@@ -164,6 +164,15 @@ public actor ProjectControlPlaneRepository {
                           storedVersion == Self.schemaVersion else {
                         throw ProjectContextError.unsupportedSchemaVersion(priorVersion)
                     }
+                    let journal = try candidate.integer("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='native_source_provider_turns'") ?? 0
+                    if journal != 0 {
+                        let pressure = try candidate.integer("SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns') WHERE name IN('pressure_decision_json','pressure_decision_sha256','pressure_reservation_id')") ?? 0
+                        guard (pressure == 0 || pressure == 3),
+                              try NativeSourcePressureSchema.validate(hasColumns: pressure == 3,
+                                integer: { try candidate.integer($0) }, text: { try candidate.text($0) }) else {
+                            throw ProjectContextError.integrityFailure("unsupported native source pressure journal extension")
+                        }
+                    }
                     _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
                         sourceURL: standardizedDatabaseURL,
                         observedVersion: try candidate.integer(ControlPlaneSQLiteConnection.ingressSchemaCapabilityVersionQuery) ?? 0,
@@ -1507,6 +1516,8 @@ public actor ProjectControlPlaneRepository {
         let dispatchOwner: UUID?
         let dispatchEpoch: Int64?
         let blocked: String?
+        let budgetDisposition: NativeSourceStoredBudgetDisposition?
+        let pressureReservationID: UUID?
     }
     private static func nativeSourceText(_ row: ControlPlaneSQLiteRow, _ index: Int32, _ maximum: Int) throws -> String {
         guard let value = try row.strictText(index, maximumBytes: maximum) else { throw NativeSourceConversationError.integrityFailure }
@@ -1565,7 +1576,8 @@ public actor ProjectControlPlaneRepository {
         connection: ControlPlaneSQLiteConnection) throws -> NativeSourceStageRow {
         guard let value = try connection.first("""
             SELECT rowid,conversation_id,task_id,intent_json,intent_sha256,state,post_json,post_sha256,result_json,result_sha256,
-                dispatch_nonce,dispatch_owner,dispatch_epoch,blocked_code
+                dispatch_nonce,dispatch_owner,dispatch_epoch,blocked_code,
+                pressure_decision_json,pressure_decision_sha256,pressure_reservation_id
             FROM native_source_provider_turns WHERE stage_id=?
             """, bindings: [.text(id.uuidString.lowercased())], map: { r -> NativeSourceStageRow in
                 guard (try? r.strictText(1, maximumBytes: 36)) == conversation.body.conversationID.uuidString.lowercased(),
@@ -1599,10 +1611,43 @@ public actor ProjectControlPlaneRepository {
                 guard (state == .accepted) == (accepted != nil), state == .prepared || state == .cancelledBeforeDispatch || post != nil else {
                     throw NativeSourceConversationError.integrityFailure
                 }
+                let disposition: NativeSourceStoredBudgetDisposition?
+                if let json = try r.strictText(14, maximumBytes: NativeSourceBudgetMetadata.maximumStoredBytes) {
+                    disposition = try NativeSourceJournalCoding.decode(NativeSourceStoredBudgetDisposition.self, json,
+                        sha: Self.nativeSourceText(r, 15, 64), maximum: NativeSourceBudgetMetadata.maximumStoredBytes).validated()
+                    guard let binding = disposition?.binding, binding.stageID == id,
+                          binding.conversationID == conversation.body.conversationID,
+                          binding.projectID == conversation.body.projectID,
+                          binding.projectGeneration == conversation.body.projectGeneration,
+                          binding.taskID == body.taskID, binding.capabilityID == body.capabilityID,
+                          binding.capabilityEpoch == body.epoch, binding.logicalRequestID == body.requestID,
+                          binding.intentSHA256 == digest, binding.logicalInputSHA256 == body.logicalInputSHA,
+                          binding.assignmentSHA256 == body.assignmentSHA,
+                          binding.sourceInferenceDeadline == body.deadline,
+                          disposition!.fenceRevision <= conversation.revision,
+                          conversation.state == .stopped || conversation.state == .sourceFenced,
+                          conversation.active == id,
+                          (try r.strictText(13, maximumBytes: 64)) != nil else { throw NativeSourceConversationError.integrityFailure }
+                    if let reservation = try r.strictText(16, maximumBytes: 36) {
+                        guard case .pressure = disposition!.metadata,
+                              try connection.scalarInt("""
+                                SELECT COUNT(*) FROM native_source_requests WHERE reservation_id=? AND task_id=? AND capability_id=?
+                                    AND epoch=? AND method='session_handoff'
+                                """, bindings: [.text(reservation),.text(body.taskID.uuidString.lowercased()),
+                                    .text(body.capabilityID.uuidString.lowercased()),.int64(body.epoch)]) == 1,
+                              try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE reservation_id=?",
+                                bindings: [.text(reservation)]) == 0 else { throw NativeSourceConversationError.integrityFailure }
+                    }
+                } else {
+                    guard r.isNull(15), r.isNull(16) else { throw NativeSourceConversationError.integrityFailure }
+                    disposition = nil
+                }
                 return .init(rowID: r.int64(0), body: body, digest: digest, state: state, post: post, accepted: accepted,
                     dispatchNonce: try r.strictText(10, maximumBytes: 36).map { try NativeTaskValue.uuid($0) },
                     dispatchOwner: try r.strictText(11, maximumBytes: 36).map { try NativeTaskValue.uuid($0) },
-                    dispatchEpoch: r.isNull(12) ? nil : r.int64(12), blocked: try r.strictText(13, maximumBytes: 64))
+                    dispatchEpoch: r.isNull(12) ? nil : r.int64(12), blocked: try r.strictText(13, maximumBytes: 64),
+                    budgetDisposition: disposition,
+                    pressureReservationID: try r.strictText(16, maximumBytes: 36).map { try NativeTaskValue.uuid($0) })
             }) else { throw NativeSourceConversationError.notFound }
         return value
     }
@@ -1840,12 +1885,137 @@ public actor ProjectControlPlaneRepository {
                 assignmentSHA: c.body.assignmentSHA, providerID: c.body.providerID, modelKey: c.body.modelKey, kind: kind,
                 parentResponseID: c.parent, input: input, tools: tools,
                 deadline: min(a.descriptor.expiresAt, ISO8601.string(from: clock.now().addingTimeInterval(300))),
-                priorUsage: priorUsage, logicalInputSHA: JSONSupport.sha256Hex(Data(request.userInput.utf8)))
+                priorUsage: priorUsage, logicalInputSHA: JSONSupport.sha256Hex(Data(request.userInput.utf8)),
+                logicalInputVersion: 1, logicalInput: request.userInput)
             _ = try body.request()
             try nativeInsertStage(body, connection: connection)
             return try nativePrepared(nativeStageUnlocked(stageID, conversation: c, connection: connection), conversation: c, connection: connection)
         }
     }
+    private func nativeBudgetAcceptedTurn(_ stage: NativeSourceStageRow, conversation: NativeSourceConversationRow) throws -> ProviderTurn {
+        guard stage.state == .accepted, stage.blocked == nil, let turn = stage.accepted, let post = stage.post,
+              turn.completed, turn.requestID == stage.body.stageID.uuidString.lowercased(),
+              turn.previousResponseID == stage.body.parentResponseID,
+              turn.providerID == conversation.body.providerID, turn.modelKey == conversation.body.modelKey,
+              turn.providerID == post.capabilities.providerID, turn.modelKey == post.capabilities.modelKey,
+              turn.providerVersion == post.capabilities.providerVersion,
+              turn.providerInstanceID == post.capabilities.providerInstanceID else { throw NativeSourceConversationError.integrityFailure }
+        try nativeVerifyPreflight(post.preflight.value(), stage: stage, conversation: conversation)
+        return turn
+    }
+
+    private func nativeBudgetBindingUnlocked(stage: NativeSourceStageRow, conversation c: NativeSourceConversationRow,
+        boundary: NativeSourceBudgetBoundary, pendingCallOrdinal: Int?, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceBudgetBinding {
+        let isLatest = try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_turns WHERE conversation_id=? AND rowid>?",
+            bindings: [.text(c.body.conversationID.uuidString.lowercased()),.int64(stage.rowID)]) == 0
+        guard stage.blocked == nil, stage.budgetDisposition == nil, isLatest else { throw NativeSourceConversationError.conflict }
+        var result: NativeSourceAcceptedResultIdentity?, pending: NativeSourcePendingCallIdentity?
+        var completed = 0
+        var outputs = Data("[]".utf8)
+        if boundary == .beforeProviderPost {
+            guard stage.state == .prepared, c.state == .active, c.active == stage.body.stageID,
+                  pendingCallOrdinal == nil else { throw NativeSourceConversationError.conflict }
+            if let parent = stage.body.parentResponseID {
+                guard let priorID = try connection.first("SELECT stage_id FROM native_source_provider_turns WHERE conversation_id=? AND rowid<? ORDER BY rowid DESC LIMIT 1",
+                    bindings: [.text(c.body.conversationID.uuidString.lowercased()),.int64(stage.rowID)],
+                    map: { try NativeTaskValue.uuid($0.strictText(0, maximumBytes: 36)) }) else { throw NativeSourceConversationError.integrityFailure }
+                let prior = try nativeStageUnlocked(priorID, conversation: c, connection: connection)
+                let turn = try nativeBudgetAcceptedTurn(prior, conversation: c)
+                guard turn.responseID == parent, stage.body.priorUsage == turn.usage else { throw NativeSourceConversationError.integrityFailure }
+                result = .init(stageID: priorID, providerRequestID: turn.requestID, providerResponseID: turn.responseID,
+                    resultSHA256: JSONSupport.sha256Hex(try NativeSourceJournalCoding.encode(turn, maximum: NativeSourceJournalCoding.maximumTurnBytes)))
+            } else {
+                guard stage.body.kind == "root", stage.body.priorUsage == nil else { throw NativeSourceConversationError.integrityFailure }
+            }
+        } else {
+            guard stage.state == .accepted else { throw NativeSourceConversationError.conflict }
+            let turn = try nativeBudgetAcceptedTurn(stage, conversation: c)
+            let idleAssistant = c.state == .idle && c.active == nil && turn.toolCalls.isEmpty && c.parent == turn.responseID
+            guard (c.state == .active && c.active == stage.body.stageID) || idleAssistant else { throw NativeSourceConversationError.conflict }
+            result = .init(stageID: stage.body.stageID, providerRequestID: turn.requestID, providerResponseID: turn.responseID,
+                resultSHA256: JSONSupport.sha256Hex(try NativeSourceJournalCoding.encode(turn, maximum: NativeSourceJournalCoding.maximumTurnBytes)))
+            let calls = try connection.all("SELECT ordinal,call_json,call_sha256,arguments_json,arguments_sha256,reservation_id,output_json FROM native_source_provider_calls WHERE stage_id=? ORDER BY ordinal LIMIT 17",
+                bindings: [.text(stage.body.stageID.uuidString.lowercased())]) { row in
+                    (Int(row.int64(0)), try Self.nativeSourceText(row, 1, 8_192), try Self.nativeSourceText(row, 2, 64),
+                     try Self.nativeSourceText(row, 3, 262_144), try Self.nativeSourceText(row, 4, 64),
+                     !row.isNull(5), !row.isNull(6))
+                }
+            guard calls.count == turn.toolCalls.count, calls.count <= 16 else { throw NativeSourceConversationError.integrityFailure }
+            var reachedPending = false
+            for (index, call) in calls.enumerated() {
+                let bytes = try nativeCallBytes(stage: stage, turn: turn, ordinal: index)
+                let arguments = try ForgeJSONCanonicalizationV1.data(from: JSONSerialization.jsonObject(with: turn.toolCalls[index].argumentsJSON))
+                guard call.0 == index, Data(call.1.utf8) == bytes, call.2 == JSONSupport.sha256Hex(bytes),
+                      Data(call.3.utf8) == arguments, call.4 == JSONSupport.sha256Hex(arguments) else { throw NativeSourceConversationError.integrityFailure }
+                if call.6 {
+                    guard !reachedPending else { throw NativeSourceConversationError.integrityFailure }
+                    completed += 1
+                } else {
+                    reachedPending = true
+                    // A reserved effect without a completed receipt is not a safe
+                    // pressure boundary, including an unknown outcome after restart.
+                    guard !call.5 else { throw NativeSourceConversationError.conflict }
+                }
+                if pendingCallOrdinal == index {
+                    pending = .init(ordinal: index, providerCallID: turn.toolCalls[index].callID,
+                        toolName: turn.toolCalls[index].name, callSHA256: call.2, argumentsSHA256: call.4)
+                }
+            }
+            outputs = try nativePriorOutputs(stage: stage, conversation: c, before: completed, connection: connection)
+            if boundary == .beforeToolOutput {
+                guard let pendingCallOrdinal, pendingCallOrdinal == completed, pending != nil,
+                      completed < calls.count else { throw NativeSourceConversationError.conflict }
+            } else {
+                guard boundary == .acceptedProviderResponse, pendingCallOrdinal == nil else { throw NativeSourceConversationError.conflict }
+            }
+        }
+        let priorCalls = try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls AS calls JOIN native_source_provider_turns AS stages ON stages.stage_id=calls.stage_id WHERE stages.conversation_id=? AND stages.rowid<?",
+            bindings: [.text(c.body.conversationID.uuidString.lowercased()),.int64(stage.rowID)])
+        let stageCalls = try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE stage_id=?",
+            bindings: [.text(stage.body.stageID.uuidString.lowercased())])
+        return try NativeSourceBudgetBinding(projectID: c.body.projectID, projectGeneration: c.body.projectGeneration,
+            taskID: c.body.taskID, capabilityID: c.body.capabilityID, capabilityEpoch: stage.body.epoch,
+            conversationID: c.body.conversationID, conversationRevision: c.revision,
+            stageID: stage.body.stageID, stageOrdinal: stage.body.ordinal, logicalRequestID: stage.body.requestID,
+            assignmentSHA256: stage.body.assignmentSHA, logicalInputSHA256: stage.body.logicalInputSHA,
+            intentSHA256: stage.digest, sourceInferenceDeadline: stage.body.deadline, stageState: stage.state,
+            boundary: boundary, observedResult: result, completedOutputCount: completed,
+            completedOutputsSHA256: JSONSupport.sha256Hex(outputs), pendingCall: pending,
+            sourceReadCallsBeforeEnrollment: c.body.priorSourceReadCallsAtEnrollment,
+            admittedProviderCallsBeforeStage: priorCalls, admittedCallsInStage: stageCalls,
+            sourceMaximumCalls: c.body.sourceLimits.maximumCalls).validated()
+    }
+
+    func nativeSourceBudgetBinding(stageID: UUID, boundary: NativeSourceBudgetBoundary,
+        pendingCallOrdinal: Int? = nil, credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourceBudgetBinding {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let (attachment, conversation) = try nativeLeaseUnlocked(lease, credential: credential, connection: connection)
+            try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
+            let stage = try nativeStageUnlocked(stageID, conversation: conversation, connection: connection)
+            guard stage.body.epoch == credential.epoch else { throw NativeSourceConversationError.conflict }
+            return try nativeBudgetBindingUnlocked(stage: stage, conversation: conversation, boundary: boundary,
+                pendingCallOrdinal: pendingCallOrdinal, connection: connection)
+        }
+    }
+
+    func nativeSourceAcceptedBudgetContext(stageID: UUID, credential: NativeTaskCapabilityCredential,
+        lease: NativeSourceConversationLease, cancellation: ToolCallCancellation? = nil) throws -> NativeSourceAcceptedBudgetContext {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let (attachment, conversation) = try nativeLeaseUnlocked(lease, credential: credential, connection: connection)
+            try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
+            let stage = try nativeStageUnlocked(stageID, conversation: conversation, connection: connection)
+            guard stage.body.epoch == credential.epoch else { throw NativeSourceConversationError.conflict }
+            let binding = try nativeBudgetBindingUnlocked(stage: stage, conversation: conversation,
+                boundary: .acceptedProviderResponse, pendingCallOrdinal: nil, connection: connection)
+            let accepted = try nativeAcceptedUnlocked(stage, conversation: conversation, connection: connection)
+            guard let post = stage.post else { throw NativeSourceConversationError.integrityFailure }
+            let bytes = try Self.nativeSourceCheckedAdd(accepted.prepared.priorContextSerializedBytes,
+                Self.nativeSourceCheckedAdd(post.preflight.bytes, Self.nativeRetainedProviderResponseBytes(accepted.turn)))
+            return .init(binding: binding, accepted: accepted, retainedContextSerializedBytes: bytes)
+        }
+    }
+
     func nativeSourcePreparedTurn(stageID: UUID, credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
         cancellation: ToolCallCancellation? = nil) throws -> NativeSourcePreparedTurn {
         try controlledTransaction(cancellation: cancellation) { connection in
@@ -2301,12 +2471,21 @@ public actor ProjectControlPlaneRepository {
         connection: ControlPlaneSQLiteConnection) throws {
         try ContinuityIngressAcceptanceReceipt.validatePolicy(policy, authorization: call.attachment.setup.record.authorization)
         guard let frozen = call.prepared.frozenCeilings else { throw NativeSourceConversationError.integrityFailure }
+        let conversation = try nativeConversationUnlocked(call.reference.conversationID,
+            attachment: call.attachment, connection: connection)
+        let priorReads = conversation.body.priorSourceReadCallsAtEnrollment
+        guard (0...conversation.body.sourceLimits.maximumCalls).contains(priorReads) else {
+            throw NativeSourceConversationError.integrityFailure
+        }
         let stageCount = try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE stage_id=?",
             bindings: [.text(call.reference.stageID.uuidString.lowercased())])
-        let total = try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE conversation_id=?",
+        let providerCalls = try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE conversation_id=?",
             bindings: [.text(call.reference.conversationID.uuidString.lowercased())])
+        // Later provider reads already belong to providerCalls; only the immutable enrollment baseline is additive.
+        let total = try Self.nativeSourceCheckedAdd(priorReads, providerCalls)
         guard stageCount <= min(policy.policy.tools.callsPerTurn, frozen.tools.callsPerTurn),
-              total <= min(policy.policy.tools.callsPerRun,policy.policy.tools.callsPerSession,frozen.tools.callsPerRun,frozen.tools.callsPerSession) else {
+              total <= min(policy.policy.tools.callsPerRun,policy.policy.tools.callsPerSession,frozen.tools.callsPerRun,
+                frozen.tools.callsPerSession,conversation.body.sourceLimits.maximumCalls) else {
             throw NativeSourceConversationError.budgetExceeded
         }
     }
@@ -2363,7 +2542,8 @@ public actor ProjectControlPlaneRepository {
                 capabilityID: c.body.capabilityID, stageID: UUID(), requestID: prior.body.requestID, epoch: credential.epoch,
                 ordinal: prior.body.ordinal + 1, assignmentSHA: c.body.assignmentSHA, providerID: c.body.providerID,
                 modelKey: c.body.modelKey, kind: "tool_continuation", parentResponseID: turn.responseID, input: outputs,
-                tools: prior.body.tools, deadline: prior.body.deadline, priorUsage: turn.usage, logicalInputSHA: prior.body.logicalInputSHA)
+                tools: prior.body.tools, deadline: prior.body.deadline, priorUsage: turn.usage, logicalInputSHA: prior.body.logicalInputSHA,
+                logicalInputVersion: prior.body.logicalInputVersion, logicalInput: prior.body.logicalInput)
             try nativeInsertStage(body, connection: connection)
             return try nativePrepared(nativeStageUnlocked(body.stageID, conversation: c, connection: connection), conversation: c, connection: connection)
         }
@@ -2394,7 +2574,7 @@ public actor ProjectControlPlaneRepository {
             guard let ceilings = call.prepared.frozenCeilings else { throw NativeSourceConversationError.integrityFailure }
             let limit = min(call.attachment.sourceLimits.maximumResultBytes, scope.policy.policy.tools.maxResultBytes,
                 ceilings.tools.maxResultBytes,call.attachment.setup.record.authorization.authorizationScope.maximumInlineOutputBytes)
-            guard scope.budget.maximumCanonicalToolResultBytes >= limit, scope.budget.maximumEscapedPayloadBytes >= 6 * limit else {
+            guard scope.budget.maximumCanonicalToolResultBytes >= limit, scope.budget.maximumEscapedPayloadBytes >= CanonicalToolResultOutputBounds.maximumStringExpansion * limit else {
                 throw NativeSourceConversationError.budgetExceeded
             }
         }
@@ -11621,6 +11801,8 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     static let ingressSchemaCapabilityVersionQuery = """
     SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='autonomous_runs') THEN 0
         WHEN (SELECT instr(sql,'''awaiting_bootstrap''') FROM sqlite_master WHERE type='table' AND name='autonomous_runs')=0 THEN 1
+        WHEN EXISTS(SELECT 1 FROM pragma_table_xinfo('native_source_provider_turns')
+            WHERE name IN ('pressure_decision_json','pressure_decision_sha256','pressure_reservation_id')) THEN 9
         WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='native_source_conversations') THEN 8
         WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='native_task_capabilities') THEN 7
         WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='continuity_operation_cancellations') THEN 6
@@ -11915,10 +12097,11 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             }
         }
         let journalTables = try scalarInt("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('native_source_conversations','native_source_provider_turns','native_source_provider_calls','native_source_capability_checks','native_source_provider_run_offsets')")
-        guard (capability == 8 && journalTables == 5) || (capability < 8 && journalTables == 0) else {
+        guard ((8...9).contains(capability) && journalTables == 5) || (capability < 8 && journalTables == 0) else {
             throw ProjectContextError.integrityFailure("incomplete native source journal schema")
         }
-        if capability > 0 { try validateSourceDerivedPreflightSchema(hasColumns: capability == 8) }
+        if capability > 0 { try validateSourceDerivedPreflightSchema(hasColumns: capability >= 8) }
+        if capability >= 8 { try validateNativeSourcePressureSchema(hasColumns: capability == 9) }
         var manifest = try VerifiedMigrationBackup.reconcileMigrationManifest(sourceURL: databaseURL,
             observedVersion: capability, scope: .continuityIngress)
         // Finish a committed older capability before preparing the next verified
@@ -11934,8 +12117,8 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                     preparedManifest: prepared, observedVersion: capability, targetMetadata: target, scope: .continuityIngress)
             }
         }
-        let upgrading = priorVersion == 2 && (1...7).contains(capability)
-        let targetCapability = upgrading ? capability + 1 : 8
+        let upgrading = priorVersion == 2 && (1...8).contains(capability)
+        let targetCapability = upgrading ? capability + 1 : 9
         if upgrading { try executeStatic("PRAGMA synchronous=FULL;") }
         defer { if upgrading { try? executeStatic("PRAGMA synchronous=NORMAL;") } }
         try transaction {
@@ -11957,6 +12140,13 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                     try executeStatic("ALTER TABLE provider_turns ADD COLUMN " + column + ";")
                 }
                 try validateSourceDerivedPreflightSchema(hasColumns: true)
+            }
+            if capability == 0 || capability == 8 {
+                for column in NativeSourcePressureSchema.columns {
+                    try executeStatic("ALTER TABLE native_source_provider_turns ADD COLUMN " + column + ";")
+                }
+                try executeStatic(NativeSourcePressureSchema.indexSQL)
+                try validateNativeSourcePressureSchema(hasColumns: true)
             }
             if capability == 4 { try populateSourceTaskFencesForMigration(timestamp: timestamp) }
             if capability == 1 { try rebuildAutonomousRunStateConstraint() }
@@ -11990,9 +12180,17 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             _ = try VerifiedMigrationBackup.completeMigrationManifest(sourceURL: databaseURL, preparedManifest: manifest,
                 observedVersion: targetCapability, targetMetadata: target, scope: .continuityIngress)
         }
-        if (1...6).contains(capability) {
+        if (1...7).contains(capability) {
             try migrate(timestamp: timestamp, priorVersion: priorVersion, databaseURL: databaseURL)
         }
+    }
+
+    private func validateNativeSourcePressureSchema(hasColumns: Bool) throws {
+        let valid = try NativeSourcePressureSchema.validate(hasColumns: hasColumns,
+            integer: { try self.scalarInt($0) }, text: { sql in
+                try self.first(sql, map: { try $0.strictText(0, maximumBytes: 32_768) }) ?? nil
+            })
+        guard valid else { throw ProjectContextError.integrityFailure("unsupported native source pressure journal extension") }
     }
 
     private static let sourceDerivedPreflightColumns = [
@@ -12406,20 +12604,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
               (length(lease_owner)=36 AND length(lease_expires_at)=20 AND lease_capability_epoch>0)),
         CHECK((ceilings_json IS NULL)=(ceilings_sha256 IS NULL))
     );
-    CREATE TABLE IF NOT EXISTS native_source_provider_turns (
-        stage_id TEXT PRIMARY KEY CHECK(length(stage_id)=36),conversation_id TEXT NOT NULL REFERENCES native_source_conversations(conversation_id),
-        task_id TEXT NOT NULL REFERENCES continuity_task_authorizations(task_id),request_id TEXT NOT NULL CHECK(length(request_id)=36),
-        ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 1 AND 8),
-        intent_json TEXT NOT NULL CHECK(length(CAST(intent_json AS BLOB))<=1048576),intent_sha256 TEXT NOT NULL CHECK(length(intent_sha256)=64),
-        state TEXT NOT NULL CHECK(state IN ('prepared','submitted','accepted','outcome_unknown','cancelled_before_dispatch')),
-        post_json TEXT CHECK(length(CAST(post_json AS BLOB))<=32768),post_sha256 TEXT CHECK(length(post_sha256)=64),
-        result_json TEXT CHECK(length(CAST(result_json AS BLOB))<=4194304),result_sha256 TEXT CHECK(length(result_sha256)=64),
-        dispatch_nonce TEXT,dispatch_owner TEXT,dispatch_epoch INTEGER,
-        blocked_code TEXT CHECK(length(CAST(blocked_code AS BLOB))<=64),cancel_request_id TEXT,cancel_reason_sha256 TEXT,cancelled_at TEXT,quarantined INTEGER NOT NULL DEFAULT 0 CHECK(quarantined IN(0,1)),
-        reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes BETWEEN 0 AND 10485760),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
-        UNIQUE(conversation_id,request_id,ordinal),
-        CHECK((post_json IS NULL)=(post_sha256 IS NULL)),CHECK((result_json IS NULL)=(result_sha256 IS NULL))
-    );
+    \(NativeSourcePressureSchema.baseTableSQL)
     CREATE INDEX IF NOT EXISTS native_source_turn_recovery ON native_source_provider_turns(state,quarantined);
     CREATE TABLE IF NOT EXISTS native_source_provider_calls (
         conversation_id TEXT NOT NULL REFERENCES native_source_conversations(conversation_id),stage_id TEXT NOT NULL REFERENCES native_source_provider_turns(stage_id),
@@ -13061,4 +13246,79 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         completed_at TEXT NOT NULL
     );
     """
+}
+
+
+/// Exact source journal variants shared by CP and co-resident runtime preflight.
+/// No schema mutation is permitted by this validator.
+enum NativeSourcePressureSchema {
+    static let baseTableSQL = """
+    CREATE TABLE IF NOT EXISTS native_source_provider_turns (
+        stage_id TEXT PRIMARY KEY CHECK(length(stage_id)=36),conversation_id TEXT NOT NULL REFERENCES native_source_conversations(conversation_id),
+        task_id TEXT NOT NULL REFERENCES continuity_task_authorizations(task_id),request_id TEXT NOT NULL CHECK(length(request_id)=36),
+        ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 1 AND 8),
+        intent_json TEXT NOT NULL CHECK(length(CAST(intent_json AS BLOB))<=1048576),intent_sha256 TEXT NOT NULL CHECK(length(intent_sha256)=64),
+        state TEXT NOT NULL CHECK(state IN ('prepared','submitted','accepted','outcome_unknown','cancelled_before_dispatch')),
+        post_json TEXT CHECK(length(CAST(post_json AS BLOB))<=32768),post_sha256 TEXT CHECK(length(post_sha256)=64),
+        result_json TEXT CHECK(length(CAST(result_json AS BLOB))<=4194304),result_sha256 TEXT CHECK(length(result_sha256)=64),
+        dispatch_nonce TEXT,dispatch_owner TEXT,dispatch_epoch INTEGER,
+        blocked_code TEXT CHECK(length(CAST(blocked_code AS BLOB))<=64),cancel_request_id TEXT,cancel_reason_sha256 TEXT,cancelled_at TEXT,quarantined INTEGER NOT NULL DEFAULT 0 CHECK(quarantined IN(0,1)),
+        reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes BETWEEN 0 AND 10485760),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+        UNIQUE(conversation_id,request_id,ordinal),
+        CHECK((post_json IS NULL)=(post_sha256 IS NULL)),CHECK((result_json IS NULL)=(result_sha256 IS NULL))
+    );
+    """
+    static let columns = [
+        "pressure_decision_json TEXT CHECK (pressure_decision_json IS NULL OR (length(CAST(pressure_decision_json AS BLOB)) BETWEEN 1 AND 32768 AND json_valid(pressure_decision_json) AND json_type(pressure_decision_json) = 'object'))",
+        "pressure_decision_sha256 TEXT CHECK ((pressure_decision_json IS NULL AND pressure_decision_sha256 IS NULL) OR (pressure_decision_json IS NOT NULL AND pressure_decision_sha256 IS NOT NULL AND length(pressure_decision_sha256) = 64 AND pressure_decision_sha256 NOT GLOB '*[^0-9a-f]*'))",
+        "pressure_reservation_id TEXT REFERENCES native_source_requests(reservation_id) CHECK (pressure_reservation_id IS NULL OR (length(pressure_reservation_id) = 36 AND pressure_decision_json IS NOT NULL AND json_extract(pressure_decision_json, '$.metadata.kind') IS 'pressure'))",
+    ]
+    static let indexSQL = "CREATE UNIQUE INDEX native_source_pressure_reservation ON native_source_provider_turns(pressure_reservation_id) WHERE pressure_reservation_id IS NOT NULL;"
+    static let recoveryIndexSQL = "CREATE INDEX native_source_turn_recovery ON native_source_provider_turns(state,quarantined);"
+    static let names = ["pressure_decision_json", "pressure_decision_sha256", "pressure_reservation_id"]
+
+    static func validate(hasColumns: Bool, integer: (String) throws -> Int?, text: (String) throws -> String?) throws -> Bool {
+        guard let definition = try text("SELECT sql FROM sqlite_master WHERE type='table' AND name='native_source_provider_turns'"),
+              definition.utf8.count <= 32_768 else { return false }
+        var actual = normalized(definition)
+        if hasColumns {
+            for column in columns {
+                let suffix = "," + normalized(column)
+                guard actual.components(separatedBy: suffix).count == 2 else { return false }
+                actual = actual.replacingOccurrences(of: suffix, with: "")
+            }
+        }
+        let expected = ["stage_id","conversation_id","task_id","request_id","ordinal","intent_json","intent_sha256","state",
+            "post_json","post_sha256","result_json","result_sha256","dispatch_nonce","dispatch_owner","dispatch_epoch",
+            "blocked_code","cancel_request_id","cancel_reason_sha256","cancelled_at","quarantined","reserved_bytes","created_at","updated_at"]
+            + (hasColumns ? names : [])
+        guard actual == normalized(baseTableSQL),
+              try integer("SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns')") == expected.count,
+              try integer("SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns') WHERE hidden<>0") == 0,
+              try integer("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger' AND tbl_name='native_source_provider_turns'") == 0,
+              try integer("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='native_source_provider_turns'") == (hasColumns ? 4 : 3) else { return false }
+        for (index, name) in expected.enumerated() {
+            guard try integer("SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns') WHERE cid=\(index) AND name='\(name)'") == 1 else { return false }
+        }
+        if hasColumns {
+            guard try integer("SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns') WHERE cid>=23 AND type='TEXT' AND \"notnull\"=0 AND dflt_value IS NULL") == 3,
+                  let index = try text("SELECT sql FROM sqlite_master WHERE type='index' AND name='native_source_pressure_reservation'"),
+                  normalized(index) == normalized(indexSQL) else { return false }
+        }
+        guard let recovery = try text("SELECT sql FROM sqlite_master WHERE type='index' AND name='native_source_turn_recovery'"),
+              normalized(recovery) == normalized(recoveryIndexSQL),
+              try integer("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='native_source_provider_turns' AND name IN ('sqlite_autoindex_native_source_provider_turns_1','sqlite_autoindex_native_source_provider_turns_2') AND sql IS NULL") == 2 else { return false }
+        return true
+    }
+    private static func normalized(_ sql: String) -> String {
+        let value = sql.replacingOccurrences(of: "IF NOT EXISTS ", with: "")
+            .replacingOccurrences(of: "\"native_source_provider_turns\"", with: "native_source_provider_turns")
+        var result = "", inLiteral = false
+        for character in value {
+            if character == "'" { inLiteral.toggle() }
+            if !inLiteral && (character.isWhitespace || character == ";") { continue }
+            result.append(character)
+        }
+        return result
+    }
 }

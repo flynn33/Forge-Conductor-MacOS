@@ -162,7 +162,7 @@ final class NativeSourceBudgetEvaluatorTests: XCTestCase, @unchecked Sendable {
         let budget = try NativeSourceBudgetEvaluator.outputBudget(call: accepted.resolved, priorOutputs: [],
             emptyOutputPreflight: preflight, capabilities: capabilities(), policySelection: fixture.policy())
         XCTAssertEqual(budget.maximumCanonicalToolResultBytes, 65_536)
-        XCTAssertGreaterThanOrEqual(budget.maximumEscapedPayloadBytes, 6 * 65_536)
+        XCTAssertGreaterThanOrEqual(budget.maximumEscapedPayloadBytes, 2 * 65_536)
         XCTAssertEqual(budget.maximumResultTokens, 4_096)
         let output = try await fixture.service.submitNativeCall(credential: fixture.credential, reference: accepted.reference,
             lease: lease, outputBudget: budget, cancellation: ToolCallCancellation(timeoutSeconds: 5))

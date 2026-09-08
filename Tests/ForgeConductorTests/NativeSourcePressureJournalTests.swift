@@ -1,0 +1,556 @@
+import XCTest
+import SQLite3
+@testable import ForgeConductorCore
+#if SWIFT_PACKAGE
+import ForgeNativeSessionHostPlugin
+#endif
+
+final class NativeSourcePressureJournalTests: XCTestCase {
+    func testSchemaEightUpgradePreservesLegacyIntentAndVerifiedBackup() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare()
+            let current = try PressureSQL.value(f.database, "SELECT intent_json FROM native_source_provider_turns")
+            var old = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(current.utf8)) as? [String: Any])
+            old.removeValue(forKey: "logicalInputVersion"); old.removeValue(forKey: "logicalInput")
+            let legacy = try ForgeJSONCanonicalizationV1.data(from: old)
+            await f.repository.close()
+            try PressureSQL.replaceIntent(f.database, stageID: prepared.stageID, bytes: legacy)
+            try PressureSQL.removePressureExtension(f.database)
+            let before = try Data(contentsOf: f.database)
+            let reopened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
+            do {
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT intent_json FROM native_source_provider_turns"), String(decoding: legacy, as: UTF8.self))
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT intent_sha256 FROM native_source_provider_turns"), JSONSupport.sha256Hex(legacy))
+                let read = try await reopened.nativeSourceRequest(taskID: f.taskID, requestID: prepared.requestID,
+                    expectedUserInput: "read fixture", credential: f.credential)
+                XCTAssertEqual(read?.stageID, prepared.stageID)
+                let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self,
+                    from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: f.database, scope: .continuityIngress)))
+                XCTAssertEqual(manifest.sourceVersion, 8); XCTAssertEqual(manifest.targetVersion, 9)
+                XCTAssertEqual(manifest.state, .completed)
+                let backup = f.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
+                XCTAssertEqual(JSONSupport.sha256Hex(try Data(contentsOf: backup)), manifest.backupSHA256)
+                XCTAssertEqual(try PressureSQL.value(backup, "SELECT intent_json FROM native_source_provider_turns"), String(decoding: legacy, as: UTF8.self))
+                XCTAssertEqual(try PressureSQL.value(backup, "SELECT COUNT(*) FROM pragma_table_xinfo('native_source_provider_turns') WHERE name LIKE 'pressure_%'"), "0")
+                XCTAssertNotEqual(try Data(contentsOf: f.database), before)
+                await reopened.close()
+                let again = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
+                await again.close()
+                XCTAssertEqual(JSONSupport.sha256Hex(try Data(contentsOf: backup)), manifest.backupSHA256)
+                let jobs = try RuntimeJobRepository(databaseURL: f.database)
+                await jobs.close()
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT version FROM runtime_job_schema_version"), "5")
+            } catch { await reopened.close(); throw error }
+        }
+    }
+
+    func testPreparedAndZeroCallBudgetReadsAreFactualAndReadOnly() async throws {
+        try await withFixture(priorReads: 2) { f in
+            let prepared = try await f.prepare()
+            let initial = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+            XCTAssertEqual(initial.sourceReadCallsBeforeEnrollment, 2)
+            XCTAssertEqual(initial.admittedProviderCallsBeforeStage, 0); XCTAssertEqual(initial.admittedCallsInStage, 0)
+            XCTAssertEqual(initial.sourceMaximumCalls, 64); XCTAssertEqual(initial.stageOrdinal, 1)
+            XCTAssertNil(initial.observedResult)
+            let approval = try await f.approval(prepared)
+            guard case .dispatch(let claim) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let actual = try ProviderTurn(requestID: prepared.stageID.uuidString.lowercased(), responseID: String(repeating: "r", count: 1_024),
+                providerID: f.capabilities.providerID, providerVersion: f.capabilities.providerVersion, modelKey: f.capabilities.modelKey,
+                providerInstanceID: f.capabilities.providerInstanceID, messages: [String(repeating: "/\u{1}", count: 1_024)],
+                toolCalls: [], usage: nil, completed: true, finishReason: .stop)
+            _ = try await f.repository.acceptNativeSourceProviderTurn(claim: claim, turn: actual, credential: f.credential, lease: f.lease)
+            let before = try PressureSQL.snapshot(f.database)
+            let context = try await f.repository.nativeSourceAcceptedBudgetContext(stageID: prepared.stageID,
+                credential: f.credential, lease: f.lease)
+            XCTAssertEqual(context.accepted.turn, actual)
+            XCTAssertNil(context.accepted.turn.usage)
+            XCTAssertEqual(context.binding.observedResult?.providerResponseID, actual.responseID)
+            XCTAssertEqual(context.binding.completedOutputCount, 0); XCTAssertTrue(context.accepted.calls.isEmpty)
+            XCTAssertGreaterThanOrEqual(context.retainedContextSerializedBytes, approval.preflight.bodyByteCount + (try JSONEncoder().encode(actual).count))
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+            _ = try await f.prepare(requestID: UUID())
+            do {
+                _ = try await f.repository.nativeSourceAcceptedBudgetContext(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+                XCTFail("Old answer became current pressure context")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+        }
+    }
+
+    func testCallPrefixAndLogicalInputSurviveContinuationWithoutAnotherDebit() async throws {
+        try await withFixture(priorReads: 2) { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            let body = try PressureSQL.value(f.database, "SELECT intent_json FROM native_source_provider_turns")
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])
+            XCTAssertEqual(object["logicalInput"] as? String, "read fixture")
+            XCTAssertEqual(object["logicalInputVersion"] as? Int, 1)
+            guard case .dispatch(let claim) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: claim,
+                turn: f.turn(prepared, calls: [f.call(id: "first-original"), f.call(id: "second-original")]),
+                credential: f.credential, lease: f.lease)
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID, boundary: .beforeToolOutput,
+                    pendingCallOrdinal: 1, credential: f.credential, lease: f.lease)
+                XCTFail("Unfinished prefix was skipped")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            try await f.finishRead(accepted.calls[0], approval)
+            let binding = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID, boundary: .beforeToolOutput,
+                pendingCallOrdinal: 1, credential: f.credential, lease: f.lease)
+            XCTAssertEqual(binding.completedOutputCount, 1)
+            XCTAssertEqual(binding.pendingCall?.providerCallID, "second-original")
+            XCTAssertEqual(binding.sourceReadCallsBeforeEnrollment, 2)
+            XCTAssertEqual(binding.admittedCallsInStage, 2)
+            let call = try await f.repository.resolveNativeSourceProviderCall(reference: accepted.calls[1], credential: f.credential, lease: f.lease)
+            XCTAssertEqual(binding.completedOutputsSHA256, call.priorOutputsSHA256)
+            let before = try PressureSQL.snapshot(f.database)
+            _ = try await f.repository.nativeSourceAcceptedBudgetContext(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+            try await f.finishRead(accepted.calls[1], approval)
+            let next = try await f.repository.prepareNativeSourceToolContinuation(acceptedStageID: prepared.stageID,
+                credential: f.credential, lease: f.lease)
+            let nextJSON = try PressureSQL.value(f.database, "SELECT intent_json FROM native_source_provider_turns WHERE ordinal=2")
+            let nextObject = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(nextJSON.utf8)) as? [String: Any])
+            XCTAssertEqual(nextObject["logicalInput"] as? String, object["logicalInput"] as? String)
+            XCTAssertEqual(nextObject["logicalInputSHA"] as? String, object["logicalInputSHA"] as? String)
+            let nextBinding = try await f.repository.nativeSourceBudgetBinding(stageID: next.stageID,
+                boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+            XCTAssertEqual(nextBinding.admittedProviderCallsBeforeStage, 2)
+            XCTAssertEqual(nextBinding.admittedCallsInStage, 0)
+            XCTAssertEqual(nextBinding.observedResult?.stageID, prepared.stageID)
+        }
+    }
+
+    func testUnknownOrExpiredLeaseCannotMintBudgetBinding() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let claim) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                    boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+                XCTFail("Submitted request became a local pressure boundary")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            try await f.repository.recordNativeSourceProviderOutcome(claim: claim, outcome: .unknown)
+            let before = try PressureSQL.snapshot(f.database)
+            do {
+                _ = try await f.repository.nativeSourceAcceptedBudgetContext(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+                XCTFail("Unknown POST became accepted context")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+            f.clock.advance(31)
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                    boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+                XCTFail("Expired lease disclosed a binding")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .leaseUnavailable) }
+        }
+    }
+
+    func testReadyHandoffCannotOmitOriginalReadDebitAfterPolicyTightens() async throws {
+        try await withFixture(priorReads: 2) { f in
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let claim) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let readyCall = try ProviderToolCall(callID: "actual-ready-call", name: "session_handoff",
+                argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["goal":"Continue the approved work"]))
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: claim,
+                turn: f.turn(prepared, calls: [readyCall]), credential: f.credential, lease: f.lease)
+            let reference = try XCTUnwrap(accepted.calls.first)
+            let call = try await f.repository.resolveNativeSourceProviderCall(reference: reference, credential: f.credential, lease: f.lease)
+            let binding = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID, boundary: .beforeToolOutput,
+                pendingCallOrdinal: 0, credential: f.credential, lease: f.lease)
+            XCTAssertEqual(binding.sourceReadCallsBeforeEnrollment, 2)
+            XCTAssertEqual(binding.admittedCallsInStage, 1)
+            let lowered = try BudgetPolicyState(globalPolicy: .init(tools: .init(callsPerTurn: 2,
+                callsPerSession: 2, callsPerRun: 2))).resolve(f.policy.scope)
+            let budget = try NativeSourceProviderOutputBudget(conversationID: reference.conversationID, stageID: reference.stageID,
+                callOrdinal: reference.ordinal, configurationFingerprintSHA256: approval.preflight.configurationFingerprintSHA256,
+                priorOutputsSHA256: call.priorOutputsSHA256, maximumCanonicalToolResultBytes: 1_048_576,
+                maximumEscapedPayloadBytes: 524_288, maximumResultTokens: 1_048_576)
+            let request = try NativeSourceCommitRequest(key: call.key, canonicalArgumentsJSON: call.canonicalArgumentsJSON,
+                managerInstanceID: f.lease.managerInstanceID, finalize: true)
+            let callback = PressureCallbackObservation()
+            let before = try PressureSQL.snapshot(f.database)
+            do {
+                _ = try await f.repository.prepareContinuitySourceCommit(request: request,
+                    correlation: f.attachment.setup.correlation, context: f.attachment.context, owner: f.attachment.owner,
+                    policySelection: lowered, prepare: { _ in callback.record(); throw PressureFixtureError.interrupted },
+                    reference: reference, credential: f.credential, lease: f.lease, outputBudget: budget,
+                    validatePreparedOutput: { _ in }, encodeResult: { _ in throw PressureFixtureError.interrupted })
+                XCTFail("Ready handoff ignored the original read debit")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .budgetExceeded) }
+            XCTAssertFalse(callback.called, "Source prepare must not run after source total3 exceeds the current cap2")
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests WHERE method='session_handoff'"), "0")
+        }
+    }
+
+    func testReadyHandoffAtExactQuotaCountsProviderReadOnlyOnce() async throws {
+        for priorReads in [1, 2] {
+            try await withFixture(priorReads: priorReads) { f in
+                let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+                guard case .dispatch(let claim) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+                let ready = try ProviderToolCall(callID: "ready-at-exact-quota", name: "session_handoff",
+                    argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["goal":"Continue the approved work"]))
+                let calls: [ProviderToolCall]
+                if priorReads == 1 { calls = [try f.call(id: "provider-read-before-ready"), ready] }
+                else { calls = [ready] }
+                let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: claim,
+                    turn: f.turn(prepared, calls: calls), credential: f.credential, lease: f.lease)
+                if priorReads == 1 { try await f.finishRead(XCTUnwrap(accepted.calls.first), approval) }
+                let reference = try XCTUnwrap(accepted.calls.last)
+                let call = try await f.repository.resolveNativeSourceProviderCall(reference: reference, credential: f.credential, lease: f.lease)
+                let binding = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID, boundary: .beforeToolOutput,
+                    pendingCallOrdinal: reference.ordinal, credential: f.credential, lease: f.lease)
+                XCTAssertEqual(binding.sourceReadCallsBeforeEnrollment + binding.admittedProviderCallsBeforeStage + binding.admittedCallsInStage, 3)
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_requests WHERE method='fs_read'"), "2")
+                let exact = try BudgetPolicyState(globalPolicy: .init(tools: .init(callsPerTurn: 2,
+                    callsPerSession: 3, callsPerRun: 3))).resolve(f.policy.scope)
+                let budget = try NativeSourceProviderOutputBudget(conversationID: reference.conversationID, stageID: reference.stageID,
+                    callOrdinal: reference.ordinal, configurationFingerprintSHA256: approval.preflight.configurationFingerprintSHA256,
+                    priorOutputsSHA256: call.priorOutputsSHA256, maximumCanonicalToolResultBytes: 1_048_576,
+                    maximumEscapedPayloadBytes: 524_288, maximumResultTokens: 1_048_576)
+                let request = try NativeSourceCommitRequest(key: call.key, canonicalArgumentsJSON: call.canonicalArgumentsJSON,
+                    managerInstanceID: f.lease.managerInstanceID, finalize: true)
+                let callback = PressureCallbackObservation(), before = try PressureSQL.snapshot(f.database)
+                do {
+                    _ = try await f.repository.prepareContinuitySourceCommit(request: request,
+                        correlation: f.attachment.setup.correlation, context: f.attachment.context, owner: f.attachment.owner,
+                        policySelection: exact, prepare: { _ in callback.record(); throw PressureFixtureError.interrupted },
+                        reference: reference, credential: f.credential, lease: f.lease, outputBudget: budget,
+                        validatePreparedOutput: { _ in }, encodeResult: { _ in throw PressureFixtureError.interrupted })
+                    XCTFail("Fixture callback should interrupt before source mutation")
+                } catch { XCTAssertEqual(error as? PressureFixtureError, .interrupted) }
+                XCTAssertTrue(callback.called, "Source total3 must remain eligible at the exact cap3")
+                XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+            }
+        }
+    }
+
+    func testCallerAndStageMetadataRejectBeforeCorruptBodyDecode() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare()
+            let invalid = try NativeTaskCapabilityCredential(capabilityID: f.credential.capabilityID, epoch: 1, secret: Data(repeating: 99, count: 32))
+            try PressureSQL.execute(f.database, "UPDATE native_source_provider_turns SET intent_json='corrupt',intent_sha256='" + String(repeating: "a", count: 64) + "'")
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                    boundary: .beforeProviderPost, credential: invalid, lease: f.lease)
+                XCTFail("Invalid credential reached corrupt body")
+            } catch { XCTAssertEqual(error as? NativeTaskCapabilityError, .credentialRejected) }
+            try PressureSQL.execute(f.database, "UPDATE native_source_provider_turns SET conversation_id='" + UUID().uuidString.lowercased() + "'")
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                    boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+                XCTFail("Foreign stage exposed an integrity oracle")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .notFound) }
+        }
+    }
+
+    func testPartialAndUnknownPressureSchemasDoNotBecomeMigrationBaselines() async throws {
+        for variant in ["partial", "extra", "index", "constraint", "trigger"] {
+            try await withFixture { f in
+                _ = try await f.prepare()
+                await f.repository.close()
+                switch variant {
+                case "partial":
+                    try PressureSQL.execute(f.database, "DROP INDEX native_source_pressure_reservation; ALTER TABLE native_source_provider_turns DROP COLUMN pressure_reservation_id")
+                case "extra":
+                    try PressureSQL.execute(f.database, "ALTER TABLE native_source_provider_turns ADD COLUMN unrelated_extension TEXT")
+                case "index":
+                    try PressureSQL.execute(f.database, "DROP INDEX native_source_pressure_reservation")
+                case "constraint":
+                    try PressureSQL.removePressureExtension(f.database)
+                    try PressureSQL.execute(f.database, "ALTER TABLE native_source_provider_turns ADD COLUMN pressure_decision_json TEXT; ALTER TABLE native_source_provider_turns ADD COLUMN pressure_decision_sha256 TEXT; ALTER TABLE native_source_provider_turns ADD COLUMN pressure_reservation_id TEXT; " + NativeSourcePressureSchema.indexSQL)
+                default:
+                    try PressureSQL.execute(f.database, "CREATE TRIGGER extra_pressure_trigger AFTER UPDATE ON native_source_provider_turns BEGIN SELECT 1; END")
+                }
+                let before = try Data(contentsOf: f.database)
+                do {
+                    let opened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
+                    await opened.close(); XCTFail("Accepted malformed pressure schema: \(variant)")
+                } catch { XCTAssertTrue(error is ProjectContextError) }
+                XCTAssertEqual(try Data(contentsOf: f.database), before)
+                do {
+                    let jobs = try RuntimeJobRepository(databaseURL: f.database)
+                    await jobs.close(); XCTFail("Malformed pressure schema became runtime baseline: \(variant)")
+                } catch { XCTAssertTrue(error is RuntimeJobError) }
+                XCTAssertEqual(try Data(contentsOf: f.database), before)
+            }
+        }
+    }
+
+    func testPressureColumnBoundsAndPairingRejectBeforeMutation() async throws {
+        try await withFixture { f in
+            _ = try await f.prepare()
+            let before = try PressureSQL.snapshot(f.database)
+            for sql in [
+                "UPDATE native_source_provider_turns SET pressure_decision_json='{}'",
+                "UPDATE native_source_provider_turns SET pressure_decision_sha256='" + String(repeating: "a", count: 64) + "'",
+                "UPDATE native_source_provider_turns SET pressure_decision_json='{}',pressure_decision_sha256='" + String(repeating: "A", count: 64) + "'",
+                "UPDATE native_source_provider_turns SET pressure_decision_json=printf('%.*c',32769,'x'),pressure_decision_sha256='" + String(repeating: "a", count: 64) + "'",
+                "UPDATE native_source_provider_turns SET pressure_decision_json='[]',pressure_decision_sha256='" + String(repeating: "a", count: 64) + "'"
+            ] { XCTAssertThrowsError(try PressureSQL.execute(f.database, sql)) }
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+        }
+    }
+
+    func testVersionedInputRejectsMissingVersionAndChangedCriticalBytes() async throws {
+        for variant in ["version", "text", "size"] {
+            try await withFixture { f in
+                let prepared = try await f.prepare()
+                let raw = try PressureSQL.value(f.database, "SELECT intent_json FROM native_source_provider_turns")
+                var object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])
+                switch variant {
+                case "version": object.removeValue(forKey: "logicalInputVersion")
+                case "text": object["logicalInput"] = "changed pending input"
+                default: object["logicalInput"] = String(repeating: "x", count: 16_385)
+                }
+                try PressureSQL.replaceIntent(f.database, stageID: prepared.stageID, bytes: ForgeJSONCanonicalizationV1.data(from: object))
+                do {
+                    _ = try await f.repository.nativeSourcePreparedTurn(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+                    XCTFail("Invalid versioned logical input decoded")
+                } catch { XCTAssertEqual(error as? NativeSourceConversationError, .integrityFailure) }
+            }
+        }
+    }
+
+    func testRetainedBudgetEnvelopeRequiresExactHashAndStopFence() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare()
+            let binding = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+            let envelope = try NativeSourceStoredBudgetDisposition(version: 1,
+                metadata: .blocked(.init(binding: binding, code: .evaluationFailed, observation: nil)),
+                fenceRevision: binding.conversationRevision + 1, recordedAt: ISO8601.string(from: f.clock.now()),
+                storageDeadline: nil).validated()
+            let bytes = try NativeSourceJournalCoding.encode(envelope, maximum: 32_768)
+            let json = String(decoding: bytes, as: UTF8.self).replacingOccurrences(of: "'", with: "''")
+            try PressureSQL.execute(f.database, "UPDATE native_source_provider_turns SET pressure_decision_json='" + json
+                + "',pressure_decision_sha256='" + JSONSupport.sha256Hex(bytes) + "',blocked_code='source_budget_blocked'")
+            do {
+                _ = try await f.repository.nativeSourcePreparedTurn(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+                XCTFail("Metadata without its stop fence decoded")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .integrityFailure) }
+            try PressureSQL.execute(f.database, "UPDATE native_source_conversations SET state='stopped',revision=revision+1")
+            let retained = try await f.repository.nativeSourcePreparedTurn(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+            XCTAssertEqual(retained.intentSHA256, prepared.intentSHA256)
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                    boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+                XCTFail("Blocked disposition minted another evaluation binding")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .conflict) }
+            try PressureSQL.execute(f.database, "UPDATE native_source_provider_turns SET pressure_decision_sha256='" + String(repeating: "f", count: 64) + "'")
+            do {
+                _ = try await f.repository.nativeSourcePreparedTurn(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+                XCTFail("Tampered budget receipt decoded")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .integrityFailure) }
+        }
+    }
+
+    func testRevokedCapabilityRejectsBudgetReadWithoutChangingJournal() async throws {
+        try await withFixture { f in
+            let prepared = try await f.prepare()
+            _ = try await f.repository.revokeNativeContinuityTask(request: .init(requestID: UUID(), taskID: f.taskID,
+                capabilityID: f.credential.capabilityID, projectID: f.attachment.descriptor.projectID,
+                projectGeneration: f.attachment.descriptor.projectGeneration, expectedEpoch: 1))
+            let before = try PressureSQL.snapshot(f.database)
+            do {
+                _ = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                    boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+                XCTFail("Revoked capability disclosed a budget binding")
+            } catch { XCTAssertEqual(error as? NativeTaskCapabilityError, .credentialRejected) }
+            XCTAssertEqual(try PressureSQL.snapshot(f.database), before)
+        }
+    }
+
+    func testBoundedPreflightTextRejectsNontextMalformedAndOversizedValues() async throws {
+        try await withFixture { f in
+            await f.repository.close()
+            try VerifiedMigrationBackup.withNonMutatingSQLitePreflight(databaseURL: f.database) { candidate in
+                let db = try XCTUnwrap(candidate)
+                XCTAssertEqual(try db.text("SELECT 'source schema'"), "source schema")
+                XCTAssertNil(try db.text("SELECT NULL"))
+                XCTAssertThrowsError(try db.text("SELECT 9"))
+                XCTAssertThrowsError(try db.text("SELECT x'ff'"))
+                XCTAssertThrowsError(try db.text("SELECT CAST(x'ff' AS TEXT)"))
+                XCTAssertThrowsError(try db.text("SELECT printf('%.*c',32769,'x')"))
+                XCTAssertThrowsError(try db.text("SELECT 'a'", maximumBytes: 0))
+            }
+        }
+    }
+
+    private func withFixture(priorReads: Int = 0, toolLimit: Int = 64, _ body: (PressureFixture) async throws -> Void) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("native-source-journal-\(UUID())").resolvingSymlinksInPath()
+        let project = root.appendingPathComponent("project"), database = root.appendingPathComponent("control.sqlite3")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let clock = PressureClock(), repository = try ProjectControlPlaneRepository(databaseURL: database, clock: clock), projectID = ProjectID()
+        do {
+            _ = try await repository.registerProjectUnchecked(projectID: projectID, displayName: "Source journal", canonicalRoot: project)
+            let approval = try NativeContinuityTaskApproval(assignmentID: "source-journal", assignmentBytes: Data("immutable document marker".utf8),
+                mission: "Read the approved source fixture", providerID: "lmstudio", adapterID: "forge.native-session-host", modelKey: "fixture/native",
+                allowedTools: ["fs_read"], completionGates: ["G04"], resourceProfile: .automatic, filesystemAccess: "read_only", networkAllowed: false,
+                maximumInlineOutputBytes: 65_536, sourceLimits: .init(maximumCalls: 64, maximumResultBytes: 65_536, maximumRequestSeconds: 30))
+            let scope = ToolAuthorizationScope(canonicalRoots: [project], writableRoots: [], allowedTools: ["fs_read"], networkAllowed: false, maximumInlineOutputBytes: 65_536)
+            let assignment = try ContinuityTaskAssignment(assignmentID: approval.assignmentID, assignmentBytes: approval.assignmentBytes,
+                mission: approval.mission, providerID: approval.providerID, adapterID: approval.adapterID, modelKey: approval.modelKey,
+                specification: .init(allowedTools: approval.allowedTools, completionGates: approval.completionGates), authorizationScope: scope)
+            let credential = try NativeTaskCapabilityCredential(capabilityID: UUID(), epoch: 1, secret: Data(repeating: 17, count: 32)), taskID = UUID()
+            let request = try NativeContinuityTaskPreparationRequest(requestID: UUID(), taskID: taskID, capabilityID: credential.capabilityID,
+                projectID: projectID, projectGeneration: .initial, approval: approval, verifierSHA256: credential.verifier.sha256,
+                expiresAt: ISO8601.string(from: clock.now().addingTimeInterval(86_400)))
+            _ = try await repository.prepareNativeContinuityTask(request: request, approvedAssignment: assignment)
+            let attachment = try await repository.authenticateNativeTaskCapability(credential: credential)
+            let policy = try BudgetPolicyState(globalPolicy: .init(tools: .init(callsPerTurn: min(8,toolLimit), callsPerSession: toolLimit, callsPerRun: toolLimit), automaticHandoffEnabled: true)).resolve(.init(kind: .projectOverride, projectID: projectID.description, projectGeneration: 1))
+            for index in 0..<priorReads {
+                let request = try NativeSourceReadRequest(key: .init(sessionID: UUID(), requestIDSHA256: JSONSupport.sha256Hex(Data("prior-\(index)".utf8))),
+                    toolName: "fs_read", canonicalArgumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["path":"fixture.txt"]), managerInstanceID: UUID())
+                guard case .execute(let admission) = try await repository.admitContinuitySourceRead(request: request,
+                    correlation: attachment.setup.correlation, context: attachment.context, owner: attachment.owner, policySelection: policy) else {
+                    throw PressureFixtureError.interrupted
+                }
+                try await repository.beginContinuitySourceRead(admission: admission, policySelection: policy)
+                _ = try await repository.completeContinuitySourceRead(admission: admission,
+                    canonicalToolResultJSON: ForgeJSONCanonicalizationV1.data(from: ["ok":true,"is_error":false,"payload":["text":"prior source read"]]), policySelection: policy)
+            }
+            let conversation = try await repository.enrollNativeSourceConversation(requestID: UUID(), taskID: taskID, credential: credential, policySelection: policy)
+            let lease = try await repository.acquireNativeSourceConversationLease(conversationID: conversation.conversationID, credential: credential, managerInstanceID: UUID())
+            let capabilities = try ProviderCapabilities(providerID: "lmstudio", providerVersion: "fixture-1", modelKey: "fixture/native",
+                providerInstanceID: "fixture-instance", contextLength: 262_144, maximumContextLength: 262_144, statefulResponses: true, streaming: true,
+                customTools: true, mcp: false, structuredOutput: true, usageReporting: true, idempotencyLookup: true,
+                capabilityFingerprintSHA256: String(repeating: "a", count: 64))
+            try await body(.init(database: database, repository: repository, clock: clock, credential: credential,
+                attachment: attachment, policy: policy, taskID: taskID, lease: lease, capabilities: capabilities))
+            await repository.close(); try FileManager.default.removeItem(at: root)
+        } catch { await repository.close(); try? FileManager.default.removeItem(at: root); throw error }
+    }
+}
+
+private enum PressureFixtureError: Error, Equatable { case interrupted }
+private final class PressureCallbackObservation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func record() { lock.lock(); value = true; lock.unlock() }
+    var called: Bool { lock.lock(); defer { lock.unlock() }; return value }
+}
+private struct PressureApproval { let preflight: ProviderRequestPreflight; let budget: NativeSourceProviderBudgetApproval }
+private struct PressureFixture {
+    let database: URL, repository: ProjectControlPlaneRepository, clock: PressureClock
+    let credential: NativeTaskCapabilityCredential, attachment: AuthenticatedContinuityTaskAttachment, policy: BudgetPolicySelection
+    let taskID: UUID, lease: NativeSourceConversationLease, capabilities: ProviderCapabilities
+    func prepare(requestID: UUID = UUID()) async throws -> NativeSourcePreparedTurn {
+        let names: Set<String> = ["fs_read","session_checkpoint","session_handoff"]
+        let tools = try ToolDefinitionCatalog.production(toolNames: names.sorted()).providerToolDefinitions(allowedToolNames: names)
+        return try await repository.prepareNativeSourceProviderTurn(request: .init(requestID: requestID,
+            conversationID: lease.conversationID, userInput: "read fixture"), credential: credential, lease: lease, tools: tools)
+    }
+    func preflight(_ prepared: NativeSourcePreparedTurn) async throws -> ProviderRequestPreflight {
+        let provider = LMStudioManagedModelProvider(transport: try LMStudioManagedSessionTransport(configuration:
+            .init(baseURL: URL(string: "http://127.0.0.1:1")!, modelKey: "fixture/native", maximumOutputTokens: 64)))
+        switch prepared.request {
+        case .root(let request): return try await provider.preflightRoot(request)
+        case .continuation(let request): return try await provider.preflightContinuation(request)
+        }
+    }
+    func approval(_ prepared: NativeSourcePreparedTurn) async throws -> PressureApproval {
+        let preflight = try await preflight(prepared)
+        let check = try await repository.reserveNativeSourceCapabilityCheck(prepared: prepared, preflight: preflight, credential: credential, lease: lease)
+        try await repository.finishNativeSourceCapabilityCheck(claim: check, capabilities: capabilities, outcome: .completed, credential: credential, lease: lease)
+        let configuration = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities, selection: policy)
+        let retained = try ContextBudgetMath.estimateTokens(serializedBytes: preflight.bodyByteCount, policy: ContextBudgetPolicy())
+        let reserve = try configuration.reserves.fixedTotal()
+        let ceilings = NativeSourceBudgetCeilings(effectiveContextTokens: configuration.capacity.capacity,
+            maximumOutputTokens: preflight.limits.maximumOutputTokens, tools: policy.policy.tools, reserves: configuration.reserves,
+            checkpointRatio: policy.policy.context.checkpointRatio, rolloverRatio: policy.policy.context.rolloverRatio, emergencyRatio: policy.policy.context.emergencyRatio)
+        let accounting = try ContextBudgetAccounting(version: "admitted_total_v2", cut: "retained_input_before_next_operation",
+            retainedInputTokens: retained, futureReserveTokens: reserve, resolvedPolicy: configuration.resolvedPolicy)
+        return try .init(preflight: preflight, budget: .init(policySelection: policy, effectiveContextTokens: configuration.capacity.capacity,
+            retainedInputTokens: retained, futureReserveTokens: reserve, limits: preflight.limits, ceilings: ceilings,
+            accounting: accounting, source: .serializedEstimate, confidence: 0.65, action: .normal))
+    }
+    func begin(_ prepared: NativeSourcePreparedTurn, _ approval: PressureApproval) async throws -> NativeSourceProviderPostAdmission {
+        try await repository.beginNativeSourceProviderPost(prepared: prepared, preflight: approval.preflight, capabilities: capabilities,
+            budget: approval.budget, credential: credential, lease: lease)
+    }
+    func finishRead(_ reference: NativeSourceProviderCallReference, _ approval: PressureApproval) async throws {
+        let call = try await repository.resolveNativeSourceProviderCall(reference: reference, credential: credential, lease: lease)
+        let budget = try NativeSourceProviderOutputBudget(conversationID: reference.conversationID, stageID: reference.stageID,
+            callOrdinal: reference.ordinal, configurationFingerprintSHA256: approval.preflight.configurationFingerprintSHA256,
+            priorOutputsSHA256: call.priorOutputsSHA256, maximumCanonicalToolResultBytes: 65_536,
+            maximumEscapedPayloadBytes: 393_216, maximumResultTokens: 4_096)
+        let request = try NativeSourceReadRequest(key: call.key, toolName: call.toolName,
+            canonicalArgumentsJSON: call.canonicalArgumentsJSON, managerInstanceID: lease.managerInstanceID)
+        guard case .execute(let admission) = try await repository.admitContinuitySourceRead(request: request,
+            correlation: attachment.setup.correlation, context: attachment.context, owner: attachment.owner,
+            policySelection: policy, reference: reference, credential: credential, lease: lease, outputBudget: budget) else {
+            throw PressureFixtureError.interrupted
+        }
+        try await repository.beginContinuitySourceRead(admission: admission, policySelection: policy,
+            reference: reference, credential: credential, lease: lease, outputBudget: budget)
+        _ = try await repository.completeContinuitySourceRead(admission: admission,
+            canonicalToolResultJSON: ForgeJSONCanonicalizationV1.data(from: ["ok":true,"is_error":false,"payload":["text":"retained read output"]]),
+            policySelection: policy, reference: reference, credential: credential, lease: lease, outputBudget: budget)
+    }
+    func call(id: String) throws -> ProviderToolCall {
+        try .init(callID: id, name: "fs_read", argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["path":"fixture.txt"]))
+    }
+    func turn(_ prepared: NativeSourcePreparedTurn, calls: [ProviderToolCall]) throws -> ProviderTurn {
+        let parent: String?
+        switch prepared.request { case .root: parent = nil; case .continuation(let r): parent = r.previousResponseID }
+        return try .init(requestID: prepared.stageID.uuidString.lowercased(), responseID: "response-" + prepared.stageID.uuidString.lowercased(),
+            previousResponseID: parent, providerID: capabilities.providerID, providerVersion: capabilities.providerVersion,
+            modelKey: capabilities.modelKey, providerInstanceID: capabilities.providerInstanceID,
+            messages: calls.isEmpty ? ["completed actual fixture turn"] : [], toolCalls: calls,
+            usage: .init(capacity: 262_144, inputTokens: 1_000, outputTokens: 20, source: .providerExact, confidence: 1),
+            completed: true, finishReason: calls.isEmpty ? .stop : .toolCalls)
+    }
+}
+private final class PressureClock: Clock, @unchecked Sendable {
+    private let lock = NSLock(); private var value = Date(timeIntervalSince1970: 1_800_000_000)
+    func now() -> Date { lock.lock(); defer { lock.unlock() }; return value }
+    func advance(_ seconds: TimeInterval) { lock.lock(); value.addTimeInterval(seconds); lock.unlock() }
+}
+private enum PressureSQL {
+    static func removePressureExtension(_ url: URL) throws {
+        try execute(url, """
+            DROP INDEX native_source_pressure_reservation;
+            ALTER TABLE native_source_provider_turns DROP COLUMN pressure_reservation_id;
+            ALTER TABLE native_source_provider_turns DROP COLUMN pressure_decision_sha256;
+            ALTER TABLE native_source_provider_turns DROP COLUMN pressure_decision_json;
+            """)
+    }
+    static func replaceIntent(_ url: URL, stageID: UUID, bytes: Data) throws {
+        try connection(url) { db in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, "UPDATE native_source_provider_turns SET intent_json=?,intent_sha256=? WHERE stage_id=?", -1, &statement, nil) == SQLITE_OK,
+                  let statement else { throw PressureFixtureError.interrupted }
+            defer { sqlite3_finalize(statement) }
+            let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            guard sqlite3_bind_text(statement, 1, String(decoding: bytes, as: UTF8.self), -1, transient) == SQLITE_OK,
+                  sqlite3_bind_text(statement, 2, JSONSupport.sha256Hex(bytes), -1, transient) == SQLITE_OK,
+                  sqlite3_bind_text(statement, 3, stageID.uuidString.lowercased(), -1, transient) == SQLITE_OK,
+                  sqlite3_step(statement) == SQLITE_DONE, sqlite3_changes(db) == 1 else { throw PressureFixtureError.interrupted }
+        }
+    }
+    static func snapshot(_ url: URL) throws -> String {
+        try value(url, """
+            SELECT json_object(
+              'stages',(SELECT json_group_array(json_array(stage_id,intent_json,intent_sha256,state,post_json,post_sha256,result_json,result_sha256,dispatch_nonce,dispatch_owner,dispatch_epoch,blocked_code,pressure_decision_json,pressure_decision_sha256,pressure_reservation_id,reserved_bytes)) FROM native_source_provider_turns),
+              'conversation',(SELECT json_group_array(json_array(conversation_id,state,revision,active_stage_id,parent_response_id,lease_owner,lease_epoch,lease_expires_at,ceilings_json)) FROM native_source_conversations),
+              'calls',(SELECT json_group_array(json_array(stage_id,ordinal,call_sha256,reservation_id,output_json,output_sha256,source_receipt_sha256)) FROM native_source_provider_calls),
+              'source',(SELECT json_group_array(json_array(reservation_id,state,result_sha256)) FROM native_source_requests))
+            """)
+    }
+    static func execute(_ url: URL, _ sql: String) throws { try connection(url) { guard sqlite3_exec($0, sql, nil, nil, nil) == SQLITE_OK else { throw PressureFixtureError.interrupted } } }
+    static func value(_ url: URL, _ sql: String) throws -> String {
+        try connection(url) { db in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw PressureFixtureError.interrupted }
+            defer { sqlite3_finalize(statement) }
+            guard sqlite3_step(statement) == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) else { throw PressureFixtureError.interrupted }
+            return String(cString: value)
+        }
+    }
+    private static func connection<T>(_ url: URL, _ body: (OpaquePointer) throws -> T) throws -> T {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK, let db else { throw PressureFixtureError.interrupted }
+        defer { sqlite3_close_v2(db) }; return try body(db)
+    }
+}

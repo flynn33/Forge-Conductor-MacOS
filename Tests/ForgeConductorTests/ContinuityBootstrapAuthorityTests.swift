@@ -238,8 +238,8 @@ final class ContinuityBootstrapAuthorityTests: XCTestCase {
                     "SELECT pk FROM pragma_table_info('continuity_ingress_holds') WHERE name='operation_id'"), 1)
                 let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self,
                     from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)))
-                XCTAssertEqual(manifest.sourceVersion, 7)
-                XCTAssertEqual(manifest.targetVersion, 8)
+                XCTAssertEqual(manifest.sourceVersion, 8)
+                XCTAssertEqual(manifest.targetVersion, 9)
                 XCTAssertEqual(manifest.state, .completed)
                 let backup = fixture.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
                 let priorHoldBackup = fixture.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v2.sqlite3")

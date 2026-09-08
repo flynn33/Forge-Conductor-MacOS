@@ -1,5 +1,13 @@
 import Foundation
 
+/// A canonical JSON payload is already escaped. Encoding that JSON text as one
+/// output String adds at most one byte per existing UTF-8 byte. The complete
+/// canonical ToolResult ceiling also bounds its payload; actual envelope framing
+/// is measured separately by preflight. This bound does not cover raw input text.
+enum CanonicalToolResultOutputBounds {
+    static let maximumStringExpansion = 2
+}
+
 /// The actual ordered function outputs for one observed provider response.
 /// The SHA covers the canonical complete output array; the byte count comes
 /// from the native transport's serialization of that same array.

@@ -291,12 +291,26 @@ before a single submission. The same transport encoder checks request bytes and
 output limits. An uncertain submission stays eligible only for recorded-receipt
 lookup, including after restart; elapsed time cannot authorize another POST.
 Provider configuration remains pinned while source or managed work owns it.
+Control-plane capability 9 adds bounded, paired pressure metadata/digest columns
+and an exact source-reservation link through a verified 8-to-9 migration. New
+requests retain their original logical input separately from the assembled prompt.
+Older canonical request bytes and missing input fields remain unchanged. Both
+control-plane and co-resident runtime schema checks reject partial or unknown
+pressure extensions. Read-only budget snapshots authenticate the exact task,
+stage and live lease before returning retained measurements.
 
 Actual provider call IDs enter the existing authenticated source dispatcher.
 Reads and checkpoint/handoff commits retain exact results and debits. Before a
 read or result continuation, admission reserves the full approved result bound,
-including JSON escaping. A ready handoff fences the source and enters the existing
+including JSON escaping. Already canonical JSON payloads reserve at most twice
+their byte ceiling when quoted once as a provider output string; raw input text
+does not use this bound. Actual envelope framing is measured separately.
+A ready handoff fences the source and enters the existing
 outbox, acceptance, exact restoration, acknowledgement and sealing sequence.
+Current source call quotas include the immutable count of reads admitted before
+conversation enrollment plus admitted provider calls. Provider reads are counted
+once. Ready handoffs retain this quota check even though they need no further
+source-provider output continuation.
 
 The successor inherits original context/output ceilings, reserve floors and tool
 allowances while applying tighter current policy. Its retained context begins
@@ -307,10 +321,42 @@ recovery verifies the original provider and broker receipts before replaying
 work. Equivalent stored usage JSON formatting remains compatible, while changed
 values, response identities and expired ownership are rejected.
 
-Automatic handoff caused by source context pressure, writable source work,
-association with an existing external desktop conversation, repeated real-provider
-rollover and complete native/process qualification remain open. A default large
-result allowance can exceed available headroom before a read; source pressure
-currently defers that work without a qualified automatic transfer. The current
-implementation and deterministic fixtures do not close G04 or establish release
-readiness.
+## Pressure components and qualification
+
+Typed pressure evaluation distinguishes rollover/emergency measurements from
+blocked policy or quota decisions and uncertain provider outcomes. The pure
+packet builder accepts only matching typed pressure metadata. It retains the full
+approved assignment, original logical input or exact legacy request, completed
+progress and results, untouched call arguments, uncertainty and remaining
+budgets. A compact decision projection binds the complete canonical decision
+SHA and in-packet identity; actual usage stays separate from prospective
+reservations. Full audit metadata remains the control plane's responsibility,
+not a replacement for successor-readable task data.
+
+The projection is capped at 4 KiB. The complete exact `context_get` result must
+fit the 64 KiB and original inline bounds, tighter original/effective result-byte
+ceilings, and retained-result token policy. The ordinary 4,096-token limit is
+unchanged. Oversized critical work produces a typed construction failure;
+optional previews alone may be clipped. The pressure owner, durable disposition
+writer and automatic pressure-handoff path are not enabled by these components.
+
+At the September 8 component checkpoint, signed native and selected Release
+suites each passed 293 tests, and the separate packet suite passed 13 tests,
+with no skips or failures. A disposable Gemma 4 E4B 4-bit conversation in
+LM Studio 0.4.23+1 at 131,072 context completed one approved file read and
+answered with the returned marker. After a manager restart, exact replay
+preserved the answer, provider receipts and debits without another provider
+call or file read. Conflicting input and generic source access were rejected.
+The full 65,536-byte read allowance remained unchanged.
+
+A separate Qwen conversation accepted a root and completed one approved read,
+then LM Studio's tool-call parser failed during the read-output continuation.
+That continuation remained `outcome_unknown` with no repeat POST. The successful
+Gemma case used an independent task and did not retry that uncertain request.
+These source-only observations do not qualify automatic handoff caused by source
+context pressure, writable source work, association with an existing external
+desktop conversation, repeated real-provider rollover or complete native/process
+qualification.
+A large result allowance can still exceed available headroom before a read;
+pressure components do not yet supply the automatic transfer. G04 and release
+readiness remain unqualified.

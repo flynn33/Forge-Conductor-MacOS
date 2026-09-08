@@ -204,13 +204,16 @@ final class ContinuityBootstrapRecoveryTests: XCTestCase {
                     XCTAssertEqual(page.references, fixture.references)
                     let url = VerifiedMigrationBackup.activeManifestURL(for: fixture.database, scope: .continuityIngress)
                     let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self, from: Data(contentsOf: url))
-                    XCTAssertEqual(manifest.sourceVersion, 7); XCTAssertEqual(manifest.targetVersion, 8)
+                    XCTAssertEqual(manifest.sourceVersion, 8); XCTAssertEqual(manifest.targetVersion, 9)
                     XCTAssertEqual(manifest.state, .completed)
                     let backup = fixture.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
                     XCTAssertEqual(JSONSupport.sha256Hex(try Data(contentsOf: backup)), manifest.backupSHA256)
                     XCTAssertEqual(try RecoverySQLite.integer(backup,
                         "SELECT COUNT(*) FROM pragma_table_info('continuity_ingress_holds') WHERE name='finalization_attempts'"), 1)
                     XCTAssertEqual(try RecoverySQLite.integer(backup,
+                        "SELECT COUNT(*) FROM pragma_table_info('native_source_provider_turns') WHERE name IN ('pressure_decision_json','pressure_decision_sha256','pressure_reservation_id')"), 0)
+                    let beforeSourceConversation = fixture.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v7.sqlite3")
+                    XCTAssertEqual(try RecoverySQLite.integer(beforeSourceConversation,
                         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='native_source_conversations'"), 0)
                     let beforeNativeTasks = fixture.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v6.sqlite3")
                     XCTAssertEqual(try RecoverySQLite.integer(beforeNativeTasks,
@@ -229,7 +232,7 @@ final class ContinuityBootstrapRecoveryTests: XCTestCase {
                     XCTAssertEqual(try RecoverySQLite.integer(fixture.database, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0)
                     await upgraded.close()
                     let reopened = try ProjectControlPlaneRepository(databaseURL: fixture.database, clock: fixture.clock)
-                    XCTAssertEqual(try RecoverySQLite.integer(fixture.database, "SELECT COUNT(*) FROM forge_migration_receipts"), 5)
+                    XCTAssertEqual(try RecoverySQLite.integer(fixture.database, "SELECT COUNT(*) FROM forge_migration_receipts"), 6)
                     await reopened.close()
                 } catch { await upgraded.close(); throw error }
             }

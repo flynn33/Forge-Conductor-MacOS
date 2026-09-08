@@ -54,31 +54,33 @@ final class SourceDerivedToolResultBudgetTests: XCTestCase, @unchecked Sendable 
         XCTAssertEqual(unknown.rawProviderUsage, overflow.usage)
     }
 
-    func testProspectiveFullResultDenialDoesNotPersistSpeculativeUsageOrAction() async throws {
-        try await withFixture { fixture in
-            let supervisor = try await fixture.open()
-            let turn = try self.turn(calls: ["call-1"])
-            try await self.observe(turn, on: supervisor)
-            let before = await supervisor.snapshot()
-            let preflight = try await self.preflight([self.output("call-1", "0")])
-            let projected = try ManagedToolResultProjection(priorPrefix: self.empty(), providerCallID: "call-1",
-                continuationPreflight: preflight, maximumToolResultBytes: 65_536, toolSchemaSHA256: self.schema)
-            let action = try await supervisor.projectToolResult(projected)
-            XCTAssertEqual(action, .emergency, "The full escaped result cannot fit a 128K context")
-            let after = await supervisor.snapshot()
-            XCTAssertEqual(after, before)
-            let stored = try await fixture.repository.contextBudgetState(identity: fixture.identity)
-            XCTAssertEqual(stored, before.state)
-            let pending = try await fixture.repository.pendingContextBudgetActionRequests()
-            XCTAssertTrue(pending.isEmpty, "A prospective result must not enqueue a canonical rollover")
-            XCTAssertEqual(after.state.latestObservation?.used, 120)
-            XCTAssertEqual(after.state.latestObservation?.accounting?.rawProviderUsage, turn.usage)
-            let smaller = try ManagedToolResultProjection(priorPrefix: self.empty(), providerCallID: "call-1",
-                continuationPreflight: preflight, maximumToolResultBytes: 1_024, toolSchemaSHA256: self.schema)
-            let admitted = try await supervisor.projectToolResult(smaller)
-            XCTAssertEqual(admitted, .normal)
-            let unchanged = await supervisor.snapshot()
-            XCTAssertEqual(unchanged, before)
+    func testProspectiveFullResultPreservesActualUsageAcrossAdmissionAndDenial() async throws {
+        for (capacity, expected) in [(131_072, ContextBudgetAction.normal), (32_768, .emergency)] {
+            try await withFixture(capacity: capacity) { fixture in
+                let supervisor = try await fixture.open()
+                let turn = try self.turn(calls: ["call-1"])
+                try await self.observe(turn, on: supervisor)
+                let before = await supervisor.snapshot()
+                let preflight = try await self.preflight([self.output("call-1", "0")])
+                let projected = try ManagedToolResultProjection(priorPrefix: self.empty(), providerCallID: "call-1",
+                    continuationPreflight: preflight, maximumToolResultBytes: 65_536, toolSchemaSHA256: self.schema)
+                let action = try await supervisor.projectToolResult(projected)
+                XCTAssertEqual(action, expected, "Reserve the same full canonical result at both context capacities")
+                let after = await supervisor.snapshot()
+                XCTAssertEqual(after, before)
+                let stored = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+                XCTAssertEqual(stored, before.state)
+                let pending = try await fixture.repository.pendingContextBudgetActionRequests()
+                XCTAssertTrue(pending.isEmpty, "A prospective result must not enqueue a canonical rollover")
+                XCTAssertEqual(after.state.latestObservation?.used, 120)
+                XCTAssertEqual(after.state.latestObservation?.accounting?.rawProviderUsage, turn.usage)
+                let smaller = try ManagedToolResultProjection(priorPrefix: self.empty(), providerCallID: "call-1",
+                    continuationPreflight: preflight, maximumToolResultBytes: 1_024, toolSchemaSHA256: self.schema)
+                let admitted = try await supervisor.projectToolResult(smaller)
+                XCTAssertEqual(admitted, .normal)
+                let unchanged = await supervisor.snapshot()
+                XCTAssertEqual(unchanged, before)
+            }
         }
     }
 
@@ -201,7 +203,7 @@ final class SourceDerivedToolResultBudgetTests: XCTestCase, @unchecked Sendable 
                 maximumToolResultBytes: 65_536, toolSchemaSHA256: self.schema)
             let allowed = try await supervisor.projectToolResult(projection)
             XCTAssertEqual(allowed, .normal)
-            let config = try self.configuration(runID: fixture.identity.runID, capacity: 131_072,
+            let config = try self.configuration(runID: fixture.identity.runID, capacity: 32_768,
                 inheritance: fixture.configuration.resolvedPolicy?.inheritedSourceBudget)
             _ = try await supervisor.reconfigure(config)
             let before = await supervisor.snapshot()

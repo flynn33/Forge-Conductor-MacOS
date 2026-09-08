@@ -270,7 +270,7 @@ final class NativeSourceConversationJournalTests: XCTestCase {
                 XCTAssertEqual(try JournalSQL.value(f.database, "SELECT COUNT(*) FROM continuity_source_dispatch_origins"), "1")
                 XCTAssertEqual(try JournalSQL.value(f.database, "SELECT COUNT(*) FROM native_source_conversations"), "0")
                 let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: f.database, scope: .continuityIngress))) as? [String: Any]
-                XCTAssertEqual(manifest?["source_version"] as? Int, 7); XCTAssertEqual(manifest?["target_version"] as? Int, 8)
+                XCTAssertEqual(manifest?["source_version"] as? Int, 8); XCTAssertEqual(manifest?["target_version"] as? Int, 9)
                 XCTAssertEqual(manifest?["state"] as? String, "completed")
                 let backup = f.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v7.sqlite3")
                 XCTAssertTrue(FileManager.default.fileExists(atPath: backup.path))
