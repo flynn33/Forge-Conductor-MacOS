@@ -669,6 +669,147 @@ final class ContinuityIngressStoreTests: XCTestCase {
         XCTAssertEqual(try store.continuityDelivery(operationID: delivery.operationID), acknowledged)
     }
 
+    func testPreparedReceiptReadbackReturnsExactOlderRevisionAfterReopen() throws {
+        let authorization = try authority()
+        let original = packet()
+        let prepared = try PreparedContinuitySourceCommit.preparing(original)
+        let store = try SQLiteStore(path: database)
+        let first = try store.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: true)
+        var later = original
+        later.goal = "Later work must not replace the frozen receipt"
+        later.updatedAt = "2026-09-08T10:02:00Z"
+        let second = try store.handoffCommit(later, authorization: authorization, automaticHandoffEnabled: true)
+        store.close()
+
+        let reopened = try SQLiteStore(path: database, postMigrationCommitObserver: nil,
+            beforeMutationCommitObserver: { _ in throw StoreError.execFailed("readback attempted a mutation") })
+        defer { reopened.close() }
+        let legacy = try reopened.handoffGet(id: original.id)
+        let pointer = try reopened.memoryGet(key: "continuity/latest")
+        for _ in 0..<3 {
+            XCTAssertEqual(try reopened.readPreparedSourceCommitForReconciliation(prepared,
+                authorization: authorization), first)
+        }
+        XCTAssertEqual(try reopened.continuityLatestRevision(continuityID: original.id,
+            authorization: authorization), second.revision)
+        XCTAssertEqual(try reopened.handoffGet(id: original.id), legacy)
+        XCTAssertEqual(try reopened.memoryGet(key: "continuity/latest"), pointer)
+        XCTAssertEqual(try reopened.pendingContinuityHandoffs().count, 2)
+        later.goal = "This exact digest was never committed"
+        XCTAssertNil(try reopened.readPreparedSourceCommitForReconciliation(
+            PreparedContinuitySourceCommit.preparing(later), authorization: authorization))
+        XCTAssertNil(try reopened.readPreparedSourceCommitForReconciliation(
+            PreparedContinuitySourceCommit.preparing(packet()), authorization: authorization))
+        XCTAssertEqual(try reopened.pendingContinuityHandoffs().count, 2)
+    }
+
+    func testPreparedReceiptReadbackPreservesDisabledDeliveryAndActualPromotion() throws {
+        let authorization = try authority()
+        let original = packet()
+        let prepared = try PreparedContinuitySourceCommit.preparing(original)
+        let store = try SQLiteStore(path: database)
+        defer { store.close() }
+        let committed = try store.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: false)
+        XCTAssertEqual(try store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization), committed)
+        XCTAssertTrue(try store.pendingContinuityHandoffs().isEmpty)
+        let explicit = try store.enqueueContinuityHandoff(identity: committed.revision.identity,
+            authorization: authorization)
+        let actual = try XCTUnwrap(store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization))
+        XCTAssertEqual(actual.revision, committed.revision)
+        XCTAssertEqual(actual.delivery, explicit)
+        XCTAssertTrue(try XCTUnwrap(actual.delivery).explicitlyRequested)
+        XCTAssertEqual(try store.pendingContinuityHandoffs().count, 1)
+    }
+
+    func testPreparedReceiptReadbackRetainsInvalidationWithoutGrantingLiveAccess() throws {
+        let authorization = try authority()
+        let original = packet()
+        let prepared = try PreparedContinuitySourceCommit.preparing(original)
+        let store = try SQLiteStore(path: database)
+        let committed = try store.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: true)
+        _ = try store.invalidateContinuityIngress(projectID: authorization.projectID, throughGeneration: .initial)
+        store.close()
+        let reopened = try SQLiteStore(path: database)
+        defer { reopened.close() }
+        let historical = try XCTUnwrap(reopened.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization))
+        XCTAssertEqual(historical.revision, committed.revision)
+        XCTAssertEqual(historical.delivery?.state, .invalidated)
+        expectIngressError(.invalidated) {
+            try reopened.continuityHandoffRevision(identity: committed.revision.identity, authorization: authorization)
+        }
+        expectIngressError(.invalidated) {
+            try reopened.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: true)
+        }
+        XCTAssertTrue(try reopened.pendingContinuityHandoffs().isEmpty)
+    }
+
+    func testPreparedReceiptReadbackRejectsForeignMetadataBeforeCorruptPacketDecode() throws {
+        let authorization = try authority()
+        let original = packet()
+        let prepared = try PreparedContinuitySourceCommit.preparing(original)
+        let store = try SQLiteStore(path: database)
+        defer { store.close() }
+        _ = try store.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: true)
+        try rawSQL("UPDATE continuity_ingress_revisions SET packet_json=x'7b7d'")
+        let foreign = try authority()
+        expectIngressError(.authorityMismatch) {
+            try store.readPreparedSourceCommitForReconciliation(prepared, authorization: foreign)
+        }
+        var absentDigest = original
+        absentDigest.goal = "No matching digest for the same foreign ID"
+        expectIngressError(.authorityMismatch) {
+            try store.readPreparedSourceCommitForReconciliation(
+                PreparedContinuitySourceCommit.preparing(absentDigest), authorization: foreign)
+        }
+        XCTAssertThrowsError(try store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization)) { XCTAssertNotEqual($0 as? ContinuityIngressError, .authorityMismatch) }
+    }
+
+    func testPreparedReceiptReadbackCancellationAndClosedStoreDoNotBecomeMissingReceipt() throws {
+        let authorization = try authority()
+        let original = packet()
+        let prepared = try PreparedContinuitySourceCommit.preparing(original)
+        let store = try SQLiteStore(path: database)
+        let committed = try store.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: false)
+        let cancelled = ToolCallCancellation(timeoutSeconds: 10)
+        cancelled.cancel()
+        XCTAssertThrowsError(try store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization, cancellation: cancelled)) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertEqual(try store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization), committed)
+        store.close()
+        XCTAssertThrowsError(try store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization))
+    }
+
+    func testPreparedReceiptReadbackUsesCommittedSnapshotWithoutAWriteReservation() throws {
+        let authorization = try authority()
+        let original = packet()
+        let prepared = try PreparedContinuitySourceCommit.preparing(original)
+        let store = try SQLiteStore(path: database)
+        defer { store.close() }
+        let committed = try store.handoffCommit(original, authorization: authorization, automaticHandoffEnabled: true)
+        var writer: OpaquePointer?
+        guard sqlite3_open(database.path, &writer) == SQLITE_OK, let writer else {
+            throw StoreError.openFailed("readback contention fixture")
+        }
+        defer { sqlite3_exec(writer, "ROLLBACK", nil, nil, nil); sqlite3_close(writer) }
+        XCTAssertEqual(sqlite3_exec(writer, "BEGIN IMMEDIATE", nil, nil, nil), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(writer, "UPDATE continuity_ingress_outbox SET attempts=1", nil, nil, nil), SQLITE_OK)
+        let before = try store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization, cancellation: ToolCallCancellation(timeoutSeconds: 1))
+        XCTAssertEqual(before, committed, "Uncommitted writer state must not enter the read snapshot")
+        XCTAssertEqual(sqlite3_exec(writer, "COMMIT", nil, nil, nil), SQLITE_OK)
+        let after = try XCTUnwrap(store.readPreparedSourceCommitForReconciliation(prepared,
+            authorization: authorization))
+        XCTAssertEqual(after.revision, committed.revision)
+        XCTAssertEqual(after.delivery?.attempts, 1)
+        XCTAssertEqual(after.delivery?.operationID, committed.delivery?.operationID)
+    }
+
     private func rawSQL(_ sql: String) throws {
         var handle: OpaquePointer?
         guard sqlite3_open(database.path, &handle) == SQLITE_OK, let handle else {

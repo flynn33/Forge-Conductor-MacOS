@@ -908,6 +908,80 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         }
     }
 
+    /// Historical receipt readback only, under the enclosing control-plane
+    /// transaction's validated opaque pressure receipt-only claim. Its retained
+    /// packet and authorization are not a new live grant. No caller may use this
+    /// internal helper to bypass task invalidation or authorize another effect.
+    func readPreparedSourceCommitForReconciliation(
+        _ prepared: PreparedContinuitySourceCommit,
+        authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffCommit? {
+        try cancellation?.checkCancellation()
+        _ = try prepared.packet()
+        try authorization.validate()
+        let authoritySHA = JSONSupport.sha256Hex(try authorization.encodedJSON())
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try ingressReadSnapshotUnlocked(cancellation: cancellation) {
+                // Check the ID's owner even if the requested digest is absent.
+                // Never decode foreign packet/authorization JSON to reject it.
+                let ownsID = try withStatementUnlocked("""
+                    SELECT project_id,project_generation,task_id,authorization_sha256
+                    FROM continuity_ingress_revisions WHERE continuity_id=? LIMIT 1
+                    """) { statement -> Bool in
+                    bind(statement, 1, prepared.continuityID)
+                    let result = sqlite3_step(statement)
+                    if result == SQLITE_DONE { return false }
+                    guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                    try requireIngressReadbackOwnerUnlocked(statement, authorization: authorization,
+                        authoritySHA: authoritySHA)
+                    return true
+                }
+                guard ownsID else { return nil }
+                let identity = try withStatementUnlocked("""
+                    SELECT project_id,project_generation,task_id,authorization_sha256,revision,resume_ready
+                    FROM continuity_ingress_revisions WHERE continuity_id=? AND packet_sha256=? LIMIT 2
+                    """) { statement -> ContinuityHandoffIdentity? in
+                    bind(statement, 1, prepared.continuityID)
+                    bind(statement, 2, prepared.packetSHA256)
+                    let result = sqlite3_step(statement)
+                    if result == SQLITE_DONE { return nil }
+                    guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                    try requireIngressReadbackOwnerUnlocked(statement, authorization: authorization,
+                        authoritySHA: authoritySHA)
+                    guard sqlite3_column_type(statement, 4) == SQLITE_INTEGER,
+                          sqlite3_column_int64(statement, 4) > 0,
+                          sqlite3_column_type(statement, 5) == SQLITE_INTEGER,
+                          sqlite3_column_int64(statement, 5) == (prepared.finalize ? 1 : 0) else {
+                        throw ContinuityIngressError.integrityFailure("source readback identity differs")
+                    }
+                    let value = try ContinuityHandoffIdentity(continuityID: prepared.continuityID,
+                        revision: sqlite3_column_int64(statement, 4), packetSHA256: prepared.packetSHA256)
+                    let next = sqlite3_step(statement)
+                    guard next == SQLITE_DONE else {
+                        if next == SQLITE_ROW {
+                            throw ContinuityIngressError.integrityFailure("duplicate source readback revision")
+                        }
+                        throw sqliteStepError(next)
+                    }
+                    return value
+                }
+                guard let identity else { return nil }
+                let revision = try requiredIngressRevisionUnlocked(identity, allowInvalidated: true)
+                guard revision.authorization == authorization,
+                      revision.canonicalPacketJSON == prepared.canonicalPacketJSON,
+                      revision.resumeReady == prepared.finalize else {
+                    throw ContinuityIngressError.integrityFailure("source readback content differs")
+                }
+                let delivery = try ingressDeliveryForRevisionUnlocked(identity)
+                guard delivery == nil || delivery?.handoff == revision else {
+                    throw ContinuityIngressError.integrityFailure("source readback delivery differs")
+                }
+                return ContinuityHandoffCommit(revision: revision, delivery: delivery)
+            }
+        }
+    }
+
     /// Resolves only this exact source ID after checking its immutable task scope.
     /// It never consults the global mutable handoff or compatibility pointer notes.
     public func continuityLatestRevision(
@@ -2883,6 +2957,48 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         try execUnlocked("PRAGMA synchronous=FULL;")
         defer { try? execUnlocked("PRAGMA synchronous=\(previous);") }
         return try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff, body)
+    }
+
+    /// Metadata, immutable packet and mutable delivery must share one SQLite
+    /// snapshot even when another process owns a connection to this source DB.
+    /// This acquires no write reservation and invokes no mutation observers.
+    private func ingressReadSnapshotUnlocked<Value>(
+        cancellation: ToolCallCancellation?, _ body: () throws -> Value
+    ) throws -> Value {
+        guard let db else { throw StoreError.openFailed("nil db") }
+        guard sqlite3_get_autocommit(db) != 0 else {
+            throw ContinuityIngressError.integrityFailure("nested source readback transaction")
+        }
+        try cancellation?.checkCancellation()
+        try execUnlocked("BEGIN DEFERRED;")
+        var finished = false
+        defer {
+            if !finished {
+                // Cancellation must not interrupt teardown of the read snapshot.
+                // The enclosing operation restores all connection handlers.
+                sqlite3_progress_handler(db, 0, nil, nil)
+                try? execUnlocked("ROLLBACK;")
+            }
+        }
+        let value = try body()
+        try cancellation?.checkCancellation()
+        try execUnlocked("COMMIT;")
+        finished = true
+        return value
+    }
+
+    private func requireIngressReadbackOwnerUnlocked(
+        _ statement: OpaquePointer,
+        authorization: ContinuityIngressAuthorization,
+        authoritySHA: String
+    ) throws {
+        guard try ingressText(statement, 0, maximumBytes: 36) == authorization.projectID.description,
+              sqlite3_column_type(statement, 1) == SQLITE_INTEGER,
+              sqlite3_column_int64(statement, 1) == Int64(authorization.projectGeneration.rawValue),
+              try ingressText(statement, 2, maximumBytes: 36) == authorization.taskID.uuidString.lowercased(),
+              try ingressText(statement, 3, maximumBytes: 64) == authoritySHA else {
+            throw ContinuityIngressError.authorityMismatch
+        }
     }
 
     private func requireIngressAuthorityUnlocked(
