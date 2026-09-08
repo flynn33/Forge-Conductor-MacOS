@@ -381,8 +381,18 @@ clear cancellation or restore provider execution. Missing receipts are retained
 and quarantined; unavailable reads throw without being treated as absence.
 Expiry at commit rolls back the audit update, and a new lease fences old owners.
 
-The tool-output pressure boundary, pressure carryover acceptance and owner
-integration remain incomplete. These components do not enable automatic pressure handoff or qualify
+The control plane also reconstructs the pending tool-output continuation from
+the accepted response and verified completed prefix. Local transport measurement
+runs outside the database transaction. A second transaction checks the same
+pending call, lease and prefix before admission or durable pressure recording.
+Cancellation during measurement grants no output or storage authority. Reads
+retain their full approved allowance; checkpoint requirements measure a prepared
+packet and its response without committing it. Admission returns that frozen
+checkpoint for the execution owner to use. A ready handoff has no continuation
+measurement requirement.
+
+Pressure carryover acceptance and owner integration remain incomplete. These
+components do not enable automatic pressure handoff or qualify
 G04. Product identity remains 0.9.0 build 1; no user-visible control or deployment
 behavior changes in this component checkpoint.
 

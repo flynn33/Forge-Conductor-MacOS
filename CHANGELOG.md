@@ -46,6 +46,10 @@ installed-stack and production-feature acceptance remain separate gates.
 - Pressure receipt recovery now works after cancellation, revocation or storage
   expiry through a separate, short-lived audit claim. It preserves exact source
   receipts without restoring execution authority or extending the storage deadline.
+- Tool-output pressure can now be persisted from a locally measured continuation
+  built from the exact pending call and retained output prefix. Full reads remain
+  uncharged until admission; checkpoint previews remain uncommitted, and ready
+  handoffs require no unused continuation headroom.
 - Added typed pressure evaluation and a deterministic recovery-packet builder.
   Packets preserve full critical work and remaining budgets, bind compact pressure
   facts to the complete decision digest, and enforce inherited retrieval limits.
