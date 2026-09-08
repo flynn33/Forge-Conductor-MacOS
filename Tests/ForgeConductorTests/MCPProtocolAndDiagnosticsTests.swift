@@ -666,7 +666,9 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         let busyError = try XCTUnwrap(busy["error"] as? [String: Any])
         XCTAssertEqual((busyError["code"] as? NSNumber)?.intValue, -32000)
         XCTAssertTrue((busyError["message"] as? String)?.contains("maximum concurrent requests") == true)
-        try Data().write(to: release)
+        // The busy ping proves notification processing, not process termination.
+        // Keep the hook held until the cancellation response confirms settlement;
+        // releasing it here can let Git commit before the runner observes cancellation.
 
         let response = try fixture.responses.read(timeout: 8)
         XCTAssertEqual((response["id"] as? NSNumber)?.intValue, 51)
