@@ -373,9 +373,16 @@ readback proves no revision exists. Re-enabling the setting after a disabled
 source commit does not enqueue delivery during recovery. Actual existing receipts
 are preserved without policy rewriting; failed readback never means absence.
 
-Receipt-only cleanup after cancellation, revocation or expiry, the tool-output
-pressure boundary, pressure carryover acceptance and owner integration remain
-incomplete. These components do not enable automatic pressure handoff or qualify
+After cancellation, revocation or storage expiry, a separate 30-second receipt
+claim validates the retained task, dispatch lineage, pressure decision and source
+reservation. It needs no bearer grant and exposes only an exact source read and
+audit update. It cannot invoke a source writer, extend the original deadline,
+clear cancellation or restore provider execution. Missing receipts are retained
+and quarantined; unavailable reads throw without being treated as absence.
+Expiry at commit rolls back the audit update, and a new lease fences old owners.
+
+The tool-output pressure boundary, pressure carryover acceptance and owner
+integration remain incomplete. These components do not enable automatic pressure handoff or qualify
 G04. Product identity remains 0.9.0 build 1; no user-visible control or deployment
 behavior changes in this component checkpoint.
 
