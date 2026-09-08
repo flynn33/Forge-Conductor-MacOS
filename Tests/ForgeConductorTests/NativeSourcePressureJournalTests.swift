@@ -6,6 +6,134 @@ import ForgeNativeSessionHostPlugin
 #endif
 
 final class NativeSourcePressureJournalTests: XCTestCase {
+    func testPressureCarryoverRejectsFabricatedReceiptBeforeAcceptingRealRevision() async throws {
+        try await withFixture { f in
+            let (claim, _) = try await f.preparedPressure()
+            let source = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("carryover-source.sqlite"), clock: f.clock)
+            defer { source.close() }
+            let actual = try await f.commitPressure(claim, policy: f.policy, source: source)
+            let forged = ContinuityHandoffRevision(identity: actual.revision.identity, authorization: actual.revision.authorization,
+                canonicalPacketJSON: actual.revision.canonicalPacketJSON, resumeReady: true,
+                committedAt: ISO8601.string(from: f.clock.now().addingTimeInterval(1)))
+            do {
+                _ = try await f.repository.acceptContinuityIngress(source: forged,
+                    operationID: ContinuityIngressOperationIdentity(revision: forged).operationID, policySelection: f.policy)
+                XCTFail("A matching packet digest substituted for the actual committed receipt")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .integrityFailure) }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM continuity_ingress_acceptances"), "0")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_run_offsets"), "0")
+            let ingress = try await f.repository.acceptContinuityIngress(source: actual.revision,
+                operationID: XCTUnwrap(actual.delivery).operationID, policySelection: f.policy)
+            let offset = try await f.repository.nativeSourceBudgetCarryover(runID: ingress.runID)
+            XCTAssertEqual(offset?.observedInputTokens, 240_000)
+        }
+    }
+
+    func testPressureCarryoverCountsUntouchedCallsAndPriorReadsOnceAcrossBootstrapAndReopen() async throws {
+        try await withFixture(priorReads: 2, toolLimit: 6) { f in
+            let source = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("carryover-source.sqlite"), clock: f.clock)
+            defer { source.close() }
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            guard case .dispatch(let post) = try await f.begin(prepared, approval) else { return XCTFail("Missing dispatch") }
+            let accepted = try await f.repository.acceptNativeSourceProviderTurn(claim: post,
+                turn: f.turn(prepared, calls: [f.call(id: "finished"), f.call(id: "pending"), f.call(id: "untouched")], inputTokens: 240_000),
+                credential: f.credential, lease: f.lease)
+            try await f.finishRead(accepted.calls[0], approval)
+            let context = try await f.repository.nativeSourceAcceptedBudgetContext(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+            guard case .pressure(let claim) = try await f.repository.recordNativeSourceBudgetDisposition(metadata: f.pressureMetadata(context),
+                credential: f.credential, lease: f.lease, policySelection: f.policy) else { return XCTFail("Missing pressure") }
+            let actual = try await f.commitPressure(claim, policy: f.policy, source: source)
+            let ingress = try await f.repository.acceptContinuityIngress(source: actual.revision,
+                operationID: XCTUnwrap(actual.delivery).operationID, policySelection: f.policy)
+            let inherited = try await f.repository.nativeSourceBudgetCarryover(runID: ingress.runID)
+            let offset = try XCTUnwrap(inherited)
+            XCTAssertEqual(offset.priorSourceReadCallsAtEnrollment, 2)
+            XCTAssertEqual(offset.admittedProviderCalls, 3)
+            XCTAssertEqual(offset.observedInputTokens, 240_000)
+            XCTAssertEqual(offset.exactUsageStageCount, 1)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT charged_calls FROM native_source_run_offsets"), "3")
+            let lease = try await f.repository.acquireRunLease(runID: ingress.runID, ownerID: "pressure-carryover")
+            let envelope = try ContinuitySourceBootstrapEnvelope(acceptance: ingress, bootstrapNonce: UUID())
+            let root = try await NativeSourceConversationJournalTests.bootstrapRoot(repository: f.repository, acceptance: ingress, envelope: envelope, lease: lease)
+            let enlarged = try BudgetPolicyState(globalPolicy: .init(tools: .init(callsPerTurn: 8, callsPerSession: 100, callsPerRun: 100),
+                automaticHandoffEnabled: true)).resolve(f.policy.scope)
+            _ = try await f.repository.persistToolInvocationIntent(root.intent, lease: lease, bootstrapGrant: root.grant, bootstrapPolicy: enlarged)
+            _ = try await f.repository.transitionToolInvocation(invocationID: root.intent.invocationID, expected: .intent, to: .executing, lease: lease, bootstrapGrant: root.grant)
+            _ = try await f.repository.executeContinuityBootstrapRetrieval(grant: root.grant, invocationID: root.intent.invocationID, lease: lease) { expected in
+                let revision = try source.continuityHandoffRevision(identity: expected.identity, authorization: expected.authorization)
+                return try .init(canonicalToolResultJSON: ForgeJSONCanonicalizationV1.data(from: ["ok":true,"is_error":false,"payload":[
+                    "ok":true,"found":true,"packet":JSONSerialization.jsonObject(with: revision.canonicalPacketJSON),
+                    "continuity_id":revision.identity.continuityID,"revision":revision.identity.revision,"packet_sha256":revision.identity.packetSHA256]]))
+            }
+            let second = try await NativeSourceConversationJournalTests.bootstrapRoot(repository: f.repository, acceptance: ingress, envelope: envelope, lease: lease)
+            do {
+                _ = try await f.repository.persistToolInvocationIntent(second.intent, lease: lease, bootstrapGrant: second.grant, bootstrapPolicy: enlarged)
+                XCTFail("Pressure carryover discarded untouched calls or lifted the initial ceiling")
+            } catch { XCTAssertTrue(error is ContinuityIngressError || error is NativeTaskCapabilityError) }
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM tool_invocations"), "1")
+            await f.repository.close()
+            let reopened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
+            do {
+                let restored = try await reopened.nativeSourceBudgetCarryover(runID: ingress.runID)
+                XCTAssertEqual(restored, offset)
+                _ = try await reopened.persistToolInvocationIntent(root.intent, lease: lease, bootstrapGrant: root.grant, bootstrapPolicy: enlarged)
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM tool_invocations"), "1")
+                await reopened.close()
+            } catch { await reopened.close(); throw error }
+        }
+    }
+
+    func testPressureCarryoverBeforeFirstPostHasNoFabricatedUsageAndKeepsTightenedCeiling() async throws {
+        try await withFixture(priorReads: 2) { f in
+            let source = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("carryover-source.sqlite"), clock: f.clock)
+            defer { source.close() }
+            let prepared = try await f.prepare(), approval = try await f.approval(prepared)
+            let current = try BudgetPolicyState(globalPolicy: .init(context: .init(mode: .manual, maxContextTokens: 16_384,
+                checkpointRatio: 0.1, rolloverRatio: 0.2, emergencyRatio: 0.3), automaticHandoffEnabled: true)).resolve(f.policy.scope)
+            let binding = try await f.repository.nativeSourceBudgetBinding(stageID: prepared.stageID,
+                boundary: .beforeProviderPost, credential: f.credential, lease: f.lease)
+            let retained = try await f.repository.nativeSourcePreparedTurn(stageID: prepared.stageID, credential: f.credential, lease: f.lease)
+            guard case .pressure(let pressure) = NativeSourceBudgetEvaluator.providerDecision(prepared: retained,
+                preflight: approval.preflight, capabilities: f.capabilities, policySelection: current, binding: binding),
+                  case .pressure(let claim) = try await f.repository.recordNativeSourceBudgetDisposition(metadata: .pressure(pressure),
+                    credential: f.credential, lease: f.lease, policySelection: current) else { return XCTFail("Missing pre-POST pressure") }
+            let actual = try await f.commitPressure(claim, policy: current, source: source)
+            let ingress = try await f.repository.acceptContinuityIngress(source: actual.revision,
+                operationID: XCTUnwrap(actual.delivery).operationID, policySelection: f.policy)
+            let value = try await f.repository.nativeSourceBudgetCarryover(runID: ingress.runID)
+            let offset = try XCTUnwrap(value)
+            XCTAssertEqual(offset.ceilings.effectiveContextTokens, 16_384)
+            XCTAssertEqual(offset.ceilings.rolloverRatio, 0.2)
+            XCTAssertEqual(offset.priorSourceReadCallsAtEnrollment, 2)
+            XCTAssertEqual(offset.admittedProviderCalls, 0)
+            XCTAssertEqual(offset.providerStageCount, 1)
+            XCTAssertEqual(offset.observedInputTokens, 0); XCTAssertEqual(offset.observedOutputTokens, 0)
+            XCTAssertEqual(offset.exactUsageStageCount, 0)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT COUNT(*) FROM native_source_provider_turns WHERE post_json IS NOT NULL OR result_json IS NOT NULL"), "0")
+        }
+    }
+
+    func testPressureCarryoverAcceptsRecoveredReceiptAfterStorageExpiryWithoutReopeningSource() async throws {
+        try await withFixture { f in
+            let (_, admission) = try await f.preparedPressure()
+            let source = try SQLiteStore(path: f.database.deletingLastPathComponent().appendingPathComponent("carryover-source.sqlite"), clock: f.clock)
+            defer { source.close() }
+            let actual = try source.handoffCommit(admission.prepared.packet(), authorization: admission.authorization, automaticHandoffEnabled: true)
+            f.clock.advance(301)
+            let references = try await f.repository.pendingNativeSourcePressureReceipts()
+            let cleanup = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: XCTUnwrap(references.first), managerInstanceID: UUID())
+            _ = try await f.repository.reconcileNativeSourcePressureReceipt(claim: cleanup,
+                readExisting: { try source.readPreparedSourceCommitForReconciliation($0, authorization: $1) })
+            _ = try await f.repository.releaseNativeSourcePressureReceiptClaim(cleanup)
+            let ingress = try await f.repository.acceptContinuityIngress(source: actual.revision,
+                operationID: XCTUnwrap(actual.delivery).operationID, policySelection: f.policy)
+            let inherited = try await f.repository.nativeSourceBudgetCarryover(runID: ingress.runID)
+            XCTAssertEqual(inherited?.observedInputTokens, 240_000)
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_conversations"), "stopped")
+            XCTAssertEqual(try PressureSQL.value(f.database, "SELECT blocked_code FROM native_source_provider_turns"), "pressure_receipt_recorded")
+        }
+    }
+
     func testCheckpointOutputPressureUsesActualPreparedResponseWithoutCommitting() async throws {
         try await withFixture { f in
             let app = try ForgeApp.bootstrap(home: f.database.deletingLastPathComponent().appendingPathComponent("checkpoint-preview"))
@@ -1287,6 +1415,18 @@ private struct PressureFixture {
     let database: URL, repository: ProjectControlPlaneRepository, clock: PressureClock
     let credential: NativeTaskCapabilityCredential, attachment: AuthenticatedContinuityTaskAttachment, policy: BudgetPolicySelection
     let taskID: UUID, lease: NativeSourceConversationLease, capabilities: ProviderCapabilities
+    func commitPressure(_ claim: NativeSourcePressureClaim, policy: BudgetPolicySelection, source: SQLiteStore) async throws -> ContinuityHandoffCommit {
+        guard case .commit(let admission) = try await repository.prepareNativeSourceBudgetHandoff(claim: claim,
+            credential: credential, policySelection: policy, responsePreflight: { try Self.responsePreflight($0) }),
+              case .commit(let attempt) = try await repository.beginNativeSourcePressureCommitAttempt(admission: admission,
+                claim: claim, credential: credential, policySelection: policy,
+                readExisting: { try source.readPreparedSourceCommitForReconciliation($0, authorization: $1) }) else {
+            throw PressureFixtureError.interrupted
+        }
+        return try await repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim, credential: credential,
+            policySelection: policy, readExisting: { try source.readPreparedSourceCommitForReconciliation($0, authorization: $1) },
+            commit: { try source.handoffCommit($0.packet(), authorization: $1, automaticHandoffEnabled: $2) })
+    }
     func preparedPressure() async throws -> (NativeSourcePressureClaim, NativeSourcePressureCommitAdmission) {
         let context = try await pressureContext()
         guard case .pressure(let claim) = try await repository.recordNativeSourceBudgetDisposition(

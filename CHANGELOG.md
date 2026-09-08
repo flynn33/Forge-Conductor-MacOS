@@ -50,6 +50,9 @@ installed-stack and production-feature acceptance remain separate gates.
   built from the exact pending call and retained output prefix. Full reads remain
   uncharged until admission; checkpoint previews remain uncommitted, and ready
   handoffs require no unused continuation headroom.
+- Successor budget carryover now verifies pressure-generated source receipts and
+  retains prior reads, admitted but untouched calls, and tightened ceilings across
+  bootstrap and restart. Pre-POST pressure carries no fabricated provider usage.
 - Added typed pressure evaluation and a deterministic recovery-packet builder.
   Packets preserve full critical work and remaining budgets, bind compact pressure
   facts to the complete decision digest, and enforce inherited retrieval limits.

@@ -391,7 +391,16 @@ packet and its response without committing it. Admission returns that frozen
 checkpoint for the execution owner to use. A ready handoff has no continuation
 measurement requirement.
 
-Pressure carryover acceptance and owner integration remain incomplete. These
+Successor acceptance now verifies the exact committed pressure source receipt
+and retains a separate pressure journal digest. It counts every admitted provider
+call, including untouched calls, plus reads admitted before enrollment once.
+The pressure decision's tightened ceilings survive later policy increases and
+repository restart. A prepared stage before POST contributes its retained intent
+but no invented provider response or usage. A receipt recovered after storage
+expiry can be accepted while the source remains stopped. The established
+provider-requested handoff digest format remains unchanged.
+
+Source-owner trigger and recovery integration remains incomplete. These
 components do not enable automatic pressure handoff or qualify
 G04. Product identity remains 0.9.0 build 1; no user-visible control or deployment
 behavior changes in this component checkpoint.

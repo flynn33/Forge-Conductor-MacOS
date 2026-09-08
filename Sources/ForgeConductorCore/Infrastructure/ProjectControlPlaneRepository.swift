@@ -3066,8 +3066,15 @@ public actor ProjectControlPlaneRepository {
 
     private func nativeAcceptedUnlocked(_ stage: NativeSourceStageRow, conversation: NativeSourceConversationRow,
         connection: ControlPlaneSQLiteConnection) throws -> NativeSourceAcceptedProviderTurn {
-        guard let turn = stage.accepted, stage.state == .accepted else { throw NativeSourceConversationError.conflict }
+        guard stage.accepted != nil, stage.state == .accepted else { throw NativeSourceConversationError.conflict }
         guard stage.blocked == nil else { throw NativeSourceConversationError.budgetExceeded }
+        return try nativeAcceptedSnapshotUnlocked(stage, conversation: conversation, connection: connection)
+    }
+    // Structural history decoding; callers separately prove execution or exact
+    // immutable-receipt authority. This does not unseal a pressure-fenced stage.
+    private func nativeAcceptedSnapshotUnlocked(_ stage: NativeSourceStageRow, conversation: NativeSourceConversationRow,
+        connection: ControlPlaneSQLiteConnection) throws -> NativeSourceAcceptedProviderTurn {
+        guard let turn = stage.accepted, stage.state == .accepted else { throw NativeSourceConversationError.conflict }
         let calls = try connection.all("SELECT ordinal,call_sha256 FROM native_source_provider_calls WHERE stage_id=? ORDER BY ordinal",
             bindings: [.text(stage.body.stageID.uuidString.lowercased())]) { row in
                 NativeSourceProviderCallReference(conversationID: conversation.body.conversationID, stageID: stage.body.stageID,
@@ -3712,6 +3719,20 @@ public actor ProjectControlPlaneRepository {
     private func nativeProviderCarryoverUnlocked(receipt: ContinuityIngressAcceptanceReceipt,
         conversationID: UUID, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceBudgetCarryover {
         let task = try validatedContinuityTaskUnlocked(receipt.authorization, allowTerminalRun: true, connection: connection)
+        if let pressure = try connection.first("""
+            SELECT c.active_stage_id,c.task_id,c.capability_id,t.pressure_reservation_id
+            FROM native_source_conversations c JOIN native_source_provider_turns t ON t.stage_id=c.active_stage_id
+            WHERE c.conversation_id=? AND t.pressure_reservation_id IS NOT NULL
+            """, bindings: [.text(conversationID.uuidString.lowercased())], map: { row in
+                NativeSourcePressureRecoveryReference(conversationID: conversationID,
+                    stageID: try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)),
+                    taskID: try NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
+                    capabilityID: try NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36)),
+                    reservationID: try NativeTaskValue.uuid(row.strictText(3, maximumBytes: 36)))
+            }) {
+            return try nativePressureCarryoverUnlocked(receipt: receipt, reference: pressure, connection: connection)
+        }
+        // Keep the established provider-ready handoff representation unchanged.
         guard let value = try connection.first("""
             SELECT task_id,body_json,body_sha256,ceilings_json,ceilings_sha256,state FROM native_source_conversations WHERE conversation_id=?
             """, bindings: [.text(conversationID.uuidString.lowercased())], map: { r in
@@ -3772,6 +3793,96 @@ public actor ProjectControlPlaneRepository {
         return .init(conversationID: conversationID, taskID: task.authorization.taskID, runID: receipt.runID,
             acceptanceSHA256: receipt.receiptSHA256, ceilings: value.1, priorSourceReadCallsAtEnrollment: value.0.priorSourceReadCallsAtEnrollment, providerStageCount: stages.count,
             admittedProviderCalls: calls.count, observedInputTokens: input, observedOutputTokens: output, exactUsageStageCount: exact, journalSHA256: digest)
+    }
+
+    private func nativePressureCarryoverUnlocked(receipt: ContinuityIngressAcceptanceReceipt,
+        reference: NativeSourcePressureRecoveryReference, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceBudgetCarryover {
+        guard reference.taskID == receipt.authorization.taskID else { throw NativeSourceConversationError.notFound }
+        let state = try nativePressureReceiptStateUnlocked(reference, connection: connection)
+        let c = state.conversation, stage = state.stage
+        guard !c.cancelled, state.row.state == "completed", state.authorization == receipt.authorization,
+              let disposition = stage.budgetDisposition, case .pressure(let pressure) = disposition.metadata,
+              (c.state == .sourceFenced && stage.blocked == "pressure_committed"
+                && disposition.fenceRevision < Int64.max && c.revision == disposition.fenceRevision + 1)
+                || (c.state == .stopped && stage.blocked == "pressure_receipt_recorded"
+                    && c.revision == disposition.fenceRevision) else { throw NativeSourceConversationError.integrityFailure }
+        let actual = try nativeCommitResultUnlocked(state.row, prepared: state.prepared,
+            authorization: state.authorization, connection: connection)
+        guard actual.revision == receipt.source,
+              try ContinuityIngressOperationIdentity(revision: actual.revision).operationID == receipt.operationID else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        let cid = reference.conversationID.uuidString.lowercased()
+        guard try connection.scalarInt("SELECT COUNT(*) FROM native_source_capability_checks WHERE conversation_id=? AND state='attempted'",
+            bindings: [.text(cid)]) == 0 else { throw NativeSourceConversationError.conflict }
+        let rows = try connection.all("""
+            SELECT stage_id,intent_sha256,result_sha256,post_sha256 FROM native_source_provider_turns
+            WHERE conversation_id=? ORDER BY rowid LIMIT 65
+            """, bindings: [.text(cid)]) { row in
+                (try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)), try Self.nativeSourceText(row, 1, 64),
+                 try row.strictText(2, maximumBytes: 64), try row.strictText(3, maximumBytes: 64))
+            }
+        guard !rows.isEmpty, rows.count <= 64, rows.last?.0 == reference.stageID else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        var input = 0, output = 0, exact = 0, admittedCalls = 0
+        var stages: [[String: Any]] = [], calls: [[String: Any]] = []
+        for (index, row) in rows.enumerated() {
+            let current = try nativeStageUnlocked(row.0, conversation: c, connection: connection)
+            guard current.body.ordinal == index + 1 else { throw NativeSourceConversationError.integrityFailure }
+            stages.append(["intent":row.1,"result":row.2 ?? "","post":row.3 ?? ""])
+            if current.state == .prepared {
+                // A pressure fence before POST retains the pending request, not
+                // an invented response, token observation or tool admission.
+                guard current.body.stageID == reference.stageID, disposition.binding.boundary == .beforeProviderPost,
+                      current.post == nil, current.accepted == nil, row.2 == nil, row.3 == nil,
+                      try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE stage_id=?",
+                        bindings: [.text(row.0.uuidString.lowercased())]) == 0 else { throw NativeSourceConversationError.integrityFailure }
+                continue
+            }
+            guard current.state == .accepted else { throw NativeSourceConversationError.integrityFailure }
+            let accepted = try nativeAcceptedSnapshotUnlocked(current, conversation: c, connection: connection)
+            guard let post = current.post, accepted.turn.requestID == current.body.stageID.uuidString.lowercased(),
+                  accepted.turn.previousResponseID == current.body.parentResponseID,
+                  accepted.turn.providerID == post.capabilities.providerID, accepted.turn.modelKey == post.capabilities.modelKey,
+                  accepted.turn.providerVersion == post.capabilities.providerVersion,
+                  accepted.turn.providerInstanceID == post.capabilities.providerInstanceID else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+            if let usage = accepted.turn.usage {
+                input = try Self.nativeSourceCheckedAdd(input, usage.inputTokens)
+                output = try Self.nativeSourceCheckedAdd(output, usage.outputTokens)
+                if usage.source == .providerExact || usage.source == .tokenizerExact { exact += 1 }
+            }
+            admittedCalls = try Self.nativeSourceCheckedAdd(admittedCalls, accepted.calls.count)
+            for call in accepted.calls {
+                guard call.checksum == JSONSupport.sha256Hex(try nativeCallBytes(stage: current, turn: accepted.turn, ordinal: call.ordinal)) else {
+                    throw NativeSourceConversationError.integrityFailure
+                }
+                let retained = try nativeOutputUnlocked(reference: call, stage: current, conversation: c, connection: connection)
+                if let retained {
+                    guard !retained.readyHandoffCommitted else { throw NativeSourceConversationError.integrityFailure }
+                } else {
+                    guard current.body.stageID == reference.stageID, call.ordinal >= disposition.binding.completedOutputCount,
+                          try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE stage_id=? AND ordinal=? AND reservation_id IS NOT NULL",
+                            bindings: [.text(row.0.uuidString.lowercased()),.int64(Int64(call.ordinal))]) == 0 else {
+                        throw NativeSourceConversationError.integrityFailure
+                    }
+                }
+                let sourceSHA = try connection.first("SELECT source_receipt_sha256 FROM native_source_provider_calls WHERE stage_id=? AND ordinal=?",
+                    bindings: [.text(row.0.uuidString.lowercased()),.int64(Int64(call.ordinal))],
+                    map: { try $0.strictText(0, maximumBytes: 64) }) ?? nil
+                calls.append(["call":call.checksum,"output":retained?.resultSHA256 ?? "","source":sourceSHA ?? ""])
+            }
+        }
+        let digest = JSONSupport.sha256Hex(try ForgeJSONCanonicalizationV1.data(from: [
+            "kind":"native_pressure_carryover_v1", "stages":stages, "calls":calls,
+            "pressure":state.dispositionSHA256, "source":JSONSupport.sha256Hex(try NativeSourceCommitEvidence.encode(actual))]))
+        return .init(conversationID: reference.conversationID, taskID: reference.taskID, runID: receipt.runID,
+            acceptanceSHA256: receipt.receiptSHA256, ceilings: pressure.observation.fields.effectiveCeilings,
+            priorSourceReadCallsAtEnrollment: c.body.priorSourceReadCallsAtEnrollment, providerStageCount: rows.count,
+            admittedProviderCalls: admittedCalls, observedInputTokens: input, observedOutputTokens: output,
+            exactUsageStageCount: exact, journalSHA256: digest)
     }
     private static func nativeSourceCheckedAdd(_ a: Int, _ b: Int) throws -> Int {
         let result = a.addingReportingOverflow(b)
