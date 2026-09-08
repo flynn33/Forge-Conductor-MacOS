@@ -5,6 +5,272 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class AutonomySupervisorTests: XCTestCase {
+    func testSourceRecoveryAlternatesWithOrdinaryWorkInTheSameCapacity() async throws {
+        try await withRepository { repository, root in
+            let ordinary = try await makeRun(repository: repository, root: root)
+            let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let nextHeld = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let first = sourceReference(held.run, rowID: 1)
+            let second = sourceReference(nextHeld.run, rowID: 2)
+            let discovery = SourceSchedulingFixture(references: [first, second])
+            let ordinaryCoordinator = DelayedStopCoordinator(runID: ordinary.run.runID)
+            let firstCoordinator = DelayedStopCoordinator(runID: first.runID)
+            let secondCoordinator = DelayedStopCoordinator(runID: second.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { try await discovery.discover($0, limit: $1) },
+                    admit: { try await discovery.admit($0) }, makeCoordinator: {
+                        $0 == first ? firstCoordinator : secondCoordinator
+                    })) { _ in ordinaryCoordinator }
+            do {
+                let report = try await supervisor.recoverOnManagerStart()
+                XCTAssertEqual(report.activatedRuns, [first.runID])
+                XCTAssertEqual(Set(report.deferredRuns), [ordinary.run.runID, second.runID])
+                await assertAutonomyError(code: "autonomous_run_bootstrap_required") {
+                    try await supervisor.activate(runID: first.runID)
+                }
+                try await supervisor.quiesce(runID: first.runID)
+                var snapshot = await supervisor.snapshot()
+                XCTAssertEqual(snapshot.activeRunIDs, [ordinary.run.runID])
+                XCTAssertEqual(snapshot.deferredRunIDs, [second.runID])
+                try await supervisor.quiesce(runID: ordinary.run.runID)
+                snapshot = await supervisor.snapshot()
+                XCTAssertEqual(snapshot.activeRunIDs, [second.runID])
+                XCTAssertTrue(snapshot.deferredRunIDs.isEmpty)
+                let firstAdmissions = await discovery.admissionCount(first.rowID)
+                XCTAssertEqual(firstAdmissions, 2, "Discovery and dispatch require separate live admission")
+                let retained = try await repository.autonomousRun(first.runID)
+                XCTAssertEqual(retained?.state, .awaitingBootstrap)
+                XCTAssertNil(retained?.activeSessionID)
+            } catch { await supervisor.shutdown(); throw error }
+            await supervisor.shutdown()
+            let cleaned = await secondCoordinator.hasFinishedCleanup()
+            XCTAssertTrue(cleaned)
+        }
+    }
+
+    func testSourceCursorAdvancesPastMalformedAndDisabledReferences() async throws {
+        try await withRepository { repository, root in
+            let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let valid = sourceReference(held.run, rowID: 17)
+            let invalid = (1...16).map { sourceReference(held.run, rowID: Int64($0), runID: RunID()) }
+            let discovery = SourceSchedulingFixture(references: invalid + [valid],
+                failedRows: Set(1...8), disabledRows: Set(9...16))
+            let coordinator = DelayedStopCoordinator(runID: held.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { try await discovery.discover($0, limit: $1) },
+                    admit: { try await discovery.admit($0) }, makeCoordinator: { reference in
+                        XCTAssertEqual(reference, valid)
+                        return coordinator
+                    })) { _ in XCTFail("Held source reached ordinary factory"); return coordinator }
+            do {
+                let report = try await supervisor.recoverOnManagerStart()
+                XCTAssertTrue(report.activatedRuns.isEmpty)
+                try await supervisor.tick()
+                let snapshot = await supervisor.snapshot()
+                XCTAssertEqual(snapshot.activeRunIDs, [valid.runID])
+                let cursors = await discovery.scannedCursors()
+                XCTAssertEqual(cursors, [nil, 16])
+                try await supervisor.tick()
+                let wrapped = await discovery.scannedCursors()
+                XCTAssertEqual(wrapped, [nil, 16, nil])
+            } catch { await supervisor.shutdown(); throw error }
+            await supervisor.shutdown()
+        }
+    }
+
+    func testSourceAdmissionIsRevalidatedBeforeFactoryAndRejectedPeerDoesNotBlock() async throws {
+        try await withRepository { repository, root in
+            let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let revoked = sourceReference(held.run, rowID: 1, runID: RunID())
+            let unavailable = sourceReference(held.run, rowID: 2, runID: RunID())
+            let valid = sourceReference(held.run, rowID: 3)
+            let discovery = SourceSchedulingFixture(references: [revoked, unavailable, valid], revokeAfterDiscovery: [1])
+            let coordinator = DelayedStopCoordinator(runID: valid.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { try await discovery.discover($0, limit: $1) },
+                    admit: { try await discovery.admit($0) }, makeCoordinator: { reference in
+                        if reference == unavailable { throw ContinuityRunError.hostCapabilityUnavailable }
+                        XCTAssertEqual(reference, valid)
+                        return coordinator
+                    })) { _ in XCTFail("Held source reached ordinary factory"); return coordinator }
+            do {
+                let report = try await supervisor.recoverOnManagerStart()
+                XCTAssertEqual(report.activatedRuns, [valid.runID])
+                XCTAssertTrue(report.deferredRuns.isEmpty)
+                let rejectedAdmissions = await discovery.admissionCount(1)
+                XCTAssertEqual(rejectedAdmissions, 2)
+            } catch { await supervisor.shutdown(); throw error }
+            await supervisor.shutdown()
+        }
+    }
+
+    func testQuiesceInvalidatesSuspendedSourceAdmissionWithoutConstructingCoordinator() async throws {
+        try await withRepository { repository, root in
+            let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let reference = sourceReference(held.run, rowID: 1)
+            let barrier = SourceAdmissionBarrier()
+            let coordinator = DelayedStopCoordinator(runID: reference.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { _, _ in
+                    ContinuityBootstrapRecoveryPage(references: [reference], diagnostics: [], nextRowID: nil)
+                }, admit: { _ in await barrier.admit() }, makeCoordinator: { _ in
+                    XCTFail("Quiesced source reached coordinator construction")
+                    return coordinator
+                })) { _ in XCTFail("Held source reached ordinary factory"); return coordinator }
+            let recovery = Task { try await supervisor.recoverOnManagerStart() }
+            for _ in 0..<2_000 {
+                if await barrier.isWaiting() { break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            let waiting = await barrier.isWaiting()
+            XCTAssertTrue(waiting)
+            try await supervisor.quiesce(runID: reference.runID)
+            await barrier.release()
+            let report = try await recovery.value
+            XCTAssertTrue(report.activatedRuns.isEmpty)
+            let snapshot = await supervisor.snapshot()
+            XCTAssertTrue(snapshot.activeRunIDs.isEmpty)
+            XCTAssertTrue(snapshot.deferredRunIDs.isEmpty)
+            await supervisor.shutdown()
+        }
+    }
+
+    func testSourceDiscoveryUsesOneBoundedDeferredQueueAndShutdownClearsIt() async throws {
+        try await withRepository { repository, root in
+            let ordinary = try await makeRun(repository: repository, root: root)
+            let references = (1...1_100).map { sourceReference(ordinary.run, rowID: Int64($0), runID: RunID()) }
+            let discovery = SourceSchedulingFixture(references: references, enabled: false)
+            let coordinator = DelayedStopCoordinator(runID: ordinary.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { try await discovery.discover($0, limit: $1) },
+                    admit: { try await discovery.admit($0) }, makeCoordinator: { _ in
+                        XCTFail("Source coordinator exceeded shared capacity")
+                        return coordinator
+                    })) { _ in coordinator }
+            do {
+                _ = try await supervisor.recoverOnManagerStart()
+                await discovery.enable()
+                for _ in 0..<70 { try await supervisor.tick() }
+                let snapshot = await supervisor.snapshot()
+                XCTAssertEqual(snapshot.activeRunIDs, [ordinary.run.runID])
+                XCTAssertEqual(snapshot.deferredRunIDs.count, AutonomySupervisor.maximumRecoveredRuns)
+                XCTAssertEqual(Set(snapshot.deferredRunIDs).count, snapshot.deferredRunIDs.count)
+                let limits = await discovery.requestedLimits()
+                XCTAssertTrue(limits.allSatisfy { $0 == AutonomySupervisor.sourceDiscoveryLimit })
+            } catch { await supervisor.shutdown(); throw error }
+            await supervisor.shutdown()
+            let stopped = await supervisor.snapshot()
+            XCTAssertTrue(stopped.activeRunIDs.isEmpty)
+            XCTAssertTrue(stopped.deferredRunIDs.isEmpty)
+        }
+    }
+
+    func testShutdownInvalidatesSuspendedSourceAdmissionAndStartupReceipt() async throws {
+        try await withRepository { repository, root in
+            let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let reference = sourceReference(held.run, rowID: 1)
+            let barrier = SourceAdmissionBarrier()
+            let coordinator = DelayedStopCoordinator(runID: reference.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: SourceBootstrapScheduling(discover: { _, _ in
+                    ContinuityBootstrapRecoveryPage(references: [reference], diagnostics: [], nextRowID: nil)
+                }, admit: { _ in await barrier.admit() }, makeCoordinator: { _ in
+                    XCTFail("Stopped source reached coordinator construction")
+                    return coordinator
+                })) { _ in XCTFail("Held source reached ordinary factory"); return coordinator }
+            let recovery = Task { try await supervisor.recoverOnManagerStart() }
+            for _ in 0..<2_000 {
+                if await barrier.isWaiting() { break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            let waiting = await barrier.isWaiting()
+            XCTAssertTrue(waiting)
+            await supervisor.shutdown()
+            await barrier.release()
+            do { _ = try await recovery.value; XCTFail("Startup returned success after shutdown") }
+            catch { XCTAssertEqual(error as? AutonomyError, .shutdown) }
+            let snapshot = await supervisor.snapshot()
+            XCTAssertFalse(snapshot.acceptingRuns)
+            XCTAssertTrue(snapshot.activeRunIDs.isEmpty)
+            XCTAssertTrue(snapshot.deferredRunIDs.isEmpty)
+        }
+    }
+
+    private func sourceReference(_ run: AutonomousRunRecord, rowID: Int64, runID: RunID? = nil) -> ContinuityBootstrapRecoveryReference {
+        ContinuityBootstrapRecoveryReference(rowID: rowID, operationID: run.activeOperationID ?? UUID(),
+            runID: runID ?? run.runID, projectID: run.projectID, projectGeneration: run.projectGeneration,
+            taskID: UUID(), receiptSHA256: JSONSupport.sha256Hex("scheduler fixture \(rowID)"))
+    }
+
+    func testHeldIngressNeverEntersDeferredQueueWhileOrdinaryRunUsesCapacity() async throws {
+        try await withRepository { repository, root in
+            let ordinary = try await makeRun(repository: repository, root: root)
+            let coordinator = DelayedStopCoordinator(runID: ordinary.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1) { runID in
+                XCTAssertEqual(runID, ordinary.run.runID)
+                return coordinator
+            }
+            do {
+                let startup = try await supervisor.recoverOnManagerStart()
+                XCTAssertEqual(startup.activatedRuns, [ordinary.run.runID])
+                let held = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+                await assertAutonomyError(code: "autonomous_run_bootstrap_required") {
+                    try await supervisor.activate(runID: held.run.runID)
+                }
+                try await supervisor.tick()
+                let busy = await supervisor.snapshot()
+                XCTAssertEqual(busy.activeRunIDs, [ordinary.run.runID])
+                XCTAssertTrue(busy.deferredRunIDs.isEmpty)
+                try await supervisor.quiesce(runID: ordinary.run.runID)
+                let afterCapacityReleased = await supervisor.snapshot()
+                XCTAssertTrue(afterCapacityReleased.activeRunIDs.isEmpty)
+                XCTAssertTrue(afterCapacityReleased.deferredRunIDs.isEmpty)
+                let retained = try await repository.autonomousRun(held.run.runID)
+                XCTAssertEqual(retained?.state, .awaitingBootstrap)
+                XCTAssertNil(retained?.activeSessionID)
+            } catch {
+                await supervisor.shutdown()
+                throw error
+            }
+            await supervisor.shutdown()
+        }
+    }
+
+    func testHeldIngressIsExcludedFromRecoveryTickAndExplicitActivation() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeBootstrapHeldApplicationRun(repository: repository, root: root)
+            let coordinator = DelayedStopCoordinator(runID: fixture.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1) { _ in
+                XCTFail("Bootstrap-held run reached ordinary coordinator construction")
+                return coordinator
+            }
+            do {
+                for _ in 0..<2 {
+                    let report = try await supervisor.recoverOnManagerStart()
+                    XCTAssertEqual(report.discoveredRuns, 1)
+                    XCTAssertTrue(report.activatedRuns.isEmpty)
+                    XCTAssertTrue(report.deferredRuns.isEmpty)
+                    try await supervisor.tick()
+                    await assertAutonomyError(code: "autonomous_run_bootstrap_required") {
+                        try await supervisor.activate(runID: fixture.run.runID)
+                    }
+                    let snapshot = await supervisor.snapshot()
+                    XCTAssertTrue(snapshot.activeRunIDs.isEmpty)
+                    XCTAssertTrue(snapshot.deferredRunIDs.isEmpty)
+                    await supervisor.shutdown()
+                }
+                let started = await coordinator.hasStarted()
+                XCTAssertFalse(started)
+                let retained = try await repository.autonomousRun(fixture.run.runID)
+                XCTAssertEqual(retained?.state, .awaitingBootstrap)
+                XCTAssertNil(retained?.activeSessionID)
+            } catch {
+                await supervisor.shutdown()
+                throw error
+            }
+        }
+    }
+
     func testLeaseFencesDuplicateOwnerAndStaleEpochAfterRecovery() async throws {
         let clock = MutableAutonomyClock(Date(timeIntervalSince1970: 1_000))
         try await withRepository(clock: clock) { repository, root in
@@ -1866,6 +2132,64 @@ final class AutonomySupervisorTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)", file: file, line: line)
         }
+    }
+}
+
+private actor SourceSchedulingFixture {
+    let references: [ContinuityBootstrapRecoveryReference]
+    let failedRows: Set<Int64>
+    let disabledRows: Set<Int64>
+    let revokeAfterDiscovery: Set<Int64>
+    private var enabled: Bool
+    private var admissions: [Int64: Int] = [:]
+    private var cursors: [Int64?] = []
+    private var limits: [Int] = []
+
+    init(references: [ContinuityBootstrapRecoveryReference], failedRows: Set<Int64> = [],
+         disabledRows: Set<Int64> = [], revokeAfterDiscovery: Set<Int64> = [], enabled: Bool = true) {
+        self.references = references
+        self.failedRows = failedRows
+        self.disabledRows = disabledRows
+        self.revokeAfterDiscovery = revokeAfterDiscovery
+        self.enabled = enabled
+    }
+
+    func enable() { enabled = true }
+    func admissionCount(_ row: Int64) -> Int { admissions[row, default: 0] }
+    func scannedCursors() -> [Int64?] { cursors }
+    func requestedLimits() -> [Int] { limits }
+    func discover(_ cursor: Int64?, limit: Int) throws -> ContinuityBootstrapRecoveryPage {
+        cursors.append(cursor)
+        limits.append(limit)
+        guard enabled else { return ContinuityBootstrapRecoveryPage(references: [], diagnostics: [], nextRowID: nil) }
+        let page = Array(references.filter { $0.rowID > (cursor ?? 0) }.prefix(limit))
+        return ContinuityBootstrapRecoveryPage(references: page, diagnostics: [],
+            nextRowID: page.count == limit ? page.last?.rowID : nil)
+    }
+    func admit(_ reference: ContinuityBootstrapRecoveryReference) throws -> Bool {
+        admissions[reference.rowID, default: 0] += 1
+        if failedRows.contains(reference.rowID) { throw ContinuityIngressError.integrityFailure("malformed scheduler fixture") }
+        return !disabledRows.contains(reference.rowID)
+            && !(revokeAfterDiscovery.contains(reference.rowID) && admissions[reference.rowID, default: 0] > 1)
+    }
+}
+
+private actor SourceAdmissionBarrier {
+    private var count = 0
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+    func isWaiting() -> Bool { continuation != nil }
+    func admit() async -> Bool {
+        count += 1
+        if count > 1 && !released {
+            await withCheckedContinuation { continuation = $0 }
+        }
+        return true
+    }
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
     }
 }
 

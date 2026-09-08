@@ -234,11 +234,15 @@ public enum MCPServeVerifier {
 
         let identityOK = serverName == connectorRole.serverID
         let protocolOK = protocolVersion.map(MCPServer.supportedProtocolVersions.contains) ?? false
-        let missingRequiredTools = Self.requiredProductTools.subtracting(toolNames).sorted()
+        let requiredTools = connectorRole == .clu ? MCPToolAccessPolicy.continuityTools : Self.requiredProductTools
+        let missingRequiredTools = requiredTools.subtracting(toolNames).sorted()
+        let roleToolsOK = connectorRole == .clu
+            ? Set(toolNames) == MCPToolAccessPolicy.continuityTools
+            : toolCount >= minimumToolCount
         let ok = ndjsonOnly
             && envelopeOK
             && protocolOK
-            && toolCount >= minimumToolCount
+            && roleToolsOK
             && descriptorsOK
             && identityOK
             && missingRequiredTools.isEmpty

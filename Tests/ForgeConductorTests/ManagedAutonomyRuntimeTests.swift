@@ -15,6 +15,116 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         try? FileManager.default.removeItem(at: home)
     }
 
+    func testShutdownDuringHeldSourceStartupPreventsLateRecoveryAndRestart() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let held = try await makeBootstrapHeldApplicationRun(repository: app.projectContexts.repository, root: home)
+        let repository = app.projectContexts.repository
+        let gate = ManagedRuntimeStartupCommitGate(commitsToSkip: 1)
+        defer { gate.release() }
+        let runtime = try ManagedAutonomyRuntime(app: app, registry: HostAdapterRegistry(), maximumConcurrentRuns: 1)
+        // The first controlled commit is the new cancellation scan, which runs
+        // before supervisor recovery. Skip that empty scan to retain this test's
+        // original post-supervisor boundary, before any source coordinator is owned.
+        await repository.configureOperationObservers(beforeCommit: { try gate.pauseOnce() })
+        let startup = Task { try await runtime.start() }
+        var stopping: Task<Void, Never>?
+        do {
+            for _ in 0..<2_000 {
+                if gate.hasEntered { break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            XCTAssertTrue(gate.hasEntered, "Startup must reach the real held-source metadata transaction")
+            let duringStartup = await runtime.snapshot()
+            XCTAssertFalse(duringStartup.started)
+            XCTAssertNil(duringStartup.startupReport)
+            XCTAssertTrue(duringStartup.supervisor.acceptingRuns)
+            do { _ = try await runtime.start(); XCTFail("Concurrent startup was accepted") }
+            catch {
+                guard let autonomy = error as? AutonomyError, case .invalidRequest = autonomy else {
+                    XCTFail("Unexpected concurrent-start error: \(error)")
+                    throw error
+                }
+            }
+
+            stopping = Task { await runtime.shutdown() }
+            var supervisorStopped = false
+            for _ in 0..<2_000 {
+                if !(await runtime.snapshot()).supervisor.acceptingRuns { supervisorStopped = true; break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            XCTAssertTrue(supervisorStopped, "Shutdown must invalidate a startup still waiting on its metadata commit")
+            gate.release()
+            await stopping?.value
+            do { _ = try await startup.value; XCTFail("Startup completed after shutdown") }
+            catch { XCTAssertEqual(error as? AutonomyError, .shutdown) }
+            await repository.configureOperationObservers()
+            let stopped = await runtime.snapshot()
+            XCTAssertFalse(stopped.started)
+            XCTAssertNil(stopped.startupReport)
+            XCTAssertFalse(stopped.supervisor.acceptingRuns)
+            XCTAssertTrue(stopped.supervisor.activeRunIDs.isEmpty)
+            XCTAssertTrue(stopped.supervisor.deferredRunIDs.isEmpty)
+            let stored = try await repository.autonomousRun(held.run.runID)
+            XCTAssertEqual(stored?.state, .awaitingBootstrap)
+            XCTAssertNil(stored?.activeSessionID)
+            let operationID = try XCTUnwrap(held.run.activeOperationID)
+            let sessions = try await repository.providerSessions(operationID: operationID)
+            XCTAssertTrue(sessions.isEmpty)
+            do { _ = try await runtime.start(); XCTFail("Stopped runtime restarted closed job storage") }
+            catch { XCTAssertEqual(error as? AutonomyError, .shutdown) }
+        } catch {
+            gate.release()
+            _ = try? await startup.value
+            await stopping?.value
+            await repository.configureOperationObservers()
+            await runtime.shutdown()
+            throw error
+        }
+        await runtime.shutdown()
+    }
+
+    func testHeldIngressCannotStartThroughRuntimeRecoveryOrControlsButCanCancel() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let fixture = try await makeBootstrapHeldApplicationRun(
+            repository: app.projectContexts.repository, root: home)
+        let provider = ManagedRuntimeFixtureProvider(fixturePath: fixture.projectRoot.appendingPathComponent("fixture.txt").path)
+        let runtime = try ManagedAutonomyRuntime(
+            app: app, registry: managedRuntimeFixtureRegistry(provider: provider), maximumConcurrentRuns: 1)
+        do {
+            let startup = try await runtime.start()
+            XCTAssertFalse(startup.activatedRuns.contains(fixture.run.runID))
+            try await runtime.tick()
+            for action in ManagedAutonomyControlAction.allCases where action != .cancel {
+                do {
+                    _ = try await runtime.controlRun(fixture.run.runID, action: action)
+                    XCTFail("Held ingress accepted ordinary \(action.rawValue)")
+                } catch {
+                    XCTAssertEqual(error as? AutonomyError, .bootstrapRequired(fixture.run.runID))
+                }
+            }
+            let unchanged = try await app.projectContexts.repository.autonomousRun(fixture.run.runID)
+            XCTAssertEqual(unchanged?.state, .awaitingBootstrap)
+            XCTAssertNil(unchanged?.activeSessionID)
+            XCTAssertNil(unchanged?.specification.work.pendingIntent)
+            _ = try await runtime.controlRun(fixture.run.runID, action: .cancel)
+            let cancelled = try await waitForRun(repository: app.projectContexts.repository, runID: fixture.run.runID, state: .cancelled)
+            XCTAssertEqual(cancelled.state, .cancelled)
+            XCTAssertNil(cancelled.activeSessionID)
+            let calls = await provider.snapshot()
+            XCTAssertEqual(calls.probeCalls, 0)
+            XCTAssertEqual(calls.rootCalls, 0)
+            XCTAssertEqual(calls.continuationCalls, 0)
+            let snapshot = await runtime.snapshot()
+            XCTAssertFalse(snapshot.supervisor.deferredRunIDs.contains(fixture.run.runID))
+        } catch {
+            await runtime.shutdown()
+            throw error
+        }
+        await runtime.shutdown()
+    }
+
     func testBudgetPolicyOverridePreservesProviderCapacityReservesAndDefaultBehavior() throws {
         let capabilities = try ProviderCapabilities(providerID: "lmstudio", providerVersion: "fixture-version",
             modelKey: "fixture/tool-model", providerInstanceID: "exact-fixture-instance",
@@ -1569,6 +1679,7 @@ private func managedFixtureCompletionValidator(
 
 private actor ManagedRuntimeFixtureProvider: ManagedModelProvider {
     struct Snapshot: Sendable {
+        let probeCalls: Int
         let rootCalls: Int
         let continuationCalls: Int
         let previousResponseID: String?
@@ -1579,6 +1690,7 @@ private actor ManagedRuntimeFixtureProvider: ManagedModelProvider {
     private let fixturePath: String
     private let rootDelay: Duration?
     private var rootCalls = 0
+    private var probeCalls = 0
     private var continuationCalls = 0
     private var previousResponseID: String?
     private var receivedToolOutput = false
@@ -1590,7 +1702,8 @@ private actor ManagedRuntimeFixtureProvider: ManagedModelProvider {
     }
 
     func probe() async throws -> ProviderCapabilities {
-        try ProviderCapabilities(
+        probeCalls += 1
+        return try ProviderCapabilities(
             providerID: providerID,
             providerVersion: "fixture-1",
             modelKey: "fixture-model",
@@ -1688,12 +1801,84 @@ private actor ManagedRuntimeFixtureProvider: ManagedModelProvider {
 
     func snapshot() -> Snapshot {
         Snapshot(
+            probeCalls: probeCalls,
             rootCalls: rootCalls,
             continuationCalls: continuationCalls,
             previousResponseID: previousResponseID,
             receivedToolOutput: receivedToolOutput
         )
     }
+}
+
+/// Shared application fixture: real native approval, source commit and control-plane
+/// acceptance, with no fabricated provider predecessor or bootstrap success.
+struct BootstrapHeldApplicationFixture {
+    let run: AutonomousRunRecord
+    let projectRoot: URL
+}
+
+func makeBootstrapHeldApplicationRun(
+    repository: ProjectControlPlaneRepository, root: URL
+) async throws -> BootstrapHeldApplicationFixture {
+    let projectRoot = root.appendingPathComponent("bootstrap-project-\(UUID().uuidString)")
+        .resolvingSymlinksInPath().standardizedFileURL
+    try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+    let project = try await repository.registerProjectUnchecked(
+        projectID: ProjectID(), displayName: "Bootstrap hold fixture", canonicalRoot: projectRoot)
+    let scope = ToolAuthorizationScope(canonicalRoots: [projectRoot], writableRoots: [], allowedTools: ["context_get", "fs_read"],
+        networkAllowed: false, maximumInlineOutputBytes: 65_536)
+    let client = ClientID("bootstrap-fixture-\(UUID().uuidString)")
+    let owner = ProjectBindingOwner(kind: .mcpClient, id: client.rawValue)
+    let binding = try await repository.bind(owner: owner, projectID: project.projectID,
+        generation: project.generation, authorizationScope: scope)
+    let approved = try ContinuityTaskAssignment(assignmentID: "bootstrap-fixture", assignmentBytes: Data("Approved fixture assignment".utf8),
+        mission: "Read the authorized fixture after bootstrap", providerID: "fixture-provider", adapterID: "fixture-adapter",
+        modelKey: "fixture-model", specification: .init(allowedTools: ["context_get", "fs_read"], completionGates: ["fixture_read"]),
+        authorizationScope: scope)
+    let setup = try await repository.authorizeContinuityTask(projectID: project.projectID,
+        expectedGeneration: project.generation, approvedAssignment: approved,
+        callerContext: binding.invocationContext(clientID: client), callerOwner: owner)
+    let source = try SQLiteStore(path: root.appendingPathComponent("bootstrap-source-\(UUID().uuidString).sqlite3"))
+    defer { source.close() }
+    let committed = try source.handoffCommit(HandoffPacket(
+        id: UUID().uuidString.lowercased(), createdAt: "2026-09-08T10:00:00Z", updatedAt: "2026-09-08T10:00:00Z",
+        source: .model, resumeReady: true, goal: "Untrusted progress must not activate a provider"),
+        authorization: setup.record.authorization, automaticHandoffEnabled: true)
+    let delivery = try XCTUnwrap(committed.delivery)
+    let policy = try BudgetPolicyState(globalPolicy: BudgetPolicy(automaticHandoffEnabled: true)).resolve(
+        BudgetPolicyScope(kind: .projectOverride, projectID: project.projectID.description, projectGeneration: 1))
+    let receipt = try await repository.acceptContinuityIngress(source: committed.revision,
+        operationID: delivery.operationID, policySelection: policy)
+    let run = try await repository.autonomousRun(receipt.runID)
+    return BootstrapHeldApplicationFixture(run: try XCTUnwrap(run), projectRoot: projectRoot)
+}
+
+private final class ManagedRuntimeStartupCommitGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let signal = DispatchSemaphore(value: 0)
+    private var entered = false
+    private var commitsToSkip: Int
+
+    init(commitsToSkip: Int = 0) { self.commitsToSkip = commitsToSkip }
+
+    var hasEntered: Bool { lock.lock(); defer { lock.unlock() }; return entered }
+
+    func pauseOnce() throws {
+        lock.lock()
+        guard !entered else { lock.unlock(); return }
+        if commitsToSkip > 0 {
+            commitsToSkip -= 1
+            lock.unlock()
+            return
+        }
+        entered = true
+        lock.unlock()
+        guard signal.wait(timeout: .now() + 10) == .success else {
+            throw AutonomyError.invalidRequest("startup transaction fixture timed out")
+        }
+    }
+
+    func release() { signal.signal() }
 }
 
 private struct ManagedRuntimeUnavailableAdapter: SessionHostAdapter, Sendable {

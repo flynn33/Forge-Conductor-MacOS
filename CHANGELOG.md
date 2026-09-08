@@ -20,6 +20,37 @@ Provider settings now have native and manager save controls. Four native product
 onboarding scenarios passed; disposable Keychain tests also executed. Complete
 installed-stack and production-feature acceptance remain separate gates.
 
+### Authorized handoff storage and admission
+
+- Added exact CLU control schemas, native task dispatch and operation-scoped
+  cancellation recovery. The CLU connector exposes only its four controls;
+  installation now includes that role in commit, rollback and removal.
+- Task-owned handoffs now have immutable canonical revisions and an atomic,
+  bounded delivery outbox. Retries preserve the original bytes and delivery identity.
+- Native task authorization binds the approved assignment, project generation and
+  exact tool scope; revocation survives restart and generic binding reactivation.
+- Native control reattachment validates the original caller after restart while
+  preserving the transferred source's write fence and peer-task isolation.
+- Shared legacy context reads, memory pointers and file projections exclude owned
+  handoffs. Existing unowned legacy packets retain their compatibility path.
+- The persistent manager delivers bounded batches into one durable task-run
+  association. Accepted runs remain held from ordinary execution, with cancellation
+  available, until exact restoration and canonical successor sealing finish.
+- An internal native bootstrap now records a candidate, reads the frozen handoff
+  through the existing broker, and verifies its typed acknowledgment. Restart
+  reuses durable provider results and retrieval proof while retaining the hold.
+- Current model capacity and recovery tool limits are checked before root creation
+  and again at restoration. The existing watchdog now recovers authorized held
+  sources under the shared run limit, with live policy checks and bounded retries.
+- Recovery separates bootstrap from successor activation, retaining the hold until
+  canonical sealing and preventing duplicate root creation across restart.
+- Internal exact-ID submission retains one explicit start permit without changing
+  automatic-handoff settings. Source transfer checks the original caller's durable
+  scope; unsupported task mutation identity fails before activation.
+- Resumed status requires an authorized broker result and a provider turn consuming
+  its exact output. Public enrollment and full native/live acceptance remain open. See
+  [Continuity ingress](docs/CONTINUITY-INGRESS.md) for integration boundaries.
+
 ### Durable budget policy
 
 - Budget preferences now persist with global/project scope, revisions, inheritance
@@ -104,6 +135,13 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Fixed
 
+- Run-state updates now require the target run's own lease and preserve an
+  unfinished source handoff's operation and accepted session identifiers until
+  verified output consumption completes the transfer.
+- Native gauge lifecycle observations now count the fixture's own production
+  surfaces separately from hidden host windows whose telemetry can change their
+  gauge lists. Shared counters, object-release checks and rendering/resource
+  quiescence remain part of the native test.
 - Runtime sandbox read rules now resolve the existing system runtime roots to
   the same physical paths used by interpreter admission, allowing Xcode's
   versioned Python framework through an existing Xcode.app alias. Authorized

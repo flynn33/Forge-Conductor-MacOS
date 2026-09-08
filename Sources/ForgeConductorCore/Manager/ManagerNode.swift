@@ -112,6 +112,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var providerConfigurationService: (any ProviderConfigurationServicing)?
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
+    private var continuityIngress: ContinuityIngressDeliveryService?
 
     public convenience init(
         app: ForgeApp,
@@ -1768,8 +1769,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
         do {
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
-            _ = try catalog.definitions(allowedToolNames: allowedTools)
+            _ = try catalog.providerToolDefinitions(allowedToolNames: allowedTools)
         } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
+            throw AutonomyError.invalidToolConfiguration(tools)
+        } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
             throw AutonomyError.invalidToolConfiguration(tools)
         }
         let request = AutonomousRunRequest(
@@ -2911,12 +2914,16 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
         lock.unlock()
 
+        let ingress = try ContinuityIngressDeliveryService(
+            source: app.store, repository: app.projectContexts.repository, config: app.config
+        )
         let value = try managedAutonomyFactory(app)
         let report = try Self.waitForAsync(timeoutSeconds: 30) {
             try await value.start()
         }
         lock.lock()
         managedAutonomy = value
+        continuityIngress = ingress
         lock.unlock()
         app.diagnostics.info(
             "manager_autonomy_recovered",
@@ -2934,15 +2941,26 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private func scheduleAutonomyTick() {
         lock.lock()
         guard let autonomy = managedAutonomy,
+              let ingress = continuityIngress,
               !runtime.autonomyTickPending,
               !runtime.shutdownRequested else {
             lock.unlock()
             return
         }
         runtime.autonomyTickPending = true
-        lock.unlock()
-
-        Task { [weak self, autonomy] in
+        let tickID = UUID()
+        runtime.autonomyTickID = tickID
+        runtime.autonomyTickTask = Task { [weak self, autonomy, ingress] in
+            defer { self?.markAutonomyTickComplete(tickID) }
+            do {
+                _ = try await ingress.drainOnce()
+            } catch {
+                if !Task.isCancelled {
+                    self?.app.diagnostics.warn("manager_continuity_delivery_failed",
+                        ["error_code": "bounded_ingress_drain_failed"], category: .manager)
+                }
+            }
+            guard !Task.isCancelled else { return }
             do {
                 try await autonomy.tick()
             } catch {
@@ -2952,27 +2970,53 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     category: .manager
                 )
             }
-            guard let self else { return }
-            self.markAutonomyTickComplete()
         }
+        lock.unlock()
     }
 
-    private func markAutonomyTickComplete() {
+    private func markAutonomyTickComplete(_ tickID: UUID) {
         lock.lock()
-        runtime.autonomyTickPending = false
+        if runtime.autonomyTickID == tickID {
+            runtime.autonomyTickPending = false
+            runtime.autonomyTickID = nil
+            runtime.autonomyTickTask = nil
+        }
         lock.unlock()
+    }
+
+    /// Runs the same bounded delivery pass used by the manager watchdog. A GUI
+    /// or MCP-only ManagerNode has no admission owner and cannot drive this path.
+    func drainContinuityIngressOnce() async throws -> ContinuityIngressDrainReport {
+        try await requiredContinuityIngress().drainOnce()
+    }
+
+    private func requiredContinuityIngress() throws -> ContinuityIngressDeliveryService {
+        lock.lock()
+        defer { lock.unlock() }
+        guard managedAutonomy != nil, !runtime.shutdownRequested, let continuityIngress else {
+            throw AutonomyError.shutdown
+        }
+        return continuityIngress
     }
 
     public func shutdownManagedAutonomy() {
         lock.lock()
         let autonomy = managedAutonomy
+        let ingress = continuityIngress
+        let tick = runtime.autonomyTickTask
         managedAutonomy = nil
+        continuityIngress = nil
         runtime.autonomyTickPending = false
+        runtime.autonomyTickID = nil
+        runtime.autonomyTickTask = nil
+        tick?.cancel()
         lock.unlock()
-        guard let autonomy else { return }
+        guard autonomy != nil || ingress != nil || tick != nil else { return }
         do {
             _ = try Self.waitForAsync(timeoutSeconds: 20) {
-                await autonomy.shutdown()
+                await ingress?.shutdown()
+                await tick?.value
+                await autonomy?.shutdown()
                 return true
             }
         } catch {

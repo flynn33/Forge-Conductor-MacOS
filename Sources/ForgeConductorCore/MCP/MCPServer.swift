@@ -46,6 +46,8 @@ public final class MCPServer: @unchecked Sendable {
     private let didCloseResponseDeliveryObserver: (@Sendable () -> Void)?
     private var responseDeliveryOpen = false
     private var activeRequests: [RequestKey: ToolCallCancellation] = [:]
+    private var initialized = false
+    private var nativeTaskSession: ContinuityNativeTaskSession?
 
     public init(
         app: ForgeApp,
@@ -76,6 +78,13 @@ public final class MCPServer: @unchecked Sendable {
         self.toolDefinitionCatalog = Result {
             try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
         }
+    }
+
+    /// Only native composition can attach this task identity. Shared stdio
+    /// initialization and tool arguments have no way to construct or replace it.
+    convenience init(nativeTaskSession: ContinuityNativeTaskSession, role: LMStudioConnectorRole = .primary) {
+        self.init(app: nativeTaskSession.app, clientID: nativeTaskSession.clientID, role: role)
+        self.nativeTaskSession = nativeTaskSession
     }
 
     /// Blocking serve loop: read newline-delimited or Content-Length framed messages from stdin.
@@ -231,6 +240,9 @@ public final class MCPServer: @unchecked Sendable {
                 let requested = (params["protocolVersion"] as? String)?
                     .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let negotiated = Self.negotiateProtocolVersion(requested)
+                cancellationLock.lock()
+                initialized = true
+                cancellationLock.unlock()
                 app.diagnostics.info("mcp_initialize", [
                     "requested": requested.isEmpty ? "(none)" : requested,
                     "negotiated": negotiated,
@@ -273,11 +285,36 @@ public final class MCPServer: @unchecked Sendable {
             case "tools/call":
                 let params = message["params"] as? [String: Any] ?? [:]
                 let name = params["name"] as? String ?? ""
+                guard MCPToolAccessPolicy.permits(name, role: role) else {
+                    return toolCallResponse(id: id, result: .failure(
+                        code: "tool_not_allowed", message: "This tool is not available through the CLU role."
+                    ))
+                }
+                if ContinuityControlToolName(rawValue: name) != nil,
+                   let supplied = params["arguments"], !(supplied is [String: Any]) {
+                    return toolCallResponse(id: id, result: try ContinuityControlToolResponse.failure(
+                        .init(.invalidRequest, field: .arguments)
+                    ).toolResult())
+                }
                 let arguments = params["arguments"] as? [String: Any] ?? [:]
                 app.diagnostics.info("mcp_tools_call", [
                     "tool": name,
                     "client_id": clientID.rawValue,
                 ], category: .mcp)
+                cancellationLock.lock()
+                let connected = initialized
+                cancellationLock.unlock()
+                if let nativeTaskSession, nativeTaskSession.handles(name) {
+                    let result = try nativeTaskSession.callSynchronously(name: name, arguments: arguments,
+                        role: ContinuityControlCapabilities.Role(rawValue: role.rawValue) ?? .primary,
+                        connected: connected, cancellation: requestCancellation)
+                    return toolCallResponse(id: id, result: result)
+                }
+                if let result = try ContinuityControlToolPack.sharedConnectionResult(
+                    name: name, arguments: arguments, app: app,
+                    role: ContinuityControlCapabilities.Role(rawValue: role.rawValue) ?? .primary,
+                    connected: connected, cancellation: requestCancellation
+                ) { return toolCallResponse(id: id, result: result) }
                 let result = try app.tools.call(
                     name: name,
                     arguments: arguments,
@@ -319,7 +356,10 @@ public final class MCPServer: @unchecked Sendable {
     }
 
     private func toolDescriptors() throws -> [[String: Any]] {
-        try toolDefinitionCatalog.get().mcpDescriptors()
+        try toolDefinitionCatalog.get().mcpDescriptors().filter {
+            guard let name = $0["name"] as? String else { return false }
+            return MCPToolAccessPolicy.permits(name, role: role)
+        }
     }
 
     private static func isNotification(_ message: [String: Any]) -> Bool {
@@ -478,6 +518,8 @@ public final class MCPServer: @unchecked Sendable {
     ) throws -> Int? {
         guard message["method"] as? String == "tools/call" else { return nil }
         let params = message["params"] as? [String: Any] ?? [:]
+        if let name = params["name"] as? String,
+           ContinuityControlToolName(rawValue: name) != nil { return nil }
         let arguments = params["arguments"] as? [String: Any] ?? [:]
         return try ToolRouter.requestedDeadlineMilliseconds(in: arguments)
     }

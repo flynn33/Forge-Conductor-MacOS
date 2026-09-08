@@ -39,6 +39,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             MemoryToolPack(),
             ProjectMemoryToolPack(),
             ContinuityToolPack(),
+            ContinuityControlToolPack(),
             ContinuityLifecycleToolPack(),
             FilesystemToolPack(),
             GitToolPack(),
@@ -67,6 +68,9 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
+        if let result = try ContinuityControlToolPack.sharedConnectionResult(
+            name: name, arguments: arguments, app: app, cancellation: cancellation
+        ) { return result }
         let start = Date()
         let requestControl = cancellation
             ?? ToolCallCancellation(timeoutSeconds: Self.defaultCallTimeoutSeconds)
@@ -178,6 +182,9 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         context: ToolInvocationContext,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
+        if let result = try ContinuityControlToolPack.sharedConnectionResult(
+            name: name, arguments: arguments, app: app, cancellation: cancellation
+        ) { return result }
         let start = Date()
         let requestControl = cancellation
             ?? ToolCallCancellation(timeoutSeconds: Self.defaultCallTimeoutSeconds)

@@ -626,6 +626,16 @@ public final class ProjectContextService: @unchecked Sendable {
         return ProjectBindingOwner(kind: .mcpClient, id: context.clientID.rawValue)
     }
 
+    /// Native task adapters share this facade's single bounded bridge admission.
+    /// UI callers use the asynchronous task session directly.
+    func performContinuityTaskOperation(
+        cancellation: ToolCallCancellation?,
+        _ operation: @escaping @Sendable (ToolCallCancellation) async throws -> ToolResult
+    ) throws -> ToolResult {
+        guard !Thread.isMainThread else { throw ContinuityControlToolFailure(.operationBusy) }
+        return try wait(cancellation: cancellation, committedResultWins: true, operation)
+    }
+
     private func wait<Value: Sendable>(
         cancellation: ToolCallCancellation?,
         committedResultWins: Bool,

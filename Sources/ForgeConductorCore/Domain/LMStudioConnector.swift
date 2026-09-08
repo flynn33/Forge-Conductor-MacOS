@@ -6,13 +6,14 @@
 
 import Foundation
 
-/// The two independently launched stdio connections installed into LM Studio.
+/// Independently launched stdio roles installed into LM Studio.
 ///
 /// Roles are values rather than free-form strings so deployment, health checks,
 /// diagnostics, and the MCP server cannot silently disagree about identity.
 public enum LMStudioConnectorRole: String, CaseIterable, Codable, Sendable {
     case primary
     case fallback
+    case clu
 
     public init(environmentValue: String?) {
         self = Self(rawValue: environmentValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
@@ -23,6 +24,7 @@ public enum LMStudioConnectorRole: String, CaseIterable, Codable, Sendable {
         switch self {
         case .primary: LMStudioEnvironment.primaryServerID
         case .fallback: LMStudioEnvironment.fallbackServerID
+        case .clu: LMStudioEnvironment.continuityServerID
         }
     }
 
@@ -30,6 +32,7 @@ public enum LMStudioConnectorRole: String, CaseIterable, Codable, Sendable {
         switch self {
         case .primary: "mcp-stdio"
         case .fallback: "mcp-stdio-fallback"
+        case .clu: "mcp-stdio-clu"
         }
     }
 }
@@ -61,6 +64,7 @@ public struct LMStudioConnectorHealth: Sendable, Equatable {
 /// keeps the service observable while repair is attempted on the other role.
 public enum LMStudioConnectionState: String, Codable, Sendable {
     case ready
+    case continuityUnavailable = "continuity_unavailable"
     case primaryOnly = "primary_only"
     case fallbackPromoted = "fallback_promoted"
     case unavailable
@@ -77,7 +81,11 @@ public struct LMStudioConnectionHealth: Sendable, Equatable {
         let primary = roles.first(where: { $0.role == .primary })?.isReady == true
         let fallback = roles.first(where: { $0.role == .fallback })?.isReady == true
         switch (primary, fallback) {
-        case (true, true): return .ready
+        case (true, true):
+            if let continuity = roles.first(where: { $0.role == .clu }), !continuity.isReady {
+                return .continuityUnavailable
+            }
+            return .ready
         case (true, false): return .primaryOnly
         case (false, true): return .fallbackPromoted
         case (false, false): return .unavailable

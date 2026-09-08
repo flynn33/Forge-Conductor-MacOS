@@ -40,6 +40,7 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         // public window lifecycle and leave the application's live telemetry
         // running. Global draw/resource counts must demonstrate quiescence;
         // an off-screen menu item's state is not a model observation.
+        if NSApp.isHidden { NSApp.unhideWithoutActivation() }
         originalVisibleWindows = NSApp.windows.filter(\.isVisible)
         for window in originalVisibleWindows { window.orderOut(nil) }
         guard await waitForQuietDraws(timeout: 8, quietInterval: 1.25) else {
@@ -138,9 +139,22 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         retainObservation("ordered-out-value-updates", before: orderedOutBaseline)
 
         let beforeReorder = counter(.gaugeDraws)
-        fixture.window.orderFront(nil)
+        await presentFixtureWindow(fixture, stage: "ordered-front")
         XCTAssertTrue(fixture.window.isVisible)
+        let exposedAfterReorder = await waitUntil(timeout: 5) {
+            fixture.window.occlusionState.contains(.visible)
+        }
+        if !exposedAfterReorder {
+            retainObservation("ordered-front-exposure-failure", before: orderedOutBaseline)
+        }
+        XCTAssertTrue(exposedAfterReorder, "The native fixture must have exposed pixels before qualifying visible redraw behavior")
         let resumedAfterReorder = await waitUntil(timeout: 5) { self.counter(.gaugeDraws) >= beforeReorder + 5 }
+        retainObservation("ordered-front-resume-result", before: orderedOutBaseline, transition: [
+            "exposed": exposedAfterReorder,
+            "resumed": resumedAfterReorder,
+            "draws_before_order_front": beforeReorder,
+            "draws_after_wait": counter(.gaugeDraws),
+        ])
         XCTAssertTrue(resumedAfterReorder, "Ordering the window front must present retained values without a test-forced draw")
         try requireActualFrames(from: views, step: 27)
 
@@ -177,12 +191,29 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
             try requireActualFrames(from: views, step: cycle + 1)
             let weakViews = views.map { NativeGaugeWeakReference($0) }
             let weakCoordinators = views.map { NativeGaugeWeakReference($0.delegate as AnyObject?) }
-            XCTAssertEqual(gauge(.gaugeActiveSurfaces), level(.gaugeActiveSurfaces, in: baseline) + 5)
+            XCTAssertEqual(level(.gaugeActiveSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 5)
+            XCTAssertEqual(level(.gaugeVisibleSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 5)
+            retainObservation("mounted-cycle-\(cycle)", before: nil)
+
+            // A separate production surface deliberately changes the shared
+            // count. It has no window, so attachment cannot submit a frame.
+            // The five fixture surfaces remain owned entirely by SwiftUI.
+            let hostSurface = GaugeMetalView()
+            let hostRenderer = MetalBarRenderer()
+            let beforeHostAttachment = RuntimeDiagnostics.shared.snapshot()
+            hostRenderer.attach(hostSurface)
+            defer { hostRenderer.detach(from: hostSurface) }
+            XCTAssertTrue(hostSurface.delegate === hostRenderer)
+            XCTAssertEqual(gauge(.gaugeActiveSurfaces), level(.gaugeActiveSurfaces, in: beforeHostAttachment) + 1)
+            XCTAssertEqual(gauge(.gaugeVisibleSurfaces), level(.gaugeVisibleSurfaces, in: beforeHostAttachment) + 1)
+            XCTAssertEqual(level(.gaugeActiveSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 5)
+            XCTAssertEqual(level(.gaugeVisibleSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 5)
 
             fixture.removeGauges()
             let detachedFromSwiftUI = await waitUntil(timeout: 5) {
                 views.allSatisfy { $0.delegate == nil }
-                    && self.gauge(.gaugeActiveSurfaces) == self.level(.gaugeActiveSurfaces, in: baseline)
+                    && self.level(.gaugeActiveSurfaces, in: fixture.surfaceDiagnostics.snapshot()) == 0
+                    && self.level(.gaugeVisibleSurfaces, in: fixture.surfaceDiagnostics.snapshot()) == 0
             }
             XCTAssertTrue(detachedFromSwiftUI, "SwiftUI dismantling must detach the production delegates and release surface accounting")
             views.removeAll()
@@ -193,12 +224,22 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
             XCTAssertTrue(releasedBySwiftUI, "Native view/coordinator references survived the SwiftUI removal boundary")
 
             let detached = RuntimeDiagnostics.shared.snapshot()
+            // No event turn separates these shared snapshots. This exact
+            // decrement is unrelated to the released fixture's exact zero.
+            hostRenderer.detach(from: hostSurface)
+            XCTAssertNil(hostSurface.delegate)
+            XCTAssertEqual(gauge(.gaugeActiveSurfaces), level(.gaugeActiveSurfaces, in: detached) - 1)
+            XCTAssertEqual(gauge(.gaugeVisibleSurfaces), level(.gaugeVisibleSurfaces, in: detached) - 1)
+            XCTAssertEqual(level(.gaugeActiveSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 0)
+            XCTAssertEqual(level(.gaugeVisibleSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 0)
+            retainObservation("unrelated-host-detach-cycle-\(cycle)", before: detached)
             // Native event turns continue while the hosting window still exists.
             // No direct call is made to a dismantled coordinator.
             await allowNativeEvents(for: 0.5)
             XCTAssertEqual(counter(.gaugeDraws), count(.gaugeDraws, in: detached))
             XCTAssertEqual(counter(.gaugeBuffersCreated), count(.gaugeBuffersCreated, in: detached))
-            XCTAssertEqual(gauge(.gaugeActiveSurfaces), level(.gaugeActiveSurfaces, in: baseline))
+            XCTAssertEqual(level(.gaugeActiveSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 0)
+            XCTAssertEqual(level(.gaugeVisibleSurfaces, in: fixture.surfaceDiagnostics.snapshot()), 0)
             retainObservation("dismantled-cycle-\(cycle)", before: detached)
             fixture.close()
             self.fixture = nil
@@ -253,10 +294,20 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
     private func mountGauges() async throws -> NativeGaugeWindow {
         guard fixture == nil else { throw NativeGaugeTestFailure("Previous test window was not released.") }
         let beforePresentation = counter(.gaugeDraws)
-        let fixture = NativeGaugeWindow()
+        let surfaceDiagnostics = RuntimeDiagnostics()
+        XCTAssertEqual(level(.gaugeActiveSurfaces, in: surfaceDiagnostics.snapshot()), 0)
+        XCTAssertEqual(level(.gaugeVisibleSurfaces, in: surfaceDiagnostics.snapshot()), 0)
+        let fixture = NativeGaugeWindow(surfaceDiagnostics: surfaceDiagnostics)
         self.fixture = fixture
-        fixture.window.orderFront(nil)
+        // Ordered-in windows can remain fully obscured by another application.
+        // Establish real exposure before measuring automatic visible frames.
+        await presentFixtureWindow(fixture, stage: "initial")
         XCTAssertTrue(fixture.window.isVisible)
+        let exposed = await waitUntil(timeout: 5) {
+            fixture.window.occlusionState.contains(.visible)
+        }
+        if !exposed { retainObservation("initial-exposure-failure", before: nil) }
+        XCTAssertTrue(exposed, "The native fixture must have exposed pixels before qualifying initial rendering")
         let mounted = await waitUntil(timeout: 5) { fixture.metalViews.count == 5 }
         XCTAssertTrue(mounted)
         fixture.hostingView.layoutSubtreeIfNeeded()
@@ -265,6 +316,24 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         }
         XCTAssertTrue(firstFrames, "Native attachment must present every initial dirty gauge without a test-forced draw")
         return fixture
+    }
+
+    private func presentFixtureWindow(_ fixture: NativeGaugeWindow, stage: String) async {
+        // App activation is asynchronous and may be refused. Request it through
+        // AppKit, then prove this exact fixture became key before checking its
+        // exposure. Window ordering alone does not establish either condition.
+        if #available(macOS 14.0, *) {
+            NSApp.activate()
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        fixture.window.makeKeyAndOrderFront(nil)
+        fixture.window.orderFrontRegardless()
+        let activated = await waitUntil(timeout: 5) {
+            NSApp.isActive && fixture.window.isKeyWindow
+        }
+        if !activated { retainObservation("\(stage)-activation-failure", before: nil) }
+        XCTAssertTrue(activated, "The native application host and exact fixture window must become active before qualifying visible rendering")
     }
 
     private func requireProductionSurfaces(in fixture: NativeGaugeWindow) throws -> [MTKView] {
@@ -321,17 +390,16 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         let deadline = Date().addingTimeInterval(timeout)
         var lastCount = counter(.gaugeDraws)
         var lastBuffers = counter(.gaugeBuffersCreated)
-        var lastSurfaces = gauge(.gaugeActiveSurfaces)
         var unchangedSince = Date()
         while Date() < deadline {
             await allowNativeEvents(for: 0.025)
             let current = counter(.gaugeDraws)
             let buffers = counter(.gaugeBuffersCreated)
-            let surfaces = gauge(.gaugeActiveSurfaces)
-            if current != lastCount || buffers != lastBuffers || surfaces != lastSurfaces {
+            // Live hidden host views may be added or released without drawing.
+            // Surface lifetime is asserted separately within the fixture scope.
+            if current != lastCount || buffers != lastBuffers {
                 lastCount = current
                 lastBuffers = buffers
-                lastSurfaces = surfaces
                 unchangedSince = Date()
             }
             if Date().timeIntervalSince(unchangedSince) >= quietInterval { return true }
@@ -376,10 +444,18 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         snapshot.gauges[gauge.rawValue] ?? 0
     }
 
-    private func retainObservation(_ name: String, before: RuntimeDiagnosticSnapshot?) {
+    private func retainObservation(_ name: String, before: RuntimeDiagnosticSnapshot?,
+                                   transition: [String: Any] = [:]) {
         var report: [String: Any] = [
             "scope": "native-production-gauge-components",
             "application_delegate_type": NSApp.delegate.map { String(reflecting: type(of: $0)) } ?? "none",
+            "application_active": NSApp.isActive,
+            "application_hidden": NSApp.isHidden,
+            "application_activation_policy": NSApp.activationPolicy().rawValue,
+            "screens": NSScreen.screens.map {
+                ["display_id": $0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? NSNull(),
+                 "frame": NSStringFromRect($0.frame)] as [String: Any]
+            },
             "host_windows": NSApp.windows.map {
                 ["identifier": $0.identifier?.rawValue ?? "", "visible": $0.isVisible] as [String: Any]
             },
@@ -389,11 +465,29 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
             "metal_device": MetalGaugeResources.shared.device?.name ?? "unavailable",
         ]
         if let before { report["before"] = before.asDictionary() }
+        if !transition.isEmpty { report["transition"] = transition }
         if let fixture {
             report["window_visible"] = fixture.window.isVisible
+            report["window_state"] = fixture.windowObservation
+            report["window_notifications"] = fixture.notificationObservation
+            report["fixture_surface_accounting"] = fixture.surfaceDiagnostics.snapshot().asDictionary()
             report["surfaces"] = fixture.metalViews.map { view in
                 ["paused": view.isPaused, "hidden": view.isHiddenOrHasHiddenAncestor,
-                 "has_delegate": view.delegate != nil] as [String: Any]
+                 "has_delegate": view.delegate != nil,
+                 "delegate_type": view.delegate.map { String(reflecting: type(of: $0)) } ?? "none",
+                 "delegate_dirty": view.delegate.flatMap { delegate in
+                     // Inspect at most 32 direct stored fields. This diagnostic
+                     // never acquires a drawable or asks the renderer to draw.
+                     Mirror(reflecting: delegate).children.prefix(32)
+                         .first(where: { $0.label == "dirty" })?.value as? Bool
+                 } as Any? ?? NSNull(),
+                 "bounds": NSStringFromRect(view.bounds),
+                 "drawable_size": NSStringFromSize(view.drawableSize),
+                 "needs_display": view.needsDisplay,
+                 "layer_needs_display": view.layer.map { $0.needsDisplay() } as Any? ?? NSNull(),
+                 "enable_set_needs_display": view.enableSetNeedsDisplay,
+                 "has_device": view.device != nil,
+                 "has_window": view.window != nil] as [String: Any]
             }
         }
         do {
@@ -411,17 +505,23 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
 @MainActor
 private struct NativeGaugeFixtureView: View {
     var showsGauges = true
+    let surfaceDiagnostics: RuntimeDiagnostics
     var body: some View {
         VStack(spacing: 12) {
             if showsGauges {
-                MetalBarGauge(fraction: 1, tint: .cyan).frame(width: 320, height: 24)
-                MetalRingGauge(fraction: 1, tint: .cyan).frame(width: 100, height: 100)
-                MetalCoreBarsView(cores: Array(repeating: 50, count: 8)).frame(width: 320, height: 100)
-                MetalLoadChart(samples: Array(repeating: 50, count: 32)).frame(width: 320, height: 100)
+                MetalBarGauge(fraction: 1, tint: .cyan, surfaceDiagnostics: surfaceDiagnostics)
+                    .frame(width: 320, height: 24)
+                MetalRingGauge(fraction: 1, tint: .cyan, surfaceDiagnostics: surfaceDiagnostics)
+                    .frame(width: 100, height: 100)
+                MetalCoreBarsView(cores: Array(repeating: 50, count: 8), surfaceDiagnostics: surfaceDiagnostics)
+                    .frame(width: 320, height: 100)
+                MetalLoadChart(samples: Array(repeating: 50, count: 32), surfaceDiagnostics: surfaceDiagnostics)
+                    .frame(width: 320, height: 100)
                 MultiSeriesLoadChart(
                     cpu: Array(repeating: 50, count: 32),
                     ram: Array(repeating: 40, count: 32),
-                    gpu: Array(repeating: 30, count: 32)
+                    gpu: Array(repeating: 30, count: 32),
+                    surfaceDiagnostics: surfaceDiagnostics
                 ).frame(width: 320, height: 100)
             }
         }
@@ -430,20 +530,67 @@ private struct NativeGaugeFixtureView: View {
 }
 
 @MainActor
-private final class NativeGaugeWindow {
+private final class NativeGaugeWindow: NSObject {
     let window: NSWindow
     let hostingView: NSHostingView<NativeGaugeFixtureView>
+    let surfaceDiagnostics: RuntimeDiagnostics
+    private var notificationCounts: [String: Int] = [:]
+    private var lastNotificationStates: [String: [String: Any]] = [:]
 
-    init() {
-        hostingView = NSHostingView(rootView: NativeGaugeFixtureView())
+    init(surfaceDiagnostics: RuntimeDiagnostics) {
+        self.surfaceDiagnostics = surfaceDiagnostics
+        hostingView = NSHostingView(rootView: NativeGaugeFixtureView(surfaceDiagnostics: surfaceDiagnostics))
         window = NSWindow(
             contentRect: NSRect(x: 100, y: 100, width: 420, height: 560),
             styleMask: [.titled, .closable], backing: .buffered, defer: false
         )
+        super.init()
         window.title = "Gauge lifecycle validation"
         window.isReleasedWhenClosed = false
         window.contentView = hostingView
+        // One observer, four fixed keys, and one replaceable observation per
+        // key. No event history, timer, or rendering work is introduced.
+        for name in [NSWindow.didExposeNotification, NSWindow.didChangeOcclusionStateNotification,
+                     NSWindow.didChangeScreenNotification, NSWindow.didUpdateNotification] {
+            notificationCounts[name.rawValue] = 0
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(observeWindowNotification(_:)), name: name, object: window
+            )
+        }
     }
+
+    var windowObservation: [String: Any] {
+        ["visible": window.isVisible,
+         "miniaturized": window.isMiniaturized,
+         "on_active_space": window.isOnActiveSpace,
+         "key_window": window.isKeyWindow,
+         "main_window": window.isMainWindow,
+         "can_become_key": window.canBecomeKey,
+         "frame": NSStringFromRect(window.frame),
+         "level": window.level.rawValue,
+         "collection_behavior": window.collectionBehavior.rawValue,
+         "hides_on_deactivate": window.hidesOnDeactivate,
+         "content_hidden": hostingView.isHiddenOrHasHiddenAncestor,
+         "occlusion_state": window.occlusionState.rawValue,
+         "has_screen": window.screen != nil,
+         "screen_id": window.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? NSNull()]
+    }
+
+    var notificationObservation: [String: Any] {
+        ["counts": notificationCounts, "last_states": lastNotificationStates]
+    }
+
+    @objc private func observeWindowNotification(_ notification: Notification) {
+        let key = notification.name.rawValue
+        guard let count = notificationCounts[key] else { return }
+        notificationCounts[key] = count == Int.max ? Int.max : count + 1
+        var state = windowObservation
+        state["observed_at"] = Date().timeIntervalSince1970
+        state["gauge_draws"] = RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.gaugeDraws.rawValue] ?? 0
+        lastNotificationStates[key] = state
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
 
     var metalViews: [MTKView] {
         var result: [MTKView] = []
@@ -458,11 +605,12 @@ private final class NativeGaugeWindow {
     }
 
     func removeGauges() {
-        hostingView.rootView = NativeGaugeFixtureView(showsGauges: false)
+        hostingView.rootView = NativeGaugeFixtureView(showsGauges: false, surfaceDiagnostics: surfaceDiagnostics)
         hostingView.layoutSubtreeIfNeeded()
     }
 
     func close() {
+        NotificationCenter.default.removeObserver(self)
         removeGauges()
         window.orderOut(nil)
         window.contentView = nil

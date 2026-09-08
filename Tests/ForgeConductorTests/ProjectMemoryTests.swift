@@ -709,7 +709,7 @@ final class ProjectMemoryTests: XCTestCase {
             enableFTS5: false
         )
         try assertMigratedSemantics(in: first)
-        XCTAssertEqual(try projectMemoryFixtureInt(at: databaseURL, sql: "PRAGMA user_version;"), 2)
+        XCTAssertEqual(try projectMemoryFixtureInt(at: databaseURL, sql: "PRAGMA user_version;"), 3)
         XCTAssertEqual(
             try projectMemoryFixtureInt(
                 at: databaseURL,
@@ -738,7 +738,7 @@ final class ProjectMemoryTests: XCTestCase {
             tags: ["migration"],
             idempotencyKey: "post-v1-migration"
         )).0
-        XCTAssertEqual(currentRecord.schemaVersion, ProjectMemoryRepository.schemaVersion)
+        XCTAssertEqual(currentRecord.schemaVersion, 2)
         first.close()
 
         let backupURL = directory.appendingPathComponent("memory.pre-migration-v1.sqlite3")
@@ -795,7 +795,7 @@ final class ProjectMemoryTests: XCTestCase {
             enableFTS5: false
         )
         try assertMigratedSemantics(in: reopened)
-        XCTAssertEqual(try reopened.get(id: currentRecord.id)?.schemaVersion, ProjectMemoryRepository.schemaVersion)
+        XCTAssertEqual(try reopened.get(id: currentRecord.id)?.schemaVersion, 2)
         XCTAssertEqual(try reopened.status()["record_count"] as? Int, 2)
         reopened.close()
 

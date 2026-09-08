@@ -126,6 +126,7 @@ public struct UnavailableManagedRunContinuityExecutor: ManagedRunContinuityExecu
 }
 
 public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
+    typealias SourceResumption = @Sendable (AutonomousRunRecord, RunLease) async throws -> AutonomousRunRecord
     public typealias ProviderResolver = @Sendable (
         _ adapterID: String
     ) throws -> any ManagedModelProvider
@@ -148,6 +149,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
     private let budget: any ManagedRunBudgetEvaluating
     private let continuity: any ManagedRunContinuityExecuting
     private let maximumToolRounds: Int
+    private let sourceResumption: SourceResumption?
 
     private var providers: [String: any ManagedModelProvider] = [:]
     private var activeRequests: [RunID: ActiveProviderRequest] = [:]
@@ -163,6 +165,21 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         continuity: any ManagedRunContinuityExecuting = UnavailableManagedRunContinuityExecutor(),
         maximumToolRounds: Int = ManagedProjectRunStepExecutor.maximumToolRounds
     ) throws {
+        try self.init(repository: repository, providerResolver: providerResolver,
+            toolDefinitionResolver: toolDefinitionResolver, broker: broker, budget: budget,
+            continuity: continuity, maximumToolRounds: maximumToolRounds, sourceResumption: nil)
+    }
+
+    init(
+        repository: ProjectControlPlaneRepository,
+        providerResolver: @escaping ProviderResolver,
+        toolDefinitionResolver: @escaping ToolDefinitionResolver,
+        broker: ToolInvocationBroker,
+        budget: any ManagedRunBudgetEvaluating = NoManagedRunBudgetEvaluator(),
+        continuity: any ManagedRunContinuityExecuting = UnavailableManagedRunContinuityExecutor(),
+        maximumToolRounds: Int = ManagedProjectRunStepExecutor.maximumToolRounds,
+        sourceResumption: SourceResumption?
+    ) throws {
         guard (1...Self.maximumToolRounds).contains(maximumToolRounds) else {
             throw AutonomyError.invalidRequest("managed provider tool-round limit is outside bounds")
         }
@@ -173,9 +190,11 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         self.budget = budget
         self.continuity = continuity
         self.maximumToolRounds = maximumToolRounds
+        self.sourceResumption = sourceResumption
     }
 
     public func prepareNextStep(for run: AutonomousRunRecord) async throws -> RunSideEffectIntent? {
+        _ = try await repository.validateAutonomousRunExecutionAdmission(run.runID)
         if yieldedAfterStep {
             yieldedAfterStep = false
             return nil
@@ -210,6 +229,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         lease: RunLease
     ) async throws -> ProjectRunStepOutcome {
         try Task.checkCancellation()
+        _ = try await repository.validateAutonomousRunExecutionAdmission(run.runID)
         switch intent.kind {
         case .continuity:
             guard activeContinuity == nil else {
@@ -230,8 +250,39 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 task.cancel()
             }
         case .providerTurn:
-            let outcome = try await executeProviderStep(intent, run: run, lease: lease)
+            let current = try await repository.validateAutonomousRunExecutionAdmission(run.runID)
+            let source: ContinuitySourceActivationReceipt?
+            if let operationID = current.activeOperationID {
+                source = try await repository.sourceActivationReceipt(runID: current.runID, operationID: operationID, lease: lease)
+            } else { source = nil }
+            let outcome = try await executeProviderStep(intent, run: current, lease: lease, sourceActivation: source)
+            try Task.checkCancellation()
+            // Finish the complete bounded step before clearing its source operation.
+            // The coordinator reloads the run revision before applying this outcome.
+            if let sourceResumption { _ = try await sourceResumption(current, lease) }
+            let reconciled = try await repository.validateAutonomousRunExecutionAdmission(current.runID)
+            if let source, reconciled.activeOperationID != source.operationID {
+                // A cleared operation is accepted only with the retained CP
+                // resumption proof, including on replay after the final commit.
+                guard reconciled.activeOperationID == nil,
+                      try await repository.sourceActivationReceipt(runID: current.runID,
+                        operationID: source.operationID, lease: lease) == source else {
+                    throw AutonomyError.intentConflict
+                }
+            }
             yieldedAfterStep = true
+            if let source, reconciled.activeOperationID == source.operationID {
+                switch outcome {
+                case .rolloverRequired, .checkpointRequired:
+                    return Self.sourceBudgetDeferral
+                case .continued, .completionRequested, .completionRequestedWithWork:
+                    return .waitingResource(code: "source_continuation_effect_required",
+                        summary: "The source successor must complete an authorized tool effect and consume its exact output before continuing")
+                case .failedRecoverable(let code, let summary):
+                    return .waitingResource(code: code, summary: summary)
+                default: break
+                }
+            }
             return outcome
         case .toolInvocation, .runtimeJob, .completionValidation:
             throw AutonomyError.invalidRequest(
@@ -252,8 +303,10 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
     private func executeProviderStep(
         _ sideEffect: RunSideEffectIntent,
         run: AutonomousRunRecord,
-        lease: RunLease
+        lease: RunLease,
+        sourceActivation: ContinuitySourceActivationReceipt?
     ) async throws -> ProjectRunStepOutcome {
+        _ = try await repository.validateAutonomousRunExecutionAdmission(run.runID)
         guard let adapterID = run.adapterID, !adapterID.isEmpty,
               let expectedProviderID = run.providerID, !expectedProviderID.isEmpty,
               let modelKey = run.modelKey, !modelKey.isEmpty else {
@@ -320,6 +373,10 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 )
             )
             strongestAction = Self.stronger(strongestAction, beforeAction)
+            if sourceActivation != nil,
+               strongestAction == .checkpoint || strongestAction == .rollover || strongestAction == .emergency {
+                return Self.sourceBudgetDeferral
+            }
             // A successor is not accepted until this exact turn is durably reserved.
             // Dispatch it before acting on another rollover signal so recovery cannot
             // create an endless chain of fresh sessions without consuming the handoff.
@@ -347,7 +404,9 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                     turnID: turnID,
                     runID: run.runID,
                     sessionID: sessionID,
-                    operationID: run.activeOperationID,
+                    operationID: try await operationForTurnReplay(turnID: turnID, sideEffect: sideEffect,
+                        run: run, sessionID: sessionID, kind: kind, idempotencyKey: idempotencyKey,
+                        previousResponseID: previousResponseID, input: input, toolSchemaSHA256: toolSchemaSHA256, lease: lease),
                     projectID: run.projectID,
                     projectGeneration: run.projectGeneration,
                     kind: kind,
@@ -480,6 +539,35 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         )
     }
 
+    private static var sourceBudgetDeferral: ProjectRunStepOutcome {
+        .waitingResource(code: "source_continuation_budget_pending",
+            summary: "Current context limits defer the source continuation while its exact pending work and tool outputs remain durable")
+    }
+
+    /// A crash may leave the side effect pending after its source resumption was
+    /// committed. Reuse a prior turn's operation only through its exact durable
+    /// identity and the control plane's retained source activation receipt.
+    private func operationForTurnReplay(turnID: UUID, sideEffect: RunSideEffectIntent,
+        run: AutonomousRunRecord, sessionID: String, kind: ProviderTurnKind, idempotencyKey: String,
+        previousResponseID: String?, input: Data, toolSchemaSHA256: String, lease: RunLease) async throws -> UUID? {
+        guard let stored = try await repository.providerTurn(turnID),
+              stored.intent.operationID != run.activeOperationID else { return run.activeOperationID }
+        guard let operationID = stored.intent.operationID,
+              run.specification.work.pendingIntent == sideEffect,
+              stored.intent.turnID == turnID, stored.intent.runID == run.runID,
+              stored.intent.sessionID == sessionID, stored.intent.projectID == run.projectID,
+              stored.intent.projectGeneration == run.projectGeneration, stored.intent.kind == kind,
+              stored.intent.idempotencyKey == idempotencyKey, stored.intent.previousResponseID == previousResponseID,
+              stored.intent.inputSHA256 == JSONSupport.sha256Hex(input), stored.intent.toolSchemaSHA256 == toolSchemaSHA256,
+              let receipt = try await repository.sourceActivationReceipt(runID: run.runID, operationID: operationID, lease: lease),
+              receipt.candidateID.uuidString.lowercased() == sessionID,
+              receipt.authorization.projectID == run.projectID,
+              receipt.authorization.projectGeneration == run.projectGeneration else {
+            throw AutonomyError.intentConflict
+        }
+        return receipt.operationID
+    }
+
     private func resolvedProvider(adapterID: String) throws -> any ManagedModelProvider {
         if let provider = providers[adapterID] { return provider }
         let provider = try providerResolver(adapterID)
@@ -577,6 +665,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         tools: [Data],
         lease: RunLease
     ) async throws -> ProviderTurn {
+        _ = try await repository.validateAutonomousRunExecutionAdmission(run.runID)
         if record.state == .completed {
             guard let recovered = try await provider.lookup(
                 idempotencyKey: record.intent.idempotencyKey
@@ -660,6 +749,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         )
         defer { activeRequests.removeValue(forKey: run.runID) }
         do {
+            _ = try await repository.validateAutonomousRunExecutionAdmission(run.runID)
             let turn: ProviderTurn
             if let previousResponseID = record.intent.previousResponseID {
                 turn = try await provider.continueSession(ProviderContinuationRequest(

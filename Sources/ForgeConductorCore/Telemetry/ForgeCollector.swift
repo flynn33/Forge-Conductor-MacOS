@@ -83,8 +83,8 @@ struct ManagerServiceHealthPolicy {
 
 /// Classifies orchestration from explicit runtime and configuration evidence.
 ///
-/// LM Studio starts MCP tools only when a chat selects them. Two valid registrations
-/// with zero child processes are therefore a configured idle state, not a warning.
+/// LM Studio starts MCP tools only when a chat selects them. Valid registrations
+/// for every connector role with zero child processes indicate configured idle.
 struct OrchestrationHealthPolicy {
     static func decide(from evidence: OrchestrationEvidence) -> OrchestrationDecision {
         let connectorActive = evidence.serveCount > 0 || evidence.mcpProcessCount > 0

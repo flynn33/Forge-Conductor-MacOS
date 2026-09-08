@@ -26,13 +26,20 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private let vertices = MetalVertexBuffer<GaugeVertex>()
-    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
     private var series: [Series] = []
     private var currentCPU: [Float] = []
     private var currentRAM: [Float] = []
     private var currentGPU: [Float?] = []
+
+    public override convenience init() { self.init(surfaceDiagnostics: nil) }
+
+    init(surfaceDiagnostics: RuntimeDiagnostics?) {
+        surfaceLifetime = GaugeSurfaceLifetime(scope: surfaceDiagnostics)
+        super.init()
+    }
 
     public func attach(to view: MTKView) {
         let resources = MetalGaugeResources.shared
@@ -207,8 +214,9 @@ struct MultiSeriesLoadChart: NSViewRepresentable {
     var cpu: [Float]
     var ram: [Float]
     var gpu: [Float?]
+    var surfaceDiagnostics: RuntimeDiagnostics? = nil
 
-    func makeCoordinator() -> MultiSeriesLoadRenderer { MultiSeriesLoadRenderer() }
+    func makeCoordinator() -> MultiSeriesLoadRenderer { MultiSeriesLoadRenderer(surfaceDiagnostics: surfaceDiagnostics) }
 
     func makeNSView(context: Context) -> MTKView {
         let view = GaugeMetalView()

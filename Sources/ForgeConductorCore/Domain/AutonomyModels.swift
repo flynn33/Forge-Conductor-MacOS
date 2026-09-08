@@ -5,6 +5,7 @@ import Foundation
 
 public enum AutonomousRunState: String, Codable, Sendable, CaseIterable {
     case created
+    case awaitingBootstrap = "awaiting_bootstrap"
     case validating
     case ready
     case starting
@@ -39,7 +40,7 @@ public enum AutonomousRunState: String, Codable, Sendable, CaseIterable {
              .rollingOver, .recovering, .validatingCompletion, .waitingProvider,
              .waitingResource, .retryWait, .failedRecoverable, .cancelRequested:
             true
-        case .paused, .blockedConfiguration, .completed, .cancelled, .failedTerminal:
+        case .awaitingBootstrap, .paused, .blockedConfiguration, .completed, .cancelled, .failedTerminal:
             false
         }
     }
@@ -829,6 +830,7 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
     case invalidToolConfiguration([String])
     case runNotFound(RunID)
     case runConflict(RunID)
+    case bootstrapRequired(RunID)
     case invalidTransition(AutonomousRunState, AutonomousRunState)
     case transitionConflict
     case leaseConflict(ownerID: String, epoch: UInt64)
@@ -852,6 +854,7 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
         case .invalidToolConfiguration: "autonomy_tool_configuration_invalid"
         case .runNotFound: "autonomous_run_not_found"
         case .runConflict: "autonomous_run_conflict"
+        case .bootstrapRequired: "autonomous_run_bootstrap_required"
         case .invalidTransition: "autonomous_run_invalid_transition"
         case .transitionConflict: "autonomous_run_transition_conflict"
         case .leaseConflict: "autonomous_run_lease_conflict"
@@ -878,6 +881,7 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
             "Allowed tools are not registered in this build: \(Self.summarizedToolNames(tools))"
         case .runNotFound(let runID): "Autonomous run not found: \(runID)"
         case .runConflict(let runID): "Autonomous run identity conflicts with its durable record: \(runID)"
+        case .bootstrapRequired(let runID): "Run \(runID) is held until its exact continuity bootstrap is verified"
         case .invalidTransition(let from, let to): "Invalid autonomous run transition: \(from.rawValue) -> \(to.rawValue)"
         case .transitionConflict: "Autonomous run state or revision changed before commit"
         case .leaseConflict(let ownerID, let epoch): "Run is leased by \(ownerID) at epoch \(epoch)"

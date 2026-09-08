@@ -184,6 +184,9 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
     private let adapterResolver: AdapterResolver
     private let handoffBuilder: any ManagedContinuityHandoffBuilding
     private let crashAfter: ManagedContinuityCrashPoint?
+    private var sourceBootstrapOperationID: UUID?
+    private var sourceBootstrapAdapter: (any SessionHostAdapterV2)?
+    private var cancelledSourceOperationID: UUID?
 
     public init(
         repository: ProjectControlPlaneRepository,
@@ -197,6 +200,173 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
         self.adapterResolver = adapterResolver
         self.handoffBuilder = handoffBuilder
         self.crashAfter = crashAfter
+    }
+
+    /// Source tasks have no provider predecessor. Their accepted source packet
+    /// advances through the same canonical operation journal and manager broker.
+    /// This step intentionally ends at acknowledgment; it cannot release a hold.
+    func executeSourceBootstrap(
+        acceptance: ContinuityIngressAcceptanceReceipt,
+        lease: RunLease,
+        broker: ToolInvocationBroker,
+        continuity: ContextContinuityService,
+        policyResolver: @escaping PersistedManagedRunBudgetEvaluator.PolicyResolver
+    ) async throws -> SourceBootstrapReceipt {
+        try Task.checkCancellation()
+        guard cancelledSourceOperationID != acceptance.operationID else { throw AutonomyError.shutdown }
+        guard sourceBootstrapOperationID == nil else { throw ContinuityIngressError.deliveryConflict }
+        sourceBootstrapOperationID = acceptance.operationID
+        defer {
+            sourceBootstrapAdapter = nil
+            sourceBootstrapOperationID = nil
+        }
+        let engine = self.engine
+        let operation = try await repository.withContinuityIngressAcceptance(acceptance: acceptance, lease: lease) {
+            try engine.prepareSourceBootstrap(acceptance: acceptance,
+                authorization: acceptance.authorization, bootstrapNonce: UUID())
+        }
+        try crashIfRequested(.handoffPersistence)
+        // The journal retains the random candidate before the remote root is
+        // requested. A restarted worker uses this same candidate and nonce.
+        let candidateID = operation.successorSessionID ?? UUID()
+        _ = try await repository.withContinuityIngressAcceptance(acceptance: acceptance, lease: lease) {
+            if operation.state == .checkpointPersisted {
+                return try engine.transitionSourceBootstrap(operationID: operation.operationID,
+                    authorization: acceptance.authorization, expectedState: operation.state,
+                    expectedChecksum: operation.stateChecksum, to: .successorRequested,
+                    candidateID: candidateID)
+            }
+            guard operation.successorSessionID == candidateID else { throw ContinuityIngressError.deliveryConflict }
+            return operation
+        }
+        try crashIfRequested(.successorRequestIntent)
+        let grant = try await repository.issueContinuityBootstrapGrant(
+            envelope: operation.envelope, candidateID: candidateID, lease: lease)
+        guard let run = try await repository.autonomousRun(acceptance.runID),
+              let adapterID = run.adapterID, let modelKey = run.modelKey else {
+            throw ContinuityRunError.hostCapabilityUnavailable
+        }
+        try Task.checkCancellation()
+        guard cancelledSourceOperationID != acceptance.operationID else { throw AutonomyError.shutdown }
+        let resolvedAdapter = try adapterResolver(adapterID)
+        guard let adapter = resolvedAdapter as? any SourceBootstrapHostAdapter else {
+            throw ContinuityRunError.hostCapabilityUnavailable
+        }
+        sourceBootstrapAdapter = resolvedAdapter
+        let request = try SourceBootstrapRequest(envelope: operation.envelope,
+            candidateID: candidateID, grantID: grant.grantID, modelKey: modelKey,
+            idempotencyKey: "source-bootstrap:\(operation.operationID.uuidString.lowercased()):\(candidateID.uuidString.lowercased())")
+        let executor = ManagedSourceBootstrapExecutor(repository: repository, engine: engine,
+            broker: broker, continuity: continuity, request: request, grant: grant,
+            lease: lease, policyResolver: policyResolver)
+        let receipt = try await adapter.createSourceAndBootstrap(request: request, executor: executor)
+        try crashIfRequested(.acknowledgementPersistence)
+        return receipt
+    }
+
+    /// The supervisor-owned activation cancels the exact adapter instance used
+    /// by this exchange. Stopping before adapter creation prevents a later bind.
+    func cancelSourceBootstrap(operationID: UUID) async {
+        guard sourceBootstrapOperationID == nil || sourceBootstrapOperationID == operationID else { return }
+        cancelledSourceOperationID = operationID
+        guard sourceBootstrapOperationID == operationID, let adapter = sourceBootstrapAdapter else { return }
+        await adapter.cancel(operationID: operationID)
+    }
+
+    /// Durable control-plane authority surrounds both independent store writes.
+    /// A partial cleanup leaves the request fenced and can replay either marker.
+    func completeSourceCancellation(claim: ContinuityOperationCancellationClaim, lease: RunLease,
+        continuity: ContextContinuityService, cancellation: ToolCallCancellation? = nil
+    ) async throws -> ContinuityOperationCancellationReceipt {
+        let engine = self.engine
+        return try await repository.completeContinuityOperationCancellation(claim: claim, lease: lease,
+            cancellation: cancellation) { request, acceptance in
+                let canonical = try engine.cancelSourceBootstrap(request: request, acceptance: acceptance,
+                    cancellation: cancellation)
+                let source = try continuity.cancelAuthorizedHandoff(request: request, acceptance: acceptance,
+                    cancellation: cancellation)
+                return ContinuityOperationCancellationEvidence(canonical: canonical, source: source)
+            }
+    }
+
+    /// Select the acknowledged winner while ordinary dispatch remains held,
+    /// then release that hold only after the canonical seal has committed.
+    /// Either database may already contain its receipt after an interruption.
+    func activateSourceBootstrap(
+        acceptance: ContinuityIngressAcceptanceReceipt,
+        lease: RunLease,
+        policyResolver: @escaping PersistedManagedRunBudgetEvaluator.PolicyResolver
+    ) async throws -> AutonomousRunRecord {
+        try Task.checkCancellation()
+        guard cancelledSourceOperationID != acceptance.operationID else { throw AutonomyError.shutdown }
+        guard let generation = Int(exactly: acceptance.authorization.projectGeneration.rawValue) else {
+            throw ContextBudgetError.invalidPolicy
+        }
+        let scope = BudgetPolicyScope(kind: .projectOverride,
+            projectID: acceptance.authorization.projectID.description, projectGeneration: generation)
+        let engine = self.engine
+        let receipt = try await repository.acceptContinuitySourceSuccessor(
+            acceptance: acceptance, lease: lease, policySelection: policyResolver(scope),
+            continuationInput: Self.automaticContinuationInput()) {
+                guard let operation = try engine.sourceBootstrap(operationID: acceptance.operationID,
+                    authorization: acceptance.authorization) else {
+                    throw ContinuitySourceActivationError.proofRequired
+                }
+                return operation
+            }
+        try crashIfRequested(.successorAcceptance)
+        try crashIfRequested(.continuationEnqueue)
+        try Task.checkCancellation()
+        guard cancelledSourceOperationID != acceptance.operationID else { throw AutonomyError.shutdown }
+        let crashAfter = self.crashAfter
+        return try await repository.completeContinuitySourceActivation(
+            receipt: receipt, lease: lease, policySelection: policyResolver(scope)) { accepted in
+                let operation = try engine.sealSourceBootstrap(operationID: accepted.operationID,
+                    authorization: accepted.authorization, expectedChecksum: accepted.acknowledgedStateChecksum,
+                    acceptanceReceipt: accepted)
+                if crashAfter == .predecessorFence {
+                    throw ManagedContinuityWorkerError.injectedCrash(.predecessorFence)
+                }
+                return operation
+            }
+    }
+
+    /// Reconcile the actual ordinary provider/tool chain with canonical source
+    /// completion. An issued continuation by itself is never resumed proof.
+    func reconcileSourceResumption(
+        run: AutonomousRunRecord, lease: RunLease,
+        policyResolver: @escaping PersistedManagedRunBudgetEvaluator.PolicyResolver
+    ) async throws -> AutonomousRunRecord {
+        try Task.checkCancellation()
+        guard let operationID = run.activeOperationID,
+              let receipt = try await repository.sourceActivationReceipt(runID: run.runID,
+                operationID: operationID, lease: lease) else { return run }
+        guard let generation = Int(exactly: run.projectGeneration.rawValue) else {
+            throw ContextBudgetError.invalidPolicy
+        }
+        let policy = try policyResolver(BudgetPolicyScope(kind: .projectOverride,
+            projectID: run.projectID.description, projectGeneration: generation))
+        let engine = self.engine, crashAfter = self.crashAfter
+        let resumed = try await repository.completeContinuitySourceResumption(
+            activationReceipt: receipt, lease: lease, policySelection: policy) { proof in
+                guard let operation = try engine.sourceBootstrap(operationID: proof.operationID,
+                    authorization: proof.activationReceipt.authorization),
+                      let sealedChecksum = operation.sealedStateChecksum else {
+                    throw ContinuitySourceActivationError.proofRequired
+                }
+                let committed = try engine.markSourceBootstrapResumed(operationID: proof.operationID,
+                    authorization: proof.activationReceipt.authorization, expectedChecksum: sealedChecksum,
+                    continuationReceipt: proof)
+                if crashAfter == .continuationSideEffect {
+                    throw ManagedContinuityWorkerError.injectedCrash(.continuationSideEffect)
+                }
+                return committed
+            }
+        guard resumed != nil else { return run }
+        guard let refreshed = try await repository.autonomousRun(run.runID) else {
+            throw AutonomyError.runNotFound(run.runID)
+        }
+        return refreshed
     }
 
     public func executeContinuityStep(

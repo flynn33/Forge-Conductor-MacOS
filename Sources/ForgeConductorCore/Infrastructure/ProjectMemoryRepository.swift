@@ -314,7 +314,7 @@ private func projectMemorySQLiteProgressHandler(_ context: UnsafeMutableRawPoint
 }
 
 public final class ProjectMemoryRepository: @unchecked Sendable {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private struct ContinuityProjectionRepair {
@@ -765,8 +765,8 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 if let existing = try continuityOperationByIdempotencyUnlocked(idempotencyKey) {
                     return existing
                 }
-                if let active = try continuityActiveOperationUnlocked() {
-                    throw ProjectMemoryError.conflict("rollover already active: \(active.operationID)")
+                if try continuityHasActiveOperationUnlocked() {
+                    throw ProjectMemoryError.conflict("another rollover is already active")
                 }
                 let timestamp = ISO8601.string(from: clock.now())
                 let checksum = Self.continuityChecksum(
@@ -851,7 +851,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityHandoff? {
         try withStatement(
-            "SELECT payload_json,content_sha256 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? LIMIT 1",
+            "SELECT payload_json,content_sha256 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? AND schema_version IN ('1.0','2.0') LIMIT 1",
             cancellation: cancellation
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
@@ -1049,7 +1049,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 didCommit: didMutationCommitObserver
             ) {
                 try withStatementUnlocked(
-                    "UPDATE rollover_operations SET last_error=?,retry_at=?,updated_at=? WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL"
+                    "UPDATE rollover_operations SET last_error=?,retry_at=?,updated_at=? WHERE operation_id=? AND project_id=? AND schema_version IN (1,2) AND quarantine_state IS NULL"
                 ) { statement in
                     bind(statement, 1, String(error.prefix(2048))); bind(statement, 2, retryAt)
                     bind(statement, 3, ISO8601.string(from: clock.now())); bind(statement, 4, operationID)
@@ -1075,7 +1075,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         cancellation: ToolCallCancellation? = nil
     ) throws -> ContinuityOperation? {
         try withStatement(
-            Self.continuityOperationSelect + " WHERE operation_id=? AND project_id=? LIMIT 1",
+            Self.continuityOperationSelect + " WHERE operation_id=? AND project_id=? AND schema_version IN (1,2) LIMIT 1",
             cancellation: cancellation
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
@@ -1106,7 +1106,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     ) throws -> ContinuityOperation? {
         try withStatement(
             Self.continuityOperationSelect
-                + " WHERE project_id=? AND state<>'predecessorSealed'"
+                + " WHERE project_id=? AND schema_version IN (1,2) AND state<>'predecessorSealed'"
                 + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1",
             cancellation: cancellation
         ) { statement in
@@ -1137,6 +1137,721 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             value: operationID,
             cancellation: cancellation
         )
+    }
+
+    // MARK: - Authorized source bootstrap preparation
+
+    func continuityPrepareSourceBootstrap(
+        acceptance: ContinuityIngressAcceptanceReceipt,
+        authorization: ContinuityIngressAuthorization,
+        bootstrapNonce: UUID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        guard authorization.projectID.description == projectID,
+              acceptance.authorization == authorization else { throw ContinuityIngressError.authorityMismatch }
+        let proposed = try ContinuitySourceBootstrapEnvelope(acceptance: acceptance, bootstrapNonce: bootstrapNonce)
+        return try withSourceBootstrapTransaction(cancellation: cancellation) {
+            guard try !hasSourceCancellationUnlocked(operationID: acceptance.operationID) else {
+                throw ContinuityIngressError.invalidated
+            }
+            if let existing = try continuitySourceBootstrapUnlocked(operationID: acceptance.operationID, authorization: authorization) {
+                guard existing.envelope.acceptance == acceptance else { throw ContinuityIngressError.deliveryConflict }
+                return existing
+            }
+            guard try !continuityHasActiveOperationUnlocked() else {
+                throw ProjectMemoryError.conflict("another rollover is already active")
+            }
+            let count = try withStatementUnlocked("SELECT COUNT(*) FROM rollover_operations WHERE project_id=? AND schema_version=3") { statement in
+                bind(statement, 1, projectID)
+                guard try stepRow(statement) else { throw ContinuityIngressError.integrityFailure("missing source operation count") }
+                return sqlite3_column_int64(statement, 0)
+            }
+            guard count < 256 else { throw ContinuityIngressError.capacityExceeded("canonical source operations") }
+            let timestamp = ISO8601.string(from: clock.now())
+            let checksum = try ContinuitySourceBootstrapOperation.checksum(envelope: proposed,
+                state: .checkpointPersisted, attempt: 2, createdAt: timestamp, updatedAt: timestamp)
+            let authoritySHA = JSONSupport.sha256Hex(try authorization.encodedJSON())
+            try withStatementUnlocked("""
+                INSERT INTO continuity_handoffs(handoff_id,project_id,operation_id,payload_json,content_sha256,
+                    created_at,schema_version,project_generation,run_id,bootstrap_nonce,continuation_issued)
+                VALUES(?,?,?,?,?,?,'3.0',?,?,?,0)
+                """) { statement in
+                bind(statement, 1, proposed.handoffID.uuidString.lowercased())
+                bind(statement, 2, projectID)
+                bind(statement, 3, acceptance.operationID.uuidString.lowercased())
+                bind(statement, 4, String(decoding: proposed.canonicalEnvelopeJSON, as: UTF8.self))
+                bind(statement, 5, proposed.envelopeSHA256)
+                bind(statement, 6, timestamp)
+                sqlite3_bind_int64(statement, 7, Int64(authorization.projectGeneration.rawValue))
+                bind(statement, 8, acceptance.runID.description)
+                bind(statement, 9, proposed.bootstrapNonce.uuidString.lowercased())
+                try stepDone(statement)
+            }
+            try withStatementUnlocked("""
+                INSERT INTO rollover_operations(operation_id,project_id,predecessor_session_id,handoff_id,
+                    state,attempt,adapter_id,idempotency_key,created_at,updated_at,state_checksum,schema_version,
+                    project_generation,run_id,bootstrap_nonce,continuation_issued,
+                    source_authorization_sha256,source_acceptance_sha256)
+                VALUES(?,?,NULL,?,'checkpointPersisted',2,?,?,?, ?,?,3,?,?,?,0,?,?)
+                """) { statement in
+                bind(statement, 1, acceptance.operationID.uuidString.lowercased())
+                bind(statement, 2, projectID)
+                bind(statement, 3, proposed.handoffID.uuidString.lowercased())
+                bind(statement, 4, nil)
+                bind(statement, 5, "source-bootstrap:\(acceptance.operationID.uuidString.lowercased())")
+                bind(statement, 6, timestamp)
+                bind(statement, 7, timestamp)
+                bind(statement, 8, checksum)
+                sqlite3_bind_int64(statement, 9, Int64(authorization.projectGeneration.rawValue))
+                bind(statement, 10, acceptance.runID.description)
+                bind(statement, 11, proposed.bootstrapNonce.uuidString.lowercased())
+                bind(statement, 12, authoritySHA)
+                bind(statement, 13, acceptance.receiptSHA256)
+                try stepDone(statement)
+            }
+            let states: [ContinuityState] = [.active, .checkpointPreparing, .checkpointPersisted]
+            for (attempt, state) in states.enumerated() {
+                try withStatementUnlocked("""
+                    INSERT INTO rollover_transitions(operation_id,project_id,from_state,to_state,attempt,created_at,
+                        adapter_id,evidence,state_checksum,schema_version,project_generation,run_id)
+                    VALUES(?,?,?,?,?,?,?,?,?,3,?,?)
+                    """) { statement in
+                    bind(statement, 1, acceptance.operationID.uuidString.lowercased())
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, attempt == 0 ? nil : states[attempt - 1].rawValue)
+                    bind(statement, 4, state.rawValue)
+                    sqlite3_bind_int(statement, 5, Int32(attempt))
+                    bind(statement, 6, timestamp)
+                    bind(statement, 7, nil)
+                    bind(statement, 8, proposed.envelopeSHA256)
+                    bind(statement, 9, try ContinuitySourceBootstrapOperation.checksum(envelope: proposed,
+                        state: state, attempt: attempt, createdAt: timestamp, updatedAt: timestamp))
+                    sqlite3_bind_int64(statement, 10, Int64(authorization.projectGeneration.rawValue))
+                    bind(statement, 11, acceptance.runID.description)
+                    try stepDone(statement)
+                }
+            }
+            guard let committed = try continuitySourceBootstrapUnlocked(operationID: acceptance.operationID, authorization: authorization) else {
+                throw ContinuityIngressError.integrityFailure("prepared source operation disappeared")
+            }
+            return committed
+        }
+    }
+
+    func continuitySourceBootstrap(operationID: UUID, authorization: ContinuityIngressAuthorization,
+                                   cancellation: ToolCallCancellation? = nil) throws -> ContinuitySourceBootstrapOperation? {
+        try authorization.validate()
+        guard authorization.projectID.description == projectID else { throw ContinuityIngressError.authorityMismatch }
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try continuitySourceBootstrapUnlocked(operationID: operationID, authorization: authorization)
+        }
+    }
+
+    /// Cancellation is an overlay on the last proved source state. Its exact
+    /// intent and readback stay in the existing journal, including before a
+    /// canonical operation exists; it never invents a checkpoint or a successor.
+    func continuityCancelSourceBootstrap(request: ContinuityOperationCancellationRequest,
+        acceptance: ContinuityIngressAcceptanceReceipt, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationCancellationMarker {
+        try request.authorization.validate()
+        guard request.authorization.projectID.description == projectID,
+              request.operationID == acceptance.operationID, request.runID == acceptance.runID,
+              request.authorization == acceptance.authorization, request.sourceIdentity == acceptance.sourceIdentity,
+              request.acceptanceReceiptSHA256 == acceptance.receiptSHA256,
+              try ContinuityOperationCancellationRequest.storedSnapshot(from: request.canonicalRequestJSON,
+                acceptance: acceptance) == request else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        return try withSourceBootstrapTransaction(cancellation: cancellation) {
+            if let retained = try sourceCancellationMarkerUnlocked(request: request, acceptance: acceptance) {
+                return retained
+            }
+            let current = try continuitySourceBootstrapUnlocked(operationID: request.operationID,
+                authorization: request.authorization)
+            guard current == nil || (current?.envelope.acceptance == acceptance && current?.isResumed == false) else {
+                throw ContinuityIngressError.deliveryConflict
+            }
+            let count = try withStatementUnlocked("""
+                SELECT COUNT(*) FROM rollover_transitions WHERE project_id=? AND schema_version=3 AND to_state='cancelled'
+                """) { statement -> Int64 in
+                bind(statement, 1, projectID)
+                guard try stepRow(statement) else { throw ContinuityIngressError.integrityFailure("missing cancellation count") }
+                return sqlite3_column_int64(statement, 0)
+            }
+            guard count < 256 else { throw ContinuityIngressError.capacityExceeded("canonical source cancellations") }
+            let timestamp = ISO8601.string(from: clock.now())
+            let evidence = try sourceCancellationEvidence(request: request, current: current, timestamp: timestamp)
+            let marker = try ContinuityOperationCancellationMarker(request: request, store: .canonicalSource,
+                evidenceSHA256: JSONSupport.sha256Hex(evidence), recordedAt: timestamp)
+            if let current {
+                try withStatementUnlocked("""
+                    UPDATE rollover_operations SET quarantine_state='source_cancelled'
+                    WHERE operation_id=? AND project_id=? AND schema_version=3 AND state_checksum=?
+                      AND source_acceptance_sha256=? AND quarantine_state IS NULL
+                    """) { statement in
+                    bind(statement, 1, request.operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+                    bind(statement, 3, current.stateChecksum); bind(statement, 4, acceptance.receiptSHA256)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else { throw ContinuityIngressError.deliveryConflict }
+                try withStatementUnlocked("""
+                    UPDATE continuity_handoffs SET quarantine_state='source_cancelled'
+                    WHERE handoff_id=? AND project_id=? AND operation_id=? AND schema_version='3.0' AND quarantine_state IS NULL
+                    """) { statement in
+                    bind(statement, 1, current.handoffID.uuidString.lowercased()); bind(statement, 2, projectID)
+                    bind(statement, 3, request.operationID.uuidString.lowercased()); try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else { throw ContinuityIngressError.deliveryConflict }
+            }
+            try withStatementUnlocked("""
+                INSERT INTO rollover_transitions(operation_id,project_id,from_state,to_state,attempt,created_at,
+                    adapter_id,evidence,state_checksum,schema_version,project_generation,run_id,successor_provider_response_id)
+                VALUES(?,?,?,'cancelled',?,?,NULL,?,?,3,?,?,?)
+                """) { statement in
+                bind(statement, 1, request.operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+                bind(statement, 3, current?.state.rawValue); sqlite3_bind_int(statement, 4, Int32(current?.attempt ?? 0))
+                bind(statement, 5, timestamp); bind(statement, 6, String(decoding: evidence, as: UTF8.self))
+                bind(statement, 7, marker.markerSHA256)
+                sqlite3_bind_int64(statement, 8, Int64(request.authorization.projectGeneration.rawValue))
+                bind(statement, 9, request.runID.description); bind(statement, 10, current?.successorProviderResponseID)
+                try stepDone(statement)
+            }
+            guard let retained = try sourceCancellationMarkerUnlocked(request: request, acceptance: acceptance) else {
+                throw ContinuityIngressError.integrityFailure("canonical cancellation disappeared")
+            }
+            return retained
+        }
+    }
+
+    private func hasSourceCancellationUnlocked(operationID: UUID) throws -> Bool {
+        try withStatementUnlocked("""
+            SELECT 1 FROM rollover_transitions WHERE operation_id=? AND project_id=? AND schema_version=3
+              AND to_state='cancelled' LIMIT 1
+            """) { statement in
+            bind(statement, 1, operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+            return try stepRow(statement)
+        }
+    }
+
+    private func sourceCancellationEvidence(request: ContinuityOperationCancellationRequest,
+        current: ContinuitySourceBootstrapOperation?, timestamp: String) throws -> Data {
+        let evidence = try ForgeJSONCanonicalizationV1.data(from: [
+            "schema_version": 1, "kind": "source_cancelled",
+            "request": JSONSerialization.jsonObject(with: request.canonicalRequestJSON),
+            "source_state": current?.state.rawValue as Any? ?? NSNull(),
+            "source_state_checksum": current?.stateChecksum as Any? ?? NSNull(),
+            "source_attempt": current?.attempt ?? 0, "recorded_at": timestamp,
+        ])
+        guard evidence.count <= ContinuityOperationCancellationRequest.maximumStoredBytes + 4 * 1_024 else {
+            throw ContinuityIngressError.capacityExceeded("source cancellation evidence bytes")
+        }
+        return evidence
+    }
+
+    private func sourceCancellationMarkerUnlocked(request: ContinuityOperationCancellationRequest,
+        acceptance: ContinuityIngressAcceptanceReceipt) throws -> ContinuityOperationCancellationMarker? {
+        try withStatementUnlocked("""
+            SELECT project_generation,run_id,from_state,attempt,created_at,evidence,state_checksum,successor_provider_response_id
+            FROM rollover_transitions WHERE operation_id=? AND project_id=? AND schema_version=3 AND to_state='cancelled' LIMIT 2
+            """) { statement in
+            bind(statement, 1, request.operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+            guard try stepRow(statement) else { return nil }
+            // Reject mismatched metadata before decoding any retained receipt.
+            guard sqlite3_column_int64(statement, 0) == Int64(request.authorization.projectGeneration.rawValue),
+                  try sourceBootstrapText(statement, 1, maximumBytes: 36) == request.runID.description else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            let current = try continuitySourceBootstrapUnlocked(operationID: request.operationID,
+                authorization: request.authorization, allowCancellationMarker: true)
+            guard current == nil || (current?.envelope.acceptance == acceptance && current?.isResumed == false),
+                  let timestamp = try sourceBootstrapText(statement, 4, maximumBytes: 128),
+                  let text = try sourceBootstrapText(statement, 5,
+                    maximumBytes: ContinuityOperationCancellationRequest.maximumStoredBytes + 4 * 1_024) else {
+                throw ContinuityIngressError.integrityFailure("invalid canonical cancellation evidence")
+            }
+            let evidence = try sourceCancellationEvidence(request: request, current: current, timestamp: timestamp)
+            let marker = try ContinuityOperationCancellationMarker(request: request, store: .canonicalSource,
+                evidenceSHA256: JSONSupport.sha256Hex(evidence), recordedAt: timestamp)
+            guard Data(text.utf8) == evidence,
+                  try sourceBootstrapText(statement, 2, maximumBytes: 32) == current?.state.rawValue,
+                  sqlite3_column_int64(statement, 3) == Int64(current?.attempt ?? 0),
+                  try sourceBootstrapText(statement, 6, maximumBytes: 64) == marker.markerSHA256,
+                  try sourceBootstrapText(statement, 7, maximumBytes: 2_048) == current?.successorProviderResponseID,
+                  try !stepRow(statement) else {
+                throw ContinuityIngressError.integrityFailure("canonical cancellation marker differs")
+            }
+            return marker
+        }
+    }
+
+    private static let sourceBootstrapStates: [ContinuityState] = [
+        .checkpointPersisted, .successorRequested, .successorCreated, .successorBootstrapping, .successorAcknowledged,
+    ]
+
+    private static func validSourceBootstrapSHA(_ value: String?) -> Bool {
+        guard let value else { return false }
+        return value.utf8.count == 64 && value.allSatisfy { "0123456789abcdef".contains($0) }
+    }
+
+    private static func validSourceBootstrapResponse(_ value: String?) -> Bool {
+        guard let value else { return false }
+        return !value.isEmpty && value.utf8.count <= 2_048
+            && value.trimmingCharacters(in: .whitespacesAndNewlines) == value
+            && !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+    }
+
+    /// The caller validates the provisional grant and proof contents. This store
+    /// binds their exact digests to the sole canonical operation; it grants no tools.
+    func continuityTransitionSourceBootstrap(
+        operationID: UUID, authorization: ContinuityIngressAuthorization,
+        expectedState: ContinuityState, expectedChecksum: String, to next: ContinuityState,
+        candidateID: UUID, providerResponseID: String? = nil,
+        retrievalProofSHA256: String? = nil, acknowledgementProofSHA256: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        guard authorization.projectID.description == projectID else { throw ContinuityIngressError.authorityMismatch }
+        guard let expectedIndex = Self.sourceBootstrapStates.firstIndex(of: expectedState),
+              expectedIndex + 1 < Self.sourceBootstrapStates.count,
+              Self.sourceBootstrapStates[expectedIndex + 1] == next,
+              Self.validSourceBootstrapSHA(expectedChecksum),
+              providerResponseID == nil || Self.validSourceBootstrapResponse(providerResponseID),
+              (next == .successorAcknowledged
+                ? Self.validSourceBootstrapSHA(retrievalProofSHA256) && Self.validSourceBootstrapSHA(acknowledgementProofSHA256) && providerResponseID != nil
+                : retrievalProofSHA256 == nil && acknowledgementProofSHA256 == nil),
+              next != .successorRequested || providerResponseID == nil,
+              next != .successorCreated || providerResponseID != nil else {
+            throw ContinuityIngressError.invalidRequest("source_bootstrap_transition")
+        }
+        let requestSHA = try ForgeJSONCanonicalizationV1.sha256Hex(of: [
+            "operation_id": operationID.uuidString.lowercased(), "expected_state": expectedState.rawValue,
+            "expected_checksum": expectedChecksum, "next_state": next.rawValue,
+            "candidate_id": candidateID.uuidString.lowercased(),
+            "provider_response_id": providerResponseID as Any? ?? NSNull(),
+            "retrieval_proof_sha256": retrievalProofSHA256 as Any? ?? NSNull(),
+            "acknowledgement_proof_sha256": acknowledgementProofSHA256 as Any? ?? NSNull(),
+        ])
+        return try withSourceBootstrapTransaction(cancellation: cancellation) {
+            guard let current = try continuitySourceBootstrapUnlocked(operationID: operationID, authorization: authorization) else {
+                throw ContinuityIngressError.notFound
+            }
+            if current.state == next {
+                let repeated = try withStatementUnlocked("""
+                    SELECT 1 FROM rollover_transitions WHERE operation_id=? AND project_id=? AND schema_version=3
+                        AND from_state=? AND to_state=? AND state_checksum=? AND evidence=? LIMIT 1
+                    """) { statement in
+                    bind(statement, 1, operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+                    bind(statement, 3, expectedState.rawValue); bind(statement, 4, next.rawValue)
+                    bind(statement, 5, current.stateChecksum); bind(statement, 6, requestSHA)
+                    return try stepRow(statement)
+                }
+                guard repeated else { throw ContinuityIngressError.deliveryConflict }
+                return current
+            }
+            guard current.state == expectedState, current.stateChecksum == expectedChecksum,
+                  current.successorSessionID == nil || current.successorSessionID == candidateID,
+                  next != .successorBootstrapping || providerResponseID == nil || providerResponseID == current.successorProviderResponseID else {
+                throw ContinuityIngressError.deliveryConflict
+            }
+            let response = providerResponseID ?? current.successorProviderResponseID
+            let timestamp = ISO8601.string(from: clock.now())
+            let checksum = try ContinuitySourceBootstrapOperation.checksum(envelope: current.envelope,
+                state: next, attempt: current.attempt + 1, createdAt: current.createdAt, updatedAt: timestamp,
+                successorSessionID: candidateID, successorProviderResponseID: response,
+                retrievalProofSHA256: retrievalProofSHA256, acknowledgementProofSHA256: acknowledgementProofSHA256)
+            try withStatementUnlocked("""
+                UPDATE rollover_operations SET state=?,attempt=attempt+1,updated_at=?,state_checksum=?,
+                    successor_session_id=?,successor_provider_response_id=?,source_retrieval_sha256=?,acknowledgement_sha256=?
+                WHERE operation_id=? AND project_id=? AND schema_version=3 AND state=? AND state_checksum=? AND quarantine_state IS NULL
+                """) { statement in
+                bind(statement, 1, next.rawValue); bind(statement, 2, timestamp); bind(statement, 3, checksum)
+                bind(statement, 4, candidateID.uuidString.lowercased()); bind(statement, 5, response)
+                bind(statement, 6, retrievalProofSHA256); bind(statement, 7, acknowledgementProofSHA256)
+                bind(statement, 8, operationID.uuidString.lowercased()); bind(statement, 9, projectID)
+                bind(statement, 10, expectedState.rawValue); bind(statement, 11, expectedChecksum)
+                try stepDone(statement)
+            }
+            guard sqlite3_changes(db) == 1 else { throw ContinuityIngressError.deliveryConflict }
+            try withStatementUnlocked("""
+                INSERT INTO rollover_transitions(operation_id,project_id,from_state,to_state,attempt,created_at,
+                    adapter_id,evidence,state_checksum,schema_version,project_generation,run_id,successor_provider_response_id)
+                VALUES(?,?,?,?,?,?,NULL,?,?,3,?,?,?)
+                """) { statement in
+                bind(statement, 1, operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+                bind(statement, 3, expectedState.rawValue); bind(statement, 4, next.rawValue)
+                sqlite3_bind_int(statement, 5, Int32(current.attempt + 1)); bind(statement, 6, timestamp)
+                bind(statement, 7, requestSHA); bind(statement, 8, checksum)
+                sqlite3_bind_int64(statement, 9, Int64(authorization.projectGeneration.rawValue))
+                bind(statement, 10, current.runID.description); bind(statement, 11, response)
+                try stepDone(statement)
+            }
+            guard let updated = try continuitySourceBootstrapUnlocked(operationID: operationID, authorization: authorization) else {
+                throw ContinuityIngressError.integrityFailure("source transition disappeared")
+            }
+            return updated
+        }
+    }
+
+    /// The control plane invokes this while holding live authority around its
+    /// already committed winner/fence receipt. No ordinary execution is admitted here.
+    func continuitySealSourceBootstrap(operationID: UUID, authorization: ContinuityIngressAuthorization,
+        expectedChecksum: String, acceptanceReceipt: ContinuitySourceActivationReceipt,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        guard authorization.projectID.description == projectID,
+              acceptanceReceipt.envelope.authorization == authorization,
+              acceptanceReceipt.envelope.operationID == operationID else { throw ContinuityIngressError.authorityMismatch }
+        guard expectedChecksum == acceptanceReceipt.acknowledgedStateChecksum,
+              try ContinuitySourceActivationReceipt.storedSnapshot(from: acceptanceReceipt.canonicalReceiptJSON,
+                envelope: acceptanceReceipt.envelope) == acceptanceReceipt else {
+            throw ContinuityIngressError.integrityFailure("invalid durable source acceptance receipt")
+        }
+        return try withSourceBootstrapTransaction(cancellation: cancellation) {
+            guard let current = try continuitySourceBootstrapUnlocked(operationID: operationID, authorization: authorization) else {
+                throw ContinuityIngressError.notFound
+            }
+            try Self.validateSourceActivationReceipt(acceptanceReceipt, envelope: current.envelope,
+                candidateID: current.successorSessionID, responseID: current.successorProviderResponseID,
+                retrievalSHA256: current.retrievalProofSHA256, acknowledgementSHA256: current.acknowledgementProofSHA256)
+            if current.state == .predecessorSealed {
+                guard current.activationReceiptSHA256 == acceptanceReceipt.receiptSHA256 else {
+                    throw ContinuityIngressError.deliveryConflict
+                }
+                return current
+            }
+            guard current.state == .successorAcknowledged, current.stateChecksum == expectedChecksum else {
+                throw ContinuityIngressError.deliveryConflict
+            }
+            return try commitSourceCompletionUnlocked(current: current, expectedChecksum: expectedChecksum,
+                activation: acceptanceReceipt, resumption: nil)
+        }
+    }
+
+    /// A source continuation is observed only from the control plane's exact
+    /// completed provider/tool effect receipt, never from a scheduled intent.
+    func continuityMarkSourceBootstrapResumed(operationID: UUID, authorization: ContinuityIngressAuthorization,
+        expectedChecksum: String, continuationReceipt: ContinuitySourceResumptionReceipt,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuitySourceBootstrapOperation {
+        try authorization.validate()
+        let activation = continuationReceipt.activationReceipt
+        guard authorization.projectID.description == projectID, activation.envelope.authorization == authorization,
+              activation.envelope.operationID == operationID else { throw ContinuityIngressError.authorityMismatch }
+        guard Self.validSourceBootstrapSHA(expectedChecksum),
+              try ContinuitySourceResumptionReceipt.storedSnapshot(from: continuationReceipt.canonicalReceiptJSON,
+                activationReceipt: activation) == continuationReceipt else {
+            throw ContinuityIngressError.integrityFailure("invalid durable source resumption receipt")
+        }
+        return try withSourceBootstrapTransaction(cancellation: cancellation) {
+            guard let current = try continuitySourceBootstrapUnlocked(operationID: operationID, authorization: authorization) else {
+                throw ContinuityIngressError.notFound
+            }
+            guard current.state == .predecessorSealed, current.activationReceiptSHA256 == activation.receiptSHA256,
+                  current.sealedStateChecksum == expectedChecksum else { throw ContinuityIngressError.deliveryConflict }
+            if current.isResumed {
+                guard current.resumedReceiptSHA256 == continuationReceipt.receiptSHA256 else {
+                    throw ContinuityIngressError.deliveryConflict
+                }
+                return current
+            }
+            return try commitSourceCompletionUnlocked(current: current, expectedChecksum: expectedChecksum,
+                activation: activation, resumption: continuationReceipt)
+        }
+    }
+
+    private static func validateSourceActivationReceipt(_ receipt: ContinuitySourceActivationReceipt,
+        envelope: ContinuitySourceBootstrapEnvelope, candidateID: UUID?, responseID: String?,
+        retrievalSHA256: String?, acknowledgementSHA256: String?) throws {
+        guard receipt.envelope == envelope, receipt.candidateID == candidateID,
+              receipt.acknowledgementProviderResponseID == responseID,
+              receipt.retrievalProofSHA256 == retrievalSHA256,
+              receipt.acknowledgementProofSHA256 == acknowledgementSHA256 else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+    }
+
+    private func commitSourceCompletionUnlocked(current: ContinuitySourceBootstrapOperation, expectedChecksum: String,
+        activation: ContinuitySourceActivationReceipt, resumption: ContinuitySourceResumptionReceipt?
+    ) throws -> ContinuitySourceBootstrapOperation {
+        let timestamp = ISO8601.string(from: clock.now()), attempt = current.attempt + 1
+        let resumed = resumption != nil
+        let checksum = try ContinuitySourceBootstrapOperation.checksum(envelope: current.envelope,
+            state: .predecessorSealed, attempt: attempt, createdAt: current.createdAt, updatedAt: timestamp,
+            successorSessionID: current.successorSessionID, successorProviderResponseID: current.successorProviderResponseID,
+            retrievalProofSHA256: current.retrievalProofSHA256, acknowledgementProofSHA256: current.acknowledgementProofSHA256,
+            activationReceiptSHA256: activation.receiptSHA256, resumedReceiptSHA256: resumption?.receiptSHA256)
+        let receiptJSON = resumption?.canonicalReceiptJSON ?? activation.canonicalReceiptJSON
+        let evidence = try ForgeJSONCanonicalizationV1.data(from: [
+            "schema_version": 1, "kind": resumed ? "source_resumed" : "source_accepted",
+            "expected_checksum": expectedChecksum,
+            "receipt": JSONSerialization.jsonObject(with: receiptJSON),
+        ])
+        guard evidence.count <= Self.maximumSourceCompletionEvidenceBytes else {
+            throw ContinuityIngressError.capacityExceeded("source completion evidence bytes")
+        }
+        try withStatementUnlocked("""
+            UPDATE rollover_operations SET state='predecessorSealed',attempt=?,updated_at=?,state_checksum=?,continuation_issued=?
+            WHERE operation_id=? AND project_id=? AND schema_version=3 AND state=? AND state_checksum=? AND quarantine_state IS NULL
+            """) { statement in
+            sqlite3_bind_int(statement, 1, Int32(attempt)); bind(statement, 2, timestamp); bind(statement, 3, checksum)
+            sqlite3_bind_int(statement, 4, resumed ? 1 : 0)
+            bind(statement, 5, current.operationID.uuidString.lowercased()); bind(statement, 6, projectID)
+            bind(statement, 7, current.state.rawValue); bind(statement, 8, current.stateChecksum)
+            try stepDone(statement)
+        }
+        guard sqlite3_changes(db) == 1 else { throw ContinuityIngressError.deliveryConflict }
+        try withStatementUnlocked("""
+            UPDATE continuity_handoffs SET continuation_issued=? WHERE handoff_id=? AND project_id=? AND schema_version='3.0'
+            """) { statement in
+            sqlite3_bind_int(statement, 1, resumed ? 1 : 0)
+            bind(statement, 2, current.handoffID.uuidString.lowercased()); bind(statement, 3, projectID)
+            try stepDone(statement)
+        }
+        guard sqlite3_changes(db) == 1 else { throw ContinuityIngressError.deliveryConflict }
+        try withStatementUnlocked("""
+            INSERT INTO rollover_transitions(operation_id,project_id,from_state,to_state,attempt,created_at,
+                adapter_id,evidence,state_checksum,schema_version,project_generation,run_id,successor_provider_response_id)
+            VALUES(?,?,?,'predecessorSealed',?,?,NULL,?,?,3,?,?,?)
+            """) { statement in
+            bind(statement, 1, current.operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+            bind(statement, 3, current.state.rawValue); sqlite3_bind_int(statement, 4, Int32(attempt))
+            bind(statement, 5, timestamp); bind(statement, 6, String(decoding: evidence, as: UTF8.self)); bind(statement, 7, checksum)
+            sqlite3_bind_int64(statement, 8, Int64(current.envelope.authorization.projectGeneration.rawValue))
+            bind(statement, 9, current.runID.description); bind(statement, 10, current.successorProviderResponseID)
+            try stepDone(statement)
+        }
+        guard let updated = try continuitySourceBootstrapUnlocked(operationID: current.operationID,
+            authorization: current.envelope.authorization) else {
+            throw ContinuityIngressError.integrityFailure("source completion disappeared")
+        }
+        return updated
+    }
+
+    private static let maximumSourceCompletionEvidenceBytes = 100 * 1_024
+
+    private struct SourceCompletionProofs {
+        let activationSHA256: String
+        let resumedSHA256: String?
+        let sealedChecksum: String
+        let latestChecksum: String
+        let updatedAt: String
+    }
+
+    private func sourceCompletionProofsUnlocked(envelope: ContinuitySourceBootstrapEnvelope,
+        candidateID: UUID?, responseID: String?, retrievalSHA256: String?, acknowledgementSHA256: String?,
+        createdAt: String, resumed: Bool) throws -> SourceCompletionProofs {
+        struct Entry {
+            let from: String
+            let attempt: Int
+            let timestamp: String
+            let evidence: Data
+            let checksum: String
+        }
+        let entries = try withStatementUnlocked("""
+            SELECT from_state,attempt,created_at,evidence,state_checksum,project_generation,run_id,
+                successor_provider_response_id,adapter_id
+            FROM rollover_transitions WHERE operation_id=? AND project_id=? AND schema_version=3
+              AND to_state='predecessorSealed' ORDER BY id LIMIT 3
+            """) { statement in
+            bind(statement, 1, envelope.operationID.uuidString.lowercased()); bind(statement, 2, projectID)
+            var rows: [Entry] = []
+            while try stepRow(statement) {
+                guard let from = try sourceBootstrapText(statement, 0, maximumBytes: 32),
+                      sqlite3_column_type(statement, 1) == SQLITE_INTEGER,
+                      let timestamp = try sourceBootstrapText(statement, 2, maximumBytes: 128),
+                      ISO8601.date(from: timestamp) != nil,
+                      let evidence = try sourceBootstrapText(statement, 3, maximumBytes: Self.maximumSourceCompletionEvidenceBytes),
+                      let checksum = try sourceBootstrapText(statement, 4, maximumBytes: 64),
+                      sqlite3_column_int64(statement, 5) == Int64(envelope.authorization.projectGeneration.rawValue),
+                      try sourceBootstrapText(statement, 6, maximumBytes: 36) == envelope.runID.description,
+                      try sourceBootstrapText(statement, 7, maximumBytes: 2_048) == responseID,
+                      sqlite3_column_type(statement, 8) == SQLITE_NULL else {
+                    throw ContinuityIngressError.integrityFailure("malformed source completion transition")
+                }
+                rows.append(.init(from: from, attempt: Int(sqlite3_column_int64(statement, 1)), timestamp: timestamp,
+                    evidence: Data(evidence.utf8), checksum: checksum))
+            }
+            return rows
+        }
+        guard entries.count == (resumed ? 2 : 1) else {
+            throw ContinuityIngressError.integrityFailure("source completion proof count differs")
+        }
+        func decode(_ entry: Entry, kind: String) throws -> (String, Data) {
+            guard let object = try JSONSerialization.jsonObject(with: entry.evidence) as? [String: Any],
+                  Set(object.keys) == ["schema_version", "kind", "expected_checksum", "receipt"],
+                  object["kind"] as? String == kind,
+                  let expected = object["expected_checksum"] as? String, Self.validSourceBootstrapSHA(expected),
+                  let receipt = object["receipt"] as? [String: Any],
+                  try ForgeJSONCanonicalizationV1.data(from: ["schema_version": 1, "kind": kind,
+                    "expected_checksum": expected, "receipt": receipt]) == entry.evidence else {
+                throw ContinuityIngressError.integrityFailure("invalid source completion evidence")
+            }
+            return (expected, try ForgeJSONCanonicalizationV1.data(from: receipt))
+        }
+        let seal = entries[0], (expectedACK, activationJSON) = try decode(seal, kind: "source_accepted")
+        let activation = try ContinuitySourceActivationReceipt.storedSnapshot(from: activationJSON, envelope: envelope)
+        try Self.validateSourceActivationReceipt(activation, envelope: envelope, candidateID: candidateID,
+            responseID: responseID, retrievalSHA256: retrievalSHA256, acknowledgementSHA256: acknowledgementSHA256)
+        guard seal.from == ContinuityState.successorAcknowledged.rawValue, seal.attempt == 7,
+              expectedACK == activation.acknowledgedStateChecksum else {
+            throw ContinuityIngressError.integrityFailure("source seal differs from accepted acknowledgment")
+        }
+        let sealChecksum = try ContinuitySourceBootstrapOperation.checksum(envelope: envelope,
+            state: .predecessorSealed, attempt: 7, createdAt: createdAt, updatedAt: seal.timestamp,
+            successorSessionID: candidateID, successorProviderResponseID: responseID,
+            retrievalProofSHA256: retrievalSHA256, acknowledgementProofSHA256: acknowledgementSHA256,
+            activationReceiptSHA256: activation.receiptSHA256)
+        guard seal.checksum == sealChecksum else { throw ContinuityIngressError.integrityFailure("source seal checksum differs") }
+        guard resumed else {
+            return .init(activationSHA256: activation.receiptSHA256, resumedSHA256: nil,
+                sealedChecksum: sealChecksum, latestChecksum: sealChecksum, updatedAt: seal.timestamp)
+        }
+        let resume = entries[1], (expectedSeal, resumedJSON) = try decode(resume, kind: "source_resumed")
+        let proof = try ContinuitySourceResumptionReceipt.storedSnapshot(from: resumedJSON, activationReceipt: activation)
+        guard resume.from == ContinuityState.predecessorSealed.rawValue, resume.attempt == 8,
+              expectedSeal == sealChecksum else { throw ContinuityIngressError.integrityFailure("source resume differs from sealed operation") }
+        let checksum = try ContinuitySourceBootstrapOperation.checksum(envelope: envelope,
+            state: .predecessorSealed, attempt: 8, createdAt: createdAt, updatedAt: resume.timestamp,
+            successorSessionID: candidateID, successorProviderResponseID: responseID,
+            retrievalProofSHA256: retrievalSHA256, acknowledgementProofSHA256: acknowledgementSHA256,
+            activationReceiptSHA256: activation.receiptSHA256, resumedReceiptSHA256: proof.receiptSHA256)
+        guard resume.checksum == checksum else { throw ContinuityIngressError.integrityFailure("source resume checksum differs") }
+        return .init(activationSHA256: activation.receiptSHA256, resumedSHA256: proof.receiptSHA256,
+            sealedChecksum: sealChecksum, latestChecksum: checksum, updatedAt: resume.timestamp)
+    }
+
+    private func continuitySourceBootstrapUnlocked(operationID: UUID, authorization: ContinuityIngressAuthorization,
+        allowCancellationMarker: Bool = false) throws -> ContinuitySourceBootstrapOperation? {
+        let authorized = try withStatementUnlocked("SELECT schema_version,source_authorization_sha256 FROM rollover_operations WHERE operation_id=? AND project_id=? LIMIT 1") { statement in
+            bind(statement, 1, operationID.uuidString.lowercased())
+            bind(statement, 2, projectID)
+            guard try stepRow(statement) else { return false }
+            guard sqlite3_column_int(statement, 0) == 3,
+                  try sourceBootstrapText(statement, 1, maximumBytes: 64) == JSONSupport.sha256Hex(authorization.encodedJSON()) else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            return true
+        }
+        guard authorized else { return nil }
+        if !allowCancellationMarker, try hasSourceCancellationUnlocked(operationID: operationID) {
+            throw ContinuityIngressError.invalidated
+        }
+        // Authorization metadata is checked before any stored packet is selected.
+        return try withStatementUnlocked("""
+            SELECT o.handoff_id,o.state,o.attempt,o.created_at,o.updated_at,o.state_checksum,
+                o.project_generation,o.run_id,o.bootstrap_nonce,o.source_acceptance_sha256,
+                h.payload_json,h.content_sha256,h.project_generation,h.run_id,h.bootstrap_nonce,
+                o.predecessor_session_id,o.predecessor_provider_response_id,o.budget_observation_id,
+                o.successor_session_id,o.successor_provider_response_id,o.continuation_issued,
+                o.quarantine_state,h.quarantine_state,h.operation_id,h.schema_version,
+                o.acknowledgement_sha256,o.source_retrieval_sha256,o.adapter_id,o.idempotency_key,h.created_at,h.continuation_issued
+            FROM rollover_operations o JOIN continuity_handoffs h ON h.handoff_id=o.handoff_id AND h.project_id=o.project_id
+            WHERE o.operation_id=? AND o.project_id=? AND o.schema_version=3 LIMIT 1
+            """) { statement in
+            bind(statement, 1, operationID.uuidString.lowercased())
+            bind(statement, 2, projectID)
+            guard try stepRow(statement),
+                  let json = try sourceBootstrapText(statement, 10, maximumBytes: ContinuitySourceBootstrapEnvelope.maximumEncodedBytes),
+                  let createdAt = try sourceBootstrapText(statement, 3, maximumBytes: 128),
+                  let updatedAt = try sourceBootstrapText(statement, 4, maximumBytes: 128),
+                  ISO8601.date(from: createdAt) != nil, ISO8601.date(from: updatedAt) != nil else {
+                throw ContinuityIngressError.integrityFailure("source operation is missing its envelope")
+            }
+            let envelope = try ContinuitySourceBootstrapEnvelope.storedSnapshot(from: Data(json.utf8))
+            guard envelope.authorization == authorization else { throw ContinuityIngressError.authorityMismatch }
+            let continuation = sqlite3_column_int64(statement, 20)
+            guard sqlite3_column_type(statement, 20) == SQLITE_INTEGER, (0...1).contains(continuation),
+                  sqlite3_column_int64(statement, 30) == continuation,
+                  let stateText = try sourceBootstrapText(statement, 1, maximumBytes: 32),
+                  let state = ContinuityState(rawValue: stateText),
+                  let stateIndex = (Self.sourceBootstrapStates + [.predecessorSealed]).firstIndex(of: state),
+                  continuation == 0 || state == .predecessorSealed,
+                  sqlite3_column_int64(statement, 2) == Int64(stateIndex + 2) + continuation else {
+                throw ContinuityIngressError.integrityFailure("unsupported source bootstrap state")
+            }
+            let candidateText = try sourceBootstrapText(statement, 18, maximumBytes: 36)
+            let candidate = candidateText.flatMap(UUID.init(uuidString:))
+            let response = try sourceBootstrapText(statement, 19, maximumBytes: 2_048)
+            let acknowledgement = try sourceBootstrapText(statement, 25, maximumBytes: 64)
+            let retrieval = try sourceBootstrapText(statement, 26, maximumBytes: 64)
+            guard (stateIndex == 0 ? candidateText == nil : candidate != nil && candidate?.uuidString.lowercased() == candidateText),
+                  (stateIndex < 2 ? response == nil : Self.validSourceBootstrapResponse(response)),
+                  (stateIndex < 4 ? acknowledgement == nil && retrieval == nil
+                    : Self.validSourceBootstrapSHA(acknowledgement) && Self.validSourceBootstrapSHA(retrieval)) else {
+                throw ContinuityIngressError.integrityFailure("invalid source bootstrap candidate or proof")
+            }
+            let completion = state == .predecessorSealed ? try sourceCompletionProofsUnlocked(envelope: envelope,
+                candidateID: candidate, responseID: response, retrievalSHA256: retrieval,
+                acknowledgementSHA256: acknowledgement, createdAt: createdAt, resumed: continuation == 1) : nil
+            let checksum = try ContinuitySourceBootstrapOperation.checksum(envelope: envelope,
+                state: state, attempt: stateIndex + 2 + Int(continuation), createdAt: createdAt, updatedAt: updatedAt,
+                successorSessionID: candidate, successorProviderResponseID: response,
+                retrievalProofSHA256: retrieval, acknowledgementProofSHA256: acknowledgement,
+                activationReceiptSHA256: completion?.activationSHA256, resumedReceiptSHA256: completion?.resumedSHA256)
+            let cancellationOverlayMatches: Bool
+            if allowCancellationMarker {
+                cancellationOverlayMatches = try sourceBootstrapText(statement, 21, maximumBytes: 32) == "source_cancelled"
+                    && sourceBootstrapText(statement, 22, maximumBytes: 32) == "source_cancelled"
+            } else {
+                cancellationOverlayMatches = sqlite3_column_type(statement, 21) == SQLITE_NULL
+                    && sqlite3_column_type(statement, 22) == SQLITE_NULL
+            }
+            guard envelope.operationID == operationID,
+                  completion == nil || (completion?.latestChecksum == checksum && completion?.updatedAt == updatedAt),
+                  try sourceBootstrapText(statement, 0, maximumBytes: 36) == envelope.handoffID.uuidString.lowercased(),
+                  try sourceBootstrapText(statement, 5, maximumBytes: 64) == checksum,
+                  sqlite3_column_int64(statement, 6) == Int64(authorization.projectGeneration.rawValue),
+                  try sourceBootstrapText(statement, 7, maximumBytes: 36) == envelope.runID.description,
+                  try sourceBootstrapText(statement, 8, maximumBytes: 36) == envelope.bootstrapNonce.uuidString.lowercased(),
+                  try sourceBootstrapText(statement, 9, maximumBytes: 64) == envelope.acceptance.receiptSHA256,
+                  try sourceBootstrapText(statement, 11, maximumBytes: 64) == envelope.envelopeSHA256,
+                  sqlite3_column_int64(statement, 12) == Int64(authorization.projectGeneration.rawValue),
+                  try sourceBootstrapText(statement, 13, maximumBytes: 36) == envelope.runID.description,
+                  try sourceBootstrapText(statement, 14, maximumBytes: 36) == envelope.bootstrapNonce.uuidString.lowercased(),
+                  (15...17).allSatisfy({ sqlite3_column_type(statement, Int32($0)) == SQLITE_NULL }),
+                  cancellationOverlayMatches,
+                  try sourceBootstrapText(statement, 23, maximumBytes: 36) == operationID.uuidString.lowercased(),
+                  try sourceBootstrapText(statement, 24, maximumBytes: 8) == ContinuitySourceBootstrapEnvelope.schemaVersion,
+                  sqlite3_column_type(statement, 27) == SQLITE_NULL,
+                  try sourceBootstrapText(statement, 28, maximumBytes: 128) == "source-bootstrap:\(operationID.uuidString.lowercased())",
+                  try sourceBootstrapText(statement, 29, maximumBytes: 128) == createdAt else {
+                throw ContinuityIngressError.integrityFailure("source operation columns differ from its frozen envelope")
+            }
+            return ContinuitySourceBootstrapOperation(envelope: envelope, state: state,
+                attempt: stateIndex + 2 + Int(continuation), createdAt: createdAt, updatedAt: updatedAt, stateChecksum: checksum,
+                successorSessionID: candidate, successorProviderResponseID: response,
+                retrievalProofSHA256: retrieval, acknowledgementProofSHA256: acknowledgement,
+                activationReceiptSHA256: completion?.activationSHA256, resumedReceiptSHA256: completion?.resumedSHA256,
+                sealedStateChecksum: completion?.sealedChecksum)
+        }
+    }
+
+    private func sourceBootstrapText(_ statement: OpaquePointer, _ index: Int32, maximumBytes: Int) throws -> String? {
+        if sqlite3_column_type(statement, index) == SQLITE_NULL { return nil }
+        let count = Int(sqlite3_column_bytes(statement, index))
+        guard sqlite3_column_type(statement, index) == SQLITE_TEXT, count <= maximumBytes,
+              let bytes = sqlite3_column_text(statement, index),
+              let value = String(bytes: UnsafeBufferPointer(start: bytes, count: count), encoding: .utf8),
+              !value.contains("\0") else {
+            throw ContinuityIngressError.integrityFailure("source bootstrap text is invalid or oversized")
+        }
+        return value
+    }
+
+    private func withSourceBootstrapTransaction<T>(cancellation: ToolCallCancellation?, _ body: () throws -> T) throws -> T {
+        try cancellation?.checkCancellation()
+        while !lock.lock(before: Date().addingTimeInterval(0.01)) { try cancellation?.checkCancellation() }
+        defer { lock.unlock() }
+        let previous = try withStatementUnlocked("PRAGMA synchronous;") { statement in
+            guard try stepRow(statement) else { throw ContinuityIngressError.integrityFailure("missing synchronous mode") }
+            return sqlite3_column_int(statement, 0)
+        }
+        guard (0...3).contains(previous) else { throw ContinuityIngressError.integrityFailure("invalid synchronous mode") }
+        try execUnlocked("PRAGMA synchronous=FULL;")
+        defer { try? execUnlocked("PRAGMA synchronous=\(previous);") }
+        return try withSQLiteControlUnlocked(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, didCommit: didMutationCommitObserver, body)
+        }
     }
 
     // MARK: - Project continuity V2
@@ -1212,8 +1927,8 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                     )
                     return existing
                 }
-                if let active = try continuityActiveOperationUnlocked() {
-                    throw ProjectMemoryError.conflict("rollover already active: \(active.operationID)")
+                if try continuityHasActiveOperationUnlocked() {
+                    throw ProjectMemoryError.conflict("another rollover is already active")
                 }
                 let timestamp = ISO8601.string(from: clock.now())
                 let checksum = Self.continuityChecksumV2(
@@ -2658,7 +3373,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private func continuityOperationUnlocked(_ id: String) throws -> ContinuityOperation? {
         try withStatementUnlocked(
             Self.continuityOperationSelect
-                + " WHERE operation_id=? AND project_id=? AND quarantine_state IS NULL LIMIT 1"
+                + " WHERE operation_id=? AND project_id=? AND schema_version IN (1,2) AND quarantine_state IS NULL LIMIT 1"
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
             guard try stepRow(statement) else { return nil }
@@ -2669,7 +3384,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private func continuityOperationByIdempotencyUnlocked(_ key: String) throws -> ContinuityOperation? {
         try withStatementUnlocked(
             Self.continuityOperationSelect
-                + " WHERE project_id=? AND idempotency_key=? AND quarantine_state IS NULL LIMIT 1"
+                + " WHERE project_id=? AND idempotency_key=? AND schema_version IN (1,2) AND quarantine_state IS NULL LIMIT 1"
         ) { statement in
             bind(statement, 1, projectID); bind(statement, 2, key)
             guard try stepRow(statement) else { return nil }
@@ -2680,7 +3395,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     private func continuityActiveOperationUnlocked() throws -> ContinuityOperation? {
         try withStatementUnlocked(
             Self.continuityOperationSelect
-                + " WHERE project_id=? AND state<>'predecessorSealed'"
+                + " WHERE project_id=? AND schema_version IN (1,2) AND state<>'predecessorSealed'"
                 + " AND quarantine_state IS NULL ORDER BY updated_at DESC LIMIT 1"
         ) { statement in
             bind(statement, 1, projectID)
@@ -2694,6 +3409,16 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             "SELECT 1 FROM continuity_handoffs WHERE handoff_id=? AND project_id=? AND quarantine_state IS NULL LIMIT 1"
         ) { statement in
             bind(statement, 1, id); bind(statement, 2, projectID)
+            return try stepRow(statement)
+        }
+    }
+
+    private func continuityHasActiveOperationUnlocked() throws -> Bool {
+        try withStatementUnlocked("""
+            SELECT 1 FROM rollover_operations WHERE project_id=? AND quarantine_state IS NULL
+              AND (state<>'predecessorSealed' OR (schema_version=3 AND continuation_issued=0)) LIMIT 1
+            """) { statement in
+            bind(statement, 1, projectID)
             return try stepRow(statement)
         }
     }
@@ -3676,13 +4401,16 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                   WHERE schema_version=1;
                 """)
             }
+            if prior < 3 {
+                try migrateSourceBootstrapTablesUnlocked(priorVersion: prior)
+            }
             try execUnlocked("""
             DROP INDEX IF EXISTS idx_rollover_active_project;
             CREATE UNIQUE INDEX idx_rollover_active_project
               ON rollover_operations(project_id)
               WHERE state <> 'predecessorSealed' AND quarantine_state IS NULL;
             """)
-            try execUnlocked("PRAGMA user_version=2;")
+            try execUnlocked("PRAGMA user_version=3;")
             if prior < 2 {
                 try withStatementUnlocked(
                     """
@@ -3758,6 +4486,150 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
+    private static let sourceBootstrapLegacyOperationDDL = """
+    CREATE TABLE rollover_operations(
+      operation_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,predecessor_session_id TEXT NOT NULL,
+      successor_session_id TEXT,handoff_id TEXT NOT NULL,state TEXT NOT NULL,attempt INTEGER NOT NULL,
+      adapter_id TEXT NOT NULL,idempotency_key TEXT NOT NULL,acknowledged_session_id TEXT,
+      acknowledged_handoff_id TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+      last_error TEXT,retry_at TEXT,state_checksum TEXT NOT NULL,
+      schema_version INTEGER NOT NULL DEFAULT 1,project_generation INTEGER,run_id TEXT,
+      predecessor_provider_response_id TEXT,successor_provider_response_id TEXT,
+      bootstrap_nonce TEXT,acknowledgement_sha256 TEXT,budget_observation_id TEXT,
+      continuation_issued INTEGER NOT NULL DEFAULT 0,quarantine_state TEXT,
+      migration_source TEXT,legacy_record_id TEXT,
+      UNIQUE(project_id,idempotency_key)
+    )
+    """
+
+    private static let sourceBootstrapLegacyTransitionDDL = """
+    CREATE TABLE rollover_transitions(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,operation_id TEXT NOT NULL,project_id TEXT NOT NULL,
+      from_state TEXT,to_state TEXT NOT NULL,attempt INTEGER NOT NULL,created_at TEXT NOT NULL,
+      adapter_id TEXT NOT NULL,evidence TEXT,state_checksum TEXT NOT NULL,
+      schema_version INTEGER NOT NULL DEFAULT 1,project_generation INTEGER,run_id TEXT,
+      successor_provider_response_id TEXT
+    )
+    """
+
+    /// The verified source backup is already prepared at the writer boundary.
+    /// Only the known V2 tables are rebuilt; extensions are preserved by rejection.
+    private func migrateSourceBootstrapTablesUnlocked(priorVersion: Int) throws {
+        let externalReferences = try withStatementUnlocked("""
+            SELECT COUNT(*) FROM sqlite_master m, pragma_foreign_key_list(m.name) f
+            WHERE m.type='table' AND f."table" IN ('rollover_operations','rollover_transitions')
+            """) { statement in
+            guard try stepRow(statement) else { throw ProjectMemoryError.integrityFailure("missing continuity foreign key check") }
+            return sqlite3_column_int64(statement, 0)
+        }
+        guard externalReferences == 0 else {
+            throw ProjectMemoryError.integrityFailure("unsupported continuity schema reference")
+        }
+        let definitions = [("rollover_operations", Self.sourceBootstrapLegacyOperationDDL),
+                           ("rollover_transitions", Self.sourceBootstrapLegacyTransitionDDL)]
+        for (table, expected) in definitions {
+            let definition = try withStatementUnlocked("SELECT sql FROM sqlite_master WHERE type='table' AND name=? LIMIT 1") { statement in
+                bind(statement, 1, table)
+                guard try stepRow(statement) else { throw ProjectMemoryError.integrityFailure("missing continuity schema") }
+                return try sourceBootstrapText(statement, 0, maximumBytes: 16 * 1_024)
+            }
+            let normalizedExpected = Self.normalizedSourceSchemaSQL(expected)
+            guard let definition,
+                  Self.normalizedSourceSchemaSQL(definition) == normalizedExpected else {
+                throw ProjectMemoryError.integrityFailure("unsupported continuity schema extension")
+            }
+            let columns = try withStatementUnlocked("SELECT name,hidden FROM pragma_table_xinfo(?) LIMIT 33") { statement in
+                bind(statement, 1, table)
+                var values: [String] = []
+                while try stepRow(statement) {
+                    guard sqlite3_column_int(statement, 1) == 0,
+                          let name = try sourceBootstrapText(statement, 0, maximumBytes: 128) else {
+                        throw ProjectMemoryError.integrityFailure("unsupported continuity generated column")
+                    }
+                    values.append(name)
+                }
+                return values
+            }
+            let indexes = try withStatementUnlocked("SELECT type,name,sql FROM sqlite_master WHERE tbl_name=? AND type IN ('index','trigger') LIMIT 5") { statement in
+                bind(statement, 1, table)
+                var values: [(String?, String?, String?)] = []
+                while try stepRow(statement) {
+                    values.append((try sourceBootstrapText(statement, 0, maximumBytes: 16),
+                        try sourceBootstrapText(statement, 1, maximumBytes: 128),
+                        try sourceBootstrapText(statement, 2, maximumBytes: 16 * 1_024)))
+                }
+                return values
+            }
+            if table == "rollover_operations" {
+                let expectedIndexes = [
+                    "idx_rollover_active_project": "CREATE UNIQUE INDEX idx_rollover_active_project ON rollover_operations(project_id) WHERE state <> 'predecessorSealed' AND quarantine_state IS NULL",
+                    "idx_rollover_project_updated": "CREATE INDEX idx_rollover_project_updated ON rollover_operations(project_id,updated_at DESC)",
+                ]
+                guard columns.count == 28, indexes.count == 4, indexes.allSatisfy({ type, name, sql in
+                    guard type == "index", let name else { return false }
+                    if ["sqlite_autoindex_rollover_operations_1", "sqlite_autoindex_rollover_operations_2"].contains(name) { return sql == nil }
+                    guard let sql, let expected = expectedIndexes[name] else { return false }
+                    let normalized = Self.normalizedSourceSchemaSQL(sql)
+                    return normalized == Self.normalizedSourceSchemaSQL(expected)
+                        || (priorVersion == 1 && name == "idx_rollover_active_project"
+                            && normalized == Self.normalizedSourceSchemaSQL(expected).replacingOccurrences(of: "ANDquarantine_stateISNULL", with: ""))
+                }) else { throw ProjectMemoryError.integrityFailure("unsupported continuity schema index") }
+            } else {
+                guard columns.count == 14, indexes.isEmpty else {
+                    throw ProjectMemoryError.integrityFailure("unsupported continuity transition schema")
+                }
+            }
+            let upgrade = table + "_source_upgrade"
+            let previousSequence: Int64? = table == "rollover_transitions" ? try withStatementUnlocked("SELECT seq FROM sqlite_sequence WHERE name='rollover_transitions' LIMIT 1") { statement in
+                try stepRow(statement) ? sqlite3_column_int64(statement, 0) : nil
+            } : nil
+            var replacement = expected.replacingOccurrences(of: "CREATE TABLE \(table)(", with: "CREATE TABLE \(upgrade)(")
+                .replacingOccurrences(of: "adapter_id TEXT NOT NULL", with: "adapter_id TEXT")
+            replacement.removeLast()
+            if table == "rollover_operations" {
+                replacement = replacement.replacingOccurrences(of: "predecessor_session_id TEXT NOT NULL", with: "predecessor_session_id TEXT")
+                    .replacingOccurrences(of: "UNIQUE(project_id,idempotency_key)",
+                        with: "source_authorization_sha256 TEXT,source_acceptance_sha256 TEXT,source_retrieval_sha256 TEXT,UNIQUE(project_id,idempotency_key)")
+                replacement += """
+                ,CHECK ((schema_version IN (1,2) AND predecessor_session_id IS NOT NULL AND adapter_id IS NOT NULL
+                  AND source_authorization_sha256 IS NULL AND source_acceptance_sha256 IS NULL AND source_retrieval_sha256 IS NULL)
+                  OR (schema_version=3 AND predecessor_session_id IS NULL AND adapter_id IS NULL
+                  AND predecessor_provider_response_id IS NULL AND budget_observation_id IS NULL
+                  AND source_authorization_sha256 IS NOT NULL AND length(source_authorization_sha256)=64
+                  AND source_acceptance_sha256 IS NOT NULL AND length(source_acceptance_sha256)=64)))
+                """
+            } else {
+                replacement += ",CHECK ((schema_version IN (1,2) AND adapter_id IS NOT NULL) OR (schema_version=3 AND adapter_id IS NULL)))"
+            }
+            try execUnlocked(replacement)
+            let names = columns.joined(separator: ",")
+            try execUnlocked("INSERT INTO \(upgrade)(\(names)) SELECT \(names) FROM \(table);")
+            try execUnlocked("DROP TABLE \(table); ALTER TABLE \(upgrade) RENAME TO \(table);")
+            if let previousSequence {
+                try withStatementUnlocked("UPDATE sqlite_sequence SET seq=MAX(seq,?) WHERE name='rollover_transitions'") { statement in
+                    sqlite3_bind_int64(statement, 1, previousSequence)
+                    try stepDone(statement)
+                }
+            }
+        }
+        try execUnlocked("CREATE INDEX idx_rollover_project_updated ON rollover_operations(project_id,updated_at DESC);")
+        let violation = try withStatementUnlocked("PRAGMA foreign_key_check;") { try stepRow($0) }
+        guard !violation else { throw ProjectMemoryError.integrityFailure("continuity migration changed foreign keys") }
+    }
+
+    private static func normalizedSourceSchemaSQL(_ sql: String) -> String {
+        var result = ""
+        var inLiteral = false
+        for character in sql {
+            if character == "'" { inLiteral.toggle() }
+            if !inLiteral && (character.isWhitespace || character == ";" || character == "\"") { continue }
+            result.append(character)
+        }
+        return result.replacingOccurrences(of: "CREATETABLEIFNOTEXISTS", with: "CREATETABLE")
+            .replacingOccurrences(of: "CREATEINDEXIFNOTEXISTS", with: "CREATEINDEX")
+            .replacingOccurrences(of: "CREATEUNIQUEINDEXIFNOTEXISTS", with: "CREATEUNIQUEINDEX")
+    }
+
     private func migrationBackupURL(sourceVersion: Int) -> URL {
         directory.appendingPathComponent(
             "memory.pre-migration-v\(sourceVersion).sqlite3",
@@ -3800,7 +4672,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             bind(statement, 14, timestamp)
             bind(statement, 15, write.expiresAt)
             bind(statement, 16, hash)
-            sqlite3_bind_int(statement, 17, Int32(Self.schemaVersion))
+            sqlite3_bind_int(statement, 17, 2)
             bind(statement, 18, write.idempotencyKey)
             try stepDone(statement)
         }

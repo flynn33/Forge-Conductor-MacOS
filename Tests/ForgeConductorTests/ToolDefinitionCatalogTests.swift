@@ -27,11 +27,15 @@ final class ToolDefinitionCatalogTests: XCTestCase {
                     schema["properties"] as? [String: Any],
                     definition.name
                 )
-                let deadline = try XCTUnwrap(
-                    properties["deadline_ms"] as? [String: Any],
-                    definition.name
-                )
-                XCTAssertEqual(deadline["type"] as? String, "integer", definition.name)
+                if ContinuityControlToolName(rawValue: definition.name) != nil {
+                    XCTAssertNil(properties["deadline_ms"], definition.name)
+                    XCTAssertEqual(schema["additionalProperties"] as? Bool, false, definition.name)
+                } else {
+                    let deadline = try XCTUnwrap(
+                        properties["deadline_ms"] as? [String: Any], definition.name
+                    )
+                    XCTAssertEqual(deadline["type"] as? String, "integer", definition.name)
+                }
             }
 
             let allowed = try catalog.definitions(

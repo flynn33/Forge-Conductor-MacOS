@@ -61,6 +61,9 @@ public actor ProjectControlPlaneRepository {
     private static let maximumContextBudgetObservationBytes = 64 * 1_024
     public static let maximumContextBudgetActionRequestsPerRead = 256
     public static let maximumPublishedProjectTransitionAuthoritiesPerProject = 16
+    static let maximumContinuityTaskAuthorizations = 1_024
+    static let maximumActiveContinuityTasksPerProject = 128
+    static let maximumContinuityIngressAcceptances = 1_024
 
     public let databaseURL: URL
 
@@ -81,6 +84,7 @@ public actor ProjectControlPlaneRepository {
     private var busyRetryObserver: (@Sendable () -> Void)?
     private var beforeCommitObserver: (@Sendable () throws -> Void)?
     private var didCommitObserver: (@Sendable () -> Void)?
+    private var beforeCommitSynchronousObserver: (@Sendable (Int) -> Void)?
 
     public init(
         databaseURL: URL,
@@ -125,6 +129,10 @@ public actor ProjectControlPlaneRepository {
                           storedVersion == Self.schemaVersion else {
                         throw ProjectContextError.unsupportedSchemaVersion(priorVersion)
                     }
+                    _ = try VerifiedMigrationBackup.reconcileMigrationManifest(
+                        sourceURL: standardizedDatabaseURL,
+                        observedVersion: try candidate.integer(ControlPlaneSQLiteConnection.ingressSchemaCapabilityVersionQuery) ?? 0,
+                        scope: .continuityIngress)
                 }
                 let connection = try ControlPlaneSQLiteConnection(
                     databaseURL: standardizedDatabaseURL,
@@ -158,11 +166,13 @@ public actor ProjectControlPlaneRepository {
     func configureOperationObservers(
         busyRetry: (@Sendable () -> Void)? = nil,
         beforeCommit: (@Sendable () throws -> Void)? = nil,
-        didCommit: (@Sendable () -> Void)? = nil
+        didCommit: (@Sendable () -> Void)? = nil,
+        beforeCommitSynchronous: (@Sendable (Int) -> Void)? = nil
     ) {
         busyRetryObserver = busyRetry
         beforeCommitObserver = beforeCommit
         didCommitObserver = didCommit
+        beforeCommitSynchronousObserver = beforeCommitSynchronous
     }
 
     public func close() {
@@ -1167,6 +1177,1256 @@ public actor ProjectControlPlaneRepository {
         return result
     }
 
+    // MARK: - Native-approved continuity task authority
+
+    /// Native authenticated setup only. A model's goal, assignment identifier,
+    /// handoff contents or MCP client identity must never call this issuer.
+    /// The caller correlation returned here stays in the verified native owner
+    /// or adapter context; it is not serialized into MCP tool arguments.
+    func authorizeContinuityTask(
+        taskID: UUID = UUID(), projectID: ProjectID, expectedGeneration: ProjectGeneration,
+        approvedAssignment: ContinuityTaskAssignment,
+        callerContext: ToolInvocationContext, callerOwner: ProjectBindingOwner,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> AuthorizedContinuityTaskSetup {
+        let assignmentData = try approvedAssignment.storedJSON()
+        let timestamp = ISO8601.string(from: clock.now())
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            let project = try requiredActiveProjectUnlocked(projectID, generation: expectedGeneration, connection: connection)
+            let caller = try validatedContinuityCallerUnlocked(context: callerContext, owner: callerOwner, connection: connection)
+            guard caller.projectID == projectID, caller.projectGeneration == expectedGeneration,
+                  caller.runID == nil else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            try Self.requireContinuityScope(approvedAssignment.authorizationScope,
+                within: caller.authorizationScope, projectRoot: project.canonicalRoot)
+            if let existing = try continuityTaskUnlocked(taskID, connection: connection) {
+                try requireSourceMutationAdmissionUnlocked(existing.authorization, connection: connection)
+                guard existing.state == .active else { throw ContinuityTaskAuthorizationError.revoked }
+                guard existing.authorization.projectID == projectID,
+                      existing.authorization.projectGeneration == expectedGeneration,
+                      existing.assignment == approvedAssignment else {
+                    throw ContinuityTaskAuthorizationError.assignmentConflict
+                }
+                let current = try validatedContinuityTaskUnlocked(existing.authorization, connection: connection)
+                try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: timestamp, existingTask: true, connection: connection)
+                return AuthorizedContinuityTaskSetup(record: current,
+                    correlation: try .nativeSetupResult(record: current, caller: caller, context: callerContext))
+            }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_task_authorizations") < Self.maximumContinuityTaskAuthorizations,
+                  try connection.scalarInt("SELECT COUNT(*) FROM continuity_task_authorizations WHERE project_id=? AND state='active'",
+                    bindings: [.text(projectID.description)]) < Self.maximumActiveContinuityTasksPerProject else {
+                throw ContinuityTaskAuthorizationError.capacityExceeded
+            }
+            let sourceOwner = ProjectBindingOwner(kind: .agentSession, id: taskID.uuidString.lowercased())
+            guard try bindingUnlocked(owner: sourceOwner, includeInactive: true, connection: connection) == nil else {
+                throw ContinuityTaskAuthorizationError.assignmentConflict
+            }
+            let sourceBindingID = UUID()
+            let authority = try ContinuityIngressAuthorization(projectID: projectID, projectGeneration: expectedGeneration,
+                sourceBindingID: sourceBindingID, taskID: taskID, assignmentID: approvedAssignment.assignmentID,
+                assignmentSHA256: approvedAssignment.assignmentSHA256, authorizationScope: approvedAssignment.authorizationScope)
+            let authorityData = try authority.encodedJSON()
+            try connection.execute(
+                """
+                INSERT INTO project_bindings(binding_id,owner_kind,owner_id,project_id,project_generation,
+                    run_id,authorization_scope_json,active,created_at,updated_at)
+                VALUES(?,'agent_session',?,?,?,NULL,?,1,?,?)
+                """,
+                bindings: [.text(sourceBindingID.uuidString.lowercased()), .text(sourceOwner.id), .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)), .text(try Self.scopeJSON(approvedAssignment.authorizationScope)),
+                    .text(timestamp), .text(timestamp)])
+            try connection.execute(
+                """
+                INSERT INTO continuity_task_authorizations(task_id,project_id,project_generation,source_binding_id,
+                    assignment_id,assignment_sha256,assignment_json,assignment_snapshot_sha256,
+                    authorization_json,authorization_sha256,state,revision,run_id,created_at,revoked_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,'active',1,NULL,?,NULL)
+                """,
+                bindings: [.text(taskID.uuidString.lowercased()), .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)), .text(sourceBindingID.uuidString.lowercased()),
+                    .text(approvedAssignment.assignmentID), .text(approvedAssignment.assignmentSHA256),
+                    .text(String(decoding: assignmentData, as: UTF8.self)), .text(JSONSupport.sha256Hex(assignmentData)),
+                    .text(String(decoding: authorityData, as: UTF8.self)), .text(JSONSupport.sha256Hex(authorityData)), .text(timestamp)])
+            try appendAutonomyEventUnlocked(runID: nil, projectID: projectID,
+                eventType: "continuity_task_authorized", severity: .info, summary: "Native task assignment was durably authorized",
+                metadata: ["task_id": taskID.uuidString.lowercased(), "source_binding_id": sourceBindingID.uuidString.lowercased(),
+                           "assignment_sha256": approvedAssignment.assignmentSHA256], connection: connection)
+            let record = try validatedContinuityTaskUnlocked(authority, connection: connection)
+            try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: timestamp, connection: connection)
+            return AuthorizedContinuityTaskSetup(record: record,
+                correlation: try .nativeSetupResult(record: record, caller: caller, context: callerContext))
+        }
+    }
+
+    /// Reattaches an explicitly selected native task after process restart.
+    /// Caller identity comes from the authenticated native attachment, never
+    /// model arguments or a search for a latest/only task on a shared transport.
+    /// This is a read and correlation issuance only: source mutation fences,
+    /// approvals, assignments, bindings, runs and operation receipts stay intact.
+    func reattachContinuityTask(
+        taskID: UUID, projectID: ProjectID, expectedGeneration: ProjectGeneration,
+        callerContext: ToolInvocationContext, callerOwner: ProjectBindingOwner,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> AuthorizedContinuityTaskSetup {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let project = try requiredActiveProjectUnlocked(projectID, generation: expectedGeneration, connection: connection)
+            let caller = try validatedContinuityCallerUnlocked(context: callerContext, owner: callerOwner, connection: connection)
+            guard caller.projectID == projectID, caller.projectGeneration == expectedGeneration, caller.runID == nil,
+                  try connection.scalarInt("""
+                    SELECT COUNT(*) FROM continuity_task_authorizations WHERE task_id=? AND project_id=? AND project_generation=?
+                    """, bindings: [.text(taskID.uuidString.lowercased()), .text(projectID.description),
+                        .int64(try Self.sqliteGeneration(expectedGeneration))]) == 1 else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            // Authenticate the immutable original caller before reading any
+            // assignment/source/run snapshot, including same-project tasks.
+            // existingTask forbids inserting or repairing a missing origin.
+            try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: "", existingTask: true, connection: connection)
+            guard let stored = try continuityTaskUnlocked(taskID, connection: connection) else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            let record = try validatedContinuityTaskUnlocked(stored.authorization, allowTerminalRun: true, connection: connection)
+            guard record.authorization.projectID == projectID, record.authorization.projectGeneration == expectedGeneration else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            try Self.requireContinuityScope(record.authorization.authorizationScope,
+                within: caller.authorizationScope, projectRoot: project.canonicalRoot)
+            return AuthorizedContinuityTaskSetup(record: record,
+                correlation: try .nativeSetupResult(record: record, caller: caller, context: callerContext))
+        }
+    }
+
+    /// Holds the existing writer fence across a bounded source-store transaction.
+    /// The closure must not suspend or call this repository. Its source commit,
+    /// including the outbox row, remains authoritative if later delivery fails.
+    func withAuthorizedContinuityTask<Value: Sendable>(
+        taskID: UUID, correlation: VerifiedContinuityTaskCorrelation?,
+        context: ToolInvocationContext, owner: ProjectBindingOwner,
+        cancellation: ToolCallCancellation? = nil,
+        mutation: @Sendable (ContinuityIngressAuthorization) throws -> Value
+    ) throws -> Value {
+        guard let correlation else { throw ContinuityTaskAuthorizationError.taskCorrelationRequired }
+        return try controlledTransaction(cancellation: cancellation, checkCancellationBeforeCommit: false) { connection in
+            guard correlation.taskID == taskID, correlation.callerOwner == owner,
+                  correlation.callerContext == context else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            let caller = try validatedContinuityCallerUnlocked(context: context, owner: owner, connection: connection)
+            guard let stored = try continuityTaskUnlocked(taskID, connection: connection) else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            let record = try validatedContinuityTaskUnlocked(stored.authorization, connection: connection)
+            let authority = record.authorization
+            try requireSourceMutationAdmissionUnlocked(authority, connection: connection)
+            guard correlation.callerBindingID == caller.bindingID,
+                  correlation.sourceBindingID == authority.sourceBindingID,
+                  correlation.projectID == authority.projectID, correlation.projectGeneration == authority.projectGeneration,
+                  caller.projectID == authority.projectID, caller.projectGeneration == authority.projectGeneration,
+                  JSONSupport.sha256Hex(try authority.encodedJSON()) == correlation.authorizationSHA256,
+                  context.runID == nil || record.runID == context.runID else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            let project = try requiredActiveProjectUnlocked(authority.projectID, generation: authority.projectGeneration, connection: connection)
+            try Self.requireContinuityScope(authority.authorizationScope, within: caller.authorizationScope, projectRoot: project.canonicalRoot)
+            try cancellation?.checkCancellation()
+            let value = try mutation(authority)
+            cancellation?.promoteCommittedResultIfPresent(value)
+            connection.finishRequestCancellationWindow()
+            return value
+        }
+    }
+
+    /// Delivery and provider admission independently revalidate the frozen source
+    /// snapshot before looking up a duplicate operation or revealing its state.
+    func validateContinuityIngressAuthorization(
+        _ authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityTaskAuthorizationRecord {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try validatedContinuityTaskUnlocked(authorization, connection: connection)
+        }
+    }
+
+    /// Native correlation and its immutable original caller are checked before
+    /// the requested operation's metadata or payload is materialized.
+    func validateContinuityOperationControlAuthority(taskID: UUID, correlation: VerifiedContinuityTaskCorrelation?,
+        context: ToolInvocationContext, owner: ProjectBindingOwner, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityTaskAuthorizationRecord {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try continuityControlOwnerUnlocked(taskID: taskID, correlation: correlation, context: context, owner: owner, connection: connection)
+        }
+    }
+
+    func continuityOperationStatus(operationID: UUID, taskID: UUID,
+        correlation: VerifiedContinuityTaskCorrelation?, context: ToolInvocationContext, owner: ProjectBindingOwner,
+        cancellation: ToolCallCancellation? = nil,
+        readProgress: @Sendable (ContinuityIngressAcceptanceReceipt) throws -> ContinuityOperationProgressEvidence? = { _ in nil }
+    ) throws -> ContinuityOperationStatus {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let task = try continuityControlOwnerUnlocked(taskID: taskID, correlation: correlation,
+                context: context, owner: owner, connection: connection)
+            let acceptance = try ownedContinuityOperationUnlocked(operationID, task: task, connection: connection)
+            let progress = try continuityCancellationUnlocked(acceptance, connection: connection) == nil ? readProgress(acceptance) : nil
+            return try continuityOperationStatusUnlocked(acceptance, progress: progress, connection: connection)
+        }
+    }
+
+    /// The FULL request commit precedes all asynchronous cancellation cleanup.
+    /// It changes neither the current run state nor any later operation.
+    func requestContinuityOperationCancellation(operationID: UUID, taskID: UUID,
+        correlation: VerifiedContinuityTaskCorrelation?, context: ToolInvocationContext, owner: ProjectBindingOwner,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationCancellationResult {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let task = try continuityControlOwnerUnlocked(taskID: taskID, correlation: correlation,
+                context: context, owner: owner, connection: connection)
+            let acceptance = try ownedContinuityOperationUnlocked(operationID, task: task, connection: connection)
+            let current = try continuityOperationStatusUnlocked(acceptance, progress: nil, connection: connection)
+            if current.terminalReceipt != nil { return .init(disposition: .alreadyTerminal, snapshot: current, request: nil) }
+            if let existing = try continuityCancellationUnlocked(acceptance, connection: connection) {
+                return .init(disposition: .alreadyRequested, snapshot: current, request: existing.request)
+            }
+            guard let run = try autonomousRunUnlocked(acceptance.runID, connection: connection), run.activeOperationID == operationID else {
+                throw ContinuityOperationControlError.conflict
+            }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations") < Self.maximumContinuityIngressAcceptances else {
+                throw ContinuityOperationControlError.invalidRequest
+            }
+            let request = try ContinuityOperationCancellationRequest(acceptance: acceptance, requestedAt: ISO8601.string(from: clock.now()))
+            try connection.execute("""
+                INSERT INTO continuity_operation_cancellations(operation_id,run_id,task_id,project_id,project_generation,
+                    acceptance_receipt_sha256,request_json,request_sha256,requested_at)
+                VALUES(?,?,?,?,?,?,?,?,?)
+                """, bindings: [.text(operationID.uuidString.lowercased()), .text(acceptance.runID.description),
+                    .text(taskID.uuidString.lowercased()), .text(acceptance.authorization.projectID.description),
+                    .int64(try Self.sqliteGeneration(acceptance.authorization.projectGeneration)), .text(acceptance.receiptSHA256),
+                    .text(String(decoding: request.canonicalRequestJSON, as: UTF8.self)), .text(request.requestSHA256), .text(request.requestedAt)])
+            return .init(disposition: .requested,
+                snapshot: try continuityOperationStatusUnlocked(acceptance, progress: nil, connection: connection), request: request)
+        }
+    }
+
+    /// Only bounded identifiers are scanned. Malformed rows advance the cursor
+    /// and are diagnosed individually; they never disclose another source.
+    func pendingContinuityOperationCancellations(afterRowID: Int64? = nil, limit: Int = 32,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuityOperationCancellationPage {
+        guard (1...64).contains(limit), afterRowID == nil || afterRowID! >= 0 else { throw ContinuityOperationControlError.invalidRequest }
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            let rows = try connection.all(Self.continuityCancellationMetadataQuery + " WHERE rowid>? AND receipt_json IS NULL AND quarantined=0 AND (retry_at IS NULL OR retry_at<=?) ORDER BY rowid LIMIT ?",
+                bindings: [.int64(afterRowID ?? 0), .text(ISO8601.string(from: clock.now())), .int64(Int64(limit))]) { row in
+                    (row.int64(0), Result { try Self.decodeContinuityCancellationReference(row) })
+                }
+            var references: [ContinuityOperationCancellationReference] = []
+            for (rowID, result) in rows {
+                try cancellation?.checkCancellation()
+                switch result {
+                case .success(let reference):
+                    let now = clock.now(), timestamp = ISO8601.string(from: clock.now())
+                    guard let limits = try connection.first("SELECT attempts,requested_at FROM continuity_operation_cancellations WHERE rowid=?",
+                        bindings: [.int64(rowID)], map: { ($0.int64(0), try $0.strictText(1, maximumBytes: 128)) }),
+                          (0...8).contains(limits.0), let requested = limits.1.flatMap(ISO8601.date(from:)) else {
+                        try connection.execute("UPDATE continuity_operation_cancellations SET quarantined=1,error_code='integrity_failure' WHERE rowid=?", bindings: [.int64(rowID)])
+                        continue
+                    }
+                    let leased = try connection.scalarInt("SELECT COUNT(*) FROM run_leases WHERE run_id=? AND expires_at>?",
+                        bindings: [.text(reference.runID.description), .text(timestamp)]) > 0
+                    if !leased && (limits.0 >= 8 || now >= requested.addingTimeInterval(86_400)) {
+                        try connection.execute("UPDATE continuity_operation_cancellations SET quarantined=1,error_code='retry_window_exceeded',retry_at=NULL WHERE rowid=?", bindings: [.int64(rowID)])
+                    } else {
+                        // A live owner must still discover its own cancellation
+                        // so it can quiesce before acquiring the cleanup lease.
+                        // Metadata grants no execution or lease authority.
+                        references.append(reference)
+                    }
+                case .failure:
+                    try connection.execute("UPDATE continuity_operation_cancellations SET quarantined=1,error_code='integrity_failure' WHERE rowid=?", bindings: [.int64(rowID)])
+                }
+            }
+            return .init(references: references, nextRowID: rows.count == limit ? rows.last?.0 : nil)
+        }
+    }
+
+    func validateContinuityOperationCancellation(reference: ContinuityOperationCancellationReference,
+        cancellation: ToolCallCancellation? = nil) throws -> Bool {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            _ = try continuityCancellationMetadataAuthorityUnlocked(reference, connection: connection)
+            return try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations WHERE operation_id=? AND receipt_json IS NULL AND quarantined=0 AND (retry_at IS NULL OR retry_at<=?)",
+                bindings: [.text(reference.operationID.uuidString.lowercased()), .text(ISO8601.string(from: clock.now()))]) == 1
+        }
+    }
+
+    /// This lease can clean up the exact durable request even if an ordinary
+    /// operator cancellation already made the run terminal. It grants no work.
+    func acquireContinuityOperationCancellationLease(reference: ContinuityOperationCancellationReference,
+        ownerID: String, policy: RunLeasePolicy = .init(), cancellation: ToolCallCancellation? = nil) throws -> RunLease {
+        try Self.validateLeaseOwner(ownerID); try Self.validate(policy)
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            _ = try continuityCancellationMetadataAuthorityUnlocked(reference, connection: connection)
+            let now = clock.now(), timestamp = ISO8601.string(from: clock.now())
+            let expires = ISO8601.string(from: now.addingTimeInterval(policy.duration))
+            guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations WHERE operation_id=? AND receipt_json IS NULL AND quarantined=0 AND (retry_at IS NULL OR retry_at<=?)",
+                bindings: [.text(reference.operationID.uuidString.lowercased()), .text(timestamp)]) == 1 else { throw ContinuityOperationControlError.conflict }
+            if let existing = try runLeaseUnlocked(reference.runID, connection: connection) {
+                if (existing.expirationDate ?? .distantPast) > now {
+                    guard existing.ownerID == ownerID else { throw AutonomyError.leaseConflict(ownerID: existing.ownerID, epoch: existing.epoch) }
+                    return existing
+                }
+                guard existing.epoch < UInt64(Int64.max),
+                      try connection.execute("UPDATE run_leases SET lease_owner=?,lease_epoch=?,acquired_at=?,renewed_at=?,expires_at=? WHERE run_id=? AND lease_epoch=? AND expires_at<=?",
+                        bindings: [.text(ownerID), .int64(Int64(existing.epoch + 1)), .text(timestamp), .text(timestamp), .text(expires),
+                            .text(reference.runID.description), .int64(Int64(existing.epoch)), .text(timestamp)]) == 1 else { throw AutonomyError.staleLease }
+            } else {
+                try connection.execute("INSERT INTO run_leases(run_id,lease_owner,lease_epoch,acquired_at,renewed_at,expires_at) VALUES(?,?,1,?,?,?)",
+                    bindings: [.text(reference.runID.description), .text(ownerID), .text(timestamp), .text(timestamp), .text(expires)])
+            }
+            guard let lease = try runLeaseUnlocked(reference.runID, connection: connection) else { throw AutonomyError.staleLease }
+            return lease
+        }
+    }
+
+    func claimContinuityOperationCancellation(reference: ContinuityOperationCancellationReference, lease: RunLease,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuityOperationCancellationClaim {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let claim = try continuityCancellationClaimUnlocked(reference, lease: lease, connection: connection)
+            guard let stored = try continuityCancellationUnlocked(claim.acceptance, connection: connection) else { throw ContinuityOperationControlError.notFound }
+            if stored.receipt != nil { return claim }
+            let now = clock.now(), timestamp = ISO8601.string(from: clock.now())
+            guard !stored.blocked, (stored.retryAt.flatMap(ISO8601.date(from:)) ?? .distantPast) <= now,
+                  let requested = ISO8601.date(from: claim.request.requestedAt), now < requested.addingTimeInterval(86_400) else {
+                throw ContinuityOperationControlError.conflict
+            }
+            let sameClaim = try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations WHERE operation_id=? AND claim_owner=? AND claim_epoch=?",
+                bindings: [.text(reference.operationID.uuidString.lowercased()), .text(lease.ownerID), .int64(Int64(lease.epoch))]) == 1
+            if !sameClaim {
+                guard try connection.execute("UPDATE continuity_operation_cancellations SET attempts=attempts+1,claim_owner=?,claim_epoch=?,retry_at=? WHERE operation_id=? AND attempts<8 AND receipt_json IS NULL",
+                    bindings: [.text(lease.ownerID), .int64(Int64(lease.epoch)), .text(timestamp), .text(reference.operationID.uuidString.lowercased())]) == 1 else {
+                    throw ContinuityOperationControlError.conflict
+                }
+            }
+            return claim
+        }
+    }
+
+    func recordContinuityOperationCancellationFailure(reference: ContinuityOperationCancellationReference, lease: RunLease,
+        failure: ContinuityOperationCancellationFailure, retryAfter: TimeInterval? = nil,
+        cancellation: ToolCallCancellation? = nil) throws {
+        guard retryAfter == nil || (retryAfter!.isFinite && (0...3_600).contains(retryAfter!)) else { throw ContinuityOperationControlError.invalidRequest }
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let claim = try continuityCancellationClaimUnlocked(reference, lease: lease, connection: connection)
+            guard try continuityCancellationUnlocked(claim.acceptance, connection: connection)?.receipt == nil else { return }
+            try deferContinuityCancellationUnlocked(claim, lease: lease, failure: failure, retryAfter: retryAfter, connection: connection)
+        }
+    }
+
+    private func deferContinuityCancellationUnlocked(_ claim: ContinuityOperationCancellationClaim, lease: RunLease,
+        failure: ContinuityOperationCancellationFailure, retryAfter: TimeInterval?, connection: ControlPlaneSQLiteConnection) throws {
+        guard let row = try connection.first("SELECT attempts,claim_owner,claim_epoch FROM continuity_operation_cancellations WHERE operation_id=?",
+            bindings: [.text(claim.reference.operationID.uuidString.lowercased())], map: { ($0.int64(0), try $0.strictText(1, maximumBytes: 512), $0.int64(2)) }),
+              row.1 == lease.ownerID, row.2 > 0, UInt64(row.2) == lease.epoch else { throw ContinuityOperationControlError.conflict }
+        let now = clock.now()
+        guard let requested = ISO8601.date(from: claim.request.requestedAt) else { throw ContinuityOperationControlError.integrityFailure }
+        let delay = max(failure == .providerOutcomeUnknown || failure == .interrupted ? 660 : 0,
+            retryAfter ?? min(300, 5 * pow(2, Double(max(0, row.0 - 1)))))
+        let retry = now.addingTimeInterval(delay)
+        let blocked = row.0 >= 8 || retry > requested.addingTimeInterval(86_400) || failure == .integrityFailure
+        try connection.execute("""
+            UPDATE continuity_operation_cancellations SET error_code=?,retry_at=?,quarantined=?,claim_owner=NULL,claim_epoch=NULL
+            WHERE operation_id=? AND request_sha256=? AND receipt_json IS NULL
+            """, bindings: [.text(failure.rawValue), .optionalText(blocked ? nil : ISO8601.string(from: retry)), .int64(blocked ? 1 : 0),
+                .text(claim.reference.operationID.uuidString.lowercased()), .text(claim.request.requestSHA256)])
+    }
+
+    private func continuityCancellationHasUnknownEffectsUnlocked(_ claim: ContinuityOperationCancellationClaim,
+        connection: ControlPlaneSQLiteConnection) throws -> Bool {
+        // An intent can have an unknown external outcome after process loss.
+        // Cancellation never manufactures a terminal response for these rows.
+        let run = ControlPlaneSQLiteBinding.text(claim.acceptance.runID.description)
+        return try connection.scalarInt("SELECT COUNT(*) FROM provider_turns WHERE run_id=? AND state IN ('intent','submitted','streaming','ambiguous','retry_wait')", bindings: [run]) > 0
+            || connection.scalarInt("SELECT COUNT(*) FROM tool_invocations WHERE run_id=? AND state IN ('intent','executing','ambiguous')", bindings: [run]) > 0
+            || connection.scalarInt("SELECT COUNT(*) FROM execution_jobs WHERE run_id=? AND state IN ('queued','running','cancelling')", bindings: [run]) > 0
+    }
+
+    func completeContinuityOperationCancellation(claim: ContinuityOperationCancellationClaim, lease: RunLease,
+        cancellation: ToolCallCancellation? = nil,
+        writeCanonical: @Sendable (ContinuityOperationCancellationRequest, ContinuityIngressAcceptanceReceipt) throws -> ContinuityOperationCancellationEvidence
+    ) throws -> ContinuityOperationCancellationReceipt {
+        let outcome: Result<ContinuityOperationCancellationReceipt, Error> = try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            guard try continuityCancellationClaimUnlocked(claim.reference, lease: lease, connection: connection) == claim,
+                  let stored = try continuityCancellationUnlocked(claim.acceptance, connection: connection) else { throw ContinuityOperationControlError.conflict }
+            if let receipt = stored.receipt { return .success(receipt) }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations WHERE operation_id=? AND claim_owner=? AND claim_epoch=?",
+                bindings: [.text(claim.reference.operationID.uuidString.lowercased()), .text(lease.ownerID), .int64(Int64(lease.epoch))]) == 1 else {
+                throw ContinuityOperationControlError.conflict
+            }
+            let evidence = try writeCanonical(claim.request, claim.acceptance)
+            let receipt = try ContinuityOperationCancellationReceipt(request: claim.request, evidence: evidence)
+            guard try continuityCancellationClaimUnlocked(claim.reference, lease: lease, connection: connection) == claim else {
+                throw ContinuityOperationControlError.conflict
+            }
+            if try continuityCancellationHasUnknownEffectsUnlocked(claim, connection: connection) {
+                try deferContinuityCancellationUnlocked(claim, lease: lease, failure: .providerOutcomeUnknown, retryAfter: 660, connection: connection)
+                return .failure(ContinuityOperationControlError.reconciliationRequired)
+            }
+            try connection.execute("""
+                UPDATE continuity_operation_cancellations SET receipt_json=?,receipt_sha256=?,completed_at=?
+                WHERE operation_id=? AND request_sha256=? AND receipt_json IS NULL
+                """, bindings: [.text(String(decoding: receipt.canonicalReceiptJSON, as: UTF8.self)), .text(receipt.receiptSHA256),
+                    .text(receipt.recordedAt), .text(claim.reference.operationID.uuidString.lowercased()), .text(claim.request.requestSHA256)])
+            let timestamp = ISO8601.string(from: clock.now())
+            guard try connection.execute("UPDATE autonomous_runs SET state='cancelled',revision=revision+1,updated_at=? WHERE run_id=? AND active_operation_id=?",
+                bindings: [.text(timestamp), .text(claim.acceptance.runID.description), .text(claim.acceptance.operationID.uuidString.lowercased())]) == 1 else {
+                throw ContinuityOperationControlError.conflict
+            }
+            try connection.execute("UPDATE continuity_ingress_holds SET state='cancelled',updated_at=? WHERE operation_id=? AND run_id=?",
+                bindings: [.text(timestamp), .text(claim.acceptance.operationID.uuidString.lowercased()), .text(claim.acceptance.runID.description)])
+            try connection.execute("UPDATE project_bindings SET active=0,updated_at=? WHERE owner_kind='provider_session' AND owner_id IN (SELECT session_id FROM provider_sessions WHERE run_id=? AND operation_id=?)",
+                bindings: [.text(timestamp), .text(claim.acceptance.runID.description), .text(claim.acceptance.operationID.uuidString.lowercased())])
+            return .success(receipt)
+        }
+        return try outcome.get()
+    }
+
+    func submitExplicitContinuityIngress(taskID: UUID, correlation: VerifiedContinuityTaskCorrelation?,
+        context: ToolInvocationContext, owner: ProjectBindingOwner, requestID: UUID, continuityID: String,
+        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil,
+        readSource: @Sendable (ContinuityIngressAuthorization) throws -> ContinuityHandoffRevision
+    ) throws -> ContinuityExplicitStartReceipt {
+        guard !continuityID.isEmpty, continuityID.utf8.count <= 256, !continuityID.contains("\0"),
+              let correlation else { throw ContinuityTaskAuthorizationError.taskCorrelationRequired }
+        return try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            guard correlation.taskID == taskID, correlation.callerOwner == owner, correlation.callerContext == context else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            let caller = try validatedContinuityCallerUnlocked(context: context, owner: owner, connection: connection)
+            guard let stored = try continuityTaskUnlocked(taskID, connection: connection) else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            let task = try validatedContinuityTaskUnlocked(stored.authorization, connection: connection)
+            let authorization = task.authorization
+            guard correlation.callerBindingID == caller.bindingID, correlation.sourceBindingID == authorization.sourceBindingID,
+                  correlation.projectID == authorization.projectID, correlation.projectGeneration == authorization.projectGeneration,
+                  caller.projectID == authorization.projectID, caller.projectGeneration == authorization.projectGeneration,
+                  correlation.authorizationSHA256 == JSONSupport.sha256Hex(try authorization.encodedJSON()),
+                  context.runID == nil || context.runID == task.runID else { throw ContinuityTaskAuthorizationError.authorityMismatch }
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: authorization)
+            try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: ISO8601.string(from: clock.now()), existingTask: true, connection: connection)
+            try requireSourceDispatchIdentityUnlocked(authorization, connection: connection)
+            if let replay = try connection.first("""
+                SELECT task_id,continuity_id,operation_id,receipt_sha256 FROM continuity_explicit_start_requests WHERE request_id=?
+                """, bindings: [.text(requestID.uuidString.lowercased())], map: { row in
+                    (try row.strictText(0, maximumBytes: 36), try row.strictText(1, maximumBytes: 256),
+                     try row.strictText(2, maximumBytes: 36), try row.strictText(3, maximumBytes: 64))
+                }) {
+                guard replay.0 == taskID.uuidString.lowercased(), replay.1 == continuityID,
+                      let id = replay.2.flatMap(UUID.init(uuidString:)),
+                      let acceptance = try acceptanceForOperationUnlocked(id, connection: connection),
+                      acceptance.authorization == authorization, acceptance.receiptSHA256 == replay.3,
+                      let permit = try explicitStartPermitUnlocked(acceptance: acceptance, connection: connection) else {
+                    throw ContinuitySourceActivationError.conflict
+                }
+                try requireContinuityOperationNotCancelledUnlocked(acceptance.operationID, connection: connection)
+                return .init(acceptance: acceptance, permit: permit)
+            }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_explicit_start_requests") < 4_096 else {
+                throw ContinuityIngressError.capacityExceeded("explicit request mappings")
+            }
+            let source = try readSource(authorization)
+            guard source.authorization == authorization, source.identity.continuityID == continuityID else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            try cancellation?.checkCancellation()
+            _ = try validatedContinuityTaskUnlocked(authorization, connection: connection)
+            let identity = try ContinuityIngressOperationIdentity(revision: source)
+            let acceptance = try acceptContinuityIngressUnlocked(source: source, operationID: identity.operationID,
+                policySelection: policySelection, connection: connection)
+            let permit: ContinuityExplicitStartPermit
+            if let existing = try explicitStartPermitUnlocked(acceptance: acceptance, connection: connection) { permit = existing }
+            else {
+                guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_explicit_start_permits") < 1_024 else {
+                    throw ContinuityIngressError.capacityExceeded("explicit operation permits")
+                }
+                permit = try .init(requestID: requestID, acceptance: acceptance, callerBindingID: caller.bindingID,
+                    issuedAt: ISO8601.string(from: clock.now()))
+                try connection.execute("""
+                    INSERT INTO continuity_explicit_start_permits(operation_id,receipt_sha256,permit_json,permit_sha256) VALUES(?,?,?,?)
+                    """, bindings: [.text(acceptance.operationID.uuidString.lowercased()), .text(acceptance.receiptSHA256),
+                        .text(String(decoding: permit.canonicalPermitJSON, as: UTF8.self)), .text(permit.permitSHA256)])
+            }
+            try connection.execute("""
+                INSERT INTO continuity_explicit_start_requests(request_id,task_id,continuity_id,operation_id,receipt_sha256) VALUES(?,?,?,?,?)
+                """, bindings: [.text(requestID.uuidString.lowercased()), .text(taskID.uuidString.lowercased()), .text(continuityID),
+                    .text(acceptance.operationID.uuidString.lowercased()), .text(acceptance.receiptSHA256)])
+            return .init(acceptance: acceptance, permit: permit)
+        }
+    }
+
+    func validateContinuitySourceStartAuthority(acceptance: ContinuityIngressAcceptanceReceipt,
+        lease: RunLease? = nil, policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuitySourceStartAuthority {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try validateSourceStartAuthorityUnlocked(acceptance: acceptance, lease: lease,
+                policySelection: policySelection, connection: connection)
+        }
+    }
+
+    /// Accepts an immutable source revision without starting provider work. The
+    /// task/run link, canonical receipt and execution hold share one commit.
+    /// Every acceptance originates at this FULL durability boundary; redelivery
+    /// returns that same durable receipt before the source may acknowledge it.
+    /// Policy is observed provenance; bootstrap must obtain current policy again.
+    func acceptContinuityIngress(
+        source: ContinuityHandoffRevision, operationID: UUID,
+        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityIngressAcceptanceReceipt {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            try acceptContinuityIngressUnlocked(source: source, operationID: operationID,
+                policySelection: policySelection, connection: connection)
+        }
+    }
+
+    private func acceptContinuityIngressUnlocked(source: ContinuityHandoffRevision, operationID: UUID,
+        policySelection: BudgetPolicySelection, connection: ControlPlaneSQLiteConnection) throws -> ContinuityIngressAcceptanceReceipt {
+        // Live authority precedes duplicate lookup or disclosure.
+        let task = try validatedContinuityTaskUnlocked(source.authorization, connection: connection)
+        let identity = try ContinuityIngressOperationIdentity(revision: source)
+        guard source.resumeReady, identity.operationID == operationID else {
+            throw ContinuityIngressError.invalidRequest("operation_identity")
+        }
+        try requireContinuityOperationNotCancelledUnlocked(operationID, connection: connection)
+        try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: source.authorization)
+        if let existing = try continuityIngressAcceptanceUnlocked(operationID: operationID,
+            keySHA256: identity.keySHA256, connection: connection) {
+            guard existing.operationID == operationID, existing.keySHA256 == identity.keySHA256,
+                  existing.source == source, task.runID == existing.runID else {
+                throw ContinuityIngressError.deliveryConflict
+            }
+            try validateContinuityIngressHoldUnlocked(receipt: existing, connection: connection)
+            return existing
+        }
+        guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_ingress_acceptances")
+                < Self.maximumContinuityIngressAcceptances else {
+            throw ContinuityIngressError.capacityExceeded("manager acceptance rows")
+        }
+        let timestamp = ISO8601.string(from: clock.now())
+        let runID: RunID
+        if let existingRunID = task.runID {
+            try requireNoActiveContinuityIngressHoldUnlocked(existingRunID, connection: connection)
+            guard let run = try autonomousRunUnlocked(existingRunID, connection: connection),
+                  !run.state.isTerminal, run.state != .cancelRequested,
+                  run.activeOperationID == nil else {
+                throw ContinuityIngressError.deliveryConflict
+            }
+            // Preserve advanced work, remaining run-wide budget ledgers and
+            // actual predecessor identity. Holding adds no synthetic usage.
+            let changed = try connection.execute(
+                "UPDATE autonomous_runs SET state='awaiting_bootstrap',active_operation_id=?,revision=revision+1,updated_at=? WHERE run_id=? AND revision=?",
+                bindings: [.text(operationID.uuidString.lowercased()), .text(timestamp),
+                    .text(existingRunID.description), .int64(Int64(run.revision))])
+            guard changed == 1 else { throw AutonomyError.transitionConflict }
+            runID = existingRunID
+        } else {
+            let assignment = task.assignment
+            // AutonomousRunRequest explicitly derives adapter_id metadata;
+            // the immutable approved assignment remains separately retained.
+            let request = AutonomousRunRequest(projectID: source.authorization.projectID,
+                projectGeneration: source.authorization.projectGeneration,
+                assignmentID: assignment.assignmentID, mission: assignment.mission,
+                providerID: assignment.providerID, adapterID: assignment.adapterID, modelKey: assignment.modelKey,
+                specification: assignment.specification, authorizationScope: assignment.authorizationScope)
+            try validateAutonomousRunRequest(request)
+            _ = try insertAutonomousRunUnlocked(request, state: .awaitingBootstrap,
+                operationID: operationID, timestamp: timestamp, connection: connection)
+            runID = request.runID
+            let linked = try connection.execute(
+                "UPDATE continuity_task_authorizations SET run_id=?,revision=revision+1 WHERE task_id=? AND state='active' AND revision=? AND run_id IS NULL",
+                bindings: [.text(runID.description), .text(source.authorization.taskID.uuidString.lowercased()),
+                    .int64(task.revision)])
+            guard linked == 1 else { throw ContinuityIngressError.deliveryConflict }
+            let bound = try connection.execute(
+                "UPDATE project_bindings SET run_id=?,updated_at=? WHERE binding_id=? AND active=1 AND run_id IS NULL",
+                bindings: [.text(runID.description), .text(timestamp),
+                    .text(source.authorization.sourceBindingID.uuidString.lowercased())])
+            guard bound == 1 else { throw ContinuityIngressError.authorityMismatch }
+        }
+        let receipt = try ContinuityIngressAcceptanceReceipt(source: source, operationID: operationID,
+            runID: runID, policySelection: policySelection, acceptedAt: timestamp)
+        try connection.execute(
+            """
+            INSERT INTO continuity_ingress_acceptances(operation_id,key_sha256,run_id,task_id,project_id,
+                project_generation,receipt_json,receipt_sha256,accepted_at) VALUES(?,?,?,?,?,?,?,?,?)
+            """,
+            bindings: [.text(operationID.uuidString.lowercased()), .text(identity.keySHA256), .text(runID.description),
+                .text(source.authorization.taskID.uuidString.lowercased()), .text(source.authorization.projectID.description),
+                .int64(try Self.sqliteGeneration(source.authorization.projectGeneration)),
+                .text(String(decoding: receipt.canonicalReceiptJSON, as: UTF8.self)), .text(receipt.receiptSHA256), .text(timestamp)])
+        try connection.execute(
+            "INSERT INTO continuity_ingress_holds(run_id,operation_id,state,created_at,updated_at) VALUES(?,?,'awaiting_bootstrap',?,?)",
+            bindings: [.text(runID.description), .text(operationID.uuidString.lowercased()), .text(timestamp), .text(timestamp)])
+        try installSourceTransferFenceUnlocked(receipt: receipt, timestamp: timestamp, connection: connection)
+        try appendAutonomyEventUnlocked(runID: runID, projectID: source.authorization.projectID,
+            eventType: "continuity_ingress_accepted", severity: .info,
+            summary: "Committed handoff accepted with a durable bootstrap hold",
+            metadata: ["operation_id": operationID.uuidString.lowercased(), "receipt_sha256": receipt.receiptSHA256,
+                "assignment_sha256": source.authorization.assignmentSHA256], connection: connection)
+        return receipt
+    }
+
+    func withContinuityIngressAcceptance<Value: Sendable>(acceptance: ContinuityIngressAcceptanceReceipt,
+        lease: RunLease, cancellation: ToolCallCancellation? = nil,
+        operation: @Sendable () throws -> Value) throws -> Value {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try validateBootstrapReceiptUnlocked(acceptance, lease: lease, connection: connection)
+            let result = try operation()
+            try cancellation?.checkCancellation()
+            try validateBootstrapReceiptUnlocked(acceptance, lease: lease, connection: connection)
+            return result
+        }
+    }
+
+    func withContinuityBootstrapAuthority<Value: Sendable>(grant: ContinuityBootstrapGrant,
+        lease: RunLease, cancellation: ToolCallCancellation? = nil,
+        operation: @Sendable () throws -> Value) throws -> Value {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            let result = try operation()
+            try cancellation?.checkCancellation()
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            return result
+        }
+    }
+
+    /// Native manager setup only. Renewal preserves the same candidate and all
+    /// retained provider intents; an expired lease never implies a new root.
+    func issueContinuityBootstrapGrant(envelope: ContinuitySourceBootstrapEnvelope, candidateID: UUID,
+                                       lease: RunLease, cancellation: ToolCallCancellation? = nil) throws -> ContinuityBootstrapGrant {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            try validateBootstrapAcceptanceUnlocked(envelope, lease: lease, connection: connection)
+            let limit = min(65_536, envelope.authorization.authorizationScope.maximumInlineOutputBytes)
+            let packet = try JSONSerialization.jsonObject(with: envelope.acceptance.source.canonicalPacketJSON)
+            let result = try ForgeJSONCanonicalizationV1.data(from: ["ok": true, "is_error": false, "payload": [
+                "ok": true, "found": true, "packet": packet, "continuity_id": envelope.sourceIdentity.continuityID,
+                "revision": envelope.sourceIdentity.revision, "packet_sha256": envelope.sourceIdentity.packetSHA256]])
+            guard result.count <= limit, envelope.authorization.authorizationScope.allowedTools.contains("context_get") else {
+                throw ContinuityIngressError.capacityExceeded("exact bootstrap result or recovery tool scope")
+            }
+            let previous = try bootstrapGrantUnlocked(candidateID: candidateID, envelope: envelope, connection: connection)
+            if previous == nil {
+                guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_bootstrap_grants") < 1_024,
+                      try connection.scalarInt("SELECT COUNT(*) FROM continuity_bootstrap_grants WHERE operation_id=?",
+                        bindings: [.text(envelope.operationID.uuidString.lowercased())]) < 8 else {
+                    throw ContinuityIngressError.capacityExceeded("bootstrap candidates")
+                }
+            }
+            let grant = try ContinuityBootstrapGrant(grantID: previous?.grantID ?? UUID(), candidateID: candidateID,
+                envelope: envelope, lease: lease, maximumOutputBytes: limit,
+                createdAt: previous?.createdAt ?? ISO8601.string(from: clock.now()))
+            let data = try grant.storedJSON()
+            if let previous {
+                let changed = try connection.execute("""
+                    UPDATE continuity_bootstrap_grants SET grant_json=?,grant_sha256=?
+                    WHERE grant_id=? AND grant_sha256=?
+                    """, bindings: [.text(String(decoding: data, as: UTF8.self)), .text(JSONSupport.sha256Hex(data)),
+                        .text(grant.grantID.uuidString.lowercased()), .text(JSONSupport.sha256Hex(try previous.storedJSON()))])
+                guard changed == 1 else { throw ContinuityIngressError.deliveryConflict }
+            } else {
+                try connection.execute("""
+                    INSERT INTO continuity_bootstrap_grants(grant_id,candidate_id,operation_id,run_id,grant_json,grant_sha256)
+                    VALUES(?,?,?,?,?,?)
+                    """, bindings: [.text(grant.grantID.uuidString.lowercased()), .text(grant.sessionID),
+                        .text(envelope.operationID.uuidString.lowercased()), .text(envelope.runID.description),
+                        .text(String(decoding: data, as: UTF8.self)), .text(JSONSupport.sha256Hex(data))])
+            }
+            return grant
+        }
+    }
+
+    /// The manager's normalized transport result is retained only after its
+    /// write-ahead turn has completed with these exact provider response IDs.
+    func recordContinuityBootstrapProviderResult(grant: ContinuityBootstrapGrant, turnID: UUID,
+                                                 result: ProviderTurn, lease: RunLease) throws {
+        try controlledTransaction(cancellation: nil, fullDurability: true) { connection in
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            guard let turn = try providerTurnUnlocked(turnID, connection: connection),
+                  turn.state == .completed, turn.intent.kind == .bootstrap,
+                  turn.intent.sessionID == grant.sessionID, turn.intent.operationID == grant.envelope.operationID,
+                  turn.providerRequestID == result.requestID, turn.providerResponseID == result.responseID,
+                  turn.intent.previousResponseID == result.previousResponseID,
+                  result.completed, result.finishReason == .toolCalls, result.toolCalls.count == 1,
+                  result.messages.count <= 128, result.messages.allSatisfy({ $0.utf8.count <= 65_536 }),
+                  result.messages.reduce(0, { $0 + $1.utf8.count }) <= 65_536,
+                  result.structuredOutputJSON.map({ $0.count <= 16_384 }) ?? true,
+                  result.toolCalls[0].argumentsJSON.count <= 8_192,
+                  [result.requestID, result.responseID, result.providerID, result.providerVersion, result.modelKey,
+                   result.providerInstanceID ?? "", result.rawArtifactID ?? ""].allSatisfy({ $0.utf8.count <= 1_024 }) else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            let task = try validatedContinuityTaskUnlocked(grant.envelope.authorization, connection: connection)
+            guard result.providerID == task.assignment.providerID, result.modelKey == task.assignment.modelKey else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            let call = result.toolCalls[0]
+            if turn.intent.previousResponseID == nil {
+                try validateExactBootstrapCall(call, source: grant.envelope.sourceIdentity)
+            } else {
+                guard call.name == "forge_continuity_ack",
+                      let proof = try bootstrapRetrievalProofUnlocked(grant: grant, connection: connection),
+                      result.previousResponseID == proof.providerResponseID else {
+                    throw ContinuityIngressError.authorityMismatch
+                }
+            }
+            let encoded = try JSONEncoder().encode(result)
+            guard encoded.count <= 131_072 else { throw ContinuityIngressError.capacityExceeded("bootstrap provider result") }
+            let data = try ForgeJSONCanonicalizationV1.data(from: JSONSerialization.jsonObject(with: encoded))
+            if let existing = try bootstrapProviderResultUnlocked(grant: grant, turnID: turnID, connection: connection) {
+                guard existing == result else { throw ContinuityIngressError.deliveryConflict }
+                return
+            }
+            guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_bootstrap_provider_results WHERE grant_id=?",
+                bindings: [.text(grant.grantID.uuidString.lowercased())]) < 2 else {
+                throw ContinuityIngressError.capacityExceeded("bootstrap root and acknowledgment results")
+            }
+            try connection.execute("""
+                INSERT INTO continuity_bootstrap_provider_results(turn_id,grant_id,result_json,result_sha256)
+                VALUES(?,?,?,?)
+                """, bindings: [.text(turnID.uuidString.lowercased()), .text(grant.grantID.uuidString.lowercased()),
+                    .text(String(decoding: data, as: UTF8.self)), .text(JSONSupport.sha256Hex(data))])
+            if result.previousResponseID == nil {
+                let changed = try connection.execute("""
+                    UPDATE provider_sessions SET provider_response_id=?,updated_at=?
+                    WHERE session_id=? AND status='candidate' AND accepted=0
+                        AND (provider_response_id IS NULL OR provider_response_id=?)
+                    """, bindings: [.text(result.responseID), .text(ISO8601.string(from: clock.now())),
+                        .text(grant.sessionID), .text(result.responseID)])
+                guard changed == 1 else { throw ContinuityIngressError.authorityMismatch }
+            }
+        }
+    }
+
+    /// Reads the known restoration cost before the native root can be sent.
+    /// It neither invents a provider call identity nor reserves a tool effect.
+    func preflightContinuityBootstrapRetrieval(grant: ContinuityBootstrapGrant, rootTurnID: UUID,
+        lease: RunLease, policy: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil) throws {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policy, authorization: grant.envelope.authorization)
+            guard let root = try providerTurnUnlocked(rootTurnID, connection: connection),
+                  root.intent.kind == .bootstrap, root.intent.previousResponseID == nil,
+                  root.intent.runID == grant.envelope.runID, root.intent.sessionID == grant.sessionID,
+                  root.intent.operationID == grant.envelope.operationID,
+                  root.intent.projectID == grant.envelope.authorization.projectID,
+                  root.intent.projectGeneration == grant.envelope.authorization.projectGeneration,
+                  ![ProviderTurnState.failed, .cancelled].contains(root.state) else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            try requireBootstrapResultLimitsUnlocked(grant: grant, policy: policy.policy.tools)
+            if let proof = try bootstrapRetrievalProofUnlocked(grant: grant, connection: connection) {
+                guard proof.providerTurnID == rootTurnID,
+                      let invocation = try toolInvocationUnlocked(proof.toolInvocationID, connection: connection),
+                      invocation.state == .completed, invocation.turnID == rootTurnID,
+                      invocation.runID == grant.envelope.runID, invocation.sessionID == grant.sessionID,
+                      invocation.projectID == grant.envelope.authorization.projectID,
+                      invocation.projectGeneration == grant.envelope.authorization.projectGeneration,
+                      invocation.toolName == "context_get", invocation.replayClass == .readOnly,
+                      invocation.providerCallID == proof.providerCallID,
+                      invocation.resultSHA256 == proof.toolResultSHA256,
+                      invocation.resultSummary == String(data: proof.canonicalToolResultJSON, encoding: .utf8),
+                      let result = try bootstrapProviderResultUnlocked(grant: grant, turnID: rootTurnID, connection: connection),
+                      result.previousResponseID == nil, result.responseID == proof.providerResponseID,
+                      result.toolCalls.count == 1, let call = result.toolCalls.first,
+                      call.callID == invocation.providerCallID,
+                      try bootstrapCallSHA256(call) == invocation.argumentsSHA256 else {
+                    throw ContinuityIngressError.integrityFailure("bootstrap preflight proof differs from completed invocation")
+                }
+                try validateExactBootstrapCall(call, source: grant.envelope.sourceIdentity)
+                return
+            }
+            if let result = try bootstrapProviderResultUnlocked(grant: grant, turnID: rootTurnID, connection: connection),
+               result.previousResponseID == nil, result.toolCalls.count == 1, let call = result.toolCalls.first {
+                try validateExactBootstrapCall(call, source: grant.envelope.sourceIdentity)
+                if let invocation = try toolInvocationByProviderCallUnlocked(sessionID: grant.sessionID,
+                    providerCallID: call.callID, connection: connection) {
+                    guard invocation.turnID == rootTurnID, invocation.runID == grant.envelope.runID,
+                          invocation.projectID == grant.envelope.authorization.projectID,
+                          invocation.projectGeneration == grant.envelope.authorization.projectGeneration,
+                          invocation.toolName == "context_get", invocation.replayClass == .readOnly,
+                          invocation.idempotencyKey == nil, invocation.reconciliationDescriptor == nil,
+                          try bootstrapCallSHA256(call) == invocation.argumentsSHA256,
+                          [ToolInvocationState.intent, .executing, .ambiguous, .failed].contains(invocation.state) else {
+                        throw ContinuityIngressError.integrityFailure("bootstrap preflight reservation differs from actual root call")
+                    }
+                    // The real provider call already owns this reservation.
+                    // Retrying its read consumes no second logical tool call.
+                    return
+                }
+            }
+            try requireBootstrapToolQuotaUnlocked(runID: grant.envelope.runID, sessionID: grant.sessionID,
+                turnID: rootTurnID, operationID: grant.envelope.operationID,
+                policy: policy.policy.tools, connection: connection)
+        }
+    }
+
+    /// Chooses the real acknowledged candidate while execution remains held.
+    func acceptContinuitySourceSuccessor(acceptance: ContinuityIngressAcceptanceReceipt, lease: RunLease,
+        policySelection: BudgetPolicySelection, continuationInput: Data, cancellation: ToolCallCancellation? = nil,
+        readCanonical: @Sendable () throws -> ContinuitySourceBootstrapOperation) throws -> ContinuitySourceActivationReceipt {
+        guard continuationInput.count <= ContinuitySourceActivationReceipt.maximumContinuationInputBytes,
+              continuationInput == (try ManagedContinuityWorker.automaticContinuationInput()) else {
+            throw ContinuitySourceActivationError.invalidRequest
+        }
+        return try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            _ = try validateSourceStartAuthorityUnlocked(acceptance: acceptance, lease: lease,
+                policySelection: policySelection, connection: connection)
+            let operation = try readCanonical()
+            guard operation.envelope.acceptance == acceptance else { throw ContinuitySourceActivationError.conflict }
+            if let stored = try sourceActivationUnlocked(operationID: acceptance.operationID, connection: connection) {
+                try validateSourceActivationUnlocked(stored.receipt, lease: lease, connection: connection)
+                guard stored.receipt.canonicalContinuationInput == continuationInput,
+                      operation.envelope == stored.receipt.envelope,
+                      (operation.state == .successorAcknowledged && operation.stateChecksum == stored.receipt.acknowledgedStateChecksum)
+                        || (operation.state == .predecessorSealed && operation.activationReceiptSHA256 == stored.receipt.receiptSHA256) else {
+                    throw ContinuitySourceActivationError.conflict
+                }
+                return stored.receipt
+            }
+            try validateBootstrapReceiptUnlocked(acceptance, lease: lease, connection: connection)
+            let proof = try validatedSourceAcknowledgementUnlocked(operation, acceptance: acceptance, connection: connection)
+            guard let run = try autonomousRunUnlocked(acceptance.runID, connection: connection), run.state == .awaitingBootstrap,
+                  try connection.scalarInt("SELECT COUNT(*) FROM continuity_source_activations") < Self.maximumContinuityIngressAcceptances else {
+                throw ContinuitySourceActivationError.conflict
+            }
+            try requireSourceEffectsReconciledUnlocked(runID: run.runID, operationID: acceptance.operationID, connection: connection)
+            let timestamp = ISO8601.string(from: clock.now()), candidateID = proof.grant.sessionID
+            let predecessorID = run.activeSessionID
+            if let predecessorID {
+                guard let predecessor = try providerSessionRecordUnlocked(predecessorID, connection: connection),
+                      predecessor.runID == run.runID, predecessor.projectID == run.projectID,
+                      predecessor.projectGeneration == run.projectGeneration,
+                      [.fencing, .fenced].contains(predecessor.status), !predecessor.accepted else {
+                    throw ContinuitySourceActivationError.conflict
+                }
+                try connection.execute("UPDATE provider_sessions SET status='fenced',accepted=0,updated_at=? WHERE session_id=?",
+                    bindings: [.text(timestamp), .text(predecessorID)])
+            }
+            guard try providerSessionForAcceptedOperationUnlocked(acceptance.operationID, connection: connection) == nil else {
+                throw ContinuitySourceActivationError.conflict
+            }
+            let duplicates = try connection.all("SELECT session_id FROM provider_sessions WHERE operation_id=? AND status='candidate' AND session_id<>? LIMIT 129",
+                bindings: [.text(acceptance.operationID.uuidString.lowercased()), .text(candidateID)],
+                map: { try $0.strictText(0, maximumBytes: 1_024) })
+            guard duplicates.count <= 128 else { throw ContinuitySourceActivationError.unresolvedEffects }
+            for duplicate in duplicates {
+                guard let duplicate else { throw ContinuitySourceActivationError.proofRequired }
+                try quarantineProviderSessionUnlocked(duplicate, timestamp: timestamp, connection: connection)
+            }
+            guard try connection.execute("""
+                UPDATE provider_sessions SET status='active',accepted=1,provider_response_id=?,updated_at=?
+                WHERE session_id=? AND operation_id=? AND status='candidate' AND accepted=0
+                """, bindings: [.text(proof.ack.responseID), .text(timestamp), .text(candidateID),
+                    .text(acceptance.operationID.uuidString.lowercased())]) == 1 else { throw ContinuitySourceActivationError.conflict }
+            try activateProviderBindingIdentityUnlocked(sessionID: candidateID, run: run, timestamp: timestamp, connection: connection)
+            guard try connection.execute("""
+                UPDATE autonomous_runs SET active_session_id=?,continuation_pending=1,revision=revision+1,updated_at=?
+                WHERE run_id=? AND active_operation_id=? AND state='awaiting_bootstrap' AND active_session_id IS ?
+                """, bindings: [.text(candidateID), .text(timestamp), .text(run.runID.description),
+                    .text(acceptance.operationID.uuidString.lowercased()), .optionalText(predecessorID)]) == 1,
+                  let winner = try providerSessionRecordUnlocked(candidateID, connection: connection) else {
+                throw ContinuitySourceActivationError.conflict
+            }
+            let key = "source-continuation:\(acceptance.operationID.uuidString.lowercased())"
+            let continuation = try automaticContinuationIntentUnlocked(operationID: acceptance.operationID,
+                runID: run.runID, projectID: run.projectID, projectGeneration: run.projectGeneration,
+                handoffID: operation.handoffID, handoffSHA256: operation.envelope.envelopeSHA256,
+                bootstrapNonceSHA256: JSONSupport.sha256Hex(Data(operation.bootstrapNonce.uuidString.lowercased().utf8)),
+                idempotencyKey: key, inputSHA256: JSONSupport.sha256Hex(continuationInput), winner: winner,
+                previousResponseID: proof.ack.responseID, timestamp: timestamp, connection: connection)
+            let receipt = try ContinuitySourceActivationReceipt(envelope: operation.envelope,
+                acknowledgedStateChecksum: operation.stateChecksum, candidateID: proof.grant.candidateID,
+                predecessorProviderSessionID: predecessorID, retrievalProofSHA256: proof.retrieval.proofSHA256,
+                acknowledgementProofSHA256: operation.acknowledgementProofSHA256!, acknowledgementProviderTurnID: proof.ackTurnID,
+                acknowledgementProviderResponseID: proof.ack.responseID, continuationTurnID: continuation.intent.turnID,
+                canonicalContinuationInput: continuationInput, continuationIdempotencyKey: key, acceptedAt: timestamp)
+            try connection.execute("""
+                INSERT INTO continuity_source_activations(operation_id,run_id,project_id,project_generation,task_id,candidate_id,
+                    envelope_json,envelope_sha256,receipt_json,receipt_sha256) VALUES(?,?,?,?,?,?,?,?,?,?)
+                """, bindings: [.text(receipt.operationID.uuidString.lowercased()), .text(receipt.runID.description),
+                    .text(receipt.authorization.projectID.description), .int64(Int64(receipt.authorization.projectGeneration.rawValue)),
+                    .text(receipt.authorization.taskID.uuidString.lowercased()), .text(candidateID),
+                    .text(String(decoding: receipt.envelope.canonicalEnvelopeJSON, as: UTF8.self)), .text(receipt.envelope.envelopeSHA256),
+                    .text(String(decoding: receipt.canonicalReceiptJSON, as: UTF8.self)), .text(receipt.receiptSHA256)])
+            guard try connection.execute("""
+                UPDATE continuity_source_task_fences SET state='accepted',activation_receipt_sha256=?
+                WHERE source_binding_id=? AND task_id=? AND operation_id=? AND receipt_sha256=? AND state='quiescing'
+                """, bindings: [.text(receipt.receiptSHA256), .text(receipt.authorization.sourceBindingID.uuidString.lowercased()),
+                    .text(receipt.authorization.taskID.uuidString.lowercased()), .text(receipt.operationID.uuidString.lowercased()),
+                    .text(acceptance.receiptSHA256)]) == 1 else { throw ContinuitySourceActivationError.conflict }
+            return receipt
+        }
+    }
+
+    /// The matching hold is released only after the guarded canonical seal returns.
+    func completeContinuitySourceActivation(receipt: ContinuitySourceActivationReceipt, lease: RunLease,
+        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil,
+        writeCanonical: @Sendable (ContinuitySourceActivationReceipt) throws -> ContinuitySourceBootstrapOperation
+    ) throws -> AutonomousRunRecord {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            _ = try validateSourceStartAuthorityUnlocked(acceptance: receipt.acceptance, lease: lease,
+                policySelection: policySelection, connection: connection)
+            try validateSourceActivationUnlocked(receipt, lease: lease, connection: connection)
+            let operation = try writeCanonical(receipt)
+            guard operation.envelope == receipt.envelope, operation.state == .predecessorSealed,
+                  operation.activationReceiptSHA256 == receipt.receiptSHA256, let sealed = operation.sealedStateChecksum,
+                  sealed.count == 64, sealed.allSatisfy({ "0123456789abcdef".contains($0) }) else {
+                throw ContinuitySourceActivationError.proofRequired
+            }
+            try validateSourceActivationUnlocked(receipt, lease: lease, connection: connection)
+            guard let run = try autonomousRunUnlocked(receipt.runID, connection: connection) else { throw AutonomyError.staleLease }
+            if let retained = try sourceActivationUnlocked(operationID: receipt.operationID, connection: connection)?.sealedChecksum {
+                guard retained == sealed, run.state != .awaitingBootstrap else { throw ContinuitySourceActivationError.conflict }
+                return run
+            }
+            var specification = run.specification
+            specification.work.metadata["provider_adapter_id"] = try validatedContinuityTaskUnlocked(receipt.authorization, connection: connection).assignment.adapterID
+            specification.work.metadata["provider_session_id"] = receipt.candidateID.uuidString.lowercased()
+            specification.work.metadata["provider_response_id"] = receipt.acknowledgementProviderResponseID
+            specification.work.metadata["continuity_operation_id"] = receipt.operationID.uuidString.lowercased()
+            specification.work.metadata["automatic_continuation_turn_id"] = receipt.continuationTurnID.uuidString.lowercased()
+            try connection.execute("UPDATE continuity_source_activations SET sealed_checksum=? WHERE operation_id=? AND sealed_checksum IS NULL",
+                bindings: [.text(sealed), .text(receipt.operationID.uuidString.lowercased())])
+            guard try connection.execute("UPDATE continuity_ingress_holds SET state='activated',updated_at=? WHERE operation_id=? AND run_id=? AND state='awaiting_bootstrap'",
+                bindings: [.text(ISO8601.string(from: clock.now())), .text(receipt.operationID.uuidString.lowercased()), .text(receipt.runID.description)]) == 1 else {
+                throw ContinuitySourceActivationError.conflict
+            }
+            if let predecessor = receipt.predecessorProviderSessionID {
+                guard try connection.execute("UPDATE provider_sessions SET status='sealed',accepted=0,updated_at=? WHERE session_id=? AND status='fenced'",
+                    bindings: [.text(ISO8601.string(from: clock.now())), .text(predecessor)]) == 1 else { throw ContinuitySourceActivationError.conflict }
+            }
+            guard try connection.execute("""
+                UPDATE autonomous_runs SET state='running',current_work_json=?,revision=revision+1,updated_at=?
+                WHERE run_id=? AND active_operation_id=? AND active_session_id=? AND state='awaiting_bootstrap'
+                """, bindings: [.text(try Self.specificationJSON(specification)), .text(ISO8601.string(from: clock.now())),
+                    .text(receipt.runID.description), .text(receipt.operationID.uuidString.lowercased()),
+                    .text(receipt.candidateID.uuidString.lowercased())]) == 1,
+                  let updated = try autonomousRunUnlocked(receipt.runID, connection: connection) else { throw ContinuitySourceActivationError.conflict }
+            return updated
+        }
+    }
+
+    func sourceActivationReceipt(runID: RunID, operationID: UUID, lease: RunLease) throws -> ContinuitySourceActivationReceipt? {
+        try controlledTransaction(cancellation: nil) { connection in
+            guard runID == lease.runID, let run = try autonomousRunUnlocked(runID, connection: connection) else { throw AutonomyError.staleLease }
+            try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: clock.now()), connection: connection)
+            _ = try requiredActiveProjectUnlocked(run.projectID, generation: run.projectGeneration, connection: connection)
+            guard let metadata = try connection.first("SELECT run_id,project_id,project_generation FROM continuity_source_activations WHERE operation_id=?",
+                bindings: [.text(operationID.uuidString.lowercased())], map: {
+                    (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 36), $0.int64(2))
+                }) else { return nil }
+            guard metadata.0 == runID.description, metadata.1 == run.projectID.description,
+                  metadata.2 > 0, UInt64(metadata.2) == run.projectGeneration.rawValue else {
+                throw ContinuitySourceActivationError.conflict
+            }
+            guard let stored = try sourceActivationUnlocked(operationID: operationID, connection: connection) else { return nil }
+            guard stored.receipt.runID == runID else { throw ContinuitySourceActivationError.conflict }
+            try validateSourceActivationUnlocked(stored.receipt, lease: lease, connection: connection)
+            return stored.receipt
+        }
+    }
+
+    /// Reconciles real ordinary work and provider consumption; absence is deferred.
+    func completeContinuitySourceResumption(activationReceipt: ContinuitySourceActivationReceipt, lease: RunLease,
+        policySelection: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil,
+        writeCanonical: @Sendable (ContinuitySourceResumptionReceipt) throws -> ContinuitySourceBootstrapOperation
+    ) throws -> ContinuitySourceResumptionReceipt? {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            try validateSourceActivationUnlocked(activationReceipt, lease: lease, connection: connection)
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: activationReceipt.authorization)
+            guard let stored = try sourceActivationUnlocked(operationID: activationReceipt.operationID, connection: connection),
+                  let sealed = stored.sealedChecksum else { return nil }
+            let receipt: ContinuitySourceResumptionReceipt
+            if let existing = stored.resumption { receipt = existing }
+            else {
+                guard let observed = try sourceResumptionEvidenceUnlocked(activationReceipt, connection: connection) else { return nil }
+                receipt = observed
+            }
+            let operation = try writeCanonical(receipt)
+            guard operation.envelope == activationReceipt.envelope, operation.state == .predecessorSealed,
+                  operation.activationReceiptSHA256 == activationReceipt.receiptSHA256,
+                  operation.sealedStateChecksum == sealed, operation.isResumed,
+                  operation.resumedReceiptSHA256 == receipt.receiptSHA256 else { throw ContinuitySourceActivationError.proofRequired }
+            try validateSourceActivationUnlocked(activationReceipt, lease: lease, connection: connection)
+            if stored.resumption == nil {
+                try connection.execute("UPDATE continuity_source_activations SET resumption_json=?,resumption_sha256=? WHERE operation_id=? AND resumption_json IS NULL",
+                    bindings: [.text(String(decoding: receipt.canonicalReceiptJSON, as: UTF8.self)), .text(receipt.receiptSHA256),
+                        .text(receipt.operationID.uuidString.lowercased())])
+                guard try connection.execute("UPDATE autonomous_runs SET active_operation_id=NULL,revision=revision+1,updated_at=? WHERE run_id=? AND active_operation_id=? AND active_session_id=?",
+                    bindings: [.text(ISO8601.string(from: clock.now())), .text(receipt.runID.description),
+                        .text(receipt.operationID.uuidString.lowercased()), .text(activationReceipt.candidateID.uuidString.lowercased())]) == 1 else {
+                    throw ContinuitySourceActivationError.conflict
+                }
+            }
+            return receipt
+        }
+    }
+
+    /// Scans only bounded scheduling metadata. Receipt and source bytes are read
+    /// by the separate leased claim after the live task binding is validated.
+    func pendingContinuityBootstrapRecoveries(afterRowID: Int64? = nil, limit: Int = 32,
+        cancellation: ToolCallCancellation? = nil) throws -> ContinuityBootstrapRecoveryPage {
+        guard (1...ContinuityBootstrapRecoveryLimits.maximumPageSize).contains(limit),
+              afterRowID == nil || afterRowID! >= 0 else { throw ContinuityBootstrapRecoveryError.invalidRequest }
+        return try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let rows = try connection.all(Self.recoveryMetadataQuery + "\n" + """
+                WHERE h.rowid>? AND h.state='awaiting_bootstrap'
+                  AND h.recovery_quarantined=0
+                  AND NOT EXISTS(SELECT 1 FROM continuity_operation_cancellations c WHERE c.operation_id=h.operation_id)
+                ORDER BY h.rowid LIMIT ?
+                """, bindings: [.int64(afterRowID ?? 0), .int64(Int64(limit))]) { row in
+                    (row.int64(0), Result { try Self.decodeRecoveryMetadata(row) })
+                }
+            var references: [ContinuityBootstrapRecoveryReference] = []
+            var diagnostics: [ContinuityBootstrapRecoveryDiagnostic] = []
+            for (rowID, result) in rows {
+                try cancellation?.checkCancellation()
+                switch result {
+                case .success(let row):
+                    if try recoveryIsDueUnlocked(row, connection: connection),
+                       try connection.scalarInt("SELECT COUNT(*) FROM run_leases WHERE run_id=? AND expires_at>?",
+                         bindings: [.text(row.reference.runID.description), .text(ISO8601.string(from: clock.now()))]) == 0 {
+                        references.append(row.reference)
+                    }
+                case .failure:
+                    try quarantineRecoveryUnlocked(rowID: rowID, connection: connection)
+                    diagnostics.append(.init(rowID: rowID, failure: .integrityFailure))
+                }
+            }
+            return .init(references: references, diagnostics: diagnostics,
+                         nextRowID: rows.count == limit ? rows.last?.0 : nil)
+        }
+    }
+
+    /// This metadata admission cannot disclose a handoff or consume an attempt.
+    func validateContinuityBootstrapRecovery(reference: ContinuityBootstrapRecoveryReference,
+        policy: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil) throws -> Bool {
+        try controlledTransaction(cancellation: cancellation) { connection in
+            let row = try requiredRecoveryMetadataUnlocked(reference, connection: connection)
+            let task = try validateRecoveryTaskUnlocked(row, connection: connection)
+            try ContinuityIngressAcceptanceReceipt.validatePolicy(policy, authorization: task.authorization)
+            try requireSourceDispatchIdentityUnlocked(task.authorization, connection: connection)
+            guard try policy.policy.automaticHandoffEnabled || hasExplicitStartMetadataUnlocked(reference: reference, task: task, connection: connection) else { return false }
+            return try recoveryIsDueUnlocked(row, connection: connection)
+        }
+    }
+
+    func claimContinuityBootstrapRecovery(reference: ContinuityBootstrapRecoveryReference,
+        lease: RunLease, policy: BudgetPolicySelection, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityBootstrapRecoveryClaim {
+        let result: Result<ContinuityBootstrapRecoveryClaim, ContinuityBootstrapRecoveryError> = try controlledTransaction(
+            cancellation: cancellation, fullDurability: true) { connection in
+                let row = try requiredRecoveryMetadataUnlocked(reference, connection: connection)
+                let task = try validateRecoveryTaskUnlocked(row, connection: connection)
+                guard lease.runID == reference.runID else { throw ContinuityBootstrapRecoveryError.claimConflict }
+                try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: clock.now()), connection: connection)
+                try ContinuityIngressAcceptanceReceipt.validatePolicy(policy, authorization: task.authorization)
+                try requireSourceDispatchIdentityUnlocked(task.authorization, connection: connection)
+                guard try policy.policy.automaticHandoffEnabled || hasExplicitStartMetadataUnlocked(reference: reference, task: task, connection: connection) else { throw ContinuityBootstrapRecoveryError.policyDeferred }
+                try requireRecoveryDueUnlocked(row)
+                if row.claimID != nil && row.leaseOwner == lease.ownerID && row.leaseEpoch == lease.epoch {
+                    throw ContinuityBootstrapRecoveryError.claimConflict
+                }
+                let acceptance: ContinuityIngressAcceptanceReceipt
+                do {
+                    guard let value = try continuityIngressAcceptanceUnlocked(operationID: reference.operationID,
+                        keySHA256: row.keySHA256, connection: connection) else {
+                        throw ContinuityIngressError.integrityFailure("recovery acceptance missing")
+                    }
+                    try validateBootstrapReceiptUnlocked(value, lease: lease, connection: connection)
+                    guard value.receiptSHA256 == reference.receiptSHA256 else {
+                        throw ContinuityIngressError.integrityFailure("recovery receipt differs from metadata")
+                    }
+                    _ = try validateSourceStartAuthorityUnlocked(acceptance: value, lease: lease, policySelection: policy, connection: connection)
+                    acceptance = value
+                } catch {
+                    guard Self.isRecoveryIntegrityError(error) else { throw error }
+                    try quarantineRecoveryUnlocked(rowID: reference.rowID, connection: connection)
+                    return .failure(.quarantined)
+                }
+                let now = clock.now(), claimID = UUID(), attempt = row.attempts + 1
+                let timestamp = ISO8601.string(from: now)
+                let deadline = row.deadline ?? ISO8601.string(from: now.addingTimeInterval(ContinuityBootstrapRecoveryLimits.retryWindow))
+                // An owner dying after dispatch cannot immediately spend another
+                // attempt inside the native provider's unknown-outcome fence.
+                let abandonedRetry = ISO8601.string(from: now.addingTimeInterval(660))
+                let prefix = reference.phase == .bootstrap ? "recovery" : "finalization"
+                try connection.execute("""
+                    UPDATE continuity_ingress_holds SET \(prefix)_attempts=?,\(prefix)_started_at=COALESCE(\(prefix)_started_at,?),
+                      \(prefix)_deadline=?,\(prefix)_retry_at=?,recovery_claim_id=?,recovery_lease_owner=?,
+                      recovery_lease_epoch=?,recovery_claim_phase=?,recovery_error_code=NULL,updated_at=? WHERE rowid=?
+                    """, bindings: [.int64(Int64(attempt)), .text(timestamp), .text(deadline), .text(abandonedRetry),
+                        .text(claimID.uuidString.lowercased()), .text(lease.ownerID), .int64(Int64(lease.epoch)),
+                        .text(reference.phase.rawValue), .text(timestamp), .int64(reference.rowID)])
+                return .success(.init(reference: reference, acceptance: acceptance, claimID: claimID,
+                                      attempt: attempt, retryDeadline: deadline))
+            }
+        return try result.get()
+    }
+
+    func finishContinuityBootstrapRecovery(claim: ContinuityBootstrapRecoveryClaim, lease: RunLease,
+        outcome: ContinuityBootstrapRecoveryOutcome, cancellation: ToolCallCancellation? = nil) throws {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            let row = try validateRecoveryClaimUnlocked(claim, lease: lease, connection: connection)
+            let now = clock.now(), timestamp = ISO8601.string(from: now)
+            var attempts = row.attempts
+            var errorCode: ContinuityBootstrapRecoveryFailure?
+            var retry: String?
+            var quarantined = false
+            switch outcome {
+            case .deferredPolicy:
+                attempts -= 1
+                retry = ISO8601.string(from: now.addingTimeInterval(30))
+            case .cancelled:
+                errorCode = .interrupted
+                retry = ISO8601.string(from: now.addingTimeInterval(660))
+            case .failed(let failure, let requested):
+                if let requested, !requested.isFinite || requested < 0 {
+                    throw ContinuityBootstrapRecoveryError.invalidRequest
+                }
+                let backoff = min(ContinuityBootstrapRecoveryLimits.maximumRetryDelay,
+                    ContinuityBootstrapRecoveryLimits.initialRetryDelay * pow(2, Double(max(0, attempts - 1))))
+                let delay = max(backoff, requested ?? 0)
+                errorCode = failure
+                quarantined = failure == .integrityFailure
+                if delay > ContinuityBootstrapRecoveryLimits.maximumRequestedRetryDelay
+                    || now.addingTimeInterval(delay) >= (ISO8601.date(from: claim.retryDeadline) ?? .distantPast) {
+                    errorCode = .retryWindowExceeded
+                    attempts = ContinuityBootstrapRecoveryLimits.maximumAttempts
+                } else { retry = ISO8601.string(from: now.addingTimeInterval(delay)) }
+            }
+            if outcome != .deferredPolicy,
+               let retry, (ISO8601.date(from: retry) ?? .distantFuture) >= (ISO8601.date(from: claim.retryDeadline) ?? .distantPast) {
+                attempts = ContinuityBootstrapRecoveryLimits.maximumAttempts
+                errorCode = .retryWindowExceeded
+            }
+            let prefix = claim.reference.phase == .bootstrap ? "recovery" : "finalization"
+            try connection.execute("""
+                UPDATE continuity_ingress_holds SET \(prefix)_attempts=?,\(prefix)_retry_at=?,recovery_error_code=?,
+                  \(prefix)_started_at=?,\(prefix)_deadline=?,recovery_quarantined=?,recovery_claim_id=NULL,recovery_lease_owner=NULL,recovery_lease_epoch=NULL,recovery_claim_phase=NULL,updated_at=?
+                WHERE rowid=? AND recovery_claim_id=?
+                """, bindings: [.int64(Int64(attempts)), .optionalText(retry), .optionalText(errorCode?.rawValue),
+                    .optionalText(attempts == 0 ? nil : row.startedAt), .optionalText(attempts == 0 ? nil : row.deadline),
+                    .int64(quarantined ? 1 : 0), .text(timestamp), .int64(claim.reference.rowID),
+                    .text(claim.claimID.uuidString.lowercased())])
+        }
+    }
+
+    /// Suppresses scheduling only after the actual canonical ACK and both durable
+    /// provider turns plus the successful exact-source retrieval agree.
+    func markContinuityBootstrapAcknowledged(claim: ContinuityBootstrapRecoveryClaim, lease: RunLease,
+        cancellation: ToolCallCancellation? = nil,
+        readCanonical: @Sendable () throws -> ContinuitySourceBootstrapOperation) throws {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            guard claim.reference.phase == .bootstrap else { throw ContinuityBootstrapRecoveryError.claimConflict }
+            try validateBootstrapReceiptUnlocked(claim.acceptance, lease: lease, connection: connection)
+            let previous = try connection.first("SELECT recovery_ack_sha256 FROM continuity_ingress_holds WHERE operation_id=? AND run_id=? AND state='awaiting_bootstrap'",
+                bindings: [.text(claim.reference.operationID.uuidString.lowercased()), .text(claim.reference.runID.description)],
+                map: { try $0.strictText(0, maximumBytes: 64) }) ?? nil
+            if previous == nil { _ = try validateRecoveryClaimUnlocked(claim, lease: lease, connection: connection) }
+            let operation = try readCanonical()
+            try validateRecoveryAcknowledgementUnlocked(operation, claim: claim, connection: connection)
+            try validateBootstrapReceiptUnlocked(claim.acceptance, lease: lease, connection: connection)
+            if let previous {
+                guard previous == operation.stateChecksum else { throw ContinuityBootstrapRecoveryError.claimConflict }
+                return
+            }
+            let changed = try connection.execute("""
+                UPDATE continuity_ingress_holds SET recovery_ack_sha256=?,recovery_error_code=NULL,recovery_retry_at=NULL,
+                  recovery_claim_id=NULL,recovery_lease_owner=NULL,recovery_lease_epoch=NULL,recovery_claim_phase=NULL,updated_at=?
+                WHERE rowid=? AND recovery_claim_id=? AND recovery_ack_sha256 IS NULL
+                """, bindings: [.text(operation.stateChecksum), .text(ISO8601.string(from: clock.now())),
+                    .int64(claim.reference.rowID), .text(claim.claimID.uuidString.lowercased())])
+            guard changed == 1 else { throw ContinuityBootstrapRecoveryError.claimConflict }
+        }
+    }
+
+    func continuityBootstrapProviderResult(grant: ContinuityBootstrapGrant, turnID: UUID,
+                                           lease: RunLease) throws -> ProviderTurn? {
+        try controlledTransaction(cancellation: nil) { connection in
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            return try bootstrapProviderResultUnlocked(grant: grant, turnID: turnID, connection: connection)
+        }
+    }
+
+    /// Executes the actual immutable-source read while live task/generation and
+    /// lease authority are guarded. No caller-supplied digest can skip this read.
+    func executeContinuityBootstrapRetrieval(grant: ContinuityBootstrapGrant, invocationID: UUID,
+        lease: RunLease, cancellation: ToolCallCancellation? = nil,
+        resolver: @Sendable (ContinuityHandoffRevision) throws -> ContinuityBootstrapReadResult
+    ) throws -> ContinuityBootstrapRetrievalProof {
+        try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            guard let invocation = try toolInvocationUnlocked(invocationID, connection: connection),
+                  invocation.sessionID == grant.sessionID, invocation.runID == grant.envelope.runID,
+                  invocation.toolName == "context_get", invocation.replayClass == .readOnly,
+                  let result = try bootstrapProviderResultUnlocked(grant: grant, turnID: invocation.turnID, connection: connection),
+                  result.previousResponseID == nil, result.toolCalls.count == 1 else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            let call = result.toolCalls[0]
+            try validateExactBootstrapCall(call, source: grant.envelope.sourceIdentity)
+            guard call.callID == invocation.providerCallID,
+                  try bootstrapCallSHA256(call) == invocation.argumentsSHA256 else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+            if let proof = try bootstrapRetrievalProofUnlocked(grant: grant, connection: connection) {
+                guard invocation.state == .completed, proof.toolInvocationID == invocationID,
+                      proof.providerTurnID == invocation.turnID, proof.providerResponseID == result.responseID,
+                      proof.providerCallID == call.callID, invocation.resultSHA256 == proof.toolResultSHA256,
+                      invocation.resultSummary == String(data: proof.canonicalToolResultJSON, encoding: .utf8) else {
+                    throw ContinuityIngressError.integrityFailure("retrieval proof differs from completed invocation")
+                }
+                return proof
+            }
+            guard invocation.state == .executing else { throw ContinuityIngressError.deliveryConflict }
+            let read = try resolver(grant.envelope.acceptance.source)
+            try cancellation?.checkCancellation()
+            try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+            let proof = try ContinuityBootstrapRetrievalProof(grant: grant, providerTurnID: invocation.turnID,
+                providerResponseID: result.responseID, providerCallID: call.callID, toolInvocationID: invocationID,
+                result: read, retrievedAt: ISO8601.string(from: clock.now()))
+            let changed = try connection.execute("""
+                UPDATE tool_invocations SET state='completed',result_sha256=?,result_summary=?,updated_at=?
+                WHERE invocation_id=? AND state='executing'
+                """, bindings: [.text(proof.toolResultSHA256), .text(String(decoding: proof.canonicalToolResultJSON, as: UTF8.self)),
+                    .text(proof.retrievedAt), .text(invocationID.uuidString.lowercased())])
+            guard changed == 1 else { throw ContinuityIngressError.deliveryConflict }
+            try connection.execute("""
+                INSERT INTO continuity_bootstrap_retrieval_proofs(grant_id,invocation_id,proof_json,proof_sha256)
+                VALUES(?,?,?,?)
+                """, bindings: [.text(grant.grantID.uuidString.lowercased()), .text(invocationID.uuidString.lowercased()),
+                    .text(String(decoding: proof.canonicalProofJSON, as: UTF8.self)), .text(proof.proofSHA256)])
+            return proof
+        }
+    }
+
+    @discardableResult
+    func revokeContinuityTask(taskID: UUID, projectID: ProjectID, expectedGeneration: ProjectGeneration,
+                              cancellation: ToolCallCancellation? = nil) throws -> ContinuityTaskAuthorizationRecord {
+        let timestamp = ISO8601.string(from: clock.now())
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            guard let record = try continuityTaskUnlocked(taskID, connection: connection),
+                  record.authorization.projectID == projectID,
+                  record.authorization.projectGeneration == expectedGeneration else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+            if record.state == .revoked { return record }
+            try revokeContinuityTasksUnlocked(projectID: projectID, generation: expectedGeneration,
+                taskID: taskID, timestamp: timestamp, connection: connection)
+            guard let revoked = try continuityTaskUnlocked(taskID, connection: connection) else {
+                throw ContinuityTaskAuthorizationError.integrityFailure("revoked task disappeared")
+            }
+            return revoked
+        }
+    }
+
     @discardableResult
     public func bind(
         owner: ProjectBindingOwner,
@@ -1429,6 +2689,8 @@ public actor ProjectControlPlaneRepository {
                   let project = try projectUnlocked(projectID, connection: connection) else {
                 throw ProjectContextError.databaseFailure("project reset compare-and-set failed")
             }
+            try revokeContinuityTasksUnlocked(projectID: projectID, generation: expectedGeneration,
+                taskID: nil, timestamp: timestamp, connection: connection)
             return project
         }
     }
@@ -2404,6 +3666,7 @@ public actor ProjectControlPlaneRepository {
             )
 
             if let existing = try autonomousRunUnlocked(request.runID, connection: connection) {
+                try requireNoContinuityIngressHoldUnlocked(request.runID, connection: connection)
                 let identityMatches = existing.projectID == request.projectID
                     && existing.projectGeneration == request.projectGeneration
                     && existing.assignmentID == request.assignmentID
@@ -2460,38 +3723,8 @@ public actor ProjectControlPlaneRepository {
                 }
             }
 
-            try connection.execute(
-                """
-                INSERT INTO autonomous_runs(
-                    run_id,project_id,project_generation,assignment_id,mission,state,
-                    continuity_mode,provider_id,model_key,current_work_json,revision,created_at,updated_at
-                ) VALUES(?,?,?,?,?,'created',?,?,?, ?,0,?,?)
-                """,
-                bindings: [
-                    .text(request.runID.description), .text(request.projectID.description),
-                    .int64(try Self.sqliteGeneration(request.projectGeneration)),
-                    .optionalText(request.assignmentID), .text(request.mission),
-                    .text(request.continuityMode.rawValue), .text(request.providerID),
-                    .text(request.modelKey), .text(specificationJSON),
-                    .text(timestamp), .text(timestamp),
-                ]
-            )
-            try upsertAutonomousRunBindingUnlocked(request, timestamp: timestamp, connection: connection)
-            try appendAutonomyEventUnlocked(
-                runID: request.runID,
-                projectID: request.projectID,
-                eventType: "autonomous_run_created",
-                severity: .info,
-                summary: "Autonomous run was durably created",
-                metadata: [
-                    "continuity_mode": request.continuityMode.rawValue,
-                    "project_generation": String(request.projectGeneration.rawValue),
-                ],
-                connection: connection
-            )
-            guard let inserted = try autonomousRunUnlocked(request.runID, connection: connection) else {
-                throw ProjectContextError.integrityFailure("autonomous run could not be read after insertion")
-            }
+            let inserted = try insertAutonomousRunUnlocked(request, state: .created,
+                operationID: nil, timestamp: timestamp, connection: connection)
             return (inserted, true)
         }
     }
@@ -2562,7 +3795,7 @@ public actor ProjectControlPlaneRepository {
         }
         return try requiredConnection().all(
             Self.autonomousRunSelect
-                + " WHERE state NOT IN ('completed','cancelled','failed_terminal') ORDER BY updated_at,run_id LIMIT ?",
+                + " WHERE state NOT IN ('completed','cancelled','failed_terminal') AND NOT EXISTS(SELECT 1 FROM continuity_operation_cancellations c WHERE c.operation_id=autonomous_runs.active_operation_id) ORDER BY updated_at,run_id LIMIT ?",
             bindings: [.int64(Int64(limit))],
             map: Self.decodeAutonomousRun
         )
@@ -2579,6 +3812,23 @@ public actor ProjectControlPlaneRepository {
             connection: connection
         )
         return run
+    }
+
+    /// Application dispatch checks the durable hold, not a cached state snapshot.
+    /// Cancellation uses its dedicated state transition and remains available.
+    public func validateAutonomousRunExecutionAdmission(_ runID: RunID) throws -> AutonomousRunRecord {
+        try controlledTransaction(cancellation: nil) { connection in
+            guard let run = try autonomousRunUnlocked(runID, connection: connection) else {
+                throw AutonomyError.runNotFound(runID)
+            }
+            _ = try requiredActiveProjectUnlocked(run.projectID, generation: run.projectGeneration, connection: connection)
+            try requireNoContinuityIngressHoldUnlocked(runID, connection: connection)
+            guard run.state != .awaitingBootstrap else { throw AutonomyError.bootstrapRequired(runID) }
+            guard !run.state.isTerminal, run.state != .cancelRequested else {
+                throw AutonomyError.invalidRequest("a stopping or terminal run cannot dispatch work")
+            }
+            return run
+        }
     }
 
     @discardableResult
@@ -2733,6 +3983,7 @@ public actor ProjectControlPlaneRepository {
         lease: RunLease,
         transition: AutonomousRunTransition
     ) throws -> AutonomousRunRecord {
+        guard lease.runID == runID else { throw AutonomyError.staleLease }
         guard transition.nextState != .completed else {
             throw AutonomyError.completionValidationRequired
         }
@@ -2750,6 +4001,37 @@ public actor ProjectControlPlaneRepository {
             guard current.state == transition.expectedState,
                   current.revision == transition.expectedRevision else {
                 throw AutonomyError.transitionConflict
+            }
+            if let active = current.activeOperationID,
+               try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations WHERE operation_id=?", bindings: [.text(active.uuidString.lowercased())]) > 0,
+               (transition.activeOperationID != nil && transition.activeOperationID != active
+                || transition.activeSessionID != nil && transition.activeSessionID != current.activeSessionID) {
+                throw ContinuityOperationControlError.cancellationRequested
+            }
+            if transition.activeOperationID != nil || transition.activeSessionID != nil {
+                let sources = try connection.all("""
+                    SELECT operation_id,candidate_id FROM continuity_source_activations
+                    WHERE run_id=? AND (resumption_json IS NULL OR resumption_sha256 IS NULL) LIMIT 2
+                    """, bindings: [.text(runID.description)], map: {
+                        (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 36))
+                    })
+                guard sources.count <= 1 else { throw ContinuitySourceActivationError.conflict }
+                if let source = sources.first {
+                    guard let operation = source.0, let candidate = source.1,
+                          UUID(uuidString: operation)?.uuidString.lowercased() == operation,
+                          UUID(uuidString: candidate)?.uuidString.lowercased() == candidate,
+                          transition.activeOperationID == nil || transition.activeOperationID?.uuidString.lowercased() == operation,
+                          transition.activeSessionID == nil || transition.activeSessionID == candidate else {
+                        throw ContinuitySourceActivationError.conflict
+                    }
+                }
+            }
+            if transition.nextState == .cancelRequested || transition.nextState == .cancelled {
+                try connection.execute(
+                    "UPDATE continuity_ingress_holds SET state='cancelled',updated_at=? WHERE run_id=? AND state='awaiting_bootstrap'",
+                    bindings: [.text(timestamp), .text(runID.description)])
+            } else {
+                try requireNoContinuityIngressHoldUnlocked(runID, connection: connection)
             }
             _ = try requiredActiveProjectUnlocked(
                 current.projectID,
@@ -2814,6 +4096,7 @@ public actor ProjectControlPlaneRepository {
         let timestamp = ISO8601.string(from: clock.now())
         return try connection.transaction {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+            try requireNoContinuityIngressHoldUnlocked(runID, connection: connection)
             guard let current = try autonomousRunUnlocked(runID, connection: connection) else {
                 throw AutonomyError.runNotFound(runID)
             }
@@ -2880,6 +4163,7 @@ public actor ProjectControlPlaneRepository {
         }
         let connection = try requiredConnection()
         try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: now), connection: connection)
+        try requireNoContinuityIngressHoldUnlocked(run.runID, connection: connection)
         guard try autonomousRunUnlocked(run.runID, connection: connection) == run,
               let project = try projectUnlocked(run.projectID, connection: connection),
               project.generation == run.projectGeneration,
@@ -2910,6 +4194,7 @@ public actor ProjectControlPlaneRepository {
         let timestamp = ISO8601.string(from: clock.now())
         return try connection.transaction {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+            try requireNoContinuityIngressHoldUnlocked(runID, connection: connection)
             guard let current = try autonomousRunUnlocked(runID, connection: connection) else {
                 throw AutonomyError.runNotFound(runID)
             }
@@ -3013,11 +4298,32 @@ public actor ProjectControlPlaneRepository {
         _ intent: ProviderSessionIntent,
         lease: RunLease
     ) throws {
-        try Self.validate(intent)
+        try reserveProviderSessionScoped(intent, lease: lease, bootstrapGrant: nil)
+    }
+
+    func reserveProviderSession(
+        _ intent: ProviderSessionIntent,
+        lease: RunLease,
+        bootstrapGrant: ContinuityBootstrapGrant
+    ) throws {
+        try reserveProviderSessionScoped(intent, lease: lease, bootstrapGrant: bootstrapGrant)
+    }
+
+    private func reserveProviderSessionScoped(
+        _ intent: ProviderSessionIntent,
+        lease: RunLease,
+        bootstrapGrant: ContinuityBootstrapGrant?
+    ) throws {
+        if bootstrapGrant == nil { try Self.validate(intent) }
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        try connection.transaction {
+        try connection.transaction(fullDurability: bootstrapGrant != nil) {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+            if let bootstrapGrant {
+                try validateBootstrapSessionIntentUnlocked(intent, grant: bootstrapGrant, lease: lease, connection: connection)
+            } else {
+                try requireNoContinuityIngressHoldUnlocked(intent.runID, connection: connection)
+            }
             guard let run = try autonomousRunUnlocked(intent.runID, connection: connection) else {
                 throw AutonomyError.runNotFound(intent.runID)
             }
@@ -3031,8 +4337,18 @@ public actor ProjectControlPlaneRepository {
                 connection: connection
             )
             if let existing = try providerSessionIdentityUnlocked(intent.sessionID, connection: connection) {
-                guard existing == ProviderSessionIdentity(intent) else {
-                    throw AutonomyError.intentConflict
+                let expected = ProviderSessionIdentity(intent,
+                    providerResponseID: bootstrapGrant == nil ? nil : existing.providerResponseID)
+                guard existing == expected else { throw AutonomyError.intentConflict }
+                if let bootstrapGrant, let response = existing.providerResponseID {
+                    guard let rootID = try connection.scalarText("""
+                        SELECT turn_id FROM provider_turns WHERE session_id=? AND request_kind='bootstrap'
+                            AND previous_response_id IS NULL LIMIT 1
+                        """, bindings: [.text(intent.sessionID)]).flatMap(UUID.init(uuidString:)),
+                          try bootstrapProviderResultUnlocked(grant: bootstrapGrant, turnID: rootID,
+                            connection: connection)?.responseID == response else {
+                        throw ContinuityIngressError.integrityFailure("candidate response has no retained bootstrap turn")
+                    }
                 }
                 return
             }
@@ -3524,11 +4840,32 @@ public actor ProjectControlPlaneRepository {
         _ intent: ProviderTurnIntent,
         lease: RunLease
     ) throws -> ProviderTurnRecord {
+        return try persistProviderTurnIntentScoped(intent, lease: lease, bootstrapGrant: nil)
+    }
+
+    func persistProviderTurnIntent(
+        _ intent: ProviderTurnIntent,
+        lease: RunLease,
+        bootstrapGrant: ContinuityBootstrapGrant
+    ) throws -> ProviderTurnRecord {
+        return try persistProviderTurnIntentScoped(intent, lease: lease, bootstrapGrant: bootstrapGrant)
+    }
+
+    private func persistProviderTurnIntentScoped(
+        _ intent: ProviderTurnIntent,
+        lease: RunLease,
+        bootstrapGrant: ContinuityBootstrapGrant?
+    ) throws -> ProviderTurnRecord {
         try Self.validate(intent)
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        return try connection.transaction(fullDurability: bootstrapGrant != nil) {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+            if let bootstrapGrant {
+                try validateBootstrapTurnIntentUnlocked(intent, grant: bootstrapGrant, lease: lease, connection: connection)
+            } else {
+                try requireNoContinuityIngressHoldUnlocked(intent.runID, connection: connection)
+            }
             guard let run = try autonomousRunUnlocked(intent.runID, connection: connection) else {
                 throw AutonomyError.runNotFound(intent.runID)
             }
@@ -3612,6 +4949,38 @@ public actor ProjectControlPlaneRepository {
         errorCode: String? = nil,
         errorSummary: String? = nil
     ) throws -> ProviderTurnRecord {
+        return try transitionProviderTurnScoped(turnID: turnID, expected: expected, to: next, lease: lease, providerRequestID: providerRequestID, providerResponseID: providerResponseID, usageJSON: usageJSON, retryAt: retryAt, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: nil)
+    }
+
+    func transitionProviderTurn(
+        turnID: UUID,
+        expected: ProviderTurnState,
+        to next: ProviderTurnState,
+        lease: RunLease,
+        providerRequestID: String? = nil,
+        providerResponseID: String? = nil,
+        usageJSON: String? = nil,
+        retryAt: String? = nil,
+        errorCode: String? = nil,
+        errorSummary: String? = nil,
+        bootstrapGrant: ContinuityBootstrapGrant
+    ) throws -> ProviderTurnRecord {
+        return try transitionProviderTurnScoped(turnID: turnID, expected: expected, to: next, lease: lease, providerRequestID: providerRequestID, providerResponseID: providerResponseID, usageJSON: usageJSON, retryAt: retryAt, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: bootstrapGrant)
+    }
+
+    private func transitionProviderTurnScoped(
+        turnID: UUID,
+        expected: ProviderTurnState,
+        to next: ProviderTurnState,
+        lease: RunLease,
+        providerRequestID: String? = nil,
+        providerResponseID: String? = nil,
+        usageJSON: String? = nil,
+        retryAt: String? = nil,
+        errorCode: String? = nil,
+        errorSummary: String? = nil,
+        bootstrapGrant: ContinuityBootstrapGrant?
+    ) throws -> ProviderTurnRecord {
         guard Self.validProviderTurnTransitions[expected]?.contains(next) == true else {
             throw AutonomyError.invalidRequest("invalid provider turn transition \(expected.rawValue) -> \(next.rawValue)")
         }
@@ -3619,12 +4988,24 @@ public actor ProjectControlPlaneRepository {
         let boundedError = try Self.boundedOptional(errorSummary, maximumBytes: 2_048, field: "provider turn error")
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        return try connection.transaction(fullDurability: bootstrapGrant != nil) {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
             guard let current = try providerTurnUnlocked(turnID, connection: connection) else {
                 throw AutonomyError.providerTurnNotFound(turnID)
             }
             guard current.intent.runID == lease.runID else { throw AutonomyError.staleLease }
+            if let bootstrapGrant {
+                try validateBootstrapGrantUnlocked(bootstrapGrant, lease: lease, connection: connection)
+                try validateBootstrapTurnIntentUnlocked(ProviderTurnIntent(turnID: current.intent.turnID,
+                    runID: current.intent.runID, sessionID: current.intent.sessionID, operationID: current.intent.operationID,
+                    projectID: current.intent.projectID, projectGeneration: current.intent.projectGeneration,
+                    kind: current.intent.kind, idempotencyKey: current.intent.idempotencyKey,
+                    previousResponseID: current.intent.previousResponseID, inputSHA256: current.intent.inputSHA256,
+                    toolSchemaSHA256: current.intent.toolSchemaSHA256), grant: bootstrapGrant, lease: lease, connection: connection)
+            }
+            if bootstrapGrant == nil && (next == .submitted || next == .streaming) {
+                try requireNoContinuityIngressHoldUnlocked(current.intent.runID, connection: connection)
+            }
             let changed = try connection.execute(
                 """
                 UPDATE provider_turns SET state=?,provider_request_id=COALESCE(?,provider_request_id),
@@ -3678,11 +5059,39 @@ public actor ProjectControlPlaneRepository {
         _ intent: ToolInvocationIntent,
         lease: RunLease
     ) throws -> ToolInvocationRecord {
+        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: nil, bootstrapPolicy: nil)
+    }
+
+    func persistToolInvocationIntent(
+        _ intent: ToolInvocationIntent,
+        lease: RunLease,
+        bootstrapGrant: ContinuityBootstrapGrant,
+        bootstrapPolicy: BudgetPolicySelection
+    ) throws -> ToolInvocationRecord {
+        return try persistToolInvocationIntentScoped(intent, lease: lease, bootstrapGrant: bootstrapGrant, bootstrapPolicy: bootstrapPolicy)
+    }
+
+    private func persistToolInvocationIntentScoped(
+        _ intent: ToolInvocationIntent,
+        lease: RunLease,
+        bootstrapGrant: ContinuityBootstrapGrant?,
+        bootstrapPolicy: BudgetPolicySelection?
+    ) throws -> ToolInvocationRecord {
         try Self.validate(intent)
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        return try connection.transaction(fullDurability: bootstrapGrant != nil) {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+            if let bootstrapGrant {
+                try validateBootstrapToolIntentUnlocked(intent, grant: bootstrapGrant, lease: lease, connection: connection)
+                guard let bootstrapPolicy else { throw ContinuityIngressError.invalidRequest("current bootstrap tool policy") }
+                try ContinuityIngressAcceptanceReceipt.validatePolicy(bootstrapPolicy, authorization: bootstrapGrant.envelope.authorization)
+                // Policy output limits apply even when the invocation already
+                // exists after a crash or has a completed replayable result.
+                try requireBootstrapResultLimitsUnlocked(grant: bootstrapGrant, policy: bootstrapPolicy.policy.tools)
+            } else {
+                try requireNoContinuityIngressHoldUnlocked(intent.runID, connection: connection)
+            }
             guard intent.runID == lease.runID else { throw AutonomyError.staleLease }
             guard let turn = try providerTurnUnlocked(intent.turnID, connection: connection) else {
                 throw AutonomyError.providerTurnNotFound(intent.turnID)
@@ -3696,7 +5105,8 @@ public actor ProjectControlPlaneRepository {
             guard let session = try providerSessionIdentityUnlocked(
                 intent.sessionID,
                 connection: connection
-            ), session.status == .active, session.accepted else {
+            ), (session.status == .active && session.accepted)
+                    || (bootstrapGrant != nil && session.status == .candidate && !session.accepted) else {
                 throw AutonomyError.invalidRequest(
                     "only the accepted active provider session may invoke project tools"
                 )
@@ -3715,6 +5125,11 @@ public actor ProjectControlPlaneRepository {
                     throw AutonomyError.intentConflict
                 }
                 return existing
+            }
+            if let bootstrapGrant, let bootstrapPolicy {
+                try requireBootstrapToolQuotaUnlocked(runID: intent.runID, sessionID: intent.sessionID,
+                    turnID: intent.turnID, operationID: bootstrapGrant.envelope.operationID,
+                    policy: bootstrapPolicy.policy.tools, connection: connection)
             }
             try connection.execute(
                 """
@@ -3767,6 +5182,34 @@ public actor ProjectControlPlaneRepository {
         errorCode: String? = nil,
         errorSummary: String? = nil
     ) throws -> ToolInvocationRecord {
+        return try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease, resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: nil)
+    }
+
+    func transitionToolInvocation(
+        invocationID: UUID,
+        expected: ToolInvocationState,
+        to next: ToolInvocationState,
+        lease: RunLease,
+        resultSHA256: String? = nil,
+        resultSummary: String? = nil,
+        errorCode: String? = nil,
+        errorSummary: String? = nil,
+        bootstrapGrant: ContinuityBootstrapGrant
+    ) throws -> ToolInvocationRecord {
+        return try transitionToolInvocationScoped(invocationID: invocationID, expected: expected, to: next, lease: lease, resultSHA256: resultSHA256, resultSummary: resultSummary, errorCode: errorCode, errorSummary: errorSummary, bootstrapGrant: bootstrapGrant)
+    }
+
+    private func transitionToolInvocationScoped(
+        invocationID: UUID,
+        expected: ToolInvocationState,
+        to next: ToolInvocationState,
+        lease: RunLease,
+        resultSHA256: String? = nil,
+        resultSummary: String? = nil,
+        errorCode: String? = nil,
+        errorSummary: String? = nil,
+        bootstrapGrant: ContinuityBootstrapGrant?
+    ) throws -> ToolInvocationRecord {
         guard Self.validToolInvocationTransitions[expected]?.contains(next) == true else {
             throw AutonomyError.invalidRequest("invalid tool invocation transition \(expected.rawValue) -> \(next.rawValue)")
         }
@@ -3775,12 +5218,27 @@ public actor ProjectControlPlaneRepository {
         let boundedError = try Self.boundedOptional(errorSummary, maximumBytes: 2_048, field: "tool error summary")
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())
-        return try connection.transaction {
+        return try connection.transaction(fullDurability: bootstrapGrant != nil) {
             try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
             guard let current = try toolInvocationUnlocked(invocationID, connection: connection) else {
                 throw AutonomyError.toolInvocationNotFound(invocationID)
             }
             guard current.runID == lease.runID else { throw AutonomyError.staleLease }
+            if let bootstrapGrant {
+                try validateBootstrapGrantUnlocked(bootstrapGrant, lease: lease, connection: connection)
+                guard next != .completed else {
+                    throw ContinuityIngressError.invalidRequest("bootstrap completion requires the guarded exact-source read")
+                }
+                try validateBootstrapToolIntentUnlocked(ToolInvocationIntent(invocationID: current.invocationID,
+                    turnID: current.turnID, runID: current.runID, sessionID: current.sessionID,
+                    projectID: current.projectID, projectGeneration: current.projectGeneration,
+                    providerCallID: current.providerCallID, toolName: current.toolName, replayClass: current.replayClass,
+                    idempotencyKey: current.idempotencyKey, argumentsSHA256: current.argumentsSHA256,
+                    reconciliationDescriptor: current.reconciliationDescriptor), grant: bootstrapGrant, lease: lease, connection: connection)
+            }
+            if bootstrapGrant == nil && next == .executing {
+                try requireNoContinuityIngressHoldUnlocked(current.runID, connection: connection)
+            }
             _ = try requiredActiveProjectUnlocked(
                 current.projectID,
                 generation: current.projectGeneration,
@@ -3958,19 +5416,1238 @@ public actor ProjectControlPlaneRepository {
     private func controlledTransaction<T>(
         cancellation: ToolCallCancellation?,
         checkCancellationBeforeCommit: Bool = true,
+        fullDurability: Bool = false,
         beforeCommitValidation: (() throws -> Void)? = nil,
         _ body: (ControlPlaneSQLiteConnection) throws -> T
     ) throws -> T {
         let connection = try requiredConnection()
+        let synchronousObserver = beforeCommitSynchronousObserver
         return try connection.transaction(
             cancellation: cancellation,
             busyRetryObserver: busyRetryObserver,
             beforeCommitObserver: beforeCommitObserver,
             didCommitObserver: didCommitObserver,
             checkCancellationBeforeCommit: checkCancellationBeforeCommit,
-            beforeCommitValidation: beforeCommitValidation
+            fullDurability: fullDurability,
+            beforeCommitValidation: {
+                if let synchronousObserver { synchronousObserver(try connection.scalarInt("PRAGMA synchronous;")) }
+                try beforeCommitValidation?()
+            }
         ) {
             try body(connection)
+        }
+    }
+
+    private func continuityControlOwnerUnlocked(taskID: UUID, correlation: VerifiedContinuityTaskCorrelation?,
+        context: ToolInvocationContext, owner: ProjectBindingOwner, connection: ControlPlaneSQLiteConnection
+    ) throws -> ContinuityTaskAuthorizationRecord {
+        guard let correlation else { throw ContinuityTaskAuthorizationError.taskCorrelationRequired }
+        guard correlation.taskID == taskID, correlation.callerContext == context, correlation.callerOwner == owner else {
+            throw ContinuityTaskAuthorizationError.authorityMismatch
+        }
+        let caller = try validatedContinuityCallerUnlocked(context: context, owner: owner, connection: connection)
+        guard let retained = try continuityTaskUnlocked(taskID, connection: connection) else { throw ContinuityTaskAuthorizationError.authorityMismatch }
+        let task = try validatedContinuityTaskUnlocked(retained.authorization, allowTerminalRun: true, connection: connection)
+        guard correlation.callerBindingID == caller.bindingID, correlation.sourceBindingID == task.authorization.sourceBindingID,
+              correlation.projectID == task.authorization.projectID, correlation.projectGeneration == task.authorization.projectGeneration,
+              caller.projectID == task.authorization.projectID, caller.projectGeneration == task.authorization.projectGeneration,
+              correlation.authorizationSHA256 == JSONSupport.sha256Hex(try task.authorization.encodedJSON()),
+              context.runID == nil || context.runID == task.runID else { throw ContinuityTaskAuthorizationError.authorityMismatch }
+        // existingTask makes this a pure read; unknown historical origins cannot be backfilled.
+        try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: "", existingTask: true, connection: connection)
+        return task
+    }
+
+    private func ownedContinuityOperationUnlocked(_ operationID: UUID, task: ContinuityTaskAuthorizationRecord,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuityIngressAcceptanceReceipt {
+        // Filtering in SQL makes missing and foreign operations indistinguishable,
+        // including a foreign operation whose receipt body is corrupt.
+        guard try connection.scalarInt("""
+            SELECT COUNT(*) FROM continuity_ingress_acceptances
+            WHERE operation_id=? AND task_id=? AND project_id=? AND project_generation=? AND run_id=?
+            """, bindings: [.text(operationID.uuidString.lowercased()), .text(task.authorization.taskID.uuidString.lowercased()),
+                .text(task.authorization.projectID.description), .int64(try Self.sqliteGeneration(task.authorization.projectGeneration)),
+                .optionalText(task.runID?.description)]) == 1 else { throw ContinuityOperationControlError.notFound }
+        guard let acceptance = try acceptanceForOperationUnlocked(operationID, connection: connection),
+              acceptance.authorization == task.authorization, acceptance.runID == task.runID else { throw ContinuityOperationControlError.integrityFailure }
+        return acceptance
+    }
+
+    private struct StoredContinuityCancellation {
+        let request: ContinuityOperationCancellationRequest
+        let receipt: ContinuityOperationCancellationReceipt?
+        let reason: String?
+        let retryAt: String?
+        let blocked: Bool
+    }
+
+    private func continuityCancellationUnlocked(_ acceptance: ContinuityIngressAcceptanceReceipt,
+        connection: ControlPlaneSQLiteConnection) throws -> StoredContinuityCancellation? {
+        try connection.first("""
+            SELECT run_id,task_id,project_id,project_generation,acceptance_receipt_sha256,
+                request_json,request_sha256,requested_at,receipt_json,receipt_sha256,completed_at,error_code,retry_at,quarantined
+            FROM continuity_operation_cancellations WHERE operation_id=?
+            """, bindings: [.text(acceptance.operationID.uuidString.lowercased())]) { row in
+                guard try row.strictText(0, maximumBytes: 36) == acceptance.runID.description,
+                      try row.strictText(1, maximumBytes: 36) == acceptance.authorization.taskID.uuidString.lowercased(),
+                      try row.strictText(2, maximumBytes: 36) == acceptance.authorization.projectID.description,
+                      row.int64(3) > 0, UInt64(row.int64(3)) == acceptance.authorization.projectGeneration.rawValue,
+                      try row.strictText(4, maximumBytes: 64) == acceptance.receiptSHA256,
+                      let json = try row.strictText(5, maximumBytes: ContinuityOperationCancellationRequest.maximumStoredBytes),
+                      JSONSupport.sha256Hex(Data(json.utf8)) == (try row.strictText(6, maximumBytes: 64)) else {
+                    throw ContinuityOperationControlError.integrityFailure
+                }
+                let request = try ContinuityOperationCancellationRequest.storedSnapshot(from: Data(json.utf8), acceptance: acceptance)
+                guard request.requestedAt == (try row.strictText(7, maximumBytes: 128)) else { throw ContinuityOperationControlError.integrityFailure }
+                let receiptJSON = try row.strictText(8, maximumBytes: ContinuityOperationCancellationReceipt.maximumStoredBytes)
+                let receiptSHA = try row.strictText(9, maximumBytes: 64), completed = try row.strictText(10, maximumBytes: 128)
+                guard (receiptJSON == nil) == (receiptSHA == nil), (receiptJSON == nil) == (completed == nil) else {
+                    throw ContinuityOperationControlError.integrityFailure
+                }
+                let receipt: ContinuityOperationCancellationReceipt?
+                if let receiptJSON {
+                    guard JSONSupport.sha256Hex(Data(receiptJSON.utf8)) == receiptSHA else { throw ContinuityOperationControlError.integrityFailure }
+                    receipt = try .storedSnapshot(from: Data(receiptJSON.utf8), request: request)
+                    guard receipt?.recordedAt == completed else { throw ContinuityOperationControlError.integrityFailure }
+                } else { receipt = nil }
+                let reason = try row.strictText(11, maximumBytes: 64), retryAt = try row.strictText(12, maximumBytes: 128)
+                guard reason == nil || ContinuityOperationCancellationFailure(rawValue: reason!) != nil,
+                      retryAt == nil || ISO8601.date(from: retryAt!) != nil, (0...1).contains(row.int64(13)) else {
+                    throw ContinuityOperationControlError.integrityFailure
+                }
+                return .init(request: request, receipt: receipt, reason: reason, retryAt: retryAt, blocked: row.int64(13) != 0)
+            }
+    }
+
+    private func continuityOperationStatusUnlocked(_ acceptance: ContinuityIngressAcceptanceReceipt,
+        progress: ContinuityOperationProgressEvidence?, connection: ControlPlaneSQLiteConnection) throws -> ContinuityOperationStatus {
+        if let progress {
+            guard progress.source == acceptance.source else { throw ContinuityOperationControlError.integrityFailure }
+            if let delivery = progress.delivery {
+                guard delivery.operationID == acceptance.operationID, delivery.handoff == acceptance.source,
+                      delivery.acceptanceReceiptSHA256 == nil || delivery.acceptanceReceiptSHA256 == acceptance.receiptSHA256 else {
+                    throw ContinuityOperationControlError.integrityFailure
+                }
+            }
+        }
+        let cancelled = try continuityCancellationUnlocked(acceptance, connection: connection)
+        if let receipt = cancelled?.receipt {
+            return .init(acceptance: acceptance, state: .cancelled, deliveryState: progress?.delivery?.state, recoveryState: .none,
+                reasonCode: nil, retryAt: nil, terminalReceipt: .init(outcome: .cancelled, receiptSHA256: receipt.receiptSHA256, recordedAt: receipt.recordedAt))
+        }
+        if let cancelled {
+            return .init(acceptance: acceptance, state: .cancelRequested, deliveryState: progress?.delivery?.state,
+                recoveryState: cancelled.blocked ? .blocked : (cancelled.reason == "provider_outcome_unknown" ? .uncertain : .pending),
+                reasonCode: cancelled.reason, retryAt: cancelled.retryAt, terminalReceipt: nil)
+        }
+        let activation = try sourceActivationUnlocked(operationID: acceptance.operationID, allowTerminalRun: true, connection: connection)
+        if let resumed = activation?.resumption {
+            guard let activation, try sourceResumptionEvidenceUnlocked(activation.receipt, connection: connection) == resumed else {
+                throw ContinuityOperationControlError.integrityFailure
+            }
+            return .init(acceptance: acceptance, state: .resumed, deliveryState: progress?.delivery?.state, recoveryState: .none,
+                reasonCode: nil, retryAt: nil, terminalReceipt: .init(outcome: .resumed, receiptSHA256: resumed.receiptSHA256, recordedAt: resumed.recordedAt))
+        }
+        var state: ContinuityOperationState = activation?.sealedChecksum == nil ? .accepted : .predecessorSealed
+        if let canonical = progress?.canonical {
+            guard canonical.envelope.acceptance == acceptance,
+                  try ContinuitySourceBootstrapOperation.checksum(envelope: canonical.envelope, state: canonical.state,
+                    attempt: canonical.attempt, createdAt: canonical.createdAt, updatedAt: canonical.updatedAt,
+                    successorSessionID: canonical.successorSessionID, successorProviderResponseID: canonical.successorProviderResponseID,
+                    retrievalProofSHA256: canonical.retrievalProofSHA256, acknowledgementProofSHA256: canonical.acknowledgementProofSHA256,
+                    activationReceiptSHA256: canonical.activationReceiptSHA256, resumedReceiptSHA256: canonical.resumedReceiptSHA256) == canonical.stateChecksum else {
+                throw ContinuityOperationControlError.integrityFailure
+            }
+            switch canonical.state {
+            case .checkpointPersisted: state = .handoffCommitted
+            case .successorRequested, .successorCreated: state = .successorRequested
+            case .successorBootstrapping: state = .successorBootstrapping
+            case .successorAcknowledged:
+                if let activation {
+                    guard canonical.stateChecksum == activation.receipt.acknowledgedStateChecksum else { throw ContinuityOperationControlError.integrityFailure }
+                } else { _ = try validatedSourceAcknowledgementUnlocked(canonical, acceptance: acceptance, connection: connection) }
+                state = .successorAcknowledged
+            case .predecessorSealed:
+                guard let activation, canonical.activationReceiptSHA256 == activation.receipt.receiptSHA256,
+                      canonical.sealedStateChecksum == activation.sealedChecksum else { throw ContinuityOperationControlError.integrityFailure }
+                state = .predecessorSealed
+            default: throw ContinuityOperationControlError.integrityFailure
+            }
+        }
+        let recovery = try connection.first("SELECT recovery_error_code,recovery_retry_at,finalization_retry_at,recovery_quarantined FROM continuity_ingress_holds WHERE operation_id=?",
+            bindings: [.text(acceptance.operationID.uuidString.lowercased())]) {
+                (try $0.strictText(0, maximumBytes: 64), try $0.strictText(1, maximumBytes: 128), try $0.strictText(2, maximumBytes: 128), $0.int64(3))
+            }
+        return .init(acceptance: acceptance, state: recovery?.3 == 1 ? .blocked : state, deliveryState: progress?.delivery?.state,
+            recoveryState: recovery?.3 == 1 ? .blocked : (progress == nil ? .uncertain : .pending),
+            reasonCode: recovery?.0, retryAt: recovery?.2 ?? recovery?.1, terminalReceipt: nil)
+    }
+
+    private static let continuityCancellationMetadataQuery = """
+        SELECT rowid,operation_id,run_id,project_id,project_generation,task_id,request_sha256 FROM continuity_operation_cancellations
+        """
+    private static func decodeContinuityCancellationReference(_ row: ControlPlaneSQLiteRow) throws -> ContinuityOperationCancellationReference {
+        guard row.int64(0) > 0, let operation = try row.strictText(1, maximumBytes: 36).flatMap(UUID.init(uuidString:)),
+              let run = try row.strictText(2, maximumBytes: 36).flatMap(UUID.init(uuidString:)),
+              let project = try row.strictText(3, maximumBytes: 36).flatMap(UUID.init(uuidString:)), row.int64(4) > 0,
+              let task = try row.strictText(5, maximumBytes: 36).flatMap(UUID.init(uuidString:)),
+              let sha = try row.strictText(6, maximumBytes: 64), sha.count == 64,
+              sha.allSatisfy({ "0123456789abcdef".contains($0) }) else { throw ContinuityOperationControlError.integrityFailure }
+        return .init(rowID: row.int64(0), operationID: operation, runID: RunID(run), projectID: ProjectID(project),
+            projectGeneration: ProjectGeneration(UInt64(row.int64(4))), taskID: task, requestSHA256: sha)
+    }
+
+    private func continuityCancellationMetadataAuthorityUnlocked(_ reference: ContinuityOperationCancellationReference,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuityTaskAuthorizationRecord {
+        guard let actual = try connection.first(Self.continuityCancellationMetadataQuery + " WHERE rowid=? AND operation_id=?",
+            bindings: [.int64(reference.rowID), .text(reference.operationID.uuidString.lowercased())], map: Self.decodeContinuityCancellationReference),
+              actual == reference else { throw ContinuityOperationControlError.notFound }
+        _ = try requiredActiveProjectUnlocked(reference.projectID, generation: reference.projectGeneration, connection: connection)
+        guard let retained = try continuityTaskUnlocked(reference.taskID, connection: connection) else { throw ContinuityOperationControlError.notFound }
+        let task = try validatedContinuityTaskUnlocked(retained.authorization, allowTerminalRun: true, connection: connection)
+        guard task.authorization.projectID == reference.projectID, task.authorization.projectGeneration == reference.projectGeneration,
+              task.runID == reference.runID else { throw ContinuityOperationControlError.notFound }
+        guard let run = try autonomousRunUnlocked(reference.runID, connection: connection), run.activeOperationID == reference.operationID else {
+            throw ContinuityOperationControlError.conflict
+        }
+        return task
+    }
+
+    private func continuityCancellationClaimUnlocked(_ reference: ContinuityOperationCancellationReference, lease: RunLease,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuityOperationCancellationClaim {
+        let task = try continuityCancellationMetadataAuthorityUnlocked(reference, connection: connection)
+        guard lease.runID == reference.runID else { throw AutonomyError.staleLease }
+        try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: clock.now()), connection: connection)
+        let acceptance = try ownedContinuityOperationUnlocked(reference.operationID, task: task, connection: connection)
+        guard let cancellation = try continuityCancellationUnlocked(acceptance, connection: connection),
+              cancellation.request.requestSHA256 == reference.requestSHA256 else { throw ContinuityOperationControlError.integrityFailure }
+        return .init(reference: reference, request: cancellation.request)
+    }
+
+    private func requireContinuityOperationNotCancelledUnlocked(_ operationID: UUID, connection: ControlPlaneSQLiteConnection) throws {
+        guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_operation_cancellations WHERE operation_id=?",
+            bindings: [.text(operationID.uuidString.lowercased())]) == 0 else { throw ContinuityOperationControlError.cancellationRequested }
+    }
+
+    private func validatedContinuityCallerUnlocked(
+        context: ToolInvocationContext, owner: ProjectBindingOwner,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> ProjectContextBinding {
+        try Self.validate(owner)
+        try Self.validate(context.projectGeneration)
+        try Self.validate(context.authorizationScope)
+        guard [.mcpClient, .providerSession, .runtimeJob].contains(owner.kind) else {
+            throw ContinuityTaskAuthorizationError.taskCorrelationRequired
+        }
+        _ = try requiredActiveProjectUnlocked(context.projectID, generation: context.projectGeneration, connection: connection)
+        guard let binding = try bindingUnlocked(owner: owner, includeInactive: false, connection: connection),
+              binding.projectID == context.projectID, binding.projectGeneration == context.projectGeneration,
+              binding.runID == context.runID, binding.authorizationScope == context.authorizationScope,
+              Self.owner(owner, matches: context) else {
+            throw ContinuityTaskAuthorizationError.authorityMismatch
+        }
+        try requireActiveProviderSessionUnlocked(owner: owner, binding: binding, connection: connection)
+        return binding
+    }
+
+    private static func requireContinuityScope(_ requested: ToolAuthorizationScope,
+                                               within granted: ToolAuthorizationScope, projectRoot: URL) throws {
+        try validate(requested)
+        try validate(granted)
+        guard requested.canonicalRoots.allSatisfy({ root in
+            contains(root, root: projectRoot) && granted.canonicalRoots.contains { contains(root, root: $0) }
+        }), requested.writableRoots.allSatisfy({ root in
+            granted.writableRoots.contains { contains(root, root: $0) }
+        }), (!requested.networkAllowed || granted.networkAllowed),
+        requested.maximumInlineOutputBytes <= granted.maximumInlineOutputBytes,
+        granted.allowedTools.contains("*") || requested.allowedTools.isSubset(of: granted.allowedTools) else {
+            throw ContinuityTaskAuthorizationError.authorityMismatch
+        }
+    }
+
+    private func continuityTaskUnlocked(_ taskID: UUID, connection: ControlPlaneSQLiteConnection) throws -> ContinuityTaskAuthorizationRecord? {
+        try connection.first(
+            """
+            SELECT task_id,project_id,project_generation,source_binding_id,assignment_id,assignment_sha256,
+                   assignment_json,assignment_snapshot_sha256,authorization_json,authorization_sha256,
+                   state,revision,run_id,created_at,revoked_at
+            FROM continuity_task_authorizations WHERE task_id=? LIMIT 1
+            """,
+            bindings: [.text(taskID.uuidString.lowercased())], map: Self.decodeContinuityTask)
+    }
+
+    private struct StoredSourceActivation {
+        let receipt: ContinuitySourceActivationReceipt
+        let sealedChecksum: String?
+        let resumption: ContinuitySourceResumptionReceipt?
+    }
+
+    private func sourceActivationUnlocked(operationID: UUID, allowTerminalRun: Bool = false, connection: ControlPlaneSQLiteConnection) throws -> StoredSourceActivation? {
+        // Authenticate metadata before materializing any immutable source payload.
+        guard let metadata = try connection.first("SELECT task_id,run_id,project_id,project_generation FROM continuity_source_activations WHERE operation_id=?",
+            bindings: [.text(operationID.uuidString.lowercased())], map: {
+                (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 36),
+                 try $0.strictText(2, maximumBytes: 36), $0.int64(3))
+            }) else { return nil }
+        guard let taskID = metadata.0.flatMap(UUID.init(uuidString:)), let task = try continuityTaskUnlocked(taskID, connection: connection),
+              task.runID?.description == metadata.1, task.authorization.projectID.description == metadata.2,
+              metadata.3 > 0, task.authorization.projectGeneration.rawValue == UInt64(metadata.3) else {
+            throw ContinuitySourceActivationError.proofRequired
+        }
+        _ = try validatedContinuityTaskUnlocked(task.authorization, allowTerminalRun: allowTerminalRun, connection: connection)
+        return try connection.first("""
+            SELECT envelope_json,envelope_sha256,receipt_json,receipt_sha256,sealed_checksum,resumption_json,resumption_sha256,candidate_id
+            FROM continuity_source_activations WHERE operation_id=?
+            """, bindings: [.text(operationID.uuidString.lowercased())]) { row in
+                guard let envelopeJSON = try row.strictText(0, maximumBytes: 524_288),
+                      let envelopeSHA = try row.strictText(1, maximumBytes: 64),
+                      let receiptJSON = try row.strictText(2, maximumBytes: ContinuitySourceActivationReceipt.maximumStoredBytes),
+                      let receiptSHA = try row.strictText(3, maximumBytes: 64),
+                      JSONSupport.sha256Hex(Data(envelopeJSON.utf8)) == envelopeSHA,
+                      JSONSupport.sha256Hex(Data(receiptJSON.utf8)) == receiptSHA else { throw ContinuitySourceActivationError.proofRequired }
+                let envelope = try ContinuitySourceBootstrapEnvelope.storedSnapshot(from: Data(envelopeJSON.utf8))
+                let receipt = try ContinuitySourceActivationReceipt.storedSnapshot(from: Data(receiptJSON.utf8), envelope: envelope)
+                guard receipt.operationID == operationID, receipt.authorization == task.authorization, receipt.runID == task.runID,
+                      receipt.candidateID.uuidString.lowercased() == (try row.strictText(7, maximumBytes: 36)) else {
+                    throw ContinuitySourceActivationError.proofRequired
+                }
+                let sealed = try row.strictText(4, maximumBytes: 64)
+                if let sealed, sealed.count != 64 || !sealed.allSatisfy({ "0123456789abcdef".contains($0) }) {
+                    throw ContinuitySourceActivationError.proofRequired
+                }
+                let resumedJSON = try row.strictText(5, maximumBytes: ContinuitySourceResumptionReceipt.maximumStoredBytes)
+                let resumedSHA = try row.strictText(6, maximumBytes: 64)
+                guard (resumedJSON == nil) == (resumedSHA == nil) else { throw ContinuitySourceActivationError.proofRequired }
+                let resumption: ContinuitySourceResumptionReceipt?
+                if let resumedJSON {
+                    guard sealed != nil, JSONSupport.sha256Hex(Data(resumedJSON.utf8)) == resumedSHA else { throw ContinuitySourceActivationError.proofRequired }
+                    resumption = try .storedSnapshot(from: Data(resumedJSON.utf8), activationReceipt: receipt)
+                } else { resumption = nil }
+                return .init(receipt: receipt, sealedChecksum: sealed, resumption: resumption)
+            }
+    }
+
+    private func validateSourceActivationUnlocked(_ receipt: ContinuitySourceActivationReceipt, lease: RunLease,
+        connection: ControlPlaneSQLiteConnection) throws {
+        try requireContinuityOperationNotCancelledUnlocked(receipt.operationID, connection: connection)
+        guard lease.runID == receipt.runID else { throw AutonomyError.staleLease }
+        try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: clock.now()), connection: connection)
+        guard let stored = try sourceActivationUnlocked(operationID: receipt.operationID, connection: connection), stored.receipt == receipt,
+              try acceptanceForOperationUnlocked(receipt.operationID, connection: connection) == receipt.acceptance,
+              let run = try autonomousRunUnlocked(receipt.runID, connection: connection), !run.state.isTerminal, run.state != .cancelRequested,
+              run.projectID == receipt.authorization.projectID, run.projectGeneration == receipt.authorization.projectGeneration,
+              run.activeSessionID == receipt.candidateID.uuidString.lowercased(),
+              (run.activeOperationID == receipt.operationID || (run.activeOperationID == nil && stored.resumption != nil)),
+              let candidate = try providerSessionRecordUnlocked(receipt.candidateID.uuidString.lowercased(), connection: connection),
+              candidate.accepted, candidate.status == .active, candidate.runID == receipt.runID,
+              candidate.operationID == receipt.operationID, candidate.handoffID == receipt.envelope.handoffID,
+              candidate.handoffSHA256 == receipt.envelope.envelopeSHA256,
+              candidate.providerResponseID == receipt.acknowledgementProviderResponseID,
+              candidate.bootstrapNonceSHA256 == JSONSupport.sha256Hex(Data(receipt.envelope.bootstrapNonce.uuidString.lowercased().utf8)),
+              try connection.scalarInt("""
+                SELECT COUNT(*) FROM continuity_source_task_fences WHERE source_binding_id=? AND task_id=? AND operation_id=?
+                  AND receipt_sha256=? AND state='accepted' AND activation_receipt_sha256=?
+                """, bindings: [.text(receipt.authorization.sourceBindingID.uuidString.lowercased()),
+                    .text(receipt.authorization.taskID.uuidString.lowercased()), .text(receipt.operationID.uuidString.lowercased()),
+                    .text(receipt.acceptance.receiptSHA256), .text(receipt.receiptSHA256)]) == 1,
+              let turn = try providerTurnUnlocked(receipt.continuationTurnID, connection: connection),
+              turn.intent.runID == receipt.runID, turn.intent.operationID == receipt.operationID,
+              turn.intent.sessionID == receipt.candidateID.uuidString.lowercased(), turn.intent.kind == .automaticContinuation,
+              turn.intent.previousResponseID == receipt.acknowledgementProviderResponseID,
+              turn.intent.inputSHA256 == receipt.continuationInputSHA256,
+              turn.intent.idempotencyKey == receipt.continuationIdempotencyKey else { throw ContinuitySourceActivationError.proofRequired }
+        let expectedHold = stored.sealedChecksum == nil ? "awaiting_bootstrap" : "activated"
+        guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_ingress_holds WHERE operation_id=? AND run_id=? AND state=?",
+            bindings: [.text(receipt.operationID.uuidString.lowercased()), .text(receipt.runID.description), .text(expectedHold)]) == 1 else {
+            throw ContinuitySourceActivationError.proofRequired
+        }
+        if let resumed = stored.resumption {
+            guard try sourceResumptionEvidenceUnlocked(receipt, connection: connection) == resumed else { throw ContinuitySourceActivationError.proofRequired }
+        }
+    }
+
+    private func requireSourceEffectsReconciledUnlocked(runID: RunID, operationID: UUID,
+        connection: ControlPlaneSQLiteConnection) throws {
+        guard try connection.scalarInt("SELECT COUNT(*) FROM tool_invocations WHERE run_id=? AND state IN ('intent','executing','ambiguous')",
+                bindings: [.text(runID.description)]) == 0,
+              try connection.scalarInt("SELECT COUNT(*) FROM execution_jobs WHERE run_id=? AND state IN ('queued','running','cancelling')",
+                bindings: [.text(runID.description)]) == 0,
+              try connection.scalarInt("SELECT COUNT(*) FROM provider_turns WHERE run_id=? AND state IN ('intent','submitted','streaming','ambiguous','retry_wait') AND (operation_id IS NULL OR operation_id<>?)",
+                bindings: [.text(runID.description), .text(operationID.uuidString.lowercased())]) == 0 else {
+            throw ContinuitySourceActivationError.unresolvedEffects
+        }
+    }
+
+    private func sourceResumptionEvidenceUnlocked(_ activation: ContinuitySourceActivationReceipt,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuitySourceResumptionReceipt? {
+        guard let automatic = try providerTurnUnlocked(activation.continuationTurnID, connection: connection), automatic.state == .completed,
+              let responseID = automatic.providerResponseID, !responseID.isEmpty,
+              automatic.providerRequestID?.isEmpty == false else { return nil }
+        guard automatic.intent.kind == .automaticContinuation, automatic.intent.operationID == activation.operationID,
+              automatic.intent.runID == activation.runID, automatic.intent.sessionID == activation.candidateID.uuidString.lowercased(),
+              automatic.intent.projectID == activation.authorization.projectID,
+              automatic.intent.projectGeneration == activation.authorization.projectGeneration,
+              automatic.intent.inputSHA256 == activation.continuationInputSHA256,
+              automatic.intent.previousResponseID == activation.acknowledgementProviderResponseID else { throw ContinuitySourceActivationError.proofRequired }
+        let invocations = try connection.all(Self.toolInvocationSelect + " WHERE turn_id=? ORDER BY rowid LIMIT 257",
+            bindings: [.text(activation.continuationTurnID.uuidString.lowercased())]) { row in
+                // Bound every legacy text column before its ordinary decoder can allocate it.
+                for index in Int32(0)...Int32(18) where index != 5 { _ = try row.strictText(index, maximumBytes: index == 14 ? 65_536 : 4_096) }
+                return try Self.decodeToolInvocation(row)
+            }
+        guard invocations.count <= 256 else { throw ContinuitySourceActivationError.proofRequired }
+        guard !invocations.isEmpty, invocations.allSatisfy({ $0.state == .completed }) else { return nil }
+        var outputs: [[String: Any]] = [], retainedBytes = 0
+        var successful: (ToolInvocationRecord, Data)?
+        for invocation in invocations {
+            guard invocation.runID == activation.runID, invocation.sessionID == automatic.intent.sessionID,
+                  invocation.projectID == activation.authorization.projectID,
+                  invocation.projectGeneration == activation.authorization.projectGeneration,
+                  activation.authorization.authorizationScope.allowedTools.contains(invocation.toolName),
+                  let summary = invocation.resultSummary, let resultSHA = invocation.resultSHA256,
+                  JSONSupport.sha256Hex(Data(summary.utf8)) == resultSHA,
+                  let result = try JSONSerialization.jsonObject(with: Data(summary.utf8)) as? [String: Any],
+                  let payload = result["payload"] as? [String: Any], result["ok"] is Bool, result["is_error"] is Bool else {
+                throw ContinuitySourceActivationError.proofRequired
+            }
+            retainedBytes += summary.utf8.count
+            guard retainedBytes <= 262_144 else { throw ContinuitySourceActivationError.proofRequired }
+            let output = try JSONSupport.canonicalJSON(payload)
+            outputs.append(["type": "function_call_output", "call_id": invocation.providerCallID, "output": output])
+            if successful == nil, !["context_get", "forge_continuity_ack"].contains(invocation.toolName),
+               result["ok"] as? Bool == true, result["is_error"] as? Bool == false {
+                successful = (invocation, Data(summary.utf8))
+            }
+        }
+        guard let successful else { return nil }
+        let inputSHA = JSONSupport.sha256Hex(try ForgeJSONCanonicalizationV1.data(from: outputs))
+        let followingIDs = try connection.all("""
+            SELECT turn_id FROM provider_turns WHERE run_id=? AND operation_id=? AND session_id=? AND request_kind='tool_continuation'
+              AND previous_response_id=? AND state='completed' AND input_sha256=? ORDER BY rowid LIMIT 2
+            """, bindings: [.text(activation.runID.description), .text(activation.operationID.uuidString.lowercased()),
+                .text(automatic.intent.sessionID), .text(responseID), .text(inputSHA)], map: { try $0.strictText(0, maximumBytes: 36) })
+        guard !followingIDs.isEmpty else { return nil }
+        guard followingIDs.count == 1, let id = followingIDs[0].flatMap(UUID.init(uuidString:)),
+              let following = try providerTurnUnlocked(id, connection: connection),
+              following.intent.projectID == activation.authorization.projectID,
+              following.intent.projectGeneration == activation.authorization.projectGeneration,
+              let followingResponseID = following.providerResponseID, !followingResponseID.isEmpty,
+              following.providerRequestID?.isEmpty == false else { throw ContinuitySourceActivationError.proofRequired }
+        return try ContinuitySourceResumptionReceipt(activationReceipt: activation, providerResponseID: responseID,
+            toolContinuationTurnID: id, toolContinuationProviderResponseID: followingResponseID, toolOutputsInputSHA256: inputSHA,
+            toolInvocationID: successful.0.invocationID, toolName: successful.0.toolName,
+            canonicalToolResultJSON: successful.1, recordedAt: following.updatedAt)
+    }
+
+    private struct RecoveryMetadata {
+        let reference: ContinuityBootstrapRecoveryReference
+        let keySHA256: String
+        let attempts: Int
+        let startedAt: String?
+        let deadline: String?
+        let retryAt: String?
+        let claimID: UUID?
+        let leaseOwner: String?
+        let leaseEpoch: UInt64?
+        let error: ContinuityBootstrapRecoveryFailure?
+        let quarantined: Bool
+        let acknowledgedSHA256: String?
+        let holdState: String
+        let claimPhase: ContinuitySourceRecoveryPhase?
+    }
+
+    private static let recoveryMetadataQuery = """
+        SELECT h.rowid,h.operation_id,h.run_id,a.project_id,a.project_generation,a.task_id,a.receipt_sha256,a.key_sha256,
+          CASE WHEN h.recovery_ack_sha256 IS NULL THEN h.recovery_attempts ELSE h.finalization_attempts END,
+          CASE WHEN h.recovery_ack_sha256 IS NULL THEN h.recovery_started_at ELSE h.finalization_started_at END,
+          CASE WHEN h.recovery_ack_sha256 IS NULL THEN h.recovery_deadline ELSE h.finalization_deadline END,
+          CASE WHEN h.recovery_ack_sha256 IS NULL THEN h.recovery_retry_at ELSE h.finalization_retry_at END,h.recovery_claim_id,
+          h.recovery_lease_owner,h.recovery_lease_epoch,h.recovery_error_code,h.recovery_quarantined,h.recovery_ack_sha256,h.state,h.recovery_claim_phase
+        FROM continuity_ingress_holds h LEFT JOIN continuity_ingress_acceptances a
+          ON a.operation_id=h.operation_id AND a.run_id=h.run_id
+        """
+
+    private static func decodeRecoveryMetadata(_ row: ControlPlaneSQLiteRow) throws -> RecoveryMetadata {
+        func uuid(_ index: Int32) throws -> UUID {
+            guard let text = try row.strictText(index, maximumBytes: 36), let uuid = UUID(uuidString: text),
+                  uuid.uuidString.lowercased() == text else { throw ContinuityBootstrapRecoveryError.quarantined }
+            return uuid
+        }
+        func digest(_ index: Int32, required: Bool = true) throws -> String? {
+            let text = try row.strictText(index, maximumBytes: 64)
+            guard let text else {
+                if required { throw ContinuityBootstrapRecoveryError.quarantined }
+                return nil
+            }
+            guard text.count == 64, text.allSatisfy({ "0123456789abcdef".contains($0) }) else {
+                throw ContinuityBootstrapRecoveryError.quarantined
+            }
+            return text
+        }
+        func date(_ index: Int32) throws -> String? {
+            let text = try row.strictText(index, maximumBytes: 128)
+            if let text, ISO8601.date(from: text) == nil { throw ContinuityBootstrapRecoveryError.quarantined }
+            return text
+        }
+        guard row.int64(0) > 0, sqlite3_column_type(row.statement, 4) == SQLITE_INTEGER, row.int64(4) > 0,
+              sqlite3_column_type(row.statement, 8) == SQLITE_INTEGER,
+              (0...Int64(ContinuityBootstrapRecoveryLimits.maximumAttempts)).contains(row.int64(8)),
+              sqlite3_column_type(row.statement, 16) == SQLITE_INTEGER, [0,1].contains(row.int64(16)),
+              let holdState = try row.strictText(18, maximumBytes: 32),
+              ["awaiting_bootstrap", "cancelled", "activated"].contains(holdState) else {
+            throw ContinuityBootstrapRecoveryError.quarantined
+        }
+        let reference = ContinuityBootstrapRecoveryReference(rowID: row.int64(0), operationID: try uuid(1),
+            runID: RunID(try uuid(2)), projectID: ProjectID(try uuid(3)), projectGeneration: ProjectGeneration(UInt64(row.int64(4))),
+            taskID: try uuid(5), receiptSHA256: try digest(6)!, phase: row.isNull(17) ? .bootstrap : .activation)
+        let started = try date(9), deadline = try date(10), retry = try date(11)
+        let claim: UUID? = row.isNull(12) ? nil : try uuid(12)
+        let owner = try row.strictText(13, maximumBytes: 512)
+        let epoch: UInt64? = row.isNull(14) ? nil : UInt64(max(0, row.int64(14)))
+        let rawError = try row.strictText(15, maximumBytes: 64)
+        let error = rawError.flatMap(ContinuityBootstrapRecoveryFailure.init(rawValue:))
+        let rawPhase = try row.strictText(19, maximumBytes: 32)
+        let phase = rawPhase.flatMap(ContinuitySourceRecoveryPhase.init(rawValue:))
+        guard (started == nil) == (deadline == nil), row.int64(8) == 0 || started != nil,
+              started == nil || ISO8601.string(from: ISO8601.date(from: started!)!.addingTimeInterval(ContinuityBootstrapRecoveryLimits.retryWindow)) == deadline,
+              claim == nil ? (owner == nil && epoch == nil) : (owner?.isEmpty == false && (epoch ?? 0) > 0),
+              rawError == nil || error != nil,
+              claim == nil ? rawPhase == nil : phase == reference.phase,
+              epoch == nil || sqlite3_column_type(row.statement, 14) == SQLITE_INTEGER else {
+            throw ContinuityBootstrapRecoveryError.quarantined
+        }
+        return .init(reference: reference, keySHA256: try digest(7)!, attempts: Int(row.int64(8)), startedAt: started,
+            deadline: deadline, retryAt: retry, claimID: claim, leaseOwner: owner, leaseEpoch: epoch, error: error,
+            quarantined: row.int64(16) == 1, acknowledgedSHA256: try digest(17, required: false), holdState: holdState, claimPhase: phase)
+    }
+
+    private func requiredRecoveryMetadataUnlocked(_ reference: ContinuityBootstrapRecoveryReference,
+        connection: ControlPlaneSQLiteConnection) throws -> RecoveryMetadata {
+        guard reference.rowID > 0, let row = try connection.first(Self.recoveryMetadataQuery + " WHERE h.rowid=?",
+            bindings: [.int64(reference.rowID)], map: Self.decodeRecoveryMetadata), row.reference == reference else {
+            throw ContinuityBootstrapRecoveryError.claimConflict
+        }
+        return row
+    }
+
+    private func requireRecoveryDueUnlocked(_ row: RecoveryMetadata) throws {
+        guard !row.quarantined else { throw ContinuityBootstrapRecoveryError.quarantined }
+        guard row.holdState == "awaiting_bootstrap" else { throw ContinuityBootstrapRecoveryError.claimConflict }
+        guard row.attempts < ContinuityBootstrapRecoveryLimits.maximumAttempts,
+              row.deadline == nil || (ISO8601.date(from: row.deadline!) ?? .distantPast) > clock.now() else {
+            throw ContinuityBootstrapRecoveryError.exhausted
+        }
+        guard row.retryAt == nil || (ISO8601.date(from: row.retryAt!) ?? .distantFuture) <= clock.now() else {
+            throw ContinuityBootstrapRecoveryError.notDue
+        }
+    }
+
+    private func recoveryIsDueUnlocked(_ row: RecoveryMetadata, connection: ControlPlaneSQLiteConnection) throws -> Bool {
+        do { try requireRecoveryDueUnlocked(row) } catch is ContinuityBootstrapRecoveryError { return false }
+        return try connection.scalarInt("""
+            SELECT COUNT(*) FROM autonomous_runs r JOIN control_projects p ON p.project_id=r.project_id
+              JOIN continuity_task_authorizations t ON t.task_id=? AND t.run_id=r.run_id
+            WHERE r.run_id=? AND r.state='awaiting_bootstrap' AND r.active_operation_id=?
+              AND r.project_id=? AND r.project_generation=? AND p.generation=r.project_generation
+              AND p.lifecycle_state='active' AND t.state='active' AND t.project_id=r.project_id
+              AND t.project_generation=r.project_generation
+            """, bindings: [.text(row.reference.taskID.uuidString.lowercased()), .text(row.reference.runID.description),
+                .text(row.reference.operationID.uuidString.lowercased()), .text(row.reference.projectID.description),
+                .int64(Int64(row.reference.projectGeneration.rawValue))]) == 1
+    }
+
+    private func validateRecoveryTaskUnlocked(_ row: RecoveryMetadata,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuityTaskAuthorizationRecord {
+        guard row.holdState == "awaiting_bootstrap", let task = try continuityTaskUnlocked(row.reference.taskID, connection: connection),
+              task.runID == row.reference.runID, task.authorization.projectID == row.reference.projectID,
+              task.authorization.projectGeneration == row.reference.projectGeneration,
+              let run = try autonomousRunUnlocked(row.reference.runID, connection: connection),
+              run.state == .awaitingBootstrap, run.activeOperationID == row.reference.operationID else {
+            throw ContinuityBootstrapRecoveryError.claimConflict
+        }
+        return try validatedContinuityTaskUnlocked(task.authorization, connection: connection)
+    }
+
+    private func validateRecoveryClaimUnlocked(_ claim: ContinuityBootstrapRecoveryClaim, lease: RunLease,
+        connection: ControlPlaneSQLiteConnection, allowAcknowledged: Bool = false) throws -> RecoveryMetadata {
+        let row = try requiredRecoveryMetadataUnlocked(claim.reference, connection: connection)
+        _ = try validateRecoveryTaskUnlocked(row, connection: connection)
+        guard !row.quarantined, allowAcknowledged || row.reference.phase == claim.reference.phase,
+              row.claimPhase == claim.reference.phase,
+              row.claimID == claim.claimID, row.leaseOwner == lease.ownerID, row.leaseEpoch == lease.epoch,
+              row.attempts == claim.attempt, row.deadline == claim.retryDeadline,
+              claim.acceptance.receiptSHA256 == claim.reference.receiptSHA256,
+              claim.acceptance.operationID == claim.reference.operationID else {
+            throw ContinuityBootstrapRecoveryError.claimConflict
+        }
+        try validateBootstrapReceiptUnlocked(claim.acceptance, lease: lease, connection: connection)
+        return row
+    }
+
+    private func quarantineRecoveryUnlocked(rowID: Int64, connection: ControlPlaneSQLiteConnection) throws {
+        try connection.execute("""
+            UPDATE continuity_ingress_holds SET recovery_quarantined=1,recovery_error_code='integrity_failure',updated_at=?
+            WHERE rowid=? AND state='awaiting_bootstrap'
+            """, bindings: [.text(ISO8601.string(from: clock.now())), .int64(rowID)])
+    }
+
+    private static func isRecoveryIntegrityError(_ error: Error) -> Bool {
+        if let value = error as? ContinuityIngressError, case .integrityFailure = value { return true }
+        if let value = error as? ProjectContextError, case .integrityFailure = value { return true }
+        if error is DecodingError { return true }
+        return false
+    }
+
+    private struct SourceAcknowledgementEvidence {
+        let grant: ContinuityBootstrapGrant
+        let retrieval: ContinuityBootstrapRetrievalProof
+        let ackTurnID: UUID
+        let ack: ProviderTurn
+    }
+
+    private func validateRecoveryAcknowledgementUnlocked(_ operation: ContinuitySourceBootstrapOperation,
+        claim: ContinuityBootstrapRecoveryClaim, connection: ControlPlaneSQLiteConnection) throws {
+        _ = try validatedSourceAcknowledgementUnlocked(operation, acceptance: claim.acceptance, connection: connection)
+    }
+
+    private func validatedSourceAcknowledgementUnlocked(_ operation: ContinuitySourceBootstrapOperation,
+        acceptance: ContinuityIngressAcceptanceReceipt, connection: ControlPlaneSQLiteConnection) throws -> SourceAcknowledgementEvidence {
+        guard operation.envelope.acceptance == acceptance, operation.state == .successorAcknowledged,
+              operation.createdAt.utf8.count <= 128, operation.updatedAt.utf8.count <= 128,
+              ISO8601.date(from: operation.createdAt) != nil, ISO8601.date(from: operation.updatedAt) != nil,
+              let candidateID = operation.successorSessionID, let responseID = operation.successorProviderResponseID,
+              let retrievalSHA = operation.retrievalProofSHA256, let ackSHA = operation.acknowledgementProofSHA256,
+              try ContinuitySourceBootstrapOperation.checksum(envelope: operation.envelope, state: operation.state,
+                attempt: operation.attempt, createdAt: operation.createdAt, updatedAt: operation.updatedAt,
+                successorSessionID: candidateID, successorProviderResponseID: responseID,
+                retrievalProofSHA256: retrievalSHA, acknowledgementProofSHA256: ackSHA) == operation.stateChecksum,
+              let grant = try bootstrapGrantUnlocked(candidateID: candidateID, envelope: operation.envelope, connection: connection),
+              let candidate = try providerSessionIdentityUnlocked(grant.sessionID, connection: connection),
+              candidate.status == .candidate, !candidate.accepted, candidate.runID == acceptance.runID,
+              candidate.projectID == acceptance.authorization.projectID, candidate.projectGeneration == acceptance.authorization.projectGeneration,
+              candidate.operationID == acceptance.operationID, candidate.handoffSHA256 == operation.envelope.envelopeSHA256,
+              let proof = try bootstrapRetrievalProofUnlocked(grant: grant, connection: connection), proof.proofSHA256 == retrievalSHA,
+              let invocation = try toolInvocationUnlocked(proof.toolInvocationID, connection: connection),
+              invocation.state == .completed, invocation.turnID == proof.providerTurnID,
+              invocation.runID == acceptance.runID, invocation.sessionID == grant.sessionID,
+              invocation.providerCallID == proof.providerCallID, invocation.toolName == "context_get", invocation.replayClass == .readOnly,
+              invocation.resultSHA256 == proof.toolResultSHA256,
+              invocation.resultSummary == String(data: proof.canonicalToolResultJSON, encoding: .utf8),
+              let root = try bootstrapProviderResultUnlocked(grant: grant, turnID: proof.providerTurnID, connection: connection),
+              root.previousResponseID == nil, root.responseID == proof.providerResponseID,
+              let rootCall = root.toolCalls.first, rootCall.callID == proof.providerCallID,
+              try bootstrapCallSHA256(rootCall) == invocation.argumentsSHA256 else {
+            throw ContinuityIngressError.integrityFailure("canonical acknowledgment lacks matching durable source recovery proof")
+        }
+        try validateExactBootstrapCall(rootCall, source: acceptance.sourceIdentity)
+        let ids = try connection.all("""
+            SELECT t.turn_id FROM provider_turns t JOIN continuity_bootstrap_provider_results b ON b.turn_id=t.turn_id
+            WHERE b.grant_id=? AND t.previous_response_id=? AND t.state='completed' LIMIT 3
+            """, bindings: [.text(grant.grantID.uuidString.lowercased()), .text(root.responseID)]) { row in
+                try row.strictText(0, maximumBytes: 36).flatMap(UUID.init(uuidString:))
+            }
+        guard ids.count == 1, let id = ids.first ?? nil,
+              let ack = try bootstrapProviderResultUnlocked(grant: grant, turnID: id, connection: connection),
+              ack.responseID == responseID, ack.previousResponseID == root.responseID,
+              let call = ack.toolCalls.first, call.name == "forge_continuity_ack",
+              try bootstrapCallSHA256(call) == ackSHA else {
+            throw ContinuityIngressError.integrityFailure("canonical acknowledgment lacks matching provider response")
+        }
+        let acknowledgement = try JSONDecoder().decode(BootstrapAcknowledgementV2.self, from: call.argumentsJSON)
+        guard acknowledgement.accepted, acknowledgement.projectID == acceptance.authorization.projectID,
+              acknowledgement.projectGeneration == acceptance.authorization.projectGeneration,
+              acknowledgement.runID == acceptance.runID, acknowledgement.operationID == acceptance.operationID,
+              acknowledgement.handoffID == operation.handoffID, acknowledgement.handoffSHA256 == operation.envelope.envelopeSHA256,
+              acknowledgement.nonce == operation.bootstrapNonce.uuidString.lowercased() else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        return .init(grant: grant, retrieval: proof, ackTurnID: id, ack: ack)
+    }
+
+    private static func hasReadOnlySourceDispatch(_ scope: ToolAuthorizationScope) -> Bool {
+        scope.writableRoots.isEmpty && !scope.networkAllowed && !scope.allowedTools.isEmpty
+            && scope.allowedTools.allSatisfy { $0 == "context_get" || ProductionToolReplayCatalog.classification(for: $0) == .readOnly }
+    }
+
+    /// Only native authenticated setup may retain the actual original caller.
+    /// A narrower approved assignment cannot stand in for the caller's scope.
+    private func retainSourceDispatchOriginUnlocked(taskID: UUID, caller: ProjectContextBinding,
+        timestamp: String, existingTask: Bool = false, connection: ControlPlaneSQLiteConnection) throws {
+        let scopeSHA = JSONSupport.sha256Hex(Data(try Self.scopeJSON(caller.authorizationScope).utf8))
+        if let existing = try connection.first("SELECT caller_binding_id,owner_kind,owner_id,scope_sha256,invalidated FROM continuity_source_dispatch_origins WHERE task_id=?",
+            bindings: [.text(taskID.uuidString.lowercased())], map: {
+                (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 64),
+                 try $0.strictText(2, maximumBytes: 512), try $0.strictText(3, maximumBytes: 64), $0.int64(4))
+            }) {
+            guard existing.0 == caller.bindingID.uuidString.lowercased(), existing.1 == caller.owner.kind.rawValue,
+                  existing.2 == caller.owner.id, existing.3 == scopeSHA, existing.4 == 0 else { throw ContinuitySourceActivationError.taskIdentityUnavailable }
+            return
+        }
+        guard !existingTask else { throw ContinuitySourceActivationError.taskIdentityUnavailable }
+        guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_source_dispatch_origins") < Self.maximumContinuityTaskAuthorizations else {
+            throw ContinuityTaskAuthorizationError.capacityExceeded
+        }
+        try connection.execute("INSERT INTO continuity_source_dispatch_origins(task_id,caller_binding_id,owner_kind,owner_id,scope_sha256,issued_at) VALUES(?,?,?,?,?,?)",
+            bindings: [.text(taskID.uuidString.lowercased()), .text(caller.bindingID.uuidString.lowercased()),
+                .text(caller.owner.kind.rawValue), .text(caller.owner.id), .text(scopeSHA), .text(timestamp)])
+    }
+
+    private func requireSourceDispatchIdentityUnlocked(_ authorization: ContinuityIngressAuthorization,
+        connection: ControlPlaneSQLiteConnection) throws {
+        guard Self.hasReadOnlySourceDispatch(authorization.authorizationScope),
+              let origin = try connection.first("SELECT caller_binding_id,owner_kind,owner_id,scope_sha256,invalidated FROM continuity_source_dispatch_origins WHERE task_id=?",
+                bindings: [.text(authorization.taskID.uuidString.lowercased())], map: {
+                    (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 64),
+                     try $0.strictText(2, maximumBytes: 512), try $0.strictText(3, maximumBytes: 64), $0.int64(4))
+                }), let kindText = origin.1, let kind = ProjectBindingOwnerKind(rawValue: kindText), let ownerID = origin.2,
+              let caller = try bindingUnlocked(owner: .init(kind: kind, id: ownerID), includeInactive: false, connection: connection),
+              origin.4 == 0, caller.bindingID.uuidString.lowercased() == origin.0, caller.projectID == authorization.projectID,
+              caller.projectGeneration == authorization.projectGeneration, caller.runID == nil,
+              Self.hasReadOnlySourceDispatch(caller.authorizationScope),
+              JSONSupport.sha256Hex(Data(try Self.scopeJSON(caller.authorizationScope).utf8)) == origin.3 else {
+            throw ContinuitySourceActivationError.taskIdentityUnavailable
+        }
+    }
+
+    private func requireSourceMutationAdmissionUnlocked(_ authorization: ContinuityIngressAuthorization,
+        connection: ControlPlaneSQLiteConnection) throws {
+        guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_source_task_fences WHERE source_binding_id=? OR task_id=?",
+            bindings: [.text(authorization.sourceBindingID.uuidString.lowercased()), .text(authorization.taskID.uuidString.lowercased())]) == 0 else {
+            throw ContinuitySourceActivationError.sourceFenced
+        }
+    }
+
+    private func installSourceTransferFenceUnlocked(receipt: ContinuityIngressAcceptanceReceipt, timestamp: String,
+        connection: ControlPlaneSQLiteConnection) throws {
+        let auth = receipt.authorization
+        if let existing = try connection.first("SELECT operation_id,receipt_sha256 FROM continuity_source_task_fences WHERE source_binding_id=? OR task_id=?",
+            bindings: [.text(auth.sourceBindingID.uuidString.lowercased()), .text(auth.taskID.uuidString.lowercased())],
+            map: { (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 64)) }) {
+            guard existing.0 == receipt.operationID.uuidString.lowercased(), existing.1 == receipt.receiptSHA256 else {
+                throw ContinuitySourceActivationError.sourceFenced
+            }
+            return
+        }
+        try connection.execute("""
+            INSERT INTO continuity_source_task_fences(source_binding_id,task_id,project_id,project_generation,run_id,
+              operation_id,receipt_sha256,state,created_at) VALUES(?,?,?,?,?,?,?,'quiescing',?)
+            """, bindings: [.text(auth.sourceBindingID.uuidString.lowercased()), .text(auth.taskID.uuidString.lowercased()),
+                .text(auth.projectID.description), .int64(Int64(auth.projectGeneration.rawValue)), .text(receipt.runID.description),
+                .text(receipt.operationID.uuidString.lowercased()), .text(receipt.receiptSHA256), .text(timestamp)])
+        // A real provider predecessor is independently fenced before any root.
+        if let run = try autonomousRunUnlocked(receipt.runID, connection: connection), let predecessorID = run.activeSessionID {
+            guard let predecessor = try providerSessionRecordUnlocked(predecessorID, connection: connection),
+                  predecessor.runID == run.runID, predecessor.projectID == run.projectID,
+                  predecessor.projectGeneration == run.projectGeneration,
+                  (predecessor.status == .active && predecessor.accepted) || [.fencing,.fenced].contains(predecessor.status) else {
+                throw ContinuitySourceActivationError.conflict
+            }
+            try connection.execute("UPDATE provider_sessions SET status='fencing',accepted=0,updated_at=? WHERE session_id=?",
+                bindings: [.text(timestamp), .text(predecessorID)])
+            try connection.execute("UPDATE project_bindings SET active=0,updated_at=? WHERE owner_kind='provider_session' AND owner_id=?",
+                bindings: [.text(timestamp), .text(predecessorID)])
+        }
+    }
+
+    private func acceptanceForOperationUnlocked(_ operationID: UUID,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuityIngressAcceptanceReceipt? {
+        guard let key = try connection.first("SELECT key_sha256 FROM continuity_ingress_acceptances WHERE operation_id=?",
+            bindings: [.text(operationID.uuidString.lowercased())], map: { try $0.strictText(0, maximumBytes: 64) }) ?? nil else { return nil }
+        return try continuityIngressAcceptanceUnlocked(operationID: operationID, keySHA256: key, connection: connection)
+    }
+
+    private func explicitStartPermitUnlocked(acceptance: ContinuityIngressAcceptanceReceipt,
+        connection: ControlPlaneSQLiteConnection) throws -> ContinuityExplicitStartPermit? {
+        try connection.first("SELECT receipt_sha256,permit_json,permit_sha256 FROM continuity_explicit_start_permits WHERE operation_id=?",
+            bindings: [.text(acceptance.operationID.uuidString.lowercased())]) { row in
+                guard try row.strictText(0, maximumBytes: 64) == acceptance.receiptSHA256,
+                      let json = try row.strictText(1, maximumBytes: ContinuityExplicitStartPermit.maximumStoredBytes),
+                      let sha = try row.strictText(2, maximumBytes: 64), JSONSupport.sha256Hex(Data(json.utf8)) == sha else {
+                    throw ContinuitySourceActivationError.proofRequired
+                }
+                return try ContinuityExplicitStartPermit.storedSnapshot(from: Data(json.utf8), acceptance: acceptance)
+            }
+    }
+
+    private func hasExplicitStartMetadataUnlocked(reference: ContinuityBootstrapRecoveryReference,
+        task: ContinuityTaskAuthorizationRecord, connection: ControlPlaneSQLiteConnection) throws -> Bool {
+        guard let row = try connection.first("SELECT receipt_sha256,permit_json,permit_sha256 FROM continuity_explicit_start_permits WHERE operation_id=?",
+            bindings: [.text(reference.operationID.uuidString.lowercased())], map: {
+                (try $0.strictText(0, maximumBytes: 64), try $0.strictText(1, maximumBytes: ContinuityExplicitStartPermit.maximumStoredBytes),
+                 try $0.strictText(2, maximumBytes: 64))
+            }) else { return false }
+        guard row.0 == reference.receiptSHA256, let json = row.1, JSONSupport.sha256Hex(Data(json.utf8)) == row.2,
+              let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any],
+              try ForgeJSONCanonicalizationV1.data(from: object) == Data(json.utf8),
+              object["kind"] as? String == "explicit_source_start", object["schema_version"] as? Int == 1,
+              object["operation_id"] as? String == reference.operationID.uuidString.lowercased(),
+              object["acceptance_receipt_sha256"] as? String == reference.receiptSHA256,
+              object["authorization_sha256"] as? String == JSONSupport.sha256Hex(try task.authorization.encodedJSON()),
+              object["task_id"] as? String == reference.taskID.uuidString.lowercased(),
+              object["source_binding_id"] as? String == task.authorization.sourceBindingID.uuidString.lowercased(),
+              object["assignment_sha256"] as? String == task.authorization.assignmentSHA256 else {
+            throw ContinuitySourceActivationError.proofRequired
+        }
+        return true
+    }
+
+    private func validateSourceStartAuthorityUnlocked(acceptance: ContinuityIngressAcceptanceReceipt,
+        lease: RunLease?, policySelection: BudgetPolicySelection, connection: ControlPlaneSQLiteConnection) throws -> ContinuitySourceStartAuthority {
+        try requireContinuityOperationNotCancelledUnlocked(acceptance.operationID, connection: connection)
+        let task = try validatedContinuityTaskUnlocked(acceptance.authorization, connection: connection)
+        guard task.runID == acceptance.runID,
+              try acceptanceForOperationUnlocked(acceptance.operationID, connection: connection) == acceptance,
+              let run = try autonomousRunUnlocked(acceptance.runID, connection: connection),
+              run.activeOperationID == acceptance.operationID, !run.state.isTerminal, run.state != .cancelRequested else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        if let lease {
+            guard lease.runID == acceptance.runID else { throw AutonomyError.staleLease }
+            try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: clock.now()), connection: connection)
+        }
+        try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: task.authorization)
+        try requireSourceDispatchIdentityUnlocked(task.authorization, connection: connection)
+        if policySelection.policy.automaticHandoffEnabled { return .automaticPolicy }
+        guard let permit = try explicitStartPermitUnlocked(acceptance: acceptance, connection: connection) else {
+            throw ContinuityBootstrapRecoveryError.policyDeferred
+        }
+        return .explicitRequest(permitSHA256: permit.permitSHA256)
+    }
+
+    private func continuityIngressAcceptanceUnlocked(operationID: UUID, keySHA256: String,
+                                                      connection: ControlPlaneSQLiteConnection) throws -> ContinuityIngressAcceptanceReceipt? {
+        try connection.first(
+            """
+            SELECT operation_id,key_sha256,run_id,task_id,project_id,project_generation,receipt_json,receipt_sha256,accepted_at
+            FROM continuity_ingress_acceptances WHERE operation_id=? OR key_sha256=? LIMIT 1
+            """,
+            bindings: [.text(operationID.uuidString.lowercased()), .text(keySHA256)]) { row in
+                guard let operation = try row.strictText(0, maximumBytes: 36),
+                      let key = try row.strictText(1, maximumBytes: 64),
+                      let run = try row.strictText(2, maximumBytes: 36),
+                      let task = try row.strictText(3, maximumBytes: 36),
+                      let project = try row.strictText(4, maximumBytes: 36), row.int64(5) > 0,
+                      let json = try row.strictText(6, maximumBytes: ContinuityIngressAcceptanceReceipt.maximumBytes),
+                      let sha = try row.strictText(7, maximumBytes: 64),
+                      let accepted = try row.strictText(8, maximumBytes: 128) else {
+                    throw ContinuityIngressError.integrityFailure("malformed acceptance row")
+                }
+                let data = Data(json.utf8)
+                guard JSONSupport.sha256Hex(data) == sha else {
+                    throw ContinuityIngressError.integrityFailure("acceptance digest mismatch")
+                }
+                let receipt = try ContinuityIngressAcceptanceReceipt.storedSnapshot(from: data)
+                guard receipt.operationID.uuidString.lowercased() == operation, receipt.keySHA256 == key,
+                      receipt.runID.description == run, receipt.authorization.taskID.uuidString.lowercased() == task,
+                      receipt.authorization.projectID.description == project,
+                      receipt.authorization.projectGeneration.rawValue == UInt64(row.int64(5)), receipt.acceptedAt == accepted else {
+                    throw ContinuityIngressError.integrityFailure("acceptance identity columns differ from snapshot")
+                }
+                return receipt
+            }
+    }
+
+    private func validateBootstrapReceiptUnlocked(_ receipt: ContinuityIngressAcceptanceReceipt, lease: RunLease,
+                                                   connection: ControlPlaneSQLiteConnection) throws {
+        guard try ContinuityIngressAcceptanceReceipt.storedSnapshot(from: receipt.canonicalReceiptJSON) == receipt,
+              lease.runID == receipt.runID else { throw ContinuityIngressError.authorityMismatch }
+        try requireContinuityOperationNotCancelledUnlocked(receipt.operationID, connection: connection)
+        let task = try validatedContinuityTaskUnlocked(receipt.authorization, connection: connection)
+        try requireSourceDispatchIdentityUnlocked(task.authorization, connection: connection)
+        try verifyRunLeaseUnlocked(lease, timestamp: ISO8601.string(from: clock.now()), connection: connection)
+        guard task.runID == receipt.runID,
+              try continuityIngressAcceptanceUnlocked(operationID: receipt.operationID,
+                keySHA256: receipt.keySHA256, connection: connection) == receipt,
+              let run = try autonomousRunUnlocked(receipt.runID, connection: connection),
+              run.state == .awaitingBootstrap, run.activeOperationID == receipt.operationID,
+              run.projectID == receipt.authorization.projectID,
+              run.projectGeneration == receipt.authorization.projectGeneration,
+              try connection.scalarText("SELECT state FROM continuity_ingress_holds WHERE operation_id=? AND run_id=?",
+                bindings: [.text(receipt.operationID.uuidString.lowercased()), .text(receipt.runID.description)]) == "awaiting_bootstrap" else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+    }
+
+    private func validateBootstrapAcceptanceUnlocked(_ envelope: ContinuitySourceBootstrapEnvelope, lease: RunLease,
+                                                      connection: ControlPlaneSQLiteConnection) throws {
+        guard try ContinuitySourceBootstrapEnvelope.storedSnapshot(from: envelope.canonicalEnvelopeJSON) == envelope else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        try validateBootstrapReceiptUnlocked(envelope.acceptance, lease: lease, connection: connection)
+    }
+
+    private func validateBootstrapGrantUnlocked(_ grant: ContinuityBootstrapGrant, lease: RunLease,
+                                                 connection: ControlPlaneSQLiteConnection) throws {
+        try validateBootstrapAcceptanceUnlocked(grant.envelope, lease: lease, connection: connection)
+        guard try bootstrapGrantUnlocked(candidateID: grant.candidateID, envelope: grant.envelope, connection: connection) == grant,
+              grant.leaseOwnerID == lease.ownerID, grant.leaseEpoch == lease.epoch,
+              (ISO8601.date(from: grant.expiresAt) ?? .distantPast) > clock.now() else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        if let candidate = try providerSessionIdentityUnlocked(grant.sessionID, connection: connection) {
+            let task = try validatedContinuityTaskUnlocked(grant.envelope.authorization, connection: connection)
+            guard candidate.status == .candidate, !candidate.accepted, candidate.runID == grant.envelope.runID,
+                  candidate.projectID == grant.envelope.authorization.projectID,
+                  candidate.projectGeneration == grant.envelope.authorization.projectGeneration,
+                  candidate.operationID == grant.envelope.operationID, candidate.handoffID == grant.envelope.handoffID,
+                  candidate.handoffSHA256 == grant.envelope.envelopeSHA256,
+                  candidate.bootstrapNonceSHA256 == JSONSupport.sha256Hex(grant.envelope.bootstrapNonce.uuidString.lowercased()),
+                  candidate.predecessorSessionID == nil, candidate.providerID == task.assignment.providerID,
+                  candidate.adapterID == task.assignment.adapterID, candidate.modelKey == task.assignment.modelKey else {
+                throw ContinuityIngressError.authorityMismatch
+            }
+        }
+    }
+
+    private func bootstrapGrantUnlocked(candidateID: UUID, envelope: ContinuitySourceBootstrapEnvelope,
+                                         connection: ControlPlaneSQLiteConnection) throws -> ContinuityBootstrapGrant? {
+        try connection.first("SELECT grant_id,operation_id,run_id,grant_json,grant_sha256 FROM continuity_bootstrap_grants WHERE candidate_id=?",
+            bindings: [.text(candidateID.uuidString.lowercased())]) { row in
+                guard let grantID = try row.strictText(0, maximumBytes: 36),
+                      let operation = try row.strictText(1, maximumBytes: 36), let run = try row.strictText(2, maximumBytes: 36),
+                      let json = try row.strictText(3, maximumBytes: ContinuityBootstrapGrant.maximumStoredBytes),
+                      let sha = try row.strictText(4, maximumBytes: 64),
+                      operation == envelope.operationID.uuidString.lowercased(), run == envelope.runID.description,
+                      JSONSupport.sha256Hex(Data(json.utf8)) == sha else {
+                    throw ContinuityIngressError.integrityFailure("malformed bootstrap grant row")
+                }
+                let value = try ContinuityBootstrapGrant.storedSnapshot(from: Data(json.utf8), envelope: envelope)
+                guard value.grantID.uuidString.lowercased() == grantID, value.candidateID == candidateID else {
+                    throw ContinuityIngressError.integrityFailure("bootstrap grant columns differ")
+                }
+                return value
+            }
+    }
+
+    private func validateBootstrapSessionIntentUnlocked(_ intent: ProviderSessionIntent, grant: ContinuityBootstrapGrant,
+                                                         lease: RunLease, connection: ControlPlaneSQLiteConnection) throws {
+        try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+        let task = try validatedContinuityTaskUnlocked(grant.envelope.authorization, connection: connection)
+        guard intent.sessionID == grant.sessionID, intent.runID == grant.envelope.runID,
+              intent.projectID == grant.envelope.authorization.projectID,
+              intent.projectGeneration == grant.envelope.authorization.projectGeneration,
+              intent.providerID == task.assignment.providerID, intent.adapterID == task.assignment.adapterID,
+              intent.modelKey == task.assignment.modelKey, intent.operationID == grant.envelope.operationID,
+              intent.handoffID == grant.envelope.handoffID, intent.handoffSHA256 == grant.envelope.envelopeSHA256,
+              intent.bootstrapNonceSHA256 == JSONSupport.sha256Hex(grant.envelope.bootstrapNonce.uuidString.lowercased()),
+              intent.predecessorSessionID == nil, intent.providerResponseID == nil,
+              intent.status == .candidate, !intent.accepted,
+              !intent.idempotencyKey.isEmpty, intent.idempotencyKey.utf8.count <= 1_024, !intent.idempotencyKey.contains("\0"),
+              intent.contextCapacity.map({ $0 > 0 && $0 <= 10_000_000 }) ?? true else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+    }
+
+    private func validateBootstrapTurnIntentUnlocked(_ intent: ProviderTurnIntent, grant: ContinuityBootstrapGrant,
+                                                      lease: RunLease, connection: ControlPlaneSQLiteConnection) throws {
+        try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+        guard intent.runID == grant.envelope.runID, intent.sessionID == grant.sessionID,
+              intent.operationID == grant.envelope.operationID, intent.kind == .bootstrap,
+              intent.projectID == grant.envelope.authorization.projectID,
+              intent.projectGeneration == grant.envelope.authorization.projectGeneration,
+              intent.toolSchemaSHA256 != nil,
+              let session = try providerSessionIdentityUnlocked(grant.sessionID, connection: connection),
+              session.status == .candidate, !session.accepted else { throw ContinuityIngressError.authorityMismatch }
+        if let previous = intent.previousResponseID {
+            guard let proof = try bootstrapRetrievalProofUnlocked(grant: grant, connection: connection),
+                  previous == proof.providerResponseID else { throw ContinuityIngressError.authorityMismatch }
+        }
+        // The same stage is recovered by its persisted identity; another key is
+        // not permission to create an additional root or acknowledgment request.
+        let other = try connection.scalarInt("""
+            SELECT COUNT(*) FROM provider_turns WHERE session_id=? AND request_kind='bootstrap'
+                AND (previous_response_id IS NULL)=? AND turn_id<>?
+            """, bindings: [.text(grant.sessionID), .int64(intent.previousResponseID == nil ? 1 : 0),
+                .text(intent.turnID.uuidString.lowercased())])
+        guard other == 0 else { throw ContinuityIngressError.deliveryConflict }
+    }
+
+    private func bootstrapCallSHA256(_ call: ProviderToolCall) throws -> String {
+        try ForgeJSONCanonicalizationV1.sha256Hex(of: JSONSerialization.jsonObject(with: call.argumentsJSON))
+    }
+
+    private func validateExactBootstrapCall(_ call: ProviderToolCall, source: ContinuityHandoffIdentity) throws {
+        guard call.name == "context_get", call.argumentsJSON.count <= 4_096,
+              let args = try JSONSerialization.jsonObject(with: call.argumentsJSON) as? [String: Any],
+              !args.isEmpty, Set(args.keys).isSubset(of: ["id", "handoff_id"]),
+              args.values.allSatisfy({ ($0 as? String) == source.continuityID }) else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+    }
+
+    private func validateBootstrapToolIntentUnlocked(_ intent: ToolInvocationIntent, grant: ContinuityBootstrapGrant,
+                                                      lease: RunLease, connection: ControlPlaneSQLiteConnection) throws {
+        try validateBootstrapGrantUnlocked(grant, lease: lease, connection: connection)
+        guard intent.runID == grant.envelope.runID, intent.sessionID == grant.sessionID,
+              intent.projectID == grant.envelope.authorization.projectID,
+              intent.projectGeneration == grant.envelope.authorization.projectGeneration,
+              intent.toolName == "context_get", intent.replayClass == .readOnly,
+              intent.idempotencyKey == nil, intent.reconciliationDescriptor == nil,
+              let result = try bootstrapProviderResultUnlocked(grant: grant, turnID: intent.turnID, connection: connection),
+              result.previousResponseID == nil, result.toolCalls.count == 1 else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+        let call = result.toolCalls[0]
+        try validateExactBootstrapCall(call, source: grant.envelope.sourceIdentity)
+        guard call.callID == intent.providerCallID, try bootstrapCallSHA256(call) == intent.argumentsSHA256 else {
+            throw ContinuityIngressError.authorityMismatch
+        }
+    }
+
+    private func requireBootstrapResultLimitsUnlocked(grant: ContinuityBootstrapGrant,
+                                                       policy: BudgetToolPolicy) throws {
+        let source = grant.envelope.acceptance.source
+        let expectedResult = try ForgeJSONCanonicalizationV1.data(from: ["ok": true, "is_error": false, "payload": [
+            "ok": true, "found": true, "packet": JSONSerialization.jsonObject(with: source.canonicalPacketJSON),
+            "continuity_id": source.identity.continuityID, "revision": source.identity.revision,
+            "packet_sha256": source.identity.packetSHA256]])
+        guard expectedResult.count <= policy.maxResultBytes else {
+            throw ContinuityIngressError.capacityExceeded("current bootstrap result-byte budget")
+        }
+        // The stored full wire includes the exact provider payload plus its
+        // success wrapper. Estimating it conservatively bounds both retained
+        // forms without truncating or substituting the frozen source packet.
+        let retainedTokens = try ContextBudgetMath.estimateTokens(serializedBytes: expectedResult.count,
+            policy: ContextBudgetPolicy())
+        guard retainedTokens <= policy.maxRetainedResultTokens else {
+            throw ContinuityIngressError.capacityExceeded("current bootstrap retained-result token budget")
+        }
+    }
+
+    private func requireBootstrapToolQuotaUnlocked(runID: RunID, sessionID: String, turnID: UUID,
+        operationID: UUID, policy: BudgetToolPolicy, connection: ControlPlaneSQLiteConnection) throws {
+        let run = runID.description
+        let checks: [(String, [ControlPlaneSQLiteBinding], Int)] = [
+            ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=?", [.text(run)], policy.callsPerRun),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE session_id=?", [.text(sessionID)], policy.callsPerSession),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE turn_id=?", [.text(turnID.uuidString.lowercased())], policy.callsPerTurn),
+            ("SELECT COUNT(*) FROM tool_invocations WHERE run_id=? AND state IN ('intent','executing','ambiguous')",
+                [.text(run)], policy.maxInFlight),
+            ("""
+             SELECT COUNT(*) FROM tool_invocations i JOIN provider_turns t ON t.turn_id=i.turn_id
+             WHERE i.run_id=? AND t.operation_id=? AND t.request_kind='bootstrap'
+             """, [.text(run), .text(operationID.uuidString.lowercased())], policy.recoveryCallsPerRollover),
+        ]
+        for (query, values, maximum) in checks {
+            guard try connection.scalarInt(query, bindings: values) < maximum else {
+                throw ContinuityIngressError.capacityExceeded("current bootstrap tool budget")
+            }
+        }
+    }
+
+    private func bootstrapProviderResultUnlocked(grant: ContinuityBootstrapGrant, turnID: UUID,
+                                                 connection: ControlPlaneSQLiteConnection) throws -> ProviderTurn? {
+        try connection.first("SELECT result_json,result_sha256 FROM continuity_bootstrap_provider_results WHERE grant_id=? AND turn_id=?",
+            bindings: [.text(grant.grantID.uuidString.lowercased()), .text(turnID.uuidString.lowercased())]) { row in
+                guard let json = try row.strictText(0, maximumBytes: 131_072), let sha = try row.strictText(1, maximumBytes: 64),
+                      JSONSupport.sha256Hex(Data(json.utf8)) == sha else {
+                    throw ContinuityIngressError.integrityFailure("malformed bootstrap provider result")
+                }
+                let data = Data(json.utf8)
+                let result = try JSONDecoder().decode(ProviderTurn.self, from: data)
+                guard try ForgeJSONCanonicalizationV1.data(from: JSONSerialization.jsonObject(with: JSONEncoder().encode(result))) == data,
+                      let turn = try providerTurnUnlocked(turnID, connection: connection), turn.state == .completed,
+                      turn.intent.sessionID == grant.sessionID, turn.intent.operationID == grant.envelope.operationID,
+                      turn.providerRequestID == result.requestID, turn.providerResponseID == result.responseID,
+                      turn.intent.previousResponseID == result.previousResponseID,
+                      result.completed, result.finishReason == .toolCalls, result.toolCalls.count == 1 else {
+                    throw ContinuityIngressError.integrityFailure("provider result differs from durable turn")
+                }
+                let task = try validatedContinuityTaskUnlocked(grant.envelope.authorization, connection: connection)
+                guard result.providerID == task.assignment.providerID, result.modelKey == task.assignment.modelKey else {
+                    throw ContinuityIngressError.authorityMismatch
+                }
+                return result
+            }
+    }
+
+    private func bootstrapRetrievalProofUnlocked(grant: ContinuityBootstrapGrant,
+                                                 connection: ControlPlaneSQLiteConnection) throws -> ContinuityBootstrapRetrievalProof? {
+        try connection.first("SELECT invocation_id,proof_json,proof_sha256 FROM continuity_bootstrap_retrieval_proofs WHERE grant_id=?",
+            bindings: [.text(grant.grantID.uuidString.lowercased())]) { row in
+                guard let invocation = try row.strictText(0, maximumBytes: 36),
+                      let json = try row.strictText(1, maximumBytes: ContinuityBootstrapRetrievalProof.maximumStoredBytes),
+                      let sha = try row.strictText(2, maximumBytes: 64), JSONSupport.sha256Hex(Data(json.utf8)) == sha else {
+                    throw ContinuityIngressError.integrityFailure("malformed bootstrap retrieval proof row")
+                }
+                let proof = try ContinuityBootstrapRetrievalProof.storedSnapshot(from: Data(json.utf8), grant: grant)
+                guard proof.toolInvocationID.uuidString.lowercased() == invocation else {
+                    throw ContinuityIngressError.integrityFailure("bootstrap proof invocation columns differ")
+                }
+                return proof
+            }
+    }
+
+    private func validateContinuityIngressHoldUnlocked(receipt: ContinuityIngressAcceptanceReceipt,
+                                                        connection: ControlPlaneSQLiteConnection) throws {
+        guard let hold = try connection.first(
+            "SELECT run_id,state FROM continuity_ingress_holds WHERE operation_id=? LIMIT 1",
+            bindings: [.text(receipt.operationID.uuidString.lowercased())], map: { row in
+                (try row.strictText(0, maximumBytes: 36), try row.strictText(1, maximumBytes: 32))
+            }), hold.0 == receipt.runID.description,
+              ["awaiting_bootstrap", "cancelled", "activated"].contains(hold.1 ?? "") else {
+            throw ContinuityIngressError.integrityFailure("acceptance bootstrap hold is missing or changed")
+        }
+    }
+
+    private func requireNoActiveContinuityIngressHoldUnlocked(_ runID: RunID,
+                                                               connection: ControlPlaneSQLiteConnection) throws {
+        if let operation = try autonomousRunUnlocked(runID, connection: connection)?.activeOperationID {
+            try requireContinuityOperationNotCancelledUnlocked(operation, connection: connection)
+        }
+        guard try connection.scalarInt("""
+            SELECT COUNT(*) FROM continuity_ingress_acceptances a
+            LEFT JOIN continuity_ingress_holds h ON h.operation_id=a.operation_id AND h.run_id=a.run_id
+            WHERE a.run_id=? AND (h.operation_id IS NULL OR h.state NOT IN ('awaiting_bootstrap','cancelled','activated'))
+            """, bindings: [.text(runID.description)]) == 0 else {
+            throw ContinuityIngressError.integrityFailure("accepted run lost its bootstrap history")
+        }
+        if try connection.scalarInt("SELECT COUNT(*) FROM continuity_ingress_holds WHERE run_id=? AND state IN ('awaiting_bootstrap','cancelled')",
+            bindings: [.text(runID.description)]) > 0 {
+            throw AutonomyError.bootstrapRequired(runID)
+        }
+    }
+
+    private func requireNoContinuityIngressHoldUnlocked(_ runID: RunID,
+                                                         connection: ControlPlaneSQLiteConnection) throws {
+        try requireNoActiveContinuityIngressHoldUnlocked(runID, connection: connection)
+        let operations = try connection.all("SELECT operation_id,state FROM continuity_ingress_holds WHERE run_id=? LIMIT 1025",
+            bindings: [.text(runID.description)], map: { (try $0.strictText(0, maximumBytes: 36), try $0.strictText(1, maximumBytes: 32)) })
+        guard operations.count <= Self.maximumContinuityIngressAcceptances else { throw AutonomyError.bootstrapRequired(runID) }
+        for operation in operations {
+            guard operation.1 == "activated", let id = operation.0.flatMap(UUID.init(uuidString:)),
+                  let stored = try sourceActivationUnlocked(operationID: id, connection: connection),
+                  stored.receipt.runID == runID, stored.sealedChecksum != nil,
+                  try connection.scalarInt("SELECT COUNT(*) FROM continuity_source_task_fences WHERE operation_id=? AND activation_receipt_sha256=? AND state='accepted'",
+                    bindings: [.text(id.uuidString.lowercased()), .text(stored.receipt.receiptSHA256)]) == 1 else {
+                throw AutonomyError.bootstrapRequired(runID)
+            }
+        }
+    }
+
+    private func insertAutonomousRunUnlocked(_ request: AutonomousRunRequest, state: AutonomousRunState,
+                                             operationID: UUID?, timestamp: String,
+                                             connection: ControlPlaneSQLiteConnection) throws -> AutonomousRunRecord {
+        guard state == .created || state == .awaitingBootstrap else { throw AutonomyError.invalidRequest("initial run state") }
+        try connection.execute(
+            """
+            INSERT INTO autonomous_runs(run_id,project_id,project_generation,assignment_id,mission,state,
+                continuity_mode,provider_id,model_key,current_work_json,active_operation_id,revision,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?,?)
+            """,
+            bindings: [.text(request.runID.description), .text(request.projectID.description),
+                .int64(try Self.sqliteGeneration(request.projectGeneration)), .optionalText(request.assignmentID), .text(request.mission),
+                .text(state.rawValue), .text(request.continuityMode.rawValue), .text(request.providerID), .text(request.modelKey),
+                .text(try Self.specificationJSON(request.specification)), .optionalText(operationID?.uuidString.lowercased()),
+                .text(timestamp), .text(timestamp)])
+        try upsertAutonomousRunBindingUnlocked(request, timestamp: timestamp, connection: connection)
+        try appendAutonomyEventUnlocked(runID: request.runID, projectID: request.projectID,
+            eventType: "autonomous_run_created", severity: .info, summary: "Autonomous run was durably created",
+            metadata: ["continuity_mode": request.continuityMode.rawValue,
+                "project_generation": String(request.projectGeneration.rawValue), "initial_state": state.rawValue], connection: connection)
+        guard let run = try autonomousRunUnlocked(request.runID, connection: connection) else {
+            throw ProjectContextError.integrityFailure("autonomous run could not be read after insertion")
+        }
+        return run
+    }
+
+    private static func decodeContinuityTask(_ row: ControlPlaneSQLiteRow) throws -> ContinuityTaskAuthorizationRecord {
+        let revokedAt = try row.strictText(14, maximumBytes: 128)
+        guard let taskID = try row.strictText(0, maximumBytes: 36).flatMap(UUID.init(uuidString:)),
+              let projectID = try row.strictText(1, maximumBytes: 36).flatMap(UUID.init(uuidString:)), row.int64(2) > 0,
+              let sourceBindingID = try row.strictText(3, maximumBytes: 36).flatMap(UUID.init(uuidString:)),
+              let assignmentID = try row.strictText(4, maximumBytes: 1_024),
+              let assignmentSHA = try row.strictText(5, maximumBytes: 64),
+              let assignmentJSON = try row.strictText(6, maximumBytes: ContinuityTaskAssignment.maximumStoredBytes),
+              let assignmentSnapshotSHA = try row.strictText(7, maximumBytes: 64),
+              let authorizationJSON = try row.strictText(8, maximumBytes: ContinuityIngressLimits.maximumAuthorizationBytes),
+              let authorizationSHA = try row.strictText(9, maximumBytes: 64),
+              let state = try row.strictText(10, maximumBytes: 7).flatMap(ContinuityTaskAuthorizationState.init(rawValue:)),
+              (1..<Int64.max).contains(row.int64(11)), let created = try row.strictText(13, maximumBytes: 128),
+              (state == .active ? revokedAt == nil : revokedAt != nil) else {
+            throw ContinuityTaskAuthorizationError.integrityFailure("malformed task row")
+        }
+        let assignmentData = Data(assignmentJSON.utf8)
+        let authorizationData = Data(authorizationJSON.utf8)
+        guard JSONSupport.sha256Hex(assignmentData) == assignmentSnapshotSHA,
+              JSONSupport.sha256Hex(authorizationData) == authorizationSHA else {
+            throw ContinuityTaskAuthorizationError.integrityFailure("task snapshot digest mismatch")
+        }
+        let assignment = try ContinuityTaskAssignment.storedSnapshot(from: assignmentData)
+        let authority = try ContinuityIngressAuthorization.storedSnapshot(from: authorizationData)
+        guard authority.taskID == taskID, authority.projectID.rawValue == projectID,
+              authority.projectGeneration.rawValue == UInt64(row.int64(2)), authority.sourceBindingID == sourceBindingID,
+              authority.assignmentID == assignmentID, authority.assignmentSHA256 == assignmentSHA,
+              assignment.assignmentID == assignmentID, assignment.assignmentSHA256 == assignmentSHA,
+              authority.authorizationScope == assignment.authorizationScope else {
+            throw ContinuityTaskAuthorizationError.integrityFailure("task identity columns differ from the approved snapshots")
+        }
+        let runID: RunID?
+        if let text = try row.strictText(12, maximumBytes: 36) {
+            guard let uuid = UUID(uuidString: text) else {
+                throw ContinuityTaskAuthorizationError.integrityFailure("invalid task run identifier")
+            }
+            runID = RunID(uuid)
+        } else { runID = nil }
+        return ContinuityTaskAuthorizationRecord(authorization: authority, assignment: assignment, state: state,
+            revision: row.int64(11), runID: runID, createdAt: created, revokedAt: revokedAt)
+    }
+
+    private func validatedContinuityTaskUnlocked(_ authorization: ContinuityIngressAuthorization, allowTerminalRun: Bool = false,
+                                                 connection: ControlPlaneSQLiteConnection) throws -> ContinuityTaskAuthorizationRecord {
+        try authorization.validate()
+        guard let record = try continuityTaskUnlocked(authorization.taskID, connection: connection) else {
+            throw ContinuityTaskAuthorizationError.authorityMismatch
+        }
+        guard record.state == .active else { throw ContinuityTaskAuthorizationError.revoked }
+        guard record.authorization == authorization else { throw ContinuityTaskAuthorizationError.authorityMismatch }
+        _ = try requiredActiveProjectUnlocked(authorization.projectID, generation: authorization.projectGeneration, connection: connection)
+        let sourceOwner = ProjectBindingOwner(kind: .agentSession, id: authorization.taskID.uuidString.lowercased())
+        guard let source = try bindingUnlocked(owner: sourceOwner, includeInactive: false, connection: connection),
+              source.bindingID == authorization.sourceBindingID,
+              source.projectID == authorization.projectID, source.projectGeneration == authorization.projectGeneration,
+              source.runID == record.runID,
+              source.authorizationScope == authorization.authorizationScope else {
+            throw ContinuityTaskAuthorizationError.authorityMismatch
+        }
+        if let runID = record.runID {
+            guard let run = try autonomousRunUnlocked(runID, connection: connection),
+                  run.projectID == authorization.projectID, run.projectGeneration == authorization.projectGeneration,
+                  run.assignmentID == record.assignment.assignmentID, run.mission == record.assignment.mission,
+                  run.providerID == record.assignment.providerID, run.modelKey == record.assignment.modelKey,
+                  run.adapterID == record.assignment.adapterID,
+                  run.specification.allowedTools == record.assignment.specification.allowedTools,
+                  run.specification.completionGates == record.assignment.specification.completionGates,
+                  run.specification.resourceProfile == record.assignment.specification.resourceProfile,
+                  (allowTerminalRun || !run.state.isTerminal),
+                  let binding = try bindingUnlocked(owner: .init(kind: .autonomousRun, id: runID.description), includeInactive: false, connection: connection),
+                  binding.authorizationScope == authorization.authorizationScope else {
+                throw ContinuityTaskAuthorizationError.authorityMismatch
+            }
+        }
+        return record
+    }
+
+    private func revokeContinuityTasksUnlocked(projectID: ProjectID, generation: ProjectGeneration, taskID: UUID?,
+                                               timestamp: String, connection: ControlPlaneSQLiteConnection) throws {
+        let suffix = taskID == nil ? "" : " AND task_id=?"
+        var bindings: [ControlPlaneSQLiteBinding] = [.text(projectID.description), .int64(try Self.sqliteGeneration(generation))]
+        if let taskID { bindings.append(.text(taskID.uuidString.lowercased())) }
+        try connection.execute(
+            """
+            UPDATE project_bindings SET active=0,lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+            WHERE owner_kind='agent_session' AND binding_id IN (
+                SELECT source_binding_id FROM continuity_task_authorizations
+                WHERE project_id=? AND project_generation=? AND state='active'
+            """ + suffix + ")", bindings: [.text(timestamp)] + bindings)
+        let count = try connection.execute(
+            "UPDATE continuity_task_authorizations SET state='revoked',revision=revision+1,revoked_at=? WHERE project_id=? AND project_generation=? AND state='active'" + suffix,
+            bindings: [.text(timestamp)] + bindings)
+        if count > 0 {
+            try appendAutonomyEventUnlocked(runID: nil, projectID: projectID, eventType: "continuity_task_revoked",
+                severity: .info, summary: "Task authority was permanently revoked",
+                metadata: ["task_id": taskID?.uuidString.lowercased() ?? "all_current_generation",
+                           "project_generation": String(generation.rawValue), "revoked_count": String(count)], connection: connection)
         }
     }
 
@@ -4502,6 +7179,7 @@ public actor ProjectControlPlaneRepository {
         connection: ControlPlaneSQLiteConnection
     ) throws -> ContinuityCommand {
         try validateContinuityCommandRequest(request)
+        try requireNoContinuityIngressHoldUnlocked(request.runID, connection: connection)
         _ = try requiredActiveProjectUnlocked(
             request.projectID,
             generation: request.projectGeneration,
@@ -4737,6 +7415,7 @@ public actor ProjectControlPlaneRepository {
     """
 
     private static let validRunTransitions: [AutonomousRunState: Set<AutonomousRunState>] = [
+        .awaitingBootstrap: [.cancelRequested],
         .created: [.validating, .paused, .cancelRequested, .failedTerminal],
         .validating: [.ready, .paused, .blockedConfiguration, .failedRecoverable,
                       .cancelRequested, .failedTerminal],
@@ -4942,7 +7621,7 @@ public actor ProjectControlPlaneRepository {
         let accepted: Bool
         let contextCapacity: Int?
 
-        init(_ intent: ProviderSessionIntent) {
+        init(_ intent: ProviderSessionIntent, providerResponseID: String? = nil) {
             sessionID = intent.sessionID
             runID = intent.runID
             projectID = intent.projectID
@@ -4950,7 +7629,7 @@ public actor ProjectControlPlaneRepository {
             providerID = intent.providerID
             adapterID = intent.adapterID
             modelKey = intent.modelKey
-            providerResponseID = intent.providerResponseID
+            self.providerResponseID = providerResponseID ?? intent.providerResponseID
             predecessorSessionID = intent.predecessorSessionID
             handoffID = intent.handoffID
             operationID = intent.operationID
@@ -5157,6 +7836,12 @@ public actor ProjectControlPlaneRepository {
         timestamp: String,
         connection: ControlPlaneSQLiteConnection
     ) throws {
+        try requireNoContinuityIngressHoldUnlocked(run.runID, connection: connection)
+        try activateProviderBindingIdentityUnlocked(sessionID: sessionID, run: run, timestamp: timestamp, connection: connection)
+    }
+
+    private func activateProviderBindingIdentityUnlocked(sessionID: String, run: AutonomousRunRecord,
+        timestamp: String, connection: ControlPlaneSQLiteConnection) throws {
         guard let runBinding = try bindingUnlocked(
             owner: ProjectBindingOwner(kind: .autonomousRun, id: run.runID.description),
             includeInactive: false,
@@ -5208,24 +7893,36 @@ public actor ProjectControlPlaneRepository {
         timestamp: String,
         connection: ControlPlaneSQLiteConnection
     ) throws -> ProviderTurnRecord {
-        guard winner.operationID == acceptance.operationID,
-              winner.handoffID == acceptance.handoffID,
-              winner.handoffSHA256 == acceptance.handoffSHA256,
-              winner.bootstrapNonceSHA256 == acceptance.bootstrapNonceSHA256 else {
+        try automaticContinuationIntentUnlocked(operationID: acceptance.operationID, runID: acceptance.runID,
+            projectID: acceptance.projectID, projectGeneration: acceptance.projectGeneration,
+            handoffID: acceptance.handoffID, handoffSHA256: acceptance.handoffSHA256,
+            bootstrapNonceSHA256: acceptance.bootstrapNonceSHA256, idempotencyKey: acceptance.automaticContinuationIdempotencyKey,
+            inputSHA256: acceptance.automaticContinuationInputSHA256, winner: winner, previousResponseID: previousResponseID,
+            timestamp: timestamp, connection: connection)
+    }
+
+    private func automaticContinuationIntentUnlocked(operationID: UUID, runID: RunID, projectID: ProjectID,
+        projectGeneration: ProjectGeneration, handoffID: UUID, handoffSHA256: String, bootstrapNonceSHA256: String,
+        idempotencyKey: String, inputSHA256: String, winner: ProviderSessionRecord, previousResponseID: String,
+        timestamp: String, connection: ControlPlaneSQLiteConnection) throws -> ProviderTurnRecord {
+        guard winner.operationID == operationID,
+              winner.handoffID == handoffID,
+              winner.handoffSHA256 == handoffSHA256,
+              winner.bootstrapNonceSHA256 == bootstrapNonceSHA256 else {
             throw AutonomyError.intentConflict
         }
         if let existing = try providerTurnForOperationUnlocked(
-            operationID: acceptance.operationID,
+            operationID: operationID,
             kind: .automaticContinuation,
             connection: connection
         ) {
-            guard existing.intent.runID == acceptance.runID,
+            guard existing.intent.runID == runID,
                   existing.intent.sessionID == winner.sessionID,
-                  existing.intent.projectID == acceptance.projectID,
-                  existing.intent.projectGeneration == acceptance.projectGeneration,
-                  existing.intent.idempotencyKey == acceptance.automaticContinuationIdempotencyKey,
+                  existing.intent.projectID == projectID,
+                  existing.intent.projectGeneration == projectGeneration,
+                  existing.intent.idempotencyKey == idempotencyKey,
                   existing.intent.previousResponseID == previousResponseID,
-                  existing.intent.inputSHA256 == acceptance.automaticContinuationInputSHA256 else {
+                  existing.intent.inputSHA256 == inputSHA256 else {
                 throw AutonomyError.intentConflict
             }
             return existing
@@ -5240,14 +7937,14 @@ public actor ProjectControlPlaneRepository {
             ) VALUES(?,?,?,?,?,?,?,?,?,?,'intent',0,?,?)
             """,
             bindings: [
-                .text(turnID.uuidString.lowercased()), .text(acceptance.runID.description),
-                .text(winner.sessionID), .text(acceptance.operationID.uuidString.lowercased()),
-                .text(acceptance.projectID.description),
-                .int64(try Self.sqliteGeneration(acceptance.projectGeneration)),
+                .text(turnID.uuidString.lowercased()), .text(runID.description),
+                .text(winner.sessionID), .text(operationID.uuidString.lowercased()),
+                .text(projectID.description),
+                .int64(try Self.sqliteGeneration(projectGeneration)),
                 .text(ProviderTurnKind.automaticContinuation.rawValue),
-                .text(acceptance.automaticContinuationIdempotencyKey),
+                .text(idempotencyKey),
                 .text(previousResponseID),
-                .text(acceptance.automaticContinuationInputSHA256),
+                .text(inputSHA256),
                 .text(timestamp), .text(timestamp),
             ]
         )
@@ -5278,6 +7975,7 @@ public actor ProjectControlPlaneRepository {
               run.activeSessionID == session.sessionID else {
             throw ProjectContextError.projectContextRequired(owner)
         }
+        try requireNoContinuityIngressHoldUnlocked(session.runID, connection: connection)
     }
 
     private func providerTurnUnlocked(
@@ -6341,6 +9039,26 @@ private struct ControlPlaneSQLiteRow {
         sqlite3_column_text(statement, index).map { String(cString: $0) }
     }
 
+    /// Preserves the entire stored byte sequence for canonical snapshot checks.
+    /// A C-string conversion would silently discard an embedded NUL and suffix.
+    func strictText(_ index: Int32, maximumBytes: Int) throws -> String? {
+        let type = sqlite3_column_type(statement, index)
+        if type == SQLITE_NULL { return nil }
+        guard type == SQLITE_TEXT else {
+            throw ProjectContextError.integrityFailure("invalid SQLite text type at column \(index)")
+        }
+        let count = Int(sqlite3_column_bytes(statement, index))
+        guard count >= 0, count <= maximumBytes,
+              let pointer = sqlite3_column_text(statement, index) else {
+            throw ProjectContextError.integrityFailure("invalid SQLite text length at column \(index)")
+        }
+        let bytes = UnsafeBufferPointer(start: pointer, count: count)
+        guard !bytes.contains(0), let value = String(bytes: bytes, encoding: .utf8) else {
+            throw ProjectContextError.integrityFailure("invalid SQLite text bytes at column \(index)")
+        }
+        return value
+    }
+
     func int64(_ index: Int32) -> Int64 {
         sqlite3_column_int64(statement, index)
     }
@@ -6431,6 +9149,13 @@ private final class ControlPlaneSQLiteOperationControl {
         acceptsCancellation = false
     }
 
+    func withCancellationSuppressed<T>(_ body: () throws -> T) rethrows -> T {
+        let prior = acceptsCancellation
+        acceptsCancellation = false
+        defer { acceptsCancellation = prior }
+        return try body()
+    }
+
     func waitForBusyRetry() -> Int32 {
         if !reportedBusy {
             reportedBusy = true
@@ -6473,6 +9198,17 @@ private func controlPlaneSQLiteProgressHandler(_ context: UnsafeMutableRawPointe
 /// Its synchronous transaction closures never suspend or escape that actor.
 private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    // Independent capability lineage: public control schema remains v2, while
+    // older decoders reject the new state instead of treating held work as ready.
+    static let ingressSchemaCapabilityVersionQuery = """
+    SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='autonomous_runs') THEN 0
+        WHEN (SELECT instr(sql,'''awaiting_bootstrap''') FROM sqlite_master WHERE type='table' AND name='autonomous_runs')=0 THEN 1
+        WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='continuity_operation_cancellations') THEN 6
+        WHEN EXISTS(SELECT 1 FROM pragma_table_info('continuity_ingress_holds') WHERE name='finalization_attempts') THEN 5
+        WHEN EXISTS(SELECT 1 FROM pragma_table_info('continuity_ingress_holds') WHERE name='recovery_attempts') THEN 4
+        WHEN EXISTS(SELECT 1 FROM pragma_table_info('continuity_ingress_holds') WHERE name='operation_id' AND pk=1) THEN 3
+        ELSE 2 END
+    """
 
     private var database: OpaquePointer?
     private let busyTimeoutMilliseconds: Int
@@ -6508,7 +9244,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                 throw ProjectContextError.databaseFailure("could not configure SQLite busy timeout")
             }
             let priorVersion = try validatedPriorVersion()
-            try migrate(timestamp: migrationTimestamp, priorVersion: priorVersion)
+            try migrate(timestamp: migrationTimestamp, priorVersion: priorVersion, databaseURL: databaseURL)
             try executeStatic("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
             try? FileManager.default.setAttributes(
                 [.posixPermissions: 0o600],
@@ -6590,6 +9326,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         beforeCommitObserver: (@Sendable () throws -> Void)? = nil,
         didCommitObserver: (@Sendable () -> Void)? = nil,
         checkCancellationBeforeCommit: Bool = true,
+        fullDurability: Bool = false,
         beforeCommitValidation: (() throws -> Void)? = nil,
         _ body: () throws -> T
     ) throws -> T {
@@ -6599,24 +9336,50 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             beforeCommitObserver: beforeCommitObserver,
             didCommitObserver: didCommitObserver
         ) {
+            // SQLite forbids changing synchronous inside a transaction. Keep
+            // this connection's prior setting for unrelated operations.
+            let previousSynchronous: Int?
+            if fullDurability {
+                guard transactionDepth == 0, sqlite3_get_autocommit(try requiredDatabase()) != 0 else {
+                    throw ProjectContextError.integrityFailure("durable acceptance requires its own transaction")
+                }
+                let previous = try scalarInt("PRAGMA synchronous;")
+                guard (0...3).contains(previous) else {
+                    throw ProjectContextError.integrityFailure("invalid SQLite synchronous mode")
+                }
+                previousSynchronous = previous
+                try executeStatic("PRAGMA synchronous=FULL;")
+            } else { previousSynchronous = nil }
+            defer {
+                if let previousSynchronous {
+                    if let activeControl {
+                        try? activeControl.withCancellationSuppressed {
+                            try executeStatic("PRAGMA synchronous=\(previousSynchronous);")
+                        }
+                    } else {
+                        try? executeStatic("PRAGMA synchronous=\(previousSynchronous);")
+                    }
+                }
+            }
             try executeStatic("BEGIN IMMEDIATE;")
             transactionDepth += 1
             defer { transactionDepth -= 1 }
             do {
                 let value = try body()
+                let commit = {
+                    try beforeCommitValidation?()
+                    try self.executeStatic("COMMIT;")
+                }
                 if checkCancellationBeforeCommit {
                     if let activeControl {
                         try activeControl.performCommit(committedResult: value) {
-                            try beforeCommitValidation?()
-                            try executeStatic("COMMIT;")
+                            try commit()
                         }
                     } else {
-                        try beforeCommitValidation?()
-                        try executeStatic("COMMIT;")
+                        try commit()
                     }
                 } else {
-                    try beforeCommitValidation?()
-                    try executeStatic("COMMIT;")
+                    try commit()
                     activeControl?.recordCommit()
                 }
                 return value
@@ -6720,33 +9483,240 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         return priorVersion
     }
 
-    private func migrate(timestamp: String, priorVersion: Int) throws {
-        try transaction {
-            try executeStatic(Self.schemaV2)
-            let quickCheck = try scalarText("PRAGMA quick_check;") ?? "missing"
-            guard quickCheck == "ok" else {
-                throw ProjectContextError.integrityFailure(quickCheck)
+    private func migrate(timestamp: String, priorVersion: Int, databaseURL: URL) throws {
+        let handle = try requiredDatabase()
+        let capability = try scalarInt(Self.ingressSchemaCapabilityVersionQuery)
+        var manifest = try VerifiedMigrationBackup.reconcileMigrationManifest(sourceURL: databaseURL,
+            observedVersion: capability, scope: .continuityIngress)
+        // Finish a committed older capability before preparing the next verified
+        // lineage. This includes restart after COMMIT but before manifest completion.
+        if let previous = manifest, previous.targetVersion == capability {
+            manifest = try VerifiedMigrationBackup.requireSQLiteMigrationReceipt(database: handle,
+                sourceURL: databaseURL, manifest: previous, scope: .continuityIngress)
+            if let prepared = manifest, prepared.state == .prepared {
+                try VerifiedMigrationBackup.checkpointSQLiteMigration(database: handle, sourceURL: databaseURL)
+                let target = try VerifiedMigrationBackup.logicalSQLiteMetadata(database: handle, sourceURL: databaseURL,
+                    expectedVersion: capability, versionQuery: Self.ingressSchemaCapabilityVersionQuery)
+                manifest = try VerifiedMigrationBackup.completeMigrationManifest(sourceURL: databaseURL,
+                    preparedManifest: prepared, observedVersion: capability, targetMetadata: target, scope: .continuityIngress)
             }
-            try execute(
-                """
+        }
+        let upgrading = priorVersion == 2 && (1...5).contains(capability)
+        let targetCapability = upgrading ? capability + 1 : 6
+        if upgrading { try executeStatic("PRAGMA synchronous=FULL;") }
+        defer { if upgrading { try? executeStatic("PRAGMA synchronous=NORMAL;") } }
+        try transaction {
+            if upgrading {
+                let backup = databaseURL.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v\(capability).sqlite3")
+                manifest = try VerifiedMigrationBackup.prepareSQLiteMigrationAtWriteBoundary(
+                    database: handle, sourceURL: databaseURL, backupURL: backup,
+                    sourceVersion: capability, targetVersion: targetCapability,
+                    versionQuery: Self.ingressSchemaCapabilityVersionQuery, scope: .continuityIngress)
+            }
+            if capability == 2 { try rebuildContinuityIngressHoldHistory() }
+            if capability == 3 { try addContinuityIngressRecoveryMetadata() }
+            if capability == 4 { try addContinuitySourceActivationMetadata() }
+            let schema = capability == 1 ? Self.schemaForLegacyIngressMigration
+                : (capability == 2 ? Self.schemaForHoldHistoryMigration : (capability == 3 ? Self.schemaForRecoveryMigration : (capability == 4 ? Self.schemaForActivationMigration : Self.schemaV2)))
+            try executeStatic(schema)
+            if capability == 4 { try populateSourceTaskFencesForMigration(timestamp: timestamp) }
+            if capability == 1 { try rebuildAutonomousRunStateConstraint() }
+            let quickCheck = try scalarText("PRAGMA quick_check;") ?? "missing"
+            guard quickCheck == "ok" else { throw ProjectContextError.integrityFailure(quickCheck) }
+            try execute("""
                 INSERT INTO control_schema_version(singleton,version,applied_at) VALUES(1,2,?)
-                ON CONFLICT(singleton) DO UPDATE SET
-                    version=excluded.version,applied_at=excluded.applied_at
+                ON CONFLICT(singleton) DO UPDATE SET version=excluded.version,applied_at=excluded.applied_at
                 WHERE control_schema_version.version < excluded.version
-                """,
-                bindings: [.text(timestamp)]
-            )
+                """, bindings: [.text(timestamp)])
             try executeStatic("PRAGMA user_version=2;")
-            try execute(
-                """
+            try execute("""
                 INSERT OR IGNORE INTO migration_receipts(
                     receipt_id,migration_name,source_version,target_version,integrity_result,
                     details_json,started_at,completed_at
                 ) VALUES('control-plane-schema-v2','control-plane-schema',?,'2','ok','{}',?,?)
-                """,
-                bindings: [.text(String(priorVersion)), .text(timestamp), .text(timestamp)]
-            )
+                """, bindings: [.text(String(priorVersion)), .text(timestamp), .text(timestamp)])
+            guard try first("PRAGMA foreign_key_check;", map: { _ in true }) == nil else {
+                throw ProjectContextError.integrityFailure("control-plane migration left invalid foreign keys")
+            }
+            if upgrading, let manifest {
+                try VerifiedMigrationBackup.recordSQLiteMigrationReceipt(database: handle, sourceURL: databaseURL, manifest: manifest)
+                try VerifiedMigrationBackup.requireSQLiteMainFileUnmoved(database: handle, sourceURL: databaseURL,
+                    purpose: "control-plane bootstrap capability migration commit")
+            }
         }
+        if upgrading, let manifest {
+            try VerifiedMigrationBackup.checkpointSQLiteMigration(database: handle, sourceURL: databaseURL)
+            let target = try VerifiedMigrationBackup.logicalSQLiteMetadata(database: handle, sourceURL: databaseURL,
+                expectedVersion: targetCapability, versionQuery: Self.ingressSchemaCapabilityVersionQuery)
+            _ = try VerifiedMigrationBackup.completeMigrationManifest(sourceURL: databaseURL, preparedManifest: manifest,
+                observedVersion: targetCapability, targetMetadata: target, scope: .continuityIngress)
+        }
+        if (1...4).contains(capability) {
+            try migrate(timestamp: timestamp, priorVersion: priorVersion, databaseURL: databaseURL)
+        }
+    }
+
+    private func addContinuitySourceActivationMetadata() throws {
+        let definition = try first("SELECT sql FROM sqlite_master WHERE type='table' AND name='continuity_ingress_holds'",
+            map: { try $0.strictText(0, maximumBytes: 8_192) }) ?? nil
+        let columns = try all("SELECT name,hidden FROM pragma_table_xinfo('continuity_ingress_holds') LIMIT 16",
+            map: { (try $0.strictText(0, maximumBytes: 128), $0.int64(1)) })
+        let expected = ["operation_id","run_id","state","created_at","updated_at","recovery_attempts","recovery_started_at",
+            "recovery_deadline","recovery_retry_at","recovery_claim_id","recovery_lease_owner","recovery_lease_epoch",
+            "recovery_error_code","recovery_quarantined","recovery_ack_sha256"]
+        let objects = try all("SELECT type,name,sql FROM sqlite_master WHERE tbl_name='continuity_ingress_holds' AND type IN ('index','trigger') LIMIT 3",
+            map: { (try $0.strictText(0, maximumBytes: 16), try $0.strictText(1, maximumBytes: 128), try $0.strictText(2, maximumBytes: 4_096)) })
+        guard let definition, Self.normalizedRunSchemaSQL(definition) == Self.normalizedRunSchemaSQL(Self.ingressRecoverySchema),
+              columns.map({ $0.0 ?? "" }) == expected, columns.allSatisfy({ $0.1 == 0 }), objects.count == 2,
+              objects.contains(where: { $0.0 == "index" && $0.1 == "sqlite_autoindex_continuity_ingress_holds_1" && $0.2 == nil }),
+              objects.contains(where: { $0.0 == "index" && $0.1 == "idx_continuity_ingress_active_hold" && $0.2.map(Self.normalizedRunSchemaSQL)
+                  == Self.normalizedRunSchemaSQL("CREATE UNIQUE INDEX idx_continuity_ingress_active_hold ON continuity_ingress_holds(run_id) WHERE state='awaiting_bootstrap'") }),
+              try scalarInt("SELECT COUNT(*) FROM continuity_ingress_holds") <= 1_024 else {
+            throw ProjectContextError.integrityFailure("unsupported source activation migration")
+        }
+        for column in Self.ingressActivationColumns { try executeStatic("ALTER TABLE continuity_ingress_holds ADD COLUMN " + column + ";") }
+        try executeStatic("""
+            UPDATE continuity_ingress_holds SET recovery_claim_phase='bootstrap' WHERE recovery_claim_id IS NOT NULL AND recovery_ack_sha256 IS NULL;
+            UPDATE continuity_ingress_holds SET recovery_claim_id=NULL,recovery_lease_owner=NULL,recovery_lease_epoch=NULL,
+                recovery_claim_phase=NULL WHERE recovery_ack_sha256 IS NOT NULL;
+            """)
+    }
+
+    private func populateSourceTaskFencesForMigration(timestamp: String) throws {
+        guard try scalarInt("SELECT COUNT(*) FROM continuity_source_task_fences") == 0 else {
+            throw ProjectContextError.integrityFailure("unexpected preexisting source transfer fences")
+        }
+        try execute("""
+            INSERT INTO continuity_source_task_fences(source_binding_id,task_id,project_id,project_generation,run_id,
+                operation_id,receipt_sha256,state,created_at)
+            SELECT t.source_binding_id,t.task_id,a.project_id,a.project_generation,a.run_id,a.operation_id,a.receipt_sha256,'quiescing',?
+            FROM continuity_ingress_acceptances a JOIN continuity_ingress_holds h ON h.operation_id=a.operation_id AND h.run_id=a.run_id
+              JOIN continuity_task_authorizations t ON t.task_id=a.task_id AND t.run_id=a.run_id
+            WHERE h.state='awaiting_bootstrap'
+            """, bindings: [.text(timestamp)])
+    }
+
+    private func addContinuityIngressRecoveryMetadata() throws {
+        let definition = try first("SELECT sql FROM sqlite_master WHERE type='table' AND name='continuity_ingress_holds'",
+            map: { try $0.strictText(0, maximumBytes: 4_096) }) ?? nil
+        let columns = try all("SELECT name,hidden FROM pragma_table_xinfo('continuity_ingress_holds') LIMIT 6",
+            map: { (try $0.strictText(0, maximumBytes: 128), $0.int64(1)) })
+        let objects = try all("SELECT type,name,sql FROM sqlite_master WHERE tbl_name='continuity_ingress_holds' AND type IN ('index','trigger') LIMIT 3",
+            map: { (try $0.strictText(0, maximumBytes: 16), try $0.strictText(1, maximumBytes: 128), try $0.strictText(2, maximumBytes: 4_096)) })
+        let expectedIndex = "CREATE UNIQUE INDEX idx_continuity_ingress_active_hold ON continuity_ingress_holds(run_id) WHERE state='awaiting_bootstrap'"
+        guard let definition,
+              Self.normalizedRunSchemaSQL(definition) == Self.normalizedRunSchemaSQL(Self.ingressHoldHistorySchema),
+              columns.map({ $0.0 ?? "" }) == ["operation_id", "run_id", "state", "created_at", "updated_at"],
+              columns.allSatisfy({ $0.1 == 0 }), objects.count == 2,
+              objects.contains(where: { $0.0 == "index" && $0.1 == "sqlite_autoindex_continuity_ingress_holds_1" && $0.2 == nil }),
+              objects.contains(where: { $0.0 == "index" && $0.1 == "idx_continuity_ingress_active_hold"
+                  && $0.2.map(Self.normalizedRunSchemaSQL) == Self.normalizedRunSchemaSQL(expectedIndex) }),
+              try scalarInt("SELECT COUNT(*) FROM continuity_ingress_holds") <= 1_024,
+              try scalarInt("""
+                SELECT COUNT(*) FROM continuity_ingress_holds h LEFT JOIN continuity_ingress_acceptances a
+                ON a.operation_id=h.operation_id AND a.run_id=h.run_id WHERE a.operation_id IS NULL
+                """) == 0 else {
+            throw ProjectContextError.integrityFailure("unsupported continuity ingress recovery metadata migration")
+        }
+        for column in Self.ingressRecoveryColumns {
+            try executeStatic("ALTER TABLE continuity_ingress_holds ADD COLUMN " + column + ";")
+        }
+    }
+
+    private func rebuildContinuityIngressHoldHistory() throws {
+        let definition = try first("SELECT sql FROM sqlite_master WHERE type='table' AND name='continuity_ingress_holds'",
+            map: { try $0.strictText(0, maximumBytes: 4_096) }) ?? nil
+        let columns = try all("SELECT name,hidden FROM pragma_table_xinfo('continuity_ingress_holds') LIMIT 6",
+            map: { (try $0.strictText(0, maximumBytes: 128), $0.int64(1)) })
+        let objects = try all("SELECT type,name,sql FROM sqlite_master WHERE tbl_name='continuity_ingress_holds' AND type IN ('index','trigger') LIMIT 3",
+            map: { (try $0.strictText(0, maximumBytes: 16), try $0.strictText(1, maximumBytes: 128), try $0.strictText(2, maximumBytes: 4_096)) })
+        guard let definition,
+              Self.normalizedRunSchemaSQL(definition) == Self.normalizedRunSchemaSQL(Self.legacyIngressHoldSchema),
+              columns.map({ $0.0 ?? "" }) == ["run_id", "operation_id", "state", "created_at", "updated_at"],
+              columns.allSatisfy({ $0.1 == 0 }), objects.count == 2,
+              Set(objects.compactMap({ $0.1 })) == ["sqlite_autoindex_continuity_ingress_holds_1", "sqlite_autoindex_continuity_ingress_holds_2"],
+              objects.allSatisfy({ $0.0 == "index" && $0.2 == nil }),
+              try scalarInt("SELECT COUNT(*) FROM continuity_ingress_holds") <= 1_024,
+              try scalarInt("""
+                SELECT COUNT(*) FROM continuity_ingress_holds h LEFT JOIN continuity_ingress_acceptances a
+                ON a.operation_id=h.operation_id AND a.run_id=h.run_id WHERE a.operation_id IS NULL
+                """) == 0,
+              try scalarInt("""
+                SELECT COUNT(*) FROM continuity_ingress_acceptances a LEFT JOIN continuity_ingress_holds h
+                ON a.operation_id=h.operation_id AND a.run_id=h.run_id WHERE h.operation_id IS NULL
+                """) == 0 else {
+            throw ProjectContextError.integrityFailure("unsupported continuity ingress hold history migration")
+        }
+        try executeStatic(Self.ingressHoldHistorySchema.replacingOccurrences(of: "IF NOT EXISTS continuity_ingress_holds",
+            with: "continuity_ingress_holds_upgrade"))
+        try executeStatic("""
+            INSERT INTO continuity_ingress_holds_upgrade(run_id,operation_id,state,created_at,updated_at)
+                SELECT run_id,operation_id,state,created_at,updated_at FROM continuity_ingress_holds;
+            DROP TABLE continuity_ingress_holds;
+            ALTER TABLE continuity_ingress_holds_upgrade RENAME TO continuity_ingress_holds;
+            """)
+    }
+
+    private func rebuildAutonomousRunStateConstraint() throws {
+        let columns = ["run_id", "project_id", "project_generation", "assignment_id", "mission", "state",
+            "continuity_mode", "provider_id", "model_key", "active_session_id", "active_operation_id", "current_work_json",
+            "completion_request_json", "last_error_code", "last_error_summary", "retry_at", "continuation_pending",
+            "revision", "created_at", "updated_at"]
+        guard let start = Self.schemaV2.range(of: "CREATE TABLE IF NOT EXISTS autonomous_runs ("),
+              let end = Self.schemaV2.range(of: ");", range: start.upperBound..<Self.schemaV2.endIndex) else {
+            throw ProjectContextError.integrityFailure("missing autonomous run migration definition")
+        }
+        let definition = String(Self.schemaV2[start.lowerBound..<end.upperBound])
+        let expectedLegacy = definition.replacingOccurrences(of: "'awaiting_bootstrap',", with: "")
+        let storedDefinition = try first("SELECT sql FROM sqlite_master WHERE type='table' AND name='autonomous_runs' LIMIT 1",
+            map: { try $0.strictText(0, maximumBytes: 16 * 1_024) }) ?? nil
+        let storedColumns = try all("SELECT name,hidden FROM pragma_table_xinfo('autonomous_runs') LIMIT 21", map: {
+            (try $0.strictText(0, maximumBytes: 128) ?? "", $0.int64(1))
+        })
+        let objects = try all("SELECT type,name,sql FROM sqlite_master WHERE tbl_name='autonomous_runs' AND type IN ('trigger','index') LIMIT 4",
+            map: { (try $0.strictText(0, maximumBytes: 16), try $0.strictText(1, maximumBytes: 256),
+                try $0.strictText(2, maximumBytes: 16 * 1_024)) })
+        let expectedIndexes = [
+            "idx_autonomous_runs_state": "CREATE INDEX idx_autonomous_runs_state ON autonomous_runs(state,retry_at)",
+            "idx_autonomous_runs_project": "CREATE INDEX idx_autonomous_runs_project ON autonomous_runs(project_id,project_generation)",
+        ]
+        guard let storedDefinition,
+              Self.normalizedRunSchemaSQL(storedDefinition) == Self.normalizedRunSchemaSQL(expectedLegacy),
+              storedColumns.map({ $0.0 }) == columns, storedColumns.allSatisfy({ $0.1 == 0 }),
+              objects.count == 3,
+              objects.allSatisfy({ entry in
+                  let (type, name, sql) = entry
+                  guard type == "index", let name else { return false }
+                  if name == "sqlite_autoindex_autonomous_runs_1" { return sql == nil }
+                  guard let sql, let expected = expectedIndexes[name] else { return false }
+                  return Self.normalizedRunSchemaSQL(sql) == Self.normalizedRunSchemaSQL(expected)
+              }) else {
+            throw ProjectContextError.integrityFailure("unsupported autonomous run schema extension")
+        }
+        let newTable = definition
+            .replacingOccurrences(of: "IF NOT EXISTS autonomous_runs", with: "autonomous_runs_ingress_upgrade")
+        try executeStatic(newTable)
+        let list = columns.joined(separator: ",")
+        try executeStatic("INSERT INTO autonomous_runs_ingress_upgrade(\(list)) SELECT \(list) FROM autonomous_runs;")
+        try executeStatic("DROP TABLE autonomous_runs; ALTER TABLE autonomous_runs_ingress_upgrade RENAME TO autonomous_runs;")
+        try executeStatic(Self.schemaForLegacyIngressMigration)
+    }
+
+    /// Compare only the known schema, allowing formatting and SQLite's table
+    /// quoting after RENAME. Preserve literal contents so changed CHECK/default
+    /// values cannot be normalized into the approved definition.
+    private static func normalizedRunSchemaSQL(_ sql: String) -> String {
+        let input = sql.replacingOccurrences(of: "IF NOT EXISTS ", with: "")
+            .replacingOccurrences(of: "\"autonomous_runs\"", with: "autonomous_runs")
+            .replacingOccurrences(of: "\"continuity_ingress_holds\"", with: "continuity_ingress_holds")
+        var result = ""
+        var inLiteral = false
+        for character in input {
+            if character == "'" { inLiteral.toggle() }
+            if !inLiteral && (character.isWhitespace || character == ";") { continue }
+            result.append(character)
+        }
+        return result
     }
 
     private func executeStatic(_ sql: String) throws {
@@ -6812,7 +9782,132 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         return .databaseFailure(value)
     }
 
+    private static let legacyIngressHoldSchema = """
+    CREATE TABLE IF NOT EXISTS continuity_ingress_holds (
+        run_id TEXT PRIMARY KEY NOT NULL CHECK (length(run_id)=36),
+        operation_id TEXT NOT NULL UNIQUE CHECK (length(operation_id)=36),
+        state TEXT NOT NULL CHECK (state IN ('awaiting_bootstrap','cancelled')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """
+    private static let ingressHoldHistorySchema = """
+    CREATE TABLE IF NOT EXISTS continuity_ingress_holds (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        state TEXT NOT NULL CHECK (state IN ('awaiting_bootstrap','cancelled','activated')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """
+    private static let ingressRecoverySchema = """
+    CREATE TABLE IF NOT EXISTS continuity_ingress_holds (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        state TEXT NOT NULL CHECK (state IN ('awaiting_bootstrap','cancelled','activated')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        recovery_attempts INTEGER NOT NULL DEFAULT 0 CHECK (recovery_attempts BETWEEN 0 AND 8),
+        recovery_started_at TEXT CHECK (length(CAST(recovery_started_at AS BLOB))<=128),
+        recovery_deadline TEXT CHECK (length(CAST(recovery_deadline AS BLOB))<=128),
+        recovery_retry_at TEXT CHECK (length(CAST(recovery_retry_at AS BLOB))<=128),
+        recovery_claim_id TEXT CHECK (length(recovery_claim_id)=36),
+        recovery_lease_owner TEXT CHECK (length(CAST(recovery_lease_owner AS BLOB)) BETWEEN 1 AND 512),
+        recovery_lease_epoch INTEGER CHECK (recovery_lease_epoch>=1),
+        recovery_error_code TEXT CHECK (length(CAST(recovery_error_code AS BLOB))<=64),
+        recovery_quarantined INTEGER NOT NULL DEFAULT 0 CHECK (recovery_quarantined IN (0,1)),
+        recovery_ack_sha256 TEXT CHECK (length(recovery_ack_sha256)=64)
+    );
+    """
+    private static let ingressRecoveryColumns = [
+        "recovery_attempts INTEGER NOT NULL DEFAULT 0 CHECK (recovery_attempts BETWEEN 0 AND 8)",
+        "recovery_started_at TEXT CHECK (length(CAST(recovery_started_at AS BLOB))<=128)",
+        "recovery_deadline TEXT CHECK (length(CAST(recovery_deadline AS BLOB))<=128)",
+        "recovery_retry_at TEXT CHECK (length(CAST(recovery_retry_at AS BLOB))<=128)",
+        "recovery_claim_id TEXT CHECK (length(recovery_claim_id)=36)",
+        "recovery_lease_owner TEXT CHECK (length(CAST(recovery_lease_owner AS BLOB)) BETWEEN 1 AND 512)",
+        "recovery_lease_epoch INTEGER CHECK (recovery_lease_epoch>=1)",
+        "recovery_error_code TEXT CHECK (length(CAST(recovery_error_code AS BLOB))<=64)",
+        "recovery_quarantined INTEGER NOT NULL DEFAULT 0 CHECK (recovery_quarantined IN (0,1))",
+        "recovery_ack_sha256 TEXT CHECK (length(recovery_ack_sha256)=64)",
+    ]
+    private static let ingressActivationHoldSchema = """
+    CREATE TABLE IF NOT EXISTS continuity_ingress_holds (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        state TEXT NOT NULL CHECK (state IN ('awaiting_bootstrap','cancelled','activated')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        recovery_attempts INTEGER NOT NULL DEFAULT 0 CHECK (recovery_attempts BETWEEN 0 AND 8),
+        recovery_started_at TEXT CHECK (length(CAST(recovery_started_at AS BLOB))<=128),
+        recovery_deadline TEXT CHECK (length(CAST(recovery_deadline AS BLOB))<=128),
+        recovery_retry_at TEXT CHECK (length(CAST(recovery_retry_at AS BLOB))<=128),
+        recovery_claim_id TEXT CHECK (length(recovery_claim_id)=36),
+        recovery_lease_owner TEXT CHECK (length(CAST(recovery_lease_owner AS BLOB)) BETWEEN 1 AND 512),
+        recovery_lease_epoch INTEGER CHECK (recovery_lease_epoch>=1),
+        recovery_error_code TEXT CHECK (length(CAST(recovery_error_code AS BLOB))<=64),
+        recovery_quarantined INTEGER NOT NULL DEFAULT 0 CHECK (recovery_quarantined IN (0,1)),
+        recovery_ack_sha256 TEXT CHECK (length(recovery_ack_sha256)=64),
+        finalization_attempts INTEGER NOT NULL DEFAULT 0 CHECK (finalization_attempts BETWEEN 0 AND 8),
+        finalization_started_at TEXT CHECK (length(CAST(finalization_started_at AS BLOB))<=128),
+        finalization_deadline TEXT CHECK (length(CAST(finalization_deadline AS BLOB))<=128),
+        finalization_retry_at TEXT CHECK (length(CAST(finalization_retry_at AS BLOB))<=128),
+        recovery_claim_phase TEXT CHECK (recovery_claim_phase IN ('bootstrap','activation'))
+    );
+    """
+    private static let ingressActivationColumns = [
+        "finalization_attempts INTEGER NOT NULL DEFAULT 0 CHECK (finalization_attempts BETWEEN 0 AND 8)",
+        "finalization_started_at TEXT CHECK (length(CAST(finalization_started_at AS BLOB))<=128)",
+        "finalization_deadline TEXT CHECK (length(CAST(finalization_deadline AS BLOB))<=128)",
+        "finalization_retry_at TEXT CHECK (length(CAST(finalization_retry_at AS BLOB))<=128)",
+        "recovery_claim_phase TEXT CHECK (recovery_claim_phase IN ('bootstrap','activation'))",
+    ]
+    private static var schemaForActivationMigration: String {
+        schemaV2.replacingOccurrences(of: operationCancellationSchema, with: "")
+    }
+    private static var schemaForRecoveryMigration: String {
+        schemaForActivationMigration.replacingOccurrences(of: ingressActivationHoldSchema, with: ingressRecoverySchema)
+    }
+    private static var schemaForHoldHistoryMigration: String {
+        schemaForRecoveryMigration.replacingOccurrences(of: ingressRecoverySchema, with: ingressHoldHistorySchema)
+    }
+    private static var schemaForLegacyIngressMigration: String {
+        schemaForHoldHistoryMigration.replacingOccurrences(of: ingressHoldHistorySchema, with: legacyIngressHoldSchema)
+            .replacingOccurrences(of: """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_continuity_ingress_active_hold
+                ON continuity_ingress_holds(run_id) WHERE state='awaiting_bootstrap';
+            """, with: "")
+    }
+
+    private static let operationCancellationSchema = """
+    CREATE TABLE IF NOT EXISTS continuity_operation_cancellations (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        task_id TEXT NOT NULL CHECK (length(task_id)=36),
+        project_id TEXT NOT NULL CHECK (length(project_id)=36),
+        project_generation INTEGER NOT NULL CHECK (project_generation>=1),
+        acceptance_receipt_sha256 TEXT NOT NULL CHECK (length(acceptance_receipt_sha256)=64),
+        request_json TEXT NOT NULL CHECK (length(CAST(request_json AS BLOB)) BETWEEN 1 AND 4096),
+        request_sha256 TEXT NOT NULL CHECK (length(request_sha256)=64),
+        requested_at TEXT NOT NULL CHECK (length(CAST(requested_at AS BLOB)) BETWEEN 1 AND 128),
+        receipt_json TEXT CHECK (length(CAST(receipt_json AS BLOB)) BETWEEN 1 AND 16384),
+        receipt_sha256 TEXT CHECK (length(receipt_sha256)=64),
+        completed_at TEXT CHECK (length(CAST(completed_at AS BLOB)) BETWEEN 1 AND 128),
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
+        retry_at TEXT CHECK (length(CAST(retry_at AS BLOB)) BETWEEN 1 AND 128),
+        error_code TEXT CHECK (length(CAST(error_code AS BLOB)) BETWEEN 1 AND 64),
+        quarantined INTEGER NOT NULL DEFAULT 0 CHECK (quarantined IN (0,1)),
+        claim_owner TEXT CHECK (length(CAST(claim_owner AS BLOB)) BETWEEN 1 AND 512),
+        claim_epoch INTEGER CHECK (claim_epoch>=1),
+        CHECK ((receipt_json IS NULL)=(receipt_sha256 IS NULL)),
+        CHECK ((receipt_json IS NULL)=(completed_at IS NULL)),
+        CHECK ((claim_owner IS NULL)=(claim_epoch IS NULL))
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_operation_cancellation_run ON continuity_operation_cancellations(run_id,operation_id);
+    """
+
     private static let schemaV2 = """
+    \(operationCancellationSchema)
     CREATE TABLE IF NOT EXISTS control_schema_version (
         singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
         version INTEGER NOT NULL CHECK (version >= 1),
@@ -6896,6 +9991,154 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     CREATE INDEX IF NOT EXISTS idx_project_bindings_run
         ON project_bindings(run_id) WHERE run_id IS NOT NULL;
 
+    -- These bounded authority tombstones deliberately survive removal of a
+    -- project or binding. An old task UUID must never regain authority through
+    -- generic binding reactivation or recreation of the same project identity.
+    CREATE TABLE IF NOT EXISTS continuity_task_authorizations (
+        task_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        project_generation INTEGER NOT NULL CHECK (project_generation >= 1),
+        source_binding_id TEXT NOT NULL UNIQUE,
+        assignment_id TEXT NOT NULL,
+        assignment_sha256 TEXT NOT NULL CHECK (length(assignment_sha256)=64),
+        assignment_json TEXT NOT NULL CHECK (length(CAST(assignment_json AS BLOB)) <= 393216),
+        assignment_snapshot_sha256 TEXT NOT NULL CHECK (length(assignment_snapshot_sha256)=64),
+        authorization_json TEXT NOT NULL CHECK (length(CAST(authorization_json AS BLOB)) <= 32768),
+        authorization_sha256 TEXT NOT NULL CHECK (length(authorization_sha256)=64),
+        state TEXT NOT NULL CHECK (state IN ('active','revoked')),
+        revision INTEGER NOT NULL CHECK (revision >= 1 AND revision < 9223372036854775807),
+        run_id TEXT UNIQUE,
+        created_at TEXT NOT NULL,
+        revoked_at TEXT,
+        CHECK ((state='active' AND revoked_at IS NULL) OR (state='revoked' AND revoked_at IS NOT NULL))
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_task_authorizations_project
+        ON continuity_task_authorizations(project_id,project_generation,state);
+
+    CREATE TABLE IF NOT EXISTS continuity_ingress_acceptances (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        key_sha256 TEXT NOT NULL UNIQUE CHECK (length(key_sha256)=64),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        task_id TEXT NOT NULL CHECK (length(task_id)=36),
+        project_id TEXT NOT NULL CHECK (length(project_id)=36),
+        project_generation INTEGER NOT NULL CHECK (project_generation>=1),
+        receipt_json TEXT NOT NULL CHECK (length(CAST(receipt_json AS BLOB))<=393216),
+        receipt_sha256 TEXT NOT NULL CHECK (length(receipt_sha256)=64),
+        accepted_at TEXT NOT NULL CHECK (length(CAST(accepted_at AS BLOB))<=128)
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_ingress_acceptances_run ON continuity_ingress_acceptances(run_id);
+    CREATE TABLE IF NOT EXISTS continuity_ingress_holds (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        state TEXT NOT NULL CHECK (state IN ('awaiting_bootstrap','cancelled','activated')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        recovery_attempts INTEGER NOT NULL DEFAULT 0 CHECK (recovery_attempts BETWEEN 0 AND 8),
+        recovery_started_at TEXT CHECK (length(CAST(recovery_started_at AS BLOB))<=128),
+        recovery_deadline TEXT CHECK (length(CAST(recovery_deadline AS BLOB))<=128),
+        recovery_retry_at TEXT CHECK (length(CAST(recovery_retry_at AS BLOB))<=128),
+        recovery_claim_id TEXT CHECK (length(recovery_claim_id)=36),
+        recovery_lease_owner TEXT CHECK (length(CAST(recovery_lease_owner AS BLOB)) BETWEEN 1 AND 512),
+        recovery_lease_epoch INTEGER CHECK (recovery_lease_epoch>=1),
+        recovery_error_code TEXT CHECK (length(CAST(recovery_error_code AS BLOB))<=64),
+        recovery_quarantined INTEGER NOT NULL DEFAULT 0 CHECK (recovery_quarantined IN (0,1)),
+        recovery_ack_sha256 TEXT CHECK (length(recovery_ack_sha256)=64),
+        finalization_attempts INTEGER NOT NULL DEFAULT 0 CHECK (finalization_attempts BETWEEN 0 AND 8),
+        finalization_started_at TEXT CHECK (length(CAST(finalization_started_at AS BLOB))<=128),
+        finalization_deadline TEXT CHECK (length(CAST(finalization_deadline AS BLOB))<=128),
+        finalization_retry_at TEXT CHECK (length(CAST(finalization_retry_at AS BLOB))<=128),
+        recovery_claim_phase TEXT CHECK (recovery_claim_phase IN ('bootstrap','activation'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_continuity_ingress_active_hold
+        ON continuity_ingress_holds(run_id) WHERE state='awaiting_bootstrap';
+
+    CREATE TABLE IF NOT EXISTS continuity_source_dispatch_origins (
+        task_id TEXT PRIMARY KEY NOT NULL CHECK (length(task_id)=36),
+        caller_binding_id TEXT NOT NULL CHECK (length(caller_binding_id)=36),
+        owner_kind TEXT NOT NULL CHECK (length(CAST(owner_kind AS BLOB))<=64),
+        owner_id TEXT NOT NULL CHECK (length(CAST(owner_id AS BLOB)) BETWEEN 1 AND 512),
+        scope_sha256 TEXT NOT NULL CHECK (length(scope_sha256)=64),
+        issued_at TEXT NOT NULL CHECK (length(CAST(issued_at AS BLOB))<=128),
+        invalidated INTEGER NOT NULL DEFAULT 0 CHECK (invalidated IN (0,1))
+    );
+    CREATE TRIGGER IF NOT EXISTS trg_continuity_source_origin_binding_update
+    AFTER UPDATE ON project_bindings
+    WHEN OLD.binding_id IS NOT NEW.binding_id OR OLD.owner_kind IS NOT NEW.owner_kind OR OLD.owner_id IS NOT NEW.owner_id
+      OR OLD.project_id IS NOT NEW.project_id OR OLD.project_generation IS NOT NEW.project_generation
+      OR OLD.run_id IS NOT NEW.run_id OR OLD.authorization_scope_json IS NOT NEW.authorization_scope_json OR OLD.active IS NOT NEW.active
+    BEGIN
+        UPDATE continuity_source_dispatch_origins SET invalidated=1 WHERE caller_binding_id=OLD.binding_id;
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_continuity_source_origin_binding_delete
+    AFTER DELETE ON project_bindings
+    BEGIN
+        UPDATE continuity_source_dispatch_origins SET invalidated=1 WHERE caller_binding_id=OLD.binding_id;
+    END;
+    CREATE TABLE IF NOT EXISTS continuity_source_task_fences (
+        source_binding_id TEXT PRIMARY KEY NOT NULL CHECK (length(source_binding_id)=36),
+        task_id TEXT NOT NULL UNIQUE CHECK (length(task_id)=36),
+        project_id TEXT NOT NULL CHECK (length(project_id)=36),
+        project_generation INTEGER NOT NULL CHECK (project_generation>=1),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        operation_id TEXT NOT NULL CHECK (length(operation_id)=36),
+        receipt_sha256 TEXT NOT NULL CHECK (length(receipt_sha256)=64),
+        state TEXT NOT NULL CHECK (state IN ('quiescing','accepted')),
+        activation_receipt_sha256 TEXT CHECK (length(activation_receipt_sha256)=64),
+        created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS continuity_explicit_start_permits (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        receipt_sha256 TEXT NOT NULL CHECK (length(receipt_sha256)=64),
+        permit_json TEXT NOT NULL CHECK (length(CAST(permit_json AS BLOB))<=8192),
+        permit_sha256 TEXT NOT NULL CHECK (length(permit_sha256)=64)
+    );
+    CREATE TABLE IF NOT EXISTS continuity_explicit_start_requests (
+        request_id TEXT PRIMARY KEY NOT NULL CHECK (length(request_id)=36),
+        task_id TEXT NOT NULL CHECK (length(task_id)=36),
+        continuity_id TEXT NOT NULL CHECK (length(CAST(continuity_id AS BLOB)) BETWEEN 1 AND 256),
+        operation_id TEXT NOT NULL CHECK (length(operation_id)=36),
+        receipt_sha256 TEXT NOT NULL CHECK (length(receipt_sha256)=64)
+    );
+    CREATE TABLE IF NOT EXISTS continuity_source_activations (
+        operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        project_id TEXT NOT NULL CHECK (length(project_id)=36),
+        project_generation INTEGER NOT NULL CHECK (project_generation>=1),
+        task_id TEXT NOT NULL CHECK (length(task_id)=36),
+        candidate_id TEXT NOT NULL CHECK (length(candidate_id)=36),
+        envelope_json TEXT NOT NULL CHECK (length(CAST(envelope_json AS BLOB))<=524288),
+        envelope_sha256 TEXT NOT NULL CHECK (length(envelope_sha256)=64),
+        receipt_json TEXT NOT NULL CHECK (length(CAST(receipt_json AS BLOB))<=98304),
+        receipt_sha256 TEXT NOT NULL CHECK (length(receipt_sha256)=64),
+        sealed_checksum TEXT CHECK (length(sealed_checksum)=64),
+        resumption_json TEXT CHECK (length(CAST(resumption_json AS BLOB))<=98304),
+        resumption_sha256 TEXT CHECK (length(resumption_sha256)=64)
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_source_activations_run ON continuity_source_activations(run_id);
+
+    CREATE TABLE IF NOT EXISTS continuity_bootstrap_grants (
+        grant_id TEXT PRIMARY KEY NOT NULL CHECK (length(grant_id)=36),
+        candidate_id TEXT NOT NULL UNIQUE CHECK (length(candidate_id)=36),
+        operation_id TEXT NOT NULL CHECK (length(operation_id)=36),
+        run_id TEXT NOT NULL CHECK (length(run_id)=36),
+        grant_json TEXT NOT NULL CHECK (length(CAST(grant_json AS BLOB))<=8192),
+        grant_sha256 TEXT NOT NULL CHECK (length(grant_sha256)=64)
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_bootstrap_grants_operation ON continuity_bootstrap_grants(operation_id);
+    CREATE TABLE IF NOT EXISTS continuity_bootstrap_provider_results (
+        turn_id TEXT PRIMARY KEY NOT NULL CHECK (length(turn_id)=36),
+        grant_id TEXT NOT NULL CHECK (length(grant_id)=36),
+        result_json TEXT NOT NULL CHECK (length(CAST(result_json AS BLOB))<=131072),
+        result_sha256 TEXT NOT NULL CHECK (length(result_sha256)=64)
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_bootstrap_results_grant ON continuity_bootstrap_provider_results(grant_id);
+    CREATE TABLE IF NOT EXISTS continuity_bootstrap_retrieval_proofs (
+        grant_id TEXT PRIMARY KEY NOT NULL CHECK (length(grant_id)=36),
+        invocation_id TEXT NOT NULL UNIQUE CHECK (length(invocation_id)=36),
+        proof_json TEXT NOT NULL CHECK (length(CAST(proof_json AS BLOB))<=98304),
+        proof_sha256 TEXT NOT NULL CHECK (length(proof_sha256)=64)
+    );
+
     CREATE TABLE IF NOT EXISTS autonomous_runs (
         run_id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL REFERENCES control_projects(project_id) ON DELETE CASCADE,
@@ -6903,7 +10146,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         assignment_id TEXT,
         mission TEXT NOT NULL,
         state TEXT NOT NULL CHECK (state IN (
-            'created','validating','ready','starting','running','checkpointing','rolling_over',
+            'created','awaiting_bootstrap','validating','ready','starting','running','checkpointing','rolling_over',
             'recovering','validating_completion','completed','waiting_provider','waiting_resource',
             'retry_wait','paused','blocked_configuration','failed_recoverable','cancel_requested',
             'cancelled','failed_terminal')),

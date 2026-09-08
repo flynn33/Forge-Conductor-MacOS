@@ -263,6 +263,29 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
 }
 
 final class NativeSessionHostPluginTests: XCTestCase {
+    func testSourceOnlyCancellationCannotOverwriteAnotherAdaptersNewLegacyReceipt() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("source-cancel-ledger-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let ledger = directory.appendingPathComponent("native-session-ledger.json")
+        let stale = try LMStudioManagedSessionHostAdapterV2(storageDirectory: directory,
+            transport: ScriptedManagedTransport(mode: .normal, ledgerURL: ledger))
+        let writer = try LMStudioManagedSessionHostAdapterV2(storageDirectory: directory,
+            transport: ScriptedManagedTransport(mode: .normal, ledgerURL: ledger))
+        let fixture = try makeV2Fixture(mission: "Preserve the other adapter's committed receipt",
+            idempotencyKey: "source-cancel-preserved-legacy")
+        let receipt = try await writer.createAndBootstrap(request: fixture.request,
+            handoffJSON: fixture.handoffJSON, challenge: fixture.challenge)
+        let committed = try Data(contentsOf: ledger)
+        // Source cancellation can arrive before its in-flight entry is installed.
+        // The older adapter has no matching legacy operation to mutate.
+        await stale.cancel(operationID: UUID())
+        XCTAssertEqual(try Data(contentsOf: ledger), committed)
+        let reopened = try LMStudioManagedSessionHostAdapterV2(storageDirectory: directory,
+            transport: ScriptedManagedTransport(mode: .normal, ledgerURL: ledger))
+        let restored = try await reopened.receipt(forIdempotencyKey: fixture.request.idempotencyKey)
+        XCTAssertEqual(restored, receipt)
+    }
+
     func testLMStudioErrorsExposeProviderNeutralFailureDisposition() {
         let cases: [(LMStudioProviderError, ManagedProviderFailureDisposition, String)] = [
             (.invalidConfiguration("fixture"), .blockedConfiguration, "lmstudio_invalid_configuration"),

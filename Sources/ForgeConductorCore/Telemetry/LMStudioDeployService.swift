@@ -157,9 +157,11 @@ public final class LMStudioDeployService: LMStudioDeploying, @unchecked Sendable
 
             let st = installer.status(preferredBinary: binary)
             let minimumToolCount = postHealth.roles.map(\.toolCount).min() ?? 0
+            let generalToolCount = postHealth.roles.filter { $0.role != .clu }.map(\.toolCount).min() ?? 0
             diagnostics.info("deploy_status", [
                 "primary": st.primaryPluginInstalled ? "ok" : "missing",
                 "fallback": st.fallbackPluginInstalled ? "ok" : "missing",
+                "clu": st.continuityPluginInstalled == true ? "ok" : "missing",
                 "mcp_json": st.mcpJSONRegistered ? "ok" : "missing",
                 "detail": st.detail,
                 "connection_state": postHealth.state.rawValue,
@@ -199,7 +201,7 @@ public final class LMStudioDeployService: LMStudioDeploying, @unchecked Sendable
                 mcpConfigPath: result.mcpConfigPath,
                 deploymentID: result.deploymentID,
                 message: fullyOK
-                    ? "Deployment complete: \(hostSummary). Standalone verification passed with at least \(minimumToolCount) tools per role."
+                    ? "Deployment complete: \(hostSummary). Primary and fallback verified at least \(generalToolCount) tools each; CLU verified its four controls."
                     : "Deployed in degraded state \(postHealth.state.rawValue): \(healthDetail(postHealth))"
             )
         } catch let e as DeployError {

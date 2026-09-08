@@ -16,11 +16,18 @@ final class LoadTraceRenderer: NSObject, MTKViewDelegate {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private let vertices = MetalVertexBuffer<GaugeVertex>()
-    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
     private var sampleCount = 0
     private var samples: [Float] = []
+
+    override convenience init() { self.init(surfaceDiagnostics: nil) }
+
+    init(surfaceDiagnostics: RuntimeDiagnostics?) {
+        surfaceLifetime = GaugeSurfaceLifetime(scope: surfaceDiagnostics)
+        super.init()
+    }
 
     func attach(to view: MTKView) {
         let resources = MetalGaugeResources.shared

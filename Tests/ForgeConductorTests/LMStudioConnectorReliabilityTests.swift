@@ -20,7 +20,7 @@ final class LMStudioConnectorReliabilityTests: XCTestCase {
         try? FileManager.default.removeItem(at: scratch)
     }
 
-    func testDeploymentVerifiesPrimaryAndFallbackBeforeAndAfterInstall() throws {
+    func testDeploymentVerifiesAllRolesBeforeAndAfterInstall() throws {
         let binary = try makeExecutable()
         let installer = RecordingInstaller(binary: binary)
         let verifier = RecordingVerifier()
@@ -30,7 +30,7 @@ final class LMStudioConnectorReliabilityTests: XCTestCase {
 
         XCTAssertTrue(result.ok)
         XCTAssertEqual(installer.installCount, 1)
-        XCTAssertEqual(verifier.roles, [.primary, .fallback, .primary, .fallback])
+        XCTAssertEqual(verifier.roles, [.primary, .fallback, .clu, .primary, .fallback, .clu])
         XCTAssertFalse(result.deploymentID.isEmpty)
     }
 
@@ -38,7 +38,7 @@ final class LMStudioConnectorReliabilityTests: XCTestCase {
         let binary = try makeExecutable()
         let installer = RecordingInstaller(binary: binary)
         let verifier = RecordingVerifier { callIndex, role in
-            !(callIndex >= 2 && role == .primary)
+            !(callIndex >= LMStudioConnectorRole.allCases.count && role == .primary)
         }
         let service = makeService(installer: installer, verifier: verifier)
 
@@ -47,7 +47,7 @@ final class LMStudioConnectorReliabilityTests: XCTestCase {
         XCTAssertFalse(result.ok)
         XCTAssertTrue(result.message.contains(LMStudioConnectionState.fallbackPromoted.rawValue))
         XCTAssertEqual(installer.installCount, 1)
-        XCTAssertEqual(verifier.roles, [.primary, .fallback, .primary, .fallback])
+        XCTAssertEqual(verifier.roles, [.primary, .fallback, .clu, .primary, .fallback, .clu])
     }
 
     func testRoleIdentityMismatchFailsBeforeInstallerMutation() throws {
@@ -58,7 +58,7 @@ final class LMStudioConnectorReliabilityTests: XCTestCase {
 
         XCTAssertThrowsError(try service.deploy(preferredBinary: binary))
         XCTAssertEqual(installer.installCount, 0)
-        XCTAssertEqual(verifier.roles, [.primary, .fallback])
+        XCTAssertEqual(verifier.roles, [.primary, .fallback, .clu])
     }
 
     func testMalformedMCPConfigurationIsPreservedWithoutReplacingLivePlugins() throws {
@@ -239,7 +239,8 @@ private final class RecordingInstaller: LMStudioPluginInstalling, @unchecked Sen
             fallbackPluginPath: "/fallback",
             mcpConfigPath: "/mcp.json",
             deploymentID: "test-deployment",
-            detail: "ready"
+            detail: "ready",
+            continuityPluginInstalled: true
         )
     }
 
@@ -302,7 +303,7 @@ private final class RecordingVerifier: MCPServeVerifying, @unchecked Sendable {
             ok: ready,
             protocolVersion: ready ? "2025-11-25" : nil,
             serverName: serverName(role),
-            toolCount: ready ? 25 : 0,
+            toolCount: ready ? (role == .clu ? 4 : 25) : 0,
             detail: ready ? "ready" : "down",
             durationMs: 1
         )

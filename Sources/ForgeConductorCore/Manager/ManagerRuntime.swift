@@ -27,6 +27,8 @@ public final class ManagerRuntime: @unchecked Sendable {
     public var restartCount = 0
     public var watchdog: DispatchSourceTimer?
     public var autonomyTickPending = false
+    var autonomyTickID: UUID?
+    var autonomyTickTask: Task<Void, Never>?
     var providerProbeInProgress = false
     var providerProbeState: ManagerProviderProbeState?
     public var lastPresencePruneAt: Date?
@@ -78,7 +80,8 @@ public final class ManagerRuntime: @unchecked Sendable {
         watchdog?.setEventHandler {}
         watchdog?.cancel()
         watchdog = nil
-        autonomyTickPending = false
+        // Canceling a timer does not finish the task it already dispatched.
+        // The owner clears pending state only when that exact task completes.
     }
 
     /// Releases signal handlers owned by this runtime. The owner must hold its lock.

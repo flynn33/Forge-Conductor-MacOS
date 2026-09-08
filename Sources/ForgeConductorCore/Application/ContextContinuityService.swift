@@ -42,6 +42,130 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     // MARK: - Public tool operations
 
+    /// The manager invokes this inside its live task-authorization transaction.
+    /// Packet text remains task data; the supplied native authorization fixes the
+    /// project, assignment and scope independently of that text. Both model and
+    /// runtime handoffs use this same source commit boundary.
+    func commitAuthorizedHandoff(
+        arguments: [String: Any],
+        clientID: ClientID,
+        source: HandoffSource,
+        finalize: Bool,
+        authorization: ContinuityIngressAuthorization,
+        automaticHandoffEnabled: Bool,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffCommit {
+        let persisted = try mutateAndPersist(
+            authorization: authorization,
+            automaticHandoffEnabled: automaticHandoffEnabled,
+            cancellation: cancellation
+        ) {
+            var packet = try buildPacket(
+                arguments: arguments, clientID: clientID, source: source,
+                finalize: finalize, authorization: authorization,
+                cancellation: cancellation
+            )
+            // A later soft checkpoint is a new non-resume-ready revision, even
+            // when its exact predecessor packet had already been finalized.
+            // The earlier immutable delivery remains intact.
+            packet.resumeReady = finalize
+            return packet
+        }
+        guard let commit = persisted.ingressCommit else {
+            throw ContinuityIngressError.integrityFailure("authorized source commit is missing")
+        }
+        return commit
+    }
+
+    /// Native task responses retain the established packet fields without
+    /// advertising shared legacy projections that intentionally exclude tasks.
+    func authorizedCommitPayload(_ commit: ContinuityHandoffCommit, finalize: Bool) throws -> [String: Any] {
+        let revision = commit.revision
+        guard revision.canonicalPacketJSON.count <= ContinuityIngressLimits.maximumPacketBytes,
+              JSONSupport.sha256Hex(revision.canonicalPacketJSON) == revision.identity.packetSHA256,
+              let object = try JSONSerialization.jsonObject(with: revision.canonicalPacketJSON) as? [String: Any],
+              let packet = HandoffPacket.fromDictionary(object),
+              packet.id == revision.identity.continuityID, packet.resumeReady == finalize,
+              revision.resumeReady == finalize,
+              try ForgeJSONCanonicalizationV1.data(from: packet.asDictionary()) == revision.canonicalPacketJSON else {
+            throw ContinuityIngressError.integrityFailure("native source commit payload differs")
+        }
+        var payload = successPayload(packet, action: finalize ? "handoff" : "checkpoint")
+        payload["paths"] = [:] as [String: Any]
+        payload["projection_ok"] = false
+        payload["projection_repair_pending"] = false
+        payload["projection_excluded"] = true
+        payload["canonical_location"] = "task_scoped_sqlite"
+        payload["continuity_id"] = revision.identity.continuityID
+        payload["revision"] = revision.identity.revision
+        payload["packet_sha256"] = revision.identity.packetSHA256
+        payload["operation_id"] = commit.delivery?.operationID.uuidString.lowercased() as Any? ?? NSNull()
+        return payload
+    }
+
+    /// Exact immutable retrieval for an already authorized caller or provisional
+    /// successor. Reading never adopts a workspace or clears predecessor fences.
+    func authorizedHandoff(
+        identity: ContinuityHandoffIdentity,
+        authorization: ContinuityIngressAuthorization,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityHandoffRevision {
+        try store.continuityHandoffRevision(
+            identity: identity, authorization: authorization, cancellation: cancellation
+        )
+    }
+
+    /// Called after the control plane authenticates exact native task ownership.
+    /// This does not repair receipts, acquire a lease, or advance source state.
+    func authorizedOperationProgress(acceptance: ContinuityIngressAcceptanceReceipt,
+        engine: ContinuityStateEngine, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationProgressEvidence {
+        let source = try store.continuityOperationProgressSource(acceptance: acceptance, cancellation: cancellation)
+        let canonical = try engine.sourceBootstrap(operationID: acceptance.operationID,
+            authorization: acceptance.authorization, cancellation: cancellation)
+        return ContinuityOperationProgressEvidence(source: source.source, delivery: source.delivery, canonical: canonical)
+    }
+
+    /// The manager calls this only through its durable operation cancellation
+    /// claim. A source-store marker by itself does not grant control authority.
+    func cancelAuthorizedHandoff(request: ContinuityOperationCancellationRequest,
+        acceptance: ContinuityIngressAcceptanceReceipt, cancellation: ToolCallCancellation? = nil
+    ) throws -> ContinuityOperationCancellationMarker {
+        try store.cancelContinuitySourceDelivery(request: request, acceptance: acceptance, cancellation: cancellation)
+    }
+
+    /// Explicit start authorizes one frozen handoff without changing automatic
+    /// policy. The control plane authenticates native task correlation before
+    /// reading source data or returning a previously accepted request.
+    func submitAuthorizedHandoff(
+        _ request: ContinuityExplicitHandoffRequest,
+        taskID: UUID, correlation: VerifiedContinuityTaskCorrelation?,
+        context: ToolInvocationContext, owner: ProjectBindingOwner,
+        repository: ProjectControlPlaneRepository, config: ConfigStore,
+        cancellation: ToolCallCancellation? = nil
+    ) async throws -> ContinuityExplicitStartReceipt {
+        guard let generation = Int(exactly: context.projectGeneration.rawValue) else {
+            throw ContinuityIngressError.invalidRequest("project_generation")
+        }
+        let selection = try config.budgetPolicySelection(scope: BudgetPolicyScope(kind: .projectOverride,
+            projectID: context.projectID.description, projectGeneration: generation))
+        let requestID = try request.requestID(taskID: taskID, projectID: context.projectID,
+                                             generation: context.projectGeneration)
+        let source = store
+        return try await repository.submitExplicitContinuityIngress(taskID: taskID, correlation: correlation,
+            context: context, owner: owner, requestID: requestID, continuityID: request.continuityID,
+            policySelection: selection, cancellation: cancellation) { authorization in
+                guard let revision = try source.continuityLatestRevision(continuityID: request.continuityID,
+                    authorization: authorization, cancellation: cancellation) else {
+                    throw ContinuityIngressError.notFound
+                }
+                // This remains durable if control-plane admission is interrupted.
+                // The outbox alone cannot grant explicit execution permission.
+                return try source.enqueueContinuityHandoff(identity: revision.identity,
+                    authorization: authorization, cancellation: cancellation).handoff
+            }
+    }
+
     /// Soft save — write/update packet; work may continue.
     public func checkpoint(
         arguments: [String: Any],
@@ -112,12 +236,12 @@ public final class ContextContinuityService: @unchecked Sendable {
     ) throws -> [String: Any] {
         let packet: HandoffPacket?
         if let id, !id.isEmpty {
-            packet = try store.handoffGet(id: id, cancellation: cancellation)
+            packet = try store.handoffLegacyGet(id: id, cancellation: cancellation)
         } else {
-            packet = try store.handoffLatest(
+            packet = try store.handoffLegacyLatest(
                 resumeReadyOnly: preferResumeReady,
                 cancellation: cancellation
-            ) ?? store.handoffLatest(
+            ) ?? store.handoffLegacyLatest(
                 resumeReadyOnly: false,
                 cancellation: cancellation
             )
@@ -148,7 +272,7 @@ public final class ContextContinuityService: @unchecked Sendable {
         limit: Int = 10,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
-        let packets = try store.handoffList(limit: limit, cancellation: cancellation)
+        let packets = try store.handoffLegacyList(limit: limit, cancellation: cancellation)
         return [
             "ok": true,
             "count": packets.count,
@@ -170,11 +294,11 @@ public final class ContextContinuityService: @unchecked Sendable {
     public func statusSummary(
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
-        let latest = try store.handoffLatest(
+        let latest = try store.handoffLegacyLatest(
             resumeReadyOnly: false,
             cancellation: cancellation
         )
-        let resume = try store.handoffLatest(
+        let resume = try store.handoffLegacyLatest(
             resumeReadyOnly: true,
             cancellation: cancellation
         )
@@ -210,10 +334,10 @@ public final class ContextContinuityService: @unchecked Sendable {
     ) throws -> HandoffPacket {
         let persisted = try mutateAndPersist(cancellation: cancellation) {
             var args = inferred
-            if let latest = try store.handoffLatest(
+            if let latest = try store.handoffLegacyLatest(
                 clientID: clientID.rawValue,
                 cancellation: cancellation
-            ) ?? store.handoffLatest(
+            ) ?? store.handoffLegacyLatest(
                 resumeReadyOnly: false,
                 cancellation: cancellation
             ) {
@@ -282,7 +406,7 @@ public final class ContextContinuityService: @unchecked Sendable {
     ) throws -> HandoffPacket {
         let persisted = try mutateAndPersist(cancellation: cancellation) {
             var args: [String: Any] = ["status": "budget_pressure"]
-            if let latest = try store.handoffLatest(
+            if let latest = try store.handoffLegacyLatest(
                 clientID: clientID.rawValue,
                 cancellation: cancellation
             ) {
@@ -353,6 +477,7 @@ public final class ContextContinuityService: @unchecked Sendable {
         source: HandoffSource,
         finalize: Bool,
         preserveAuthorIdentity: Bool = false,
+        authorization: ContinuityIngressAuthorization? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket {
         try cancellation?.checkCancellation()
@@ -366,10 +491,24 @@ public final class ContextContinuityService: @unchecked Sendable {
             clientID: clientID.rawValue
         )
         if let existingID {
-            guard let prior = try store.handoffGet(
-                id: existingID,
-                cancellation: cancellation
-            ) else {
+            let prior: HandoffPacket?
+            if let authorization {
+                // Authorize the exact source identity before reading any prior
+                // packet. A mutable compatibility row is never a scoped fallback.
+                if let frozen = try store.continuityLatestRevision(
+                    continuityID: existingID, authorization: authorization,
+                    cancellation: cancellation
+                ) {
+                    prior = HandoffPacket.fromDictionary(
+                        try JSONSupport.object(from: frozen.canonicalPacketJSON)
+                    )
+                } else {
+                    prior = nil
+                }
+            } else {
+                prior = try store.handoffLegacyGet(id: existingID, cancellation: cancellation)
+            }
+            guard let prior else {
                 throw StoreError.notFound("Unknown handoff packet: \(existingID)")
             }
             base = prior
@@ -377,7 +516,7 @@ public final class ContextContinuityService: @unchecked Sendable {
             if !(preserveAuthorIdentity && !finalize) {
                 base.source = source
             }
-        } else if let latest = try store.handoffLatest(
+        } else if authorization == nil, let latest = try store.handoffLegacyLatest(
             clientID: clientID.rawValue,
             cancellation: cancellation
         ), !latest.resumeReady {
@@ -440,27 +579,31 @@ public final class ContextContinuityService: @unchecked Sendable {
             base.decisions = decisions
         }
 
-        let currentAgents = try snapshotAgents(
-            clientID: clientID,
-            cancellation: cancellation
-        )
-        if existingID != nil {
-            // A resumed chat may checkpoint the recovered packet before it has
-            // reattached every listed agent. Keep prior snapshots whose durable
-            // sessions are still open, replacing them as the new client reattaches.
-            base.agents = try mergeOpenAgentSnapshots(
-                prior: base.agents,
-                current: currentAgents,
+        if authorization == nil {
+            let currentAgents = try snapshotAgents(
+                clientID: clientID,
                 cancellation: cancellation
             )
-        } else {
-            base.agents = currentAgents
-        }
+            if existingID != nil {
+                // A resumed chat may checkpoint the recovered packet before it has
+                // reattached every listed agent. Keep prior snapshots whose durable
+                // sessions are still open, replacing them as the new client reattaches.
+                base.agents = try mergeOpenAgentSnapshots(
+                    prior: base.agents,
+                    current: currentAgents,
+                    cancellation: cancellation
+                )
+            } else {
+                base.agents = currentAgents
+            }
 
-        // Fill goal/cwd from active binding if still empty.
-        if let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
-            if base.goal.isEmpty { base.goal = binding.goal }
-            if base.cwd == nil || base.cwd?.isEmpty == true { base.cwd = binding.cwd }
+            // Legacy client-scoped snapshots remain available on their existing
+            // path. A shared transport does not authorize importing another task's
+            // agent goal, directory or open sessions into a scoped handoff.
+            if let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
+                if base.goal.isEmpty { base.goal = binding.goal }
+                if base.cwd == nil || base.cwd?.isEmpty == true { base.cwd = binding.cwd }
+            }
         }
 
         if finalize {
@@ -572,9 +715,12 @@ public final class ContextContinuityService: @unchecked Sendable {
     private struct PersistenceOutcome {
         var packet: HandoffPacket
         var projectionWarning: String?
+        var ingressCommit: ContinuityHandoffCommit? = nil
     }
 
     private func mutateAndPersist(
+        authorization: ContinuityIngressAuthorization? = nil,
+        automaticHandoffEnabled: Bool = false,
         cancellation: ToolCallCancellation?,
         _ mutation: () throws -> HandoffPacket
     ) throws -> PersistenceOutcome {
@@ -589,18 +735,33 @@ public final class ContextContinuityService: @unchecked Sendable {
         return try withPersistenceFileLock(cancellation: cancellation) {
             try cancellation?.checkCancellation()
             let packet = try mutation()
-            try store.handoffUpsert(packet, cancellation: cancellation)
+            let ingress: ContinuityHandoffCommit?
+            if let authorization {
+                ingress = try store.handoffCommit(
+                    packet, authorization: authorization,
+                    automaticHandoffEnabled: automaticHandoffEnabled,
+                    cancellation: cancellation
+                )
+            } else {
+                try store.handoffUpsert(packet, cancellation: cancellation)
+                ingress = nil
+            }
             // SQLite is authoritative. A cancellation observed after this point
             // cannot turn the durable handoff into a reported failure.
+            if ingress != nil {
+                // Shared legacy projections carry no task authorization. Keep
+                // scoped packets at the exact, authorized SQLite read boundary.
+                return PersistenceOutcome(packet: packet, projectionWarning: nil, ingressCommit: ingress)
+            }
             do {
                 try writeProjections(packet)
-                return PersistenceOutcome(packet: packet, projectionWarning: nil)
+                return PersistenceOutcome(packet: packet, projectionWarning: nil, ingressCommit: ingress)
             } catch {
                 diagnostics.warn("continuity_projection_write_failed", [
                     "handoff_id": packet.id,
                     "error": "\(error)",
                 ], category: .general)
-                return PersistenceOutcome(packet: packet, projectionWarning: "\(error)")
+                return PersistenceOutcome(packet: packet, projectionWarning: "\(error)", ingressCommit: ingress)
             }
         }
     }
@@ -618,7 +779,7 @@ public final class ContextContinuityService: @unchecked Sendable {
         try withPersistenceFileLock(cancellation: nil) {
             try store.handoffRepairPointers()
             try ensureMemoryIndex()
-            for packet in try store.handoffListAll() {
+            for packet in try store.handoffLegacyListAll() {
                 do {
                     try writePacketProjection(packet)
                 } catch {
@@ -628,7 +789,7 @@ public final class ContextContinuityService: @unchecked Sendable {
                     ], category: .general)
                 }
             }
-            if let latest = try store.handoffLatest(resumeReadyOnly: false) {
+            if let latest = try store.handoffLegacyLatest(resumeReadyOnly: false) {
                 try writeLatestProjections(latest)
             }
         }

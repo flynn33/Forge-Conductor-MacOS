@@ -56,11 +56,18 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private let vertices = MetalVertexBuffer<GaugeVertex>()
-    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
     private var fraction: Float = 0
     private var color = MetalGaugePalette.cyan
+
+    override convenience init() { self.init(surfaceDiagnostics: nil) }
+
+    init(surfaceDiagnostics: RuntimeDiagnostics?) {
+        surfaceLifetime = GaugeSurfaceLifetime(scope: surfaceDiagnostics)
+        super.init()
+    }
 
     func attach(_ view: MTKView) {
         let resources = MetalGaugeResources.shared
@@ -150,8 +157,9 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
 struct MetalBarGauge: NSViewRepresentable {
     var fraction: Double
     var tint: Color
+    var surfaceDiagnostics: RuntimeDiagnostics? = nil
 
-    func makeCoordinator() -> MetalBarRenderer { MetalBarRenderer() }
+    func makeCoordinator() -> MetalBarRenderer { MetalBarRenderer(surfaceDiagnostics: surfaceDiagnostics) }
 
     func makeNSView(context: Context) -> MTKView {
         let v = GaugeMetalView(frame: NSRect(x: 0, y: 0, width: 48, height: 8))
@@ -195,12 +203,19 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private let vertices = MetalVertexBuffer<GaugeVertex>()
-    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
     private var count = 0
     private var fraction: Float = 0
     private var color = MetalGaugePalette.cyan
+
+    override convenience init() { self.init(surfaceDiagnostics: nil) }
+
+    init(surfaceDiagnostics: RuntimeDiagnostics?) {
+        surfaceLifetime = GaugeSurfaceLifetime(scope: surfaceDiagnostics)
+        super.init()
+    }
 
     func attach(_ view: MTKView) {
         let resources = MetalGaugeResources.shared
@@ -330,8 +345,9 @@ struct MetalRingGauge: NSViewRepresentable {
     var fraction: Double
     var tint: Color
     var label: String = ""
+    var surfaceDiagnostics: RuntimeDiagnostics? = nil
 
-    func makeCoordinator() -> MetalRingRenderer { MetalRingRenderer() }
+    func makeCoordinator() -> MetalRingRenderer { MetalRingRenderer(surfaceDiagnostics: surfaceDiagnostics) }
     func makeNSView(context: Context) -> MTKView {
         let v = GaugeMetalView()
         context.coordinator.attach(v)
@@ -370,11 +386,18 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private let vertices = MetalVertexBuffer<GaugeVertex>()
-    private let surfaceLifetime = GaugeSurfaceLifetime()
+    private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
     private var count = 0
     private var cores: [Float] = []
+
+    override convenience init() { self.init(surfaceDiagnostics: nil) }
+
+    init(surfaceDiagnostics: RuntimeDiagnostics?) {
+        surfaceLifetime = GaugeSurfaceLifetime(scope: surfaceDiagnostics)
+        super.init()
+    }
 
     func attach(_ view: MTKView) {
         let resources = MetalGaugeResources.shared
@@ -486,7 +509,8 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
 
 struct MetalCoreBarsView: NSViewRepresentable {
     var cores: [Double]
-    func makeCoordinator() -> MetalCoreBarsRenderer { MetalCoreBarsRenderer() }
+    var surfaceDiagnostics: RuntimeDiagnostics? = nil
+    func makeCoordinator() -> MetalCoreBarsRenderer { MetalCoreBarsRenderer(surfaceDiagnostics: surfaceDiagnostics) }
     func makeNSView(context: Context) -> MTKView {
         let v = GaugeMetalView()
         context.coordinator.attach(v)
