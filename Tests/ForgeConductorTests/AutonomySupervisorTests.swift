@@ -427,6 +427,26 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testRunIntentRejectsLeaseFromAnotherRunBeforeMutation() async throws {
+        try await withRepository { repository, root in
+            let first = try await makeRun(repository: repository, root: root)
+            let second = try await makeRun(repository: repository, root: root.appendingPathComponent("other"))
+            let lease = try await repository.acquireRunLease(runID: first.run.runID, ownerID: "intent-owner")
+            let intent = RunSideEffectIntent(kind: .continuity, idempotencyKey: "exact-run-intent",
+                payloadSHA256: String(repeating: "a", count: 64), summary: "Preserve the exact run boundary")
+            await assertAutonomyError(code: "autonomous_run_lease_stale") {
+                _ = try await repository.persistRunSideEffectIntent(runID: second.run.runID,
+                    lease: lease, expectedRevision: second.run.revision, intent: intent)
+            }
+            let unchanged = try await repository.autonomousRun(second.run.runID)
+            XCTAssertEqual(unchanged, second.run)
+            let accepted = try await repository.persistRunSideEffectIntent(runID: first.run.runID,
+                lease: lease, expectedRevision: first.run.revision, intent: intent)
+            XCTAssertEqual(accepted.specification.work.pendingIntent, intent)
+            XCTAssertEqual(accepted.revision, first.run.revision + 1)
+        }
+    }
+
     func testLeaseFencesDuplicateOwnerAndStaleEpochAfterRecovery() async throws {
         let clock = MutableAutonomyClock(Date(timeIntervalSince1970: 1_000))
         try await withRepository(clock: clock) { repository, root in

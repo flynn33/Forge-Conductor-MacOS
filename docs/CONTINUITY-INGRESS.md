@@ -50,6 +50,30 @@ task-scoped mutation dispatch returns `task_identity_unavailable` before source
 transfer. Independent tasks remain available; the shared MCP process is never
 globally fenced to stand in for exact task authority.
 
+## Legacy migration during project registration
+
+Manager registration and MCP project initialization invoke the existing legacy
+migrator after exact project activation, while holding the registration transition
+fence. The migrator imports records with provable project identity as read-only
+history and quarantines ambiguous records with a retained explanation. Migration
+does not create a successor or use `LATEST` as project authority. It preserves
+the original legacy files and uses the existing transactional migration receipts
+for restart and replay.
+
+The registration scan is limited to 128 JSON candidates and 512 directory entries.
+It opens candidates relative to a pinned directory descriptor and rejects symbolic
+links, hard links, FIFOs, oversized files and other non-regular inputs. Invalid
+candidates retain a quarantine explanation without copying linked content. An
+inventory exceeding either limit fails before any migration commit and leaves
+registration reconciliation pending; it never reports a partial prefix as complete.
+
+MCP initialization reports `legacy_continuity_migration` as `pending`, `complete`
+with receipt and counts, or `not_needed`. A migration failure after registration
+commits preserves that primary result and requests an exact retry. Manager results
+likewise retain the committed project identity and its current lifecycle state
+when migration still needs reconciliation. These migrations grant no active run
+or task authority.
+
 ## Manager admission and execution hold
 
 The persistent manager owns delivery through its existing watchdog. Each pass
@@ -76,6 +100,16 @@ the durable hold. Generic transitions cannot release it; cancellation remains
 available. Current policy or an exact explicit start permit is checked again
 before provider effects. A source outbox Boolean alone never grants permission
 to bypass disabled automatic handoff.
+
+Native process evidence now covers forced termination after source commit,
+source claim, manager acceptance and source acknowledgment. Each child test host
+runs the production source or delivery service and is terminated with SIGKILL;
+recovery uses the persistent manager's normal delivery entrypoint. Retained effect
+records verify the original packet hash, one run, acknowledged delivery and no
+second acceptance. The two claimed cases advance the injected clock by 31 seconds
+to make their persisted leases eligible. Coverage ends at `awaiting_bootstrap`;
+remote provider acceptance and the complete rollover crash matrix remain separate
+qualification requirements.
 
 Source schema version 8 adds explicit-submission provenance without resetting
 existing claims. The control plane retains its public schema version 2 and uses
@@ -391,10 +425,80 @@ packet and its response without committing it. Admission returns that frozen
 checkpoint for the execution owner to use. A ready handoff has no continuation
 measurement requirement.
 
-Pressure carryover acceptance and owner integration remain incomplete. These
-components do not enable automatic pressure handoff or qualify
-G04. Product identity remains 0.9.0 build 1; no user-visible control or deployment
-behavior changes in this component checkpoint.
+Successor acceptance now verifies the exact committed pressure source receipt
+and retains a separate pressure journal digest. It counts every admitted provider
+call, including untouched calls, plus reads admitted before enrollment once.
+The pressure decision's tightened ceilings survive later policy increases and
+repository restart. A prepared stage before POST contributes its retained intent
+but no invented provider response or usage. A receipt recovered after storage
+expiry can be accepted while the source remains stopped. The established
+provider-requested handoff digest format remains unchanged.
+
+Stage ordinals restart at one for each logical source message. Pressure admission
+checks contiguous stages within each message, rejects interleaved request reuse,
+and verifies the exact provider response chain across messages.
+
+The source owner now checks pressure before provider dispatch, after every
+accepted response (including assistant-only answers), and before tool effects.
+It stops and joins inference renewal before adopting the fixed storage claim.
+The manager uses the real continuity writer and commits the exact checkpoint
+packet measured during output admission. Intrinsically oversized read allowances
+are rejected before any read or handoff effect.
+
+The existing watchdog separately pages unfinished pressure storage and expired
+receipt cleanup. Storage failures retain a short lease cooldown and the original
+five-minute deadline; writer attempts remain capped at eight. Receipt read
+failures use durable exponential retry delays and quarantine after eight failed
+reads. Neither recovery path acquires a provider permit or issues a model POST.
+Shutdown retains ownership until a pending storage callback actually exits.
+
+If frozen critical data cannot fit its inherited packet, decision, retrieval or
+commit-response limit before reservation, the owner records a specific terminal
+pressure reason and releases the storage claim. It preserves the pressure data
+without creating a source reservation or repeatedly attempting the same packet.
+
+The compact bootstrap root explicitly names acknowledgment contract version 2,
+separately from envelope schema 3.0. The adapter still requires exactly one typed
+acknowledgment with the correct identity, checksum and nonce; a second corrected
+call cannot make a multiple-call response valid.
+The root also supplies the complete expected acknowledgment object, encoded by
+the same typed wire model used for validation. This challenge is included in
+bootstrap byte admission. It grants no authority and cannot fill missing fields
+in the model's actual acknowledgment.
+Tool discovery uses a separate cancellation token bounded by the current lease.
+Its admission deadline cannot shorten the five-minute source exchange deadline;
+the owner renews the lease during provider inference. Task cancellation still
+cancels discovery, and the existing per-call and provider limits remain enforced.
+A native regression crosses the initial 30-second lease with a 31-second response.
+
+Pending-intent writes require the lease to identify the same target run before
+any mutation. A native process probe verifies one lease winner, preservation of
+the exact pending intent after that process is killed, epoch advancement after
+expiry, and rejection of the old lease. This covers the repository ownership
+boundary; the complete manager/provider crash matrix remains separate.
+
+Source exchange failure diagnostics record the provider/owner phase, a bounded
+code and cancellation/deadline flags. Prompts and raw exception text are excluded.
+
+A disposable real-provider pressure test now reaches source handoff commit,
+manager admission, a fresh successor root and exact context retrieval. Gemma 4
+E4B returned multiple acknowledgment calls, including incomplete calls, which
+were rejected without successor activation. Its larger-packet attempt also
+retained an unknown provider outcome after the request deadline. A separate
+Qwen3 Coder 30B attempt ended without a source response receipt during prompt
+processing. These failed runs retain their native receipts and recovery fences;
+they do not prove resumed successor work or pass G04.
+A later direct Gemma run, using a disposable 90-second provider wait setting,
+completed exact retrieval, a single valid acknowledgment and successor activation.
+The successor requested `fs_read`, but reserving the full approved 64 KiB result
+crossed that fixture's inherited emergency threshold before the read. The pending
+work remained durable. This proves activation, while continued work under that
+policy and complete gate qualification remain open.
+
+Integration tests exercise real source/outbox commits, untouched reads, failed
+writes, interrupted receipts, expiry and shutdown with a fixture provider. Real
+provider pressure rollover and complete G04 qualification remain open. Product
+identity remains 0.9.0 build 1.
 
 At the September 8 component checkpoint, signed native and selected Release
 suites each passed 293 tests, and the separate packet suite passed 13 tests,
@@ -414,5 +518,6 @@ context pressure, writable source work, association with an existing external
 desktop conversation, repeated real-provider rollover or complete native/process
 qualification.
 A large result allowance can still exceed available headroom before a read;
-pressure components do not yet supply the automatic transfer. G04 and release
-readiness remain unqualified.
+the owner distinguishes intrinsic capacity failure from transferable context
+pressure before any read. Repeated real-provider pressure rollover, G04 and
+release readiness remain unqualified.

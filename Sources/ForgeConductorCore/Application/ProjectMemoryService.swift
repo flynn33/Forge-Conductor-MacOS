@@ -2074,6 +2074,18 @@ public final class ProjectMemoryService: @unchecked Sendable {
         ]
     }
 
+    /// Called only by the existing registration coordinators after exact
+    /// control-plane activation, while their project transition fence is held.
+    @discardableResult
+    func migrateLegacyContinuity(
+        projectID: ProjectID,
+        generation: ProjectGeneration
+    ) throws -> LegacyContinuityMigrationReceipt? {
+        let repository = try repositoryForProject(projectID.description)
+        return try LegacyContinuityMigrator(repository: repository).migrateDirectory(
+            paths.memoryHandoffsDir, expectedProjectGeneration: generation.rawValue)
+    }
+
     public func remember(
         projectID: String,
         write: ProjectMemoryWrite,

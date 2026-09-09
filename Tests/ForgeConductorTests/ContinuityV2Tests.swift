@@ -1291,6 +1291,183 @@ final class ContinuityV2Tests: XCTestCase {
         XCTAssertEqual(readyAfterExternal, 1)
     }
 
+    func testProjectRegistrationMigratesLegacyRecordsThroughBothProductionEntrypoints() throws {
+        for entrypoint in ["manager", "mcp"] {
+            let root = temporaryRoot("registration-migration-\(entrypoint)")
+            let home = root.appendingPathComponent("home")
+            let project = root.appendingPathComponent("project")
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let app = try ForgeApp.bootstrap(home: home)
+            defer {
+                _ = app.shutdown()
+                try? FileManager.default.removeItem(at: root)
+            }
+            _ = try app.config.update(["allowed_roots": [project.path]], save: false)
+            let node = ManagerNode(app: app)
+            func register() throws -> String {
+                if entrypoint == "manager" {
+                    let result = try node.registerProjectResult(path: project.path)
+                    XCTAssertEqual(result.registrationState, .committed, "\(result)")
+                    return try XCTUnwrap(result.projectID)
+                }
+                let result = try app.tools.call(name: "project_memory.initialize",
+                    arguments: ["project_path": project.path], clientID: ClientID("legacy-registration"))
+                XCTAssertTrue(result.ok, "\(result.payload)")
+                return try XCTUnwrap(result.payload["project_id"] as? String)
+            }
+            let projectID = try register()
+            let repository = try app.projectMemory.repositoryForProject(projectID)
+            let priorReceipts = try repository.continuityMigrationReceiptCount()
+            let exact = try makeLegacyHandoff(projectID: projectID)
+            let ambiguous = try makeLegacyHandoff(projectID: UUID().uuidString.lowercased())
+            let exactURL = app.paths.memoryHandoffsDir.appendingPathComponent("exact.json")
+            let ambiguousURL = app.paths.memoryHandoffsDir.appendingPathComponent("ambiguous.json")
+            let exactData = try JSONSupport.data(from: exact.asDictionary())
+            let ambiguousData = try JSONSupport.data(from: ambiguous.asDictionary())
+            try exactData.write(to: exactURL)
+            try ambiguousData.write(to: ambiguousURL)
+            let latest = app.paths.memoryHandoffsDir.appendingPathComponent("LATEST")
+            let latestData = Data("ambiguous\n".utf8)
+            try latestData.write(to: latest)
+
+            XCTAssertEqual(try register(), projectID)
+            XCTAssertEqual(try repository.continuityLegacyQuarantineCount(), 1, entrypoint)
+            XCTAssertEqual(try repository.continuityMigrationReceiptCount(), priorReceipts + 1, entrypoint)
+            XCTAssertEqual(try repository.continuityHandoff(id: exact.handoffID)?.contentSHA256,
+                exact.contentSHA256, entrypoint)
+            XCTAssertNil(try repository.continuityHandoff(id: ambiguous.handoffID), entrypoint)
+            XCTAssertNil(try repository.continuityActiveOperationV2(), entrypoint)
+            XCTAssertEqual(try register(), projectID)
+            XCTAssertEqual(try repository.continuityMigrationReceiptCount(), priorReceipts + 1, entrypoint)
+            XCTAssertEqual(try Data(contentsOf: exactURL), exactData)
+            XCTAssertEqual(try Data(contentsOf: ambiguousURL), ambiguousData)
+            XCTAssertEqual(try Data(contentsOf: latest), latestData)
+            XCTAssertTrue(app.shutdown().completed)
+            let reopened = try ForgeApp.bootstrap(home: home)
+            defer { _ = reopened.shutdown() }
+            _ = try reopened.config.update(["allowed_roots": [project.path]], save: false)
+            if entrypoint == "manager" {
+                let result = try ManagerNode(app: reopened).registerProjectResult(path: project.path)
+                XCTAssertEqual(result.registrationState, .committed)
+                XCTAssertEqual(result.projectID, projectID)
+            } else {
+                let result = try reopened.tools.call(name: "project_memory.initialize",
+                    arguments: ["project_path": project.path], clientID: ClientID("legacy-after-restart"))
+                XCTAssertTrue(result.ok)
+                XCTAssertEqual(result.payload["project_id"] as? String, projectID)
+            }
+            let restored = try reopened.projectMemory.repositoryForProject(projectID)
+            XCTAssertEqual(try restored.continuityMigrationReceiptCount(), priorReceipts + 1)
+            XCTAssertEqual(try restored.continuityLegacyQuarantineCount(), 1)
+            XCTAssertNil(try restored.continuityActiveOperationV2())
+        }
+    }
+
+    func testLegacyDirectoryMigrationRejectsLinksAndFIFOWithoutReadingTheirContent() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-directory-links")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let directory = fixture.root.appendingPathComponent("legacy")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let external = fixture.root.appendingPathComponent("external.json")
+        let marker = "PRIVATE_EXTERNAL_CONTENT_7F3D"
+        let payload = try makeLegacyHandoff(projectID: fixture.projectID, mission: marker)
+        let bytes = try JSONSupport.data(from: payload.asDictionary())
+        try bytes.write(to: external)
+        try FileManager.default.createSymbolicLink(at: directory.appendingPathComponent("symlink.json"),
+            withDestinationURL: external)
+        try FileManager.default.linkItem(at: external, to: directory.appendingPathComponent("hardlink.json"))
+        XCTAssertEqual(mkfifo(directory.appendingPathComponent("pipe.json").path, 0o600), 0)
+        let start = Date()
+        let receipt = try XCTUnwrap(LegacyContinuityMigrator(repository: repository)
+            .migrateDirectory(directory, expectedProjectGeneration: 1))
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+        XCTAssertEqual(receipt.importedCount, 0)
+        XCTAssertEqual(receipt.quarantinedCount, 3)
+        XCTAssertNil(try repository.continuityHandoff(id: payload.handoffID))
+        let quarantine = repository.directory.appendingPathComponent("continuity/LegacyContinuityQuarantine")
+        for file in try FileManager.default.contentsOfDirectory(at: quarantine, includingPropertiesForKeys: nil) {
+            XCTAssertFalse(try String(contentsOf: file, encoding: .utf8).contains(marker))
+        }
+        XCTAssertEqual(try Data(contentsOf: external), bytes)
+    }
+
+    func testLegacyDirectoryInventoryOverflowCommitsNoPartialMigration() throws {
+        let fixture = try makeMemoryFixture(label: "legacy-directory-overflow")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let directory = fixture.root.appendingPathComponent("legacy")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for index in 0...LegacyContinuityMigrator.maximumCandidateCount {
+            try Data("{}".utf8).write(to: directory.appendingPathComponent("\(index).json"))
+        }
+        let before = try repository.continuityMigrationReceiptCount()
+        XCTAssertThrowsError(try LegacyContinuityMigrator(repository: repository)
+            .migrateDirectory(directory, expectedProjectGeneration: 1)) { error in
+            guard case ProjectMemoryError.migrationFailed = error else {
+                return XCTFail("Expected a bounded migration error, got \(error)")
+            }
+        }
+        XCTAssertEqual(try repository.continuityMigrationReceiptCount(), before)
+        XCTAssertEqual(try repository.continuityLegacyQuarantineCount(), 0)
+    }
+
+    func testManagerRegistrationRetainsPendingMigrationAndReplaysAfterInventoryRepair() throws {
+        let root = temporaryRoot("registration-migration-recovery")
+        let project = root.appendingPathComponent("project")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home"))
+        defer {
+            _ = app.shutdown()
+            try? FileManager.default.removeItem(at: root)
+        }
+        _ = try app.config.update(["allowed_roots": [project.path]], save: false)
+        let directory = app.paths.memoryHandoffsDir
+        let overflow = directory.appendingPathComponent("overflow.json")
+        for index in 0..<LegacyContinuityMigrator.maximumCandidateCount {
+            try Data("{\"legacy_index\":\(index)}".utf8)
+                .write(to: directory.appendingPathComponent("\(index).json"))
+        }
+        try Data("{}".utf8).write(to: overflow)
+        let node = ManagerNode(app: app)
+        let pending = try node.registerProjectResult(path: project.path)
+        XCTAssertEqual(pending.registrationState, .reconciliationRequired)
+        XCTAssertEqual(pending.lifecycleState, ProjectLifecycleState.active.rawValue)
+        let projectID = try XCTUnwrap(pending.projectID)
+        let repository = try app.projectMemory.repositoryForProject(projectID)
+        XCTAssertEqual(try repository.continuityLegacyQuarantineCount(), 0)
+        // Model an explicit repair of the disposable inventory, then replay
+        // the exact registration through the ordinary manager endpoint.
+        try FileManager.default.removeItem(at: overflow)
+        let recovered = try node.registerProjectResult(path: project.path)
+        XCTAssertEqual(recovered.registrationState, .committed)
+        XCTAssertEqual(recovered.projectID, projectID)
+        XCTAssertEqual(try repository.continuityLegacyQuarantineCount(),
+            LegacyContinuityMigrator.maximumCandidateCount)
+        XCTAssertNil(try repository.continuityActiveOperationV2())
+        try Data("{}".utf8).write(to: overflow)
+        let mcpPending = try app.tools.call(name: "project_memory.initialize",
+            arguments: ["project_path": project.path], clientID: ClientID("migration-recovery"))
+        XCTAssertTrue(mcpPending.ok)
+        XCTAssertEqual(mcpPending.payload["primary_committed"] as? Bool, true)
+        XCTAssertEqual(mcpPending.payload["reconciliation_required"] as? Bool, true)
+        XCTAssertEqual((mcpPending.payload["legacy_continuity_migration"] as? [String: Any])?["status"] as? String,
+            "pending")
+        try FileManager.default.removeItem(at: overflow)
+        let mcpRecovered = try app.tools.call(name: "project_memory.initialize",
+            arguments: ["project_path": project.path], clientID: ClientID("migration-recovery"))
+        XCTAssertTrue(mcpRecovered.ok)
+        XCTAssertEqual((mcpRecovered.payload["legacy_continuity_migration"] as? [String: Any])?["status"] as? String,
+            "complete")
+        XCTAssertEqual(try repository.continuityLegacyQuarantineCount(), LegacyContinuityMigrator.maximumCandidateCount)
+    }
+
     func testLegacyMigrationImportsExactProjectReadOnlyAndQuarantinesAmbiguous() throws {
         let fixture = try makeMemoryFixture(label: "legacy-migration")
         defer {

@@ -57,6 +57,7 @@ struct NativeSourcePressureClaim: Sendable {
     }
 }
 struct NativeSourcePressureRecoveryReference: Sendable {
+    var rowID: Int64 = 0
     let conversationID: UUID, stageID: UUID, taskID: UUID, capabilityID: UUID, reservationID: UUID
 }
 struct NativeSourceToolOutputPressureProof: Sendable {
@@ -2824,25 +2825,81 @@ public actor ProjectControlPlaneRepository {
                 || capability.epoch != row.epoch || capability.expiresAt <= now || row.deadline <= now)
     }
 
-    func pendingNativeSourcePressureReceipts(limit: Int = 16,
+    func pendingNativeSourcePressureTurns(afterRowID: Int64? = nil, limit: Int = 4,
+        cancellation: ToolCallCancellation? = nil) throws -> NativeSourceRecoveryPage {
+        guard (afterRowID ?? 0) >= 0, (1...32).contains(limit) else { throw NativeSourceConversationError.invalidRequest("cursor") }
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            let now = ISO8601.string(from: clock.now())
+            let rows = try connection.all("""
+                SELECT t.rowid,t.conversation_id,t.task_id,t.request_id,t.stage_id
+                FROM native_source_provider_turns t JOIN native_source_conversations c ON c.conversation_id=t.conversation_id
+                JOIN native_task_capabilities k ON k.capability_id=c.capability_id
+                LEFT JOIN native_source_requests r ON r.reservation_id=t.pressure_reservation_id
+                WHERE t.rowid>? AND t.quarantined=0 AND c.active_stage_id=t.stage_id AND c.cancelled=0
+                    AND c.state='stopped' AND t.blocked_code IN('pressure_pending','pressure_prepared')
+                    AND (c.lease_owner IS NULL OR c.lease_expires_at<=?) AND k.state='active' AND k.expires_at>?
+                    AND json_extract(t.pressure_decision_json,'$.storage_deadline')>?
+                    AND (r.reservation_id IS NULL OR (r.state='pending' AND r.quarantined=0 AND (r.retry_at IS NULL OR r.retry_at<=?)))
+                ORDER BY t.rowid LIMIT ?
+                """, bindings: [.int64(afterRowID ?? 0),.text(now),.text(now),.text(now),.text(now),.int64(Int64(limit))]) { row in
+                    try NativeSourceRecoveryReference(rowID: row.int64(0), conversationID: NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
+                        taskID: NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36)),
+                        requestID: NativeTaskValue.uuid(row.strictText(3, maximumBytes: 36)),
+                        stageID: NativeTaskValue.uuid(row.strictText(4, maximumBytes: 36)))
+                }
+            return .init(references: rows, nextRowID: rows.count == limit ? rows.last?.rowID : nil)
+        }
+    }
+
+    /// Failed writes remain readback eligible. The fixed storage deadline and
+    /// durable attempt ceiling remain unchanged; the lease supplies a cooldown
+    /// even when packet preparation failed before a source reservation existed.
+    func deferNativeSourcePressureRetry(claim: NativeSourcePressureClaim, credential: NativeTaskCapabilityCredential,
+        preparationError: NativeSourcePressurePacketError? = nil) throws -> Bool {
+        try controlledTransaction(cancellation: nil, fullDurability: true) { connection in
+            let (_, _, stage) = try nativePressureStateUnlocked(claim: claim, credential: credential, connection: connection)
+            guard let reservation = stage.pressureReservationID else {
+                let code: String
+                switch preparationError {
+                case .criticalPacketTooLarge: code = "pressure_critical_packet_too_large"
+                case .decisionProjectionTooLarge: code = "pressure_decision_projection_too_large"
+                case .bootstrapOutputTooLarge: code = "pressure_bootstrap_output_too_large"
+                case .commitResponseTooLarge: code = "pressure_commit_response_too_large"
+                default: return false
+                }
+                // No source effect or reservation exists. Frozen critical data
+                // cannot fit its inherited bound, so retry cannot repair it.
+                guard try connection.execute("UPDATE native_source_provider_turns SET blocked_code=?,updated_at=? WHERE stage_id=? AND pressure_reservation_id IS NULL AND blocked_code='pressure_pending'",
+                    bindings: [.text(code),.text(ISO8601.string(from: clock.now())),.text(claim.stageID.uuidString.lowercased())]) == 1 else {
+                    throw NativeSourceConversationError.conflict
+                }
+                return true
+            }
+            try connection.execute("UPDATE native_source_requests SET retry_at=? WHERE reservation_id=? AND state='pending'",
+                bindings: [.text(claim.expiresAt),.text(reservation.uuidString.lowercased())])
+            return false
+        }
+    }
+
+    func pendingNativeSourcePressureReceipts(afterRowID: Int64? = nil, limit: Int = 16,
         cancellation: ToolCallCancellation? = nil) throws -> [NativeSourcePressureRecoveryReference] {
-        guard (1...32).contains(limit) else { throw NativeSourceConversationError.invalidRequest("limit") }
+        guard (afterRowID ?? 0) >= 0, (1...32).contains(limit) else { throw NativeSourceConversationError.invalidRequest("limit") }
         return try controlledTransaction(cancellation: cancellation) { connection in
             let now = ISO8601.string(from: clock.now())
             return try connection.all("""
-                SELECT c.conversation_id,t.stage_id,c.task_id,c.capability_id,r.reservation_id
+                SELECT c.conversation_id,t.stage_id,c.task_id,c.capability_id,r.reservation_id,t.rowid
                 FROM native_source_provider_turns t JOIN native_source_conversations c ON c.conversation_id=t.conversation_id
                 JOIN native_source_requests r ON r.reservation_id=t.pressure_reservation_id
                 JOIN native_task_capabilities k ON k.capability_id=c.capability_id
                 JOIN continuity_task_authorizations a ON a.task_id=c.task_id
                 JOIN continuity_source_dispatch_origins o ON o.task_id=c.task_id
-                WHERE r.state='pending' AND r.quarantined=0 AND c.active_stage_id=t.stage_id
+                WHERE t.rowid>? AND (r.retry_at IS NULL OR r.retry_at<=?) AND r.state='pending' AND r.quarantined=0 AND c.active_stage_id=t.stage_id
                     AND (c.lease_owner IS NULL OR c.lease_expires_at<=?)
                     AND (r.deadline<=? OR k.expires_at<=? OR k.state='revoked' OR k.epoch!=r.epoch
                          OR c.cancelled=1 OR a.state='revoked' OR o.invalidated=1)
                 ORDER BY t.rowid LIMIT ?
-                """, bindings: [.text(now),.text(now),.text(now),.int64(Int64(limit))]) {
-                    .init(conversationID: try NativeTaskValue.uuid($0.strictText(0, maximumBytes: 36)),
+                """, bindings: [.int64(afterRowID ?? 0),.text(now),.text(now),.text(now),.text(now),.int64(Int64(limit))]) {
+                    .init(rowID: $0.int64(5), conversationID: try NativeTaskValue.uuid($0.strictText(0, maximumBytes: 36)),
                         stageID: try NativeTaskValue.uuid($0.strictText(1, maximumBytes: 36)),
                         taskID: try NativeTaskValue.uuid($0.strictText(2, maximumBytes: 36)),
                         capabilityID: try NativeTaskValue.uuid($0.strictText(3, maximumBytes: 36)),
@@ -2911,6 +2968,21 @@ public actor ProjectControlPlaneRepository {
                 bindings: [.text(ISO8601.string(from: clock.now())),.text(claim.reference.stageID.uuidString.lowercased()),
                     .text(state.row.id.uuidString.lowercased())])
             return actual
+        }
+    }
+
+    func deferNativeSourcePressureReceiptRetry(_ claim: NativeSourcePressureReceiptClaim) throws {
+        try controlledTransaction(cancellation: nil, fullDurability: true) { connection in
+            let state = try validateNativePressureReceiptClaimUnlocked(claim, connection: connection)
+            guard state.row.state == "pending" else { return }
+            let previous = try connection.first("SELECT error_code FROM native_source_requests WHERE reservation_id=?",
+                bindings: [.text(state.row.id.uuidString.lowercased())], map: { $0.text(0) }) ?? nil
+            let prefix = "pressure_receipt_retry_"
+            let priorCount = previous.flatMap { $0.hasPrefix(prefix) ? Int($0.dropFirst(prefix.count)) : nil } ?? 0
+            let count = min(7, max(0, priorCount)) + 1
+            let retry = ISO8601.string(from: clock.now().addingTimeInterval(min(60, 5 * pow(2, Double(count - 1)))))
+            try connection.execute("UPDATE native_source_requests SET retry_at=?,error_code=?,quarantined=? WHERE reservation_id=? AND state='pending'",
+                bindings: [.text(retry),.text(prefix + String(count)),.int64(count == 8 ? 1 : 0),.text(state.row.id.uuidString.lowercased())])
         }
     }
 
@@ -3066,8 +3138,15 @@ public actor ProjectControlPlaneRepository {
 
     private func nativeAcceptedUnlocked(_ stage: NativeSourceStageRow, conversation: NativeSourceConversationRow,
         connection: ControlPlaneSQLiteConnection) throws -> NativeSourceAcceptedProviderTurn {
-        guard let turn = stage.accepted, stage.state == .accepted else { throw NativeSourceConversationError.conflict }
+        guard stage.accepted != nil, stage.state == .accepted else { throw NativeSourceConversationError.conflict }
         guard stage.blocked == nil else { throw NativeSourceConversationError.budgetExceeded }
+        return try nativeAcceptedSnapshotUnlocked(stage, conversation: conversation, connection: connection)
+    }
+    // Structural history decoding; callers separately prove execution or exact
+    // immutable-receipt authority. This does not unseal a pressure-fenced stage.
+    private func nativeAcceptedSnapshotUnlocked(_ stage: NativeSourceStageRow, conversation: NativeSourceConversationRow,
+        connection: ControlPlaneSQLiteConnection) throws -> NativeSourceAcceptedProviderTurn {
+        guard let turn = stage.accepted, stage.state == .accepted else { throw NativeSourceConversationError.conflict }
         let calls = try connection.all("SELECT ordinal,call_sha256 FROM native_source_provider_calls WHERE stage_id=? ORDER BY ordinal",
             bindings: [.text(stage.body.stageID.uuidString.lowercased())]) { row in
                 NativeSourceProviderCallReference(conversationID: conversation.body.conversationID, stageID: stage.body.stageID,
@@ -3712,6 +3791,20 @@ public actor ProjectControlPlaneRepository {
     private func nativeProviderCarryoverUnlocked(receipt: ContinuityIngressAcceptanceReceipt,
         conversationID: UUID, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceBudgetCarryover {
         let task = try validatedContinuityTaskUnlocked(receipt.authorization, allowTerminalRun: true, connection: connection)
+        if let pressure = try connection.first("""
+            SELECT c.active_stage_id,c.task_id,c.capability_id,t.pressure_reservation_id
+            FROM native_source_conversations c JOIN native_source_provider_turns t ON t.stage_id=c.active_stage_id
+            WHERE c.conversation_id=? AND t.pressure_reservation_id IS NOT NULL
+            """, bindings: [.text(conversationID.uuidString.lowercased())], map: { row in
+                NativeSourcePressureRecoveryReference(conversationID: conversationID,
+                    stageID: try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)),
+                    taskID: try NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
+                    capabilityID: try NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36)),
+                    reservationID: try NativeTaskValue.uuid(row.strictText(3, maximumBytes: 36)))
+            }) {
+            return try nativePressureCarryoverUnlocked(receipt: receipt, reference: pressure, connection: connection)
+        }
+        // Keep the established provider-ready handoff representation unchanged.
         guard let value = try connection.first("""
             SELECT task_id,body_json,body_sha256,ceilings_json,ceilings_sha256,state FROM native_source_conversations WHERE conversation_id=?
             """, bindings: [.text(conversationID.uuidString.lowercased())], map: { r in
@@ -3772,6 +3865,110 @@ public actor ProjectControlPlaneRepository {
         return .init(conversationID: conversationID, taskID: task.authorization.taskID, runID: receipt.runID,
             acceptanceSHA256: receipt.receiptSHA256, ceilings: value.1, priorSourceReadCallsAtEnrollment: value.0.priorSourceReadCallsAtEnrollment, providerStageCount: stages.count,
             admittedProviderCalls: calls.count, observedInputTokens: input, observedOutputTokens: output, exactUsageStageCount: exact, journalSHA256: digest)
+    }
+
+    private func nativePressureCarryoverUnlocked(receipt: ContinuityIngressAcceptanceReceipt,
+        reference: NativeSourcePressureRecoveryReference, connection: ControlPlaneSQLiteConnection) throws -> NativeSourceBudgetCarryover {
+        guard reference.taskID == receipt.authorization.taskID else { throw NativeSourceConversationError.notFound }
+        let state = try nativePressureReceiptStateUnlocked(reference, connection: connection)
+        let c = state.conversation, stage = state.stage
+        guard !c.cancelled, state.row.state == "completed", state.authorization == receipt.authorization,
+              let disposition = stage.budgetDisposition, case .pressure(let pressure) = disposition.metadata,
+              (c.state == .sourceFenced && stage.blocked == "pressure_committed"
+                && disposition.fenceRevision < Int64.max && c.revision == disposition.fenceRevision + 1)
+                || (c.state == .stopped && stage.blocked == "pressure_receipt_recorded"
+                    && c.revision == disposition.fenceRevision) else { throw NativeSourceConversationError.integrityFailure }
+        let actual = try nativeCommitResultUnlocked(state.row, prepared: state.prepared,
+            authorization: state.authorization, connection: connection)
+        guard actual.revision == receipt.source,
+              try ContinuityIngressOperationIdentity(revision: actual.revision).operationID == receipt.operationID else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        let cid = reference.conversationID.uuidString.lowercased()
+        guard try connection.scalarInt("SELECT COUNT(*) FROM native_source_capability_checks WHERE conversation_id=? AND state='attempted'",
+            bindings: [.text(cid)]) == 0 else { throw NativeSourceConversationError.conflict }
+        let rows = try connection.all("""
+            SELECT stage_id,intent_sha256,result_sha256,post_sha256 FROM native_source_provider_turns
+            WHERE conversation_id=? ORDER BY rowid LIMIT 65
+            """, bindings: [.text(cid)]) { row in
+                (try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)), try Self.nativeSourceText(row, 1, 64),
+                 try row.strictText(2, maximumBytes: 64), try row.strictText(3, maximumBytes: 64))
+            }
+        guard !rows.isEmpty, rows.count <= 64, rows.last?.0 == reference.stageID else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        var input = 0, output = 0, exact = 0, admittedCalls = 0
+        var stages: [[String: Any]] = [], calls: [[String: Any]] = []
+        var requests: Set<UUID> = []
+        var previousRequest: UUID?, previousResponse: String?
+        var previousOrdinal = 0
+        for row in rows {
+            let current = try nativeStageUnlocked(row.0, conversation: c, connection: connection)
+            // Ordinals belong to one logical send. A later send restarts at one
+            // while continuing the exact preceding provider response chain.
+            if current.body.requestID == previousRequest {
+                guard current.body.ordinal == previousOrdinal + 1 else { throw NativeSourceConversationError.integrityFailure }
+            } else {
+                guard current.body.ordinal == 1, requests.insert(current.body.requestID).inserted else {
+                    throw NativeSourceConversationError.integrityFailure
+                }
+            }
+            guard current.body.parentResponseID == previousResponse else { throw NativeSourceConversationError.integrityFailure }
+            previousRequest = current.body.requestID; previousOrdinal = current.body.ordinal
+            stages.append(["intent":row.1,"result":row.2 ?? "","post":row.3 ?? ""])
+            if current.state == .prepared {
+                // A pressure fence before POST retains the pending request, not
+                // an invented response, token observation or tool admission.
+                guard current.body.stageID == reference.stageID, disposition.binding.boundary == .beforeProviderPost,
+                      current.post == nil, current.accepted == nil, row.2 == nil, row.3 == nil,
+                      try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE stage_id=?",
+                        bindings: [.text(row.0.uuidString.lowercased())]) == 0 else { throw NativeSourceConversationError.integrityFailure }
+                continue
+            }
+            guard current.state == .accepted else { throw NativeSourceConversationError.integrityFailure }
+            let accepted = try nativeAcceptedSnapshotUnlocked(current, conversation: c, connection: connection)
+            guard let post = current.post, accepted.turn.requestID == current.body.stageID.uuidString.lowercased(),
+                  accepted.turn.previousResponseID == current.body.parentResponseID,
+                  accepted.turn.providerID == post.capabilities.providerID, accepted.turn.modelKey == post.capabilities.modelKey,
+                  accepted.turn.providerVersion == post.capabilities.providerVersion,
+                  accepted.turn.providerInstanceID == post.capabilities.providerInstanceID else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+            previousResponse = accepted.turn.responseID
+            if let usage = accepted.turn.usage {
+                input = try Self.nativeSourceCheckedAdd(input, usage.inputTokens)
+                output = try Self.nativeSourceCheckedAdd(output, usage.outputTokens)
+                if usage.source == .providerExact || usage.source == .tokenizerExact { exact += 1 }
+            }
+            admittedCalls = try Self.nativeSourceCheckedAdd(admittedCalls, accepted.calls.count)
+            for call in accepted.calls {
+                guard call.checksum == JSONSupport.sha256Hex(try nativeCallBytes(stage: current, turn: accepted.turn, ordinal: call.ordinal)) else {
+                    throw NativeSourceConversationError.integrityFailure
+                }
+                let retained = try nativeOutputUnlocked(reference: call, stage: current, conversation: c, connection: connection)
+                if let retained {
+                    guard !retained.readyHandoffCommitted else { throw NativeSourceConversationError.integrityFailure }
+                } else {
+                    guard current.body.stageID == reference.stageID, call.ordinal >= disposition.binding.completedOutputCount,
+                          try connection.scalarInt("SELECT COUNT(*) FROM native_source_provider_calls WHERE stage_id=? AND ordinal=? AND reservation_id IS NOT NULL",
+                            bindings: [.text(row.0.uuidString.lowercased()),.int64(Int64(call.ordinal))]) == 0 else {
+                        throw NativeSourceConversationError.integrityFailure
+                    }
+                }
+                let sourceSHA = try connection.first("SELECT source_receipt_sha256 FROM native_source_provider_calls WHERE stage_id=? AND ordinal=?",
+                    bindings: [.text(row.0.uuidString.lowercased()),.int64(Int64(call.ordinal))],
+                    map: { try $0.strictText(0, maximumBytes: 64) }) ?? nil
+                calls.append(["call":call.checksum,"output":retained?.resultSHA256 ?? "","source":sourceSHA ?? ""])
+            }
+        }
+        let digest = JSONSupport.sha256Hex(try ForgeJSONCanonicalizationV1.data(from: [
+            "kind":"native_pressure_carryover_v1", "stages":stages, "calls":calls,
+            "pressure":state.dispositionSHA256, "source":JSONSupport.sha256Hex(try NativeSourceCommitEvidence.encode(actual))]))
+        return .init(conversationID: reference.conversationID, taskID: reference.taskID, runID: receipt.runID,
+            acceptanceSHA256: receipt.receiptSHA256, ceilings: pressure.observation.fields.effectiveCeilings,
+            priorSourceReadCallsAtEnrollment: c.body.priorSourceReadCallsAtEnrollment, providerStageCount: rows.count,
+            admittedProviderCalls: admittedCalls, observedInputTokens: input, observedOutputTokens: output,
+            exactUsageStageCount: exact, journalSHA256: digest)
     }
     private static func nativeSourceCheckedAdd(_ a: Int, _ b: Int) throws -> Int {
         let result = a.addingReportingOverflow(b)
@@ -7398,6 +7595,7 @@ public actor ProjectControlPlaneRepository {
         expectedRevision: UInt64,
         intent: RunSideEffectIntent
     ) throws -> AutonomousRunRecord {
+        guard lease.runID == runID else { throw AutonomyError.staleLease }
         try Self.validate(intent)
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())

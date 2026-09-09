@@ -96,7 +96,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
 
     func submitNativeCall(resolved: ResolvedNativeSourceProviderCall,
         credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
-        outputBudget: NativeSourceProviderOutputBudget,
+        outputBudget: NativeSourceProviderOutputBudget, preparedCheckpoint: PreparedContinuitySourceCommit? = nil,
         cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput {
         try Task.checkCancellation(); try cancellation.checkCancellation()
         // Resolve again after winning the execution slot. Every effect below
@@ -118,7 +118,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
                 outputBudget: outputBudget, cancellation: cancellation)
         case "session_checkpoint", "session_handoff":
             try await commitNative(current, credential: credential, lease: lease,
-                outputBudget: outputBudget, cancellation: cancellation)
+                outputBudget: outputBudget, preparedCheckpoint: preparedCheckpoint, cancellation: cancellation)
         default: throw NativeSourceConversationError.integrityFailure
         }
         guard let completed = try await repository.nativeSourceProviderCallOutput(reference: current.reference,
@@ -196,7 +196,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
 
     private func commitNative(_ resolved: ResolvedNativeSourceProviderCall,
         credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
-        outputBudget: NativeSourceProviderOutputBudget, cancellation: ToolCallCancellation) async throws {
+        outputBudget: NativeSourceProviderOutputBudget, preparedCheckpoint: PreparedContinuitySourceCommit?, cancellation: ToolCallCancellation) async throws {
         let repository = app.projectContexts.repository
         let source = app.continuity
         let clientID = attachment.context.clientID
@@ -210,7 +210,11 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
         let decision = try await repository.prepareContinuitySourceCommit(request: request,
             correlation: attachment.setup.correlation, context: attachment.context, owner: attachment.owner,
             policySelection: selection(), prepare: { authorization in
-                try source.prepareAuthorizedSourceCommit(arguments: JSONSupport.object(from: argumentsJSON),
+                if let preparedCheckpoint {
+                    guard !finalize, !preparedCheckpoint.finalize else { throw NativeSourceConversationError.conflict }
+                    return preparedCheckpoint
+                }
+                return try source.prepareAuthorizedSourceCommit(arguments: JSONSupport.object(from: argumentsJSON),
                     clientID: clientID, source: .model, finalize: finalize,
                     authorization: authorization, cancellation: cancellation)
             }, reference: resolved.reference, credential: credential, lease: lease, outputBudget: outputBudget,

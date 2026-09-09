@@ -840,7 +840,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                             "registered project publication authority did not match activation"
                         )
                     }
+                    accepted = activated
                     try projectRegistrationCheckpoint(.controlPlaneActivated)
+                    try app.projectMemory.migrateLegacyContinuity(
+                        projectID: activated.projectID, generation: activated.generation)
                     do {
                         try app.projectMemory.identities.completeRegistrationIntent(
                             retainedRegistration.preparation
@@ -1938,17 +1941,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             }, tools: { [weak self] credential, lease, cancellation in
                 guard let self else { throw NativeSourceOperatorError.unavailable }
                 return try await self.taskHTTPService.nativeProviderTools(credential: credential, lease: lease, cancellation: cancellation)
-            }, call: { [weak self] credential, reference, lease, budget, cancellation in
+            }, call: { [weak self] credential, reference, lease, budget, checkpoint, cancellation in
                 guard let self else { throw NativeSourceOperatorError.unavailable }
                 return try await self.taskHTTPService.submitNativeCall(credential: credential, reference: reference,
-                    lease: lease, outputBudget: budget, cancellation: cancellation)
-            }, budgetEvaluator: { prepared, preflight, capabilities, selection in
-                try NativeSourceBudgetEvaluator.providerApproval(prepared: prepared, preflight: preflight,
-                    capabilities: capabilities, policySelection: selection)
-            }, outputBudgetEvaluator: { call, outputs, preflight, capabilities, selection in
-                try NativeSourceBudgetEvaluator.outputBudget(call: call, priorOutputs: outputs,
-                    emptyOutputPreflight: preflight, capabilities: capabilities, policySelection: selection)
-            }, beginProviderOperation: { [weak self] in
+                    lease: lease, outputBudget: budget, preparedCheckpoint: checkpoint, cancellation: cancellation)
+            }, pressureIO: NativeSourcePressureIO(source: app.continuity), diagnostics: app.diagnostics, beginProviderOperation: { [weak self] in
                 guard let self else { throw NativeSourceOperatorError.unavailable }
                 try self.beginProviderRunOperation()
                 return NativeSourceProviderOperationLease { self.finishProviderRunOperation() }

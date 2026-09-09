@@ -448,7 +448,7 @@ final class NativeSourceConversationJournalTests: XCTestCase {
             "ok":true,"continuity_id":commit.revision.identity.continuityID,"revision":commit.revision.identity.revision,
             "packet_sha256":commit.revision.identity.packetSHA256]])
     }
-    private static func bootstrapRoot(repository: ProjectControlPlaneRepository, acceptance: ContinuityIngressAcceptanceReceipt,
+    static func bootstrapRoot(repository: ProjectControlPlaneRepository, acceptance: ContinuityIngressAcceptanceReceipt,
         envelope: ContinuitySourceBootstrapEnvelope, lease: RunLease) async throws -> (grant: ContinuityBootstrapGrant,intent: ToolInvocationIntent) {
         let grant = try await repository.issueContinuityBootstrapGrant(envelope: envelope, candidateID: UUID(), lease: lease)
         let session = ProviderSessionIntent(sessionID: grant.sessionID, runID: acceptance.runID, projectID: acceptance.authorization.projectID,

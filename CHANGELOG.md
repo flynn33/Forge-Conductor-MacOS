@@ -22,6 +22,12 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Authorized handoff storage and admission
 
+- Native process tests now force termination after source commit, source claim,
+  manager acceptance and source acknowledgment, retaining evidence of exact
+  handoff recovery and one accepted run. Remote-provider crash recovery remains open.
+- Manager and MCP project registration now migrate attributable legacy handoffs
+  as read-only records and quarantine ambiguous records, with bounded inventory,
+  durable replay and explicit pending migration status.
 - Approved native tasks now accept source messages through the manager, with
   bounded provider ownership, durable response/call identities and authenticated
   send, status and cancellation commands.
@@ -50,13 +56,35 @@ installed-stack and production-feature acceptance remain separate gates.
   built from the exact pending call and retained output prefix. Full reads remain
   uncharged until admission; checkpoint previews remain uncommitted, and ready
   handoffs require no unused continuation headroom.
+- Successor budget carryover now verifies pressure-generated source receipts and
+  retains prior reads, admitted but untouched calls, and tightened ceilings across
+  bootstrap and restart. Pre-POST pressure carries no fabricated provider usage.
 - Added typed pressure evaluation and a deterministic recovery-packet builder.
   Packets preserve full critical work and remaining budgets, bind compact pressure
   facts to the complete decision digest, and enforce inherited retrieval limits.
-  The pressure owner and durable handoff writer are not enabled yet.
+- The source owner now routes pressure decisions into the real handoff writer
+  before POST, after accepted answers and before tool effects. It joins inference
+  renewal before storage and passes measured checkpoint packets to execution.
+  The watchdog resumes storage and reconciles expired receipts without another
+  provider permit or POST, with durable retry bounds and retained shutdown ownership.
 - Successor budgets begin with the actual bootstrap acknowledgement. Actual
   tool-output prefixes and completed response chains survive replay without
   duplicate effects or repeated context charges.
+- Pressure handoff admission now validates stage order within each source message
+  while preserving the response chain across messages. Frozen recovery packets
+  that exceed their inherited limits stop with a durable reason before storage.
+- Source bootstrap instructions distinguish envelope schema 3.0 from acknowledgment
+  contract version 2. Multiple acknowledgment calls remain rejected even when a
+  later call corrects an earlier version.
+- The source bootstrap root supplies the complete expected acknowledgment as a
+  bounded challenge, including nonce and acceptance fields. Activation still
+  requires the model's actual complete, single-call acknowledgment.
+- Pending run intents now reject leases issued for another run before any
+  mutation, preserving the exact run boundary during ownership recovery.
+- Tool discovery now uses its own lease-bounded cancellation token, preserving
+  the renewable source exchange deadline during longer provider responses.
+- Source exchange failures now record bounded diagnostic codes and cancellation
+  state without retaining prompts, credentials or raw provider error messages.
 - Native Responses requests can now be checked locally against the transport's
   exact encoded bytes and configured limits before dispatch. This preflight
   performs no inference or credential lookup and does not certify cached receipts.
