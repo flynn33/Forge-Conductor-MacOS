@@ -2854,12 +2854,30 @@ public actor ProjectControlPlaneRepository {
     /// Failed writes remain readback eligible. The fixed storage deadline and
     /// durable attempt ceiling remain unchanged; the lease supplies a cooldown
     /// even when packet preparation failed before a source reservation existed.
-    func deferNativeSourcePressureRetry(claim: NativeSourcePressureClaim, credential: NativeTaskCapabilityCredential) throws {
+    func deferNativeSourcePressureRetry(claim: NativeSourcePressureClaim, credential: NativeTaskCapabilityCredential,
+        preparationError: NativeSourcePressurePacketError? = nil) throws -> Bool {
         try controlledTransaction(cancellation: nil, fullDurability: true) { connection in
             let (_, _, stage) = try nativePressureStateUnlocked(claim: claim, credential: credential, connection: connection)
-            guard let reservation = stage.pressureReservationID else { return }
+            guard let reservation = stage.pressureReservationID else {
+                let code: String
+                switch preparationError {
+                case .criticalPacketTooLarge: code = "pressure_critical_packet_too_large"
+                case .decisionProjectionTooLarge: code = "pressure_decision_projection_too_large"
+                case .bootstrapOutputTooLarge: code = "pressure_bootstrap_output_too_large"
+                case .commitResponseTooLarge: code = "pressure_commit_response_too_large"
+                default: return false
+                }
+                // No source effect or reservation exists. Frozen critical data
+                // cannot fit its inherited bound, so retry cannot repair it.
+                guard try connection.execute("UPDATE native_source_provider_turns SET blocked_code=?,updated_at=? WHERE stage_id=? AND pressure_reservation_id IS NULL AND blocked_code='pressure_pending'",
+                    bindings: [.text(code),.text(ISO8601.string(from: clock.now())),.text(claim.stageID.uuidString.lowercased())]) == 1 else {
+                    throw NativeSourceConversationError.conflict
+                }
+                return true
+            }
             try connection.execute("UPDATE native_source_requests SET retry_at=? WHERE reservation_id=? AND state='pending'",
                 bindings: [.text(claim.expiresAt),.text(reservation.uuidString.lowercased())])
+            return false
         }
     }
 
@@ -3881,9 +3899,22 @@ public actor ProjectControlPlaneRepository {
         }
         var input = 0, output = 0, exact = 0, admittedCalls = 0
         var stages: [[String: Any]] = [], calls: [[String: Any]] = []
-        for (index, row) in rows.enumerated() {
+        var requests: Set<UUID> = []
+        var previousRequest: UUID?, previousResponse: String?
+        var previousOrdinal = 0
+        for row in rows {
             let current = try nativeStageUnlocked(row.0, conversation: c, connection: connection)
-            guard current.body.ordinal == index + 1 else { throw NativeSourceConversationError.integrityFailure }
+            // Ordinals belong to one logical send. A later send restarts at one
+            // while continuing the exact preceding provider response chain.
+            if current.body.requestID == previousRequest {
+                guard current.body.ordinal == previousOrdinal + 1 else { throw NativeSourceConversationError.integrityFailure }
+            } else {
+                guard current.body.ordinal == 1, requests.insert(current.body.requestID).inserted else {
+                    throw NativeSourceConversationError.integrityFailure
+                }
+            }
+            guard current.body.parentResponseID == previousResponse else { throw NativeSourceConversationError.integrityFailure }
+            previousRequest = current.body.requestID; previousOrdinal = current.body.ordinal
             stages.append(["intent":row.1,"result":row.2 ?? "","post":row.3 ?? ""])
             if current.state == .prepared {
                 // A pressure fence before POST retains the pending request, not
@@ -3903,6 +3934,7 @@ public actor ProjectControlPlaneRepository {
                   accepted.turn.providerInstanceID == post.capabilities.providerInstanceID else {
                 throw NativeSourceConversationError.integrityFailure
             }
+            previousResponse = accepted.turn.responseID
             if let usage = accepted.turn.usage {
                 input = try Self.nativeSourceCheckedAdd(input, usage.inputTokens)
                 output = try Self.nativeSourceCheckedAdd(output, usage.outputTokens)

@@ -560,7 +560,7 @@ actor NativeSourceConversationService {
         let token = ToolCallCancellation(timeoutSeconds: min(20, max(0, remaining)))
         let io = pressureIO
         var claim = original
-        var succeeded = false
+        var releaseClaim = false
         do {
             let commandID = try beginCommand(token)
             defer { commands.removeValue(forKey: commandID); operationGate.remove(commandID) }
@@ -585,15 +585,16 @@ actor NativeSourceConversationService {
                     }
                 }
             } onCancel: { token.cancel() }
-            succeeded = true
+            releaseClaim = true
         } catch {
-            try? await repository.deferNativeSourcePressureRetry(claim: claim, credential: credential)
+            releaseClaim = (try? await repository.deferNativeSourcePressureRetry(claim: claim, credential: credential,
+                preparationError: error as? NativeSourcePressurePacketError)) ?? false
             // The durable pressure packet and consumed attempt remain available
             // for exact source readback; an error is never absence evidence.
         }
-        // On failure retain the short lease as a durable cooldown, including
-        // pre-reservation failures. Its expiry never exceeds the fixed window.
-        if succeeded { _ = try? await repository.releaseNativeSourcePressureClaim(claim) }
+        // Retryable failures retain the short lease as a durable cooldown.
+        // Success and permanent preparation failures release their ownership.
+        if releaseClaim { _ = try? await repository.releaseNativeSourcePressureClaim(claim) }
     }
 
     private func boundedLeg<Value: Sendable>(cancellation: ToolCallCancellation,

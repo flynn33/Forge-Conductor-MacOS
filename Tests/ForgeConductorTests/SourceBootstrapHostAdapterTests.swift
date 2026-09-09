@@ -22,6 +22,9 @@ final class SourceBootstrapHostAdapterTests: XCTestCase {
         XCTAssertEqual(stats.roots.count, 1)
         XCTAssertEqual(stats.continuations.count, 1)
         let root = try XCTUnwrap(stats.roots.first)
+        let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(root.userInput.utf8)) as? [String: Any])
+        XCTAssertEqual(envelope["schema_version"] as? String, "3.0")
+        XCTAssertEqual(envelope["acknowledgement_contract_version"] as? Int, 2)
         XCTAssertEqual(root.tools.map(\.name), ["context_get"])
         XCTAssertFalse(root.userInput.contains(fixture.packetGoal))
         XCTAssertFalse(root.userInput.contains("\"packet\":"))
@@ -171,6 +174,22 @@ final class SourceBootstrapHostAdapterTests: XCTestCase {
         XCTAssertFalse(events.contains("record-ack"))
     }
 
+    func testCorrectedSecondAcknowledgementDoesNotAuthorizeDuplicateCalls() async throws {
+        let fixture = try SourceHostFixture()
+        defer { fixture.remove() }
+        let trace = SourceHostTrace()
+        let transport = SourceHostTransport(trace: trace, mode: .duplicateCorrectedAck)
+        let adapter = try LMStudioManagedSessionHostAdapterV2(storageDirectory: fixture.providerDirectory, transport: transport)
+        do {
+            _ = try await adapter.createSourceAndBootstrap(request: fixture.request,
+                executor: SourceHostExecutor(fixture: fixture, trace: trace))
+            XCTFail("Accepted two acknowledgements after the provider corrected its version")
+        } catch {}
+        let events = await trace.events
+        XCTAssertTrue(events.contains("provider-ack"))
+        XCTAssertFalse(events.contains("record-ack"))
+    }
+
     func testExplicitCancellationStopsOwnedRootBeforeRetrieval() async throws {
         let fixture = try SourceHostFixture()
         defer { fixture.remove() }
@@ -305,7 +324,7 @@ private actor SourceHostExecutor: SourceBootstrapExecuting {
 }
 
 private actor SourceHostTransport: LMStudioManagedTransporting {
-    enum Mode: Sendable { case normal, wrongSource, prematureACK, extraTool, missingUsage, unknownRoot, wrongAckNonce, delayedRoot }
+    enum Mode: Sendable { case normal, wrongSource, prematureACK, extraTool, missingUsage, unknownRoot, wrongAckNonce, delayedRoot, duplicateCorrectedAck }
     let trace: SourceHostTrace
     let mode: Mode
     var roots: [LMStudioRootRequest] = []
@@ -349,9 +368,16 @@ private actor SourceHostTransport: LMStudioManagedTransporting {
         var arguments = properties.mapValues { $0["const"]! }
         if mode == .wrongAckNonce { arguments["nonce"] = UUID().uuidString.lowercased() }
         let data = try ForgeJSONCanonicalizationV1.data(from: arguments)
+        var calls = [LMStudioFunctionCall(itemID: "source-ack-item", callID: "source-ack-call", name: tool.name, arguments: String(decoding: data, as: UTF8.self))]
+        if mode == .duplicateCorrectedAck {
+            arguments["acknowledgement_contract_version"] = 3
+            let incorrect = try ForgeJSONCanonicalizationV1.data(from: arguments)
+            calls.insert(LMStudioFunctionCall(itemID: "incorrect-ack-item", callID: "incorrect-ack-call", name: tool.name,
+                arguments: String(decoding: incorrect, as: UTF8.self)), at: 0)
+        }
         return LMStudioResponseTurn(responseID: "source-ack-response", previousResponseID: request.previousResponseID,
             model: "fixture/tool-model", status: "completed", assistantText: "",
-            functionCalls: [LMStudioFunctionCall(itemID: "source-ack-item", callID: "source-ack-call", name: tool.name, arguments: String(decoding: data, as: UTF8.self))],
+            functionCalls: calls,
             usage: LMStudioUsage(inputTokens: 700, outputTokens: 80, totalTokens: 999))
     }
 

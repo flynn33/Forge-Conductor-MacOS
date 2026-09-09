@@ -400,6 +400,10 @@ but no invented provider response or usage. A receipt recovered after storage
 expiry can be accepted while the source remains stopped. The established
 provider-requested handoff digest format remains unchanged.
 
+Stage ordinals restart at one for each logical source message. Pressure admission
+checks contiguous stages within each message, rejects interleaved request reuse,
+and verifies the exact provider response chain across messages.
+
 The source owner now checks pressure before provider dispatch, after every
 accepted response (including assistant-only answers), and before tool effects.
 It stops and joins inference renewal before adopting the fixed storage claim.
@@ -413,6 +417,25 @@ five-minute deadline; writer attempts remain capped at eight. Receipt read
 failures use durable exponential retry delays and quarantine after eight failed
 reads. Neither recovery path acquires a provider permit or issues a model POST.
 Shutdown retains ownership until a pending storage callback actually exits.
+
+If frozen critical data cannot fit its inherited packet, decision, retrieval or
+commit-response limit before reservation, the owner records a specific terminal
+pressure reason and releases the storage claim. It preserves the pressure data
+without creating a source reservation or repeatedly attempting the same packet.
+
+The compact bootstrap root explicitly names acknowledgment contract version 2,
+separately from envelope schema 3.0. The adapter still requires exactly one typed
+acknowledgment with the correct identity, checksum and nonce; a second corrected
+call cannot make a multiple-call response valid.
+
+A disposable real-provider pressure test now reaches source handoff commit,
+manager admission, a fresh successor root and exact context retrieval. Gemma 4
+E4B returned multiple acknowledgment calls, including incomplete calls, which
+were rejected without successor activation. Its larger-packet attempt also
+retained an unknown provider outcome after the request deadline. A separate
+Qwen3 Coder 30B attempt hit the first-response deadline during source prompt
+processing. These failed runs retain their native receipts and recovery fences;
+they do not prove resumed successor work or pass G04.
 
 Integration tests exercise real source/outbox commits, untouched reads, failed
 writes, interrupted receipts, expiry and shutdown with a fixture provider. Real

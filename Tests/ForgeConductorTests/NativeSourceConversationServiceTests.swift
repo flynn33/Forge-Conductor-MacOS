@@ -4,6 +4,54 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class NativeSourceConversationServiceTests: XCTestCase, @unchecked Sendable {
+    func testOversizedPressureRecoveryStopsBeforeStorageAndDoesNotRetryPreparation() async throws {
+        try await withFixture(mode: .pressureAnswer) { f in
+            try f.enableAutomaticHandoff()
+            let service = f.service(); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: String(repeating: "x", count: 13_701)), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_turns WHERE blocked_code='pressure_bootstrap_output_too_large' AND pressure_decision_json IS NOT NULL AND pressure_reservation_id IS NULL"), 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests"), 0)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_conversations WHERE state='stopped' AND lease_owner IS NULL"), 1)
+            XCTAssertTrue(try f.app.store.pendingContinuityHandoffs().isEmpty)
+            let pending = try await f.repository.pendingNativeSourcePressureTurns()
+            XCTAssertTrue(pending.references.isEmpty)
+            _ = try await service.recoverOnce(cancellation: .init(timeoutSeconds: 5))
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 0)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests"), 0)
+            XCTAssertEqual(f.pool.activeCount, 0); XCTAssertEqual(f.operations.value, 0)
+        }
+    }
+
+    func testPressureCarryoverAcceptsTwoCompletedSourceRequestsWithIndependentOrdinals() async throws {
+        try await withFixture(mode: .pressureSecondAnswer) { f in
+            try f.enableAutomaticHandoff()
+            let service = f.service(); service.setOperational(true)
+            for input in ["First source message", "Second source message"] {
+                _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: input), cancellation: .init(timeoutSeconds: 5))
+                try await self.eventually { !(await service.hasRetainedWork()) }
+            }
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_turns WHERE ordinal=1 AND state='accepted'"), 2)
+            let delivery = try XCTUnwrap(f.app.store.pendingContinuityHandoffs().first)
+            let policy = try f.app.config.budgetPolicySelection(scope: .init(kind: .projectOverride,
+                projectID: f.projectID.description, projectGeneration: 1))
+            let accepted = try await f.repository.acceptContinuityIngress(source: delivery.handoff,
+                operationID: delivery.operationID, policySelection: policy)
+            let carryover = try await f.repository.nativeSourceBudgetCarryover(runID: accepted.runID)
+            XCTAssertEqual(carryover?.providerStageCount, 2)
+            XCTAssertEqual(carryover?.exactUsageStageCount, 2)
+            XCTAssertEqual(carryover?.observedInputTokens, 121_000)
+            XCTAssertEqual(carryover?.observedOutputTokens, 40)
+            let replay = try await f.repository.acceptContinuityIngress(source: delivery.handoff,
+                operationID: delivery.operationID, policySelection: policy)
+            XCTAssertEqual(replay.runID, accepted.runID)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM autonomous_runs"), 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 1)
+        }
+    }
+
     func testAcceptedAnswerPressureCommitsActualSourceAndOutboxWithoutAnotherPost() async throws {
         try await withFixture(mode: .pressureAnswer) { f in
             try f.enableAutomaticHandoff()
@@ -711,7 +759,7 @@ private final class SourceOwnerBudgetDiagnostics: @unchecked Sendable {
 }
 
 actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
-    enum Mode: Sendable { case heldProbe, unknownRoot, readHandoffSuffix, readThenAnswer, answer, pressureAnswer, pressureRead, checkpointThenAnswer }
+    enum Mode: Sendable { case heldProbe, unknownRoot, readHandoffSuffix, readThenAnswer, answer, pressureAnswer, pressureRead, pressureSecondAnswer, checkpointThenAnswer }
     struct Counts: Sendable { let probes: Int; let roots: Int; let continuations: Int; let lookups: Int; let legacyLookups: Int; let continuationPreflights: Int }
     nonisolated let providerID = "lmstudio"
     private let mode: Mode
@@ -796,8 +844,8 @@ actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
         try .init(requestID: operation.uuidString.lowercased(), responseID: "response-" + operation.uuidString.lowercased(), previousResponseID: parent,
             providerID: providerID, providerVersion: "fixture", modelKey: "fixture/native", providerInstanceID: "fixture-instance",
             messages: calls.isEmpty ? ["Retained actual response"] : [], toolCalls: calls,
-            usage: mode == .pressureAnswer || mode == .pressureRead
-                ? .init(capacity: contextLength, inputTokens: mode == .pressureAnswer ? 120_000 : 70_000,
+            usage: mode == .pressureAnswer || mode == .pressureRead || mode == .pressureSecondAnswer
+                ? .init(capacity: contextLength, inputTokens: mode == .pressureAnswer ? 120_000 : mode == .pressureRead ? 70_000 : parent == nil ? 1_000 : 120_000,
                     outputTokens: 20, source: .providerExact, confidence: 1) : nil, completed: true,
             finishReason: calls.isEmpty ? .stop : .toolCalls)
     }

@@ -64,6 +64,12 @@ installed-stack and production-feature acceptance remain separate gates.
 - Successor budgets begin with the actual bootstrap acknowledgement. Actual
   tool-output prefixes and completed response chains survive replay without
   duplicate effects or repeated context charges.
+- Pressure handoff admission now validates stage order within each source message
+  while preserving the response chain across messages. Frozen recovery packets
+  that exceed their inherited limits stop with a durable reason before storage.
+- Source bootstrap instructions distinguish envelope schema 3.0 from acknowledgment
+  contract version 2. Multiple acknowledgment calls remain rejected even when a
+  later call corrects an earlier version.
 - Native Responses requests can now be checked locally against the transport's
   exact encoded bytes and configured limits before dispatch. This preflight
   performs no inference or credential lookup and does not certify cached receipts.
