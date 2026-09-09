@@ -204,6 +204,15 @@ LM Studio only starts the `serve` processes when a chat has those MCP servers se
 
 ## 6. Continuity (packet automation and current boundary)
 
+When a project is registered, Forge preserves old handoff files, imports clearly
+attributable records as read-only history, and quarantines ambiguous records with
+an explanation. These records do not start or authorize a successor. Project
+initialization reports migration status and counts. If migration is pending,
+registration retains the committed project identity and reports reconciliation
+as required. Resolve the reported migration issue, then retry registration for
+the same project. See [Legacy migration](docs/CONTINUITY-INGRESS.md#legacy-migration-during-project-registration)
+for inventory limits and recovery behavior.
+
 The checkpoint and handoff behavior below is implemented. The current
 development snapshot has not yet proven autonomous session succession through a
 manager-owned, threshold-forced real-provider rollover. Until that test also

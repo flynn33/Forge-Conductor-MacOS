@@ -50,6 +50,30 @@ task-scoped mutation dispatch returns `task_identity_unavailable` before source
 transfer. Independent tasks remain available; the shared MCP process is never
 globally fenced to stand in for exact task authority.
 
+## Legacy migration during project registration
+
+Manager registration and MCP project initialization invoke the existing legacy
+migrator after exact project activation, while holding the registration transition
+fence. The migrator imports records with provable project identity as read-only
+history and quarantines ambiguous records with a retained explanation. Migration
+does not create a successor or use `LATEST` as project authority. It preserves
+the original legacy files and uses the existing transactional migration receipts
+for restart and replay.
+
+The registration scan is limited to 128 JSON candidates and 512 directory entries.
+It opens candidates relative to a pinned directory descriptor and rejects symbolic
+links, hard links, FIFOs, oversized files and other non-regular inputs. Invalid
+candidates retain a quarantine explanation without copying linked content. An
+inventory exceeding either limit fails before any migration commit and leaves
+registration reconciliation pending; it never reports a partial prefix as complete.
+
+MCP initialization reports `legacy_continuity_migration` as `pending`, `complete`
+with receipt and counts, or `not_needed`. A migration failure after registration
+commits preserves that primary result and requests an exact retry. Manager results
+likewise retain the committed project identity and its current lifecycle state
+when migration still needs reconciliation. These migrations grant no active run
+or task authority.
+
 ## Manager admission and execution hold
 
 The persistent manager owns delivery through its existing watchdog. Each pass

@@ -840,7 +840,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                             "registered project publication authority did not match activation"
                         )
                     }
+                    accepted = activated
                     try projectRegistrationCheckpoint(.controlPlaneActivated)
+                    try app.projectMemory.migrateLegacyContinuity(
+                        projectID: activated.projectID, generation: activated.generation)
                     do {
                         try app.projectMemory.identities.completeRegistrationIntent(
                             retainedRegistration.preparation

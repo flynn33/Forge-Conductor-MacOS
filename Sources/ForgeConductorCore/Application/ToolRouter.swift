@@ -1251,16 +1251,29 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                     preparation: preparation,
                     cancellation: cancellation
                 )
-                let initialization = try app.projectMemory.commitInitialization(
+                var initialization = try app.projectMemory.commitInitialization(
                     preparation,
                     cancellation: nil,
                     onIdentityCommitted: onIdentityCommitted
                 )
+                initialization["legacy_continuity_migration"] = ["status": "pending"]
                 onInitializationCommitted?(initialization)
                 let activated = try app.projectContexts.finalizeRegistration(
                     preparation: preparation,
                     cancellation: nil
                 )
+                guard accepted.projectID == activated.projectID,
+                      accepted.generation == activated.generation,
+                      activated.projectID.description.caseInsensitiveCompare(preparation.descriptor.id) == .orderedSame,
+                      activated.canonicalRoot == preparation.target.canonicalRoot else {
+                    throw ProjectContextError.projectScopeMismatch
+                }
+                let migration = try app.projectMemory.migrateLegacyContinuity(
+                    projectID: activated.projectID, generation: activated.generation)
+                var migrationStatus = migration?.asDictionary() ?? [:]
+                migrationStatus["status"] = migration == nil ? "not_needed" : "complete"
+                initialization["legacy_continuity_migration"] = migrationStatus
+                onInitializationCommitted?(initialization)
                 let context = try app.projectContexts.bindMCPClient(
                     project: activated,
                     clientID: clientID,
