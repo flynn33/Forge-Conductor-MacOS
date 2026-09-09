@@ -25,6 +25,10 @@ final class SourceBootstrapHostAdapterTests: XCTestCase {
         let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(root.userInput.utf8)) as? [String: Any])
         XCTAssertEqual(envelope["schema_version"] as? String, "3.0")
         XCTAssertEqual(envelope["acknowledgement_contract_version"] as? Int, 2)
+        let challenge = try XCTUnwrap(envelope["expected_acknowledgement"] as? [String: Any])
+        let expected = try JSONDecoder().decode(BootstrapAcknowledgementV2.self,
+            from: ForgeJSONCanonicalizationV1.data(from: challenge))
+        XCTAssertEqual(expected, receipt.bootstrap.acknowledgement)
         XCTAssertEqual(root.tools.map(\.name), ["context_get"])
         XCTAssertFalse(root.userInput.contains(fixture.packetGoal))
         XCTAssertFalse(root.userInput.contains("\"packet\":"))
@@ -170,6 +174,22 @@ final class SourceBootstrapHostAdapterTests: XCTestCase {
         } catch {}
         let events = await trace.events
         XCTAssertTrue(events.contains("retrieve"))
+        XCTAssertTrue(events.contains("provider-ack"))
+        XCTAssertFalse(events.contains("record-ack"))
+    }
+
+    func testChallengeDoesNotReplaceMissingProviderAcknowledgementFields() async throws {
+        let fixture = try SourceHostFixture()
+        defer { fixture.remove() }
+        let trace = SourceHostTrace()
+        let adapter = try LMStudioManagedSessionHostAdapterV2(storageDirectory: fixture.providerDirectory,
+            transport: SourceHostTransport(trace: trace, mode: .missingAckFields))
+        do {
+            _ = try await adapter.createSourceAndBootstrap(request: fixture.request,
+                executor: SourceHostExecutor(fixture: fixture, trace: trace))
+            XCTFail("Filled missing provider acknowledgment fields from the challenge")
+        } catch {}
+        let events = await trace.events
         XCTAssertTrue(events.contains("provider-ack"))
         XCTAssertFalse(events.contains("record-ack"))
     }
@@ -324,7 +344,7 @@ private actor SourceHostExecutor: SourceBootstrapExecuting {
 }
 
 private actor SourceHostTransport: LMStudioManagedTransporting {
-    enum Mode: Sendable { case normal, wrongSource, prematureACK, extraTool, missingUsage, unknownRoot, wrongAckNonce, delayedRoot, duplicateCorrectedAck }
+    enum Mode: Sendable { case normal, wrongSource, prematureACK, extraTool, missingUsage, unknownRoot, wrongAckNonce, delayedRoot, duplicateCorrectedAck, missingAckFields }
     let trace: SourceHostTrace
     let mode: Mode
     var roots: [LMStudioRootRequest] = []
@@ -367,6 +387,7 @@ private actor SourceHostTransport: LMStudioManagedTransporting {
         let properties = try XCTUnwrap(parameters["properties"] as? [String: [String: Any]])
         var arguments = properties.mapValues { $0["const"]! }
         if mode == .wrongAckNonce { arguments["nonce"] = UUID().uuidString.lowercased() }
+        if mode == .missingAckFields { arguments.removeValue(forKey: "nonce"); arguments.removeValue(forKey: "accepted") }
         let data = try ForgeJSONCanonicalizationV1.data(from: arguments)
         var calls = [LMStudioFunctionCall(itemID: "source-ack-item", callID: "source-ack-call", name: tool.name, arguments: String(decoding: data, as: UTF8.self))]
         if mode == .duplicateCorrectedAck {

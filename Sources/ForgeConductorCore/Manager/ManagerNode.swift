@@ -1942,7 +1942,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 guard let self else { throw NativeSourceOperatorError.unavailable }
                 return try await self.taskHTTPService.submitNativeCall(credential: credential, reference: reference,
                     lease: lease, outputBudget: budget, preparedCheckpoint: checkpoint, cancellation: cancellation)
-            }, pressureIO: NativeSourcePressureIO(source: app.continuity), beginProviderOperation: { [weak self] in
+            }, pressureIO: NativeSourcePressureIO(source: app.continuity), diagnostics: app.diagnostics, beginProviderOperation: { [weak self] in
                 guard let self else { throw NativeSourceOperatorError.unavailable }
                 try self.beginProviderRunOperation()
                 return NativeSourceProviderOperationLease { self.finishProviderRunOperation() }

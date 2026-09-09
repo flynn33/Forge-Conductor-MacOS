@@ -4,6 +4,27 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class NativeSourceConversationServiceTests: XCTestCase, @unchecked Sendable {
+    func testSourceResponseBeyondInitialLeaseSurvivesCatalogDiscoveryAndRenewal() async throws {
+        try await withFixture(mode: .slowAnswer) { f in
+            let service = f.service(); service.setOperational(true)
+            let request = try NativeSourceSendRequest(taskID: f.taskID, requestID: UUID(), input: "Wait for the actual source response")
+            _ = try await service.send(request, cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { await f.provider.counts().roots == 1 }
+            // Cross the real 30-second initial lease while the owner renews it.
+            try await Task.sleep(for: .seconds(32))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            let status = try await service.status(.init(taskID: f.taskID, requestID: request.requestID), cancellation: .init(timeoutSeconds: 5))
+            XCTAssertEqual(status.stageState, "accepted")
+            XCTAssertEqual(status.conversationState, "idle")
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1)
+            XCTAssertEqual(counts.lookups, 0)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_turns WHERE state='outcome_unknown'"), 0)
+            XCTAssertEqual(f.pool.activeCount, 0)
+            XCTAssertEqual(f.bridge.retainedWorkCount, 0)
+        }
+    }
+
     func testOversizedPressureRecoveryStopsBeforeStorageAndDoesNotRetryPreparation() async throws {
         try await withFixture(mode: .pressureAnswer) { f in
             try f.enableAutomaticHandoff()
@@ -249,6 +270,10 @@ final class NativeSourceConversationServiceTests: XCTestCase, @unchecked Sendabl
             let initial = await f.provider.counts()
             XCTAssertEqual(initial.roots, 1); XCTAssertEqual(initial.probes, 1)
             XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_turns WHERE state='outcome_unknown'"), 1)
+            let diagnostics = f.app.diagnostics.recent(limit: 20)
+            let diagnosticBytes = try JSONEncoder().encode(diagnostics)
+            XCTAssertTrue(String(decoding: diagnosticBytes, as: UTF8.self).contains("native_source_exchange_failed"))
+            XCTAssertFalse(String(decoding: diagnosticBytes, as: UTF8.self).contains(request.input))
             _ = await first.shutdown(deadline: Date().addingTimeInterval(1))
             let resumed = f.service(); resumed.setOperational(true)
             _ = try await resumed.recoverOnce(cancellation: .init(timeoutSeconds: 5))
@@ -674,6 +699,7 @@ private final class SourceOwnerFixture: @unchecked Sendable {
                         maximumEscapedPayloadBytes: budget?.maximumEscapedPayloadBytes ?? 0))
                 }
             },
+            diagnostics: app.diagnostics,
             beginProviderOperation: { [operations] in operations.increment(); return .init { operations.decrement() } })
         servicesLock.lock(); services.append(service); servicesLock.unlock()
         return service
@@ -759,7 +785,7 @@ private final class SourceOwnerBudgetDiagnostics: @unchecked Sendable {
 }
 
 actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
-    enum Mode: Sendable { case heldProbe, unknownRoot, readHandoffSuffix, readThenAnswer, answer, pressureAnswer, pressureRead, pressureSecondAnswer, checkpointThenAnswer }
+    enum Mode: Sendable { case heldProbe, slowAnswer, unknownRoot, readHandoffSuffix, readThenAnswer, answer, pressureAnswer, pressureRead, pressureSecondAnswer, checkpointThenAnswer }
     struct Counts: Sendable { let probes: Int; let roots: Int; let continuations: Int; let lookups: Int; let legacyLookups: Int; let continuationPreflights: Int }
     nonisolated let providerID = "lmstudio"
     private let mode: Mode
@@ -816,6 +842,7 @@ actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
     func createRoot(_ request: ProviderRootRequest, observedCapabilities: ProviderCapabilities) async throws -> ProviderTurn {
         guard observedCapabilities == (try capabilities()) else { throw NativeSourceConversationError.conflict }
         roots += 1
+        if mode == .slowAnswer { try await Task.sleep(for: .seconds(31)) }
         var calls: [ProviderToolCall] = []
         if mode == .readHandoffSuffix || mode == .readThenAnswer || mode == .pressureRead {
             calls.append(try .init(itemID: "item-read", callID: "source-read", name: "fs_read", argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["path": path])))

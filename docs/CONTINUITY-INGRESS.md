@@ -427,13 +427,25 @@ The compact bootstrap root explicitly names acknowledgment contract version 2,
 separately from envelope schema 3.0. The adapter still requires exactly one typed
 acknowledgment with the correct identity, checksum and nonce; a second corrected
 call cannot make a multiple-call response valid.
+The root also supplies the complete expected acknowledgment object, encoded by
+the same typed wire model used for validation. This challenge is included in
+bootstrap byte admission. It grants no authority and cannot fill missing fields
+in the model's actual acknowledgment.
+Tool discovery uses a separate cancellation token bounded by the current lease.
+Its admission deadline cannot shorten the five-minute source exchange deadline;
+the owner renews the lease during provider inference. Task cancellation still
+cancels discovery, and the existing per-call and provider limits remain enforced.
+A native regression crosses the initial 30-second lease with a 31-second response.
+
+Source exchange failure diagnostics record the provider/owner phase, a bounded
+code and cancellation/deadline flags. Prompts and raw exception text are excluded.
 
 A disposable real-provider pressure test now reaches source handoff commit,
 manager admission, a fresh successor root and exact context retrieval. Gemma 4
 E4B returned multiple acknowledgment calls, including incomplete calls, which
 were rejected without successor activation. Its larger-packet attempt also
 retained an unknown provider outcome after the request deadline. A separate
-Qwen3 Coder 30B attempt hit the first-response deadline during source prompt
+Qwen3 Coder 30B attempt ended without a source response receipt during prompt
 processing. These failed runs retain their native receipts and recovery fences;
 they do not prove resumed successor work or pass G04.
 

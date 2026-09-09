@@ -76,6 +76,7 @@ actor NativeSourceConversationService {
     private let call: Call
     private let pressureIO: NativeSourcePressureIO
     private let outputObserver: OutputObserver
+    private let diagnostics: (any DiagnosticRecording)?
     private let beginProviderOperation: @Sendable () throws -> NativeSourceProviderOperationLease
     private nonisolated let operationGate = NativeSourceOperationGate()
     private var operational: Bool { operationGate.isOperational }
@@ -96,6 +97,7 @@ actor NativeSourceConversationService {
          policyResolver: @escaping @Sendable (ProjectID, ProjectGeneration) throws -> BudgetPolicySelection,
          tools: @escaping Tools, call: @escaping Call,
          pressureIO: NativeSourcePressureIO, outputObserver: @escaping OutputObserver = { _, _ in },
+         diagnostics: (any DiagnosticRecording)? = nil,
          beginProviderOperation: @escaping @Sendable () throws -> NativeSourceProviderOperationLease) {
         self.repository = repository; self.providerWorkAdmission = providerWorkAdmission
         self.managerInstanceID = managerInstanceID; self.clock = clock
@@ -103,6 +105,7 @@ actor NativeSourceConversationService {
         self.configurationResolver = configurationResolver; self.policyResolver = policyResolver
         self.tools = tools; self.call = call; self.pressureIO = pressureIO
         self.outputObserver = outputObserver; self.beginProviderOperation = beginProviderOperation
+        self.diagnostics = diagnostics
     }
 
     func send(_ request: NativeSourceSendRequest, cancellation: ToolCallCancellation) async throws -> NativeSourceOperatorResponse {
@@ -347,6 +350,7 @@ actor NativeSourceConversationService {
                         await storePressure(pressure, credential: credential)
                     }
                 } catch {
+                    recordFailure(error, phase: "owner", cancellation: token)
                     if !(error is CancellationError), !token.isCancelled,
                        let latest = try? await repository.nativeSourceRequest(taskID: key.taskID, requestID: key.requestID,
                            credential: credential, cancellation: ToolCallCancellation(timeoutSeconds: 3)),
@@ -433,7 +437,13 @@ actor NativeSourceConversationService {
             case .prepared:
                 let preflight = try await Self.preflight(prepared.request, provider: provider)
                 _ = try await checkedConfiguration(assignment: assignment, preflight: preflight)
-                let definitions = try await tools(credential, await leaseState.current(), cancellation)
+                // Discovery is bounded by the current lease. It must not shorten
+                // the exchange deadline: the owner renews that lease during inference.
+                let catalogToken = ToolCallCancellation(timeoutSeconds: min(120, max(0, cancellation.remainingTimeInterval ?? 120)))
+                let definitions = try await withTaskCancellationHandler {
+                    try Task.checkCancellation(); try cancellation.checkCancellation()
+                    return try await tools(credential, await leaseState.current(), catalogToken)
+                } onCancel: { catalogToken.cancel() }
                 guard definitions == Self.tools(prepared.request) else { throw NativeSourceConversationError.conflict }
                 let check = try await repository.reserveNativeSourceCapabilityCheck(prepared: prepared, preflight: preflight,
                     credential: credential, lease: await leaseState.current(), cancellation: cancellation)
@@ -479,6 +489,7 @@ actor NativeSourceConversationService {
                         accepted = try await repository.acceptNativeSourceProviderTurn(claim: claim, turn: turn,
                             credential: credential, lease: await leaseState.current(), cancellation: cancellation)
                     } catch {
+                        recordFailure(error, phase: "provider", cancellation: cancellation)
                         try? await repository.recordNativeSourceProviderOutcome(claim: claim, outcome: .unknown,
                             cancellation: ToolCallCancellation(timeoutSeconds: 3))
                         throw error
@@ -622,6 +633,21 @@ actor NativeSourceConversationService {
             }
         }
         return "source_preparation_failed"
+    }
+    private func recordFailure(_ error: Error, phase: String, cancellation: ToolCallCancellation) {
+        let code: String
+        if let provider = error as? any ManagedProviderFailure {
+            let value = provider.managedProviderFailureCode
+            code = !value.isEmpty && value.utf8.count <= 64 && value.utf8.allSatisfy({
+                (97...122).contains($0) || (48...57).contains($0) || $0 == 95
+            }) ? value : "provider_failure"
+        } else if error is CancellationError { code = "cancelled" }
+        else if error as? NativeSourceConversationError == .leaseUnavailable { code = "lease_unavailable" }
+        else if error as? NativeSourceConversationError == .outcomeUnknown { code = "outcome_unknown" }
+        else { code = Self.stopReason(error) }
+        diagnostics?.warn("native_source_exchange_failed", ["phase":phase,"error_code":code,
+            "task_cancelled":String(Task.isCancelled),"owner_cancelled":String(cancellation.isCancelled),
+            "owner_deadline_exceeded":String(cancellation.isDeadlineExceeded)], category: .manager)
     }
     private static func preflight(_ request: NativeSourceProviderRequest,
         provider: any ManagedModelProviderRequestPreflighting) async throws -> ProviderRequestPreflight {

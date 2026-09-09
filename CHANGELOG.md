@@ -70,6 +70,13 @@ installed-stack and production-feature acceptance remain separate gates.
 - Source bootstrap instructions distinguish envelope schema 3.0 from acknowledgment
   contract version 2. Multiple acknowledgment calls remain rejected even when a
   later call corrects an earlier version.
+- The source bootstrap root supplies the complete expected acknowledgment as a
+  bounded challenge, including nonce and acceptance fields. Activation still
+  requires the model's actual complete, single-call acknowledgment.
+- Tool discovery now uses its own lease-bounded cancellation token, preserving
+  the renewable source exchange deadline during longer provider responses.
+- Source exchange failures now record bounded diagnostic codes and cancellation
+  state without retaining prompts, credentials or raw provider error messages.
 - Native Responses requests can now be checked locally against the transport's
   exact encoded bytes and configured limits before dispatch. This preflight
   performs no inference or credential lookup and does not certify cached receipts.
