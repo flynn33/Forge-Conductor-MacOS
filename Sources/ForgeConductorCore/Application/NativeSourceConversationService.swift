@@ -26,13 +26,33 @@ struct NativeSourceRecoveryReport: Sendable {
     let retained: Int
 }
 
+struct NativeSourcePressureIO: Sendable {
+    let checkpoint: @Sendable (ResolvedNativeSourceProviderCall, ToolCallCancellation) throws -> (prepared: PreparedContinuitySourceCommit, resultJSON: Data)
+    let preflight: @Sendable (PreparedContinuitySourceCommit) throws -> Data
+    let read: @Sendable (PreparedContinuitySourceCommit, ContinuityIngressAuthorization, ToolCallCancellation) throws -> ContinuityHandoffCommit?
+    let commit: @Sendable (PreparedContinuitySourceCommit, ContinuityIngressAuthorization, Bool, ToolCallCancellation) throws -> ContinuityHandoffCommit
+
+    init(source: ContextContinuityService,
+        commitOverride: (@Sendable (PreparedContinuitySourceCommit, ContinuityIngressAuthorization, Bool, ToolCallCancellation) throws -> ContinuityHandoffCommit)? = nil) {
+        checkpoint = { call, token in
+            let prepared = try source.prepareAuthorizedSourceCommit(arguments: JSONSupport.object(from: call.canonicalArgumentsJSON),
+                clientID: call.attachment.context.clientID, source: .model, finalize: false,
+                authorization: call.attachment.setup.record.authorization, cancellation: token)
+            let result = try source.nativeSourcePreparedToolResult(prepared)
+            return (prepared, try ForgeJSONCanonicalizationV1.data(from: ["ok":result.ok,"is_error":result.isError,"payload":result.payload]))
+        }
+        preflight = { try MCPToolResponse.data(id: String(repeating: "\u{0}", count: 256), result: source.nativeSourcePreparedToolResult($0)) }
+        read = { try source.readPreparedSourceCommitForReconciliation($0, authorization: $1, cancellation: $2) }
+        commit = commitOverride ?? { try source.commitPreparedAuthorizedSourceCommit($0, authorization: $1, automaticHandoffEnabled: $2, cancellation: $3) }
+    }
+}
+
 /// The manager's existing watchdog calls recovery. This owner has no dispatch
 /// queue and shares the same provider ceiling as managed run coordinators.
 actor NativeSourceConversationService {
     typealias Tools = @Sendable (NativeTaskCapabilityCredential, NativeSourceConversationLease, ToolCallCancellation) async throws -> [Data]
-    typealias Call = @Sendable (NativeTaskCapabilityCredential, NativeSourceProviderCallReference, NativeSourceConversationLease, NativeSourceProviderOutputBudget, ToolCallCancellation) async throws -> NativeSourceProviderCallOutput
-    typealias BudgetEvaluator = @Sendable (NativeSourcePreparedTurn, ProviderRequestPreflight, ProviderCapabilities, BudgetPolicySelection) throws -> NativeSourceProviderBudgetApproval
-    typealias OutputBudgetEvaluator = @Sendable (ResolvedNativeSourceProviderCall, [NativeSourceProviderCallOutput], ProviderRequestPreflight?, ProviderCapabilities, BudgetPolicySelection) throws -> NativeSourceProviderOutputBudget
+    typealias Call = @Sendable (NativeTaskCapabilityCredential, NativeSourceProviderCallReference, NativeSourceConversationLease, NativeSourceProviderOutputBudget, PreparedContinuitySourceCommit?, ToolCallCancellation) async throws -> NativeSourceProviderCallOutput
+    typealias OutputObserver = @Sendable (ResolvedNativeSourceProviderCall, NativeSourceToolOutputEvaluation) -> Void
 
     private struct Key: Hashable, Sendable { let taskID: UUID; let requestID: UUID }
     private struct Work {
@@ -54,8 +74,8 @@ actor NativeSourceConversationService {
     private let policyResolver: @Sendable (ProjectID, ProjectGeneration) throws -> BudgetPolicySelection
     private let tools: Tools
     private let call: Call
-    private let budgetEvaluator: BudgetEvaluator
-    private let outputBudgetEvaluator: OutputBudgetEvaluator
+    private let pressureIO: NativeSourcePressureIO
+    private let outputObserver: OutputObserver
     private let beginProviderOperation: @Sendable () throws -> NativeSourceProviderOperationLease
     private nonisolated let operationGate = NativeSourceOperationGate()
     private var operational: Bool { operationGate.isOperational }
@@ -65,6 +85,8 @@ actor NativeSourceConversationService {
     private var work: [Key: Work] = [:]
     private var recoveryInProgress = false
     private var recoveryCursor: Int64?
+    private var pressureCursor: Int64?
+    private var receiptCursor: Int64?
 
     init(repository: ProjectControlPlaneRepository, providerWorkAdmission: NativeProviderWorkAdmission,
          managerInstanceID: UUID, clock: any Clock,
@@ -73,14 +95,14 @@ actor NativeSourceConversationService {
          configurationResolver: @escaping @Sendable () async throws -> ProviderConfigurationSnapshot,
          policyResolver: @escaping @Sendable (ProjectID, ProjectGeneration) throws -> BudgetPolicySelection,
          tools: @escaping Tools, call: @escaping Call,
-         budgetEvaluator: @escaping BudgetEvaluator, outputBudgetEvaluator: @escaping OutputBudgetEvaluator,
+         pressureIO: NativeSourcePressureIO, outputObserver: @escaping OutputObserver = { _, _ in },
          beginProviderOperation: @escaping @Sendable () throws -> NativeSourceProviderOperationLease) {
         self.repository = repository; self.providerWorkAdmission = providerWorkAdmission
         self.managerInstanceID = managerInstanceID; self.clock = clock
         self.attachmentResolver = attachmentResolver; self.providerResolver = providerResolver
         self.configurationResolver = configurationResolver; self.policyResolver = policyResolver
-        self.tools = tools; self.call = call; self.budgetEvaluator = budgetEvaluator
-        self.outputBudgetEvaluator = outputBudgetEvaluator; self.beginProviderOperation = beginProviderOperation
+        self.tools = tools; self.call = call; self.pressureIO = pressureIO
+        self.outputObserver = outputObserver; self.beginProviderOperation = beginProviderOperation
     }
 
     func send(_ request: NativeSourceSendRequest, cancellation: ToolCallCancellation) async throws -> NativeSourceOperatorResponse {
@@ -214,7 +236,40 @@ actor NativeSourceConversationService {
             } catch is CancellationError { throw CancellationError() }
             catch { /* One stale, disabled or malformed reference does not block its peers. */ }
         }
-        return .init(scanned: page.references.count, started: started, retained: work.count)
+        let pressure = try await repository.pendingNativeSourcePressureTurns(afterRowID: pressureCursor, limit: 4, cancellation: cancellation)
+        pressureCursor = pressure.nextRowID
+        for reference in pressure.references {
+            try cancellation.checkCancellation()
+            guard operational, !closing else { break }
+            do {
+                let credential = try attachmentResolver(reference.taskID).credential
+                let claim = try await repository.acquireNativeSourcePressureClaim(conversationID: reference.conversationID,
+                    stageID: reference.stageID, credential: credential, managerInstanceID: managerInstanceID, cancellation: cancellation)
+                // Storage recovery owns no provider permit and sends no request.
+                await storePressure(claim, credential: credential)
+            } catch is CancellationError { throw CancellationError() }
+            catch { /* Bounded pages revisit stale or temporarily unavailable claims. */ }
+        }
+        let receipts = try await repository.pendingNativeSourcePressureReceipts(afterRowID: receiptCursor, limit: 4, cancellation: cancellation)
+        receiptCursor = receipts.count == 4 ? receipts.last?.rowID : nil
+        let io = pressureIO
+        for reference in receipts {
+            try cancellation.checkCancellation()
+            guard operational, !closing else { break }
+            do {
+                let claim = try await repository.acquireNativeSourcePressureReceiptClaim(reference: reference,
+                    managerInstanceID: managerInstanceID, cancellation: cancellation)
+                do {
+                    _ = try await repository.reconcileNativeSourcePressureReceipt(claim: claim,
+                        readExisting: { try io.read($0, $1, cancellation) }, cancellation: cancellation)
+                } catch {
+                    try? await repository.deferNativeSourcePressureReceiptRetry(claim)
+                }
+                _ = try? await repository.releaseNativeSourcePressureReceiptClaim(claim)
+            } catch is CancellationError { throw CancellationError() }
+            catch { /* Read-only cleanup must not prevent another task's recovery. */ }
+        }
+        return .init(scanned: page.references.count + pressure.references.count + receipts.count, started: started, retained: work.count)
     }
 
     nonisolated func setOperational(_ value: Bool) { operationGate.setOperational(value) }
@@ -285,8 +340,12 @@ actor NativeSourceConversationService {
         let task = Task { [self] in
             await withTaskCancellationHandler {
                 do {
-                    try await protectedExchange(prepared: prepared, credential: credential, leaseState: leaseState,
-                        assignment: assignment, provider: provider, cancellation: token)
+                    if let pressure = try await protectedExchange(prepared: prepared, credential: credential, leaseState: leaseState,
+                        assignment: assignment, provider: provider, cancellation: token) {
+                        // The task group has joined inference and renewal. Storage
+                        // owns a separate fixed deadline, with this task's stop fence.
+                        await storePressure(pressure, credential: credential)
+                    }
                 } catch {
                     if !(error is CancellationError), !token.isCancelled,
                        let latest = try? await repository.nativeSourceRequest(taskID: key.taskID, requestID: key.requestID,
@@ -320,10 +379,10 @@ actor NativeSourceConversationService {
 
     private func protectedExchange(prepared: NativeSourcePreparedTurn, credential: NativeTaskCapabilityCredential,
         leaseState: NativeSourceLeaseState, assignment: ContinuityTaskAssignment,
-        provider: any ManagedModelProviderObservedDispatching, cancellation: ToolCallCancellation) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
+        provider: any ManagedModelProviderObservedDispatching, cancellation: ToolCallCancellation) async throws -> NativeSourcePressureClaim? {
+        try await withThrowingTaskGroup(of: NativeSourcePressureClaim?.self) { group in
             group.addTask { [self] in
-                try await exchange(prepared: prepared, credential: credential, leaseState: leaseState,
+                    try await exchange(prepared: prepared, credential: credential, leaseState: leaseState,
                     assignment: assignment, provider: provider, cancellation: cancellation)
             }
             group.addTask { [repository] in
@@ -342,13 +401,13 @@ actor NativeSourceConversationService {
                 throw NativeSourceConversationError.deadlineExceeded
             }
             defer { group.cancelAll() }
-            _ = try await group.next()
+            return try await group.next() ?? nil
         }
     }
 
     private func exchange(prepared initial: NativeSourcePreparedTurn, credential: NativeTaskCapabilityCredential,
         leaseState: NativeSourceLeaseState, assignment: ContinuityTaskAssignment,
-        provider: any ManagedModelProviderObservedDispatching, cancellation: ToolCallCancellation) async throws {
+        provider: any ManagedModelProviderObservedDispatching, cancellation: ToolCallCancellation) async throws -> NativeSourcePressureClaim? {
         var prepared = initial
         for _ in 0..<8 {
             try Task.checkCancellation(); try cancellation.checkCancellation()
@@ -370,7 +429,7 @@ actor NativeSourceConversationService {
                     credential: credential, lease: lease, cancellation: cancellation) else { throw NativeSourceConversationError.integrityFailure }
                 accepted = retained
             case .cancelledBeforeDispatch:
-                return
+                return nil
             case .prepared:
                 let preflight = try await Self.preflight(prepared.request, provider: provider)
                 _ = try await checkedConfiguration(assignment: assignment, preflight: preflight)
@@ -390,7 +449,19 @@ actor NativeSourceConversationService {
                 }
                 _ = try await checkedConfiguration(assignment: assignment, preflight: preflight)
                 let policy = try policyResolver(authenticated.descriptor.projectID, authenticated.descriptor.projectGeneration)
-                let budget = try budgetEvaluator(prepared, preflight, capabilities, policy)
+                let refreshed = try await repository.nativeSourcePreparedTurn(stageID: prepared.stageID, credential: credential,
+                    lease: await leaseState.current(), cancellation: cancellation)
+                let binding = try await repository.nativeSourceBudgetBinding(stageID: prepared.stageID, boundary: .beforeProviderPost,
+                    credential: credential, lease: await leaseState.current(), cancellation: cancellation)
+                let budget: NativeSourceProviderBudgetApproval
+                switch NativeSourceBudgetEvaluator.providerDecision(prepared: refreshed, preflight: preflight,
+                    capabilities: capabilities, policySelection: policy, binding: binding) {
+                case .admitted(let value): budget = value
+                case .pressure(let value):
+                    return try await recordPressure(.pressure(value), credential: credential, leaseState: leaseState, policy: policy, cancellation: cancellation)
+                case .blocked(let value):
+                    return try await recordPressure(.blocked(value), credential: credential, leaseState: leaseState, policy: policy, cancellation: cancellation)
+                }
                 let admission = try await repository.beginNativeSourceProviderPost(prepared: prepared, preflight: preflight,
                     capabilities: capabilities, budget: budget, credential: credential, lease: await leaseState.current(), cancellation: cancellation)
                 switch admission {
@@ -415,8 +486,18 @@ actor NativeSourceConversationService {
                 }
             }
             guard accepted.calls.count <= 16 else { throw NativeSourceConversationError.integrityFailure }
-            if accepted.calls.isEmpty { return }
-            guard let capabilities = accepted.prepared.retainedCapabilities,
+            let acceptedPolicy = try policyResolver(authenticated.descriptor.projectID, authenticated.descriptor.projectGeneration)
+            let context = try await repository.nativeSourceAcceptedBudgetContext(stageID: accepted.prepared.stageID,
+                credential: credential, lease: await leaseState.current(), cancellation: cancellation)
+            switch NativeSourceBudgetEvaluator.acceptedDecision(context: context, policySelection: acceptedPolicy) {
+            case .admitted: break
+            case .pressure(let value):
+                return try await recordPressure(.pressure(value), credential: credential, leaseState: leaseState, policy: acceptedPolicy, cancellation: cancellation)
+            case .blocked(let value):
+                return try await recordPressure(.blocked(value), credential: credential, leaseState: leaseState, policy: acceptedPolicy, cancellation: cancellation)
+            }
+            if accepted.calls.isEmpty { return nil }
+            guard accepted.prepared.retainedCapabilities != nil,
                   let retainedPreflight = accepted.prepared.retainedPreflight else { throw NativeSourceConversationError.integrityFailure }
             var outputs: [NativeSourceProviderCallOutput] = []
             for reference in accepted.calls {
@@ -431,31 +512,88 @@ actor NativeSourceConversationService {
                     lease: currentLease, policySelection: policy, cancellation: cancellation) {
                     output = retained
                 } else {
-                    let emptyPreflight: ProviderRequestPreflight?
-                    if resolved.toolName == "session_handoff" {
-                        emptyPreflight = nil
-                    } else {
-                        let emptyRequest = try Self.emptyOutputRequest(accepted: accepted, outputs: outputs, callID: resolved.callID)
-                        let measured = try await provider.preflightContinuation(emptyRequest)
-                        _ = try await checkedConfiguration(assignment: assignment, preflight: measured)
-                        guard measured.configurationFingerprintSHA256 == retainedPreflight.configurationFingerprintSHA256 else {
-                            throw NativeSourceConversationError.conflict
-                        }
-                        emptyPreflight = measured
+                    let io = pressureIO
+                    let evaluation = try await repository.evaluateNativeSourceToolOutput(reference: reference, credential: credential,
+                        lease: currentLease, policySelection: policy, measureContinuation: { [self] request in
+                            let measured = try await provider.preflightContinuation(request)
+                            _ = try await checkedConfiguration(assignment: assignment, preflight: measured)
+                            guard measured.configurationFingerprintSHA256 == retainedPreflight.configurationFingerprintSHA256 else {
+                                throw NativeSourceConversationError.conflict
+                            }
+                            return measured
+                        }, prepareCheckpoint: { try io.checkpoint($0, cancellation) }, cancellation: cancellation)
+                    outputObserver(resolved, evaluation)
+                    let budget: NativeSourceProviderOutputBudget
+                    let checkpoint: PreparedContinuitySourceCommit?
+                    switch evaluation {
+                    case .admitted(let value, let frozen): budget = value; checkpoint = frozen
+                    case .pressure(let claim): return claim
+                    case .blocked: return nil
                     }
-                    let budget = try outputBudgetEvaluator(resolved, outputs, emptyPreflight, capabilities, policy)
                     let callToken = ToolCallCancellation(timeoutSeconds: min(120, max(0, cancellation.remainingTimeInterval ?? 120)))
                     output = try await withTaskCancellationHandler {
-                        try await call(credential, reference, await leaseState.current(), budget, callToken)
+                        try await call(credential, reference, await leaseState.current(), budget, checkpoint, callToken)
                     } onCancel: { callToken.cancel() }
                 }
-                if output.readyHandoffCommitted { return }
+                if output.readyHandoffCommitted { return nil }
                 outputs.append(output)
             }
             prepared = try await repository.prepareNativeSourceToolContinuation(acceptedStageID: accepted.prepared.stageID,
                 credential: credential, lease: await leaseState.current(), cancellation: cancellation)
         }
         throw NativeSourceConversationError.budgetExceeded
+    }
+
+    private func recordPressure(_ metadata: NativeSourceBudgetMetadata, credential: NativeTaskCapabilityCredential,
+        leaseState: NativeSourceLeaseState, policy: BudgetPolicySelection, cancellation: ToolCallCancellation) async throws -> NativeSourcePressureClaim? {
+        switch try await repository.recordNativeSourceBudgetDisposition(metadata: metadata, credential: credential,
+            lease: await leaseState.current(), policySelection: policy, cancellation: cancellation) {
+        case .pressure(let claim): return claim
+        case .blocked: return nil
+        }
+    }
+
+    /// Called only after the inference task group has joined. Storage gets its
+    /// own fixed deadline and never renews provider authority.
+    private func storePressure(_ original: NativeSourcePressureClaim, credential: NativeTaskCapabilityCredential) async {
+        let remaining = (ISO8601.date(from: original.storageDeadline) ?? clock.now()).timeIntervalSince(clock.now())
+        let token = ToolCallCancellation(timeoutSeconds: min(20, max(0, remaining)))
+        let io = pressureIO
+        var claim = original
+        var succeeded = false
+        do {
+            let commandID = try beginCommand(token)
+            defer { commands.removeValue(forKey: commandID); operationGate.remove(commandID) }
+            try await withTaskCancellationHandler {
+                try Task.checkCancellation(); try token.checkCancellation()
+                claim = try await repository.renewNativeSourcePressureClaim(claim: original, credential: credential, cancellation: token)
+                let attachment = try await repository.authenticateNativeTaskCapability(credential: credential, cancellation: token)
+                let policy = try policyResolver(attachment.descriptor.projectID, attachment.descriptor.projectGeneration)
+                switch try await repository.prepareNativeSourceBudgetHandoff(claim: claim, credential: credential,
+                    policySelection: policy, responsePreflight: io.preflight, cancellation: token) {
+                case .completed: break
+                case .commit(let admission):
+                    switch try await repository.beginNativeSourcePressureCommitAttempt(admission: admission, claim: claim,
+                        credential: credential, policySelection: policy,
+                        readExisting: { try io.read($0, $1, token) }, cancellation: token) {
+                    case .completed: break
+                    case .commit(let attempt):
+                        _ = try await repository.commitNativeSourceBudgetHandoff(attempt: attempt, claim: claim,
+                            credential: credential, policySelection: policy,
+                            readExisting: { try io.read($0, $1, token) },
+                            commit: { try io.commit($0, $1, $2, token) }, cancellation: token)
+                    }
+                }
+            } onCancel: { token.cancel() }
+            succeeded = true
+        } catch {
+            try? await repository.deferNativeSourcePressureRetry(claim: claim, credential: credential)
+            // The durable pressure packet and consumed attempt remain available
+            // for exact source readback; an error is never absence evidence.
+        }
+        // On failure retain the short lease as a durable cooldown, including
+        // pre-reservation failures. Its expiry never exceeds the fixed window.
+        if succeeded { _ = try? await repository.releaseNativeSourcePressureClaim(claim) }
     }
 
     private func boundedLeg<Value: Sendable>(cancellation: ToolCallCancellation,

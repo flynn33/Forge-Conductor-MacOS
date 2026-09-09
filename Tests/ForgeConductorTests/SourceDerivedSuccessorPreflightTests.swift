@@ -407,16 +407,10 @@ private final class SourceDerivedFixture: @unchecked Sendable {
                         projectID: projectID.description, projectGeneration: Int(generation.rawValue)))
                 }, tools: { credential, lease, token in
                     try await admittedBridge.nativeProviderTools(credential: credential, lease: lease, cancellation: token)
-                }, call: { credential, reference, lease, budget, token in
+                }, call: { credential, reference, lease, budget, checkpoint, token in
                     try await admittedBridge.submitNativeCall(credential: credential, reference: reference,
-                        lease: lease, outputBudget: budget, cancellation: token)
-                }, budgetEvaluator: { prepared, preflight, capabilities, selection in
-                    try NativeSourceBudgetEvaluator.providerApproval(prepared: prepared, preflight: preflight,
-                        capabilities: capabilities, policySelection: selection)
-                }, outputBudgetEvaluator: { call, outputs, preflight, capabilities, selection in
-                    try NativeSourceBudgetEvaluator.outputBudget(call: call, priorOutputs: outputs,
-                        emptyOutputPreflight: preflight, capabilities: capabilities, policySelection: selection)
-                }, beginProviderOperation: { .init {} })
+                        lease: lease, outputBudget: budget, preparedCheckpoint: checkpoint, cancellation: token)
+                }, pressureIO: NativeSourcePressureIO(source: app.continuity), beginProviderOperation: { .init {} })
             service = owner
             owner.setOperational(true)
             let send = try NativeSourceSendRequest(taskID: taskID, requestID: UUID(), input: "Read and hand off the approved task")

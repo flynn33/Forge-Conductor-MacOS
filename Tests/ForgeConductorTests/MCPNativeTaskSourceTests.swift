@@ -678,10 +678,10 @@ private struct NativeBridgeHeldDispatcher: MCPNativeSourceDispatching {
     }
     func submitNativeCall(resolved: ResolvedNativeSourceProviderCall, credential: NativeTaskCapabilityCredential,
                           lease: NativeSourceConversationLease, outputBudget: NativeSourceProviderOutputBudget,
-                          cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput {
+                          preparedCheckpoint: PreparedContinuitySourceCommit?, cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput {
         await gate.waitIfHeld()
         try cancellation.checkCancellation()
         return try await base.submitNativeCall(resolved: resolved, credential: credential, lease: lease,
-            outputBudget: outputBudget, cancellation: cancellation)
+            outputBudget: outputBudget, preparedCheckpoint: preparedCheckpoint, cancellation: cancellation)
     }
 }

@@ -4,6 +4,153 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class NativeSourceConversationServiceTests: XCTestCase, @unchecked Sendable {
+    func testAcceptedAnswerPressureCommitsActualSourceAndOutboxWithoutAnotherPost() async throws {
+        try await withFixture(mode: .pressureAnswer) { f in
+            try f.enableAutomaticHandoff()
+            let service = f.service(); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Preserve source progress"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='completed' AND method='session_handoff' AND recovery_attempts=1"), 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_conversations WHERE state='source_fenced'"), 1)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 0)
+            XCTAssertEqual(counts.continuationPreflights, 0)
+            XCTAssertEqual(f.pool.activeCount, 0); XCTAssertEqual(f.operations.value, 0)
+        }
+    }
+
+    func testProjectedReadPressureTransfersUntouchedCallWithoutReading() async throws {
+        try await withFixture(mode: .pressureRead) { f in
+            try f.enableAutomaticHandoff()
+            let service = f.service(); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Read within the approved budget"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='completed' AND method='session_handoff'"), 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE method='fs_read'"), 0)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_calls WHERE output_json IS NOT NULL"), 0)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 0)
+            XCTAssertEqual(counts.continuationPreflights, 1)
+        }
+    }
+
+    func testRestartReconcilesCommittedPressureSourceWithoutRepeatingWriterOrProvider() async throws {
+        try await withFixture(mode: .pressureAnswer) { f in
+            try f.enableAutomaticHandoff()
+            let writes = SourceOwnerCounter()
+            let io = NativeSourcePressureIO(source: f.app.continuity, commitOverride: { prepared, authorization, automatic, token in
+                writes.increment()
+                _ = try f.app.continuity.commitPreparedAuthorizedSourceCommit(prepared, authorization: authorization,
+                    automaticHandoffEnabled: automatic, cancellation: token)
+                throw NativeSourceConversationError.integrityFailure
+            })
+            let service = f.service(pressureIO: io); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Recover the exact source receipt"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            XCTAssertEqual(writes.value, 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='pending' AND recovery_attempts=1"), 1)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 1)
+            _ = await service.shutdown(deadline: Date().addingTimeInterval(1))
+            // Advance only recovery eligibility; the original pressure decision,
+            // packet, source receipt, and fixed storage deadline stay intact.
+            try f.makePressureRetryDue()
+            let resumed = f.service(pressureIO: io); resumed.setOperational(true)
+            _ = try await resumed.recoverOnce(cancellation: .init(timeoutSeconds: 10))
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='completed' AND recovery_attempts=1"), 1)
+            XCTAssertEqual(writes.value, 1)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 0); XCTAssertEqual(counts.probes, 1)
+            XCTAssertEqual(f.pool.activeCount, 0); XCTAssertEqual(f.operations.value, 0)
+        }
+    }
+
+    func testFailedPressureWriteRetriesFromJournalWithoutNewProviderPermit() async throws {
+        try await withFixture(mode: .pressureAnswer) { f in
+            try f.enableAutomaticHandoff()
+            let service = f.service(pressureIO: NativeSourcePressureIO(source: f.app.continuity, commitOverride: { _, _, _, _ in
+                throw NativeSourceConversationError.integrityFailure
+            })); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Retain progress across storage failure"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 0)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='pending' AND recovery_attempts=1 AND retry_at IS NOT NULL"), 1)
+            _ = await service.shutdown(deadline: Date().addingTimeInterval(1))
+            try f.makePressureRetryDue()
+            let permit = try XCTUnwrap(f.pool.tryAcquire(owner: .source(taskID: UUID(), requestID: UUID())))
+            defer { f.pool.release(permit) }
+            let resumed = f.service(); resumed.setOperational(true)
+            _ = try await resumed.recoverOnce(cancellation: .init(timeoutSeconds: 10))
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='completed' AND recovery_attempts=2"), 1)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.probes, 1); XCTAssertEqual(counts.continuations, 0)
+            XCTAssertEqual(f.pool.activeCount, 1); XCTAssertEqual(f.operations.value, 0)
+        }
+    }
+
+    func testExpiredCapabilityReceiptCleanupCannotInvokeWriterOrResumeSource() async throws {
+        try await withFixture(mode: .pressureAnswer) { f in
+            try f.enableAutomaticHandoff()
+            let writes = SourceOwnerCounter()
+            let io = NativeSourcePressureIO(source: f.app.continuity, commitOverride: { prepared, authorization, automatic, token in
+                writes.increment()
+                _ = try f.app.continuity.commitPreparedAuthorizedSourceCommit(prepared, authorization: authorization,
+                    automaticHandoffEnabled: automatic, cancellation: token)
+                throw NativeSourceConversationError.integrityFailure
+            })
+            let service = f.service(pressureIO: io); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Retain the expired source receipt"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            _ = await service.shutdown(deadline: Date().addingTimeInterval(1))
+            try f.makePressureRetryDue(expireCapability: true)
+            let resumed = f.service(pressureIO: io); resumed.setOperational(true)
+            _ = try await resumed.recoverOnce(cancellation: .init(timeoutSeconds: 10))
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='completed' AND recovery_attempts=1"), 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_conversations WHERE state='stopped'"), 1)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_turns WHERE blocked_code='pressure_receipt_recorded'"), 1)
+            XCTAssertEqual(writes.value, 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 0)
+        }
+    }
+
+    func testShutdownRetainsStorageOwnerUntilItsCancelledCallbackExits() async throws {
+        try await withFixture(mode: .pressureAnswer) { f in
+            let gate = SourceOwnerStorageGate()
+            let service = f.service(pressureIO: NativeSourcePressureIO(source: f.app.continuity, commitOverride: { _, _, _, token in
+                gate.wait()
+                try token.checkCancellation()
+                throw NativeSourceConversationError.integrityFailure
+            })); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Stop pressure storage safely"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { gate.entered }
+            let report = await service.shutdown(deadline: Date().addingTimeInterval(0.05))
+            XCTAssertFalse(report.completed)
+            XCTAssertEqual(f.pool.activeCount, 1); XCTAssertEqual(f.operations.value, 1)
+            gate.release()
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            XCTAssertEqual(f.pool.activeCount, 0); XCTAssertEqual(f.operations.value, 0)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 0)
+        }
+    }
+
+    func testCheckpointDispatcherCommitsTheExactPacketMeasuredByOwner() async throws {
+        try await withFixture(mode: .checkpointThenAnswer) { f in
+            let service = f.service(); service.setOperational(true)
+            _ = try await service.send(.init(taskID: f.taskID, requestID: UUID(), input: "Checkpoint the current work"), cancellation: .init(timeoutSeconds: 5))
+            try await self.eventually { !(await service.hasRetainedWork()) }
+            let sha = try XCTUnwrap(f.budgetDiagnostics.snapshot().checkpointSHA256)
+            XCTAssertEqual(sha.count, 64)
+            XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_requests WHERE state='completed' AND method='session_checkpoint' AND packet_sha256='\(sha)'"), 1)
+            let counts = await f.provider.counts()
+            XCTAssertEqual(counts.roots, 1); XCTAssertEqual(counts.continuations, 1)
+            XCTAssertEqual(try f.app.store.pendingContinuityHandoffs().count, 0)
+        }
+    }
+
     func testSendReturnsFrozenIntentWhileProbeRetainsCapacityAndReplayPinsInput() async throws {
         try await withFixture(mode: .heldProbe) { f in
             let service = f.service()
@@ -171,9 +318,8 @@ final class NativeSourceConversationServiceTests: XCTestCase, @unchecked Sendabl
             XCTAssertEqual(read.requiredEscapedBytes, 131_072)
             XCTAssertEqual(try ContextBudgetMath.estimateTokens(serializedBytes: read.requiredEscapedBytes,
                 policy: ContextBudgetPolicy()), 54_614)
-            XCTAssertLessThan(read.maximumCanonicalToolResultBytes, read.approvedResultBytes)
-            XCTAssertLessThan(read.maximumEscapedPayloadBytes, read.requiredEscapedBytes)
-            XCTAssertEqual(observed.bridgeError, .budgetExceeded)
+            XCTAssertEqual(observed.blocked, .fullResultCannotFit)
+            XCTAssertNil(observed.bridgeError, "Intrinsic capacity rejection happens before dispatcher effects")
             XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_turns WHERE state='accepted'"), 1)
             XCTAssertEqual(try f.scalar("SELECT COUNT(*) FROM native_source_provider_calls"), 1,
                            "Retain the actual provider call identity for reconciliation")
@@ -436,7 +582,7 @@ private final class SourceOwnerFixture: @unchecked Sendable {
                     path: project.appendingPathComponent("source.txt").path, contextLength: contextLength), bridge: bridge)
         } catch { app.shutdown(); try? FileManager.default.removeItem(at: home); throw error }
     }
-    func service() -> NativeSourceConversationService {
+    func service(pressureIO: NativeSourcePressureIO? = nil) -> NativeSourceConversationService {
         let service = NativeSourceConversationService(repository: repository, providerWorkAdmission: pool, managerInstanceID: UUID(), clock: SystemClock(),
             attachmentResolver: { [credential, taskID] requested in
                 guard requested == taskID else { throw NativeSourceConversationError.notFound }
@@ -446,10 +592,10 @@ private final class SourceOwnerFixture: @unchecked Sendable {
             }, policyResolver: { [app] project, generation in
                 try app.config.budgetPolicySelection(scope: .init(kind: .projectOverride, projectID: project.description, projectGeneration: Int(generation.rawValue)))
             }, tools: { [bridge] credential, lease, token in try await bridge.nativeProviderTools(credential: credential, lease: lease, cancellation: token) },
-            call: { [bridge, budgetDiagnostics] credential, reference, lease, budget, token in
+            call: { [bridge, budgetDiagnostics] credential, reference, lease, budget, checkpoint, token in
                 do {
                     let output = try await bridge.submitNativeCall(credential: credential, reference: reference,
-                        lease: lease, outputBudget: budget, cancellation: token)
+                        lease: lease, outputBudget: budget, preparedCheckpoint: checkpoint, cancellation: token)
                     if output.readyHandoffCommitted {
                         let payload = try JSONSupport.object(from: output.canonicalPayloadJSON)
                         budgetDiagnostics.record(handoffID: payload["handoff_id"] as? String)
@@ -459,26 +605,47 @@ private final class SourceOwnerFixture: @unchecked Sendable {
                     budgetDiagnostics.record(error: error as? NativeSourceConversationError)
                     throw error
                 }
-            }, budgetEvaluator: { prepared, preflight, capabilities, selection in
-                try NativeSourceBudgetEvaluator.providerApproval(prepared: prepared, preflight: preflight,
-                    capabilities: capabilities, policySelection: selection)
-            }, outputBudgetEvaluator: { [budgetDiagnostics] call, outputs, preflight, capabilities, selection in
-                let budget = try NativeSourceBudgetEvaluator.outputBudget(call: call, priorOutputs: outputs,
-                    emptyOutputPreflight: preflight, capabilities: capabilities, policySelection: selection)
+            }, pressureIO: pressureIO ?? NativeSourcePressureIO(source: app.continuity), outputObserver: { [budgetDiagnostics] call, evaluation in
+                let budget: NativeSourceProviderOutputBudget?
+                switch evaluation {
+                case .admitted(let value, let checkpoint):
+                    budget = value
+                    if let checkpoint { budgetDiagnostics.record(checkpointSHA256: checkpoint.packetSHA256) }
+                case .blocked(let stored):
+                    budget = nil
+                    if case .blocked(let failure) = stored.metadata { budgetDiagnostics.record(blocked: failure.code) }
+                case .pressure: budget = nil
+                }
                 if call.toolName == "fs_read" {
                     let ceiling = min(65_536, call.attachment.sourceLimits.maximumResultBytes,
                         call.attachment.setup.record.assignment.authorizationScope.maximumInlineOutputBytes,
-                        selection.policy.tools.maxResultBytes, call.prepared.frozenCeilings?.tools.maxResultBytes ?? Int.max)
-                    budgetDiagnostics.record(read: .init(contextLength: capabilities.contextLength,
+                        call.prepared.frozenCeilings?.tools.maxResultBytes ?? Int.max)
+                    budgetDiagnostics.record(read: .init(contextLength: call.prepared.retainedCapabilities?.contextLength ?? 0,
                         approvedResultBytes: ceiling, requiredEscapedBytes: ceiling * CanonicalToolResultOutputBounds.maximumStringExpansion,
-                        maximumCanonicalToolResultBytes: budget.maximumCanonicalToolResultBytes,
-                        maximumEscapedPayloadBytes: budget.maximumEscapedPayloadBytes))
+                        maximumCanonicalToolResultBytes: budget?.maximumCanonicalToolResultBytes ?? 0,
+                        maximumEscapedPayloadBytes: budget?.maximumEscapedPayloadBytes ?? 0))
                 }
-                return budget
             },
             beginProviderOperation: { [operations] in operations.increment(); return .init { operations.decrement() } })
         servicesLock.lock(); services.append(service); servicesLock.unlock()
         return service
+    }
+    func enableAutomaticHandoff() throws {
+        let previous = try app.config.budgetPolicySelection(scope: .globalDefault)
+        _ = try app.config.updateBudgetPolicy(.init(scope: .globalDefault, expectedRevision: previous.revision,
+            expectedGlobalRevision: previous.globalRevision, operation: .set, policy: BudgetPolicy(automaticHandoffEnabled: true)))
+    }
+    func makePressureRetryDue(expireCapability: Bool = false) throws {
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(app.paths.controlPlaneSQLite.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK, let db else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        defer { sqlite3_close(db) }
+        let sql = "UPDATE native_source_conversations SET lease_expires_at='2000-01-01T00:00:00Z'; UPDATE native_source_requests SET retry_at=NULL WHERE state='pending'"
+            + (expireCapability ? "; UPDATE native_task_capabilities SET expires_at='2000-01-01T00:00:00Z'" : "")
+        guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+            throw NativeSourceConversationError.integrityFailure
+        }
     }
     func scalar(_ sql: String) throws -> Int {
         var db: OpaquePointer?
@@ -522,23 +689,29 @@ private final class SourceOwnerBudgetDiagnostics: @unchecked Sendable {
     struct Snapshot: Sendable {
         let read: Read?
         let bridgeError: NativeSourceConversationError?
+        let blocked: NativeSourceBudgetFailureCode?
         let handoffID: String?
+        let checkpointSHA256: String?
     }
     private let lock = NSLock()
     private var lastRead: Read?
     private var lastError: NativeSourceConversationError?
+    private var lastBlocked: NativeSourceBudgetFailureCode?
+    func record(blocked: NativeSourceBudgetFailureCode) { lock.lock(); lastBlocked = blocked; lock.unlock() }
     private var lastHandoffID: String?
+    private var lastCheckpointSHA256: String?
+    func record(checkpointSHA256: String) { lock.lock(); lastCheckpointSHA256 = checkpointSHA256; lock.unlock() }
     func record(handoffID: String?) { lock.lock(); lastHandoffID = handoffID; lock.unlock() }
     func record(read: Read) { lock.lock(); lastRead = read; lock.unlock() }
     func record(error: NativeSourceConversationError?) { lock.lock(); lastError = error; lock.unlock() }
     func snapshot() -> Snapshot {
         lock.lock(); defer { lock.unlock() }
-        return .init(read: lastRead, bridgeError: lastError, handoffID: lastHandoffID)
+        return .init(read: lastRead, bridgeError: lastError, blocked: lastBlocked, handoffID: lastHandoffID, checkpointSHA256: lastCheckpointSHA256)
     }
 }
 
 actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
-    enum Mode: Sendable { case heldProbe, unknownRoot, readHandoffSuffix, readThenAnswer, answer }
+    enum Mode: Sendable { case heldProbe, unknownRoot, readHandoffSuffix, readThenAnswer, answer, pressureAnswer, pressureRead, checkpointThenAnswer }
     struct Counts: Sendable { let probes: Int; let roots: Int; let continuations: Int; let lookups: Int; let legacyLookups: Int; let continuationPreflights: Int }
     nonisolated let providerID = "lmstudio"
     private let mode: Mode
@@ -596,8 +769,12 @@ actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
         guard observedCapabilities == (try capabilities()) else { throw NativeSourceConversationError.conflict }
         roots += 1
         var calls: [ProviderToolCall] = []
-        if mode == .readHandoffSuffix || mode == .readThenAnswer {
+        if mode == .readHandoffSuffix || mode == .readThenAnswer || mode == .pressureRead {
             calls.append(try .init(itemID: "item-read", callID: "source-read", name: "fs_read", argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["path": path])))
+        }
+        if mode == .checkpointThenAnswer {
+            calls.append(try .init(itemID: "item-checkpoint", callID: "source-checkpoint", name: "session_checkpoint",
+                argumentsJSON: ForgeJSONCanonicalizationV1.data(from: ["goal": "Continue approved work", "summary": "Checkpoint current progress"])))
         }
         if mode == .readHandoffSuffix {
             calls.append(try .init(itemID: "item-handoff", callID: "source-handoff", name: "session_handoff",
@@ -618,7 +795,10 @@ actor SourceOwnerProvider: ManagedModelProviderObservedDispatching {
     private func result(operation: UUID, parent: String?, calls: [ProviderToolCall]) throws -> ProviderTurn {
         try .init(requestID: operation.uuidString.lowercased(), responseID: "response-" + operation.uuidString.lowercased(), previousResponseID: parent,
             providerID: providerID, providerVersion: "fixture", modelKey: "fixture/native", providerInstanceID: "fixture-instance",
-            messages: calls.isEmpty ? ["Retained actual response"] : [], toolCalls: calls, usage: nil, completed: true,
+            messages: calls.isEmpty ? ["Retained actual response"] : [], toolCalls: calls,
+            usage: mode == .pressureAnswer || mode == .pressureRead
+                ? .init(capacity: contextLength, inputTokens: mode == .pressureAnswer ? 120_000 : 70_000,
+                    outputTokens: 20, source: .providerExact, confidence: 1) : nil, completed: true,
             finishReason: calls.isEmpty ? .stop : .toolCalls)
     }
     func lookup(idempotencyKey: String) async throws -> ProviderTurn? { legacyLookups += 1; throw NativeSourceConversationError.unsupportedProvider }
@@ -653,4 +833,17 @@ private actor NativeSourceGateLaunchFixture {
         return .init(admitted: admitted, workID: workID, cancellation: token, task: task)
     }
     func counts() -> (started: Int, completed: Int, cancelled: Int) { (started, completed, cancelled) }
+}
+
+private final class SourceOwnerStorageGate: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var hasEntered = false, released = false
+    var entered: Bool { condition.lock(); defer { condition.unlock() }; return hasEntered }
+    func wait() {
+        condition.lock(); defer { condition.unlock() }
+        hasEntered = true
+        let deadline = Date().addingTimeInterval(5)
+        while !released, condition.wait(until: deadline) {}
+    }
+    func release() { condition.lock(); released = true; condition.broadcast(); condition.unlock() }
 }

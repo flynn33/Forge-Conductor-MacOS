@@ -56,7 +56,11 @@ installed-stack and production-feature acceptance remain separate gates.
 - Added typed pressure evaluation and a deterministic recovery-packet builder.
   Packets preserve full critical work and remaining budgets, bind compact pressure
   facts to the complete decision digest, and enforce inherited retrieval limits.
-  The pressure owner and durable handoff writer are not enabled yet.
+- The source owner now routes pressure decisions into the real handoff writer
+  before POST, after accepted answers and before tool effects. It joins inference
+  renewal before storage and passes measured checkpoint packets to execution.
+  The watchdog resumes storage and reconciles expired receipts without another
+  provider permit or POST, with durable retry bounds and retained shutdown ownership.
 - Successor budgets begin with the actual bootstrap acknowledgement. Actual
   tool-output prefixes and completed response chains survive replay without
   duplicate effects or repeated context charges.

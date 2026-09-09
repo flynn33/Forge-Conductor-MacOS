@@ -400,10 +400,24 @@ but no invented provider response or usage. A receipt recovered after storage
 expiry can be accepted while the source remains stopped. The established
 provider-requested handoff digest format remains unchanged.
 
-Source-owner trigger and recovery integration remains incomplete. These
-components do not enable automatic pressure handoff or qualify
-G04. Product identity remains 0.9.0 build 1; no user-visible control or deployment
-behavior changes in this component checkpoint.
+The source owner now checks pressure before provider dispatch, after every
+accepted response (including assistant-only answers), and before tool effects.
+It stops and joins inference renewal before adopting the fixed storage claim.
+The manager uses the real continuity writer and commits the exact checkpoint
+packet measured during output admission. Intrinsically oversized read allowances
+are rejected before any read or handoff effect.
+
+The existing watchdog separately pages unfinished pressure storage and expired
+receipt cleanup. Storage failures retain a short lease cooldown and the original
+five-minute deadline; writer attempts remain capped at eight. Receipt read
+failures use durable exponential retry delays and quarantine after eight failed
+reads. Neither recovery path acquires a provider permit or issues a model POST.
+Shutdown retains ownership until a pending storage callback actually exits.
+
+Integration tests exercise real source/outbox commits, untouched reads, failed
+writes, interrupted receipts, expiry and shutdown with a fixture provider. Real
+provider pressure rollover and complete G04 qualification remain open. Product
+identity remains 0.9.0 build 1.
 
 At the September 8 component checkpoint, signed native and selected Release
 suites each passed 293 tests, and the separate packet suite passed 13 tests,
@@ -423,5 +437,6 @@ context pressure, writable source work, association with an existing external
 desktop conversation, repeated real-provider rollover or complete native/process
 qualification.
 A large result allowance can still exceed available headroom before a read;
-pressure components do not yet supply the automatic transfer. G04 and release
-readiness remain unqualified.
+the owner distinguishes intrinsic capacity failure from transferable context
+pressure before any read. Repeated real-provider pressure rollover, G04 and
+release readiness remain unqualified.

@@ -399,6 +399,36 @@ final class NativeSourcePressureJournalTests: XCTestCase {
         }
     }
 
+    func testReceiptRetryCooldownExhaustionAndOversizedStoredCounterAreBounded() async throws {
+        for initial in [0, Int.max] {
+            try await withFixture { f in
+                let (_, admission) = try await f.preparedPressure()
+                f.clock.advance(301)
+                try PressureSQL.execute(f.database, "UPDATE native_source_requests SET error_code='pressure_receipt_retry_\(initial)'")
+                let attempts = initial == 0 ? 8 : 1
+                for attempt in 1...attempts {
+                    let refs = try await f.repository.pendingNativeSourcePressureReceipts(limit: 1)
+                    let reference = try XCTUnwrap(refs.first)
+                    let later = try await f.repository.pendingNativeSourcePressureReceipts(afterRowID: reference.rowID, limit: 1)
+                    XCTAssertTrue(later.isEmpty)
+                    let claim = try await f.repository.acquireNativeSourcePressureReceiptClaim(reference: reference, managerInstanceID: UUID())
+                    try await f.repository.deferNativeSourcePressureReceiptRetry(claim)
+                    _ = try await f.repository.releaseNativeSourcePressureReceiptClaim(claim)
+                    let immediate = try await f.repository.pendingNativeSourcePressureReceipts()
+                    XCTAssertTrue(immediate.isEmpty, "Cooldown is durable and survives releasing the claim")
+                    XCTAssertEqual(try PressureSQL.value(f.database, "SELECT quarantined FROM native_source_requests"), attempt == attempts ? "1" : "0")
+                    f.clock.advance(61)
+                }
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT error_code FROM native_source_requests"), "pressure_receipt_retry_8")
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT state FROM native_source_requests"), "pending")
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT recovery_attempts FROM native_source_requests"), "0")
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT packet_sha256 FROM native_source_requests"), admission.prepared.packetSHA256)
+                let exhausted = try await f.repository.pendingNativeSourcePressureReceipts()
+                XCTAssertTrue(exhausted.isEmpty)
+            }
+        }
+    }
+
     func testReceiptCleanupDistinguishesUnavailableStoreFromAbsentCommit() async throws {
         try await withFixture { f in
             let (_, admission) = try await f.preparedPressure()

@@ -31,7 +31,7 @@ protocol MCPNativeSourceDispatching: MCPTaskHTTPDispatching {
         cancellation: ToolCallCancellation) async throws -> ResolvedNativeSourceProviderCall
     func submitNativeCall(resolved: ResolvedNativeSourceProviderCall,
         credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
-        outputBudget: NativeSourceProviderOutputBudget,
+        outputBudget: NativeSourceProviderOutputBudget, preparedCheckpoint: PreparedContinuitySourceCommit?,
         cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput
 }
 
@@ -197,7 +197,7 @@ final class MCPTaskHTTPService: @unchecked Sendable {
 
     func submitNativeCall(credential: NativeTaskCapabilityCredential,
         reference: NativeSourceProviderCallReference, lease: NativeSourceConversationLease,
-        outputBudget: NativeSourceProviderOutputBudget,
+        outputBudget: NativeSourceProviderOutputBudget, preparedCheckpoint: PreparedContinuitySourceCommit? = nil,
         cancellation: ToolCallCancellation) async throws -> NativeSourceProviderCallOutput {
         try await performNative(credential: credential, cancellation: cancellation, prepare: { dispatcher, token in
             let resolved = try await dispatcher.resolveNativeProviderCall(reference: reference,
@@ -214,7 +214,7 @@ final class MCPTaskHTTPService: @unchecked Sendable {
                 referenceSHA256: digest), expiresAt: expiry, value: resolved)
         }, execute: { dispatcher, resolved, token in
             try await dispatcher.submitNativeCall(resolved: resolved, credential: credential,
-                lease: lease, outputBudget: outputBudget, cancellation: token)
+                lease: lease, outputBudget: outputBudget, preparedCheckpoint: preparedCheckpoint, cancellation: token)
         })
     }
 
