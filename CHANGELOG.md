@@ -73,6 +73,8 @@ installed-stack and production-feature acceptance remain separate gates.
 - The source bootstrap root supplies the complete expected acknowledgment as a
   bounded challenge, including nonce and acceptance fields. Activation still
   requires the model's actual complete, single-call acknowledgment.
+- Pending run intents now reject leases issued for another run before any
+  mutation, preserving the exact run boundary during ownership recovery.
 - Tool discovery now uses its own lease-bounded cancellation token, preserving
   the renewable source exchange deadline during longer provider responses.
 - Source exchange failures now record bounded diagnostic codes and cancellation

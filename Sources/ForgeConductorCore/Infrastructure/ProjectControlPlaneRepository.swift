@@ -7595,6 +7595,7 @@ public actor ProjectControlPlaneRepository {
         expectedRevision: UInt64,
         intent: RunSideEffectIntent
     ) throws -> AutonomousRunRecord {
+        guard lease.runID == runID else { throw AutonomyError.staleLease }
         try Self.validate(intent)
         let connection = try requiredConnection()
         let timestamp = ISO8601.string(from: clock.now())

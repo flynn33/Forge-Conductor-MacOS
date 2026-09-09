@@ -437,6 +437,12 @@ the owner renews the lease during provider inference. Task cancellation still
 cancels discovery, and the existing per-call and provider limits remain enforced.
 A native regression crosses the initial 30-second lease with a 31-second response.
 
+Pending-intent writes require the lease to identify the same target run before
+any mutation. A native process probe verifies one lease winner, preservation of
+the exact pending intent after that process is killed, epoch advancement after
+expiry, and rejection of the old lease. This covers the repository ownership
+boundary; the complete manager/provider crash matrix remains separate.
+
 Source exchange failure diagnostics record the provider/owner phase, a bounded
 code and cancellation/deadline flags. Prompts and raw exception text are excluded.
 
@@ -448,6 +454,12 @@ retained an unknown provider outcome after the request deadline. A separate
 Qwen3 Coder 30B attempt ended without a source response receipt during prompt
 processing. These failed runs retain their native receipts and recovery fences;
 they do not prove resumed successor work or pass G04.
+A later direct Gemma run, using a disposable 90-second provider wait setting,
+completed exact retrieval, a single valid acknowledgment and successor activation.
+The successor requested `fs_read`, but reserving the full approved 64 KiB result
+crossed that fixture's inherited emergency threshold before the read. The pending
+work remained durable. This proves activation, while continued work under that
+policy and complete gate qualification remain open.
 
 Integration tests exercise real source/outbox commits, untouched reads, failed
 writes, interrupted receipts, expiry and shutdown with a fixture provider. Real
