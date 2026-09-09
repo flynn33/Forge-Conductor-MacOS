@@ -3993,7 +3993,8 @@ private final class LockedFailureMessages: @unchecked Sendable {
     }
 }
 
-private final class MigrationXCTestFixture {
+// Shared by the native migration and ingress process-termination tests.
+final class MigrationXCTestFixture {
     let process: Process
     private let output: Pipe
     private let error: Pipe
@@ -4044,7 +4045,7 @@ private enum MigrationXCTestFixtureError: Error, LocalizedError {
     }
 }
 
-private func launchMigrationXCTestFixture(
+func launchMigrationXCTestFixture(
     testIdentifier: String,
     environment additions: [String: String]
 ) throws -> MigrationXCTestFixture {
@@ -4089,7 +4090,7 @@ private func launchMigrationXCTestFixture(
     return MigrationXCTestFixture(process: process, output: output, error: error)
 }
 
-private func waitForMigrationMarker(
+func waitForMigrationMarker(
     _ markerURL: URL,
     child: MigrationXCTestFixture,
     timeout: TimeInterval
@@ -4109,7 +4110,7 @@ private func waitForMigrationMarker(
     }
 }
 
-private func forceKillMigrationXCTestFixture(
+func forceKillMigrationXCTestFixture(
     _ child: MigrationXCTestFixture,
     timeout: TimeInterval
 ) throws -> (reason: Process.TerminationReason, status: Int32) {

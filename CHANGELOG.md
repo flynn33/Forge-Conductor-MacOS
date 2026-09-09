@@ -22,6 +22,9 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Authorized handoff storage and admission
 
+- Native process tests now force termination after source commit, source claim,
+  manager acceptance and source acknowledgment, retaining evidence of exact
+  handoff recovery and one accepted run. Remote-provider crash recovery remains open.
 - Manager and MCP project registration now migrate attributable legacy handoffs
   as read-only records and quarantine ambiguous records, with bounded inventory,
   durable replay and explicit pending migration status.

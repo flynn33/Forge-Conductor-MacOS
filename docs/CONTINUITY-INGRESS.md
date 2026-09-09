@@ -101,6 +101,16 @@ available. Current policy or an exact explicit start permit is checked again
 before provider effects. A source outbox Boolean alone never grants permission
 to bypass disabled automatic handoff.
 
+Native process evidence now covers forced termination after source commit,
+source claim, manager acceptance and source acknowledgment. Each child test host
+runs the production source or delivery service and is terminated with SIGKILL;
+recovery uses the persistent manager's normal delivery entrypoint. Retained effect
+records verify the original packet hash, one run, acknowledged delivery and no
+second acceptance. The two claimed cases advance the injected clock by 31 seconds
+to make their persisted leases eligible. Coverage ends at `awaiting_bootstrap`;
+remote provider acceptance and the complete rollover crash matrix remain separate
+qualification requirements.
+
 Source schema version 8 adds explicit-submission provenance without resetting
 existing claims. The control plane retains its public schema version 2 and uses
 a verified backup before expanding the run-state constraint. Unknown table
