@@ -1,48 +1,15 @@
-<!-- FORGE-SHIPPING:BEGIN -->
-# Active CLU rescue execution contract
+<!-- FORGE-OWNER-SLICE-WORKFLOW:BEGIN -->
+# Current execution workflow (owner-directed, single slice)
 
-The owner selected the September 5, 2026 CLU Shippable Rescue package at
-`/Users/jimdaley/Projects/Forge-Conductor/Forge-Conductor-CLU-Shippable-Rescue-2026-09-05`.
-Read its START-HERE.md and CODEX-EXECUTION-PROMPT.md. Its
-`phases/work-packages.json` governs P00-P14 scheduling. The active rescue
-record is `/Users/jimdaley/Projects/Forge-Conductor/rescue-evidence/20260905T145048Z/run-state.json`.
-Use the package selector against that explicit record. Existing doctor,
-state/evidence tools and completion gates remain required evidence tools;
-the historical selector is read-only context, not current dispatch authority.
-Preserve the prior ledger, event chain, feature baseline and all substantive
-safety, compatibility, ownership and qualification requirements below.
-No attribution credits, trailers, or attributed artifact/branch names.
-Build and qualify the candidate; the owner controls protected merges and shipping.
+The owner supplies the current slice and all working locations. Perform only that slice with the tools actually exposed. Read the necessary source, make one small change, test it, commit locally, push the slice branch, and open a PR targeting main. Then stop for owner review. Historical packages, selectors, phase lists, and old handoffs do not choose work. Do not run automation scripts for this workflow. Preserve existing native engineering, compatibility, authorization, and evidence requirements. Never merge or begin another slice without the owner's next instruction. Missing information, a failed required check, or no new evidence means report the specific blocker and stop.
 
-The owner supplied CLU-CORRECTION-001 on September 5, 2026. Read
-`docs/decisions/CLU-CORRECTION-001.md` and the separately retained amendment at
-`/Users/jimdaley/Projects/Forge-Conductor/Forge-Conductor-CLU-Correction-001-2026-09-05`.
-Its SHA256SUMS digest is
-`0aa7cb3529ed1c68a6ec0bc0becdc58f5e17ed876593d5346a3aa4e6af01d779`.
-It supersedes conflicting CLU ingress, restoration, deployment and acceptance
-requirements only. Keep P00-P14 and the original package unchanged. Require
-durable automatic submission from authorized existing conversations, exact
-successful context_get restoration, and the added acceptance cases. API
-qualification cannot waive the separately required visible desktop experience.
-<!-- FORGE-SHIPPING:END -->
+A fresh slice branch is cut from current `main` only after the prior slice is merged and the owner authorizes the slice. The supplied session contract and the one authorized slice card are the complete working context; do not load old packages, archived transcripts, the full slice sequence, or old resume seeds as dispatch. After each slice: one tested local commit, one PR targeting `main`, and a hard stop.
 
-<!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:BEGIN -->
-# Autonomous continuity implementation supplement
+This section is the single current assignment source for this repository, and the open-PR owner review is the single stop boundary.
+<!-- FORGE-OWNER-SLICE-WORKFLOW:END -->
 
-The former continuity-design package is absent. For autonomy, continuity,
-project context, provider, shell, or runtime work, use the active shipping
-work orders B and D, `.forge-codex/architecture/CONTINUITY_AND_ROLLOVER.md`,
-`.forge-codex/architecture/HOST_ADAPTER_PLUGIN.md`, and
-`.forge-codex/specifications/CONTINUITY_STATE_MACHINE.md`. The retained
-requirements are shell enabled by default with explicit opt-outs preserved,
-exact project-generation binding, manager-owned context enforcement, a real
-LM Studio transport in the existing session-host plugin, automatic fresh-root
-rollover, predecessor fencing, crash recovery, and automatic continuation.
-Their presence in source is not proof of production qualification.
-<!-- FORGE-AUTONOMOUS-CONTINUITY-DESIGN:END -->
-
-<!-- FORGE-CONDUCTOR-AUTONOMOUS-CONTRACT:BEGIN -->
-# Forge Conductor repository execution contract
+<!-- FORGE-CONDUCTOR-ENGINEERING:BEGIN -->
+# Engineering requirements (in force for every slice)
 
 ## Mission
 
@@ -58,45 +25,7 @@ Deliver a production-quality native macOS Forge Conductor application in which:
 - the application remains efficient on supported Macs with differing physical-memory capacities;
 - build, test, debug, profiling, migration, compatibility, and recovery evidence is retained.
 
-This file is authoritative for the repair run. Repository-specific instructions that follow this section remain in force unless they conflict with a stricter requirement here.
-
-## Required reading before editing
-
-Read, in order:
-
-1. `.forge-codex/docs/EXECUTION_CONTRACT.md`
-2. `.forge-codex/docs/EVIDENCE_RULES.md`
-3. `.forge-codex/docs/DECISION_POLICY.md`
-4. `.forge-codex/docs/FAIL_FORWARD_POLICY.md`
-5. `.forge-codex/docs/FEATURE_PRESERVATION.md`
-6. `.forge-codex/docs/AUDIT_TO_REMEDIATION.md`
-7. `.forge-codex/docs/PHASE_PLAYBOOK.md`
-8. `.forge-codex/architecture/TARGET_ARCHITECTURE.md`
-9. `.forge-codex/specifications/COMPLETION_GATES.md`
-10. `.forge-codex/plans/phases.json`
-11. `.forge-codex/plans/gates.json`
-
-Read the subject-specific architecture and specification documents immediately before implementing that subject.
-
-## Start and resume protocol
-
-At the beginning of every session or process invocation:
-
-```bash
-./.forge-codex/scripts/doctor.sh
-./.forge-codex/scripts/statectl.py show
-./.forge-codex/scripts/select_next_work.py
-```
-
-Then:
-
-1. Read `.forge-codex/state/current-handoff.json` when present.
-2. Inspect the current Git status and do not overwrite unrelated work.
-3. Read the last successful gate and the open issue ledger.
-4. Re-run the smallest proof command required to establish the current state.
-5. Continue the selected ready phase. Do not restart completed work without contrary evidence.
-
-All state changes must be atomic and recorded in `.forge-codex/state/events.jsonl`.
+These requirements bind every slice. They do not choose which slice runs.
 
 ## Non-negotiable engineering constraints
 
@@ -129,30 +58,14 @@ A source risk does not become a confirmed leak without E0 ownership or release e
 
 Before changing behavior:
 
-1. Generate `.forge-codex/state/feature-baseline.json`.
+1. Identify the affected feature surface and its prior contract.
 2. Create or update executable parity tests for every detected feature surface.
 3. Record baseline screenshots or semantic UI snapshots for critical screens where practical.
-4. Record MCP capability and schema snapshots.
-5. Record settings/defaults, migrations, commands, project formats, and integrations.
+4. Record MCP capability and schema snapshots where the surface includes MCP tools.
+5. Record settings/defaults, migrations, commands, project formats, and integrations where affected.
 6. Associate each source change with preserved feature identifiers.
 
 A feature may be changed only when necessary to correct a proven defect or implement a requested capability. Its prior contract must remain available or receive a versioned migration and compatibility test.
-
-## Repair order
-
-Execute the phase DAG in `.forge-codex/plans/phases.json`. The default critical path is:
-
-1. reproducible baseline and observability;
-2. bounded telemetry delivery;
-3. efficient gauge/Metal ownership and cadence;
-4. lifecycle and concurrency closure;
-5. bounded histories, caches, and subprocess I/O;
-6. project-memory MCP;
-7. continuity engine and handoffs;
-8. supported host adapter/plugin and automatic rollover;
-9. integration, migration, stress, profiling, and release gates.
-
-Build and run the smallest relevant tests after each coherent change. Commit checkpoints after passing phase gates.
 
 ## Telemetry invariant
 
@@ -182,41 +95,44 @@ A rollover is not complete until:
 
 Crash recovery must resume from every transition without duplicate or lost work. When an external host cannot create sessions through a supported API, Forge must provide a native host mode via the plugin contract rather than pretend that MCP alone can force the external UI.
 
+## Shell and data protection
+
+- The native shell tool remains available for owner-authorized direct native commands, with its existing timeout, output, and truncation semantics preserved. A timed-out or truncated result is never treated as a pass.
+- Durable project state (memory, continuity, credentials) remains isolated by stable project identity, bounded, and never exposed across projects. Do not weaken trust checks or signing to make a check pass.
+
 ## Fail-forward behavior
 
 - Persist evidence and state before risky work.
 - Retry transient operations with bounded exponential backoff and a total deadline.
-- Mark a blocked gate with evidence, continue independent ready phases, and revisit it automatically.
-- A global hard blocker stops release, not investigation or independent implementation.
-- After three no-progress attempts, switch to diagnostic mode, isolate the smallest reproducer, and choose a reversible alternate implementation.
+- Mark blocked work with evidence. Do not begin another slice or widen scope; report the specific blocker and stop.
+- A global hard blocker stops release, not investigation within the authorized slice.
 - Never wait indefinitely for a process, pipe, stream, lock, network operation, or model response.
-- Never ask the operator to choose among technical options already resolvable by this contract.
+- Never ask the owner to choose among technical options already resolvable by these requirements.
 
-## Required build and validation loop
+## Build and validation (direct native commands)
 
-Use the repository's project shape. Prefer the included project-local entrypoint once installed:
+Use the repository's own build definitions with direct native commands, one at a time:
 
-```bash
-./script/build_and_run.sh --verify
-./.forge-codex/scripts/test_all.sh
-./.forge-codex/scripts/run_gates.sh --ready
-```
+- CLI build: `swift build --product forge-conductor`
+- App compilation: `swift build --product forge-conductor-app`
+- Focused unit test: `swift test --filter '<observed test class or class/test method>'`
+- Ordinary app build: `xcodebuild -scheme ForgeConductor -configuration Debug -destination 'platform=macOS' build`
+- Focused app-hosted test: `xcodebuild -scheme ForgeConductorAppTests -configuration Debug -destination 'platform=macOS' -parallel-testing-enabled NO '-only-testing:ForgeConductorAppTests/<observed class>/<observed method>' test`
+- Whitespace check: `git diff --check`
 
-On macOS, collect runtime evidence with the commands selected by:
+Require a successful terminal result and verify that the intended test actually executed. Zero selected tests, skips, timeouts, and truncated output without a terminal result are not passes. Sanitizer and release-configuration matrices remain available for the slices that specifically require them; they are not default per-slice gates.
+<!-- FORGE-CONDUCTOR-ENGINEERING:END -->
 
-```bash
-./.forge-codex/scripts/profile_macos.sh --list
-```
+<!-- FORGE-SUPERSEDED-AUTOMATION-HISTORY:BEGIN -->
+# Superseded dispatch and automation (history — no dispatch authority)
 
-Run Address Sanitizer and Thread Sanitizer in separate configurations. Run release-configuration performance tests. Capture before/after flows using the same fixture, machine, build configuration, duration, and interaction script.
+The mechanisms below were active dispatch for earlier runs. They are superseded by the current execution workflow above. They select no work, they carry no "stricter contract wins" authority, and none of their commands or scripts may be executed as part of this workflow. Their full text is retained in the archived package directories (`.forge-codex/`, `.forge-continuity-design/`, `.forge-qwen-remediation/`, `.forge-qwen-shippable-v080/`, `.forge-e2/`, `.alpha-work/`) and in Git history.
 
-## Completion
+Superseded, for reference only:
 
-Completion requires:
+- **CLU shippable rescue contract:** the owner-machine rescue package location, its START-HERE/CODEX-EXECUTION-PROMPT reading, `phases/work-packages.json` P00–P14 scheduling, the `run-state.json` package selector, and the CLU-CORRECTION-001 reading requirements.
+- **Autonomous continuity design supplement:** dispatch to shipping work orders B and D and to `.forge-codex` architecture/specification documents, including automatic fresh-root rollover and automatic continuation.
+- **Autonomous repair contract dispatch:** the "this file is authoritative for the repair run… stricter requirement wins" clause, the eleven-document required-reading list, the scripted start/resume protocol (`doctor.sh`, `statectl.py`, `select_next_work.py`, `current-handoff.json`, `events.jsonl` recording), the `phases.json` repair-order DAG, the scripted build/gate loop (`build_and_run.sh --verify`, `test_all.sh`, `run_gates.sh --ready`, `profile_macos.sh --list`), and completion via `verify_completion.py`.
 
-```bash
-./.forge-codex/scripts/verify_completion.py
-```
-
-to exit zero. It must verify all hard gates, feature parity, no unresolved critical/high findings, successful migrations, MCP conformance, continuity crash recovery, resource-budget evidence, and the prohibited-attribution scan. Do not replace evidence files manually or mark gates successful without their commands and artifacts.
-<!-- FORGE-CONDUCTOR-AUTONOMOUS-CONTRACT:END -->
+Do not resume any of these as a current assignment from any seed, handoff, or package.
+<!-- FORGE-SUPERSEDED-AUTOMATION-HISTORY:END -->
