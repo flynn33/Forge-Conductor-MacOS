@@ -383,6 +383,75 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertEqual(durable["count"] as? Int, 1)
     }
 
+    func testSelectedProjectRecordIsIsolatedFromOtherProjectsAndSurvivesReopen() throws {
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let memory = ProjectMemoryService(paths: paths)
+        defer { memory.closeAll() }
+
+        // Two distinct project identities from the existing two-project fixture.
+        let descriptorA = try memory.initializeUnchecked(path: projectA.path)
+        let descriptorB = try memory.initializeUnchecked(path: projectB.path)
+        let idA = try XCTUnwrap(descriptorA["project_id"] as? String)
+        let idB = try XCTUnwrap(descriptorB["project_id"] as? String)
+        XCTAssertNotEqual(idA, idB)
+
+        // Write one record to the first project through the normal service path...
+        let written = try memory.remember(
+            projectID: idA,
+            write: ProjectMemoryWrite(
+                kind: "decision",
+                title: "Slice 05 isolation marker",
+                summary: "Selected project boundary check"
+            )
+        )
+        XCTAssertEqual(written["project_id"] as? String, idA)
+        XCTAssertEqual(written["disposition"] as? String, "inserted")
+        let recordID = try XCTUnwrap(written["record_id"] as? String)
+
+        // ...and read it back through the same path.
+        let inA = try memory.get(projectID: idA, ids: [recordID], includeBody: false)
+        XCTAssertEqual(inA["project_id"] as? String, idA)
+        XCTAssertEqual(inA["count"] as? Int, 1)
+        XCTAssertEqual((inA["records"] as? [[String: Any]])?.first?["id"] as? String, recordID)
+
+        // The second project cannot obtain it through lookup or search.
+        let inB = try memory.get(projectID: idB, ids: [recordID], includeBody: false)
+        XCTAssertEqual(inB["project_id"] as? String, idB)
+        XCTAssertEqual(inB["count"] as? Int, 0)
+        let searchedB = try memory.search(
+            projectID: idB, query: "isolation marker", kinds: [], tags: [],
+            sessionID: nil, limit: 10, cursor: nil, includeBody: false, maximumResponseBytes: 65536
+        )
+        XCTAssertEqual(searchedB["count"] as? Int, 0)
+
+        // An unregistered project identity must never fall back to the first project's store.
+        let unregistered = UUID().uuidString.lowercased()
+        XCTAssertThrowsError(
+            try memory.get(projectID: unregistered, ids: [recordID], includeBody: false)
+        ) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .projectNotFound(unregistered))
+        }
+        XCTAssertThrowsError(
+            try memory.search(
+                projectID: unregistered, query: "isolation marker", kinds: [], tags: [],
+                sessionID: nil, limit: 10, cursor: nil, includeBody: false, maximumResponseBytes: 65536
+            )
+        ) { error in
+            XCTAssertEqual(error as? ProjectMemoryError, .projectNotFound(unregistered))
+        }
+
+        // Close and reopen the isolated repository using the existing fixture machinery.
+        memory.closeAll()
+        let reopened = ProjectMemoryService(paths: paths)
+        defer { reopened.closeAll() }
+        let durable = try reopened.get(projectID: idA, ids: [recordID], includeBody: true)
+        XCTAssertEqual(durable["count"] as? Int, 1)
+        let record = try XCTUnwrap((durable["records"] as? [[String: Any]])?.first)
+        XCTAssertEqual(record["id"] as? String, recordID)
+        XCTAssertEqual(record["title"] as? String, "Slice 05 isolation marker")
+    }
+
     func testBatchPaginationUpdateConflictLinkAndTombstone() throws {
         let app = try bootstrapApplication()
         defer { app.shutdown() }
