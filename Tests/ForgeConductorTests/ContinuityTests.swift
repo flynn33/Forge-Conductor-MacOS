@@ -350,6 +350,159 @@ final class ContinuityTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(HandoffPacket.fromDictionary(legacyGenerated)).resumeSeedIsCustom)
     }
 
+    func testCoherentResumeKeepsCurrentAssignmentAcrossSaveAndRestore() throws {
+        // SLICE-03 fixture: one current slice plus one clearly superseded old
+        // task, saved and restored through the real tool paths in an isolated
+        // store. It does not load the incident packet and does not touch live
+        // continuity storage. Reading an identifier back is not proof: every
+        // assertion below checks field content (goal, narrative, next action,
+        // resume instruction).
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let oldClient = ClientID("coherent-resume-old")
+        let currentClient = ClientID("coherent-resume-current")
+        let readerClient = ClientID("coherent-resume-reader")
+
+        let oldGoal = "Alpha recovery: repair the legacy daemon"
+        let oldNarrative = "Old alpha recovery assignment, replaced by the small-slice sequence."
+        let oldNext = "Resume the alpha recovery steps"
+        let oldSeed = "Resume the old alpha recovery package from its saved instructions."
+
+        // 1. The clearly superseded old task is finalized first.
+        let old = try app.tools.call(
+            name: "session_handoff",
+            arguments: [
+                "goal": oldGoal,
+                "status": "superseded",
+                "narrative": oldNarrative,
+                "next_actions": [oldNext],
+                "resume_seed": oldSeed,
+            ],
+            clientID: oldClient
+        )
+        XCTAssertTrue(old.ok, "\(old.payload)")
+        let oldID = try XCTUnwrap(old.payload["handoff_id"] as? String)
+
+        // 2. The current slice is finalized after the old task, so the current
+        // record is the latest resume-ready one by write order.
+        let currentGoal = "SLICE-03: Keep the current assignment consistent across a saved resume"
+        let midNarrative = "SLICE-03 focused checks are running on branch qwen-slice-03-coherent-resume."
+        let midNext = "Run the focused checkpoint/restore test"
+        let midSeed = "Resume only SLICE-03. Current stage is testing. Next action: \(midNext); do not start another slice."
+        let current = try app.tools.call(
+            name: "session_handoff",
+            arguments: [
+                "goal": currentGoal,
+                "status": "testing",
+                "narrative": midNarrative,
+                "next_actions": [midNext],
+                "resume_seed": midSeed,
+            ],
+            clientID: currentClient
+        )
+        XCTAssertTrue(current.ok, "\(current.payload)")
+        let currentID = try XCTUnwrap(current.payload["handoff_id"] as? String)
+        XCTAssertNotEqual(oldID, currentID)
+
+        // 3. New-chat bootstrap restore returns the current slice, not the
+        // superseded old assignment.
+        let restored = try app.tools.call(
+            name: "context_get",
+            arguments: ["resume_ready": true],
+            clientID: readerClient
+        )
+        XCTAssertEqual(restored.payload["found"] as? Bool, true)
+        XCTAssertEqual(restored.payload["handoff_id"] as? String, currentID)
+        let restoredPacket = try XCTUnwrap(restored.payload["packet"] as? [String: Any])
+        let restoredTask = try XCTUnwrap(restoredPacket["task"] as? [String: Any])
+        XCTAssertEqual(restoredTask["goal"] as? String, currentGoal)
+        XCTAssertEqual(restoredTask["next_actions"] as? [String], [midNext])
+        XCTAssertEqual(restoredPacket["narrative"] as? String, midNarrative)
+        let restoredResume = try XCTUnwrap(restoredPacket["resume"] as? [String: Any])
+        XCTAssertEqual(restoredResume["seed"] as? String, midSeed)
+        XCTAssertFalse((restoredResume["seed"] as? String ?? "").contains("alpha recovery"))
+
+        // 4. A progress save on the current record moves it to the open-PR
+        // pause. The supported mutable checkpoint path takes explicit fields;
+        // every supplied field describes the same slice and pause state.
+        let pauseStatus = "pr_open_awaiting_owner_review"
+        let pauseNarrative = "SLICE-03 PR opened for owner review; implementation preserved."
+        let pauseNext = "Wait for the owner's instruction on the open PR; do not start another slice."
+        let pauseSeed = "Resume only SLICE-03. Current stage is PR-open. Next action: \(pauseNext)"
+        let progress = try app.tools.call(
+            name: "session_checkpoint",
+            arguments: [
+                "handoff_id": currentID,
+                "status": pauseStatus,
+                "narrative": pauseNarrative,
+                "next_actions": [pauseNext],
+                "resume_seed": pauseSeed,
+            ],
+            clientID: currentClient
+        )
+        XCTAssertTrue(progress.ok, "\(progress.payload)")
+        let storedCurrent = try XCTUnwrap(app.store.handoffGet(id: currentID))
+        XCTAssertEqual(storedCurrent.goal, currentGoal)
+        XCTAssertEqual(storedCurrent.status, pauseStatus)
+        XCTAssertEqual(storedCurrent.narrative, pauseNarrative)
+        XCTAssertEqual(storedCurrent.nextActions, [pauseNext])
+        XCTAssertEqual(storedCurrent.resumeSeed, pauseSeed)
+        XCTAssertTrue(storedCurrent.resumeSeedIsCustom)
+
+        // 5. The progress save stays the latest record, and the open-PR pause
+        // survives restoration as a pause. No field tells the successor to
+        // start another slice.
+        let latest = try app.tools.call(
+            name: "context_get",
+            arguments: [:],
+            clientID: readerClient
+        )
+        XCTAssertEqual(latest.payload["found"] as? Bool, true)
+        XCTAssertEqual(latest.payload["handoff_id"] as? String, currentID)
+
+        let pauseRestored = try app.tools.call(
+            name: "context_get",
+            arguments: ["resume_ready": true],
+            clientID: ClientID("coherent-resume-reader-2")
+        )
+        XCTAssertEqual(pauseRestored.payload["found"] as? Bool, true)
+        XCTAssertEqual(pauseRestored.payload["handoff_id"] as? String, currentID)
+        let pausePacket = try XCTUnwrap(pauseRestored.payload["packet"] as? [String: Any])
+        let pauseTask = try XCTUnwrap(pausePacket["task"] as? [String: Any])
+        XCTAssertEqual(pauseTask["goal"] as? String, currentGoal)
+        XCTAssertEqual(pauseTask["status"] as? String, pauseStatus)
+        XCTAssertEqual(pauseTask["next_actions"] as? [String], [pauseNext])
+        XCTAssertEqual(pausePacket["narrative"] as? String, pauseNarrative)
+        let pauseResume = try XCTUnwrap(pausePacket["resume"] as? [String: Any])
+        XCTAssertEqual(pauseResume["seed"] as? String, pauseSeed)
+        XCTAssertFalse((pauseResume["seed"] as? String ?? "").contains("alpha recovery"))
+        XCTAssertFalse((pauseTask["goal"] as? String ?? "").contains("alpha recovery"))
+        for action in pauseTask["next_actions"] as? [String] ?? [] {
+            XCTAssertTrue(action.contains("do not start another slice"), action)
+        }
+        XCTAssertTrue(pauseSeed.contains("do not start another slice"), pauseSeed)
+
+        // 6. The superseded old record is immutable: restored exactly as saved,
+        // including its custom seed marker. The source did not rewrite it.
+        let oldRead = try app.tools.call(
+            name: "context_get",
+            arguments: ["handoff_id": oldID],
+            clientID: readerClient
+        )
+        XCTAssertEqual(oldRead.payload["found"] as? Bool, true)
+        let oldPacket = try XCTUnwrap(oldRead.payload["packet"] as? [String: Any])
+        let oldTask = try XCTUnwrap(oldPacket["task"] as? [String: Any])
+        XCTAssertEqual(oldTask["goal"] as? String, oldGoal)
+        XCTAssertEqual(oldTask["status"] as? String, "superseded")
+        XCTAssertEqual(oldTask["next_actions"] as? [String], [oldNext])
+        XCTAssertEqual(oldPacket["narrative"] as? String, oldNarrative)
+        XCTAssertEqual(try XCTUnwrap(oldPacket["resume"] as? [String: Any])["seed"] as? String, oldSeed)
+        let storedOld = try XCTUnwrap(app.store.handoffGet(id: oldID))
+        XCTAssertEqual(storedOld.resumeSeed, oldSeed)
+        XCTAssertTrue(storedOld.resumeSeedIsCustom)
+    }
+
     func testUnknownExplicitHandoffIDFailsWithoutMutation() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
