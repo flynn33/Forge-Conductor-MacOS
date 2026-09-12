@@ -466,6 +466,121 @@ final class ProjectContextIntegrationTests: XCTestCase {
         }
     }
 
+    func testGenerationResetIsIsolatedFromOtherProjectsAndPreservesGlobalSettings() throws {
+        try withApplication { app, root in
+            let manager = ManagerNode(app: app)
+            let clientA = ClientID("reset-selected-client")
+            let clientB = ClientID("reset-other-client")
+            let projectA = try makeProject(root: root, name: "reset-selected-project")
+            let projectB = try makeProject(root: root, name: "reset-other-project")
+            let initializedA = try initialize(app: app, project: projectA, clientID: clientA)
+            let initializedB = try initialize(app: app, project: projectB, clientID: clientB)
+            let projectIDA = try XCTUnwrap(initializedA.payload["project_id"] as? String)
+            let projectIDB = try XCTUnwrap(initializedB.payload["project_id"] as? String)
+            XCTAssertNotEqual(projectIDA, projectIDB)
+            let selectedID = ProjectID(try XCTUnwrap(UUID(uuidString: projectIDA)))
+            let otherID = ProjectID(try XCTUnwrap(UUID(uuidString: projectIDB)))
+
+            let markerA = "selected-only-\(UUID().uuidString.lowercased())"
+            let markerB = "other-only-\(UUID().uuidString.lowercased())"
+            let rememberedA = try app.tools.call(
+                name: "project_memory.remember",
+                arguments: [
+                    "project_id": projectIDA,
+                    "kind": "fact",
+                    "title": markerA,
+                    "summary": "Disposable record bound to the selected project",
+                ],
+                clientID: clientA
+            )
+            XCTAssertTrue(rememberedA.ok, "\(rememberedA.payload)")
+            let rememberedB = try app.tools.call(
+                name: "project_memory.remember",
+                arguments: [
+                    "project_id": projectIDB,
+                    "kind": "fact",
+                    "title": markerB,
+                    "summary": "Disposable record bound to the other project",
+                ],
+                clientID: clientB
+            )
+            XCTAssertTrue(rememberedB.ok, "\(rememberedB.payload)")
+
+            let settingsBefore = try app.config.budgetPolicySnapshot()
+
+            let receipt = try manager.resetProjectGeneration(
+                projectID: selectedID,
+                expectedGeneration: .initial
+            )
+            XCTAssertEqual(receipt["ok"] as? Bool, true)
+            XCTAssertEqual(receipt["new_generation"] as? UInt64, 2)
+            XCTAssertEqual(receipt["invalidated_binding_count"] as? Int, 1)
+
+            XCTAssertEqual(try app.config.budgetPolicySnapshot(), settingsBefore)
+
+            let selectedStatus = try manager.projectStatus(projectID: selectedID)
+            XCTAssertEqual(selectedStatus["project_generation"] as? UInt64, 2)
+            XCTAssertEqual(selectedStatus["lifecycle_state"] as? String, "active")
+
+            let fenced = try app.tools.call(
+                name: "project_memory.status",
+                arguments: ["project_id": projectIDA],
+                clientID: clientA
+            )
+            XCTAssertFalse(fenced.ok)
+            XCTAssertEqual(fenced.payload["code"] as? String, "project_context_required")
+
+            XCTAssertThrowsError(
+                try app.projectContexts.beginReset(
+                    projectID: selectedID,
+                    expectedGeneration: .initial
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? ProjectContextError,
+                    .staleProjectGeneration(expected: .initial, actual: ProjectGeneration(2))
+                )
+            }
+
+            let otherStatus = try manager.projectStatus(projectID: otherID)
+            XCTAssertEqual(otherStatus["project_generation"] as? UInt64, 1)
+            XCTAssertEqual(otherStatus["lifecycle_state"] as? String, "active")
+
+            let otherStillUsable = try app.tools.call(
+                name: "project_memory.status",
+                arguments: ["project_id": projectIDB],
+                clientID: clientB
+            )
+            XCTAssertTrue(otherStillUsable.ok, "\(otherStillUsable.payload)")
+
+            let otherOwnRecord = try app.tools.call(
+                name: "project_memory.search",
+                arguments: ["project_id": projectIDB, "query": markerB],
+                clientID: clientB
+            )
+            XCTAssertTrue(otherOwnRecord.ok, "\(otherOwnRecord.payload)")
+            XCTAssertEqual(otherOwnRecord.payload["count"] as? Int, 1)
+
+            let otherSeesNoSelectedRecord = try app.tools.call(
+                name: "project_memory.search",
+                arguments: ["project_id": projectIDB, "query": markerA],
+                clientID: clientB
+            )
+            XCTAssertTrue(otherSeesNoSelectedRecord.ok, "\(otherSeesNoSelectedRecord.payload)")
+            XCTAssertEqual(otherSeesNoSelectedRecord.payload["count"] as? Int, 0)
+
+            let reboundA = try initialize(app: app, project: projectA, clientID: clientA)
+            XCTAssertEqual(reboundA.payload["project_generation"] as? UInt64, 2)
+            let selectedRecordSurvives = try app.tools.call(
+                name: "project_memory.search",
+                arguments: ["project_id": projectIDA, "query": markerA],
+                clientID: clientA
+            )
+            XCTAssertTrue(selectedRecordSurvives.ok, "\(selectedRecordSurvives.payload)")
+            XCTAssertEqual(selectedRecordSurvives.payload["count"] as? Int, 1)
+        }
+    }
+
     private func withApplication(
         _ body: (ForgeApp, URL) throws -> Void
     ) throws {
