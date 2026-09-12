@@ -331,6 +331,73 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(maximum.payload["has_more"] as? Bool, false)
     }
 
+    func testFSEditAppliesUniqueMatchAndReportsNoMatch() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let path = tempHome.appendingPathComponent("edit-me.txt").path
+        let writeClient = ClientID("fs-edit-write")
+        let editClient = ClientID("fs-edit-apply")
+        let verifyClient = ClientID("fs-edit-verify")
+        try bindProjectContext(app: app, clientID: writeClient)
+        try bindProjectContext(app: app, clientID: editClient)
+        try bindProjectContext(app: app, clientID: verifyClient)
+        _ = try app.tools.call(
+            name: "fs_write",
+            arguments: ["path": path, "content": "alpha target-marker beta\ntarget-marker gamma"],
+            clientID: writeClient
+        )
+
+        // Exact, uniquely matched edit: the old string occurs once.
+        let applied = try app.tools.call(
+            name: "fs_edit",
+            arguments: [
+                "path": path,
+                "old": "alpha target-marker beta",
+                "new": "alpha replaced-marker beta",
+            ],
+            clientID: editClient
+        )
+        XCTAssertTrue(applied.ok, "\(applied.payload)")
+        XCTAssertEqual(applied.payload["path"] as? String, path)
+        XCTAssertEqual(applied.payload["replacements"] as? Int, 1)
+
+        let reread = try app.tools.call(
+            name: "fs_read",
+            arguments: ["path": path],
+            clientID: verifyClient
+        )
+        XCTAssertTrue(reread.ok, "\(reread.payload)")
+        XCTAssertEqual(
+            reread.payload["content"] as? String,
+            "alpha replaced-marker beta\ntarget-marker gamma"
+        )
+
+        // Existing edit contract: a non-unique old replaces every occurrence
+        // and reports the count; a targeted edit must supply a unique match.
+        let multiPath = tempHome.appendingPathComponent("edit-dup.txt").path
+        _ = try app.tools.call(
+            name: "fs_write",
+            arguments: ["path": multiPath, "content": "dup one\ndup two"],
+            clientID: writeClient
+        )
+        let multi = try app.tools.call(
+            name: "fs_edit",
+            arguments: ["path": multiPath, "old": "dup", "new": "single"],
+            clientID: editClient
+        )
+        XCTAssertTrue(multi.ok, "\(multi.payload)")
+        XCTAssertEqual(multi.payload["replacements"] as? Int, 2)
+
+        // A non-matching old fails with a distinct no_match code.
+        let miss = try app.tools.call(
+            name: "fs_edit",
+            arguments: ["path": path, "old": "absent-marker", "new": "nope"],
+            clientID: editClient
+        )
+        XCTAssertFalse(miss.ok)
+        XCTAssertEqual(miss.payload["code"] as? String, "no_match")
+    }
+
     func testIdenticalToolCallLoopSoftHandoffThenHardBlock() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
