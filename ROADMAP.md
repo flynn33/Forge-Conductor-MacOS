@@ -14,7 +14,7 @@ Every PR updates its affected row with a real link, evidence, and limitation. Be
 
 | Phase | Milestone / assigned slice | Audit status | Acceptance and current evidence |
 |---|---|---|---|
-| TRACKING | T-ROADMAP / tracking setup | Open; introducing PR on branch `docs/tracking-roadmap` | This roadmap, delivery contract, owner PR checklist, current agent entry, README and changelog updates are published through one local-first PR. Acceptance waits for merge and local sync. |
+| TRACKING | T-ROADMAP / tracking setup | Open; [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46) | This roadmap, delivery contract, owner PR checklist, current agent entry, README and changelog updates are published through one local-first PR. Acceptance waits for merge and local sync. |
 | FOUNDATION | F-DISPATCH / 01 | Recorded | One owner-selected slice replaces historical dispatch. [PR #39](https://github.com/flynn33/Forge-Conductor-MacOS/pull/39). Documentation validation only. |
 | FOUNDATION | F-BUILD / 02 | Recorded | CLI build and six focused atomic-file tests reported passing. [PR #40](https://github.com/flynn33/Forge-Conductor-MacOS/pull/40); [build note](docs/BUILD-BASELINE.md). Not native GUI execution. |
 | FOUNDATION | F-RESUME / 03 | Recorded | Coherent current task and review pause survive save/restore; explicit seed must match caller narrative. [PR #41](https://github.com/flynn33/Forge-Conductor-MacOS/pull/41); [resume note](docs/COHERENT-RESUME.md). |
@@ -52,7 +52,7 @@ Every PR updates its affected row with a real link, evidence, and limitation. Be
 
 | Phase | State at audit / required closeout |
 |---|---|
-| TRACKING | Published through branch `docs/tracking-roadmap`: roadmap, delivery workflow, owner PR checklist, active workflow entry, README status, and Unreleased changelog. Acceptance waits for merge; post-merge synchronization is a separate owner-authorized step. |
+| TRACKING | Published through [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46): roadmap, delivery workflow, owner PR checklist, active workflow entry, README status, and Unreleased changelog. Acceptance waits for merge; post-merge synchronization is a separate owner-authorized step. |
 | FOUNDATION | The five component slices are merged at their recorded scope. Consolidated phase documentation and the new local/Xcode receipt were not established by this audit; reconcile without repeating the tests. |
 | NATIVE | Partial. Generation fencing is recorded; native build/UI verification and actual selectable clearing remain separate. |
 | CONTINUITY | Existing implementation and historical tests; milestone-specific verification and any narrow corrections remain open. |
