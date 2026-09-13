@@ -131,7 +131,7 @@ struct ProjectsOperatorView: View {
                 viewModel.resetSelectedProject()
             }
         } message: { project in
-            Text("\(project.displayName)\n\(project.projectID)\nGeneration \(project.projectGeneration) will be replaced. Active bindings and in-flight work for this generation will be fenced by the manager.")
+            Text("\(project.displayName)\n\(project.projectID)\nGeneration \(project.projectGeneration) will be replaced. Active bindings and in-flight work for this generation will be fenced, and the project memory store will be closed by the manager. Durable memory records persist; only the selected project is affected.")
         }
         .task { viewModel.load() }
         .accessibilityIdentifier("projects-operator-view")
@@ -270,6 +270,7 @@ struct ProjectsOperatorView: View {
                 Button("Reset Generation…", role: .destructive) {
                     showingResetConfirmation = true
                 }
+                .disabled(viewModel.isLoading)
                 .accessibilityIdentifier("project-reset")
             }
         }
