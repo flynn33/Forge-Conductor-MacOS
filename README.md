@@ -58,6 +58,21 @@ forge-conductor install-lmstudio-plugin
 
 No manual LM Studio configuration-file edit or restart is required. Selecting which plugins a model may use remains a per-chat LM Studio choice.
 
+## Project roadmap and delivery
+
+The [project roadmap](ROADMAP.md) records phases, milestones, accepted evidence,
+and unresolved requirements. Every pull request updates that record. Phase
+closeout updates this README, the Unreleased changelog, and affected documents.
+The [delivery workflow](docs/DELIVERY-WORKFLOW.md) defines local-first commits,
+Xcode workspace synchronization, owner review, and post-merge reconciliation.
+
+Recent owner-directed verification established the CLI baseline, coherent
+resume inputs, read/edit/command results, project-memory isolation, and
+selected-project generation fencing. These checks do not, by themselves,
+qualify the current signed GUI, selectable memory/continuity clearing, writable
+source handoff, existing-desktop attachment, or complete live rollover recovery.
+Generation reset preserves durable memory; it must not be described as a flush.
+
 ## Requirements
 
 - macOS 26+
