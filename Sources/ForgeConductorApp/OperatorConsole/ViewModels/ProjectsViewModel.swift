@@ -150,11 +150,17 @@ final class ProjectsViewModel: ObservableObject {
                     generation: project.projectGeneration
                 )
                 notice = "Reset generation \(receipt.priorGeneration) → \(receipt.newGeneration); fenced \(receipt.invalidatedBindingCount) binding(s)."
-                let refreshed = try await client.projectStatus(projectID: project.projectID)
-                projects.removeAll { $0.projectID == refreshed.projectID }
-                projects.append(refreshed)
-                projects.sort { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-                selectedProjectID = refreshed.projectID
+                do {
+                    let refreshed = try await client.projectStatus(projectID: project.projectID)
+                    projects.removeAll { $0.projectID == refreshed.projectID }
+                    projects.append(refreshed)
+                    projects.sort { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+                    selectedProjectID = refreshed.projectID
+                } catch {
+                    // The manager committed the reset before the refresh failed.
+                    // Keep the committed result visible and show the real refresh error.
+                    errorMessage = error.localizedDescription
+                }
                 lastUpdated = Date()
             } catch {
                 errorMessage = error.localizedDescription
