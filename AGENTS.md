@@ -1,11 +1,17 @@
 <!-- FORGE-OWNER-SLICE-WORKFLOW:BEGIN -->
-# Current execution workflow (owner-directed, single slice)
+# Current owner-directed delivery workflow
 
-The owner supplies the current slice and all working locations. Perform only that slice with the tools actually exposed. Read the necessary source, make one small change, test it, commit locally, push the slice branch, and open a PR targeting main. Then stop for owner review. Historical packages, selectors, phase lists, and old handoffs do not choose work. Do not run automation scripts for this workflow. Preserve existing native engineering, compatibility, authorization, and evidence requirements. Never merge or begin another slice without the owner's next instruction. Missing information, a failed required check, or no new evidence means report the specific blocker and stop.
+The owner supplies one current slice and the working checkout. Perform only that slice with actually exposed tools. Read its necessary source, make the smallest justified change, check it, commit locally, push the slice branch, and open one PR targeting `main`. Then stop for owner review. Never merge, enable auto-merge, or start another slice without the owner's next instruction.
 
-A fresh slice branch is cut from current `main` only after the prior slice is merged and the owner authorizes the slice. The supplied session contract and the one authorized slice card are the complete working context; do not load old packages, archived transcripts, the full slice sequence, or old resume seeds as dispatch. After each slice: one tested local commit, one PR targeting `main`, and a hard stop.
+`ROADMAP.md` is the canonical phase/milestone record. `docs/DELIVERY-WORKFLOW.md` defines publication and synchronization. Every PR updates its affected roadmap row with actual evidence, blocker state, and the real PR link. The roadmap records work; it is not a task selector. Historical packages, selectors, old handoffs, and archived phase lists have no dispatch authority.
 
-This section is the single current assignment source for this repository, and the open-PR owner review is the single stop boundary.
+At every phase end, update README, the existing Unreleased changelog, and the affected current documents in the closing PR. Missing documentation leaves the phase open. A deferred requirement remains deferred, not complete.
+
+All product edits are local-first. Start new authorized work from safely synchronized `main`. Verify source/resource/test membership in the canonical `ForgeConductor.xcworkspace` and its existing project with every PR; change the graph only when needed. Do not regenerate the project or confuse package compilation with signed native execution. Documentation-only PRs record an unchanged graph rather than manufacturing project edits.
+
+One logical slice may use a small local documentation follow-up commit to add the actual PR URL. Before the review pause, verify local branch, remote branch, and PR head agree. After the owner confirms merge, a separate synchronization-only instruction fast-forwards local `main`, verifies the workspace and affected build inputs, and records a receipt on that PR. It does not begin another slice.
+
+Use direct native commands and actual tool schemas, not automation scripts or archived gate runners. Preserve the engineering requirements below, existing signing/authorization, shell access, data isolation, compatibility, and evidence. Keep the running build host separate from the candidate. An unavailable capability or failed required check is a specific blocker, not permission to lower protections or fabricate a pass.
 <!-- FORGE-OWNER-SLICE-WORKFLOW:END -->
 
 <!-- FORGE-CONDUCTOR-ENGINEERING:BEGIN -->

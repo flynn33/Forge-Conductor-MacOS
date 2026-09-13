@@ -20,6 +20,18 @@ Provider settings now have native and manager save controls. Four native product
 onboarding scenarios passed; disposable Keychain tests also executed. Complete
 installed-stack and production-feature acceptance remain separate gates.
 
+### Project tracking and verified baseline
+
+- Added a canonical phase/milestone roadmap and a local-first delivery contract:
+  every PR records progress and Xcode synchronization; phase closeout updates
+  README, changelog, and affected documents.
+- Recorded the merged instruction cleanup and focused CLI, coherent-resume,
+  read/edit/command, project-memory, and generation-reset verification.
+  These are narrow recorded checks, not a claim that all application paths ran.
+- Clarified that selected-project generation reset preserves durable records.
+  Selectable memory/continuity clearing and remaining native/live integration
+  qualification remain separately tracked.
+
 ### Authorized handoff storage and admission
 
 - Native process tests now force termination after source commit, source claim,
