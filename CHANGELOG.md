@@ -22,6 +22,10 @@ installed-stack and production-feature acceptance remain separate gates.
 
 ### Project tracking and verified baseline
 
+- Reconciled merged PR #46 and its post-merge synchronization receipt with a
+  fresh local/remote `main` readback at `50d1821`. Recorded the current native
+  host, toolchain, signing, provider, and hardware prerequisites without
+  promoting them to product or distribution evidence.
 - Added a canonical phase/milestone roadmap and a local-first delivery contract:
   every PR records progress and Xcode synchronization; phase closeout updates
   README, changelog, and affected documents.
