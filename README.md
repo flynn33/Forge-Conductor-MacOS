@@ -73,6 +73,12 @@ qualify the current signed GUI, selectable memory/continuity clearing, writable
 source handoff, existing-desktop attachment, or complete live rollover recovery.
 Generation reset preserves durable memory; it must not be described as a flush.
 
+The tracking workflow in [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46)
+is merged, and local/remote `main` equality at merge commit `50d1821` was
+rechecked September 14, 2026. The current host, signing, provider, and hardware
+prerequisites are recorded in the [roadmap](ROADMAP.md#current-prerequisite-snapshot--september-14-2026).
+That inventory is not a native-build or release-qualification result.
+
 ## Requirements
 
 - macOS 26+

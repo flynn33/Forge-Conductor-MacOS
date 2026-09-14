@@ -1,6 +1,6 @@
 # Forge Conductor macOS — project roadmap
 
-Audit baseline: September 12, 2026, source `4750e8ee93aeb7dbbcde6b3408d409cb47ee2be1`; reconciled September 13, 2026 to source `b8e927c76bb13a58e6f161789c162ddac629ef95` after owner PR #45. This is an evidence baseline, not a checkout/reset instruction. Confirm newer merged work before updating a row.
+Audit baseline: September 12, 2026, source `4750e8ee93aeb7dbbcde6b3408d409cb47ee2be1`; reconciled September 13, 2026 to source `b8e927c76bb13a58e6f161789c162ddac629ef95` after owner PR #45. Remote and local `main` were rechecked September 14, 2026 at `50d18219fd7f898f2a7cb9bb5cc057aa3c2d9a3e` after owner PR #46. These are evidence baselines, not checkout/reset instructions. Confirm newer merged work before updating a row.
 
 The roadmap is the canonical phase/milestone record. The owner authorizes one small task at a time; this table is not an automatic task selector. Follow [the delivery workflow](docs/DELIVERY-WORKFLOW.md).
 
@@ -14,7 +14,7 @@ Every PR updates its affected row with a real link, evidence, and limitation. Be
 
 | Phase | Milestone / assigned slice | Audit status | Acceptance and current evidence |
 |---|---|---|---|
-| TRACKING | T-ROADMAP / tracking setup | Open; [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46) | This roadmap, delivery contract, owner PR checklist, current agent entry, README and changelog updates are published through one local-first PR. Acceptance waits for merge and local sync. |
+| TRACKING | T-ROADMAP / tracking setup | Recorded through [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46); prerequisite refresh ready in [PR #47](https://github.com/flynn33/Forge-Conductor-MacOS/pull/47) | PR #46 merged as `50d1821`. Its [post-merge receipt](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46#issuecomment-5654771876) records the first local synchronization; local and remote `main` equality was independently rechecked September 14, 2026. PR #47 records that refresh and the current release prerequisites; its documentation-only diff leaves the native graph unchanged. |
 | FOUNDATION | F-DISPATCH / 01 | Recorded | One owner-selected slice replaces historical dispatch. [PR #39](https://github.com/flynn33/Forge-Conductor-MacOS/pull/39). Documentation validation only. |
 | FOUNDATION | F-BUILD / 02 | Recorded | CLI build and six focused atomic-file tests reported passing. [PR #40](https://github.com/flynn33/Forge-Conductor-MacOS/pull/40); [build note](docs/BUILD-BASELINE.md). Not native GUI execution. |
 | FOUNDATION | F-RESUME / 03 | Recorded | Coherent current task and review pause survive save/restore; explicit seed must match caller narrative. [PR #41](https://github.com/flynn33/Forge-Conductor-MacOS/pull/41); [resume note](docs/COHERENT-RESUME.md). |
@@ -52,7 +52,7 @@ Every PR updates its affected row with a real link, evidence, and limitation. Be
 
 | Phase | State at audit / required closeout |
 |---|---|
-| TRACKING | Published through [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46): roadmap, delivery workflow, owner PR checklist, active workflow entry, README status, and Unreleased changelog. Acceptance waits for merge; post-merge synchronization is a separate owner-authorized step. |
+| TRACKING | Recorded through merged [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46) and its [post-merge receipt](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46#issuecomment-5654771876). The September 14 prerequisite refresh is ready in [PR #47](https://github.com/flynn33/Forge-Conductor-MacOS/pull/47); merge acceptance and its post-merge synchronization remain pending. |
 | FOUNDATION | The five component slices are merged at their recorded scope. Consolidated phase documentation and the new local/Xcode receipt were not established by this audit; reconcile without repeating the tests. |
 | NATIVE | Partial. Generation fencing is recorded; native build/UI verification and actual selectable clearing remain separate. |
 | CONTINUITY | Existing implementation and historical tests; milestone-specific verification and any narrow corrections remain open. |
@@ -62,7 +62,7 @@ Every PR updates its affected row with a real link, evidence, and limitation. Be
 
 ## Dependencies and useful next work
 
-Publish tracking first, then obtain an early ordinary native baseline before more UI work. Original slices 01–06 are accepted history, not fresh assignments. The owner may separately assign FOUNDATION documentation catch-up without reopening its unchanged implementation.
+Tracking is recorded. The next owner-authorized product slice should obtain an early ordinary native baseline before more UI work. Original slices 01–06 are accepted history, not fresh assignments. The owner may separately assign FOUNDATION documentation catch-up without reopening its unchanged implementation.
 
 Generation-reset UI work must preserve the recorded reset semantics. Actual clearing starts with its own scope contract, followed by one mode-specific implementation at a time. Those later cards require owner authorization; this roadmap does not authorize bulk database deletion.
 
@@ -75,3 +75,11 @@ Manager-owned API live testing may be independently owner-authorized while deskt
 The baseline is six merged commits beyond the prior package review. Those commits changed instructions, tests, and verification notes, not production sources or the native build graph. Test counts in the linked PRs are reported historical executions, not new tests run by this roadmap. After the audit, owner PR #45 (merged as `b8e927c`) changed the native reset action and its focused tests; that acceptance is recorded on the N-RESET-UI row.
 
 Current build, provider, and release boundaries remain documented in [XCODE.md](XCODE.md), [continuity ingress](docs/CONTINUITY-INGRESS.md), and [README.md](README.md). Historical package gates are not silently closed or reinstated as automatic dispatch.
+
+## Current prerequisite snapshot — September 14, 2026
+
+- **Source and review state:** the configured fetch/push remote is `flynn33/Forge-Conductor-MacOS`; local `main`, `origin/main`, and GitHub's current `main` ref equal `50d18219fd7f898f2a7cb9bb5cc057aa3c2d9a3e`. GitHub reports PR #46 merged and no open pull requests. Pre-existing untracked lock files, a profiling result, and an alpha-recovery directory remain preserved and excluded.
+- **Native host:** the inspected host is an Apple-silicon Mac16,7 with 48 GiB physical memory, macOS 26.6.2, Xcode 26.6 build 17F113, and Apple Swift 6.3.3. This is prerequisite inventory, not a signed build or hardware-support matrix.
+- **Signing and notarization:** Release settings still resolve marketing version 0.9.0, build 1, Developer ID Application, and team `2Y25RTLZET`. The current keychain exposes a usable Apple Development identity but no Developer ID Application identity. No approved notarization profile was identified. Distribution remains blocked pending owner-provided credentials and later product gates.
+- **Provider:** LM Studio and its CLI are installed, but the local server was off during this inspection. No provider workflow or continuity claim was exercised.
+- **Authority:** the current owner-directed one-slice workflow remains active. This prerequisite reconciliation does not authorize merge, replacement of the working installation, credential creation, notarization, public shipment, or another product slice.

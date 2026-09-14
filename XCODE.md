@@ -74,6 +74,14 @@ Application** on team `2Y25RTLZET`; this host currently has no valid Developer
 ID identity. Entitlements live at
 `Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements`.
 
+The September 14, 2026 prerequisite recheck observed macOS 26.6.2 on an arm64
+Mac16,7 with 48 GiB physical memory, Xcode 26.6 build 17F113, and Apple Swift
+6.3.3. Release settings still resolve version 0.9.0, build 1, Developer ID
+Application, and team `2Y25RTLZET`. The keychain exposed a usable Apple
+Development identity but no Developer ID Application identity, and no approved
+notarization profile was identified. This is host inventory only; it is not a
+signed build, hardware matrix, archive, or notarization result.
+
 For a local optimized build signed with James Daley's Apple Development
 certificate, select the signing identity and compiled peer-trust policy
 together:
