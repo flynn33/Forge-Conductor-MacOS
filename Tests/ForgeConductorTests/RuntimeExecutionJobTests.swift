@@ -2009,7 +2009,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
     }
 
-    func testRuntimeLaunchGateMapsApprovedTeamsToExactCertificateClasses() throws {
+    func testRuntimeLaunchGateMapsActiveAndEarlierTeamsToTheBuildCertificateClass() throws {
         let development = try XCTUnwrap(
             RuntimeLaunchGate.requiredProductCodeSigningRequirement(
                 identifier: RuntimeLaunchGate.productIdentifier,
@@ -2018,8 +2018,13 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
         XCTAssertTrue(development.contains("anchor apple generic"))
         XCTAssertTrue(development.contains("9AQ2C2838M"))
+        #if DEBUG || FORGE_DEVELOPMENT_SIGNING
         XCTAssertTrue(development.contains("1.2.840.113635.100.6.1.12"))
         XCTAssertFalse(development.contains("1.2.840.113635.100.6.1.13"))
+        #else
+        XCTAssertTrue(development.contains("1.2.840.113635.100.6.1.13"))
+        XCTAssertFalse(development.contains("1.2.840.113635.100.6.1.12"))
+        #endif
 
         let distribution = try XCTUnwrap(
             RuntimeLaunchGate.requiredProductCodeSigningRequirement(

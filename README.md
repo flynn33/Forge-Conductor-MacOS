@@ -37,6 +37,22 @@ acceptance, and the broader physical-hardware/RAM-tier matrix are owner-deferred
 and non-blocking for this delivery. Required functional product work remains in
 scope and must not be replaced by those deferrals.
 
+For an Xcode archive, open `ForgeConductor.xcworkspace` and select the
+`ForgeConductor` scheme. Its app icon is supplied by `AppIcon.appiconset`; the
+similarly named `Forge Conductor` archive uses a different bundle identifier and
+has no icon. The [Xcode guide](XCODE.md) gives the archive identity and bundle
+checks to run before self-distribution. The canonical archive now contains one
+installable app product, with the manager CLI embedded at `Contents/Helpers`.
+Ordinary Release requests Developer ID Application for James Daley's team
+`9AQ2C2838M`. Xcode used a cloud-managed Developer ID certificate for that
+team on a different archive. James has now installed local Developer ID
+Application and Installer identities for the same team, enabling the exact
+Developer ID archive and package signing. A universal `0.9.0 (1)` app archive
+and Developer ID export now pass strict nested-signature and Release bundle
+checks; a local installer package is signed with James's Developer ID Installer
+identity and a trusted timestamp. Notarization, stapling, public Gatekeeper
+acceptance, and shipment remain separate owner release steps.
+
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
 source revisions, passing local scenarios, and subsequent GitHub CI repairs.
 The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) describes the

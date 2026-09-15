@@ -22,6 +22,36 @@ Release build, coherent signed bundle and bounded isolated launch are complete.
 Privileged root-service E2, exact existing-desktop attachment, public distribution
 qualification and the owner-controlled source merge remain separate boundaries.
 
+### Release archive preparation
+
+- Inspected September 15 Xcode archives: the `Forge Conductor` scheme's
+  `Raven-Forge-Software.Forge-Conductor` app had no icon metadata or icon
+  resources, while the canonical `ForgeConductor` archive contained `AppIcon.icns`,
+  `Assets.car` and matching `AppIcon` bundle keys. Documented the exact scheme,
+  bundle identifier and icon checks for the archive/export path.
+- Removed macOS-SDK Apple Development identity overrides from the five shipping
+  Release targets and set their distribution team to James Daley's
+  `9AQ2C2838M`. Ordinary Release now resolves Developer ID Application;
+  the earlier `2Y25RTLZET` Developer ID identity remains admitted for existing
+  products. The explicit development-signed Release override produced a
+  canonical universal archive with the icon,
+  manager, launcher and filesystem helper. Strict nested signature validation
+  and the `DevelopmentRelease` bundle checker passed. The first canonical
+  archive was generic because the CLI installed as a second product, and
+  `developer-id` export rejected it. Release now uses `SKIP_INSTALL = YES` for
+  the CLI while keeping it in `Contents/Helpers`; a rebuilt app-only archive
+  contains `ApplicationProperties`. Release also uses manual signing for the
+  five shipping targets, removing Xcode's conflict between automatic development
+  signing and a specified Developer ID identity. James Daley has since installed
+  local Developer ID Application and Installer identities for team
+  `9AQ2C2838M`, clearing the earlier build-time certificate error. A fresh
+  universal `0.9.0 (1)` Developer ID archive and export now pass strict deep
+  signatures and the Release privileged-bundle checker, including every nested
+  product and the daemon hash seal. A local installer package signed with his
+  Developer ID Installer identity has a trusted timestamp and contains the
+  exported app. Notarization, stapling, public Gatekeeper acceptance, and
+  shipment remain unverified owner release steps.
+
 ### Project tracking and verified baseline
 
 - Adopted the owner-authorized continuous functional-development workflow and

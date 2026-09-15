@@ -31,8 +31,13 @@ list, then signs nested code before strictly verifying the enclosing bundle.
 The script does not synthesize Xcode's embedded framework layout.
 
 Signed Xcode products bind each role to an exact Apple signing requirement.
-Development team `9AQ2C2838M` requires Apple Development; distribution team
-`2Y25RTLZET` requires Developer ID Application. Manager staging, runtime launch,
+The active development and Developer ID distribution team is James Daley's
+`9AQ2C2838M`; the earlier `2Y25RTLZET` distribution team remains admitted
+only for previously signed Developer ID products. Active Debug and explicit
+development-signed Release builds require Apple Development, while ordinary
+Release requires Developer ID Application. Product-role admission accepts only
+the active build's certificate class for the exact owner team and only
+Developer ID for the earlier team. Manager staging, runtime launch,
 and the outer bundle verifier apply the corresponding Apple anchor, identifier,
 team, and certificate-class requirement to the app, CLI, daemon, runtime
 launcher, and core framework. This is identity admission, not rollback
