@@ -366,7 +366,7 @@ enum NativeSourcePressurePacketBuilder {
 
     private static func callIdentity(stage: UUID, ordinal: Int, response: String, call: String,
                                      tool: String, seen: inout Set<String>) throws {
-        guard (0..<16).contains(ordinal), ["fs_read", "session_checkpoint", "session_handoff"].contains(tool) else {
+        guard (0..<16).contains(ordinal), MCPNativeTaskSourceProfile.allSourceToolNames.contains(tool) else {
             throw NativeSourcePressurePacketError.invalidSnapshot
         }
         try identifier(response, maximum: 1_024); try identifier(call, maximum: 1_024)

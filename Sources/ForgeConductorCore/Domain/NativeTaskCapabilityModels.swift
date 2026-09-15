@@ -120,12 +120,13 @@ public struct NativeTaskCapabilityDescriptor: Sendable, Equatable {
         guard Set(o.keys) == ["task_id","capability_id","project_id","project_generation","epoch","state","profile_id","profile_version",
             "approval_sha256","scope_sha256","original_caller_binding_id","source_binding_id","expires_at","issued_at","revoked_at"],
             let s = o["state"] as? String, let state = State(rawValue: s),
-            o["profile_id"] as? String == "forge.native-task-source", JSONSupport.exactInteger(o["profile_version"]) == 1,
+            o["profile_id"] as? String == "forge.native-task-source",
+            let profileVersion = JSONSupport.exactInteger(o["profile_version"]), (1...2).contains(profileVersion),
             let generation = JSONSupport.exactInteger(o["project_generation"]), generation > 0,
             let epoch = JSONSupport.exactInteger(o["epoch"]), epoch > 0 else { throw NativeTaskCapabilityError.integrityFailure }
         taskID = try NativeTaskValue.uuid(o["task_id"]); capabilityID = try NativeTaskValue.uuid(o["capability_id"])
         projectID = ProjectID(try NativeTaskValue.uuid(o["project_id"])); projectGeneration = .init(UInt64(generation))
-        self.epoch = Int64(epoch); self.state = state; profileID = "forge.native-task-source"; profileVersion = 1
+        self.epoch = Int64(epoch); self.state = state; profileID = "forge.native-task-source"; self.profileVersion = profileVersion
         approvalSHA256 = try NativeTaskValue.sha(o["approval_sha256"]); scopeSHA256 = try NativeTaskValue.sha(o["scope_sha256"])
         originalCallerBindingID = try NativeTaskValue.uuid(o["original_caller_binding_id"]); sourceBindingID = try NativeTaskValue.uuid(o["source_binding_id"])
         expiresAt = try NativeTaskValue.date(o["expires_at"]); issuedAt = try NativeTaskValue.date(o["issued_at"])
@@ -180,7 +181,8 @@ public struct NativeTaskCapabilityCommandReceipt: Sendable, Equatable {
             ["prepare","rotate","revoke"].contains(action), let state = o["result_state"] as? String,
             state == (action == "revoke" ? "revoked" : "active"), let epoch = JSONSupport.exactInteger(o["result_epoch"]), epoch > 0,
             let generation = JSONSupport.exactInteger(o["project_generation"]), generation > 0,
-            o["profile_id"] as? String == "forge.native-task-source", JSONSupport.exactInteger(o["profile_version"]) == 1 else {
+            o["profile_id"] as? String == "forge.native-task-source",
+            let profileVersion = JSONSupport.exactInteger(o["profile_version"]), (1...2).contains(profileVersion) else {
             throw NativeTaskCapabilityError.integrityFailure
         }
         requestID = try NativeTaskValue.uuid(o["request_id"]); taskID = try NativeTaskValue.uuid(o["task_id"])
@@ -191,7 +193,7 @@ public struct NativeTaskCapabilityCommandReceipt: Sendable, Equatable {
             : (priorEpoch != nil && priorEpoch! > 0 && priorEpoch! < Int64.max && resultEpoch == priorEpoch! + 1) else {
             throw NativeTaskCapabilityError.integrityFailure
         }
-        profileID = "forge.native-task-source"; profileVersion = 1
+        profileID = "forge.native-task-source"; self.profileVersion = profileVersion
         requestSHA256 = try NativeTaskValue.sha(o["request_sha256"]); approvalSHA256 = try NativeTaskValue.sha(o["approval_sha256"])
         scopeSHA256 = try NativeTaskValue.sha(o["scope_sha256"]); documentSHA256 = try NativeTaskValue.sha(o["document_sha256"])
         verifierSHA256 = o["verifier_sha256"] is NSNull ? nil : try NativeTaskValue.sha(o["verifier_sha256"])

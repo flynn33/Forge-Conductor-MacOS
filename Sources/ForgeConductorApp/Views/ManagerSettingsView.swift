@@ -217,7 +217,7 @@ struct ManagerSettingsView: View {
                 }
 
                 Text(
-                    "Protected regular-file and symbolic-link deletes require the separately signed service. Production move and recursive directory delete remain unavailable until their signed-helper recovery protocols are implemented and qualified. Shell tools remain nonprivileged and are controlled independently above."
+                    "Protected regular-file, symbolic-link, empty-directory, move, and bounded recursive-delete operations use the separately signed service. Move refuses replacement and remains within one authorized writable root; recursive delete commits one recoverable leaf or empty-directory transaction at a time. Shell tools remain nonprivileged and are controlled independently above."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

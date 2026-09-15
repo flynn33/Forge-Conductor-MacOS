@@ -2865,6 +2865,8 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         context: ToolInvocationContext?,
         cancellation: ToolCallCancellation?,
         recoveryLedger: SecureFilesystemRecoveryLedger,
+        expectedIdentity: ForgeFilesystemIdentity? = nil,
+        allowEmptyDirectory: Bool = false,
         authorityValidator: @Sendable (ToolInvocationContext) throws -> Void = { _ in },
         retentionAttemptObserver: (@Sendable () -> Void)? = nil
     ) throws -> ToolResult {
@@ -2966,11 +2968,26 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         guard Darwin.lstat(target.path, &leafInformation) == 0 else {
             return .failure(code: "not_found", message: "Filesystem leaf does not exist")
         }
-        guard leafInformation.st_mode & S_IFMT != S_IFDIR else {
+        let isDirectory = leafInformation.st_mode & S_IFMT == S_IFDIR
+        guard !isDirectory || allowEmptyDirectory else {
             return .failure(
                 code: ForgeFilesystemErrorCode.capabilityUnavailable,
                 message: "Directory deletion is disabled until privileged recursive recovery is qualified"
             )
+        }
+        let observedIdentity = Self.identity(leafInformation)
+        if let expectedIdentity {
+            guard expectedIdentity.device == observedIdentity.device,
+                  expectedIdentity.inode == observedIdentity.inode,
+                  expectedIdentity.mode == observedIdentity.mode,
+                  expectedIdentity.owner == observedIdentity.owner,
+                  expectedIdentity.group == observedIdentity.group,
+                  expectedIdentity.linkCount == observedIdentity.linkCount else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.sourceIdentityMismatch,
+                    message: "Filesystem entry identity changed before protected capture"
+                )
+            }
         }
         let requestID = cancellation?.requestID ?? UUID()
         let request = ForgeFilesystemMutationRequest(
@@ -2981,8 +2998,9 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
             rootID: "\(UInt64(rootInformation.st_dev)):\(UInt64(rootInformation.st_ino))",
             rootIdentity: Self.identity(rootInformation),
             relativePathComponents: relativeComponents,
-            access: .deleteLeaf,
-            contract: .currentEntry
+            access: isDirectory ? .deleteEmptyDirectory : .deleteLeaf,
+            contract: expectedIdentity == nil ? .currentEntry : .namespaceVersionExact,
+            expectedLeafIdentity: expectedIdentity
         )
         if let errorCode = request.validationError() {
             return .failure(
@@ -3075,6 +3093,226 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         if callerCleanupRequired { result.payload["caller_cleanup_required"] = true }
         result.payload["committed"] = response.committed
         result.payload["durability_confirmed"] = response.durabilityConfirmed
+        return result
+    }
+
+    func moveEntry(
+        from sourceURL: URL,
+        to destinationURL: URL,
+        context: ToolInvocationContext?,
+        cancellation: ToolCallCancellation?,
+        recoveryLedger: SecureFilesystemRecoveryLedger,
+        authorityValidator: @Sendable (ToolInvocationContext) throws -> Void = { _ in }
+    ) throws -> ToolResult {
+        guard let context else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "Protected filesystem move requires a durable project context"
+            )
+        }
+        switch transport.serviceStatus() {
+        case .enabled:
+            break
+        case .requiresApproval:
+            return .failure(
+                code: ForgeFilesystemErrorCode.helperNotApproved,
+                message: "Secure filesystem service requires approval in System Settings",
+                retryable: true
+            )
+        case .notRegistered, .notFound:
+            return .failure(
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "Secure filesystem service is unavailable",
+                retryable: true
+            )
+        }
+        try cancellation?.checkCancellation()
+        let operationalProbe = transport.operationalProbe(
+            timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
+        )
+        guard operationalProbe.operational else {
+            return .failure(
+                code: operationalProbe.code,
+                message: operationalProbe.message,
+                retryable: operationalProbe.code == ForgeFilesystemErrorCode.helperUnavailable
+            )
+        }
+        let reconciliation = reconcileRecoveryLedger(
+            recoveryLedger: recoveryLedger,
+            cancellation: cancellation,
+            purgeTerminalReceipts: true
+        )
+        guard reconciliation.available else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "Protected filesystem recovery debt could not be verified"
+            )
+        }
+        guard reconciliation.retainedCount < SecureFilesystemRecoveryLedger.maximumRecords else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.protectedNamespaceUnavailable,
+                message: "Protected filesystem recovery is full; reconcile retained transactions before another mutation"
+            )
+        }
+        guard let source = Self.canonicalizedLeafPath(sourceURL.standardizedFileURL),
+              let destination = Self.canonicalizedLeafPath(destinationURL.standardizedFileURL),
+              source != destination else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "Filesystem move endpoints cannot be canonicalized"
+            )
+        }
+        let writableRoots = context.authorizationScope.writableRoots.compactMap {
+            Self.canonicalExistingDirectory($0)
+        }
+        .filter { Self.contains(source, root: $0) && Self.contains(destination, root: $0) }
+        .sorted { $0.pathComponents.count > $1.pathComponents.count }
+        guard let root = writableRoots.first,
+              source != root,
+              destination != root else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "One authorized writable project root must contain both move endpoints"
+            )
+        }
+        var sourceInformation = stat()
+        guard Darwin.lstat(source.path, &sourceInformation) == 0 else {
+            return .failure(code: "not_found", message: "Filesystem source does not exist")
+        }
+        let sourceIdentity = Self.identity(sourceInformation)
+        guard ForgeFilesystemRequesterPolicy.permitsEntryType(
+            mode: sourceIdentity.mode,
+            access: .moveEntry
+        ) else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "Filesystem source type cannot be moved securely"
+            )
+        }
+        var destinationInformation = stat()
+        guard Darwin.lstat(destination.path, &destinationInformation) != 0,
+              errno == ENOENT else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.versionConflict,
+                message: "Filesystem move does not overwrite an existing destination"
+            )
+        }
+        let sourceComponents = Array(source.pathComponents.dropFirst(root.pathComponents.count))
+        let destinationComponents = Array(
+            destination.pathComponents.dropFirst(root.pathComponents.count)
+        )
+        if sourceInformation.st_mode & S_IFMT == S_IFDIR,
+           destinationComponents.count > sourceComponents.count,
+           Array(destinationComponents.prefix(sourceComponents.count)) == sourceComponents {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "A directory cannot be moved below itself"
+            )
+        }
+        let rootDescriptor = Self.openPinnedDirectory(root)
+        guard rootDescriptor >= 0 else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "Authorized project root cannot be opened"
+            )
+        }
+        let rootHandle = FileHandle(fileDescriptor: rootDescriptor, closeOnDealloc: true)
+        defer { try? rootHandle.close() }
+        var rootInformation = stat()
+        guard Darwin.fstat(rootDescriptor, &rootInformation) == 0 else {
+            return .failure(
+                code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                message: "Authorized project root identity cannot be read"
+            )
+        }
+        let request = ForgeFilesystemMutationRequest(
+            requestID: (cancellation?.requestID ?? UUID()).uuidString.lowercased(),
+            transactionID: UUID().uuidString.lowercased(),
+            projectID: context.projectID.description,
+            projectGeneration: context.projectGeneration.rawValue,
+            rootID: "\(UInt64(rootInformation.st_dev)):\(UInt64(rootInformation.st_ino))",
+            rootIdentity: Self.identity(rootInformation),
+            relativePathComponents: sourceComponents,
+            destinationRelativePathComponents: destinationComponents,
+            access: .moveEntry,
+            contract: .namespaceVersionExact,
+            expectedLeafIdentity: sourceIdentity
+        )
+        if let errorCode = request.validationError() {
+            return .failure(code: errorCode, message: "Protected move request is invalid")
+        }
+        do {
+            try recoveryLedger.retain(
+                SecureFilesystemRecoveryRecord(
+                    request: request,
+                    originatingClientID: context.clientID,
+                    rootPath: root.path
+                ),
+                validatingCurrentAuthority: { try authorityValidator(context) }
+            )
+        } catch let error as ProjectContextError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            throw ToolCallDeadlineExceeded()
+        } catch {
+            return .failure(
+                code: ForgeFilesystemErrorCode.transactionUnavailable,
+                message: "Protected filesystem recovery authority could not be retained"
+            )
+        }
+        let response = transport.deleteLeaf(
+            request: request,
+            authorizedRoot: rootHandle,
+            timeout: min(60, max(0.001, cancellation?.remainingTimeInterval ?? 60))
+        )
+        guard Self.responseMatchesTransaction(
+            response,
+            transactionID: request.transactionID,
+            terminalRequiresAcknowledgement: true
+        ) else {
+            var result = ToolResult.failure(
+                code: ForgeFilesystemErrorCode.protocolMismatch,
+                message: "Secure filesystem service returned mismatched transaction identity"
+            )
+            result.payload["recovery_required"] = true
+            result.payload["filesystem_transaction_id"] = request.transactionID
+            return result
+        }
+        var callerCleanupRequired = false
+        if !response.acknowledgementRequired, response.recoveryTransactionID == nil {
+            do { _ = try recoveryLedger.remove(transactionID: request.transactionID) }
+            catch { callerCleanupRequired = true }
+        }
+        if response.ok {
+            var payload: [String: Any] = [
+                "source": source.path,
+                "destination": destination.path,
+                "moved": true,
+                "committed": response.committed,
+                "durability_confirmed": response.durabilityConfirmed,
+                "filesystem_transaction_id": response.recoveryTransactionID
+                    ?? request.transactionID,
+                "acknowledgement_required": response.acknowledgementRequired,
+            ]
+            if callerCleanupRequired { payload["caller_cleanup_required"] = true }
+            return .success(payload)
+        }
+        var result = ToolResult.failure(
+            code: response.code,
+            message: response.message,
+            retryable: response.code == ForgeFilesystemErrorCode.helperUnavailable
+                || response.code == ForgeFilesystemErrorCode.helperNotApproved
+        )
+        if let transactionID = response.recoveryTransactionID {
+            result.payload["recovery_required"] = true
+            result.payload["filesystem_transaction_id"] = transactionID
+        }
+        result.payload["acknowledgement_required"] = response.acknowledgementRequired
+        result.payload["committed"] = response.committed
+        result.payload["durability_confirmed"] = response.durabilityConfirmed
+        if callerCleanupRequired { result.payload["caller_cleanup_required"] = true }
         return result
     }
 

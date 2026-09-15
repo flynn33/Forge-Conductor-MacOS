@@ -17,8 +17,13 @@ protocol MCPTaskHTTPDispatching: Sendable {
     var sessionBindingSHA256: String { get }
     var expiresAt: Date { get }
     func toolDescriptorsJSON() throws -> Data
+    func permitsTool(named name: String) -> Bool
     func call(name: String, argumentsJSON: Data, identity: MCPTaskRequestIdentity,
               cancellation: ToolCallCancellation) async throws -> ToolResult
+}
+
+extension MCPTaskHTTPDispatching {
+    func permitsTool(named _: String) -> Bool { true }
 }
 
 /// Native calls are resolved from a durable accepted provider turn. Ordinary
@@ -202,7 +207,7 @@ final class MCPTaskHTTPService: @unchecked Sendable {
         try await performNative(credential: credential, cancellation: cancellation, prepare: { dispatcher, token in
             let resolved = try await dispatcher.resolveNativeProviderCall(reference: reference,
                 credential: credential, lease: lease, cancellation: token)
-            guard MCPNativeTaskSourceProfile.sourceToolNames.contains(resolved.toolName),
+            guard MCPNativeTaskSourceProfile.allSourceToolNames.contains(resolved.toolName),
                   !resolved.callID.isEmpty, resolved.callID.utf8.count <= 512,
                   !resolved.callID.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
                   let expiry = ISO8601.date(from: lease.expiresAt) else { throw NativeSourceConversationError.integrityFailure }
@@ -496,11 +501,18 @@ final class MCPTaskHTTPService: @unchecked Sendable {
         let name = params["name"] as? String
         var durableSourceSessionID: UUID?
         if method == "tools/call" {
-            guard let name, MCPNativeTaskSourceProfile.toolNames.contains(name),
+            guard let name, MCPNativeTaskSourceProfile.allToolNames.contains(name),
                   params["arguments"] == nil || params["arguments"] is [String: Any] else {
                 return .response(Self.rpcError(id: idJSON, code: -32602, message: "tool_not_allowed"))
             }
-            if MCPNativeTaskSourceProfile.sourceToolNames.contains(name) {
+            guard dispatcher.permitsTool(named: name) else {
+                return .response(Self.rpcError(
+                    id: idJSON,
+                    code: -32602,
+                    message: "tool_not_allowed"
+                ))
+            }
+            if MCPNativeTaskSourceProfile.allSourceToolNames.contains(name) {
                 guard let raw = request[header: "forge-source-session-id"], raw.utf8.count == 36,
                       let namespace = UUID(uuidString: raw), namespace.uuidString.lowercased() == raw else {
                     return .response(Self.rpcError(id: idJSON, code: -32602, message: "source_session_id_required"))
@@ -590,18 +602,37 @@ final class MCPTaskHTTPService: @unchecked Sendable {
 enum MCPTaskHTTPError: Error { case responseTooLarge }
 
 enum MCPNativeTaskSourceProfile {
-    static let sourceToolNames: Set<String> = ["fs_read", "session_checkpoint", "session_handoff"]
-    static let toolNames: Set<String> = ["fs_read", "session_checkpoint", "session_handoff",
-        "clu_capabilities", "clu_start_handoff", "clu_status", "clu_cancel"]
+    static let readOnlyFilesystemToolNames: Set<String> = ["fs_read"]
+    static let writableFilesystemToolNames: Set<String> = ["fs_read", "fs_write", "fs_edit"]
+    static let continuityToolNames: Set<String> = ["session_checkpoint", "session_handoff"]
+    static let controlToolNames: Set<String> = ["clu_capabilities", "clu_start_handoff", "clu_status", "clu_cancel"]
+    // Compatibility aliases for the original version-1 profile.
+    static let sourceToolNames = readOnlyFilesystemToolNames.union(continuityToolNames)
+    static let toolNames = sourceToolNames.union(controlToolNames)
+    static let allSourceToolNames = writableFilesystemToolNames.union(continuityToolNames)
+    static let allToolNames = allSourceToolNames.union(controlToolNames)
     static let stoppedToolNames: Set<String> = ["clu_capabilities", "clu_status", "clu_cancel"]
 
     /// Pure catalog conversion for local request preflight. The admitted method
     /// above additionally verifies the live task lease before exposing tools.
-    static func providerToolDefinitions(catalog: ToolDefinitionCatalog) throws -> [Data] {
-        let definitions = try catalog.providerToolDefinitions(allowedToolNames: sourceToolNames)
+    static func sourceToolNames(profileVersion: Int) throws -> Set<String> {
+        switch profileVersion {
+        case 1: sourceToolNames
+        case 2: writableFilesystemToolNames.union(continuityToolNames)
+        default: throw NativeTaskCapabilityError.unsupportedProfile
+        }
+    }
+
+    static func toolNames(profileVersion: Int) throws -> Set<String> {
+        try sourceToolNames(profileVersion: profileVersion).union(controlToolNames)
+    }
+
+    static func providerToolDefinitions(catalog: ToolDefinitionCatalog, profileVersion: Int = 1) throws -> [Data] {
+        let allowed = try sourceToolNames(profileVersion: profileVersion)
+        let definitions = try catalog.providerToolDefinitions(allowedToolNames: allowed)
         let names = try definitions.map { try JSONSupport.object(from: $0)["name"] as? String }
-        guard definitions.count == sourceToolNames.count,
-              Set(names.compactMap { $0 }) == sourceToolNames else { throw NativeTaskCapabilityError.unsupportedProfile }
+        guard definitions.count == allowed.count,
+              Set(names.compactMap { $0 }) == allowed else { throw NativeTaskCapabilityError.unsupportedProfile }
         return definitions
     }
 }

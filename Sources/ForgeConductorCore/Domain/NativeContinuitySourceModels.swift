@@ -10,6 +10,7 @@ struct NativeSourceRequestKey: Sendable, Equatable {
 }
 
 struct NativeSourceReadRequest: Sendable, Equatable {
+    static let supportedToolNames: Set<String> = ["fs_read", "fs_write", "fs_edit"]
     let key: NativeSourceRequestKey
     let toolName: String
     let canonicalArgumentsJSON: Data
@@ -17,13 +18,16 @@ struct NativeSourceReadRequest: Sendable, Equatable {
     let managerInstanceID: UUID
     let requestedDeadlineMilliseconds: Int?
     init(key: NativeSourceRequestKey, toolName: String, canonicalArgumentsJSON: Data, managerInstanceID: UUID) throws {
-        guard toolName == "fs_read", !canonicalArgumentsJSON.isEmpty, canonicalArgumentsJSON.count <= 16_384,
+        guard Self.supportedToolNames.contains(toolName), !canonicalArgumentsJSON.isEmpty, canonicalArgumentsJSON.count <= 16_384,
               let arguments = try JSONSerialization.jsonObject(with: canonicalArgumentsJSON) as? [String: Any],
               try ForgeJSONCanonicalizationV1.data(from: arguments) == canonicalArgumentsJSON else {
             throw NativeTaskCapabilityError.invalidRequest("source_read")
         }
         self.key = key; self.toolName = toolName; self.canonicalArgumentsJSON = canonicalArgumentsJSON
-        argumentsSHA256 = JSONSupport.sha256Hex(canonicalArgumentsJSON); self.managerInstanceID = managerInstanceID
+        // Include the method in durable identity so the same request id and
+        // arguments can never be replayed as a different filesystem effect.
+        argumentsSHA256 = JSONSupport.sha256Hex(Data("forge.native-source-filesystem.v1\0\(toolName)\0\(JSONSupport.sha256Hex(canonicalArgumentsJSON))".utf8))
+        self.managerInstanceID = managerInstanceID
         // Reject malformed deadlines before a durable call debit is reserved.
         requestedDeadlineMilliseconds = try ToolRouter.requestedDeadlineMilliseconds(in: arguments)
     }
@@ -31,6 +35,11 @@ struct NativeSourceReadRequest: Sendable, Equatable {
     func effectiveDeadlineMilliseconds(limits: NativeTaskSourceLimits) -> Int {
         min(requestedDeadlineMilliseconds ?? 30_000, limits.maximumRequestSeconds * 1_000)
     }
+
+    /// Capability-v7 databases classified this bounded ledger as `fs_read`.
+    /// Profile v2 retains that on-disk class while the domain-separated digest
+    /// and provider-call journal preserve the exact method and effect identity.
+    var storageMethod: String { "fs_read" }
 }
 
 /// Issued only after the durable debit transaction. The credential stays inside

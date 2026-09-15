@@ -1693,12 +1693,14 @@ private struct LMStudioResponsesPayload: Encodable {
     var previousResponseID: String?
     var input: [LMStudioEncodedInput]
     var tools: [LMStudioFunctionTool]
+    var toolChoice: String?
 
     private enum CodingKeys: String, CodingKey {
         case model, store, stream
         case maximumOutputTokens = "max_output_tokens"
         case previousResponseID = "previous_response_id"
         case input, tools
+        case toolChoice = "tool_choice"
     }
 }
 
@@ -1857,7 +1859,8 @@ public actor LMStudioRESTClient {
             idempotencyKey: "forge-provider-contract-probe-v1-" + JSONSupport.sha256Hex(
                 inventory.providerVersion + "\u{0}" + selected.key + "\u{0}" + instance.id
             ),
-            providerRequestID: nil
+            providerRequestID: nil,
+            toolChoice: "required"
         )
         guard contractTurn.previousResponseID == nil,
               contractTurn.status == "completed",
@@ -2109,7 +2112,7 @@ public actor LMStudioRESTClient {
     private func encodeResponse(
         model: String, previousResponseID: String?, input: [LMStudioEncodedInput],
         tools: [LMStudioFunctionTool], idempotencyKey: String,
-        providerRequestID: String?
+        providerRequestID: String?, toolChoice: String? = nil
     ) throws -> Data {
         guard tools.count <= 128 else {
             throw LMStudioProviderError.invalidConfiguration("tool count exceeds 128")
@@ -2130,12 +2133,16 @@ public actor LMStudioRESTClient {
                 providerRequestID, field: "provider request ID", maximumBytes: 1024
             )
         }
+        guard toolChoice == nil || toolChoice == "required" else {
+            throw LMStudioProviderError.invalidConfiguration("unsupported tool choice")
+        }
         let payload = LMStudioResponsesPayload(
             model: model,
             maximumOutputTokens: configuration.maximumOutputTokens,
             previousResponseID: previousResponseID,
             input: input,
-            tools: tools
+            tools: tools,
+            toolChoice: toolChoice
         )
         let body = try Self.responseEncoder().encode(payload)
         guard body.count <= configuration.maximumRequestBytes else {
@@ -2153,10 +2160,11 @@ public actor LMStudioRESTClient {
     private func performResponse(
         model: String, previousResponseID: String?, input: [LMStudioEncodedInput],
         tools: [LMStudioFunctionTool], idempotencyKey: String,
-        providerRequestID: String?
+        providerRequestID: String?, toolChoice: String? = nil
     ) async throws -> LMStudioResponseTurn {
         let body = try encodeResponse(model: model, previousResponseID: previousResponseID,
-            input: input, tools: tools, idempotencyKey: idempotencyKey, providerRequestID: providerRequestID)
+            input: input, tools: tools, idempotencyKey: idempotencyKey,
+            providerRequestID: providerRequestID, toolChoice: toolChoice)
         var request = URLRequest(url: try configuration.endpoint("v1/responses"))
         request.httpMethod = "POST"
         request.httpBody = body

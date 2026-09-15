@@ -1,5 +1,24 @@
 # Project generation reset isolation — SLICE-06 verification
 
+## Functional completion update — 2026-09-14
+
+Generation reset remains a fencing operation and still preserves durable
+content. The operator now captures the exact selected project, generation and
+operation before presenting confirmation; completion validates the receipt and
+refreshed project identity before replacing UI state, and a selection changed
+while the request runs is preserved.
+
+Separate selectable clearing modes now remove selected-project memory,
+continuity, both scopes together, or terminal run history. Each clear is pinned
+before cross-store work, replays its original receipt after interruption, and
+advances the generation once. Continuity clear removes checkpoint/handoff
+payloads from both project-memory and control-plane storage, strips retained
+run-history artifact references/result summaries, and keeps only bounded
+payload-free task, operation and ingress-key tombstones. Active work or an
+unsettled provider/tool effect refuses the transition. Focused reset/UI and
+five clearing tests cover replay, restart, project isolation and preserved
+settings/user-memory boundaries; no real user content was cleared.
+
 **Status:** behavior verified working — no source repair required. The service-boundary reset (`ManagerNode.resetProjectGeneration` → `ProjectContextService.beginReset`/`completeReset`) resets only the selected project: it advances that project's generation, invalidates its active work, and fences its client, while a second project's records, bindings, and generation remain untouched and persisted global settings are unchanged. The one uncovered isolation case (cross-project reset isolation at the service boundary) gained a focused regression.
 **Evidence class:** E1 (executed focused tests on this checkout against disposable fixtures).
 **Date:** 2026-09-12

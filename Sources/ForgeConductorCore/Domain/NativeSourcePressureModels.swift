@@ -81,7 +81,7 @@ struct NativeSourcePendingCallIdentity: Codable, Sendable, Equatable {
     let argumentsSHA256: String
     func validated() throws -> Self {
         try NativeSourcePressureValidation.require((0..<16).contains(ordinal)
-            && ["fs_read", "session_checkpoint", "session_handoff"].contains(toolName))
+            && MCPNativeTaskSourceProfile.allSourceToolNames.contains(toolName))
         try NativeSourcePressureValidation.identifier(providerCallID)
         try NativeSourcePressureValidation.hash(callSHA256)
         try NativeSourcePressureValidation.hash(argumentsSHA256)
@@ -266,7 +266,8 @@ struct NativeSourceProspectiveContext: Codable, Sendable {
                 && next.configurationRevision == source.configurationRevision
                 && next.configurationFingerprintSHA256 == source.configurationFingerprintSHA256
                 && next.serializedInputByteCount == serializedInputBytes)
-            try NativeSourcePressureValidation.require((requirement.kind == .readCeiling && observation.binding.pendingCall?.toolName == "fs_read")
+            try NativeSourcePressureValidation.require((requirement.kind == .readCeiling
+                    && observation.binding.pendingCall.map({ NativeSourceReadRequest.supportedToolNames.contains($0.toolName) }) == true)
                 || (requirement.kind == .preparedCheckpoint && observation.binding.pendingCall?.toolName == "session_checkpoint"))
         }
         // Numeric projection is recomputed by the pure evaluator and CP at commit.

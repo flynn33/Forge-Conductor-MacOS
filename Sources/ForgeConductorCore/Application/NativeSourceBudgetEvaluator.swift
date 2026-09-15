@@ -105,9 +105,10 @@ enum NativeSourceBudgetEvaluator {
         guard let resultTokenBytes = Int(exactly: bytesForResultTokens) else {
             throw NativeSourceConversationError.budgetExceeded
         }
-        let resultCap = min(call.toolName == "fs_read" ? 65_536 : 1_048_576,
+        let filesystem = NativeSourceReadRequest.supportedToolNames.contains(call.toolName)
+        let resultCap = min(filesystem ? 65_536 : 1_048_576,
             ceilings.tools.maxResultBytes, escapedHeadroom / CanonicalToolResultOutputBounds.maximumStringExpansion,
-            call.toolName == "fs_read" ? Int.max : resultTokenBytes)
+            filesystem ? Int.max : resultTokenBytes)
         return try .init(conversationID: call.reference.conversationID, stageID: call.reference.stageID,
             callOrdinal: call.reference.ordinal,
             configurationFingerprintSHA256: emptyOutputPreflight.configurationFingerprintSHA256,
@@ -370,7 +371,7 @@ extension NativeSourceBudgetEvaluator {
                 prospective: .init(projectedRetainedInputTokens: projected, serializedInputBytes: inputBytes,
                     outputRequirement: requirement, continuationPreflight: .init(next))))
             observation = measured
-            if call.toolName == "fs_read" {
+            if NativeSourceReadRequest.supportedToolNames.contains(call.toolName) {
                 let full = min(65_536, call.attachment.sourceLimits.maximumResultBytes,
                     call.attachment.setup.record.assignment.authorizationScope.maximumInlineOutputBytes,
                     inputs.ceilings.tools.maxResultBytes)

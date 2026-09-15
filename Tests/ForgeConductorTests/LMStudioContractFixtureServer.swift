@@ -327,6 +327,7 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
 
     private static func capabilityProbeRoute(_ request: [String: Any]) throws -> Route? {
         guard let tools = request["tools"] as? [[String: Any]],
+              request["tool_choice"] as? String == "required",
               tools.count == 1,
               let tool = tools.first,
               tool["type"] as? String == "function",

@@ -11,17 +11,23 @@ under **Unreleased** is not a new qualified release.
 
 ## [Unreleased]
 
-This is a 0.9.0 development snapshot, not a qualified release. Product version
-surfaces remain 0.9.0 build 1. P10/G10, filesystem E2, complete installed/native
-Settings and service qualification, Developer ID Release, manager-owned
-real-provider autonomous continuity, owner-deferred representative physical-
-hardware qualification, and current G09-G12 remain open and release-blocking.
-Provider settings now have native and manager save controls. Four native production
-onboarding scenarios passed; disposable Keychain tests also executed. Complete
-installed-stack and production-feature acceptance remain separate gates.
+This is a 0.9.0 development snapshot, not a public release. Product version
+surfaces remain 0.9.0 build 1. The current target is the functional development
+build: an optimized Apple Development-signed Release application and coherent
+hashed package. Developer ID Release, notarization/stapling, public-download
+acceptance and the broader physical-hardware/RAM-tier matrix are owner-deferred
+and non-blocking for this delivery; they are not recorded as passed. The current
+functional source, one production-adapter managed rollover, a canonical workspace
+Release build, coherent signed bundle and bounded isolated launch are complete.
+Privileged root-service E2, exact existing-desktop attachment, public distribution
+qualification and the owner-controlled source merge remain separate boundaries.
 
 ### Project tracking and verified baseline
 
+- Adopted the owner-authorized continuous functional-development workflow and
+  its development-signed acceptance scope while retaining protected merge,
+  publication, credential, working-installation, feature, isolation and
+  evidence boundaries.
 - Reconciled merged PR #46 and its post-merge synchronization receipt with a
   fresh local/remote `main` readback at `50d1821`. Recorded the current native
   host, toolchain, signing, provider, and hardware prerequisites without
@@ -35,6 +41,48 @@ installed-stack and production-feature acceptance remain separate gates.
 - Clarified that selected-project generation reset preserves durable records.
   Selectable memory/continuity clearing and remaining native/live integration
   qualification remain separately tracked.
+
+### Functional completion
+
+- Recovered a local startup failure caused by a completed store migration
+  manifest whose named historical backup was absent. The prior manifest and a
+  private pre-recovery home copy were retained; the matching migration receipt
+  and database integrity were checked before a new verified 6-to-8 backup was
+  created. The missing 5-to-6 recovery artifact is not represented as restored.
+- Corrected the filesystem qualification-isolation test to inspect only the
+  shipping app's native-target block after Xcode reordered sibling targets.
+  Its exclusion assertions remain in force. The post-edit full Swift run
+  completed 1,578 tests with 12 explicit skips and zero failures; native UI
+  automation timed out before test execution and remains separately unverified.
+- Restored coherent ordinary Xcode Release signing defaults for the app, Core
+  framework, manager/CLI, filesystem daemon and runtime launcher. SDK-specific
+  Apple Development overrides had silently displaced the displayed Developer ID
+  setting. Development-signed Release remains available through the explicit
+  team, identity and compiled trust-policy override.
+- Pinned project-reset confirmation to the immutable captured project identity,
+  generation and operation; validated receipts and refreshed status before UI
+  replacement while preserving a deliberately changed selection.
+- Added recoverable selected-project memory, continuity, combined and terminal
+  run-history clearing. Continuity clearing removes project-memory and
+  control-plane payload copies while retaining bounded payload-free anti-replay
+  identities; unsettled effects fail closed.
+- Added the writable native source profile without widening the compatible
+  read-only profile. `fs_write` and `fs_edit` retain the normal project and tool
+  authorization path, durable request identity and task isolation.
+- Routed production no-replacement move and bounded bottom-up recursive delete
+  through the separately signed filesystem service and its retained recovery
+  ledger. Focused protocol and adversarial tests pass; owner-approved root
+  service execution remains unmeasured.
+- Added capability 10 migration for the versioned writable native-source profile.
+  Provider capability probes now require a tool call in the encoded Responses
+  request, preventing a permissive model answer from masquerading as tool support.
+- Repaired source-fence identity capture to retain the observed filesystem link
+  count. The complete Swift suite then executed 1,578 tests with 11 explicit
+  environment/fixture skips and no failures.
+- Built the canonical workspace in optimized Release configuration with the
+  Apple Development identity and matching peer-trust compilation policy. The
+  app, framework, manager/CLI, runtime launcher and filesystem daemon passed the
+  `DevelopmentRelease` bundle checker and strict signature verification.
 
 ### Authorized handoff storage and admission
 
@@ -138,7 +186,8 @@ installed-stack and production-feature acceptance remain separate gates.
   automatic-handoff settings. Source transfer checks the original caller's durable
   scope; unsupported task mutation identity fails before activation.
 - Resumed status requires an authorized broker result and a provider turn consuming
-  its exact output. Public enrollment and full native/live acceptance remain open. See
+  its exact output. Existing-desktop attachment remains unsupported without an
+  authenticated host API. See
   [Continuity ingress](docs/CONTINUITY-INGRESS.md) for integration boundaries.
 
 ### Durable budget policy
@@ -426,14 +475,14 @@ installed-stack and production-feature acceptance remain separate gates.
   4,096-entry project-directory scan. Same-UID mutation of the owner-only
   recovery files or SQLite store remains outside this integrity boundary. A
   same-UID writer can also remove or coherently replace an intent, or inflate
-  the directory to deny the operator snapshot. Signed native UI execution is
-  still required before shipment.
+  the directory to deny the operator snapshot. The current development-signed
+  candidate has bounded native launch evidence; public shipment remains separate.
 - The project build entrypoint now builds and stages the manager CLI at
   `Contents/Helpers/forge-conductor`, signs it before the enclosing app, and
   performs strict signature verification of the CLI, runtime launcher,
   filesystem daemon, and app bundle. Source and focused product-path tests are
-  green; an exact current-source installed, signed bundle execution remains an
-  open qualification step.
+  green. The current-source development-signed bundle now passes coherent bundle,
+  isolated CLI and bounded direct-launch checks.
 
 ### Open qualification and security boundaries
 

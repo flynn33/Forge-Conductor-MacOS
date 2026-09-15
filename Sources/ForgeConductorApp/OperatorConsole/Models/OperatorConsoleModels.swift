@@ -177,16 +177,80 @@ struct OperatorProjectContinuity: Decodable, Sendable, Equatable {
 }
 
 struct OperatorResetReceipt: Decodable, Sendable, Equatable {
+    /// Present on the direct reset response. Historical nested project
+    /// projections omit the redundant project identity, so decoding remains
+    /// additive while callers at the mutation boundary require and validate it.
+    let projectID: String?
     let priorGeneration: UInt64
     let newGeneration: UInt64
     let invalidatedBindingCount: Int
     let completedAt: String?
 
     enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
         case priorGeneration = "prior_generation"
         case newGeneration = "new_generation"
         case invalidatedBindingCount = "invalidated_binding_count"
         case completedAt = "completed_at"
+    }
+}
+
+enum OperatorProjectContentClearMode: String, Codable, Sendable, CaseIterable, Identifiable {
+    case memory
+    case continuity
+    case memoryAndContinuity = "memory_and_continuity"
+    case runHistory = "run_history"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .memory: "Memory"
+        case .continuity: "Continuity"
+        case .memoryAndContinuity: "Memory and Continuity"
+        case .runHistory: "Completed Run History"
+        }
+    }
+
+    var effectDescription: String {
+        switch self {
+        case .memory:
+            "Removes user memory and derived retrieval entries. Continuity and run history remain."
+        case .continuity:
+            "Removes checkpoint and handoff content. User memory and run history remain."
+        case .memoryAndContinuity:
+            "Removes user memory plus checkpoint and handoff content in one recoverable operation."
+        case .runHistory:
+            "Removes completed run history. Active or unsettled work blocks this operation."
+        }
+    }
+}
+
+struct OperatorProjectContentClearReceipt: Decodable, Sendable, Equatable {
+    let operationID: String
+    let projectID: String
+    let mode: OperatorProjectContentClearMode
+    let priorGeneration: UInt64
+    let newGeneration: UInt64
+    let memoryRecordCount: Int
+    let continuityRecordCount: Int
+    let runHistoryCount: Int
+    let invalidatedBindingCount: Int
+    let completedAt: String
+    let replayed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operation_id"
+        case projectID = "project_id"
+        case mode
+        case priorGeneration = "prior_generation"
+        case newGeneration = "new_generation"
+        case memoryRecordCount = "memory_record_count"
+        case continuityRecordCount = "continuity_record_count"
+        case runHistoryCount = "run_history_count"
+        case invalidatedBindingCount = "invalidated_binding_count"
+        case completedAt = "completed_at"
+        case replayed
     }
 }
 

@@ -4,6 +4,13 @@ Product identity: marketing version **0.9.0**, build **1**. Xcode resolves those
 values from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime
 uses the matching constants in `ForgeFilesystemProtocolConstants`.
 
+The current [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
+uses optimized Release configuration with the documented Apple Development
+identity and matching `FORGE_DEVELOPMENT_SIGNING` peer policy. Production
+Developer ID defaults remain available for later public distribution; Developer
+ID, notarization/stapling and the broader physical-hardware matrix are
+owner-deferred and non-blocking for the current delivery.
+
 ## Open
 
 ```bash
@@ -35,18 +42,18 @@ filesystem daemon; it does not synthesize the Xcode framework layout.
 ```bash
 cd /path/to/Forge-Conductor-MacOS
 
-xcodebuild -project ForgeConductor.xcodeproj \
+xcodebuild -workspace ForgeConductor.xcworkspace \
   -scheme ForgeConductor \
   -destination 'platform=macOS,arch=arm64' \
   build
 
-xcodebuild -project ForgeConductor.xcodeproj \
+xcodebuild -workspace ForgeConductor.xcworkspace \
   -scheme ForgeConductor \
   -destination 'platform=macOS,arch=arm64' \
   -only-testing:ForgeConductorTests \
   test
 
-xcodebuild -project ForgeConductor.xcodeproj \
+xcodebuild -workspace ForgeConductor.xcworkspace \
   -scheme ForgeConductorAppTests \
   -destination 'platform=macOS,arch=arm64' \
   -only-testing:ForgeConductorAppTests \
@@ -59,7 +66,7 @@ contracts without changing the main scheme. The `ForgeConductorUITests` target l
 foregrounds the real app, so run it only when the Mac's screen is available:
 
 ```bash
-xcodebuild -project ForgeConductor.xcodeproj \
+xcodebuild -workspace ForgeConductor.xcworkspace \
   -scheme ForgeConductor \
   -destination 'platform=macOS,arch=arm64' \
   -only-testing:ForgeConductorUITests \
@@ -79,27 +86,35 @@ Mac16,7 with 48 GiB physical memory, Xcode 26.6 build 17F113, and Apple Swift
 6.3.3. Release settings still resolve version 0.9.0, build 1, Developer ID
 Application, and team `2Y25RTLZET`. The keychain exposed a usable Apple
 Development identity but no Developer ID Application identity, and no approved
-notarization profile was identified. This is host inventory only; it is not a
-signed build, hardware matrix, archive, or notarization result.
+notarization profile was identified. Those distribution prerequisites are
+owner-deferred for the functional development build. This is host inventory
+only; it is not a signed build or hardware-matrix result.
 
 For a local optimized build signed with James Daley's Apple Development
 certificate, select the signing identity and compiled peer-trust policy
 together:
 
 ```bash
-xcodebuild -project ForgeConductor.xcodeproj \
+xcodebuild -workspace ForgeConductor.xcworkspace \
   -scheme ForgeConductor \
   -configuration Release \
   -destination 'platform=macOS,arch=arm64' \
   DEVELOPMENT_TEAM=9AQ2C2838M \
   CODE_SIGN_IDENTITY='Apple Development' \
-  SWIFT_ACTIVE_COMPILATION_CONDITIONS=FORGE_DEVELOPMENT_SIGNING \
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) FORGE_DEVELOPMENT_SIGNING' \
   build
 
 ./.forge-codex/scripts/check_privileged_filesystem_bundle.sh \
   '/path/to/Build/Products/Release/Forge Conductor.app' \
   DevelopmentRelease
 ```
+
+The ordinary workspace Release settings now resolve Developer ID Application
+and team `2Y25RTLZET` for all five shipping targets. This explicit development
+invocation resolves Apple Development and team `9AQ2C2838M` for the app and its
+dependencies. A previously present SDK-specific identity override made the
+ordinary Release setting resolve to Apple Development despite the displayed
+Developer ID value; that mismatch has been removed.
 
 Omitting `FORGE_DEVELOPMENT_SIGNING` from an Apple Development-signed Release
 build intentionally fails the exact installer or peer-identity checks. The
@@ -111,15 +126,20 @@ Do not set `CODE_SIGN_IDENTITY[sdk=macosx*] = -` on the app target: that forces
 ad-hoc signing and Notary/App Store reject the archive as missing Hardened Runtime.
 
 An earlier exact-revision focused signed Debug navigation qualification completed
-100 Rig/MCP round trips. That is useful supporting native UI evidence, but the
-final current-source rerun remains open and it is not a Developer ID Release,
-archive, notarization, staple, Gatekeeper, protected-service lifecycle, or full
-native UI matrix pass. Those release checks remain open.
+100 Rig/MCP round trips. The functional-development candidate also completed a
+bounded direct launch from its isolated Release product. A current app-hosted
+gauge attempt could not activate a display link because the test environment
+reported zero valid displays; that result is unexecuted, not a product pass or
+failure. Developer ID Release, archive, notarization, staple, Gatekeeper,
+privileged root-service E2, and the broader native UI/hardware matrix are not
+required by this development-delivery scope and are not recorded as passed.
 
-Package P10/G10, filesystem E2, production move/recursive-directory deletion,
-the complete installed/native provider, Settings and service matrix,
-manager-owned real-provider forced rollover, representative physical hardware,
-and final G09-G12 completion evidence remain open. All four native production
+The functional-development candidate now includes production move/recursive-
+directory deletion, one manager-owned real-provider forced rollover, the complete
+1,578-test Swift regression, and a coherent development-signed workspace Release.
+Filesystem root-service E2, exact existing-desktop attachment, representative
+physical hardware and public-distribution qualification remain outside the proven
+scope. All four native production
 onboarding scenarios passed, including folder authorization, provider save and
 discovery, manager replacement and Settings shell disable/re-enable with fresh
 MCP processes. The initial September 4 SwiftPM baseline executed 1,001 tests in
@@ -132,10 +152,9 @@ defaults and migration, explicit opt-out and denial, `tools/list`, established
 replacement. Its raw CLI also passes `version`, `status`, and `doctor` with the
 adjacent signed launcher. That installed-app run deliberately omits System
 Events and remains partial; the separate Xcode onboarding run covers native
-Settings control and post-Settings re-enable. These focused results do not satisfy
-the still-open Developer ID Release, complete installed/native matrix, or P10
-boundaries. A successful Xcode build or focused test does not mark those items
-complete.
+Settings control and post-Settings re-enable. These results support the functional
+development build; they do not claim Developer ID, notarization, universal
+installation, privileged root-service E2, or public shipment.
 
 The SwiftPM convenience bundle includes the Core resource bundle under
 `Contents/Resources`, shared by the app and embedded CLI. Agent and telemetry

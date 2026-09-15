@@ -340,6 +340,12 @@ public final class ForgeFilesystemServiceInfo: NSObject, NSSecureCoding, @unchec
 
 public enum ForgeFilesystemAccess: Int {
     case deleteLeaf = 1
+    /// Additive access used only for an empty directory entry. Older helpers
+    /// reject this raw value without changing delete-leaf behavior.
+    case deleteEmptyDirectory = 2
+    /// Additive same-volume, no-overwrite rename inside one authorized root.
+    /// Older helpers reject this raw value without changing delete behavior.
+    case moveEntry = 3
 }
 
 public enum ForgeFilesystemErrorCode {
@@ -454,6 +460,19 @@ public enum ForgeFilesystemRequesterPolicy {
         let type = mode & UInt32(S_IFMT)
         return type == UInt32(S_IFREG) || type == UInt32(S_IFLNK)
     }
+
+    public static func permitsEntryType(mode: UInt32, access: ForgeFilesystemAccess) -> Bool {
+        if access == .deleteEmptyDirectory {
+            return mode & UInt32(S_IFMT) == UInt32(S_IFDIR)
+        }
+        if access == .moveEntry {
+            let type = mode & UInt32(S_IFMT)
+            return type == UInt32(S_IFREG)
+                || type == UInt32(S_IFLNK)
+                || type == UInt32(S_IFDIR)
+        }
+        return permitsLeafType(mode: mode)
+    }
 }
 
 /// Bounded deterministic open addressing for protected project bindings.
@@ -542,6 +561,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
     public let rootID: String
     public let rootIdentity: ForgeFilesystemIdentity
     public let relativePathComponents: [String]
+    public let destinationRelativePathComponents: [String]?
     public let accessRawValue: Int
     public let contractRawValue: Int
     public let expectedLeafIdentity: ForgeFilesystemIdentity?
@@ -556,6 +576,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         rootID: String,
         rootIdentity: ForgeFilesystemIdentity,
         relativePathComponents: [String],
+        destinationRelativePathComponents: [String]? = nil,
         access: ForgeFilesystemAccess,
         contract: ForgeFilesystemOperationContract,
         expectedLeafIdentity: ForgeFilesystemIdentity? = nil
@@ -568,6 +589,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         self.rootID = rootID
         self.rootIdentity = rootIdentity
         self.relativePathComponents = relativePathComponents
+        self.destinationRelativePathComponents = destinationRelativePathComponents
         accessRawValue = access.rawValue
         contractRawValue = contract.rawValue
         self.expectedLeafIdentity = expectedLeafIdentity
@@ -580,6 +602,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
             rootID: rootID,
             rootIdentity: rootIdentity,
             relativePathComponents: relativePathComponents,
+            destinationRelativePathComponents: destinationRelativePathComponents,
             accessRawValue: access.rawValue,
             contractRawValue: contract.rawValue,
             expectedLeafIdentity: expectedLeafIdentity
@@ -616,6 +639,10 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         self.rootID = rootID
         self.rootIdentity = rootIdentity
         relativePathComponents = components
+        destinationRelativePathComponents = coder.decodeObject(
+            of: [NSArray.self, NSString.self],
+            forKey: "destination_relative_components"
+        ) as? [String]
         accessRawValue = coder.decodeInteger(forKey: "access")
         contractRawValue = coder.decodeInteger(forKey: "operation_contract")
         expectedLeafIdentity = coder.decodeObject(
@@ -636,6 +663,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         coder.encode(rootID, forKey: "root_id")
         coder.encode(rootIdentity, forKey: "root_identity")
         coder.encode(relativePathComponents, forKey: "relative_components")
+        coder.encode(destinationRelativePathComponents, forKey: "destination_relative_components")
         coder.encode(accessRawValue, forKey: "access")
         coder.encode(contractRawValue, forKey: "operation_contract")
         coder.encode(expectedLeafIdentity, forKey: "expected_leaf_identity")
@@ -659,7 +687,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
               UUID(uuidString: projectID) != nil,
               projectGeneration > 0,
               projectGeneration <= UInt64(Int64.max),
-              access == .deleteLeaf,
+              let access,
               contract != nil,
               !rootID.isEmpty,
               rootID.utf8.count <= 128 else {
@@ -672,8 +700,8 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
             }
         case .namespaceVersionExact, .contentVersionExact:
             guard let expectedLeafIdentity,
-                  ForgeFilesystemRequesterPolicy.permitsLeafType(
-                      mode: expectedLeafIdentity.mode
+                  ForgeFilesystemRequesterPolicy.permitsEntryType(
+                      mode: expectedLeafIdentity.mode, access: access
                   ) else {
                 return ForgeFilesystemErrorCode.invalidRequest
             }
@@ -685,6 +713,19 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
               relativePathComponents.allSatisfy(Self.validRelativeComponent) else {
             return ForgeFilesystemErrorCode.invalidRequest
         }
+        if access == .moveEntry {
+            guard let destinationRelativePathComponents,
+                  !destinationRelativePathComponents.isEmpty,
+                  destinationRelativePathComponents.count
+                    <= ForgeFilesystemProtocolConstants.maximumRelativeComponents,
+                  destinationRelativePathComponents.allSatisfy(Self.validRelativeComponent),
+                  destinationRelativePathComponents != relativePathComponents,
+                  expectedLeafIdentity != nil else {
+                return ForgeFilesystemErrorCode.invalidRequest
+            }
+        } else if destinationRelativePathComponents != nil {
+            return ForgeFilesystemErrorCode.invalidRequest
+        }
         guard requestDigestSHA256 == Self.calculateRequestDigest(
             protocolVersion: protocolVersion,
             requestID: requestID,
@@ -694,6 +735,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
             rootID: rootID,
             rootIdentity: rootIdentity,
             relativePathComponents: relativePathComponents,
+            destinationRelativePathComponents: destinationRelativePathComponents,
             accessRawValue: accessRawValue,
             contractRawValue: contractRawValue,
             expectedLeafIdentity: expectedLeafIdentity
@@ -731,6 +773,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         let rootID: String
         let rootIdentity: DigestIdentity
         let relativePathComponents: [String]
+        let destinationRelativePathComponents: [String]?
         let accessRawValue: Int
         let contractRawValue: Int
         let expectedLeafIdentity: DigestIdentity?
@@ -745,6 +788,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
         rootID: String,
         rootIdentity: ForgeFilesystemIdentity,
         relativePathComponents: [String],
+        destinationRelativePathComponents: [String]?,
         accessRawValue: Int,
         contractRawValue: Int,
         expectedLeafIdentity: ForgeFilesystemIdentity?
@@ -760,6 +804,7 @@ public final class ForgeFilesystemMutationRequest: NSObject, NSSecureCoding, @un
             rootID: rootID,
             rootIdentity: DigestIdentity(rootIdentity),
             relativePathComponents: relativePathComponents,
+            destinationRelativePathComponents: destinationRelativePathComponents,
             accessRawValue: accessRawValue,
             contractRawValue: contractRawValue,
             expectedLeafIdentity: expectedLeafIdentity.map(DigestIdentity.init)

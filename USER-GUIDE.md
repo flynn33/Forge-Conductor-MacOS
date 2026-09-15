@@ -3,15 +3,22 @@
 Version **0.9.0**, build **1**. This guide is for operators who run Forge Conductor with
 [LM Studio](https://lmstudio.ai) on macOS.
 
+The current delivery target is the [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md):
+an optimized Release application signed with the available Apple Development
+identity. Developer ID distribution, notarization/stapling, public-download
+acceptance and the broader physical-hardware/RAM-tier matrix are owner-deferred
+and non-blocking for this delivery. They are not recorded as passed, and all
+functional product requirements remain in scope.
+
 ## Current status
 
 | Implemented and test-backed in this source | Still open or deferred before shipment |
 |---------------------------------|----------------------------------------|
 | The CLI reports 0.9.0; runtime constants, Xcode settings, and the built app bundle report 0.9.0 build 1. | Signed distinct-process filesystem E2 and recovery qualification. |
-| Native app surfaces build; an earlier exact-revision Apple Development-signed 100-cycle Rig/MCP navigation result remains supporting evidence. | Final current-source navigation/action rerun, Developer ID Release, full native/settings/service lifecycle, archive, notarization, staple, and Gatekeeper validation. |
+| The current Apple Development-signed Release bundle is coherent and passed isolated CLI checks plus a bounded direct GUI launch; an earlier 100-cycle Rig/MCP navigation result remains supporting evidence. | Developer ID Release, full public-distribution UI/service matrix, archive, notarization, staple, and Gatekeeper validation are owner-deferred. |
 | Project memory, durable jobs and telemetry have regression coverage. Four native onboarding scenarios passed, including Settings shell disable/re-enable with fresh MCP processes. The shipping handoff records exact evidence and installed shell/manager checks. | Complete installed/native service matrix, Developer ID Release, and exact P10 production qualification. |
-| Durable continuity state, provider receipt storage, successor/fencing models, and tool-effect reconciliation are implemented. | Manager-owned threshold-forced real-provider rollover, exact successor acknowledgment, automatic continuation, GUI-closed operation, and durable crash recovery. |
-| Protected regular-file/symlink deletion has protocol-v5 capture and recovery machinery. | Production `fs_move`, recursive directory `fs_delete`, signed distinct-process filesystem E2, and recovery qualification. |
+| Durable continuity state, provider receipt storage, successor/fencing models and tool-effect reconciliation are implemented; one manager-owned real-provider rollover completed exact acknowledgment, successor work, GUI-closed recovery and stable replay. | A second live attempt exceeded the provider deadline and is not a repeat pass; exact existing-desktop attachment remains unsupported without a host API. |
+| Protected regular-file, symbolic-link, empty-directory, no-replacement move and bounded recursive-delete operations have protocol-v5 capture and recovery machinery. | Signed distinct-process filesystem E2 and recovery qualification remain unmeasured pending owner-approved service execution. |
 | Provider controls save endpoint/model settings and Keychain credential changes through the manager. Native onboarding and disposable Keychain tests have executed. | Final installed-stack and complete provider/autonomy production acceptance. |
 | Package P10/G10 evidence remains available for qualification review. | Package P10/G10 and current G09-G12 remain open; representative physical-hardware qualification is owner-deferred. |
 
@@ -409,9 +416,9 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 
 - Forge will not open a new LM Studio window or tab.
 - Forge will not compact the current chat’s token window.
-- The current checkpoint does not yet qualify manager-owned autonomous
-  succession. A directly invoked provider-adapter test is not a substitute for
-  the required forced-rollover scenario.
+- One manager-owned autonomous succession completed with the real loopback LM
+  Studio provider. Deterministic tests cover repeated rollover; the second live
+  attempt timed out during long prompt processing and is not counted as a pass.
 - An interrupted protected deletion can retain a recovery handle and prevent
   new mutations on that protected volume. Path absence alone is not a successful
   delete receipt. Preserve the recovery identifier; do not remove protected
@@ -420,14 +427,16 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 - Protected filesystem capture and quarantine mitigate known destructive-path
   races but do not eliminate them. E2 remains mandatory until the signed
   distinct-process 57-case matrix and formal predicates pass. Production
-  `fs_move` and recursive directory `fs_delete` are unavailable until their
-  additive signed-helper protocols are implemented and qualified.
+  `fs_move` refuses replacement and crosses neither an authorized root nor a
+  volume; recursive directory `fs_delete` commits bounded bottom-up helper
+  transactions. Their focused protocol/adversarial tests pass, while approved
+  root-service execution remains unmeasured on this host.
 - Configure the managed provider using Provider controls and test the saved
   connection before starting Autonomy. Four native onboarding scenarios passed;
   complete installed-stack and provider/autonomy qualification remain open.
-- Current G09-G12, the full installed/native service matrix, Developer ID Release,
-  real-provider continuity, and owner-deferred representative physical-hardware
-  gates remain open; this guide is not a ship authorization.
+- Developer ID Release, public-distribution qualification, exact existing-desktop
+  attachment, privileged root-service E2 and the representative physical-hardware
+  matrix remain unproved or owner-deferred; this guide is not a ship authorization.
 - `/Applications/Forge Conductor.app` is not updated by `install` if the OS refuses the overwrite. Check **version** on the binary LM Studio actually spawns.
 - `forge-conductor install` from the CLI may stage a **CLI** binary inside `~/.forge-conductor/Forge Conductor.app`. That bundle is not a substitute for the SwiftUI GUI in `dist/` or a proper app-bundle install.
 - Read-only tools can list most of your home directory. Treat that as a real permission, not a sandbox.
@@ -435,6 +444,16 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
 ---
 
 ## 13. Troubleshooting
+
+**Bootstrap failed: migration backup verification**
+
+Do not delete a migration manifest, replace a backup with the current database,
+or loosen file permissions to force startup. A completed manifest may refer to
+a historical backup that is no longer present. Preserve the Forge home first;
+check database integrity, schema version, and the exact migration receipt on a
+disposable copy before any recovery. A newer verified backup cannot restore the
+missing historical version. The CLI's `status` and `doctor` commands can confirm
+startup after the recovery record is reconciled.
 
 **MCP never starts / 60s timeout**  
 The registered `command` is not a `serve` binary, or stdout is being buffered (0.5+ unbuffers it). Run:

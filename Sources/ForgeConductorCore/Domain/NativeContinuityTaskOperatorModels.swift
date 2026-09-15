@@ -91,8 +91,13 @@ public struct NativeContinuityTaskApproval: Sendable, Equatable {
             maximumCalls: NativeTaskOperatorWire.integer(limits, "maximum_calls", range: 1...64),
             maximumResultBytes: NativeTaskOperatorWire.integer(limits, "maximum_result_bytes", range: 1...65_536),
             maximumRequestSeconds: NativeTaskOperatorWire.integer(limits, "maximum_request_seconds", range: 1...60))
-        // Reject unsupported approval instead of silently narrowing it.
-        guard filesystemAccess == "read_only", !networkAllowed, Set(allowedTools) == ["fs_read"] else {
+        // Reject unsupported approval instead of silently narrowing it. The
+        // enclosing preparation request binds either shape to an exact profile
+        // version, so an approval cannot be reinterpreted after signing.
+        let tools = Set(allowedTools)
+        guard !networkAllowed,
+              (filesystemAccess == "read_only" && tools == ["fs_read"]
+                || filesystemAccess == "read_write" && tools == ["fs_read", "fs_write", "fs_edit"]) else {
             throw NativeTaskOperatorError.invalidRequest("approval_scope")
         }
     }
@@ -153,9 +158,14 @@ public struct NativeContinuityTaskPreparationRequest: Sendable, Equatable {
         projectGeneration = ProjectGeneration(UInt64(try NativeTaskOperatorWire.integer(arguments, "project_generation", range: 1...Int.max)))
         profileID = try NativeTaskOperatorWire.string(arguments, "profile_id", maximum: 64)
         profileVersion = try NativeTaskOperatorWire.integer(arguments, "profile_version", range: 1...Int.max)
-        guard profileID == "forge.native-task-source", profileVersion == 1,
+        guard profileID == "forge.native-task-source", (1...2).contains(profileVersion),
               let value = arguments["approval"] as? [String: Any] else { throw NativeTaskOperatorError.invalidRequest("profile") }
         approval = try NativeContinuityTaskApproval(arguments: value)
+        let expectedTools: Set<String> = profileVersion == 1 ? ["fs_read"] : ["fs_read", "fs_write", "fs_edit"]
+        let expectedAccess = profileVersion == 1 ? "read_only" : "read_write"
+        guard approval.filesystemAccess == expectedAccess, Set(approval.allowedTools) == expectedTools else {
+            throw NativeTaskOperatorError.invalidRequest("profile")
+        }
         verifierSHA256 = try NativeTaskOperatorWire.hash(arguments, "verifier_sha256")
         expiresAt = try NativeTaskOperatorWire.date(arguments, "expires_at")
         canonicalRequestJSON = try NativeTaskOperatorWire.canonical(arguments, maximumBytes: Self.maximumBodyBytes)

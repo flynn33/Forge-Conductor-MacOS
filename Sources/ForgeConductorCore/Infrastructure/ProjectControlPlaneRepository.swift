@@ -166,6 +166,7 @@ public actor ProjectControlPlaneRepository {
     static let maximumContinuityTaskAuthorizations = 1_024
     static let maximumActiveContinuityTasksPerProject = 128
     static let maximumContinuityIngressAcceptances = 1_024
+    static let maximumContinuityAuthorityTombstones = 32_768
 
     public let databaseURL: URL
 
@@ -1296,9 +1297,12 @@ public actor ProjectControlPlaneRepository {
         try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
             let project = try requiredActiveProjectUnlocked(request.projectID, generation: request.projectGeneration, connection: connection)
             let a = request.approval, scope = approvedAssignment.authorizationScope
-            guard request.profileID == "forge.native-task-source", request.profileVersion == 1,
-                  scope.canonicalRoots == [project.canonicalRoot], scope.writableRoots.isEmpty,
-                  !scope.networkAllowed, scope.allowedTools == ["fs_read"],
+            let expectedTools: Set<String> = request.profileVersion == 1
+                ? ["fs_read"] : ["fs_read", "fs_write", "fs_edit"]
+            let expectedWritableRoots = request.profileVersion == 1 ? [] : [project.canonicalRoot]
+            guard request.profileID == "forge.native-task-source", (1...2).contains(request.profileVersion),
+                  scope.canonicalRoots == [project.canonicalRoot], scope.writableRoots == expectedWritableRoots,
+                  !scope.networkAllowed, scope.allowedTools == expectedTools,
                   scope.maximumInlineOutputBytes == a.maximumInlineOutputBytes,
                   approvedAssignment.assignmentID == a.assignmentID, approvedAssignment.assignmentBytes == a.assignmentBytes,
                   approvedAssignment.mission == a.mission, approvedAssignment.providerID == a.providerID,
@@ -1336,11 +1340,12 @@ public actor ProjectControlPlaneRepository {
                 callerContext: context, callerOwner: owner, connection: connection)
             let scopeSHA = JSONSupport.sha256Hex(Data(try Self.scopeJSON(scope).utf8))
             try connection.execute("""
-                INSERT INTO native_task_capabilities(capability_id,task_id,project_id,project_generation,epoch,state,verifier_sha256,
+                INSERT INTO native_task_capabilities(capability_id,task_id,project_id,project_generation,profile_version,epoch,state,verifier_sha256,
                     caller_binding_id,source_binding_id,approval_sha256,scope_sha256,authorization_sha256,document_sha256,
-                    source_limits_json,expires_at,issued_at,revoked_at) VALUES(?,?,?,?,1,'active',?,?,?,?,?,?,?,?,?,?,NULL)
+                    source_limits_json,expires_at,issued_at,revoked_at) VALUES(?,?,?,?,?,1,'active',?,?,?,?,?,?,?,?,?,?,NULL)
                 """, bindings: [.text(request.capabilityID.uuidString.lowercased()), .text(request.taskID.uuidString.lowercased()),
-                    .text(request.projectID.description), .int64(try Self.sqliteGeneration(request.projectGeneration)), .text(request.verifierSHA256),
+                    .text(request.projectID.description), .int64(try Self.sqliteGeneration(request.projectGeneration)),
+                    .int64(Int64(request.profileVersion)), .text(request.verifierSHA256),
                     .text(callerID.uuidString.lowercased()), .text(setup.record.authorization.sourceBindingID.uuidString.lowercased()),
                     .text(approvedAssignment.assignmentSHA256), .text(scopeSHA), .text(setup.correlation.authorizationSHA256),
                     .text(approvedAssignment.documentSHA256), .text(String(decoding: try ForgeJSONCanonicalizationV1.data(from: a.sourceLimits.wireObject), as: UTF8.self)),
@@ -1407,6 +1412,7 @@ public actor ProjectControlPlaneRepository {
 
     private struct StoredNativeCapability {
         let capabilityID: UUID, taskID: UUID, projectID: ProjectID, generation: ProjectGeneration
+        let profileVersion: Int
         let epoch: Int64, state: String, verifierSHA256: String?
         let callerBindingID: UUID, sourceBindingID: UUID
         let approvalSHA256: String, scopeSHA256: String, authorizationSHA256: String, documentSHA256: String
@@ -1415,7 +1421,7 @@ public actor ProjectControlPlaneRepository {
             try .init(arguments: ["task_id": taskID.uuidString.lowercased(), "capability_id": capabilityID.uuidString.lowercased(),
                 "project_id": projectID.description, "project_generation": generation.rawValue, "epoch": epoch,
                 "state": state == "revoked" ? "revoked" : (expiresAt <= ISO8601.string(from: now) ? "expired" : "active"),
-                "profile_id": "forge.native-task-source", "profile_version": 1, "approval_sha256": approvalSHA256,
+                "profile_id": "forge.native-task-source", "profile_version": profileVersion, "approval_sha256": approvalSHA256,
                 "scope_sha256": scopeSHA256, "original_caller_binding_id": callerBindingID.uuidString.lowercased(),
                 "source_binding_id": sourceBindingID.uuidString.lowercased(), "expires_at": expiresAt, "issued_at": issuedAt,
                 "revoked_at": revokedAt as Any? ?? NSNull()])
@@ -1424,30 +1430,30 @@ public actor ProjectControlPlaneRepository {
 
     private func nativeCapabilityUnlocked(_ id: UUID, connection: ControlPlaneSQLiteConnection) throws -> StoredNativeCapability? {
         try connection.first("""
-            SELECT capability_id,task_id,project_id,project_generation,epoch,state,verifier_sha256,caller_binding_id,source_binding_id,
+            SELECT capability_id,task_id,project_id,project_generation,profile_version,epoch,state,verifier_sha256,caller_binding_id,source_binding_id,
                 approval_sha256,scope_sha256,authorization_sha256,document_sha256,source_limits_json,expires_at,issued_at,revoked_at
             FROM native_task_capabilities WHERE capability_id=?
             """, bindings: [.text(id.uuidString.lowercased())]) { row in
-                guard row.int64(3) > 0, row.int64(4) > 0,
-                      let state = try row.strictText(5, maximumBytes: 16), ["active","revoked"].contains(state),
-                      let limitsJSON = try row.strictText(13, maximumBytes: 512) else { throw NativeTaskCapabilityError.integrityFailure }
+                guard row.int64(3) > 0, (1...2).contains(row.int64(4)), row.int64(5) > 0,
+                      let state = try row.strictText(6, maximumBytes: 16), ["active","revoked"].contains(state),
+                      let limitsJSON = try row.strictText(14, maximumBytes: 512) else { throw NativeTaskCapabilityError.integrityFailure }
                 let limits = try JSONDecoder().decode(NativeTaskSourceLimits.self, from: Data(limitsJSON.utf8))
                 guard try ForgeJSONCanonicalizationV1.data(from: limits.wireObject) == Data(limitsJSON.utf8) else { throw NativeTaskCapabilityError.integrityFailure }
-                let verifier = try row.strictText(6, maximumBytes: 64), revoked = try row.strictText(16, maximumBytes: 20)
+                let verifier = try row.strictText(7, maximumBytes: 64), revoked = try row.strictText(17, maximumBytes: 20)
                 guard (state == "active") == (verifier != nil), (state == "revoked") == (revoked != nil) else { throw NativeTaskCapabilityError.integrityFailure }
                 if let verifier { _ = try NativeTaskValue.sha(verifier) }; if let revoked { _ = try NativeTaskValue.date(revoked) }
                 return .init(capabilityID: try NativeTaskValue.uuid(row.strictText(0, maximumBytes: 36)),
                     taskID: try NativeTaskValue.uuid(row.strictText(1, maximumBytes: 36)),
                     projectID: ProjectID(try NativeTaskValue.uuid(row.strictText(2, maximumBytes: 36))), generation: .init(UInt64(row.int64(3))),
-                    epoch: row.int64(4), state: state, verifierSHA256: verifier,
-                    callerBindingID: try NativeTaskValue.uuid(row.strictText(7, maximumBytes: 36)),
-                    sourceBindingID: try NativeTaskValue.uuid(row.strictText(8, maximumBytes: 36)),
-                    approvalSHA256: try NativeTaskValue.sha(row.strictText(9, maximumBytes: 64)),
-                    scopeSHA256: try NativeTaskValue.sha(row.strictText(10, maximumBytes: 64)),
-                    authorizationSHA256: try NativeTaskValue.sha(row.strictText(11, maximumBytes: 64)),
-                    documentSHA256: try NativeTaskValue.sha(row.strictText(12, maximumBytes: 64)), limits: limits,
-                    expiresAt: try NativeTaskValue.date(row.strictText(14, maximumBytes: 20)),
-                    issuedAt: try NativeTaskValue.date(row.strictText(15, maximumBytes: 20)), revokedAt: revoked)
+                    profileVersion: Int(row.int64(4)), epoch: row.int64(5), state: state, verifierSHA256: verifier,
+                    callerBindingID: try NativeTaskValue.uuid(row.strictText(8, maximumBytes: 36)),
+                    sourceBindingID: try NativeTaskValue.uuid(row.strictText(9, maximumBytes: 36)),
+                    approvalSHA256: try NativeTaskValue.sha(row.strictText(10, maximumBytes: 64)),
+                    scopeSHA256: try NativeTaskValue.sha(row.strictText(11, maximumBytes: 64)),
+                    authorizationSHA256: try NativeTaskValue.sha(row.strictText(12, maximumBytes: 64)),
+                    documentSHA256: try NativeTaskValue.sha(row.strictText(13, maximumBytes: 64)), limits: limits,
+                    expiresAt: try NativeTaskValue.date(row.strictText(15, maximumBytes: 20)),
+                    issuedAt: try NativeTaskValue.date(row.strictText(16, maximumBytes: 20)), revokedAt: revoked)
             }
     }
 
@@ -1488,7 +1494,8 @@ public actor ProjectControlPlaneRepository {
             let caller = try bindingUnlocked(owner: .init(kind: .mcpClient, id: ownerID), includeInactive: false, connection: connection),
             caller.bindingID == c.callerBindingID, caller.projectID == projectID, caller.projectGeneration == generation, caller.runID == nil,
             JSONSupport.sha256Hex(Data(try Self.scopeJSON(caller.authorizationScope).utf8)) == c.scopeSHA256,
-            caller.authorizationScope.allowedTools == ["fs_read"], caller.authorizationScope.writableRoots.isEmpty,
+            caller.authorizationScope.allowedTools == (c.profileVersion == 1 ? ["fs_read"] : ["fs_read", "fs_write", "fs_edit"]),
+            caller.authorizationScope.writableRoots == (c.profileVersion == 1 ? [] : caller.authorizationScope.canonicalRoots),
             !caller.authorizationScope.networkAllowed,
             try connection.scalarInt("""
                 SELECT COUNT(*) FROM continuity_task_authorizations WHERE task_id=? AND project_id=? AND project_generation=?
@@ -1951,7 +1958,7 @@ public actor ProjectControlPlaneRepository {
             }
             try requireSourceMutationAdmissionUnlocked(a.setup.record.authorization, connection: connection)
             guard c.state == .idle, c.active == nil else { throw c.state == .sourceFenced ? NativeSourceConversationError.sourceFenced : .conflict }
-            let names: Set<String> = ["fs_read","session_checkpoint","session_handoff"]
+            let names = try MCPNativeTaskSourceProfile.sourceToolNames(profileVersion: a.descriptor.profileVersion)
             let expected = try ToolDefinitionCatalog.production(toolNames: names.sorted()).providerToolDefinitions(allowedToolNames: names)
             guard tools == expected else { throw NativeSourceConversationError.invalidRequest("source_catalog") }
             let kind = c.parent == nil ? "root" : "user_continuation"
@@ -2121,7 +2128,7 @@ public actor ProjectControlPlaneRepository {
         let requirement: NativeSourceToolOutputRequirement
         let checkpoint: PreparedContinuitySourceCommit?
         switch call.toolName {
-        case "fs_read":
+        case "fs_read", "fs_write", "fs_edit":
             let full = min(65_536, call.attachment.sourceLimits.maximumResultBytes,
                 call.attachment.setup.record.authorization.authorizationScope.maximumInlineOutputBytes,
                 policySelection.policy.tools.maxResultBytes, call.prepared.frozenCeilings?.tools.maxResultBytes ?? Int.max)
@@ -3268,8 +3275,8 @@ public actor ProjectControlPlaneRepository {
         let call = turn.toolCalls[ordinal]
         guard !call.callID.isEmpty, call.callID.utf8.count <= 512,
               !call.callID.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
-              ["fs_read","session_checkpoint","session_handoff"].contains(call.name),
-              call.argumentsJSON.count <= (call.name == "fs_read" ? 16_384 : 262_144),
+              MCPNativeTaskSourceProfile.allSourceToolNames.contains(call.name),
+              call.argumentsJSON.count <= (NativeSourceReadRequest.supportedToolNames.contains(call.name) ? 16_384 : 262_144),
               let arguments = try JSONSerialization.jsonObject(with: call.argumentsJSON) as? [String: Any] else {
             throw NativeSourceConversationError.invalidRequest("provider tool call")
         }
@@ -4019,14 +4026,16 @@ public actor ProjectControlPlaneRepository {
         nativeScope: NativeSourceExecutionScope?, cancellation: ToolCallCancellation? = nil) throws -> NativeSourceReadAdmissionResult {
         try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
             let attachment = try nativeSourceAttachmentUnlocked(correlation, context: context, owner: owner, nativeScope: nativeScope, connection: connection)
-            try nativeScopeAdmission(nativeScope, key: request.key, method: request.toolName, argumentsSHA: request.argumentsSHA256,
+            try nativeScopeAdmission(nativeScope, key: request.key, method: request.toolName,
+                argumentsSHA: JSONSupport.sha256Hex(request.canonicalArgumentsJSON),
                 managerID: request.managerInstanceID, connection: connection)
             let authorization = attachment.setup.record.authorization
             try requireSourceMutationAdmissionUnlocked(authorization, connection: connection)
             try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: authorization)
             let currentTime = ISO8601.string(from: clock.now())
             if let row = try nativeSourceRowUnlocked(key: request.key, connection: connection) {
-                try validateNativeSourceRow(row, attachment: attachment, method: request.toolName, argumentSHA: request.argumentsSHA256)
+                try validateNativeSourceRow(row, attachment: attachment, method: request.storageMethod,
+                    argumentSHA: request.argumentsSHA256)
                 if row.state == "completed" {
                     return .completed(try nativeReadReceiptUnlocked(row, limits: attachment.sourceLimits,
                         authorization: authorization, policy: policySelection, connection: connection))
@@ -4056,7 +4065,7 @@ public actor ProjectControlPlaneRepository {
             let deadline = min(expires, ISO8601.string(from: clock.now().addingTimeInterval(duration)))
             guard deadline > currentTime else { throw ToolCallDeadlineExceeded() }
             let id = UUID()
-            try insertNativeSourceRequestUnlocked(id: id, key: request.key, method: request.toolName, argumentsSHA: request.argumentsSHA256,
+            try insertNativeSourceRequestUnlocked(id: id, key: request.key, method: request.storageMethod, argumentsSHA: request.argumentsSHA256,
                 managerID: request.managerInstanceID, attachment: attachment, policy: policySelection, deadline: deadline,
                 chargedCalls: charged + 1, prepared: nil, connection: connection)
             try nativeScopeReservation(nativeScope, reservationID: id, connection: connection)
@@ -4069,7 +4078,8 @@ public actor ProjectControlPlaneRepository {
         try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
             let attachment = try nativeSourceAttachmentUnlocked(admission.correlation, context: admission.correlation.callerContext,
                 owner: admission.correlation.callerOwner, nativeScope: nativeScope, connection: connection)
-            try nativeScopeAdmission(nativeScope, key: admission.request.key, method: "fs_read", argumentsSHA: admission.request.argumentsSHA256,
+            try nativeScopeAdmission(nativeScope, key: admission.request.key, method: admission.request.toolName,
+                argumentsSHA: JSONSupport.sha256Hex(admission.request.canonicalArgumentsJSON),
                 managerID: admission.request.managerInstanceID, connection: connection)
             try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
             try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: attachment.setup.record.authorization)
@@ -4104,7 +4114,8 @@ public actor ProjectControlPlaneRepository {
         return try controlledTransaction(cancellation: cancellation, fullDurability: true) { connection in
             let attachment = try nativeSourceAttachmentUnlocked(admission.correlation, context: admission.correlation.callerContext,
                 owner: admission.correlation.callerOwner, nativeScope: nativeScope, connection: connection)
-            try nativeScopeAdmission(nativeScope, key: admission.request.key, method: "fs_read", argumentsSHA: admission.request.argumentsSHA256,
+            try nativeScopeAdmission(nativeScope, key: admission.request.key, method: admission.request.toolName,
+                argumentsSHA: JSONSupport.sha256Hex(admission.request.canonicalArgumentsJSON),
                 managerID: admission.request.managerInstanceID, connection: connection)
             try requireSourceMutationAdmissionUnlocked(attachment.setup.record.authorization, connection: connection)
             let row = try requireNativeReadAdmissionUnlocked(admission, attachment: attachment, connection: connection)
@@ -4502,7 +4513,8 @@ public actor ProjectControlPlaneRepository {
         guard let row = try nativeSourceRowUnlocked(key: admission.request.key, connection: connection),
               row.id == admission.reservationID, row.managerID == admission.request.managerInstanceID,
               row.deadline == admission.deadline, row.chargedCalls == admission.chargedCalls else { throw NativeTaskCapabilityError.requestConflict }
-        try validateNativeSourceRow(row, attachment: attachment, method: "fs_read", argumentSHA: admission.request.argumentsSHA256)
+        try validateNativeSourceRow(row, attachment: attachment, method: admission.request.storageMethod,
+            argumentSHA: admission.request.argumentsSHA256)
         return row
     }
     private func nativeReadResultBounds(_ bytes: Data, limits: NativeTaskSourceLimits,
@@ -4605,6 +4617,12 @@ public actor ProjectControlPlaneRepository {
                 try retainSourceDispatchOriginUnlocked(taskID: taskID, caller: caller, timestamp: timestamp, existingTask: true, connection: connection)
                 return AuthorizedContinuityTaskSetup(record: current,
                     correlation: try .nativeSetupResult(record: current, caller: caller, context: callerContext))
+            }
+            guard try connection.scalarInt(
+                "SELECT COUNT(*) FROM continuity_authority_tombstones WHERE kind='task' AND identity=?",
+                bindings: [.text(taskID.uuidString.lowercased())]
+            ) == 0 else {
+                throw ContinuityTaskAuthorizationError.revoked
             }
             guard try connection.scalarInt("SELECT COUNT(*) FROM continuity_task_authorizations") < Self.maximumContinuityTaskAuthorizations,
                   try connection.scalarInt("SELECT COUNT(*) FROM continuity_task_authorizations WHERE project_id=? AND state='active'",
@@ -5098,6 +5116,12 @@ public actor ProjectControlPlaneRepository {
         }
         try requireContinuityOperationNotCancelledUnlocked(operationID, connection: connection)
         try ContinuityIngressAcceptanceReceipt.validatePolicy(policySelection, authorization: source.authorization)
+        guard try connection.scalarInt(
+            "SELECT COUNT(*) FROM continuity_authority_tombstones WHERE (kind='operation' AND identity=?) OR (kind='ingress_key' AND identity=?)",
+            bindings: [.text(operationID.uuidString.lowercased()), .text(identity.keySHA256)]
+        ) == 0 else {
+            throw ContinuityIngressError.invalidated
+        }
         if let existing = try continuityIngressAcceptanceUnlocked(operationID: operationID,
             keySHA256: identity.keySHA256, connection: connection) {
             guard existing.operationID == operationID, existing.keySHA256 == identity.keySHA256,
@@ -6300,6 +6324,609 @@ public actor ProjectControlPlaneRepository {
                 }
                 throw ProjectContextError.resetNotPrepared(projectID)
             }
+        }
+    }
+
+    public func projectContentClearOperation(
+        operationID: UUID
+    ) throws -> ProjectContentClearOperation? {
+        try projectContentClearOperationUnlocked(
+            operationID: operationID,
+            connection: requiredConnection()
+        )
+    }
+
+    /// Durably pins the destructive request before any project-local content is
+    /// removed. Only quiescent projects enter the transition; active or uncertain
+    /// work remains intact and blocks the clear instead of being guessed terminal.
+    public func prepareProjectContentClear(
+        _ request: ProjectContentClearRequest,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectContentClearOperation {
+        try cancellation?.checkCancellation()
+        try Self.validate(request.expectedGeneration)
+        guard request.expectedGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectContextError.invalidGeneration(request.expectedGeneration.rawValue)
+        }
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            if let existing = try projectContentClearOperationUnlocked(
+                operationID: request.operationID,
+                connection: connection
+            ) {
+                guard existing.request == request else {
+                    throw ProjectContextError.projectTransitionConflict(request.projectID)
+                }
+                return existing
+            }
+            guard try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM project_content_clear_operations
+                WHERE project_id=? AND state='prepared'
+                """,
+                bindings: [.text(request.projectID.description)]
+            ) == 0 else {
+                throw ProjectContextError.projectTransitionConflict(request.projectID)
+            }
+            _ = try requiredActiveProjectUnlocked(
+                request.projectID,
+                generation: request.expectedGeneration,
+                connection: connection
+            )
+            let activeRuns = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM autonomous_runs
+                WHERE project_id=? AND state NOT IN ('completed','cancelled','failed_terminal')
+                """,
+                bindings: [.text(request.projectID.description)]
+            )
+            let activeJobs = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM execution_jobs
+                WHERE project_id=? AND state NOT IN
+                    ('completed','failed','timed_out','cancelled','quarantined_stale')
+                """,
+                bindings: [.text(request.projectID.description)]
+            )
+            let unsettledContinuityEffects = try connection.scalarInt(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM native_source_provider_turns
+                     WHERE conversation_id IN (
+                        SELECT conversation_id FROM native_source_conversations
+                        WHERE project_id=? AND project_generation=?
+                     ) AND state IN ('submitted','outcome_unknown'))
+                  + (SELECT COUNT(*) FROM native_source_requests
+                     WHERE task_id IN (
+                        SELECT task_id FROM continuity_task_authorizations
+                        WHERE project_id=? AND project_generation=?
+                     ) AND state IN ('admitted','executing','pending'))
+                  + (SELECT COUNT(*) FROM provider_turns
+                     WHERE project_id=? AND project_generation=?
+                       AND state IN ('submitted','streaming','ambiguous','retry_wait'))
+                  + (SELECT COUNT(*) FROM tool_invocations
+                     WHERE project_id=? AND project_generation=?
+                       AND state IN ('executing','ambiguous'))
+                """,
+                bindings: [
+                    .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                    .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                    .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                    .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                ]
+            )
+            guard activeRuns == 0, activeJobs == 0,
+                  !request.mode.clearsContinuity || unsettledContinuityEffects == 0 else {
+                throw ProjectContextError.projectTransitionConflict(request.projectID)
+            }
+
+            let timestamp = ISO8601.string(from: clock.now())
+            let changed = try connection.execute(
+                """
+                UPDATE control_projects SET lifecycle_state='resetting',updated_at=?
+                WHERE project_id=? AND generation=? AND lifecycle_state='active'
+                """,
+                bindings: [
+                    .text(timestamp), .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                ]
+            )
+            guard changed == 1 else {
+                throw ProjectContextError.projectTransitionConflict(request.projectID)
+            }
+            try revokeContinuityTasksUnlocked(
+                projectID: request.projectID,
+                generation: request.expectedGeneration,
+                taskID: nil,
+                timestamp: timestamp,
+                connection: connection
+            )
+            try connection.execute(
+                """
+                INSERT INTO project_content_clear_operations(
+                    operation_id,project_id,prior_generation,new_generation,mode,state,
+                    memory_record_count,continuity_record_count,run_history_count,
+                    invalidated_binding_count,created_at,updated_at,completed_at
+                ) VALUES(?,?,?,?,?,'prepared',0,0,0,0,?,?,NULL)
+                """,
+                bindings: [
+                    .text(request.operationID.uuidString.lowercased()),
+                    .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                    .int64(try Self.sqliteGeneration(ProjectGeneration(
+                        request.expectedGeneration.rawValue + 1
+                    ))),
+                    .text(request.mode.rawValue), .text(timestamp), .text(timestamp),
+                ]
+            )
+            guard let prepared = try projectContentClearOperationUnlocked(
+                operationID: request.operationID,
+                connection: connection
+            ) else {
+                throw ProjectContextError.databaseFailure(
+                    "project content clear preparation could not be read back"
+                )
+            }
+            return prepared
+        }
+    }
+
+    public func completeProjectContentClear(
+        operationID: UUID,
+        projectMemoryReceipt: ProjectMemoryContentClearReceipt,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectContentClearReceipt {
+        try cancellation?.checkCancellation()
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            guard let operation = try projectContentClearOperationUnlocked(
+                operationID: operationID,
+                connection: connection
+            ) else {
+                throw ProjectContextError.invalidIdentifier(
+                    "project content clear operation"
+                )
+            }
+            if let receipt = operation.receipt {
+                return ProjectContentClearReceipt(
+                    operationID: receipt.operationID,
+                    projectID: receipt.projectID,
+                    mode: receipt.mode,
+                    priorGeneration: receipt.priorGeneration,
+                    newGeneration: receipt.newGeneration,
+                    memoryRecordCount: receipt.memoryRecordCount,
+                    continuityRecordCount: receipt.continuityRecordCount,
+                    runHistoryCount: receipt.runHistoryCount,
+                    invalidatedBindingCount: receipt.invalidatedBindingCount,
+                    completedAt: receipt.completedAt,
+                    replayed: true
+                )
+            }
+            let request = operation.request
+            guard projectMemoryReceipt.operationID == operationID,
+                  projectMemoryReceipt.projectID.caseInsensitiveCompare(
+                    request.projectID.description
+                  ) == .orderedSame,
+                  projectMemoryReceipt.mode == request.mode,
+                  projectMemoryReceipt.memoryRecordCount >= 0,
+                  projectMemoryReceipt.continuityRecordCount >= 0 else {
+                throw ProjectContextError.projectTransitionConflict(request.projectID)
+            }
+            guard let project = try projectUnlocked(request.projectID, connection: connection),
+                  project.generation == request.expectedGeneration,
+                  project.lifecycleState == .resetting else {
+                throw ProjectContextError.projectTransitionConflict(request.projectID)
+            }
+
+            var runHistoryCount = 0
+            if request.mode == .runHistory {
+                let project = request.projectID.description
+                let terminal = "('completed','cancelled','failed_terminal')"
+                try connection.execute(
+                    "DELETE FROM autonomy_events WHERE project_id=? AND run_id IN (SELECT run_id FROM autonomous_runs WHERE project_id=? AND state IN \(terminal))",
+                    bindings: [.text(project), .text(project)]
+                )
+                try connection.execute(
+                    "DELETE FROM native_source_provider_run_offsets WHERE run_id IN (SELECT run_id FROM autonomous_runs WHERE project_id=? AND state IN \(terminal))",
+                    bindings: [.text(project)]
+                )
+                try connection.execute(
+                    "DELETE FROM native_source_run_offsets WHERE run_id IN (SELECT run_id FROM autonomous_runs WHERE project_id=? AND state IN \(terminal))",
+                    bindings: [.text(project)]
+                )
+                try connection.execute(
+                    "DELETE FROM execution_jobs WHERE project_id=? AND run_id IN (SELECT run_id FROM autonomous_runs WHERE project_id=? AND state IN \(terminal))",
+                    bindings: [.text(project), .text(project)]
+                )
+                runHistoryCount = try connection.scalarInt(
+                    "SELECT COUNT(*) FROM autonomous_runs WHERE project_id=? AND state IN \(terminal)",
+                    bindings: [.text(project)]
+                )
+                try connection.execute(
+                    "DELETE FROM autonomous_runs WHERE project_id=? AND state IN \(terminal)",
+                    bindings: [.text(project)]
+                )
+            }
+
+            var continuityRecordCount = projectMemoryReceipt.continuityRecordCount
+            if request.mode.clearsContinuity {
+                let controlPlaneCount = try clearContinuityControlPlanePayloadsUnlocked(
+                    projectID: request.projectID,
+                    generation: request.expectedGeneration,
+                    timestamp: ISO8601.string(from: clock.now()),
+                    connection: connection
+                )
+                let sum = continuityRecordCount.addingReportingOverflow(controlPlaneCount)
+                guard !sum.overflow else {
+                    throw ProjectContextError.databaseFailure(
+                        "project continuity clear count overflowed"
+                    )
+                }
+                continuityRecordCount = sum.partialValue
+            }
+
+            let timestamp = ISO8601.string(from: clock.now())
+            let invalidated = try connection.execute(
+                """
+                UPDATE project_bindings
+                SET active=0,lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+                WHERE project_id=? AND project_generation=? AND active=1
+                """,
+                bindings: [
+                    .text(timestamp), .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                ]
+            )
+            let next = ProjectGeneration(request.expectedGeneration.rawValue + 1)
+            let advanced = try connection.execute(
+                """
+                UPDATE control_projects SET generation=?,lifecycle_state='active',updated_at=?
+                WHERE project_id=? AND generation=? AND lifecycle_state='resetting'
+                """,
+                bindings: [
+                    .int64(try Self.sqliteGeneration(next)), .text(timestamp),
+                    .text(request.projectID.description),
+                    .int64(try Self.sqliteGeneration(request.expectedGeneration)),
+                ]
+            )
+            guard advanced == 1 else {
+                throw ProjectContextError.databaseFailure(
+                    "project content clear generation compare-and-set failed"
+                )
+            }
+            let completed = try connection.execute(
+                """
+                UPDATE project_content_clear_operations
+                SET state='committed',memory_record_count=?,continuity_record_count=?,
+                    run_history_count=?,invalidated_binding_count=?,updated_at=?,completed_at=?
+                WHERE operation_id=? AND project_id=? AND state='prepared'
+                """,
+                bindings: [
+                    .int64(Int64(projectMemoryReceipt.memoryRecordCount)),
+                    .int64(Int64(continuityRecordCount)),
+                    .int64(Int64(runHistoryCount)), .int64(Int64(invalidated)),
+                    .text(timestamp), .text(timestamp),
+                    .text(operationID.uuidString.lowercased()),
+                    .text(request.projectID.description),
+                ]
+            )
+            guard completed == 1 else {
+                throw ProjectContextError.databaseFailure(
+                    "project content clear receipt commit failed"
+                )
+            }
+            try appendEventUnlocked(
+                projectID: request.projectID,
+                eventType: "project_content_cleared",
+                severity: "info",
+                summary: "Selected project content was cleared",
+                metadata: [
+                    "operation_id": operationID.uuidString.lowercased(),
+                    "mode": request.mode.rawValue,
+                    "prior_generation": String(request.expectedGeneration.rawValue),
+                    "new_generation": String(next.rawValue),
+                    "memory_records": String(projectMemoryReceipt.memoryRecordCount),
+                    "continuity_records": String(projectMemoryReceipt.continuityRecordCount),
+                    "run_history": String(runHistoryCount),
+                ],
+                connection: connection
+            )
+            guard let receipt = try projectContentClearOperationUnlocked(
+                operationID: operationID,
+                connection: connection
+            )?.receipt else {
+                throw ProjectContextError.databaseFailure(
+                    "project content clear receipt could not be read back"
+                )
+            }
+            return receipt
+        }
+    }
+
+    /// Removes model-retrievable continuity payloads after all selected-project
+    /// work is terminal and every effect is reconciled. Compact identities and
+    /// digests survive in a bounded tombstone ledger so cleared operations and
+    /// task credentials can never be admitted again.
+    private func clearContinuityControlPlanePayloadsUnlocked(
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        timestamp: String,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> Int {
+        let project = projectID.description
+        let sqliteGeneration = try Self.sqliteGeneration(generation)
+        let bindings: [ControlPlaneSQLiteBinding] = [
+            .text(project), .int64(sqliteGeneration),
+        ]
+        let newTombstones = try connection.scalarInt(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM continuity_task_authorizations
+                 WHERE project_id=? AND project_generation=?
+                   AND NOT EXISTS (
+                       SELECT 1 FROM continuity_authority_tombstones t
+                       WHERE t.kind='task' AND t.identity=continuity_task_authorizations.task_id
+                   ))
+              + (SELECT COUNT(*) FROM continuity_ingress_acceptances
+                 WHERE project_id=? AND project_generation=?
+                   AND NOT EXISTS (
+                       SELECT 1 FROM continuity_authority_tombstones t
+                       WHERE t.kind='operation' AND t.identity=continuity_ingress_acceptances.operation_id
+                   ))
+              + (SELECT COUNT(*) FROM continuity_ingress_acceptances
+                 WHERE project_id=? AND project_generation=?
+                   AND NOT EXISTS (
+                       SELECT 1 FROM continuity_authority_tombstones t
+                       WHERE t.kind='ingress_key' AND t.identity=continuity_ingress_acceptances.key_sha256
+                   ))
+            """,
+            bindings: bindings + bindings + bindings
+        )
+        let retainedTombstones = try connection.scalarInt(
+            "SELECT COUNT(*) FROM continuity_authority_tombstones"
+        )
+        guard retainedTombstones <= Self.maximumContinuityAuthorityTombstones - newTombstones else {
+            throw ProjectContextError.databaseFailure(
+                "continuity authority tombstone capacity is exhausted"
+            )
+        }
+        try connection.execute(
+            """
+            INSERT OR IGNORE INTO continuity_authority_tombstones(
+                kind,identity,project_id,project_generation,retained_at
+            ) SELECT 'task',task_id,project_id,project_generation,?
+              FROM continuity_task_authorizations
+              WHERE project_id=? AND project_generation=?
+            """,
+            bindings: [.text(timestamp)] + bindings
+        )
+        try connection.execute(
+            """
+            INSERT OR IGNORE INTO continuity_authority_tombstones(
+                kind,identity,project_id,project_generation,retained_at
+            ) SELECT 'operation',operation_id,project_id,project_generation,?
+              FROM continuity_ingress_acceptances
+              WHERE project_id=? AND project_generation=?
+            """,
+            bindings: [.text(timestamp)] + bindings
+        )
+        try connection.execute(
+            """
+            INSERT OR IGNORE INTO continuity_authority_tombstones(
+                kind,identity,project_id,project_generation,retained_at
+            ) SELECT 'ingress_key',key_sha256,project_id,project_generation,?
+              FROM continuity_ingress_acceptances
+              WHERE project_id=? AND project_generation=?
+            """,
+            bindings: [.text(timestamp)] + bindings
+        )
+
+        var removed = 0
+        func record(_ count: Int) throws {
+            let sum = removed.addingReportingOverflow(count)
+            guard !sum.overflow else {
+                throw ProjectContextError.databaseFailure(
+                    "project continuity clear count overflowed"
+                )
+            }
+            removed = sum.partialValue
+        }
+        let taskPredicate = "SELECT task_id FROM continuity_task_authorizations WHERE project_id=? AND project_generation=?"
+        let operationPredicate = "SELECT operation_id FROM continuity_ingress_acceptances WHERE project_id=? AND project_generation=?"
+        let conversationPredicate = "SELECT conversation_id FROM native_source_conversations WHERE project_id=? AND project_generation=?"
+
+        try record(try connection.execute(
+            "DELETE FROM native_source_provider_calls WHERE conversation_id IN (\(conversationPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_source_capability_checks WHERE conversation_id IN (\(conversationPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_source_provider_turns WHERE conversation_id IN (\(conversationPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_source_provider_run_offsets WHERE task_id IN (\(taskPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_source_conversations WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_task_commands WHERE capability_id IN (SELECT capability_id FROM native_task_capabilities WHERE project_id=? AND project_generation=?)",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_source_requests WHERE task_id IN (\(taskPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_source_run_offsets WHERE task_id IN (\(taskPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM native_task_capabilities WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+
+        try record(try connection.execute(
+            "DELETE FROM continuity_bootstrap_provider_results WHERE grant_id IN (SELECT grant_id FROM continuity_bootstrap_grants WHERE operation_id IN (\(operationPredicate)))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_bootstrap_retrieval_proofs WHERE grant_id IN (SELECT grant_id FROM continuity_bootstrap_grants WHERE operation_id IN (\(operationPredicate)))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_bootstrap_grants WHERE operation_id IN (\(operationPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_explicit_start_requests WHERE task_id IN (\(taskPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_explicit_start_permits WHERE operation_id IN (\(operationPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_source_activations WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_operation_cancellations WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_source_task_fences WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_source_dispatch_origins WHERE task_id IN (\(taskPredicate))",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_ingress_holds WHERE operation_id IN (\(operationPredicate))",
+            bindings: bindings
+        ))
+
+        // Terminal run history retains state and immutable digests, but no
+        // checkpoint result summary or external payload-artifact reference.
+        try record(try connection.execute(
+            """
+            UPDATE tool_invocations
+            SET arguments_artifact_id=NULL,result_artifact_id=NULL,result_summary=NULL
+            WHERE project_id=? AND project_generation=?
+              AND (arguments_artifact_id IS NOT NULL OR result_artifact_id IS NOT NULL OR result_summary IS NOT NULL)
+            """,
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            """
+            UPDATE provider_turns
+            SET request_artifact_id=NULL,result_artifact_id=NULL
+            WHERE project_id=? AND project_generation=?
+              AND (request_artifact_id IS NOT NULL OR result_artifact_id IS NOT NULL)
+            """,
+            bindings: bindings
+        ))
+
+        try record(try connection.execute(
+            "DELETE FROM continuity_ingress_acceptances WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+        try record(try connection.execute(
+            "DELETE FROM continuity_task_authorizations WHERE project_id=? AND project_generation=?",
+            bindings: bindings
+        ))
+        return removed
+    }
+
+    private func projectContentClearOperationUnlocked(
+        operationID: UUID,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> ProjectContentClearOperation? {
+        try connection.first(
+            """
+            SELECT operation_id,project_id,prior_generation,new_generation,mode,state,
+                   memory_record_count,continuity_record_count,run_history_count,
+                   invalidated_binding_count,created_at,updated_at,completed_at
+            FROM project_content_clear_operations WHERE operation_id=? LIMIT 1
+            """,
+            bindings: [.text(operationID.uuidString.lowercased())]
+        ) { row in
+            guard let operationValue = row.text(0),
+                  let storedOperationID = UUID(uuidString: operationValue),
+                  storedOperationID == operationID,
+                  let projectValue = row.text(1),
+                  let projectUUID = UUID(uuidString: projectValue),
+                  row.int64(2) > 0,
+                  row.int64(3) == row.int64(2) + 1,
+                  let modeValue = row.text(4),
+                  let mode = ProjectContentClearMode(rawValue: modeValue),
+                  let stateValue = row.text(5),
+                  let state = ProjectContentClearState(rawValue: stateValue),
+                  let createdAt = row.text(10), ISO8601.date(from: createdAt) != nil,
+                  let updatedAt = row.text(11), ISO8601.date(from: updatedAt) != nil else {
+                throw ProjectContextError.integrityFailure(
+                    "project content clear operation is malformed"
+                )
+            }
+            let counts = (row.int64(6), row.int64(7), row.int64(8), row.int64(9))
+            guard counts.0 >= 0, counts.1 >= 0, counts.2 >= 0, counts.3 >= 0,
+                  counts.0 <= Int64(Int.max), counts.1 <= Int64(Int.max),
+                  counts.2 <= Int64(Int.max), counts.3 <= Int64(Int.max) else {
+                throw ProjectContextError.integrityFailure(
+                    "project content clear counts are invalid"
+                )
+            }
+            let request = ProjectContentClearRequest(
+                operationID: storedOperationID,
+                projectID: ProjectID(projectUUID),
+                expectedGeneration: ProjectGeneration(UInt64(row.int64(2))),
+                mode: mode
+            )
+            let completedAt = row.text(12)
+            let receipt: ProjectContentClearReceipt?
+            if state == .committed {
+                guard let completedAt, ISO8601.date(from: completedAt) != nil else {
+                    throw ProjectContextError.integrityFailure(
+                        "committed project content clear lacks a timestamp"
+                    )
+                }
+                receipt = ProjectContentClearReceipt(
+                    operationID: storedOperationID,
+                    projectID: request.projectID,
+                    mode: mode,
+                    priorGeneration: request.expectedGeneration,
+                    newGeneration: ProjectGeneration(UInt64(row.int64(3))),
+                    memoryRecordCount: Int(counts.0),
+                    continuityRecordCount: Int(counts.1),
+                    runHistoryCount: Int(counts.2),
+                    invalidatedBindingCount: Int(counts.3),
+                    completedAt: completedAt,
+                    replayed: false
+                )
+            } else {
+                guard completedAt == nil, counts == (0, 0, 0, 0) else {
+                    throw ProjectContextError.integrityFailure(
+                        "prepared project content clear has terminal fields"
+                    )
+                }
+                receipt = nil
+            }
+            return ProjectContentClearOperation(
+                request: request,
+                state: state,
+                receipt: receipt,
+                createdAt: createdAt,
+                updatedAt: updatedAt
+            )
         }
     }
 
@@ -12943,6 +13570,8 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     static let ingressSchemaCapabilityVersionQuery = """
     SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='autonomous_runs') THEN 0
         WHEN (SELECT instr(sql,'''awaiting_bootstrap''') FROM sqlite_master WHERE type='table' AND name='autonomous_runs')=0 THEN 1
+        WHEN EXISTS(SELECT 1 FROM pragma_table_xinfo('native_task_capabilities')
+            WHERE name='profile_version') THEN 10
         WHEN EXISTS(SELECT 1 FROM pragma_table_xinfo('native_source_provider_turns')
             WHERE name IN ('pressure_decision_json','pressure_decision_sha256','pressure_reservation_id')) THEN 9
         WHEN EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='native_source_conversations') THEN 8
@@ -13239,11 +13868,11 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             }
         }
         let journalTables = try scalarInt("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('native_source_conversations','native_source_provider_turns','native_source_provider_calls','native_source_capability_checks','native_source_provider_run_offsets')")
-        guard ((8...9).contains(capability) && journalTables == 5) || (capability < 8 && journalTables == 0) else {
+        guard ((8...10).contains(capability) && journalTables == 5) || (capability < 8 && journalTables == 0) else {
             throw ProjectContextError.integrityFailure("incomplete native source journal schema")
         }
         if capability > 0 { try validateSourceDerivedPreflightSchema(hasColumns: capability >= 8) }
-        if capability >= 8 { try validateNativeSourcePressureSchema(hasColumns: capability == 9) }
+        if capability >= 8 { try validateNativeSourcePressureSchema(hasColumns: capability >= 9) }
         var manifest = try VerifiedMigrationBackup.reconcileMigrationManifest(sourceURL: databaseURL,
             observedVersion: capability, scope: .continuityIngress)
         // Finish a committed older capability before preparing the next verified
@@ -13259,8 +13888,8 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                     preparedManifest: prepared, observedVersion: capability, targetMetadata: target, scope: .continuityIngress)
             }
         }
-        let upgrading = priorVersion == 2 && (1...8).contains(capability)
-        let targetCapability = upgrading ? capability + 1 : 9
+        let upgrading = priorVersion == 2 && (1...9).contains(capability)
+        let targetCapability = upgrading ? capability + 1 : 10
         if upgrading { try executeStatic("PRAGMA synchronous=FULL;") }
         defer { if upgrading { try? executeStatic("PRAGMA synchronous=NORMAL;") } }
         try transaction {
@@ -13289,6 +13918,9 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
                 }
                 try executeStatic(NativeSourcePressureSchema.indexSQL)
                 try validateNativeSourcePressureSchema(hasColumns: true)
+            }
+            if capability == 9 {
+                try executeStatic("ALTER TABLE native_task_capabilities ADD COLUMN profile_version INTEGER NOT NULL DEFAULT 1 CHECK(profile_version IN (1,2));")
             }
             if capability == 4 { try populateSourceTaskFencesForMigration(timestamp: timestamp) }
             if capability == 1 { try rebuildAutonomousRunStateConstraint() }
@@ -13322,7 +13954,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
             _ = try VerifiedMigrationBackup.completeMigrationManifest(sourceURL: databaseURL, preparedManifest: manifest,
                 observedVersion: targetCapability, targetMetadata: target, scope: .continuityIngress)
         }
-        if (1...7).contains(capability) {
+        if (1...9).contains(capability) {
             try migrate(timestamp: timestamp, priorVersion: priorVersion, databaseURL: databaseURL)
         }
     }
@@ -13678,11 +14310,18 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         "finalization_retry_at TEXT CHECK (length(CAST(finalization_retry_at AS BLOB))<=128)",
         "recovery_claim_phase TEXT CHECK (recovery_claim_phase IN ('bootstrap','activation'))",
     ]
+    private static var legacyNativeTaskCapabilitySchema: String {
+        nativeTaskCapabilitySchema.replacingOccurrences(
+            of: "profile_version INTEGER NOT NULL CHECK(profile_version IN (1,2)),",
+            with: ""
+        )
+    }
     private static var schemaForNativeConversationMigration: String {
         schemaV2.replacingOccurrences(of: nativeSourceConversationSchema, with: "")
+            .replacingOccurrences(of: nativeTaskCapabilitySchema, with: legacyNativeTaskCapabilitySchema)
     }
     private static var schemaForCancellationMigration: String {
-        schemaForNativeConversationMigration.replacingOccurrences(of: nativeTaskCapabilitySchema, with: "")
+        schemaForNativeConversationMigration.replacingOccurrences(of: legacyNativeTaskCapabilitySchema, with: "")
     }
     private static var schemaForActivationMigration: String {
         schemaForCancellationMigration.replacingOccurrences(of: operationCancellationSchema, with: "")
@@ -13785,6 +14424,7 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         capability_id TEXT PRIMARY KEY NOT NULL CHECK(length(capability_id)=36),
         task_id TEXT NOT NULL UNIQUE REFERENCES continuity_task_authorizations(task_id) CHECK(length(task_id)=36),
         project_id TEXT NOT NULL CHECK(length(project_id)=36), project_generation INTEGER NOT NULL CHECK(project_generation>=1),
+        profile_version INTEGER NOT NULL CHECK(profile_version IN (1,2)),
         epoch INTEGER NOT NULL CHECK(epoch>=1), state TEXT NOT NULL CHECK(state IN ('active','revoked')),
         verifier_sha256 TEXT CHECK(length(verifier_sha256)=64),
         caller_binding_id TEXT NOT NULL CHECK(length(caller_binding_id)=36), source_binding_id TEXT NOT NULL CHECK(length(source_binding_id)=36),
@@ -13904,6 +14544,31 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     CREATE INDEX IF NOT EXISTS idx_project_transition_authority_retention
         ON project_transition_authority(project_id,state,sequence DESC);
 
+    CREATE TABLE IF NOT EXISTS project_content_clear_operations (
+        operation_id TEXT PRIMARY KEY CHECK(length(operation_id)=36),
+        project_id TEXT NOT NULL REFERENCES control_projects(project_id) ON DELETE CASCADE,
+        prior_generation INTEGER NOT NULL CHECK(prior_generation>=1),
+        new_generation INTEGER NOT NULL CHECK(new_generation=prior_generation+1),
+        mode TEXT NOT NULL CHECK(mode IN
+            ('memory','continuity','memory_and_continuity','run_history')),
+        state TEXT NOT NULL CHECK(state IN ('prepared','committed')),
+        memory_record_count INTEGER NOT NULL DEFAULT 0 CHECK(memory_record_count>=0),
+        continuity_record_count INTEGER NOT NULL DEFAULT 0 CHECK(continuity_record_count>=0),
+        run_history_count INTEGER NOT NULL DEFAULT 0 CHECK(run_history_count>=0),
+        invalidated_binding_count INTEGER NOT NULL DEFAULT 0
+            CHECK(invalidated_binding_count>=0),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT,
+        CHECK((state='prepared' AND completed_at IS NULL)
+            OR (state='committed' AND completed_at IS NOT NULL)),
+        UNIQUE(project_id,operation_id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_project_content_clear_prepared
+        ON project_content_clear_operations(project_id) WHERE state='prepared';
+    CREATE INDEX IF NOT EXISTS idx_project_content_clear_retention
+        ON project_content_clear_operations(project_id,state,updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS project_bindings (
         binding_id TEXT PRIMARY KEY,
         owner_kind TEXT NOT NULL
@@ -13924,6 +14589,20 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         ON project_bindings(project_id, project_generation, active);
     CREATE INDEX IF NOT EXISTS idx_project_bindings_run
         ON project_bindings(run_id) WHERE run_id IS NOT NULL;
+
+    -- Payload-free, bounded authority facts retained after an explicit clear.
+    -- These prevent cleared task and operation identities from regaining effect
+    -- without retaining assignment, handoff, checkpoint, or provider content.
+    CREATE TABLE IF NOT EXISTS continuity_authority_tombstones (
+        kind TEXT NOT NULL CHECK(kind IN ('task','operation','ingress_key')),
+        identity TEXT NOT NULL CHECK(length(identity) IN (36,64)),
+        project_id TEXT NOT NULL CHECK(length(project_id)=36),
+        project_generation INTEGER NOT NULL CHECK(project_generation>=1),
+        retained_at TEXT NOT NULL CHECK(length(CAST(retained_at AS BLOB))<=128),
+        PRIMARY KEY(kind,identity)
+    );
+    CREATE INDEX IF NOT EXISTS idx_continuity_authority_tombstones_project
+        ON continuity_authority_tombstones(project_id,project_generation,kind);
 
     -- These bounded authority tombstones deliberately survive removal of a
     -- project or binding. An old task UUID must never regain authority through

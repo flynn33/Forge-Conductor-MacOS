@@ -203,6 +203,84 @@ public struct ProjectGenerationResetReceipt: Codable, Sendable, Equatable {
     public let completedAt: String
 }
 
+public enum ProjectContentClearMode: String, Codable, Sendable, CaseIterable {
+    case memory
+    case continuity
+    case memoryAndContinuity = "memory_and_continuity"
+    case runHistory = "run_history"
+
+    public var clearsMemory: Bool {
+        self == .memory || self == .memoryAndContinuity
+    }
+
+    public var clearsContinuity: Bool {
+        self == .continuity || self == .memoryAndContinuity
+    }
+}
+
+public struct ProjectContentClearRequest: Codable, Sendable, Equatable {
+    public let operationID: UUID
+    public let projectID: ProjectID
+    public let expectedGeneration: ProjectGeneration
+    public let mode: ProjectContentClearMode
+
+    public init(
+        operationID: UUID,
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        mode: ProjectContentClearMode
+    ) {
+        self.operationID = operationID
+        self.projectID = projectID
+        self.expectedGeneration = expectedGeneration
+        self.mode = mode
+    }
+}
+
+public struct ProjectContentClearReceipt: Codable, Sendable, Equatable {
+    public let operationID: UUID
+    public let projectID: ProjectID
+    public let mode: ProjectContentClearMode
+    public let priorGeneration: ProjectGeneration
+    public let newGeneration: ProjectGeneration
+    public let memoryRecordCount: Int
+    public let continuityRecordCount: Int
+    public let runHistoryCount: Int
+    public let invalidatedBindingCount: Int
+    public let completedAt: String
+    public let replayed: Bool
+
+    public func asDictionary() -> [String: Any] {
+        [
+            "ok": true,
+            "operation_id": operationID.uuidString.lowercased(),
+            "project_id": projectID.description,
+            "mode": mode.rawValue,
+            "prior_generation": priorGeneration.rawValue,
+            "new_generation": newGeneration.rawValue,
+            "memory_record_count": memoryRecordCount,
+            "continuity_record_count": continuityRecordCount,
+            "run_history_count": runHistoryCount,
+            "invalidated_binding_count": invalidatedBindingCount,
+            "completed_at": completedAt,
+            "replayed": replayed,
+        ]
+    }
+}
+
+public enum ProjectContentClearState: String, Codable, Sendable {
+    case prepared
+    case committed
+}
+
+public struct ProjectContentClearOperation: Codable, Sendable, Equatable {
+    public let request: ProjectContentClearRequest
+    public let state: ProjectContentClearState
+    public let receipt: ProjectContentClearReceipt?
+    public let createdAt: String
+    public let updatedAt: String
+}
+
 /// Durable result of moving an existing project identity to a new canonical
 /// repository root. Relinking always advances the generation so no authority
 /// issued for the prior root can be reused at the new location.

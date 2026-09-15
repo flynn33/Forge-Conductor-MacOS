@@ -7,6 +7,24 @@ import Foundation
 final class ProjectsViewModel: ObservableObject {
     private static let maximumPendingReconciliations = 100
 
+    struct ResetConfirmation: Sendable, Equatable, Identifiable {
+        let projectID: String
+        let displayName: String
+        let generation: UInt64
+
+        var id: String { "\(projectID.lowercased()):\(generation)" }
+    }
+
+    struct ClearConfirmation: Sendable, Equatable, Identifiable {
+        let operationID: UUID
+        let projectID: String
+        let displayName: String
+        let generation: UInt64
+        let mode: OperatorProjectContentClearMode
+
+        var id: UUID { operationID }
+    }
+
     private struct PendingRegistration: Sendable, Equatable {
         let request: OperatorProjectRegistrationRequest
         let projectID: String?
@@ -33,6 +51,7 @@ final class ProjectsViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var notice: String?
+    @Published private(set) var pendingClearConfirmation: ClearConfirmation?
     @Published private(set) var lastUpdated: Date?
     @Published private var pendingRegistrations: [String: PendingRegistration] = [:]
     @Published private var pendingRelinks: [String: PendingRelink] = [:]
@@ -137,8 +156,109 @@ final class ProjectsViewModel: ObservableObject {
         pendingRegistrations.removeValue(forKey: pending.key)
     }
 
-    func resetSelectedProject() {
-        guard !isLoading, let project = selectedProject else { return }
+    func resetConfirmationForSelectedProject() -> ResetConfirmation? {
+        guard !isLoading, let project = selectedProject else { return nil }
+        return ResetConfirmation(
+            projectID: project.projectID,
+            displayName: project.displayName,
+            generation: project.projectGeneration
+        )
+    }
+
+    func clearConfirmationForSelectedProject(
+        mode: OperatorProjectContentClearMode
+    ) -> ClearConfirmation? {
+        guard !isLoading, let project = selectedProject else { return nil }
+        return ClearConfirmation(
+            operationID: UUID(),
+            projectID: project.projectID,
+            displayName: project.displayName,
+            generation: project.projectGeneration,
+            mode: mode
+        )
+    }
+
+    func clearProjectContent(_ confirmation: ClearConfirmation) {
+        guard !isLoading else { return }
+        guard let current = selectedProject,
+              current.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+              current.projectGeneration == confirmation.generation else {
+            errorMessage = "The confirmed project or generation changed. Confirm clearing again."
+            return
+        }
+        let expectedNewGeneration = confirmation.generation.addingReportingOverflow(1)
+        guard !expectedNewGeneration.overflow else {
+            errorMessage = "The confirmed project generation cannot be advanced."
+            return
+        }
+        pendingClearConfirmation = confirmation
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let receipt = try await client.clearProjectContent(
+                    operationID: confirmation.operationID,
+                    projectID: confirmation.projectID,
+                    generation: confirmation.generation,
+                    mode: confirmation.mode
+                )
+                guard UUID(uuidString: receipt.operationID) == confirmation.operationID,
+                      receipt.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+                      receipt.mode == confirmation.mode,
+                      receipt.priorGeneration == confirmation.generation,
+                      receipt.newGeneration == expectedNewGeneration.partialValue else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "project content clear receipt is inconsistent; reconcile the original operation"
+                    )
+                }
+                pendingClearConfirmation = nil
+                notice = "Cleared \(confirmation.mode.title.lowercased()) for \(confirmation.displayName); generation \(receipt.priorGeneration) → \(receipt.newGeneration)."
+                do {
+                    let refreshed = try await client.projectStatus(projectID: confirmation.projectID)
+                    guard refreshed.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+                          refreshed.projectGeneration == receipt.newGeneration else {
+                        throw OperatorManagerClientError.invalidPayload(
+                            "project status did not match the committed clear receipt"
+                        )
+                    }
+                    projects.removeAll {
+                        $0.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame
+                    }
+                    projects.append(refreshed)
+                    projects.sort {
+                        $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+                    }
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+                lastUpdated = Date()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
+    }
+
+    func reconcilePendingContentClear() {
+        guard let pendingClearConfirmation, !isLoading else { return }
+        clearProjectContent(pendingClearConfirmation)
+    }
+
+    func resetProject(_ confirmation: ResetConfirmation) {
+        guard !isLoading else { return }
+        guard let current = selectedProject,
+              current.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+              current.projectGeneration == confirmation.generation else {
+            errorMessage = "The selected project or generation changed. Confirm the reset again."
+            return
+        }
+        let expectedNewGeneration = confirmation.generation.addingReportingOverflow(1)
+        guard !expectedNewGeneration.overflow else {
+            errorMessage = "The confirmed project generation cannot be advanced."
+            return
+        }
         isLoading = true
         errorMessage = nil
         notice = nil
@@ -146,16 +266,32 @@ final class ProjectsViewModel: ObservableObject {
             guard let self else { return }
             do {
                 let receipt = try await client.resetProject(
-                    projectID: project.projectID,
-                    generation: project.projectGeneration
+                    projectID: confirmation.projectID,
+                    generation: confirmation.generation
                 )
+                guard let receiptProjectID = receipt.projectID,
+                      receiptProjectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+                      receipt.priorGeneration == confirmation.generation,
+                      receipt.newGeneration == expectedNewGeneration.partialValue,
+                      receipt.invalidatedBindingCount >= 0 else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "project reset receipt did not match the confirmed project generation"
+                    )
+                }
                 notice = "Reset generation \(receipt.priorGeneration) → \(receipt.newGeneration); fenced \(receipt.invalidatedBindingCount) binding(s)."
                 do {
-                    let refreshed = try await client.projectStatus(projectID: project.projectID)
-                    projects.removeAll { $0.projectID == refreshed.projectID }
+                    let refreshed = try await client.projectStatus(projectID: confirmation.projectID)
+                    guard refreshed.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+                          refreshed.projectGeneration == receipt.newGeneration else {
+                        throw OperatorManagerClientError.invalidPayload(
+                            "project status did not match the committed reset receipt"
+                        )
+                    }
+                    projects.removeAll {
+                        $0.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame
+                    }
                     projects.append(refreshed)
                     projects.sort { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-                    selectedProjectID = refreshed.projectID
                 } catch {
                     // The manager committed the reset before the refresh failed.
                     // Keep the committed result visible and show the real refresh error.

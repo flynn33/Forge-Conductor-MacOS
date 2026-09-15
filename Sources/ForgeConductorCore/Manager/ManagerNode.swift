@@ -70,6 +70,16 @@ enum ManagerProjectRegistrationInterruption: Error, Sendable {
     case simulatedProcessExit(ManagerProjectRegistrationCheckpoint)
 }
 
+enum ManagerProjectContentClearCheckpoint: Sendable {
+    case controlPlanePrepared
+    case projectMemoryCommitted
+    case controlPlaneCommitted
+}
+
+enum ManagerProjectContentClearInterruption: Error, Sendable {
+    case simulatedProcessExit(ManagerProjectContentClearCheckpoint)
+}
+
 private struct ManagerProjectRegistrationReconciliationError: Error, LocalizedError, Sendable {
     let code: String
     let message: String
@@ -106,6 +116,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private let projectRelinkCheckpoint: @Sendable (ManagerProjectRelinkCheckpoint) throws -> Void
     private let projectRegistrationCheckpoint: @Sendable (
         ManagerProjectRegistrationCheckpoint
+    ) throws -> Void
+    private let projectContentClearCheckpoint: @Sendable (
+        ManagerProjectContentClearCheckpoint
     ) throws -> Void
     private var providerConfigurationInProgress = false
     private var providerRunOperations = 0
@@ -232,6 +245,23 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
     }
 
+    convenience init(
+        app: ForgeApp,
+        projectContentClearCheckpoint: @escaping @Sendable (
+            ManagerProjectContentClearCheckpoint
+        ) throws -> Void
+    ) {
+        self.init(
+            app: app,
+            managedAutonomyFactory: { try ManagedAutonomyRuntime(app: $0) },
+            hostAdapterRegistry: .shared,
+            generationResetCheckpoint: { _, _ in },
+            projectRelinkCheckpoint: { _ in },
+            projectRegistrationCheckpoint: { _ in },
+            projectContentClearCheckpoint: projectContentClearCheckpoint
+        )
+    }
+
     private init(
         app: ForgeApp,
         managedAutonomyFactory: @escaping ManagedAutonomyFactory,
@@ -246,7 +276,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ) throws -> Void,
         projectRegistrationCheckpoint: @escaping @Sendable (
             ManagerProjectRegistrationCheckpoint
-        ) throws -> Void
+        ) throws -> Void,
+        projectContentClearCheckpoint: @escaping @Sendable (
+            ManagerProjectContentClearCheckpoint
+        ) throws -> Void = { _ in }
     ) {
         self.app = app
         self.taskHTTPService = MCPTaskHTTPService(app: app)
@@ -259,6 +292,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         self.generationResetCheckpoint = generationResetCheckpoint
         self.projectRelinkCheckpoint = projectRelinkCheckpoint
         self.projectRegistrationCheckpoint = projectRegistrationCheckpoint
+        self.projectContentClearCheckpoint = projectContentClearCheckpoint
     }
 
     deinit {
@@ -1455,6 +1489,83 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
     }
 
+    /// Clears one explicitly selected project content scope under a durable
+    /// operation identity. Control-plane preparation fences old work before the
+    /// per-project database commits, and exact replay completes or returns the
+    /// same receipt after interruption.
+    public func clearProjectContent(
+        _ request: ProjectContentClearRequest
+    ) throws -> ProjectContentClearReceipt {
+        let filesystemRecovery = SecureFilesystemRecoveryLedger(paths: app.paths)
+        do {
+            return try filesystemRecovery.withRetainedAuthorityFence(
+                projectID: request.projectID,
+                generation: request.expectedGeneration
+            ) { assertNoRetainedAuthority in
+                try assertNoRetainedAuthority()
+                guard try app.projectMemory.identities.pendingRegistration(
+                    projectID: request.projectID.description
+                ) == nil else {
+                    throw ProjectContextError.projectTransitionConflict(request.projectID)
+                }
+                let prepared = try Self.waitForAsync(timeoutSeconds: 10) {
+                    try await self.app.projectContexts.repository
+                        .prepareProjectContentClear(request)
+                }
+                if let receipt = prepared.receipt {
+                    return ProjectContentClearReceipt(
+                        operationID: receipt.operationID,
+                        projectID: receipt.projectID,
+                        mode: receipt.mode,
+                        priorGeneration: receipt.priorGeneration,
+                        newGeneration: receipt.newGeneration,
+                        memoryRecordCount: receipt.memoryRecordCount,
+                        continuityRecordCount: receipt.continuityRecordCount,
+                        runHistoryCount: receipt.runHistoryCount,
+                        invalidatedBindingCount: receipt.invalidatedBindingCount,
+                        completedAt: receipt.completedAt,
+                        replayed: true
+                    )
+                }
+                try projectContentClearCheckpoint(.controlPlanePrepared)
+                try assertNoRetainedAuthority()
+                app.projectMemory.closeProject(request.projectID.description)
+                let memoryReceipt = try app.projectMemory.repositoryForProject(
+                    request.projectID.description
+                ).clearContent(
+                    operationID: request.operationID,
+                    mode: request.mode
+                )
+                try projectContentClearCheckpoint(.projectMemoryCommitted)
+                let receipt = try Self.waitForAsync(timeoutSeconds: 10) {
+                    try await self.app.projectContexts.repository.completeProjectContentClear(
+                        operationID: request.operationID,
+                        projectMemoryReceipt: memoryReceipt
+                    )
+                }
+                try projectContentClearCheckpoint(.controlPlaneCommitted)
+                app.diagnostics.info(
+                    "manager_project_content_cleared",
+                    [
+                        "project_id": request.projectID.description,
+                        "operation_id": request.operationID.uuidString.lowercased(),
+                        "mode": request.mode.rawValue,
+                        "prior_generation": "\(receipt.priorGeneration.rawValue)",
+                        "new_generation": "\(receipt.newGeneration.rawValue)",
+                        "memory_records": "\(receipt.memoryRecordCount)",
+                        "continuity_records": "\(receipt.continuityRecordCount)",
+                        "run_history": "\(receipt.runHistoryCount)",
+                        "replayed": "\(receipt.replayed)",
+                    ],
+                    category: .manager
+                )
+                return receipt
+            }
+        } catch SecureFilesystemRecoveryLedgerError.retainedAuthority {
+            throw ProjectContextError.retainedFilesystemRecovery(request.projectID)
+        }
+    }
+
     private static func projectDictionary(_ project: ProjectControlRecord) -> [String: Any] {
         [
             "ok": true,
@@ -1981,15 +2092,21 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         guard project.lifecycleState == .active else { throw ProjectContextError.projectNotActive(project.lifecycleState) }
         let root = try authorizedProjectRoot(project.canonicalRoot)
         let approval = request.approval
-        guard approval.filesystemAccess == "read_only", !approval.networkAllowed,
-              Set(approval.allowedTools) == ["fs_read"] else { throw NativeTaskCapabilityError.unsupportedProfile }
+        let expectedTools: Set<String> = request.profileVersion == 1
+            ? ["fs_read"] : ["fs_read", "fs_write", "fs_edit"]
+        let expectedAccess = request.profileVersion == 1 ? "read_only" : "read_write"
+        guard (1...2).contains(request.profileVersion), approval.filesystemAccess == expectedAccess,
+              !approval.networkAllowed, Set(approval.allowedTools) == expectedTools else {
+            throw NativeTaskCapabilityError.unsupportedProfile
+        }
         let assignment = try ContinuityTaskAssignment(
             assignmentID: approval.assignmentID, assignmentBytes: approval.assignmentBytes,
             mission: approval.mission, providerID: approval.providerID, adapterID: approval.adapterID,
             modelKey: approval.modelKey,
             specification: AutonomousRunSpecification(allowedTools: approval.allowedTools,
                 completionGates: approval.completionGates, resourceProfile: approval.resourceProfile),
-            authorizationScope: ToolAuthorizationScope(canonicalRoots: [root], writableRoots: [],
+            authorizationScope: ToolAuthorizationScope(canonicalRoots: [root],
+                writableRoots: request.profileVersion == 2 ? [root] : [],
                 allowedTools: Set(approval.allowedTools), networkAllowed: false,
                 maximumInlineOutputBytes: approval.maximumInlineOutputBytes))
         return try await app.projectContexts.repository.prepareNativeContinuityTask(request: request,

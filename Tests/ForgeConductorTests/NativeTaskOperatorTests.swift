@@ -373,9 +373,12 @@ private enum OperatorFixture {
     }
     static func result(_ command: NativeTaskOperatorCommand, prior: NativeTaskCapabilityCommandResult? = nil) throws -> NativeTaskCapabilityCommandResult {
         let now = ISO8601.string(from: Date())
+        let profileVersion: Int
+        if case .prepare(let request) = command { profileVersion = request.profileVersion }
+        else { profileVersion = prior?.current.profileVersion ?? 1 }
         var object: [String: Any] = prior?.current.wireObject ?? ["task_id": command.taskID.uuidString.lowercased(),
             "capability_id": command.capabilityID.uuidString.lowercased(), "project_id": command.projectID.description,
-            "project_generation": command.projectGeneration.rawValue, "profile_id": "forge.native-task-source", "profile_version": 1,
+            "project_generation": command.projectGeneration.rawValue, "profile_id": "forge.native-task-source", "profile_version": profileVersion,
             "approval_sha256": String(repeating: "b", count: 64), "scope_sha256": String(repeating: "c", count: 64),
             "original_caller_binding_id": UUID().uuidString.lowercased(), "source_binding_id": UUID().uuidString.lowercased()]
         object["epoch"] = command.resultEpoch; object["state"] = command.action == "revoke" ? "revoked" : "active"

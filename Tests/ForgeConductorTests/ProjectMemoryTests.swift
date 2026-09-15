@@ -383,6 +383,141 @@ final class ProjectMemoryTests: XCTestCase {
         XCTAssertEqual(durable["count"] as? Int, 1)
     }
 
+    func testProjectContentClearModesAreScopedDurableAndExactlyReplayable() throws {
+        let projectIDA = UUID().uuidString.lowercased()
+        let projectIDB = UUID().uuidString.lowercased()
+        let directoryA = home.appendingPathComponent("clear-project-a", isDirectory: true)
+        let directoryB = home.appendingPathComponent("clear-project-b", isDirectory: true)
+        var repositoryA: ProjectMemoryRepository? = try ProjectMemoryRepository(
+            projectID: projectIDA,
+            directory: directoryA,
+            enableFTS5: false
+        )
+        let repositoryB = try ProjectMemoryRepository(
+            projectID: projectIDB,
+            directory: directoryB,
+            enableFTS5: false
+        )
+        defer {
+            repositoryA?.close()
+            repositoryB.close()
+        }
+
+        let memoryA = try XCTUnwrap(repositoryA).remember(ProjectMemoryWrite(
+            kind: "decision",
+            title: "Project A clear fixture",
+            summary: "A-only memory"
+        )).0
+        let memoryB = try repositoryB.remember(ProjectMemoryWrite(
+            kind: "decision",
+            title: "Project B preserved fixture",
+            summary: "B-only memory"
+        )).0
+        let continuityA = UUID().uuidString.lowercased()
+        let continuityB = UUID().uuidString.lowercased()
+        _ = try XCTUnwrap(repositoryA).continuityCreateOperation(
+            operationID: continuityA,
+            predecessorSessionID: "project-a-session",
+            handoffID: UUID().uuidString.lowercased(),
+            adapterID: "fixture-adapter",
+            idempotencyKey: "project-a-continuity"
+        )
+        _ = try repositoryB.continuityCreateOperation(
+            operationID: continuityB,
+            predecessorSessionID: "project-b-session",
+            handoffID: UUID().uuidString.lowercased(),
+            adapterID: "fixture-adapter",
+            idempotencyKey: "project-b-continuity"
+        )
+
+        let memoryClearID = UUID()
+        let memoryReceipt = try XCTUnwrap(repositoryA).clearContent(
+            operationID: memoryClearID,
+            mode: .memory
+        )
+        XCTAssertEqual(memoryReceipt.memoryRecordCount, 1)
+        XCTAssertEqual(memoryReceipt.continuityRecordCount, 0)
+        XCTAssertFalse(memoryReceipt.replayed)
+        XCTAssertNil(try XCTUnwrap(repositoryA).get(id: memoryA.id))
+        XCTAssertNotNil(try XCTUnwrap(repositoryA).continuityOperation(id: continuityA))
+        XCTAssertNotNil(try repositoryB.get(id: memoryB.id))
+        XCTAssertNotNil(try repositoryB.continuityOperation(id: continuityB))
+
+        let replay = try XCTUnwrap(repositoryA).clearContent(
+            operationID: memoryClearID,
+            mode: .memory
+        )
+        XCTAssertTrue(replay.replayed)
+        XCTAssertEqual(replay.memoryRecordCount, memoryReceipt.memoryRecordCount)
+        XCTAssertEqual(replay.committedAt, memoryReceipt.committedAt)
+        XCTAssertThrowsError(try XCTUnwrap(repositoryA).clearContent(
+            operationID: memoryClearID,
+            mode: .continuity
+        )) { error in
+            guard case ProjectMemoryError.conflict = error else {
+                return XCTFail("Expected operation identity conflict, received \(error)")
+            }
+        }
+
+        repositoryA?.close()
+        repositoryA = try ProjectMemoryRepository(
+            projectID: projectIDA,
+            directory: directoryA,
+            enableFTS5: false
+        )
+        let reopenedReplay = try XCTUnwrap(repositoryA).clearContent(
+            operationID: memoryClearID,
+            mode: .memory
+        )
+        XCTAssertTrue(reopenedReplay.replayed)
+        XCTAssertNil(try XCTUnwrap(repositoryA).get(id: memoryA.id))
+        XCTAssertNotNil(try XCTUnwrap(repositoryA).continuityOperation(id: continuityA))
+
+        let continuityReceipt = try XCTUnwrap(repositoryA).clearContent(
+            operationID: UUID(),
+            mode: .continuity
+        )
+        XCTAssertEqual(continuityReceipt.memoryRecordCount, 0)
+        XCTAssertGreaterThanOrEqual(continuityReceipt.continuityRecordCount, 2)
+        XCTAssertNil(try XCTUnwrap(repositoryA).continuityOperation(id: continuityA))
+        XCTAssertNotNil(try repositoryB.get(id: memoryB.id))
+        XCTAssertNotNil(try repositoryB.continuityOperation(id: continuityB))
+    }
+
+    func testCombinedProjectContentClearRemovesMemoryAndContinuityTogether() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent("clear-project-combined", isDirectory: true)
+        let repository = try ProjectMemoryRepository(
+            projectID: projectID,
+            directory: directory,
+            enableFTS5: false
+        )
+        defer { repository.close() }
+        let memory = try repository.remember(ProjectMemoryWrite(
+            kind: "fact",
+            title: "Combined clear fixture",
+            summary: "Remove both scopes"
+        )).0
+        let continuityID = UUID().uuidString.lowercased()
+        _ = try repository.continuityCreateOperation(
+            operationID: continuityID,
+            predecessorSessionID: "combined-session",
+            handoffID: UUID().uuidString.lowercased(),
+            adapterID: "fixture-adapter",
+            idempotencyKey: "combined-continuity"
+        )
+
+        let receipt = try repository.clearContent(
+            operationID: UUID(),
+            mode: .memoryAndContinuity
+        )
+        XCTAssertEqual(receipt.memoryRecordCount, 1)
+        XCTAssertGreaterThanOrEqual(receipt.continuityRecordCount, 2)
+        XCTAssertNil(try repository.get(id: memory.id))
+        XCTAssertNil(try repository.continuityOperation(id: continuityID))
+        XCTAssertTrue(try repository.quickCheck())
+    }
+
     func testSelectedProjectRecordIsIsolatedFromOtherProjectsAndSurvivesReopen() throws {
         let paths = AppPaths(home: home)
         try paths.ensureLayout()

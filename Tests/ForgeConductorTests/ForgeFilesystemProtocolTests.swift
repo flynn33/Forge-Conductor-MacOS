@@ -357,6 +357,63 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         XCTAssertEqual(decoded.requestDigestSHA256, request.requestDigestSHA256)
     }
 
+    func testMoveRequestBindsExactSourceAndDestinationWithoutChangingDeleteEnvelope() throws {
+        let sourceIdentity = ForgeFilesystemIdentity(
+            device: 1,
+            inode: 77,
+            mode: UInt32(S_IFDIR | 0o700),
+            owner: 501,
+            group: 20,
+            linkCount: 2
+        )
+        let request = ForgeFilesystemMutationRequest(
+            requestID: UUID().uuidString.lowercased(),
+            transactionID: UUID().uuidString.lowercased(),
+            projectID: UUID().uuidString.lowercased(),
+            projectGeneration: 3,
+            rootID: "1:2",
+            rootIdentity: ForgeFilesystemIdentity(
+                device: 1, inode: 2, mode: UInt32(S_IFDIR | 0o700),
+                owner: 501, group: 20, linkCount: 2
+            ),
+            relativePathComponents: ["source"],
+            destinationRelativePathComponents: ["folder", "destination"],
+            access: .moveEntry,
+            contract: .namespaceVersionExact,
+            expectedLeafIdentity: sourceIdentity
+        )
+        XCTAssertNil(request.validationError())
+        XCTAssertEqual(request.access, .moveEntry)
+        let data = try NSKeyedArchiver.archivedData(
+            withRootObject: request,
+            requiringSecureCoding: true
+        )
+        let decoded = try XCTUnwrap(NSKeyedUnarchiver.unarchivedObject(
+            ofClass: ForgeFilesystemMutationRequest.self,
+            from: data
+        ))
+        XCTAssertEqual(decoded.destinationRelativePathComponents, ["folder", "destination"])
+        XCTAssertEqual(decoded.requestDigestSHA256, request.requestDigestSHA256)
+
+        let missingDestination = ForgeFilesystemMutationRequest(
+            requestID: request.requestID,
+            transactionID: request.transactionID,
+            projectID: request.projectID,
+            projectGeneration: request.projectGeneration,
+            rootID: request.rootID,
+            rootIdentity: request.rootIdentity,
+            relativePathComponents: request.relativePathComponents,
+            access: .moveEntry,
+            contract: .namespaceVersionExact,
+            expectedLeafIdentity: sourceIdentity
+        )
+        XCTAssertEqual(
+            missingDestination.validationError(),
+            ForgeFilesystemErrorCode.invalidRequest
+        )
+        XCTAssertNotEqual(request.requestDigestSHA256, makeRequest().requestDigestSHA256)
+    }
+
     func testMutationRequestRequiresContractSpecificExpectedIdentity() {
         let currentEntry = makeRequest(
             contract: .currentEntry,
