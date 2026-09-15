@@ -127,6 +127,66 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attach("authorized-folder-after-relaunch", persisted)
     }
 
+    func testNativeProjectRegistrationUsesSelectedFolderAndSurvivesRelaunch() async throws {
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        XCTAssertTrue(app.buttons["project-register"].waitForExistence(timeout: 10))
+        let before: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
+        XCTAssertTrue(before.projects.isEmpty)
+
+        try click(app.buttons["project-register"])
+        XCTAssertTrue(folderPanel.waitForExistence(timeout: 10), "The production project picker must appear")
+        XCTAssertTrue(folderPanel.buttons["Choose Project"].exists)
+        try chooseFolderInNativePanel(projectRoot.path, prompt: "Choose Project")
+        XCTAssertTrue(app.buttons["project-register-confirm"].waitForExistence(timeout: 10))
+        XCTAssertTrue(contains(element("project-register-name"), projectRoot.lastPathComponent))
+        try click(app.buttons["project-register-confirm"])
+
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            self.app.buttons["project-register"].isEnabled
+                && self.app.staticTexts[self.projectRoot.lastPathComponent].exists
+        })
+        let after: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
+        let project = try XCTUnwrap(after.projects.first)
+        XCTAssertEqual(after.projects.count, 1)
+        XCTAssertEqual(project.canonicalRoot, projectRoot.path)
+        XCTAssertEqual(project.lifecycleState, "active")
+        XCTAssertGreaterThan(project.projectGeneration, 0)
+        attach("native-project-registration", after)
+
+        app.terminate()
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        XCTAssertTrue(element("project-row-\(project.projectID)").waitForExistence(timeout: 10))
+        let restored: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
+        XCTAssertEqual(restored.projects, after.projects)
+    }
+
+    func testDirectProjectPathRegistrationChecksAbsolutePathAndCommits() async throws {
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-register-by-path"])
+        let path = app.textFields["project-register-path"]
+        let confirm = app.buttons["project-register-confirm"]
+        XCTAssertTrue(path.waitForExistence(timeout: 10))
+        try replace(path, with: "relative/project")
+        XCTAssertFalse(confirm.isEnabled)
+        try replace(path, with: projectRoot.path)
+        XCTAssertTrue(waitUntil { confirm.isEnabled })
+        try click(confirm)
+
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            self.app.buttons["project-register-by-path"].isEnabled
+                && self.app.staticTexts[self.projectRoot.lastPathComponent].exists
+        })
+        let snapshot: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
+        let project = try XCTUnwrap(snapshot.projects.first)
+        XCTAssertEqual(snapshot.projects.count, 1)
+        XCTAssertEqual(project.canonicalRoot, projectRoot.path)
+        XCTAssertEqual(project.lifecycleState, "active")
+        attach("direct-project-path-registration", snapshot)
+    }
+
     func testNativeProviderSaveOfflineFailureAndInvalidEndpointsSurviveManagerReplacement() async throws {
         // A bound, non-listening socket keeps the offline endpoint deterministic
         // without standing in for a model server or accepting provider requests.
@@ -327,7 +387,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attachScreenshot("production-open-panel")
     }
 
-    private func chooseFolderInNativePanel(_ path: String) throws {
+    private func chooseFolderInNativePanel(_ path: String, prompt: String = "Authorize Folder") throws {
         app.typeKey("g", modifierFlags: [.command, .shift])
         let goToSheet = folderPanel.sheets["GoToWindow"]
         guard goToSheet.waitForExistence(timeout: 5) else {
@@ -351,7 +411,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         guard waitUntil(timeout: 5, { !goToSheet.exists }) else {
             throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
         }
-        try click(folderPanel.buttons["Authorize Folder"])
+        try click(folderPanel.buttons[prompt])
         XCTAssertTrue(waitUntil { !self.folderPanel.exists })
     }
 
@@ -616,6 +676,24 @@ private struct OnboardingProviderModels: Codable, Sendable {
     struct Model: Codable, Sendable { let key: String; let loaded: Bool; let toolUseCapable: Bool }
     let revision: String
     let models: [Model]
+}
+
+private struct OnboardingProjectSnapshot: Codable, Sendable, Equatable {
+    struct Project: Codable, Sendable, Equatable {
+        let projectID: String
+        let displayName: String
+        let canonicalRoot: String
+        let projectGeneration: UInt64
+        let lifecycleState: String
+        enum CodingKeys: String, CodingKey {
+            case projectID = "project_id"
+            case displayName = "display_name"
+            case canonicalRoot = "canonical_root"
+            case projectGeneration = "project_generation"
+            case lifecycleState = "lifecycle_state"
+        }
+    }
+    let projects: [Project]
 }
 
 private struct OnboardingOperatorSnapshot: Decodable, Sendable {
