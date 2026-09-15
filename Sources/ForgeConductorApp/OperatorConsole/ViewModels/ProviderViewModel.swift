@@ -49,12 +49,14 @@ final class ProviderViewModel: ObservableObject {
                 let loadedProvider = try await client.snapshot(limit: 100).provider
                 try Task.checkCancellation()
                 provider = loadedProvider
-                if loadedProvider == nil {
-                    errorMessage = "The manager did not publish a provider capability snapshot."
-                }
                 let saved = try await client.providerConfiguration()
                 try Task.checkCancellation()
                 apply(saved)
+                if loadedProvider == nil {
+                    noticeMessage = saved.saved
+                        ? "Settings are saved. Test Connection to check the loaded model."
+                        : "No provider settings are saved. Enter the LM Studio endpoint and model, then Save."
+                }
             } catch is CancellationError {
                 return
             } catch {
@@ -117,7 +119,7 @@ final class ProviderViewModel: ObservableObject {
                 if inventory.models.isEmpty {
                     noticeMessage = "The server returned no models. Add a model in LM Studio, then refresh."
                 } else if !inventory.models.contains(where: { $0.loaded && $0.toolUseCapable }) {
-                    noticeMessage = "No tool-capable model is loaded. Load a supported model in LM Studio, then refresh."
+                    noticeMessage = "LM Studio's model inventory reports no loaded tool-capable instance. Load the selected model variant in LM Studio, then refresh."
                 }
             } catch is CancellationError { return }
             catch { errorMessage = error.localizedDescription }
