@@ -40,7 +40,13 @@ final class H0IsolationTests: XCTestCase {
             project.range(of: "D574F9BCA1204936B158984B /* ForgeConductor */ = {")
         )
         let targetsEnd = try XCTUnwrap(project.range(of: "/* End PBXNativeTarget section */"))
-        let appTarget = String(project[appStart.lowerBound ..< targetsEnd.lowerBound])
+        let appEnd = try XCTUnwrap(project.range(
+            of: "\n\t\t};",
+            range: appStart.upperBound ..< targetsEnd.lowerBound
+        ))
+        // Xcode may reorder sibling targets; inspect only the shipping app target.
+        let appTarget = String(project[appStart.lowerBound ..< appEnd.upperBound])
+        XCTAssertTrue(appTarget.contains("productType = \"com.apple.product-type.application\";"))
         XCTAssertFalse(appTarget.contains("ForgeFilesystemQualificationSupport"))
         XCTAssertFalse(appTarget.contains("ForgeFilesystemQualificationHarness"))
         XCTAssertFalse(appTarget.contains("ForgeFilesystemAdversary"))

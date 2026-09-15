@@ -21,7 +21,7 @@ Forge Conductor is a native macOS orchestration server for local models hosted b
 | `forge-conductor` / `ForgeConductorCLI` | CLI, installer, manager commands, and MCP stdio executable |
 | `forge-conductor-app` / `ForgeConductorApp` | SwiftUI/AppKit/Metal operator application |
 | `forge-runtime-launcher` / `ForgeRuntimeLauncher` | Signed, resource-bounded native process launcher for managed jobs |
-| `forge-filesystem-daemon` / `ForgeFilesystemDaemon` | Privileged leaf capture, protected quarantine, and request recovery; authorized quarantine disposition and E2 qualification remain open |
+| `forge-filesystem-daemon` / `ForgeFilesystemDaemon` | Privileged regular-file, symbolic-link, empty-directory and no-replacement move capture, protected quarantine, and request recovery; bounded recursive deletion composes those transactions, while root-service E2 qualification remains open |
 | `ForgeConductorTests` | Unit, integration, security, connector, and process acceptance tests |
 
 The Xcode project mirrors these boundaries. SwiftPM provides a second
@@ -122,7 +122,10 @@ resolve executable
 - Agent grant/deny lists and configured workspace roots are enforced before tool dispatch.
 - Ordinary filesystem authorization canonicalizes paths and rejects traversal or
   symlink escape before dispatch. Privileged destructive mutation has additional
-  protocol-v5 capture and quarantine controls, but its documented E2 races remain.
+  protocol-v5 capture and quarantine controls. Move publishes from the protected
+  capture with no replacement inside one authorized writable root and volume;
+  recursive delete commits bounded bottom-up leaf/empty-directory transactions.
+  The documented signed distinct-process E2 matrix remains unmeasured.
 - HTTP bodies, MCP frames, file reads, subprocess capture, and returned shell output are bounded.
 - Audit records redact commands and file contents.
 - Session and handoff paths may narrow existing authority but cannot create new
@@ -157,20 +160,23 @@ The earlier exact-revision 100-cycle Rig/MCP navigation result remains historica
 supporting evidence. A later native Release gauge run passed four tests,
 including 100 lifecycle cycles and draw/buffer/weak-owner assertions, while
 closed fixture windows accumulated to 101. This does not establish whole-app
-window or leak closure. Developer ID Release signing, the full production native
-UI/settings/service-lifecycle matrix, P10, archive, notarization, and
-staple/Gatekeeper evidence remain release-blocking. The retained local and CI
-results are distinguished in [qualification status](QUALIFICATION-STATUS.md).
+window or leak closure. The current functional-development candidate passes a
+canonical workspace Release build, coherent Apple Development signatures,
+isolated CLI checks and a bounded direct GUI launch. Developer ID Release signing,
+the public-distribution native matrix, P10, archive, notarization, staple/
+Gatekeeper evidence and the broader hardware matrix remain owner-deferred or
+outside this delivery scope. The retained local and CI results are distinguished
+in [qualification status](QUALIFICATION-STATUS.md).
 
-Autonomous continuity requires the manager-owned, threshold-forced real-provider
-rollover with exact successor acknowledgment, predecessor fencing and idempotent
-sealing, automatic continuation, GUI-closed operation, and every durable
-crash-state recovery. The 660-second response fence and restart-durable receipts
+One manager-owned threshold-forced real-provider rollover completed exact successor
+acknowledgment, predecessor fencing and idempotent sealing, automatic continuation,
+GUI-closed injected-crash recovery and stable replay. Deterministic tests cover two
+sequential rollovers and the wider crash matrix. A second live attempt exceeded the
+600-second provider deadline and later returned a conflict, so it is not counted as
+a repeat pass. The 660-second response fence and restart-durable receipts
 mitigate one ambiguity; without a provider request-ID lookup, retries can still
 repeat inference even though reconciled tool effects do not execute twice. Unit
-and synthetic-host tests are insufficient. Current
-G09-G12 and owner-deferred representative physical-hardware qualification also
-remain open.
+and synthetic-host results remain accurately distinguished from the live result.
 
 ## Persistence
 

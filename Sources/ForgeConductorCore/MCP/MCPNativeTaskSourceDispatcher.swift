@@ -8,20 +8,29 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
     private let attachment: AuthenticatedContinuityTaskAttachment
     private let managerInstanceID: UUID
     private let carrier: ContinuityNativeTaskSession
+    private let sourceToolNames: Set<String>
+    private let toolNames: Set<String>
     let sessionBindingSHA256: String
     let expiresAt: Date
 
     init(app: ForgeApp, attachment: AuthenticatedContinuityTaskAttachment, managerInstanceID: UUID) throws {
         let descriptor = attachment.descriptor
-        guard descriptor.profileID == "forge.native-task-source", descriptor.profileVersion == 1,
+        let expectedFilesystemTools = descriptor.profileVersion == 1
+            ? MCPNativeTaskSourceProfile.readOnlyFilesystemToolNames
+            : MCPNativeTaskSourceProfile.writableFilesystemToolNames
+        let expectedWritableRoots = descriptor.profileVersion == 1
+            ? [] : attachment.setup.record.assignment.authorizationScope.canonicalRoots
+        guard descriptor.profileID == "forge.native-task-source", (1...2).contains(descriptor.profileVersion),
               descriptor.state == .active,
               let expiry = ISO8601DateFormatter().date(from: descriptor.expiresAt),
-              attachment.setup.record.assignment.authorizationScope.allowedTools == ["fs_read"],
-              attachment.setup.record.assignment.authorizationScope.writableRoots.isEmpty,
+              attachment.setup.record.assignment.authorizationScope.allowedTools == expectedFilesystemTools,
+              attachment.setup.record.assignment.authorizationScope.writableRoots == expectedWritableRoots,
               !attachment.setup.record.assignment.authorizationScope.networkAllowed else {
             throw NativeTaskCapabilityError.unsupportedProfile
         }
         self.app = app; self.attachment = attachment; self.managerInstanceID = managerInstanceID
+        sourceToolNames = try MCPNativeTaskSourceProfile.sourceToolNames(profileVersion: descriptor.profileVersion)
+        toolNames = try MCPNativeTaskSourceProfile.toolNames(profileVersion: descriptor.profileVersion)
         carrier = .authenticated(app: app, attachment: attachment)
         expiresAt = expiry
         sessionBindingSHA256 = try ForgeJSONCanonicalizationV1.sha256Hex(of: [
@@ -33,26 +42,31 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
 
     func toolDescriptorsJSON() throws -> Data {
         let descriptors = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames).mcpDescriptors()
-            .filter { ($0["name"] as? String).map(MCPNativeTaskSourceProfile.toolNames.contains) == true }
-        guard descriptors.count == MCPNativeTaskSourceProfile.toolNames.count else {
+            .filter { ($0["name"] as? String).map(toolNames.contains) == true }
+        guard descriptors.count == toolNames.count else {
             throw NativeTaskCapabilityError.unsupportedProfile
         }
         return try ForgeJSONCanonicalizationV1.data(from: descriptors)
+    }
+
+    func permitsTool(named name: String) -> Bool {
+        toolNames.contains(name)
     }
 
     func call(name: String, argumentsJSON: Data, identity: MCPTaskRequestIdentity,
               cancellation: ToolCallCancellation) async throws -> ToolResult {
         do {
             try Task.checkCancellation(); try cancellation.checkCancellation()
-            guard MCPNativeTaskSourceProfile.toolNames.contains(name),
+            guard toolNames.contains(name),
                   let arguments = try JSONSerialization.jsonObject(with: argumentsJSON) as? [String: Any],
                   try ForgeJSONCanonicalizationV1.data(from: arguments) == argumentsJSON else {
                 throw NativeTaskCapabilityError.invalidRequest("tool")
             }
             let result: ToolResult
             switch name {
-            case "fs_read":
-                result = try await read(argumentsJSON: argumentsJSON, identity: identity, cancellation: cancellation)
+            case "fs_read", "fs_write", "fs_edit":
+                result = try await filesystem(name: name, argumentsJSON: argumentsJSON,
+                    identity: identity, cancellation: cancellation)
             case "session_checkpoint", "session_handoff":
                 result = try await commit(argumentsJSON: argumentsJSON, identity: identity,
                     finalize: name == "session_handoff", cancellation: cancellation)
@@ -77,7 +91,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
             lease: lease, credential: credential, cancellation: cancellation)
         try requireMatchingAttachment(current)
         return try MCPNativeTaskSourceProfile.providerToolDefinitions(
-            catalog: .production(toolNames: app.tools.toolNames))
+            catalog: .production(toolNames: app.tools.toolNames), profileVersion: attachment.descriptor.profileVersion)
     }
 
     func resolveNativeProviderCall(reference: NativeSourceProviderCallReference,
@@ -86,7 +100,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
         let resolved = try await app.projectContexts.repository.resolveNativeSourceProviderCall(
             reference: reference, credential: credential, lease: lease, cancellation: cancellation)
         try requireMatchingAttachment(resolved.attachment)
-        guard MCPNativeTaskSourceProfile.sourceToolNames.contains(resolved.toolName),
+        guard sourceToolNames.contains(resolved.toolName),
               !resolved.callID.isEmpty, resolved.callID.utf8.count <= 512,
               !resolved.callID.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
               try ForgeJSONCanonicalizationV1.data(from: JSONSupport.object(from: resolved.canonicalArgumentsJSON))
@@ -113,8 +127,8 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
             return completed
         }
         switch current.toolName {
-        case "fs_read":
-            try await readNative(current, credential: credential, lease: lease,
+        case "fs_read", "fs_write", "fs_edit":
+            try await filesystemNative(current, credential: credential, lease: lease,
                 outputBudget: outputBudget, cancellation: cancellation)
         case "session_checkpoint", "session_handoff":
             try await commitNative(current, credential: credential, lease: lease,
@@ -132,7 +146,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
         guard current.descriptor == attachment.descriptor else { throw NativeTaskCapabilityError.credentialRejected }
     }
 
-    private func readNative(_ resolved: ResolvedNativeSourceProviderCall,
+    private func filesystemNative(_ resolved: ResolvedNativeSourceProviderCall,
         credential: NativeTaskCapabilityCredential, lease: NativeSourceConversationLease,
         outputBudget: NativeSourceProviderOutputBudget, cancellation: ToolCallCancellation) async throws {
         let repository = app.projectContexts.repository
@@ -146,7 +160,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
               escaped.partialValue <= outputBudget.maximumEscapedPayloadBytes else {
             throw NativeSourceConversationError.budgetExceeded
         }
-        let request = try NativeSourceReadRequest(key: resolved.key, toolName: "fs_read",
+        let request = try NativeSourceReadRequest(key: resolved.key, toolName: resolved.toolName,
             canonicalArgumentsJSON: resolved.canonicalArgumentsJSON, managerInstanceID: lease.managerInstanceID)
         try cancellation.tightenDeadline(milliseconds: request.effectiveDeadlineMilliseconds(limits: attachment.sourceLimits))
         let decision = try await repository.admitContinuitySourceRead(request: request,
@@ -166,7 +180,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
                     projectGeneration: attachment.context.projectGeneration, clientID: attachment.context.clientID,
                     authorizationScope: attachment.setup.record.assignment.authorizationScope)
                 let authorized = try ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
-                    tool: "fs_read", arguments: JSONSupport.object(from: resolved.canonicalArgumentsJSON),
+                    tool: resolved.toolName, arguments: JSONSupport.object(from: resolved.canonicalArgumentsJSON),
                     context: context, clientID: context.clientID, binding: nil, cancellation: cancellation)
                 try await repository.beginContinuitySourceRead(admission: admission, policySelection: selection(),
                     reference: resolved.reference, credential: credential, lease: lease,
@@ -175,7 +189,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
                 switch authorized {
                 case .denied(let code, let message): result = .failure(code: code, message: message)
                 case .allowed(let normalized):
-                    guard let executed = try FilesystemToolPack().handle(name: "fs_read", arguments: normalized,
+                    guard let executed = try FilesystemToolPack().handle(name: resolved.toolName, arguments: normalized,
                         context: context, clientID: context.clientID, app: app, cancellation: cancellation) else {
                         throw NativeSourceConversationError.integrityFailure
                     }
@@ -268,10 +282,10 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
             projectID: attachment.descriptor.projectID.description, projectGeneration: generation))
     }
 
-    private func read(argumentsJSON: Data, identity: MCPTaskRequestIdentity,
+    private func filesystem(name: String, argumentsJSON: Data, identity: MCPTaskRequestIdentity,
                       cancellation: ToolCallCancellation) async throws -> ToolResult {
         let repository = app.projectContexts.repository
-        let request = try NativeSourceReadRequest(key: durableSourceKey(identity), toolName: "fs_read",
+        let request = try NativeSourceReadRequest(key: durableSourceKey(identity), toolName: name,
             canonicalArgumentsJSON: argumentsJSON, managerInstanceID: managerInstanceID)
         try cancellation.tightenDeadline(milliseconds: request.effectiveDeadlineMilliseconds(limits: attachment.sourceLimits))
         let decision = try await repository.admitContinuitySourceRead(request: request,
@@ -291,7 +305,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
                     projectGeneration: attachment.context.projectGeneration, clientID: attachment.context.clientID,
                     authorizationScope: scope)
                 let authorizer = ToolAuthorizationService(paths: app.paths, config: app.config)
-                let authorized = try authorizer.authorize(tool: "fs_read", arguments: arguments,
+                let authorized = try authorizer.authorize(tool: name, arguments: arguments,
                     context: context, clientID: context.clientID, binding: nil, cancellation: cancellation)
                 let result: ToolResult
                 switch authorized {
@@ -304,7 +318,7 @@ final class MCPNativeTaskSourceDispatcher: MCPNativeSourceDispatching {
                     // before the bounded pack read, without holding a CP writer.
                     try await repository.beginContinuitySourceRead(admission: admission,
                         policySelection: selection(), cancellation: cancellation)
-                    guard let executed = try FilesystemToolPack().handle(name: "fs_read", arguments: normalized,
+                    guard let executed = try FilesystemToolPack().handle(name: name, arguments: normalized,
                         context: context, clientID: context.clientID, app: app, cancellation: cancellation) else {
                         throw NativeTaskCapabilityError.integrityFailure
                     }

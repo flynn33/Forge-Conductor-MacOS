@@ -262,7 +262,7 @@ final class NativeSourceConversationJournalTests: XCTestCase {
             let assignment = try JournalSQL.value(f.database, "SELECT assignment_json FROM continuity_task_authorizations")
             let verifier = try JournalSQL.value(f.database, "SELECT verifier_sha256 FROM native_task_capabilities")
             await f.repository.close()
-            try JournalSQL.execute(f.database, "ALTER TABLE provider_turns DROP COLUMN source_preflight_sha256; ALTER TABLE provider_turns DROP COLUMN source_preflight_json; DROP TABLE native_source_provider_run_offsets; DROP TABLE native_source_provider_calls; DROP TABLE native_source_capability_checks; DROP TABLE native_source_provider_turns; DROP TABLE native_source_conversations;")
+            try JournalSQL.execute(f.database, "ALTER TABLE native_task_capabilities DROP COLUMN profile_version; ALTER TABLE provider_turns DROP COLUMN source_preflight_sha256; ALTER TABLE provider_turns DROP COLUMN source_preflight_json; DROP TABLE native_source_provider_run_offsets; DROP TABLE native_source_provider_calls; DROP TABLE native_source_capability_checks; DROP TABLE native_source_provider_turns; DROP TABLE native_source_conversations;")
             let reopened = try ProjectControlPlaneRepository(databaseURL: f.database, clock: f.clock)
             do {
                 XCTAssertEqual(try JournalSQL.value(f.database, "SELECT assignment_json FROM continuity_task_authorizations"), assignment)
@@ -270,7 +270,7 @@ final class NativeSourceConversationJournalTests: XCTestCase {
                 XCTAssertEqual(try JournalSQL.value(f.database, "SELECT COUNT(*) FROM continuity_source_dispatch_origins"), "1")
                 XCTAssertEqual(try JournalSQL.value(f.database, "SELECT COUNT(*) FROM native_source_conversations"), "0")
                 let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: f.database, scope: .continuityIngress))) as? [String: Any]
-                XCTAssertEqual(manifest?["source_version"] as? Int, 8); XCTAssertEqual(manifest?["target_version"] as? Int, 9)
+                XCTAssertEqual(manifest?["source_version"] as? Int, 9); XCTAssertEqual(manifest?["target_version"] as? Int, 10)
                 XCTAssertEqual(manifest?["state"] as? String, "completed")
                 let backup = f.database.deletingPathExtension().appendingPathExtension("pre-ingress-capability-v7.sqlite3")
                 XCTAssertTrue(FileManager.default.fileExists(atPath: backup.path))

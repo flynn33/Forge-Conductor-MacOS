@@ -49,18 +49,34 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: leaf), Data("preserve".utf8))
     }
 
-    func testProductionPackDisablesMoveWithoutSameUserFallback() throws {
+    func testProductionPackDispatchesMoveOnlyThroughPrivilegedClient() throws {
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("app"))
         defer { app.shutdown() }
         let source = root.appendingPathComponent("preserved-move.txt")
         let destination = root.appendingPathComponent("must-not-exist.txt")
         try Data("preserve".utf8).write(to: source)
 
-        let result = try XCTUnwrap(try FilesystemToolPack().handle(
+        let clientID = ClientID("production-move-dispatch")
+        _ = try bindProductionProject(
+            app: app,
+            project: root,
+            clientID: clientID
+        )
+        let transport = SecureFilesystemTransportStub(
+            status: .enabled,
+            response: ForgeFilesystemResponse(
+                ok: false,
+                code: ForgeFilesystemErrorCode.helperIdentityMismatch,
+                message: "identity mismatch"
+            )
+        )
+        let result = try XCTUnwrap(try FilesystemToolPack(
+            secureMutationClient: SecureFilesystemMutationClient(transport: transport)
+        ).handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: makeContext(),
-            clientID: ClientID("production-move-disabled"),
+            context: try app.projectContexts.invocationContext(for: clientID),
+            clientID: clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -68,8 +84,14 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertFalse(result.ok)
         XCTAssertEqual(
             result.payload["code"] as? String,
-            ForgeFilesystemErrorCode.capabilityUnavailable
+            ForgeFilesystemErrorCode.helperIdentityMismatch
         )
+        XCTAssertEqual(transport.deleteCallCount, 1)
+        let request = try XCTUnwrap(transport.requests.first)
+        XCTAssertEqual(request.access, .moveEntry)
+        XCTAssertEqual(request.contract, .namespaceVersionExact)
+        XCTAssertNotNil(request.expectedLeafIdentity)
+        XCTAssertEqual(request.destinationRelativePathComponents, ["must-not-exist.txt"])
         XCTAssertEqual(try Data(contentsOf: source), Data("preserve".utf8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
     }
@@ -277,7 +299,7 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(transport.deleteCallCount, 0)
     }
 
-    func testProductionDirectoryDeleteFailsClosedWithoutLocalMutation() throws {
+    func testProductionDirectoryDeleteDispatchesBoundedBottomUpHelperTransactions() throws {
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("app"))
         defer { app.shutdown() }
         let project = root.appendingPathComponent("limit-project", isDirectory: true)
@@ -289,7 +311,37 @@ final class SecureFilesystemMutationTests: XCTestCase {
         try Data("second".utf8).write(to: second)
         let clientID = ClientID("production-recursive-limit")
         _ = try bindProductionProject(app: app, project: project, clientID: clientID)
-        let transport = SecureFilesystemTransportStub(status: .enabled)
+        let transport = SecureFilesystemTransportStub(
+            status: .enabled,
+            deleteResponseProvider: { request in
+                let entry = project.appendingPathComponent(
+                    request.relativePathComponents.joined(separator: "/")
+                )
+                do {
+                    try FileManager.default.removeItem(at: entry)
+                } catch {
+                    XCTFail("fixture helper could not remove \(entry.path): \(error)")
+                }
+                return ForgeFilesystemResponse(
+                    ok: true,
+                    code: "ok",
+                    message: "committed",
+                    committed: true,
+                    durabilityConfirmed: true,
+                    recoveryTransactionID: request.transactionID,
+                    acknowledgementRequired: true
+                )
+            },
+            acknowledgeResponseProvider: { request in
+                ForgeFilesystemResponse(
+                    ok: true,
+                    code: "ok",
+                    message: "acknowledged",
+                    durabilityConfirmed: true,
+                    recoveryTransactionID: request.transactionID
+                )
+            }
+        )
         let router = ToolRouter(
             app: app,
             packs: [FilesystemToolPack(
@@ -304,15 +356,14 @@ final class SecureFilesystemMutationTests: XCTestCase {
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         )
 
-        XCTAssertFalse(result.ok)
-        XCTAssertEqual(
-            result.payload["code"] as? String,
-            ForgeFilesystemErrorCode.capabilityUnavailable
-        )
-        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.path))
-        XCTAssertEqual(try Data(contentsOf: first), Data("first".utf8))
-        XCTAssertEqual(try Data(contentsOf: second), Data("second".utf8))
-        XCTAssertEqual(transport.deleteCallCount, 0)
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(result.payload["deleted_entries"] as? Int, 3)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+        XCTAssertEqual(transport.deleteCallCount, 3)
+        XCTAssertEqual(transport.acknowledgeCallCount, 3)
+        XCTAssertEqual(transport.requests.map(\.access), [
+            .deleteLeaf, .deleteLeaf, .deleteEmptyDirectory,
+        ])
     }
 
     func testSecureClientMapsUnavailableStatusesWithoutDispatchingMutation() throws {
@@ -4742,6 +4793,7 @@ private final class SecureFilesystemTransportStub: SecureFilesystemServiceTransp
         ((ForgeFilesystemTransactionControlRequest) -> ForgeFilesystemResponse)?
     private let lock = NSLock()
     private var storedDeleteCallCount = 0
+    private var storedRequests: [ForgeFilesystemMutationRequest] = []
     private var storedQueryCallCount = 0
     private var storedResumeCallCount = 0
     private var storedAcknowledgeCallCount = 0
@@ -4786,6 +4838,12 @@ private final class SecureFilesystemTransportStub: SecureFilesystemServiceTransp
         return storedDeleteCallCount
     }
 
+    var requests: [ForgeFilesystemMutationRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedRequests
+    }
+
     var queryCallCount: Int {
         lock.lock()
         defer { lock.unlock() }
@@ -4825,6 +4883,7 @@ private final class SecureFilesystemTransportStub: SecureFilesystemServiceTransp
     ) -> ForgeFilesystemResponse {
         lock.lock()
         storedDeleteCallCount += 1
+        storedRequests.append(request)
         lock.unlock()
         return deleteResponseProvider?(request) ?? response
     }

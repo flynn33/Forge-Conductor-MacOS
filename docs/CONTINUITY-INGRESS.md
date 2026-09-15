@@ -3,8 +3,9 @@
 Source storage, task authorization and manager admission are implemented in the
 existing native Core module. Internal source transfer connects the canonical
 worker, native provider, exact retrieval broker and supervisor recovery. Public
-CLU controls are implemented; authenticated attachment to an existing desktop
-conversation and full native/live qualification remain open.
+CLU controls are implemented, and one complete production-adapter managed
+rollover is verified. Authenticated attachment to an existing desktop
+conversation remains unsupported without a host API.
 This change keeps product identity at 0.9.0 build 1.
 
 ## Source commit and delivery
@@ -248,11 +249,16 @@ forge-conductor manager task revoke --task UUID --expected-epoch N
 Preparation accepts the registered project ID and generation, exact assignment
 bytes and scope, provider selection, completion gates, explicit source limits and
 absolute expiry. The manager checks current folder authorization. Preparation
-creates no run and does not contact a provider. The first source profile,
+creates no run and does not contact a provider. The compatible source profile,
 `forge.native-task-source` version 1, supports approved `fs_read` work with a
-read-only filesystem scope and no network access. Unsupported work scope is
-rejected. Source calls are capped at 64 per task, results at 64 KiB and deadlines
-at 60 seconds; the approved limits and current policy can lower those ceilings.
+read-only filesystem scope and no network access. The additive version 2 profile
+supports exactly `fs_read`, `fs_write` and `fs_edit`, with writable roots pinned
+to its approved canonical roots. Both profiles expose the same continuity and
+CLU control surface. The server advertises and preflights only the selected
+profile's tools; unsupported work or cross-task/project authority is rejected
+before dispatch. Source calls are capped at 64 per task, results at 64 KiB and
+deadlines at 60 seconds; the approved limits and current policy can lower those
+ceilings.
 
 Operator commands use manager authentication. A separate task credential stays
 in the protected native task store; printed receipts omit its bearer value.
@@ -519,5 +525,18 @@ desktop conversation, repeated real-provider rollover or complete native/process
 qualification.
 A large result allowance can still exceed available headroom before a read;
 the owner distinguishes intrinsic capacity failure from transferable context
-pressure before any read. Repeated real-provider pressure rollover, G04 and
-release readiness remain unqualified.
+pressure before any read.
+
+The September 14 functional-development run used the production adapter with
+LM Studio and `qwen/qwen3-coder-30b` at its exact 131,072-token capacity. The
+first provider turn triggered pressure rollover and completed durable handoff,
+fresh root, exact retrieval and acknowledgment, predecessor seal/fence, successor
+`fs_read`, consumption of the full returned marker, injected bootstrap-crash
+recovery and stable replay with one active successor. Capability probing now sets
+Responses `tool_choice` to `required`; deterministic fixture coverage rejects a
+probe that does not receive that exact transport field.
+
+A separate repeat-live attempt spent more than the production 600-second provider
+deadline in prompt processing and later returned `lmstudio_conflict`. It emitted
+no terminal success record and is not counted as a second pass. The deterministic
+double-rollover test remains the evidence for two sequential transitions.

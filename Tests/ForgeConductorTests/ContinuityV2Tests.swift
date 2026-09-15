@@ -880,6 +880,109 @@ final class ContinuityV2Tests: XCTestCase {
         )
     }
 
+    func testTwoSequentialManagedRolloversReleaseTheProjectFenceWithoutDuplicateWork() throws {
+        let fixture = try makeMemoryFixture(label: "sequential-managed-rollovers")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let engine = ContinuityStateEngine(memory: fixture.memory)
+        let runID = UUID().uuidString.lowercased()
+
+        func completeRollover(
+            predecessor: String,
+            successor: String,
+            response: String
+        ) throws -> ContinuityOperationV2 {
+            let handoff = try makeHandoffV2(
+                projectID: fixture.projectID,
+                generation: 1,
+                runID: runID,
+                mode: .managedAutonomous,
+                predecessorSessionID: predecessor,
+                predecessorProviderResponseID: "response-\(predecessor)"
+            )
+            var operation = try engine.prepareV2(
+                handoff: handoff,
+                predecessorSessionID: predecessor,
+                predecessorProviderResponseID: "response-\(predecessor)",
+                adapterID: "forge.native-session-host",
+                idempotencyKey: "sequential-\(handoff.operationID)"
+            )
+            operation = try repository.continuityTransitionV2(
+                operationID: operation.operationID,
+                expected: .checkpointPersisted,
+                to: .successorRequested
+            )
+            operation = try repository.continuityTransitionV2(
+                operationID: operation.operationID,
+                expected: .successorRequested,
+                to: .successorCreated,
+                successorSessionID: successor,
+                successorProviderResponseID: response
+            )
+            operation = try repository.continuityTransitionV2(
+                operationID: operation.operationID,
+                expected: .successorCreated,
+                to: .successorBootstrapping
+            )
+            let acknowledgement = BootstrapAcknowledgementV2(
+                projectID: ProjectID(try XCTUnwrap(UUID(uuidString: fixture.projectID))),
+                projectGeneration: ProjectGeneration(operation.projectGeneration),
+                runID: RunID(try XCTUnwrap(UUID(uuidString: operation.runID))),
+                operationID: try XCTUnwrap(UUID(uuidString: operation.operationID)),
+                handoffID: try XCTUnwrap(UUID(uuidString: handoff.handoffID)),
+                handoffSHA256: handoff.contentSHA256,
+                nonce: try XCTUnwrap(handoff.bootstrapNonce)
+            )
+            operation = try repository.continuityAcknowledgeV2(
+                operationID: operation.operationID,
+                receipt: BootstrapReceipt(
+                    acknowledgement: acknowledgement,
+                    internalSessionID: successor,
+                    providerResponseID: response,
+                    modelKey: "fixture/model",
+                    adapterID: "forge.native-session-host"
+                )
+            )
+            operation = try repository.continuityTransitionV2(
+                operationID: operation.operationID,
+                expected: .successorAcknowledged,
+                to: .predecessorSealed
+            )
+            XCTAssertTrue(
+                try repository.continuityMarkContinuationIssuedV2(
+                    operationID: operation.operationID
+                )
+            )
+            return try XCTUnwrap(repository.continuityOperationV2(id: operation.operationID))
+        }
+
+        let first = try completeRollover(
+            predecessor: "session-0",
+            successor: "session-1",
+            response: "response-session-1"
+        )
+        let second = try completeRollover(
+            predecessor: "session-1",
+            successor: "session-2",
+            response: "response-session-2"
+        )
+
+        XCTAssertEqual(first.state, .predecessorSealed)
+        XCTAssertEqual(second.state, .predecessorSealed)
+        XCTAssertTrue(first.continuationIssued)
+        XCTAssertTrue(second.continuationIssued)
+        XCTAssertNotEqual(first.operationID, second.operationID)
+        XCTAssertNotEqual(first.handoffID, second.handoffID)
+        XCTAssertEqual(first.runID, second.runID)
+        XCTAssertEqual(
+            try repository.continuityTransitionCount(operationID: first.operationID),
+            try repository.continuityTransitionCount(operationID: second.operationID)
+        )
+    }
+
     func testManagedBridgeReturnsDurableCheckpointReceiptWithinBoundedCleanup() async throws {
         let fixture = try makeMemoryFixture(label: "bridge-committed-result")
         defer {
@@ -2575,7 +2678,9 @@ final class ContinuityV2Tests: XCTestCase {
         projectID: String,
         generation: Int,
         runID: String,
-        mode: ContinuityMode = .externalMCPCompatibility
+        mode: ContinuityMode = .externalMCPCompatibility,
+        predecessorSessionID: String = "predecessor",
+        predecessorProviderResponseID: String = "resp-predecessor"
     ) throws -> ContinuityHandoffV2 {
         try ContinuityHandoffV2(
             operationID: UUID().uuidString.lowercased(),
@@ -2594,9 +2699,9 @@ final class ContinuityV2Tests: XCTestCase {
                 "assignment_id": "FC-CONT-001",
             ],
             predecessorSession: [
-                "session_id": "predecessor",
+                "session_id": predecessorSessionID,
                 "provider_id": "lmstudio-local",
-                "provider_response_id": "resp-predecessor",
+                "provider_response_id": predecessorProviderResponseID,
                 "adapter_id": "forge.native-session-host",
                 "model": "fixture/tool-model",
             ],

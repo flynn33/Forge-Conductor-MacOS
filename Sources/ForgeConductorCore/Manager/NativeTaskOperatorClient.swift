@@ -13,13 +13,18 @@ public protocol NativeSourceOperatorTransport: Sendable {
 public struct NativeContinuityTaskPreparationInput: Sendable {
     public let projectID: ProjectID
     public let projectGeneration: ProjectGeneration
+    public let profileVersion: Int
     public let approval: NativeContinuityTaskApproval
     public let expiresAt: String
 
-    public init(projectID: ProjectID, projectGeneration: ProjectGeneration,
+    public init(projectID: ProjectID, projectGeneration: ProjectGeneration, profileVersion: Int = 1,
                 approval: NativeContinuityTaskApproval, expiresAt: String) throws {
         guard projectGeneration.rawValue > 0, projectGeneration.rawValue <= UInt64(Int.max) else { throw NativeTaskOperatorError.invalidRequest("project_generation") }
-        self.projectID = projectID; self.projectGeneration = projectGeneration; self.approval = approval
+        guard (1...2).contains(profileVersion) else { throw NativeTaskOperatorError.invalidRequest("profile_version") }
+        let expectedTools: Set<String> = profileVersion == 1 ? ["fs_read"] : ["fs_read", "fs_write", "fs_edit"]
+        guard approval.filesystemAccess == (profileVersion == 1 ? "read_only" : "read_write"),
+              Set(approval.allowedTools) == expectedTools else { throw NativeTaskOperatorError.invalidRequest("profile") }
+        self.projectID = projectID; self.projectGeneration = projectGeneration; self.profileVersion = profileVersion; self.approval = approval
         self.expiresAt = try NativeTaskOperatorWire.date(["expires_at": expiresAt], "expires_at")
     }
     public init(data: Data) throws {
@@ -27,11 +32,12 @@ public struct NativeContinuityTaskPreparationInput: Sendable {
         try NativeTaskOperatorWire.keys(object, required: ["schema_version", "project_id", "project_generation", "profile_id", "profile_version", "approval", "expires_at"])
         try NativeTaskOperatorWire.version(object)
         guard object["profile_id"] as? String == "forge.native-task-source",
-              JSONSupport.exactInteger(object["profile_version"]) == 1,
+              let profileVersion = JSONSupport.exactInteger(object["profile_version"]), (1...2).contains(profileVersion),
               let approval = object["approval"] as? [String: Any] else { throw NativeTaskOperatorError.invalidRequest("profile") }
         try self.init(projectID: ProjectID(NativeTaskOperatorWire.uuid(object, "project_id")),
             projectGeneration: ProjectGeneration(UInt64(NativeTaskOperatorWire.integer(object, "project_generation", range: 1...Int.max))),
-            approval: NativeContinuityTaskApproval(arguments: approval), expiresAt: NativeTaskOperatorWire.date(object, "expires_at"))
+            profileVersion: profileVersion, approval: NativeContinuityTaskApproval(arguments: approval),
+            expiresAt: NativeTaskOperatorWire.date(object, "expires_at"))
     }
 }
 
@@ -82,7 +88,8 @@ public actor NativeTaskOperatorClient {
         let taskID = UUID(), capabilityID = UUID()
         let credential = try Self.credential(capabilityID: capabilityID, epoch: 1)
         let request = try NativeContinuityTaskPreparationRequest(requestID: UUID(), taskID: taskID, capabilityID: capabilityID,
-            projectID: input.projectID, projectGeneration: input.projectGeneration, approval: input.approval,
+            projectID: input.projectID, projectGeneration: input.projectGeneration, profileVersion: input.profileVersion,
+            approval: input.approval,
             verifierSHA256: credential.verifier.sha256, expiresAt: input.expiresAt)
         let command = NativeTaskOperatorCommand.prepare(request)
         _ = try store.stage(command, candidate: credential, endpoint: endpoint)

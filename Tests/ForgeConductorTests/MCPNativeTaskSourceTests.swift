@@ -5,6 +5,65 @@ import ForgeNativeSessionHostPlugin
 @testable import ForgeConductorCore
 
 final class MCPNativeTaskSourceTests: XCTestCase, @unchecked Sendable {
+    func testWritableProfilePerformsOneDurableProjectScopedEffectAndReplaysAfterRestart() async throws {
+        var fixture = try await NativeSourceHTTPFixture.create(profileVersion: 2)
+        defer { fixture.stop() }
+        var session = try fixture.initializeReady(credential: fixture.credential)
+        let listed = try fixture.rpc(["jsonrpc": "2.0", "id": "write-list", "method": "tools/list"], session: session)
+        let tools = try XCTUnwrap((try JSONSupport.object(from: listed.0)["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+        XCTAssertEqual(Set(tools.compactMap { $0["name"] as? String }),
+            try MCPNativeTaskSourceProfile.toolNames(profileVersion: 2))
+
+        let target = fixture.file.deletingLastPathComponent().appendingPathComponent("managed-write.txt")
+        let message: [String: Any] = ["jsonrpc": "2.0", "id": "durable-write", "method": "tools/call",
+            "params": ["name": "fs_write", "arguments": ["path": target.path, "content": "managed write one"]]]
+        let first = try fixture.rpc(message, session: session)
+        XCTAssertEqual(first.1.statusCode, 200)
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "managed write one")
+
+        try Data("owner replacement".utf8).write(to: target)
+        let replay = try fixture.rpc(message, session: session)
+        XCTAssertEqual(replay.0, first.0)
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "owner replacement",
+            "An exact completed mutation must return its receipt without executing again")
+
+        let drained = await fixture.service.shutdown()
+        XCTAssertTrue(drained)
+        fixture = try fixture.reopened()
+        session = try fixture.initializeReady(credential: fixture.credential)
+        let restartedReplay = try fixture.rpc(message, session: session)
+        XCTAssertEqual(restartedReplay.0, first.0)
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "owner replacement")
+
+        let denied = try fixture.call("fs_write", id: "outside-write",
+            arguments: ["path": fixture.outside.path, "content": "forbidden"], session: session)
+        XCTAssertEqual(denied["ok"] as? Bool, false)
+        XCTAssertEqual(try String(contentsOf: fixture.outside, encoding: .utf8), "private outside marker")
+
+        let peer = try fixture.rpc(message, session: session, credential: fixture.peerCredential)
+        XCTAssertEqual(peer.1.statusCode, 404, "Another task cannot discover or borrow the original task's attached session")
+        let revoke = try NativeContinuityTaskRevocationRequest(requestID: UUID(), taskID: fixture.taskID,
+            capabilityID: fixture.credential.capabilityID, projectID: fixture.projectID,
+            projectGeneration: .initial, expectedEpoch: 1)
+        _ = try await fixture.app.projectContexts.repository.revokeNativeContinuityTask(request: revoke)
+        let revoked = try fixture.rpc(["jsonrpc": "2.0", "id": "revoked-write", "method": "tools/call",
+            "params": ["name": "fs_write", "arguments": ["path": target.path, "content": "revoked"]]], session: session)
+        XCTAssertEqual(revoked.1.statusCode, 401)
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "owner replacement")
+    }
+
+    func testReadOnlyProfileDoesNotAdvertiseOrDispatchMutationTools() async throws {
+        let fixture = try await NativeSourceHTTPFixture.create()
+        defer { fixture.stop() }
+        let session = try fixture.initializeReady(credential: fixture.credential)
+        let response = try fixture.rpc(["jsonrpc": "2.0", "id": "read-only-write", "method": "tools/call",
+            "params": ["name": "fs_write", "arguments": ["path": fixture.file.path, "content": "forbidden"]]], session: session)
+        XCTAssertEqual(response.1.statusCode, 200)
+        let object = try JSONSupport.object(from: response.0)
+        XCTAssertEqual((object["error"] as? [String: Any])?["message"] as? String, "tool_not_allowed")
+        XCTAssertEqual(try String(contentsOf: fixture.file, encoding: .utf8), "native source marker one")
+    }
+
     func testAcceptedNativeReadRejectsInsufficientOutputReservationThenReplaysExactPackResult() async throws {
         let fixture = try await NativeSourceHTTPFixture.create()
         defer { fixture.stop() }
@@ -453,7 +512,7 @@ final class NativeSourceHTTPFixture {
         try server.start()
     }
 
-    static func create(sourceManagerInstanceID: UUID? = nil) async throws -> NativeSourceHTTPFixture {
+    static func create(sourceManagerInstanceID: UUID? = nil, profileVersion: Int = 1) async throws -> NativeSourceHTTPFixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-native-http-source-\(UUID())")
             .resolvingSymlinksInPath().standardizedFileURL
         let project = root.appendingPathComponent("project")
@@ -471,13 +530,16 @@ final class NativeSourceHTTPFixture {
             let projectID = ProjectID(try XCTUnwrap((initialized["project_id"] as? String).flatMap(UUID.init(uuidString:))))
             _ = try await app.projectContexts.repository.registerProjectUnchecked(projectID: projectID,
                 displayName: "Native HTTP source", canonicalRoot: project)
-            let scope = ToolAuthorizationScope(canonicalRoots: [project], writableRoots: [], allowedTools: ["fs_read"],
+            let allowedTools: Set<String> = profileVersion == 1 ? ["fs_read"] : ["fs_read", "fs_write", "fs_edit"]
+            let access = profileVersion == 1 ? "read_only" : "read_write"
+            let scope = ToolAuthorizationScope(canonicalRoots: [project], writableRoots: profileVersion == 1 ? [] : [project],
+                allowedTools: allowedTools,
                 networkAllowed: false, maximumInlineOutputBytes: 65_536)
             let approval = try NativeContinuityTaskApproval(assignmentID: "native-http-source",
-                assignmentBytes: Data("Read the approved source file".utf8), mission: "Read the approved source file",
+                assignmentBytes: Data("Use the approved project filesystem".utf8), mission: "Use the approved project filesystem",
                 providerID: "lmstudio", adapterID: "forge.native-session-host", modelKey: "fixture/source-model",
-                allowedTools: ["fs_read"], completionGates: ["G04"], resourceProfile: .automatic,
-                filesystemAccess: "read_only", networkAllowed: false, maximumInlineOutputBytes: 65_536,
+                allowedTools: allowedTools.sorted(), completionGates: ["G04"], resourceProfile: .automatic,
+                filesystemAccess: access, networkAllowed: false, maximumInlineOutputBytes: 65_536,
                 sourceLimits: .init(maximumCalls: 8, maximumResultBytes: 65_536, maximumRequestSeconds: 30))
             let assignment = try ContinuityTaskAssignment(assignmentID: approval.assignmentID,
                 assignmentBytes: approval.assignmentBytes, mission: approval.mission, providerID: approval.providerID,
@@ -490,7 +552,7 @@ final class NativeSourceHTTPFixture {
             for (id, value) in [(taskID, credential), (UUID(), peer)] {
                 let request = try NativeContinuityTaskPreparationRequest(requestID: UUID(), taskID: id,
                     capabilityID: value.capabilityID, projectID: projectID, projectGeneration: .initial,
-                    approval: approval, verifierSHA256: value.verifier.sha256,
+                    profileVersion: profileVersion, approval: approval, verifierSHA256: value.verifier.sha256,
                     expiresAt: ISO8601.string(from: Date().addingTimeInterval(3600)))
                 _ = try await app.projectContexts.repository.prepareNativeContinuityTask(request: request, approvedAssignment: assignment)
             }

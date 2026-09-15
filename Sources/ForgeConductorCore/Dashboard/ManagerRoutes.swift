@@ -249,6 +249,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumProjectRegistrationBodyBytes = 16_384
     public static let maximumProjectRelinkPathBytes = 4_096
     static let maximumProjectRelinkBodyBytes = 16_384
+    static let maximumProjectContentClearBodyBytes = 512
     static let maximumRuntimeJobCancelBodyBytes = 256
     static let maximumProviderProbeBodyBytes = 512
     static let maximumRunControlBodyBytes = 256
@@ -622,6 +623,82 @@ public final class ManagerRoutes: @unchecked Sendable {
                 uniquingKeysWith: { receipt, _ in receipt }
             )
             http.respondJSON(connection, status: 200, object: result)
+        case ("POST", "/api/manager/projects/clear-content"):
+            guard target.queryItems.isEmpty,
+                  body.count <= Self.maximumProjectContentClearBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "project_content_clear_body_too_large",
+                    "message": "Project content clearing accepts one bounded operation request",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_project_content_clear",
+                    "message": "Project content clearing requires a JSON object",
+                ])
+                return
+            }
+            guard object.count == 4,
+                  Set(object.keys) == [
+                    "operation_id", "project_id", "project_generation", "mode",
+                  ],
+                  let operationValue = object["operation_id"] as? String,
+                  operationValue.utf8.count <= 36,
+                  let operationID = UUID(uuidString: operationValue),
+                  let projectValue = object["project_id"] as? String,
+                  projectValue.utf8.count <= 36,
+                  let projectUUID = UUID(uuidString: projectValue),
+                  let generationValue = integer(object["project_generation"]),
+                  generationValue > 0,
+                  let modeValue = object["mode"] as? String,
+                  modeValue.utf8.count <= 32,
+                  let mode = ProjectContentClearMode(rawValue: modeValue) else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_project_content_clear",
+                    "message": "Project content clearing requires exactly one operation UUID, project UUID, generation, and supported mode",
+                ])
+                return
+            }
+            do {
+                let receipt = try manager.clearProjectContent(
+                    ProjectContentClearRequest(
+                        operationID: operationID,
+                        projectID: ProjectID(projectUUID),
+                        expectedGeneration: ProjectGeneration(UInt64(generationValue)),
+                        mode: mode
+                    )
+                )
+                http.respondJSON(connection, status: 200, object: receipt.asDictionary())
+            } catch let error as ProjectContextError {
+                let status: Int
+                switch error {
+                case .projectNotFound:
+                    status = 404
+                case .databaseBusy:
+                    status = 503
+                case .projectTransitionConflict, .projectNotActive, .staleProjectGeneration,
+                     .retainedFilesystemRecovery:
+                    status = 409
+                case .invalidIdentifier, .invalidGeneration:
+                    status = 400
+                default:
+                    status = 500
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": error == .databaseBusy,
+                    "reconciliation_required": status == 409 || error == .databaseBusy,
+                ])
+            }
         case ("POST", "/api/manager/runtime-jobs/cancel"):
             guard body.count <= Self.maximumRuntimeJobCancelBodyBytes else {
                 http.respondJSON(connection, status: 413, object: [

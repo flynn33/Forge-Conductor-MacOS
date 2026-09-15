@@ -736,6 +736,101 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         ]
     }
 
+    /// Applies the project-local portion of a durable content clear exactly
+    /// once. The receipt lives in the same SQLite transaction as the deletion,
+    /// so manager recovery can safely replay after a lost response or restart.
+    public func clearContent(
+        operationID: UUID,
+        mode: ProjectContentClearMode,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectMemoryContentClearReceipt {
+        let operation = operationID.uuidString.lowercased()
+        let committed = try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                try cancellation?.checkCancellation()
+                if let existing = try contentClearReceiptUnlocked(operationID: operation) {
+                    guard existing.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+                          existing.mode == mode else {
+                        throw ProjectMemoryError.conflict(
+                            "content clear operation identity was reused with different authority"
+                        )
+                    }
+                    return ProjectMemoryContentClearReceipt(
+                        operationID: operationID,
+                        projectID: existing.projectID,
+                        mode: existing.mode,
+                        memoryRecordCount: existing.memoryRecordCount,
+                        continuityRecordCount: existing.continuityRecordCount,
+                        committedAt: existing.committedAt,
+                        replayed: true
+                    )
+                }
+
+                var memoryRecordCount = 0
+                var continuityRecordCount = 0
+                if mode.clearsMemory {
+                    memoryRecordCount = try countForProjectUnlocked(table: "memory_records")
+                    try deleteForProjectUnlocked(table: "memory_records")
+                    try deleteForProjectUnlocked(table: "event_journal")
+                    try execUnlocked(
+                        "DELETE FROM memory_tags WHERE id NOT IN (SELECT tag_id FROM memory_record_tags);"
+                    )
+                }
+                if mode.clearsContinuity {
+                    let continuityTables = [
+                        "continuity_handoffs", "rollover_operations", "rollover_transitions",
+                        "project_active_sessions", "legacy_continuity_quarantine",
+                        "continuity_projection_repairs", "handoffs", "sessions", "artifacts",
+                    ]
+                    for table in continuityTables {
+                        continuityRecordCount += try countForProjectUnlocked(table: table)
+                    }
+                    for table in [
+                        "continuity_projection_repairs", "rollover_transitions",
+                        "rollover_operations", "continuity_handoffs", "project_active_sessions",
+                        "legacy_continuity_quarantine", "handoffs", "sessions", "artifacts",
+                    ] {
+                        try deleteForProjectUnlocked(table: table)
+                    }
+                }
+
+                let timestamp = ISO8601.string(from: clock.now())
+                try withStatementUnlocked(
+                    """
+                    INSERT INTO project_content_clear_receipts(
+                        operation_id,project_id,mode,memory_record_count,
+                        continuity_record_count,committed_at
+                    ) VALUES(?,?,?,?,?,?)
+                    """
+                ) { statement in
+                    bind(statement, 1, operation)
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, mode.rawValue)
+                    sqlite3_bind_int64(statement, 4, Int64(memoryRecordCount))
+                    sqlite3_bind_int64(statement, 5, Int64(continuityRecordCount))
+                    bind(statement, 6, timestamp)
+                    try stepDone(statement)
+                }
+                return ProjectMemoryContentClearReceipt(
+                    operationID: operationID,
+                    projectID: projectID,
+                    mode: mode,
+                    memoryRecordCount: memoryRecordCount,
+                    continuityRecordCount: continuityRecordCount,
+                    committedAt: timestamp,
+                    replayed: false
+                )
+            }
+        }
+        if mode.clearsContinuity {
+            try removeContinuityProjectionFiles()
+        }
+        return committed
+    }
+
     public func exportRecords(
         cancellation: ToolCallCancellation? = nil
     ) throws -> [[String: Any]] {
@@ -4297,6 +4392,13 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS project_aliases(project_id TEXT NOT NULL,alias TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(project_id,alias));
             CREATE TABLE IF NOT EXISTS maintenance_state(project_id TEXT PRIMARY KEY,last_run_at TEXT,state_json TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS event_journal(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id TEXT NOT NULL,record_id TEXT,action TEXT NOT NULL,detail TEXT,created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS project_content_clear_receipts(
+              operation_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,mode TEXT NOT NULL
+                CHECK(mode IN ('memory','continuity','memory_and_continuity','run_history')),
+              memory_record_count INTEGER NOT NULL CHECK(memory_record_count>=0),
+              continuity_record_count INTEGER NOT NULL CHECK(continuity_record_count>=0),
+              committed_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS continuity_handoffs(
               handoff_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,operation_id TEXT NOT NULL UNIQUE,
               payload_json TEXT NOT NULL,content_sha256 TEXT NOT NULL,created_at TEXT NOT NULL,
@@ -4773,6 +4875,100 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 }
             }
             return false
+        }
+    }
+
+    private func contentClearReceiptUnlocked(
+        operationID: String
+    ) throws -> ProjectMemoryContentClearReceipt? {
+        try withStatementUnlocked(
+            """
+            SELECT project_id,mode,memory_record_count,continuity_record_count,committed_at
+            FROM project_content_clear_receipts WHERE operation_id=? LIMIT 1
+            """
+        ) { statement in
+            bind(statement, 1, operationID)
+            guard try stepRow(statement) else { return nil }
+            guard let storedProjectID = text(statement, 0),
+                  let modeValue = text(statement, 1),
+                  let mode = ProjectContentClearMode(rawValue: modeValue),
+                  let committedAt = text(statement, 4),
+                  let identifier = UUID(uuidString: operationID) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "project content clear receipt is malformed"
+                )
+            }
+            let memoryCount = sqlite3_column_int64(statement, 2)
+            let continuityCount = sqlite3_column_int64(statement, 3)
+            guard memoryCount >= 0, memoryCount <= Int64(Int.max),
+                  continuityCount >= 0, continuityCount <= Int64(Int.max) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "project content clear receipt counts are invalid"
+                )
+            }
+            return ProjectMemoryContentClearReceipt(
+                operationID: identifier,
+                projectID: storedProjectID,
+                mode: mode,
+                memoryRecordCount: Int(memoryCount),
+                continuityRecordCount: Int(continuityCount),
+                committedAt: committedAt,
+                replayed: false
+            )
+        }
+    }
+
+    private func countForProjectUnlocked(table: String) throws -> Int {
+        let permitted = Set([
+            "memory_records", "event_journal", "continuity_handoffs",
+            "rollover_operations", "rollover_transitions", "project_active_sessions",
+            "legacy_continuity_quarantine", "continuity_projection_repairs",
+            "handoffs", "sessions", "artifacts",
+        ])
+        guard permitted.contains(table) else {
+            throw ProjectMemoryError.integrityFailure(
+                "project content clear table is not permitted"
+            )
+        }
+        return try withStatementUnlocked(
+            "SELECT COUNT(*) FROM \(table) WHERE project_id=?"
+        ) { statement in
+            bind(statement, 1, projectID)
+            guard try stepRow(statement) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "project content clear count could not be read"
+                )
+            }
+            let count = sqlite3_column_int64(statement, 0)
+            guard count >= 0, count <= Int64(Int.max) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "project content clear count is invalid"
+                )
+            }
+            return Int(count)
+        }
+    }
+
+    private func deleteForProjectUnlocked(table: String) throws {
+        _ = try countForProjectUnlocked(table: table)
+        try withStatementUnlocked("DELETE FROM \(table) WHERE project_id=?") { statement in
+            bind(statement, 1, projectID)
+            try stepDone(statement)
+        }
+    }
+
+    private func removeContinuityProjectionFiles() throws {
+        let fileManager = FileManager.default
+        for name in ["continuity", "LegacyContinuityQuarantine"] {
+            let target = directory.appendingPathComponent(name, isDirectory: true)
+            guard fileManager.fileExists(atPath: target.path) else { continue }
+            do {
+                try fileManager.removeItem(at: target)
+            } catch {
+                throw ProjectMemoryError.integrityFailure(
+                    "continuity projection cleanup is pending recovery"
+                )
+            }
         }
     }
 

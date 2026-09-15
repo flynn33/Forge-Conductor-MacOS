@@ -178,18 +178,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 guard let path = ToolArgHelpers.string(arguments, "path") else {
                     return .failure(code: "missing_path", message: "path required")
                 }
-                return try secureMutationClient.deleteLeaf(
-                    at: ToolArgHelpers.resolvePath(path),
-                    context: context,
-                    cancellation: cancellation,
-                    recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths),
-                    authorityValidator: { currentContext in
-                        try app.projectContexts.validate(
-                            currentContext,
-                            cancellation: cancellation
-                        )
-                    }
-                )
+                return try secureRecursiveDelete(at: ToolArgHelpers.resolvePath(path), client: secureMutationClient,
+                    context: context, app: app, cancellation: cancellation)
             }
             return try fsDelete(
                 arguments,
@@ -218,10 +208,26 @@ public struct FilesystemToolPack: ToolPackHandling {
                 recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths)
             )
         case "fs_move":
-            if secureMutationClient != nil {
-                return .failure(
-                    code: "filesystem_capability_unavailable",
-                    message: "Filesystem move is disabled until privileged move recovery is qualified"
+            if let secureMutationClient {
+                guard let source = ToolArgHelpers.string(arguments, "path")
+                        ?? ToolArgHelpers.string(arguments, "src")
+                        ?? ToolArgHelpers.string(arguments, "source"),
+                      let destination = ToolArgHelpers.string(arguments, "dest")
+                        ?? ToolArgHelpers.string(arguments, "destination") else {
+                    return .failure(code: "missing_args", message: "path/src and dest required")
+                }
+                return try secureMutationClient.moveEntry(
+                    from: ToolArgHelpers.resolvePath(source),
+                    to: ToolArgHelpers.resolvePath(destination),
+                    context: context,
+                    cancellation: cancellation,
+                    recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths),
+                    authorityValidator: { currentContext in
+                        try app.projectContexts.validate(
+                            currentContext,
+                            cancellation: cancellation
+                        )
+                    }
                 )
             }
             return try fsMove(
@@ -635,6 +641,107 @@ public struct FilesystemToolPack: ToolPackHandling {
             "deleted": true,
             "deleted_entries": removedCount,
         ])
+    }
+
+    /// Production deletion is a bounded bottom-up sequence of exact-entry
+    /// transactions owned by the signed helper. Each entry is atomically
+    /// captured into the helper's protected same-volume namespace before its
+    /// terminal mutation; no same-user quarantine substitutes for that proof.
+    private func secureRecursiveDelete(
+        at url: URL,
+        client: SecureFilesystemMutationClient,
+        context: ToolInvocationContext?,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
+        let plan: [DeletionEntry]
+        do {
+            plan = try Self.recursiveDeletionPlan(at: url, cancellation: cancellation)
+        } catch FilesystemMutationError.entryLimitExceeded {
+            return .failure(code: "filesystem_mutation_limit",
+                message: "Recursive deletion exceeds the \(Self.maximumRecursiveMutationEntries)-entry limit")
+        }
+        let ledger = SecureFilesystemRecoveryLedger(paths: app.paths)
+        var completed = 0
+        var lastPayload: [String: Any] = [:]
+        for entry in plan {
+            do { try cancellation?.checkCancellation() }
+            catch {
+                guard completed > 0 else { throw error }
+                return Self.partialMutationResult(operation: "delete", source: url,
+                    destination: nil, completedEntries: completed, error: error)
+            }
+            guard let currentInformation = try Self.lstatInformationIfExists(at: entry.url),
+                  entry.identity.matches(currentInformation) else {
+                let error = SourceFenceError.changed
+                if completed == 0 { return Self.sourceChangedFailure(error) }
+                return Self.partialMutationResult(operation: "delete", source: url,
+                    destination: nil, completedEntries: completed, error: error)
+            }
+            // Directory link counts may change as child directories are retired.
+            // Refresh the exact identity immediately before the helper capture
+            // while retaining the original device/inode/type/owner fence.
+            let identity = ForgeFilesystemIdentity(
+                device: UInt64(currentInformation.st_dev),
+                inode: UInt64(currentInformation.st_ino),
+                mode: UInt32(currentInformation.st_mode),
+                owner: UInt32(currentInformation.st_uid),
+                group: UInt32(currentInformation.st_gid),
+                linkCount: UInt64(currentInformation.st_nlink)
+            )
+            let result = try client.deleteLeaf(at: entry.url, context: context, cancellation: cancellation,
+                recoveryLedger: ledger, expectedIdentity: identity, allowEmptyDirectory: entry.isDirectory,
+                authorityValidator: { currentContext in
+                    try app.projectContexts.validate(currentContext, cancellation: cancellation)
+                })
+            guard result.ok else {
+                if completed == 0 { return result }
+                var partial = result
+                partial.payload["partial_mutation"] = true
+                partial.payload["operation"] = "delete"
+                partial.payload["path"] = url.path
+                partial.payload["completed_entries"] = completed
+                return partial
+            }
+            completed += 1
+            lastPayload = result.payload
+            if result.payload["acknowledgement_required"] as? Bool == true,
+               let transactionID = result.payload["filesystem_transaction_id"] as? String {
+                let acknowledgement = try client.recoverDelete(
+                    transactionID: transactionID,
+                    action: "acknowledge",
+                    context: context,
+                    cancellation: cancellation,
+                    recoveryLedger: ledger
+                )
+                guard acknowledgement.ok else {
+                    var partial = acknowledgement
+                    partial.payload["partial_mutation"] = true
+                    partial.payload["operation"] = "delete"
+                    partial.payload["path"] = url.path
+                    partial.payload["completed_entries"] = completed
+                    return partial
+                }
+                lastPayload = acknowledgement.payload
+            }
+            deletionStepObserver?(completed)
+        }
+        guard !Self.pathEntryExists(url) else {
+            return Self.partialMutationResult(
+                operation: "delete",
+                source: url,
+                destination: nil,
+                completedEntries: completed,
+                error: SourceFenceError.changed
+            )
+        }
+        var payload: [String: Any] = ["path": url.path, "deleted": true,
+            "deleted_entries": completed, "committed": true]
+        for key in ["durability_confirmed", "filesystem_transaction_id", "acknowledgement_required",
+                    "caller_cleanup_required"] where lastPayload[key] != nil {
+            payload[key] = lastPayload[key]
+        }
+        return .success(payload)
     }
 
     private func fsMove(
@@ -1371,13 +1478,15 @@ public struct FilesystemToolPack: ToolPackHandling {
         let mode: UInt32
         let owner: UInt32
         let group: UInt32
+        let linkCount: UInt64
 
-        init(device: Int64, inode: UInt64, mode: UInt32, owner: UInt32, group: UInt32) {
+        init(device: Int64, inode: UInt64, mode: UInt32, owner: UInt32, group: UInt32, linkCount: UInt64 = 1) {
             self.device = device
             self.inode = inode
             self.mode = mode
             self.owner = owner
             self.group = group
+            self.linkCount = linkCount
         }
 
         init(_ information: stat) {
@@ -1386,6 +1495,7 @@ public struct FilesystemToolPack: ToolPackHandling {
             mode = UInt32(information.st_mode)
             owner = UInt32(information.st_uid)
             group = UInt32(information.st_gid)
+            linkCount = UInt64(information.st_nlink)
         }
 
         var isDirectory: Bool {
@@ -1456,7 +1566,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 inode: inode,
                 mode: mode,
                 owner: owner,
-                group: group
+                group: group,
+                linkCount: linkCount
             )
         }
 

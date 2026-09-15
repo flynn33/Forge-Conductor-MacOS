@@ -21,6 +21,22 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 > below. Package P10/G10 records remain open; this documentation does not mark
 > any package gate complete.
 
+The current local signed candidate has passed a repaired live-home startup,
+manager, telemetry, and native navigation check. One historical store-migration
+backup was absent and remains unavailable for rollback; its completed manifest
+was preserved before a new verified migration backup was created. The last full
+Swift run completed 1,578 tests with 12 explicit skips and zero failures after
+correcting an Xcode target-order-sensitive isolation test. The native
+UI-automation runner timed out before executing its test. LM Studio's saved MCP
+path still names the deleted `/Applications/Forge Conductor.app` installation.
+
+The current delivery target is the [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md):
+an optimized Release application signed with the available Apple Development
+identity. Developer ID distribution, notarization/stapling, public-download
+acceptance, and the broader physical-hardware/RAM-tier matrix are owner-deferred
+and non-blocking for this delivery. Required functional product work remains in
+scope and must not be replaced by those deferrals.
+
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
 source revisions, passing local scenarios, and subsequent GitHub CI repairs.
 The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) describes the
@@ -28,8 +44,9 @@ same provider setup and installation workflow.
 
 Manager-owned runs now use [installed native completion policy](docs/NATIVE-COMPLETION.md).
 Missing policy blocks completion; model-supplied hashes cannot approve a gate.
-CLU correction implementation and its separate live API/desktop qualification
-remain in progress.
+The native managed host completed one real threshold-driven rollover; exact
+attachment to an existing external desktop conversation remains unsupported
+without an authenticated host API.
 
 The [native source attachment](docs/CONTINUITY-INGRESS.md#authenticated-native-source-attachment)
 supports explicitly approved read-only tasks through the existing manager, with
@@ -66,15 +83,15 @@ closeout updates this README, the Unreleased changelog, and affected documents.
 The [delivery workflow](docs/DELIVERY-WORKFLOW.md) defines local-first commits,
 Xcode workspace synchronization, owner review, and post-merge reconciliation.
 
-Recent owner-directed verification established the CLI baseline, coherent
-resume inputs, read/edit/command results, project-memory isolation, and
-selected-project generation fencing. These checks do not, by themselves,
-qualify the current signed GUI, selectable memory/continuity clearing, writable
-source handoff, existing-desktop attachment, or complete live rollover recovery.
-Generation reset preserves durable memory; it must not be described as a flush.
+Current owner-directed verification covers immutable reset confirmation,
+recoverable content clearing, telemetry/manager ownership, production filesystem
+dispatch, writable source handoff, deterministic repeated rollover and one complete
+real-provider rollover. Generation reset still preserves durable memory; it must
+not be described as a flush. Existing-desktop attachment remains a separate,
+unsupported host capability.
 
 The tracking workflow in [PR #46](https://github.com/flynn33/Forge-Conductor-MacOS/pull/46)
-is merged, and local/remote `main` equality at merge commit `50d1821` was
+is merged; PR #47 is also merged, and local/remote `main` equality at merge commit `d05e56a` was
 rechecked September 14, 2026. The current host, signing, provider, and hardware
 prerequisites are recorded in the [roadmap](ROADMAP.md#current-prerequisite-snapshot--september-14-2026).
 That inventory is not a native-build or release-qualification result.
@@ -162,12 +179,12 @@ work recorded under **Unreleased** in the changelog.
 | Area | Implemented behavior |
 |------|----------------------|
 | **Product identity** | The CLI reports marketing version **0.9.0**. Swift constants, Xcode configurations, and the built app bundle report version **0.9.0**, build **1**. |
-| **Operator app** | The native SwiftUI app exposes Rig, MCP, Agents, Tools, Feed, Projects, Autonomy, Continuity, Runtimes, Provider, Evidence, Diagnostics, and Manager surfaces. An earlier exact-revision Apple Development-signed 100-cycle Rig/MCP result is supporting evidence; the final current-source signed navigation and action matrix remains open. |
+| **Operator app** | The native SwiftUI app exposes Rig, MCP, Agents, Tools, Feed, Projects, Autonomy, Continuity, Runtimes, Provider, Evidence, Diagnostics, and Manager surfaces. The current Apple Development-signed Release product passed coherent bundle checks and a bounded isolated launch; an earlier 100-cycle Rig/MCP result remains supporting evidence. |
 | **Project memory** | Twelve `project_memory.*` tools provide bounded search, optimistic updates, links, batch writes, health, and checksummed import/export while legacy `memory_*` tools remain available. |
 | **Shell** | Project shell tools are enabled on clean installs, ambiguous legacy disabled state migrates to enabled, explicit opt-out persists, and `shell_exec` retains its registered name, authorized `/bin/bash -lc` behavior, 120-second ceiling, and established result contract. Clean-profile `bash.run` is additive. |
-| **Continuity** | Durable checkpoints, handoffs, successor state, fencing, and a native LM Studio provider adapter are implemented and covered by deterministic recovery tests. Real-provider threshold rollover and the full crash-state matrix remain open below. |
+| **Continuity** | Durable checkpoints, handoffs, successor state, fencing, and a native LM Studio provider adapter are implemented. Deterministic recovery and double-rollover tests pass, and one real-provider threshold rollover completed through successor work and stable replay. |
 | **Runtime and telemetry** | Startup, settings and diagnostics export run outside the main actor with bounded operation ownership. Hidden windows and hidden ancestors stop Metal draw submission; showing the window redraws pending values. Telemetry, subprocess pipes and durable jobs remain bounded. |
-| **Filesystem mitigation** | Protocol-v5 capture, bounded protected quarantine, durable receipts, and additive `fs_delete_recovery` narrow and record regular-file/symlink deletion race impact. Move and recursive directory deletion remain unavailable in production. |
+| **Filesystem mitigation** | Protocol-v5 capture, bounded protected quarantine, durable receipts, and additive `fs_delete_recovery` protect regular-file, symbolic-link, empty-directory, no-replacement move, and bounded bottom-up recursive-delete operations. Every production mutation uses the separately signed helper; no same-user fallback is accepted. |
 
 The [current shipping handoff](.forge-codex/state/release-handoff.md) records
 exact source manifests, Debug/Release regression counts, native tests, separate
@@ -181,13 +198,14 @@ These results do not qualify every feature or close the remaining release gates.
 - **Filesystem E2:** the signed distinct-process 57-row matrix, durable-crash
   recovery matrix, terminal receipt/physical-leaf reconciliation, and formal
   closure remain required. Production `fs_move` and recursive directory
-  `fs_delete` are currently unavailable; their hardened internal paths and
-  tests are not a production capability. Quarantine is mitigation, not
-  elimination.
-- **Native release:** the focused signed Debug navigation test is supporting
-  evidence only. Developer ID Release build, full native/settings/service
-  lifecycle, archive, notarization, stapling, and Gatekeeper execution remain
-  open.
+  `fs_delete` now dispatch through the signed-helper recovery protocol and pass
+  focused in-process contract/adversarial tests; root-service execution remains
+  unmeasured on this host because service approval requires owner interaction.
+  Quarantine is mitigation, not elimination.
+- **Native development delivery:** the current-source Apple Development-signed
+  Release app, coherent nested bundle, isolated CLI checks and bounded direct GUI
+  launch pass. Developer ID Release, notarization, stapling, public Gatekeeper/
+  download acceptance and the broader UI/hardware matrix are owner-deferred.
 - **Shell qualification:** a bounded Apple Development-signed installed-app
   scenario executed the established `shell_exec` contract through both the app
   executable and installed raw CLI. It proved clean-install enablement,
@@ -207,17 +225,21 @@ These results do not qualify every feature or close the remaining release gates.
   saved configuration. The four native onboarding scenarios passed; complete
   installed-stack and provider/autonomy qualification remain open. A successful
   save or connection test alone does not qualify managed Autonomy.
-- **Provider continuity:** an unresolved provider-response crash is fenced for
-  660 seconds. LM Studio exposes no request-ID receipt lookup; after the fence,
+- **Provider continuity:** one real 131,072-token threshold rollover completed
+  durable handoff, exact acknowledgment, predecessor sealing, successor `fs_read`,
+  output consumption, injected crash recovery and stable replay. A second attempt
+  exceeded the production 600-second provider deadline during prompt processing
+  and later returned `lmstudio_conflict`; it is not a second pass. An unresolved
+  provider-response crash is fenced for 660 seconds. LM Studio exposes no request-ID receipt lookup; after the fence,
   each retry can create at most one duplicate model inference, and repeated
   operator or recovery retries can repeat inference. Tool-effect reconciliation
   prevents duplicate tool execution, but the inference race is not eliminated.
-  Release authority still requires the manager-owned threshold-forced real-
-  provider rollover with exact successor acknowledgment, predecessor fencing,
-  automatic continuation, GUI-closed operation, and durable crash recovery.
-- **Hardware and completion:** representative physical-hardware qualification
-  is owner-deferred. The full clean release matrix, current package P10/G10 and
-  G09-G12 evidence, and final completion validation remain open.
+  Deterministic tests cover two sequential rollovers and the broader crash matrix.
+- **Hardware and completion:** the broader representative physical-hardware and
+  RAM-tier matrix is owner-deferred and non-blocking for the functional
+  development build; it is not recorded as passed. Compatible macOS execution,
+  automated native tests and accurately labeled simulated conditions remain in
+  scope alongside current P10/G10, G09-G12 and functional completion evidence.
 
 Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Current
 product behavior and qualification boundaries are in
@@ -225,8 +247,9 @@ product behavior and qualification boundaries are in
 records its own still-open evidence state and does not override current source
 or executable behavior.
 
-No implementation, unit test, focused UI test, or synthetic-provider result in
-this snapshot closes P10, G10, filesystem E2, or final release qualification.
+The functional development build is distinct from P10/G10 public-distribution
+qualification. Nothing in this snapshot claims filesystem root-service E2,
+Developer ID signing, notarization, public shipment, or universal installation.
 
 ## Design principles
 

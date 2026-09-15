@@ -14,6 +14,12 @@ protocol OperatorManagerClientProtocol: Sendable {
     ) async throws -> OperatorProjectRegistrationOutcome
     func projectStatus(projectID: String) async throws -> OperatorProject
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt
+    func clearProjectContent(
+        operationID: UUID,
+        projectID: String,
+        generation: UInt64,
+        mode: OperatorProjectContentClearMode
+    ) async throws -> OperatorProjectContentClearReceipt
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -33,6 +39,17 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func clearProjectContent(
+        operationID: UUID,
+        projectID: String,
+        generation: UInt64,
+        mode: OperatorProjectContentClearMode
+    ) async throws -> OperatorProjectContentClearReceipt {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Project content clearing is unavailable from this manager client."
+        )
+    }
+
     func budgetPolicy(scope: BudgetPolicyScope) async throws -> BudgetPolicySelection {
         try await settings().resolvedBudgetPolicy(scope: scope)
     }
@@ -233,11 +250,79 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
     }
 
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt {
-        try await request(
+        guard UUID(uuidString: projectID) != nil,
+              generation > 0,
+              generation < UInt64(Int64.max) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project reset requires one valid project identity and generation"
+            )
+        }
+        let successor = generation.addingReportingOverflow(1)
+        guard !successor.overflow else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project reset generation cannot be advanced"
+            )
+        }
+        let receipt: OperatorResetReceipt = try await request(
             method: "POST",
             path: "/api/manager/projects/reset-generation",
             body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation)
         )
+        guard let receiptProjectID = receipt.projectID,
+              receiptProjectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              receipt.priorGeneration == generation,
+              receipt.newGeneration == successor.partialValue,
+              receipt.invalidatedBindingCount >= 0 else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project reset receipt did not match the requested project generation"
+            )
+        }
+        return receipt
+    }
+
+    func clearProjectContent(
+        operationID: UUID,
+        projectID: String,
+        generation: UInt64,
+        mode: OperatorProjectContentClearMode
+    ) async throws -> OperatorProjectContentClearReceipt {
+        guard let projectUUID = UUID(uuidString: projectID),
+              generation > 0,
+              generation < UInt64(Int64.max) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project content clearing requires one operation, project, generation, and mode"
+            )
+        }
+        let successor = generation.addingReportingOverflow(1)
+        guard !successor.overflow else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project content clear generation cannot be advanced"
+            )
+        }
+        let receipt: OperatorProjectContentClearReceipt = try await request(
+            method: "POST",
+            path: "/api/manager/projects/clear-content",
+            body: ProjectContentClearBody(
+                operationID: operationID,
+                projectID: projectUUID,
+                projectGeneration: generation,
+                mode: mode
+            )
+        )
+        guard UUID(uuidString: receipt.operationID) == operationID,
+              receipt.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              receipt.mode == mode,
+              receipt.priorGeneration == generation,
+              receipt.newGeneration == successor.partialValue,
+              receipt.memoryRecordCount >= 0,
+              receipt.continuityRecordCount >= 0,
+              receipt.runHistoryCount >= 0,
+              receipt.invalidatedBindingCount >= 0 else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project content clear receipt is inconsistent; reconcile the original operation"
+            )
+        }
+        return receipt
     }
 
     func relinkProject(
@@ -486,6 +571,12 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
     }
     func projectStatus(projectID: String) async throws -> OperatorProject { throw error }
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt { throw error }
+    func clearProjectContent(
+        operationID: UUID,
+        projectID: String,
+        generation: UInt64,
+        mode: OperatorProjectContentClearMode
+    ) async throws -> OperatorProjectContentClearReceipt { throw error }
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -555,6 +646,20 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.resetProject(projectID: projectID, generation: generation)
     }
 
+    func clearProjectContent(
+        operationID: UUID,
+        projectID: String,
+        generation: UInt64,
+        mode: OperatorProjectContentClearMode
+    ) async throws -> OperatorProjectContentClearReceipt {
+        try await current.clearProjectContent(
+            operationID: operationID,
+            projectID: projectID,
+            generation: generation,
+            mode: mode
+        )
+    }
+
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -621,6 +726,20 @@ private struct ProjectGenerationBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
+    }
+}
+
+private struct ProjectContentClearBody: Encodable {
+    let operationID: UUID
+    let projectID: UUID
+    let projectGeneration: UInt64
+    let mode: OperatorProjectContentClearMode
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operation_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case mode
     }
 }
 

@@ -219,7 +219,13 @@ final class OperatorProjectContractTests: XCTestCase {
         let client = OperatorProjectContractClient(
             registration: .committed(project: registered, reconciled: true),
             status: reset,
-            resetReceipt: try XCTUnwrap(reset.resetReceipt)
+            resetReceipt: OperatorResetReceipt(
+                projectID: projectID,
+                priorGeneration: 7,
+                newGeneration: 8,
+                invalidatedBindingCount: 1,
+                completedAt: "2026-09-13T00:00:00Z"
+            )
         )
         let viewModel = ProjectsViewModel(client: client)
 
@@ -228,7 +234,7 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedProject, registered)
         XCTAssertTrue(viewModel.notice?.contains("Reconciled") == true)
 
-        viewModel.resetSelectedProject()
+        viewModel.resetProject(try XCTUnwrap(viewModel.resetConfirmationForSelectedProject()))
         try await Self.waitUntilIdle(viewModel)
         XCTAssertEqual(viewModel.selectedProject, reset)
         XCTAssertEqual(viewModel.selectedProject?.projectGeneration, 8)

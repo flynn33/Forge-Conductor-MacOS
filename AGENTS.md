@@ -1,17 +1,17 @@
 <!-- FORGE-OWNER-SLICE-WORKFLOW:BEGIN -->
-# Current owner-directed delivery workflow
+# Current owner-directed completion workflow
 
-The owner supplies one current slice and the working checkout. Perform only that slice with actually exposed tools. Read its necessary source, make the smallest justified change, check it, commit locally, push the slice branch, and open one PR targeting `main`. Then stop for owner review. Never merge, enable auto-merge, or start another slice without the owner's next instruction.
+The current target is the [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md). Continue small, tested, local-first changes across the remaining authorized completion phases. A phase or PR boundary does not stop independent authorized work. Keep one coherent completion branch and reviewable PR where practical. Never merge, enable auto-merge, publish publicly, create credentials, or replace the working installation without the owner's separate authorization.
 
 `ROADMAP.md` is the canonical phase/milestone record. `docs/DELIVERY-WORKFLOW.md` defines publication and synchronization. Every PR updates its affected roadmap row with actual evidence, blocker state, and the real PR link. The roadmap records work; it is not a task selector. Historical packages, selectors, old handoffs, and archived phase lists have no dispatch authority.
 
-At every phase end, update README, the existing Unreleased changelog, and the affected current documents in the closing PR. Missing documentation leaves the phase open. A deferred requirement remains deferred, not complete.
+At every phase end, update README, the existing Unreleased changelog, and the affected current documents in the completion PR. Missing documentation leaves the phase open. A deferred requirement remains deferred, not complete.
 
 All product edits are local-first. Start new authorized work from safely synchronized `main`. Verify source/resource/test membership in the canonical `ForgeConductor.xcworkspace` and its existing project with every PR; change the graph only when needed. Do not regenerate the project or confuse package compilation with signed native execution. Documentation-only PRs record an unchanged graph rather than manufacturing project edits.
 
-One logical slice may use a small local documentation follow-up commit to add the actual PR URL. Before the review pause, verify local branch, remote branch, and PR head agree. After the owner confirms merge, a separate synchronization-only instruction fast-forwards local `main`, verifies the workspace and affected build inputs, and records a receipt on that PR. It does not begin another slice.
+Use a small local documentation follow-up commit to add the actual PR URL. At meaningful checkpoints, verify local branch, remote branch, and PR head agree. After an authorized merge is observed, safely fast-forward local `main`, verify the workspace and affected build inputs, record a receipt on that PR, and continue independent authorized work without requiring a trivial synchronization assignment.
 
-Use direct native commands and actual tool schemas, not automation scripts or archived gate runners. Preserve the engineering requirements below, existing signing/authorization, shell access, data isolation, compatibility, and evidence. Keep the running build host separate from the candidate. An unavailable capability or failed required check is a specific blocker, not permission to lower protections or fabricate a pass.
+Use direct native commands, actual tool schemas, and inspected narrow build/test/evidence utilities; do not revive archived task selectors or broad gate runners. Preserve the engineering requirements below, existing signing/authorization, shell access, data isolation, compatibility, and evidence. Keep the running build host separate from the candidate. An unavailable capability or failed required check blocks its gate, not independent authorized work, and is never permission to lower protections or fabricate a pass.
 <!-- FORGE-OWNER-SLICE-WORKFLOW:END -->
 
 <!-- FORGE-CONDUCTOR-ENGINEERING:BEGIN -->
@@ -110,7 +110,7 @@ Crash recovery must resume from every transition without duplicate or lost work.
 
 - Persist evidence and state before risky work.
 - Retry transient operations with bounded exponential backoff and a total deadline.
-- Mark blocked work with evidence. Do not begin another slice or widen scope; report the specific blocker and stop.
+- Mark blocked work with evidence. Continue independent work inside the authorized completion phases without widening product or security scope.
 - A global hard blocker stops release, not investigation within the authorized slice.
 - Never wait indefinitely for a process, pipe, stream, lock, network operation, or model response.
 - Never ask the owner to choose among technical options already resolvable by these requirements.

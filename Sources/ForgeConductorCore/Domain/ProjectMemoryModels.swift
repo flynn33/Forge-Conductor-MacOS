@@ -271,3 +271,13 @@ public struct ProjectMemoryWrite: Sendable {
         self.idempotencyKey = idempotencyKey
     }
 }
+
+public struct ProjectMemoryContentClearReceipt: Sendable, Equatable {
+    public let operationID: UUID
+    public let projectID: String
+    public let mode: ProjectContentClearMode
+    public let memoryRecordCount: Int
+    public let continuityRecordCount: Int
+    public let committedAt: String
+    public let replayed: Bool
+}

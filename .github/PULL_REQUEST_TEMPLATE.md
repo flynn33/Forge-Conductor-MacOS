@@ -16,6 +16,8 @@ If you are the repository owner proceeding anyway, complete the sections below.
 
 <!-- What changed and why. Human-authored description only. -->
 
+Delivery scope: `functional_development_build`
+
 ## Test plan
 
 - [ ]
@@ -45,7 +47,7 @@ Workspace/membership result; build or execution evidence; explicit not-run items
 
 ## Review and post-merge receipt
 
-Stop for owner review. Only the owner authorizes merge. After merge, record a PR comment with merged/local/remote main identity, workspace result, and affected-check evidence. An approved or open PR is not a merged/synchronized result.
+Only the owner authorizes merge. Independent completion work may continue while review or CI is pending. After an authorized merge, record a PR comment with merged/local/remote main identity, workspace result, and affected-check evidence. An approved or open PR is not a merged/synchronized result.
 
 ---
 
