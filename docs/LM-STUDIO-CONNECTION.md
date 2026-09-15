@@ -28,6 +28,14 @@ owned LM Studio chats.
 | `serve` / `mcp` / `mcp-serve` | Stdio MCP (`ForgeProcessEntry` → `MCPServer`) |
 | `manager run [--home …] [--open]` | Dashboard manager (LaunchAgent path) |
 
+## Native managed-run setup
+
+The native Provider screen saves the LM Studio server origin and an exact model key. Saving is durable and does not prove the server is reachable. Run **Refresh Models** and **Test Connection** after starting the local server and loading a model. Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory and requires a tool-capable model with a nonempty `loaded_instances` entry and valid context length. LM Studio's OpenAI-compatible `/v1/models` lists downloaded models when just-in-time loading is enabled, so that list alone does not prove readiness.
+
+On September 15, 2026, this host's `lms ps` showed `qwen/qwen3.8-27b@8bit` loaded under the base identifier while the v1 inventory selected `qwen/qwen3.8-27b@4bit` and returned no loaded instances. Forge's connection probe correctly rejected that inventory. After the idle 8-bit instance was unloaded and the selected 4-bit variant loaded under the same identifier, v1 returned one instance with a 262144-token context and the manager connection probe reported `reachable`. This is a variant alignment requirement, not a missing local-model download.
+
+Register the repository in **Projects** using the native picker or **Enter Project Path…**, then authorize its canonical folder in **Manager** settings. The manager runs independently of the Autonomy tab. A managed run cannot be admitted until its project root is authorized; **Autonomy** starts runs after a project is registered and the Provider connection is checked.
+
 ## Authoritative connection path (stable)
 
 **Primary (official LM Studio mechanism):** `~/.lmstudio/mcp.json`
