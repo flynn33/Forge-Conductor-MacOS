@@ -6,9 +6,8 @@ import SwiftUI
 
 struct ProjectsOperatorView: View {
     @StateObject private var viewModel: ProjectsViewModel
-    @State private var showingRegistration = false
-    @State private var registrationPath = ""
-    @State private var registrationName = ""
+    @State private var registrationDraft: ProjectRegistrationDraft?
+    @State private var registrationPickerErrorMessage: String?
     @State private var resetConfirmation: ProjectsViewModel.ResetConfirmation?
     @State private var clearConfirmation: ProjectsViewModel.ClearConfirmation?
     @State private var clearMode: OperatorProjectContentClearMode = .memory
@@ -39,11 +38,19 @@ struct ProjectsOperatorView: View {
             }
             .listStyle(.sidebar)
             .safeAreaInset(edge: .bottom) {
-                Button("Register Project…", systemImage: "plus") {
-                    chooseProjectFolder()
+                VStack(spacing: 8) {
+                    Button("Register Project…", systemImage: "plus") {
+                        chooseProjectFolder()
+                    }
+                    .accessibilityIdentifier("project-register")
+                    Button("Enter Project Path…") {
+                        registrationDraft = ProjectRegistrationDraft(
+                            path: "", name: "", allowsPathEntry: true
+                        )
+                    }
+                    .accessibilityIdentifier("project-register-by-path")
                 }
                 .padding(10)
-                .accessibilityIdentifier("project-register")
             }
         } detail: {
             ScrollView {
@@ -56,6 +63,12 @@ struct ProjectsOperatorView: View {
                     )
                     if let error = viewModel.errorMessage {
                         OperatorErrorBanner(message: error, retry: viewModel.load)
+                    }
+                    if let error = registrationPickerErrorMessage {
+                        Text(error)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("project-picker-error")
                     }
                     if let notice = viewModel.notice {
                         OperatorNoticeBanner(message: notice)
@@ -120,8 +133,8 @@ struct ProjectsOperatorView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $showingRegistration) {
-            registrationSheet
+        .sheet(item: $registrationDraft) { draft in
+            ProjectRegistrationSheet(draft: draft, viewModel: viewModel)
         }
         .alert(
             "Reset project generation?",
@@ -335,31 +348,6 @@ struct ProjectsOperatorView: View {
         }
     }
 
-    private var registrationSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Register Project").font(.title2.bold())
-            Text("Registration resolves a canonical root and creates or reconnects the manager-owned project identity.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            LabeledContent("Folder") { OperatorIdentifier(registrationPath) }
-            TextField("Display name (optional)", text: $registrationName)
-                .accessibilityIdentifier("project-register-name")
-            HStack {
-                Button("Cancel", role: .cancel) { showingRegistration = false }
-                Spacer()
-                Button("Register") {
-                    viewModel.register(path: registrationPath, displayName: registrationName)
-                    showingRegistration = false
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(registrationPath.isEmpty || viewModel.isLoading)
-                .accessibilityIdentifier("project-register-confirm")
-            }
-        }
-        .padding(22)
-        .frame(width: 520)
-    }
-
     private func chooseProjectFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -367,10 +355,16 @@ struct ProjectsOperatorView: View {
         panel.canCreateDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose Project"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        registrationPath = url.standardizedFileURL.path
-        registrationName = url.lastPathComponent
-        showingRegistration = true
+        guard panel.runModal() == .OK else { return }
+        guard let url = panel.urls.first, url.isFileURL,
+              (url.path as NSString).isAbsolutePath else {
+            registrationPickerErrorMessage = "The folder picker did not return an absolute project path. Use Enter Project Path… to register the folder."
+            return
+        }
+        registrationPickerErrorMessage = nil
+        registrationDraft = ProjectRegistrationDraft(
+            path: url.path, name: url.lastPathComponent, allowsPathEntry: false
+        )
     }
 
     /// Uses the native directory picker in production. UI qualification can
@@ -393,7 +387,74 @@ struct ProjectsOperatorView: View {
             .deletingLastPathComponent()
         panel.prompt = "Relink Project"
         panel.message = "Choose the new location of \(project.displayName). Forge Conductor will verify that it is the same Git repository."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        viewModel.relinkSelectedProject(to: url.standardizedFileURL.path)
+        guard panel.runModal() == .OK, let url = panel.urls.first,
+              url.isFileURL, (url.path as NSString).isAbsolutePath else { return }
+        viewModel.relinkSelectedProject(to: url.path)
+    }
+}
+
+private struct ProjectRegistrationDraft: Identifiable {
+    let id = UUID()
+    let path: String
+    let name: String
+    let allowsPathEntry: Bool
+}
+
+private struct ProjectRegistrationSheet: View {
+    @ObservedObject var viewModel: ProjectsViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var path: String
+    @State private var name: String
+    private let allowsPathEntry: Bool
+
+    init(draft: ProjectRegistrationDraft, viewModel: ProjectsViewModel) {
+        self.viewModel = viewModel
+        allowsPathEntry = draft.allowsPathEntry
+        _path = State(initialValue: draft.path)
+        _name = State(initialValue: draft.name)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Register Project").font(.title2.bold())
+            Text("Registration resolves a canonical root and creates or reconnects the manager-owned project identity.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if allowsPathEntry {
+                TextField("Project folder (absolute path)", text: $path)
+                    .accessibilityIdentifier("project-register-path")
+            } else {
+                LabeledContent("Folder") {
+                    Text(path)
+                        .lineLimit(3)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("project-register-selected-path")
+                }
+            }
+            if viewModel.isLoading {
+                Text("Waiting for the manager to finish refreshing projects.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("project-register-waiting-for-manager")
+            }
+            Text("Forge resolves the canonical Git repository identity and checks the folder before registration.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Display name (optional)", text: $name)
+                .accessibilityIdentifier("project-register-name")
+            HStack {
+                Button("Cancel", role: .cancel) { dismiss() }
+                Spacer()
+                Button("Register") {
+                    viewModel.register(path: path, displayName: name)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!(path as NSString).isAbsolutePath || viewModel.isLoading)
+                .accessibilityIdentifier("project-register-confirm")
+            }
+        }
+        .padding(22)
+        .frame(width: 520)
     }
 }

@@ -64,6 +64,19 @@ struct AutonomyOperatorView: View {
                         OperatorNoticeBanner(message: notice)
                     }
 
+                    if viewModel.projects.isEmpty {
+                        Text("Register a repository in Projects before starting a managed run. The manager itself starts with the app; its lifecycle controls are in Manager.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("autonomy-project-prerequisite")
+                    } else if viewModel.provider?.health != "reachable"
+                                && viewModel.provider?.health != "contract_valid" {
+                        Text("Authorize the project folder in Manager, then save the LM Studio endpoint and loaded model in Provider and run Test Connection.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("autonomy-provider-prerequisite")
+                    }
+
                     if let run = viewModel.selectedRun {
                         runDetail(run)
                     } else if viewModel.errorMessage == nil, !viewModel.isLoading {
