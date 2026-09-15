@@ -45,11 +45,13 @@ When all functional gates above pass, the handoff label is:
 
 ## September 14, 2026 candidate record
 
-- Base source is merged `main` commit `d05e56a1d517dbfbcd971105cf2917cb1f186f34`
-  plus the completion-branch worktree patch identified in the external artifact
-  manifest. The owner authorized and registered a repository-local Git signing
-  key September 15. A signed commit, push and review PR remain required; no
-  unsigned commit or push substitutes for that requirement.
+- The development candidate was built from merged `main` commit
+  `d05e56a1d517dbfbcd971105cf2917cb1f186f34` plus the completion-branch
+  worktree patch identified in the external artifact manifest. Those source
+  inputs were committed as owner-signed tested source `c417887d5f388cefcb58d01d46ef63134ebe8f6f`
+  and pushed in [PR #48](https://github.com/flynn33/Forge-Conductor-MacOS/pull/48).
+  The documentation-only link follow-up does not replace that tested-source
+  identity or constitute owner merge acceptance.
 - The complete Swift package suite executed 1,578 tests with 11 explicit
   environment/fixture skips and zero failures.
 - A September 15 publication readback of the same source inputs passed the
