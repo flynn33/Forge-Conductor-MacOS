@@ -84,7 +84,8 @@ daemon, and UI-test targets use the valid **Apple Development: James Daley**
 identity on team `9AQ2C2838M`. Release configurations request **Developer ID
 Application** on that same team. Xcode's account has already cloud-signed an
 earlier, different product as `Developer ID Application: James Daley
-(9AQ2C2838M)`, while the local keychain has no usable Developer ID identity.
+(9AQ2C2838M)`. James has now installed usable local Developer ID Application
+and Installer identities for the same team in the login keychain.
 The earlier `2Y25RTLZET` Developer ID team remains in the product trust policy
 for previously signed products. Entitlements live at
 `Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements`.
@@ -136,14 +137,28 @@ cannot use the Developer ID export method. Verify the app and embedded products
 with the existing `check_privileged_filesystem_bundle.sh` checker in `Release`
 mode. The five shipping Release targets use manual signing because Xcode rejects
 automatic development signing paired with an explicit Developer ID identity.
-The ordinary archive currently reports no local Developer ID Application
-certificate for James Daley's team with a private key. An existing cloud-managed
-certificate used for another product does not supply that build-time private
-key. The explicit development-signed archive is local qualification evidence;
+Before those local identities were installed, the ordinary archive reported no
+Developer ID Application certificate for James Daley's team with a private key.
+The cloud-managed certificate used for another product did not supply that
+build-time private key. The explicit development-signed archive is local qualification evidence;
 its compiled peer policy requires Apple Development and cannot be treated as a
 Developer ID product merely by re-signing it at export. Notarization, stapling,
 and Gatekeeper acceptance are distinct checks after an exact Developer ID
 archive and export.
+
+On September 15, the ordinary Release configuration produced a universal
+`0.9.0 (1)` Developer ID app archive with one installable app product. A
+`developer-id` export succeeded with manual signing for team `9AQ2C2838M`.
+The archive and exported app passed strict deep all-architectures signature
+verification and the Release privileged-bundle checker, including the embedded
+CLI, runtime launcher, Core framework, filesystem daemon, and caller-sealed
+daemon hashes. All five exported code objects carry James Daley's Developer ID
+Application identity and secure timestamps. A local installer package made
+from that exported app is signed with his Developer ID Installer identity and a
+trusted timestamp. The local review receipt under
+`/Users/jimdaley/Projects/Forge-Conductor/Release-Prep-2026-09-15/DeveloperID-0.9.0-1`
+records the exact artifact hashes. Notarization and public acceptance remain
+separate release steps.
 
 Omitting `FORGE_DEVELOPMENT_SIGNING` from an Apple Development-signed Release
 build intentionally fails the exact installer or peer-identity checks. The

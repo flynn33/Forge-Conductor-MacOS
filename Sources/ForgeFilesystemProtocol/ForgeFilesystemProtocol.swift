@@ -63,9 +63,9 @@ public enum ForgeFilesystemProtocolConstants {
 
     /// Returns the stable Apple signing policy for one exact Forge product role.
     /// The current owner team has both Apple Development and Developer ID
-    /// identities. The active build requirement remains class-specific; this
-    /// generic product-role check accepts either exact class for that same
-    /// team. The earlier distribution team remains Developer ID-only.
+    /// identities. Its accepted class follows the active build mode, so a
+    /// Developer ID process cannot stage an Apple Development product. The
+    /// earlier distribution team remains Developer ID-only.
     public static func requiredProductCodeSigningRequirement(
         identifier: String,
         teamIdentifier: String
@@ -82,9 +82,13 @@ public enum ForgeFilesystemProtocolConstants {
         let certificateRequirement: String
         switch teamIdentifier {
         case developmentTeamIdentifier:
+            #if DEBUG || FORGE_DEVELOPMENT_SIGNING
             certificateRequirement =
-                "(certificate leaf[field.1.2.840.113635.100.6.1.12] exists "
-                + "or certificate leaf[field.1.2.840.113635.100.6.1.13] exists)"
+                "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
+            #else
+            certificateRequirement =
+                "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+            #endif
         case productionTeamIdentifier:
             certificateRequirement =
                 "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"

@@ -35,8 +35,8 @@ The active development and Developer ID distribution team is James Daley's
 `9AQ2C2838M`; the earlier `2Y25RTLZET` distribution team remains admitted
 only for previously signed Developer ID products. Active Debug and explicit
 development-signed Release builds require Apple Development, while ordinary
-Release requires Developer ID Application. The generic product-role admission
-accepts only those two certificate classes for the exact owner team and only
+Release requires Developer ID Application. Product-role admission accepts only
+the active build's certificate class for the exact owner team and only
 Developer ID for the earlier team. Manager staging, runtime launch,
 and the outer bundle verifier apply the corresponding Apple anchor, identifier,
 team, and certificate-class requirement to the app, CLI, daemon, runtime

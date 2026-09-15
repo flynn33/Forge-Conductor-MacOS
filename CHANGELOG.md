@@ -42,11 +42,15 @@ qualification and the owner-controlled source merge remain separate boundaries.
   the CLI while keeping it in `Contents/Helpers`; a rebuilt app-only archive
   contains `ApplicationProperties`. Release also uses manual signing for the
   five shipping targets, removing Xcode's conflict between automatic development
-  signing and a specified Developer ID identity. The ordinary archive now
-  reports that this Mac has no Developer ID Application certificate for James
-  Daley's team with a local private key. Xcode has previously cloud-signed a
-  different archive with his Developer ID; this product's exact signed archive,
-  notarization, stapling, and public acceptance remain unverified.
+  signing and a specified Developer ID identity. James Daley has since installed
+  local Developer ID Application and Installer identities for team
+  `9AQ2C2838M`, clearing the earlier build-time certificate error. A fresh
+  universal `0.9.0 (1)` Developer ID archive and export now pass strict deep
+  signatures and the Release privileged-bundle checker, including every nested
+  product and the daemon hash seal. A local installer package signed with his
+  Developer ID Installer identity has a trusted timestamp and contains the
+  exported app. Notarization, stapling, public Gatekeeper acceptance, and
+  shipment remain unverified owner release steps.
 
 ### Project tracking and verified baseline
 

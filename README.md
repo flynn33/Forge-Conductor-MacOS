@@ -44,12 +44,14 @@ has no icon. The [Xcode guide](XCODE.md) gives the archive identity and bundle
 checks to run before self-distribution. The canonical archive now contains one
 installable app product, with the manager CLI embedded at `Contents/Helpers`.
 Ordinary Release requests Developer ID Application for James Daley's team
-`9AQ2C2838M`. Xcode has used an existing cloud-managed Developer ID certificate
-for that team on a different archive; the local keychain has no Developer ID
-identity. The ordinary Developer ID archive now reaches certificate selection
-and reports that no team-matching local certificate with a private key exists.
-This product's Developer ID archive, notarization, and Gatekeeper acceptance
-still need direct qualification.
+`9AQ2C2838M`. Xcode used a cloud-managed Developer ID certificate for that
+team on a different archive. James has now installed local Developer ID
+Application and Installer identities for the same team, enabling the exact
+Developer ID archive and package signing. A universal `0.9.0 (1)` app archive
+and Developer ID export now pass strict nested-signature and Release bundle
+checks; a local installer package is signed with James's Developer ID Installer
+identity and a trusted timestamp. Notarization, stapling, public Gatekeeper
+acceptance, and shipment remain separate owner release steps.
 
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
 source revisions, passing local scenarios, and subsequent GitHub CI repairs.
