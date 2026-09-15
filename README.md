@@ -143,6 +143,8 @@ separate release requirements.
 | **Events & Evidence / Diagnostics** | Bounded manager events, durable evidence references, logs, and doctor signals |
 | **Manager** | Start/Stop/Restart control, authorized folders, project-shell policy, protected-filesystem service controls, maintenance, and doctor |
 
+For a first managed run, register a Git repository in **Projects** with the folder picker or **Enter Project Path…** and an absolute path. Authorize that repository folder under **Manager** settings. Start the LM Studio local server, load the model variant selected in LM Studio, then save `http://127.0.0.1:1234` and its model identifier in **Provider** and run **Test Connection**. **Autonomy** starts runs after these prerequisites; the manager itself starts with the app or its LaunchAgent and is controlled from **Manager**. An idle model shown by `lms ps` can still appear unloaded to Forge when LM Studio's v1 model inventory lists a different selected variant.
+
 Only Forge-managed LM Studio runtime entries appear in these surfaces; unrelated
 processes and foreign-project continuity remain excluded.
 

@@ -44,6 +44,8 @@ qualification and the owner-controlled source merge remain separate boundaries.
 
 ### Functional completion
 
+- Repaired native project registration after the folder picker: one atomic sheet draft now retains the selected path and display name across modal dismissal. Added absolute-path registration beside the picker; manager-side canonical project identity and authorization remain authoritative. Fresh Provider and Autonomy screens name their actual setup prerequisites instead of treating an untested provider snapshot as a failure.
+- On the owner host, the existing manager accepted and cancelled a bounded read-only run after the repository was registered, its root was authorized, and the local LM Studio selected variant was loaded. The earlier provider failure came from an unsaved configuration and a loaded variant absent from LM Studio's v1 `loaded_instances`. Focused native picker, direct-path, offline Provider, live LM Studio Provider, and Autonomy UI tests passed. A development-signed optimized app passed bundle inspection and bounded isolated bootstrap; an earlier UI attempt was interrupted by the host's registered privileged daemon launch constraint and remains retained as a non-pass.
 - Recovered a local startup failure caused by a completed store migration
   manifest whose named historical backup was absent. The prior manifest and a
   private pre-recovery home copy were retained; the matching migration receipt
