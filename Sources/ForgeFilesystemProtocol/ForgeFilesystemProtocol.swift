@@ -17,6 +17,8 @@ public enum ForgeFilesystemProtocolConstants {
     public static let runtimeLauncherIdentifier = "com.forge-conductor.runtime-launcher"
     public static let coreFrameworkIdentifier = "com.forge-conductor.core"
     public static let developmentTeamIdentifier = "9AQ2C2838M"
+    public static let ownerDistributionTeamIdentifier = "9AQ2C2838M"
+    /// Retained for products previously distributed under this team.
     public static let productionTeamIdentifier = "2Y25RTLZET"
     public static let maximumRelativeComponents = 128
     public static let maximumComponentBytes = 255
@@ -60,9 +62,10 @@ public enum ForgeFilesystemProtocolConstants {
     }
 
     /// Returns the stable Apple signing policy for one exact Forge product role.
-    /// Team and certificate class are intentionally inseparable: development
-    /// artifacts use Apple Development while distribution artifacts use
-    /// Developer ID Application.
+    /// The current owner team has both Apple Development and Developer ID
+    /// identities. The active build requirement remains class-specific; this
+    /// generic product-role check accepts either exact class for that same
+    /// team. The earlier distribution team remains Developer ID-only.
     public static func requiredProductCodeSigningRequirement(
         identifier: String,
         teamIdentifier: String
@@ -80,7 +83,8 @@ public enum ForgeFilesystemProtocolConstants {
         switch teamIdentifier {
         case developmentTeamIdentifier:
             certificateRequirement =
-                "certificate leaf[field.1.2.840.113635.100.6.1.12] exists"
+                "(certificate leaf[field.1.2.840.113635.100.6.1.12] exists "
+                + "or certificate leaf[field.1.2.840.113635.100.6.1.13] exists)"
         case productionTeamIdentifier:
             certificateRequirement =
                 "certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
@@ -98,7 +102,7 @@ public enum ForgeFilesystemProtocolConstants {
         #if DEBUG || FORGE_DEVELOPMENT_SIGNING
         developmentTeamIdentifier
         #else
-        productionTeamIdentifier
+        ownerDistributionTeamIdentifier
         #endif
     }
 

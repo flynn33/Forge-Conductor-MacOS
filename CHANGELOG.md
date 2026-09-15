@@ -30,12 +30,23 @@ qualification and the owner-controlled source merge remain separate boundaries.
   `Assets.car` and matching `AppIcon` bundle keys. Documented the exact scheme,
   bundle identifier and icon checks for the archive/export path.
 - Removed macOS-SDK Apple Development identity overrides from the five shipping
-  Release targets and set their distribution team to `2Y25RTLZET`. Ordinary
-  Release now resolves Developer ID Application; the explicit development-signed
-  Release override produced a canonical universal archive with the icon,
+  Release targets and set their distribution team to James Daley's
+  `9AQ2C2838M`. Ordinary Release now resolves Developer ID Application;
+  the earlier `2Y25RTLZET` Developer ID identity remains admitted for existing
+  products. The explicit development-signed Release override produced a
+  canonical universal archive with the icon,
   manager, launcher and filesystem helper. Strict nested signature validation
-  and the `DevelopmentRelease` bundle checker passed. A valid Developer ID
-  identity, notarization, stapling and public acceptance remain unverified.
+  and the `DevelopmentRelease` bundle checker passed. The first canonical
+  archive was generic because the CLI installed as a second product, and
+  `developer-id` export rejected it. Release now uses `SKIP_INSTALL = YES` for
+  the CLI while keeping it in `Contents/Helpers`; a rebuilt app-only archive
+  contains `ApplicationProperties`. Release also uses manual signing for the
+  five shipping targets, removing Xcode's conflict between automatic development
+  signing and a specified Developer ID identity. The ordinary archive now
+  reports that this Mac has no Developer ID Application certificate for James
+  Daley's team with a local private key. Xcode has previously cloud-signed a
+  different archive with his Developer ID; this product's exact signed archive,
+  notarization, stapling, and public acceptance remain unverified.
 
 ### Project tracking and verified baseline
 

@@ -1056,7 +1056,7 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
         ))
     }
 
-    func testProductRequirementsBindEachApprovedTeamToOnlyItsCertificateClass() throws {
+    func testProductRequirementsBindOwnerAndEarlierTeamsToApprovedCertificateClasses() throws {
         let identifiers = [
             ForgeFilesystemProtocolConstants.appIdentifier,
             ForgeFilesystemProtocolConstants.managerIdentifier,
@@ -1074,7 +1074,11 @@ final class ForgeFilesystemProtocolTests: XCTestCase {
             XCTAssertTrue(development.contains("identifier \"\(identifier)\""))
             XCTAssertTrue(development.contains("9AQ2C2838M"))
             XCTAssertTrue(development.contains("1.2.840.113635.100.6.1.12"))
-            XCTAssertFalse(development.contains("1.2.840.113635.100.6.1.13"))
+            XCTAssertTrue(development.contains("1.2.840.113635.100.6.1.13"))
+            XCTAssertEqual(
+                ForgeFilesystemProtocolConstants.ownerDistributionTeamIdentifier,
+                ForgeFilesystemProtocolConstants.developmentTeamIdentifier
+            )
 
             let distribution = try XCTUnwrap(
                 ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement(

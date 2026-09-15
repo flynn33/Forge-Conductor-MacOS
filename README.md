@@ -41,8 +41,15 @@ For an Xcode archive, open `ForgeConductor.xcworkspace` and select the
 `ForgeConductor` scheme. Its app icon is supplied by `AppIcon.appiconset`; the
 similarly named `Forge Conductor` archive uses a different bundle identifier and
 has no icon. The [Xcode guide](XCODE.md) gives the archive identity and bundle
-checks to run before self-distribution. This host still lacks a valid Developer
-ID Application identity for the production team.
+checks to run before self-distribution. The canonical archive now contains one
+installable app product, with the manager CLI embedded at `Contents/Helpers`.
+Ordinary Release requests Developer ID Application for James Daley's team
+`9AQ2C2838M`. Xcode has used an existing cloud-managed Developer ID certificate
+for that team on a different archive; the local keychain has no Developer ID
+identity. The ordinary Developer ID archive now reaches certificate selection
+and reports that no team-matching local certificate with a private key exists.
+This product's Developer ID archive, notarization, and Gatekeeper acceptance
+still need direct qualification.
 
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
 source revisions, passing local scenarios, and subsequent GitHub CI repairs.

@@ -951,8 +951,12 @@ final class ProductPathReliabilityTests: XCTestCase {
                 "Release shipped target \(identifier) must require Developer ID signing"
             )
             XCTAssertTrue(
-                settings.contains("DEVELOPMENT_TEAM = 2Y25RTLZET;"),
-                "Release shipped target \(identifier) must use the distribution team"
+                settings.contains("DEVELOPMENT_TEAM = 9AQ2C2838M;"),
+                "Release shipped target \(identifier) must use James Daley's team"
+            )
+            XCTAssertTrue(
+                settings.contains("CODE_SIGN_STYLE = Manual;"),
+                "Release shipped target \(identifier) must not combine automatic development signing with a manually specified Developer ID identity"
             )
             XCTAssertFalse(
                 settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#)
@@ -962,6 +966,27 @@ final class ProductPathReliabilityTests: XCTestCase {
                 "SDK-specific signing must not override the Release identity"
             )
         }
+    }
+
+    func testXcodeReleaseArchiveKeepsManagerCLIEmbeddedWithoutInstallingItSeparately() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appendingPathComponent(
+                "ForgeConductor.xcodeproj/project.pbxproj"
+            ),
+            encoding: .utf8
+        )
+        let start = try XCTUnwrap(project.range(of: "\n\t\t462BB7BBB61F4979BE23EEDD /* Release */"))
+        let end = try XCTUnwrap(
+            project.range(of: "\n\t\t};", range: start.lowerBound..<project.endIndex)
+        )
+        let cliRelease = project[start.lowerBound..<end.upperBound]
+        XCTAssertTrue(cliRelease.contains("SKIP_INSTALL = YES;"))
+        XCTAssertTrue(project.contains("/* forge-conductor in Embed Manager CLI */"))
+        XCTAssertTrue(project.contains("dstPath = Contents/Helpers;"))
     }
 
     func testPrivilegedFilesystemBundleCheckerRetainsExactOptionalCLISealContract() throws {

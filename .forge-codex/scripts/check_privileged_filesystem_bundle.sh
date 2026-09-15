@@ -215,7 +215,7 @@ case "$CONFIGURATION" in
     CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.12] exists'
     ;;
   Release)
-    TEAM_IDENTIFIER="2Y25RTLZET"
+    TEAM_IDENTIFIER="9AQ2C2838M"
     CERTIFICATE_REQUIREMENT='certificate leaf[field.1.2.840.113635.100.6.1.13] exists'
     ;;
   *)
