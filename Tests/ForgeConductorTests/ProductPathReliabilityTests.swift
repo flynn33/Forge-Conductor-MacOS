@@ -950,8 +950,16 @@ final class ProductPathReliabilityTests: XCTestCase {
                 settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
                 "Release shipped target \(identifier) must require Developer ID signing"
             )
+            XCTAssertTrue(
+                settings.contains("DEVELOPMENT_TEAM = 2Y25RTLZET;"),
+                "Release shipped target \(identifier) must use the distribution team"
+            )
             XCTAssertFalse(
                 settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#)
+            )
+            XCTAssertFalse(
+                settings.contains("CODE_SIGN_IDENTITY[sdk=macosx*]"),
+                "SDK-specific signing must not override the Release identity"
             )
         }
     }

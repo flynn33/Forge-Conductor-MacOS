@@ -37,6 +37,13 @@ acceptance, and the broader physical-hardware/RAM-tier matrix are owner-deferred
 and non-blocking for this delivery. Required functional product work remains in
 scope and must not be replaced by those deferrals.
 
+For an Xcode archive, open `ForgeConductor.xcworkspace` and select the
+`ForgeConductor` scheme. Its app icon is supplied by `AppIcon.appiconset`; the
+similarly named `Forge Conductor` archive uses a different bundle identifier and
+has no icon. The [Xcode guide](XCODE.md) gives the archive identity and bundle
+checks to run before self-distribution. This host still lacks a valid Developer
+ID Application identity for the production team.
+
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
 source revisions, passing local scenarios, and subsequent GitHub CI repairs.
 The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) describes the

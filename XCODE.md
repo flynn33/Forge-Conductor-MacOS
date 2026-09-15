@@ -20,6 +20,11 @@ open ForgeConductor.xcworkspace
 
 The workspace intentionally contains the single canonical Xcode project. Using
 it keeps the entry point stable if additional native modules are added later.
+Archive the **ForgeConductor** scheme from this workspace. The similarly named
+**Forge Conductor** scheme and the bundle identifier
+`Raven-Forge-Software.Forge-Conductor` belong to a different product. An archive
+with that scheme and identifier contains neither this project's `AppIcon.icns`
+nor its bundled manager, launcher and filesystem helper.
 
 ## Schemes (pick the right one)
 
@@ -115,6 +120,20 @@ invocation resolves Apple Development and team `9AQ2C2838M` for the app and its
 dependencies. A previously present SDK-specific identity override made the
 ordinary Release setting resolve to Apple Development despite the displayed
 Developer ID value; that mismatch has been removed.
+
+For a distribution candidate, choose **Product → Archive** with the
+**ForgeConductor** scheme and inspect the resulting archive before choosing
+**Distribute App**. The archive's `Info.plist` must identify scheme
+`ForgeConductor` and application `com.forge-conductor.app`. Its app bundle must
+contain `Contents/Resources/AppIcon.icns` and `Contents/Resources/Assets.car`,
+and its generated `CFBundleIconFile` and `CFBundleIconName` must both be
+`AppIcon`. Verify the app and embedded products with the existing
+`check_privileged_filesystem_bundle.sh` checker in `Release` mode. Developer ID
+signing requires a valid **Developer ID Application** identity for team
+`2Y25RTLZET`; the current host exposes only Apple Development identities, so a
+development-signed archive is a local qualification artifact, not a public
+distribution candidate. Notarization, stapling and Gatekeeper acceptance remain
+distinct checks after a Developer ID export.
 
 Omitting `FORGE_DEVELOPMENT_SIGNING` from an Apple Development-signed Release
 build intentionally fails the exact installer or peer-identity checks. The

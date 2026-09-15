@@ -22,6 +22,21 @@ Release build, coherent signed bundle and bounded isolated launch are complete.
 Privileged root-service E2, exact existing-desktop attachment, public distribution
 qualification and the owner-controlled source merge remain separate boundaries.
 
+### Release archive preparation
+
+- Inspected September 15 Xcode archives: the `Forge Conductor` scheme's
+  `Raven-Forge-Software.Forge-Conductor` app had no icon metadata or icon
+  resources, while the canonical `ForgeConductor` archive contained `AppIcon.icns`,
+  `Assets.car` and matching `AppIcon` bundle keys. Documented the exact scheme,
+  bundle identifier and icon checks for the archive/export path.
+- Removed macOS-SDK Apple Development identity overrides from the five shipping
+  Release targets and set their distribution team to `2Y25RTLZET`. Ordinary
+  Release now resolves Developer ID Application; the explicit development-signed
+  Release override produced a canonical universal archive with the icon,
+  manager, launcher and filesystem helper. Strict nested signature validation
+  and the `DevelopmentRelease` bundle checker passed. A valid Developer ID
+  identity, notarization, stapling and public acceptance remain unverified.
+
 ### Project tracking and verified baseline
 
 - Adopted the owner-authorized continuous functional-development workflow and
