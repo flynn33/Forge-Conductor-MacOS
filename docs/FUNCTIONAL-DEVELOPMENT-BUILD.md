@@ -70,3 +70,27 @@ When all functional gates above pass, the handoff label is:
 - Privileged root-service E2 and native display-link execution are unmeasured on
   this host. Developer ID signing, notarization, stapling, public-download
   acceptance and the broader physical-hardware matrix are owner-deferred.
+
+## September 15, 2026 operator-onboarding candidate
+
+- Completion branch `fix/native-operator-onboarding` starts at synchronized
+  `main` source `c55509a60d6694ba460b9dbbf92f0ce6f899f0f1`; its tested
+  patch repairs native picker registration and first-run Provider/Autonomy
+  guidance. The current Xcode source/test membership is unchanged.
+- The picker and direct-path native registration UI tests each passed against
+  a fresh isolated home and relaunch. Offline Provider durability/error and
+  live loopback LM Studio model discovery/connection/relaunch tests each passed,
+  along with two focused Autonomy start-state tests. The live owner manager
+  accepted and then cancelled one bounded read-only managed run; cancellation
+  is not a mission-completion claim.
+- The canonical workspace built an optimized arm64 `0.9.0 (1)` app with Apple
+  Development team `9AQ2C2838M` and the matching
+  `FORGE_DEVELOPMENT_SIGNING` policy. Strict `DevelopmentRelease` inspection
+  verified the app, embedded CLI, Core framework, runtime launcher and
+  filesystem daemon. A bounded isolated launch reached the ordinary manager
+  status route and closed its listener on GUI shutdown. The working
+  installation was not replaced.
+- The first native UI attempt hit the already registered privileged daemon's
+  host launch constraint and is retained as a non-pass. Later focused native
+  UI tests ran and passed on the same host. Production root-service execution
+  and mission completion remain distinct qualification gates.
