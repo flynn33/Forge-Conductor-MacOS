@@ -100,4 +100,35 @@ When all functional gates above pass, the handoff label is:
 - The selected product inputs are reviewed in [PR #50](https://github.com/flynn33/Forge-Conductor-MacOS/pull/50). The tested product source is `7fb299945c5bfc9ae50340ceb078acee94ff4a32`; later branch commits changed documentation only. The archive at `/Users/flynn/Downloads/Forge-Conductor-Onboarding-0.9.0-dev.zip` contains the optimized arm64 Apple Development-signed `0.9.0 (1)` app. Its SHA-256 is `6168306b8905c491c0f26dac7acec3e7f2615397679f18fae7f27a4da36c9af8`; the local `/Users/flynn/Downloads/Forge-Conductor-Onboarding-0.9.0-dev-manifest.json` records the review source and validation. No `.dSYM` product was emitted in this Release build's product directory.
 - The archive extracted with `ditto`. The extracted app and nested CLI, Core framework, runtime launcher and filesystem daemon passed the `DevelopmentRelease` signature/bundle checker. A fresh isolated Forge home and unused loopback port then launched the exact extracted GUI/Manager, returned version `0.9.0` from `/api/manager/status`, and closed the listener after GUI shutdown. The owner installation was not replaced.
 - To rebuild, open `ForgeConductor.xcworkspace` and use the explicit Apple Development Release invocation in [XCODE.md](../XCODE.md). To inspect the archived candidate separately, extract it into a new directory with `ditto -x -k`. For a live evaluation alongside the existing installation, use a fresh `FORGE_CONDUCTOR_HOME` and configure that home's `config.json` dashboard host `127.0.0.1` on an unused port before launching the extracted app executable. The smoke test used the canonical schema-v2 configuration with a distinct port. Launch with `env FORGE_CONDUCTOR_HOME=/path/to/fresh-home "/path/to/extracted/Forge Conductor.app/Contents/MacOS/Forge Conductor"` after writing that isolated configuration; do not reuse the working `~/.forge-conductor` home for this test.
-- The macOS CI build jobs for PR #50 are queued for a `macos-26` runner; a queued job is not a pass. Production root-service E2 and an exact existing-desktop attachment remain unmeasured/open, while Developer ID, notarization and the broader physical-hardware matrix remain owner-deferred. This record does not assert that all SG gates have passed.
+- PR #50's native source integrity, Swift Debug/Release, Xcode Debug/Release,
+  and attribution checks passed at review head `e8aeca49d6d394047b74c05a9536fa4fce031ec1`.
+  A documentation-only follow-up does not change the tested build inputs.
+- **E0 — installed privileged-service failure:** the running 0.9.0 app reported
+  its filesystem daemon registered but not responding. `launchctl` and unified
+  logs repeatedly showed launchd failing to resolve
+  `Contents/MacOS/forge-filesystem-daemon`; the Developer ID-signed binary
+  existed and passed strict bundle verification. An unused 0.8.1 app with the
+  same bundle identifier was moved reversibly to
+  `/Users/flynn/Downloads/Forge Conductor 0.8.1 Archived.app`. The next launch
+  resolved the 0.9.0 binary, but macOS then rejected it under a category-3
+  launch constraint while the binary was category 6. Forge's supported
+  Update/Reinstall action unregistered the service and its immediate register
+  returned “Operation not permitted”; its separate Enable action restored the
+  prior registered, not-responding state. The manager remained healthy.
+  The pre/post launchd records are in
+  `/Users/flynn/Downloads/Forge-Daemon-Registration-PreRepair.txt` and
+  `/Users/flynn/Downloads/Forge-Daemon-Registration-AfterDuplicateMove.txt`.
+- macOS Login Items required Touch ID or the account password to refresh its
+  background-item switch. The initial sheet was canceled. After the owner
+  supplied Touch ID, the switch was turned off and back on, and its final
+  state was verified on. Forge's Update/Reinstall still returned “Operation
+  not permitted”; Enable restored registration, but `launchctl` still showed
+  a category-3 constraint against the Developer ID binary. No production root
+  mutation executed. Apple's
+  [ServiceManagement bundle contract](https://developer.apple.com/documentation/servicemanagement/updating-helper-executables-from-earlier-versions-of-macos)
+  confirms that the plist's relative `BundleProgram` form is correct, so this
+  trace does not justify weakening the plist or code-signing requirements.
+  SG07 root-service execution remains blocked, and exact existing-desktop
+  attachment remains open. Developer ID public distribution, notarization and
+  the broader physical-hardware matrix remain owner-deferred. The functional
+  handoff label is not asserted while SG07 is unresolved.
