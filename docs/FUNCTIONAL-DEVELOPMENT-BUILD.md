@@ -165,3 +165,16 @@ When all functional gates above pass, the handoff label is:
   remained after the Touch ID-authorized Login Items refresh; this
   development-signed archive is not a production-service pass and does not
   assert the functional handoff label.
+- **E0 — host registration constraint:** read-only `launchctl print` still
+  reports `needs LWCR update` and a `validation-category` 3 requirement for
+  `com.forge-conductor.filesystem-daemon`, while the installed daemon is signed
+  as Developer ID category 6 with the exact service identifier and team.
+  [Apple's launch-constraint reference](https://developer.apple.com/documentation/security/defining-launch-environment-and-library-constraints)
+  maps category 3 to development signing and 6 to Developer ID; an
+  [Apple ServiceManagement example](https://developer.apple.com/forums/thread/802443)
+  describes `SMAppServiceErrorDomain` code 1 as a missing daemon approval. The
+  registered background switch was restored to on, yet Forge's supported
+  re-registration returned that same denial. This evidence locates the current
+  failure in the host's registered requirement and approval transition. It
+  does not prove that a clean installation would pass, and it does not justify
+  weakening the daemon signature, trust policy, or launch plist.
