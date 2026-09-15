@@ -97,7 +97,7 @@ When all functional gates above pass, the handoff label is:
 
 ## September 15, 2026 onboarding archive receipt
 
-- The selected product inputs are reviewed in [PR #50](https://github.com/flynn33/Forge-Conductor-MacOS/pull/50). The tested product source is `7fb299945c5bfc9ae50340ceb078acee94ff4a32`; later branch commits changed documentation only. The archive at `/Users/flynn/Downloads/Forge-Conductor-Onboarding-0.9.0-dev.zip` contains the optimized arm64 Apple Development-signed `0.9.0 (1)` app. Its SHA-256 is `6168306b8905c491c0f26dac7acec3e7f2615397679f18fae7f27a4da36c9af8`; the local `/Users/flynn/Downloads/Forge-Conductor-Onboarding-0.9.0-dev-manifest.json` records the review source and validation. No `.dSYM` product was emitted in this Release build's product directory.
+- The selected product inputs were reviewed in the now-closed [PR #50](https://github.com/flynn33/Forge-Conductor-MacOS/pull/50). The tested product source is `7fb299945c5bfc9ae50340ceb078acee94ff4a32`; later branch commits changed documentation only. The archive at `/Users/flynn/Downloads/Forge-Conductor-Onboarding-0.9.0-dev.zip` contains the optimized arm64 Apple Development-signed `0.9.0 (1)` app. Its SHA-256 is `6168306b8905c491c0f26dac7acec3e7f2615397679f18fae7f27a4da36c9af8`; the local `/Users/flynn/Downloads/Forge-Conductor-Onboarding-0.9.0-dev-manifest.json` records the review source and validation. No `.dSYM` product was emitted in this Release build's product directory.
 - The archive extracted with `ditto`. The extracted app and nested CLI, Core framework, runtime launcher and filesystem daemon passed the `DevelopmentRelease` signature/bundle checker. A fresh isolated Forge home and unused loopback port then launched the exact extracted GUI/Manager, returned version `0.9.0` from `/api/manager/status`, and closed the listener after GUI shutdown. The owner installation was not replaced.
 - To rebuild, open `ForgeConductor.xcworkspace` and use the explicit Apple Development Release invocation in [XCODE.md](../XCODE.md). To inspect the archived candidate separately, extract it into a new directory with `ditto -x -k`. For a live evaluation alongside the existing installation, use a fresh `FORGE_CONDUCTOR_HOME` and configure that home's `config.json` dashboard host `127.0.0.1` on an unused port before launching the extracted app executable. The smoke test used the canonical schema-v2 configuration with a distinct port. Launch with `env FORGE_CONDUCTOR_HOME=/path/to/fresh-home "/path/to/extracted/Forge Conductor.app/Contents/MacOS/Forge Conductor"` after writing that isolated configuration; do not reuse the working `~/.forge-conductor` home for this test.
 - PR #50's native source integrity, Swift Debug/Release, Xcode Debug/Release,
@@ -132,3 +132,49 @@ When all functional gates above pass, the handoff label is:
   attachment remains open. Developer ID public distribution, notarization and
   the broader physical-hardware matrix remain owner-deferred. The functional
   handoff label is not asserted while SG07 is unresolved.
+
+## September 15, 2026 merged PR #51 archive receipt
+
+- [PR #51](https://github.com/flynn33/Forge-Conductor-MacOS/pull/51) merged as
+  `bea6b5a5ab6cbc387207f7830805fe82288f13cf`; local `main` was safely
+  fast-forwarded and verified equal to `origin/main`. Its eight onboarding
+  product/document files matched the locally combined tree byte for byte at
+  review head `bd9c22c41b2f08df0d20cf9209ba8d00d0b00fde`. The canonical
+  workspace already includes every affected Swift source and selected UI test;
+  PR #51 did not change its source, resource, or test graph.
+- The combined tree passed both direct SwiftPM product builds, the workspace
+  Debug build, three focused signing/project tests, and one selected native
+  direct-path registration UI test. Its xcresult reports one passed, zero
+  skipped, and zero failed. An optimized arm64 Apple Development Release build
+  completed with the compiled `FORGE_DEVELOPMENT_SIGNING` policy. Strict deep
+  code-signing validation and `DevelopmentRelease` inspection passed for the
+  app and all nested products. The app reports `0.9.0 (1)`; no `.dSYM` appeared
+  in the Release product directory.
+- The combined-main archive is
+  `/Users/flynn/Downloads/Forge-Conductor-PR51-Onboarding-0.9.0-dev.zip`.
+  SHA-256: `a58a7be4e484ca7ec86cc290e6aa3ed817895fc36817b7736f504757c418895f`.
+  `ditto` extraction and the same nested-signature checker passed on the exact
+  extracted app. Its GUI launched against a fresh isolated Forge home and
+  loopback port; `/api/manager/status` returned the matching home, port, and
+  version `0.9.0`. The listener closed after GUI termination. The working
+  installation was not replaced. The earlier PR #50 archive remains an exact
+  historical source receipt.
+- PR #51 merge-head macOS CI was still queued or running when this receipt was
+  written. The live root-service E2 matrix and exact external-desktop
+  attachment remain open. The installed Developer ID daemon E0 failure above
+  remained after the Touch ID-authorized Login Items refresh; this
+  development-signed archive is not a production-service pass and does not
+  assert the functional handoff label.
+- **E0 — host registration constraint:** read-only `launchctl print` still
+  reports `needs LWCR update` and a `validation-category` 3 requirement for
+  `com.forge-conductor.filesystem-daemon`, while the installed daemon is signed
+  as Developer ID category 6 with the exact service identifier and team.
+  [Apple's launch-constraint reference](https://developer.apple.com/documentation/security/defining-launch-environment-and-library-constraints)
+  maps category 3 to development signing and 6 to Developer ID; an
+  [Apple ServiceManagement example](https://developer.apple.com/forums/thread/802443)
+  describes `SMAppServiceErrorDomain` code 1 as a missing daemon approval. The
+  registered background switch was restored to on, yet Forge's supported
+  re-registration returned that same denial. This evidence locates the current
+  failure in the host's registered requirement and approval transition. It
+  does not prove that a clean installation would pass, and it does not justify
+  weakening the daemon signature, trust policy, or launch plist.
