@@ -955,6 +955,38 @@ public final class ManagerInstaller: @unchecked Sendable {
             for: src,
             sourceApplication: sourceApplication
         )
+        let sourceResources = sourceResourceBundle(
+            for: binarySource,
+            invokedBy: src,
+            sourceApplication: sourceApplication
+        )
+        let resourceTarget = binDir.appendingPathComponent(
+            "ForgeConductor_ForgeConductorCore.bundle",
+            isDirectory: true
+        )
+        let resourceStage = sourceResources.map { _ in
+            temporarySibling(
+                of: resourceTarget,
+                marker: "stage",
+                transactionID: transactionID
+            )
+        }
+        #if SWIFT_PACKAGE
+        // A statically linked SwiftPM CLI must find Core's generated bundle
+        // beside its executable. Refuse a bare binary before changing the
+        // installed artifacts; otherwise the relocated MCP server aborts.
+        if sourceResources == nil,
+           sourceFramework == nil,
+           isMachOExecutable(binarySource) {
+            throw NSError(
+                domain: "ManagerInstaller",
+                code: 17,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "SwiftPM CLI is missing ForgeConductor_ForgeConductorCore.bundle "
+                    + "beside its executable"]
+            )
+        }
+        #endif
         if requiringPrivilegedApplication, sourceFramework == nil {
             throw privilegedPayloadError(
                 "Required manager framework is unavailable for privileged staging"
@@ -987,6 +1019,7 @@ public final class ManagerInstaller: @unchecked Sendable {
             runtimeLauncherStage,
             frameworkStage,
             mirroredFrameworkStage,
+            resourceStage,
             appStage,
             commandLinkStage,
         ].compactMap { $0 }
@@ -1018,12 +1051,17 @@ public final class ManagerInstaller: @unchecked Sendable {
             try artifactValidator.verify(mirroredFrameworkStage, kind: .framework)
         }
 
+        if let sourceResources, let resourceStage {
+            try artifactCopier.copyItem(at: sourceResources, to: resourceStage)
+        }
+
         try stageApplicationBundle(
             sourceApplication: sourceApplication,
             invokedBy: src,
             executable: binaryStage,
             runtimeLauncher: runtimeLauncherStage,
             framework: frameworkStage,
+            resourceBundle: sourceResources,
             at: appStage,
             requiringPrivilegedApplication: requiringPrivilegedApplication
         )
@@ -1046,6 +1084,9 @@ public final class ManagerInstaller: @unchecked Sendable {
             ArtifactReplacement(target: binaryTarget, staged: binaryStage),
             ArtifactReplacement(target: appTarget, staged: appStage),
         ]
+        if let resourceStage {
+            replacements.append(ArtifactReplacement(target: resourceTarget, staged: resourceStage))
+        }
         if let commandLinkTarget {
             replacements.append(
                 ArtifactReplacement(target: commandLinkTarget, staged: commandLinkStage)
@@ -1120,6 +1161,11 @@ public final class ManagerInstaller: @unchecked Sendable {
             executable: installedBinaryURL,
             runtimeLauncher: runtimeLauncher,
             framework: framework,
+            resourceBundle: sourceResourceBundle(
+                for: source,
+                invokedBy: source,
+                sourceApplication: sourceApplication
+            ),
             at: stagedApp,
             requiringPrivilegedApplication: false
         )
@@ -1135,6 +1181,7 @@ public final class ManagerInstaller: @unchecked Sendable {
         executable: URL,
         runtimeLauncher: URL,
         framework: URL?,
+        resourceBundle: URL?,
         at stagedBundle: URL,
         requiringPrivilegedApplication: Bool
     ) throws {
@@ -1152,8 +1199,19 @@ public final class ManagerInstaller: @unchecked Sendable {
                 at: stagedBundle,
                 executable: executable,
                 runtimeLauncher: runtimeLauncher,
-                framework: framework
+                framework: framework,
+                resourceBundle: resourceBundle
             )
+        }
+
+        if let resourceBundle, sourceApplication != nil {
+            let target = stagedBundle.appendingPathComponent(
+                "Contents/Resources/ForgeConductor_ForgeConductorCore.bundle",
+                isDirectory: true
+            )
+            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if itemExists(at: target) { try fm.removeItem(at: target) }
+            try artifactCopier.copyItem(at: resourceBundle, to: target)
         }
 
         let runtimeLauncherURL = embeddedRuntimeLauncher(in: stagedBundle)
@@ -1184,7 +1242,8 @@ public final class ManagerInstaller: @unchecked Sendable {
         at bundleURL: URL,
         executable: URL,
         runtimeLauncher: URL,
-        framework: URL?
+        framework: URL?,
+        resourceBundle: URL?
     ) throws {
         let fm = FileManager.default
         let contents = bundleURL.appendingPathComponent("Contents", isDirectory: true)
@@ -1194,6 +1253,12 @@ public final class ManagerInstaller: @unchecked Sendable {
         try fm.createDirectory(at: macos, withIntermediateDirectories: true)
         try fm.createDirectory(at: resources, withIntermediateDirectories: true)
         try fm.createDirectory(at: helpers, withIntermediateDirectories: true)
+        if let resourceBundle {
+            try artifactCopier.copyItem(
+                at: resourceBundle,
+                to: resources.appendingPathComponent("ForgeConductor_ForgeConductorCore.bundle")
+            )
+        }
 
         let version = ForgeApp.version
         let buildVersion = ForgeApp.buildVersion
@@ -1282,6 +1347,36 @@ public final class ManagerInstaller: @unchecked Sendable {
                 .appendingPathComponent(name)
         )
         return candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) })
+    }
+
+    private func sourceResourceBundle(
+        for managerBinary: URL,
+        invokedBy sourceExecutable: URL,
+        sourceApplication: URL?
+    ) -> URL? {
+        let name = "ForgeConductor_ForgeConductorCore.bundle"
+        var candidates = [
+            managerBinary.deletingLastPathComponent().appendingPathComponent(name),
+            sourceExecutable.deletingLastPathComponent().appendingPathComponent(name),
+        ]
+        if let sourceApplication {
+            candidates.append(sourceApplication.appendingPathComponent("Contents/Resources/" + name))
+        }
+        return candidates.first(where: { candidate in
+            var information = stat()
+            return candidate.path.withCString { Darwin.lstat($0, &information) } == 0
+                && information.st_mode & S_IFMT == S_IFDIR
+        })
+    }
+
+    private func isMachOExecutable(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let magic = try? handle.read(upToCount: 4) else { return false }
+        return magic == Data([0xcf, 0xfa, 0xed, 0xfe])
+            || magic == Data([0xfe, 0xed, 0xfa, 0xcf])
+            || magic == Data([0xca, 0xfe, 0xba, 0xbe])
+            || magic == Data([0xbe, 0xba, 0xfe, 0xca])
     }
 
     private func managerBinarySource(
