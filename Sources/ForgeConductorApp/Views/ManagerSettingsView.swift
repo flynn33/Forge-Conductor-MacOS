@@ -50,7 +50,6 @@ struct ManagerSettingsView: View {
                                 .truncationMode(.middle)
                                 .textSelection(.enabled)
                                 .help(path)
-                                .accessibilityLabel(path)
                                 .accessibilityIdentifier("settings-allowed-root-path-\(index)")
                             Spacer(minLength: 8)
                             Button {
