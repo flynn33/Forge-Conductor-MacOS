@@ -30,6 +30,7 @@
 		0F6BD5F82C2B4D4EB08671E9 /* Infrastructure/ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E767C4B3CE445F9CBA245F /* Infrastructure/ProcessRunner.swift */; };
 		1340067FD4B0B3F80F0835F3 /* Domain/ContinuityExplicitSubmissionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B13222461CCB55821BAB73 /* Domain/ContinuityExplicitSubmissionModels.swift */; };
 		136EB907F8144B23A1268E10 /* ForgeConductorCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D77B00000000000000000001 /* ForgeConductorCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1FEBD9C424A4245A89601F6 /* ForgeConductorCore.framework */; };
 		140AC75DBD91431D978295EB /* Views/TelemetryDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26DA374A604430BB13B2234 /* Views/TelemetryDashboardView.swift */; };
 		14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */; };
 		16379F0DEF0242D3885D60F4 /* Telemetry/Collectors/ProcessMetricsCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BEAE622F3543EFA5CDDCEF /* Telemetry/Collectors/ProcessMetricsCollector.swift */; };
@@ -915,6 +916,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D77B00000000000000000001 /* ForgeConductorCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
