@@ -15,27 +15,59 @@ Forge Conductor is purpose-built for LM Studio and its local MCP runtime.
 | **Wiki** | [Project wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) |
 | **Contributions** | **Closed** — see [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-> **Current status:** this is a 0.9.0 development snapshot, not a ship-authorized
-> release. The Swift runtime, Xcode app, and built app bundle all report 0.9.0
-> build 1. Implemented behavior and remaining release work are listed separately
-> below. Package P10/G10 records remain open; this documentation does not mark
-> any package gate complete.
+> **Current status:** this is a 0.9.0 development snapshot. The owner now targets
+> a fully functional, feature-complete, shippable build and will perform shipment
+> separately. The Swift runtime, Xcode app, and built app bundle report 0.9.0
+> build 1. Open qualification gates remain listed below; no source update alone
+> makes this a shippable release.
 
-The current local signed candidate has passed a repaired live-home startup,
+The earlier signed development candidate passed a repaired live-home startup,
 manager, telemetry, and native navigation check. One historical store-migration
 backup was absent and remains unavailable for rollback; its completed manifest
-was preserved before a new verified migration backup was created. The last full
-Swift run completed 1,578 tests with 12 explicit skips and zero failures after
-correcting an Xcode target-order-sensitive isolation test. The native
-UI-automation runner timed out before executing its test. LM Studio's saved MCP
-path still names the deleted `/Applications/Forge Conductor.app` installation.
+was preserved before a new verified migration backup was created. The current
+macOS 27/Xcode 27 Swift suite executed 1,553 tests with 12 explicit skips and
+zero failures after the SwiftPM CLI resource-staging, fail-closed, and bounded
+Autonomy completion-parser repairs.
+The native
+UI-automation runner previously timed out before executing its test. The live
+LM Studio MCP registrations now point to the installed 0.9.0 app. Its saved
+provider reached the loaded `qwen/qwen3.8-27b` model and passed the tool
+contract probe. A bounded read-only managed run reached a native session and
+three `fs_read` calls, but its completion request was embedded at the end of
+model prose and the installed manager left it `running` after yielding. The
+current source repairs that parser; native completion policy and the registered
+privileged filesystem daemon still require qualification.
+A separate live run in the current-source development-signed candidate
+recognized the model's completion marker and correctly entered
+`blocked_configuration` when the owner-only native gate policy was absent.
+With a private policy bound to a disposable read-only run, the same candidate
+then completed against LM Studio: the signed native XCTest package executed its
+one required case with no failures or skips, `tests` passed, and the terminal
+state persisted after a manager restart. This qualifies that isolated path;
+the operator policy importer is now Core- and native-UI-tested, including an
+exact run-bound file selection and owner-only readback; an ordinary
+installed-stack terminal run and the root daemon remain open.
+The current-source signed GUI also passed focused native project registration,
+live Provider save/connection/relaunch, Manager folder authorization, and
+Autonomy run-start tests on macOS 27. The Manager test initially reproduced an
+accessibility-label recursion crash after selecting a folder. Removing the
+redundant label from the authorized-path text let the identical flow pass while
+retaining its path readback and accessibility identifier.
+The full signed production-onboarding class then executed seven native cases
+with no skips or failures; two further exact Provider-to-Autonomy repeats passed.
+An earlier full-class attempt had one live Provider probe return unreachable
+before Autonomy start. The failure is retained as a non-pass and the native test
+now captures provider controls and manager state if it recurs.
+The post-repair arm64 development-signed Release candidate passed strict nested
+bundle checks and ZIP integrity; its retained local archive and SHA-256 are in
+the [functional-build evidence](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md).
 
-The current delivery target is the [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md):
-an optimized Release application signed with the available Apple Development
-identity. Developer ID distribution, notarization/stapling, public-download
-acceptance, and the broader physical-hardware/RAM-tier matrix are owner-deferred
-and non-blocking for this delivery. Required functional product work remains in
-scope and must not be replaced by those deferrals.
+The current delivery target is a shippable build with functional product paths,
+signed distinct-process filesystem evidence, Developer ID packaging,
+notarization/stapling, Gatekeeper acceptance, and appropriate hardware evidence.
+The earlier [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
+remains a historical candidate record. These release gates remain open until
+tested; the owner has authorized direct `main` updates and will ship separately.
 
 For an Xcode archive, open `ForgeConductor.xcworkspace` and select the
 `ForgeConductor` scheme. Its app icon is supplied by `AppIcon.appiconset`; the
@@ -46,17 +78,66 @@ installable app product, with the manager CLI embedded at `Contents/Helpers`.
 Ordinary Release requests Developer ID Application for James Daley's team
 `9AQ2C2838M`. Xcode used a cloud-managed Developer ID certificate for that
 team on a different archive. James has now installed local Developer ID
-Application and Installer identities for the same team, enabling the exact
-Developer ID archive and package signing. A universal `0.9.0 (1)` app archive
-and Developer ID export now pass strict nested-signature and Release bundle
-checks; a local installer package is signed with James's Developer ID Installer
-identity and a trusted timestamp. Notarization, stapling, public Gatekeeper
-acceptance, and shipment remain separate owner release steps.
+Application and Installer identities for the same team on the archive host,
+enabling that exact Developer ID archive and package signing. Those identities
+are now available on this current host too. The former current-source Release
+exit 65 was a certificate prerequisite failure; the current patch-bound source
+has since produced a universal Developer ID archive, exported app, and signed
+local installer package. The exported app and package pass signature and Release
+bundle checks. Xcode Organizer notarized the app, and its stapled local export
+passes Gatekeeper before and after ZIP extraction. The separately signed
+installer package remains unnotarized and fails Gatekeeper's install assessment.
+The extracted notarized app launched with a fresh Forge home on port 7790;
+Manager Start, native folder authorization/save, and disposable project
+registration committed under that isolated home before bounded shutdown.
+Functional root-service, hardware, package, and published-source qualification
+remain open.
+The newer notarized policy-import candidate also used an isolated home and
+fresh port 7792. After native folder authorization and project registration,
+its packaged manager saved and probed the loaded LM Studio model, admitted a
+read-only run with an exact imported signed XCTest policy, and reached
+`completed` with one required native case passed, zero failed/skipped, and no
+timeout/truncation. The same terminal state survived a full process restart.
+Its [artifact and result receipt](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md#september-16-2026-packaged-native-completion-receipt)
+records the ZIP hash and qualification limits. The current installed root
+service and exact published-source archive remain separate release gates.
+The September 16 System Settings readback showed the owner installation's
+background activity off and its Manager status **Approval required**; the old
+OS daemon registration also has a development signing-category constraint.
+This leaves distinct-process root-service execution open despite the valid
+Developer ID app export.
+The final current-local-workspace archive includes the updated canonical Xcode
+test-target graph; its stapled exact-code export and extracted ZIP passed local
+Gatekeeper. The final unshipped ZIP SHA-256 is
+`f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`.
+The complete September 16 current-source `swift test` terminal summary
+executed 1,554 XCTest cases with 12 explicit skips and zero failures.
+The final local installer product was signed with a trusted timestamp through
+the Installer key's already allowed `productbuild` path; its expanded app retains
+the notarized app ticket and passes nested signing and app Gatekeeper checks.
+The outer package remains unnotarized and fails Gatekeeper's install assessment.
+Focused Debug and signed Xcode-compiled Release Core resource stress each
+passed on this 128 GiB host with injected 8 GiB limits. Another physical-memory
+capacity remains unqualified. The final optimized XCTest rerun compiled the
+report-failure guard, passed one selected case with zero failures, and wrote a
+Release-labeled report. The functional-build receipt records its exact path,
+hash, and open gates. The existing macOS CI Release lane will retain the same
+guarded report and bounded host-capacity inventory after publication; that
+future result is not yet counted as a pass or a second physical host.
+An isolated arm64 Apple Development-signed current-source Release build passed
+the `DevelopmentRelease` nested-bundle check, embedded CLI checks, and a
+bounded candidate GUI/manager startup on scratch port 7789 without replacing
+the installed app.
+The earlier universal `0.9.0 (1)` app archive and Developer ID export remain
+historical evidence for their original source. The new local Developer ID
+archive/export/package and hashes are recorded in the [Xcode guide](XCODE.md).
+The owner will ship only after the remaining qualification gates close.
 
 The [qualification summary](docs/QUALIFICATION-STATUS.md) identifies the tested
 source revisions, passing local scenarios, and subsequent GitHub CI repairs.
-The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) describes the
-same provider setup and installation workflow.
+The [wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) is an earlier
+0.9.0 snapshot; use the current repository guides for the latest setup and
+qualification state until the wiki is revised.
 
 Manager-owned runs now use [installed native completion policy](docs/NATIVE-COMPLETION.md).
 Missing policy blocks completion; model-supplied hashes cannot approve a gate.
@@ -94,10 +175,10 @@ No manual LM Studio configuration-file edit or restart is required. Selecting wh
 ## Project roadmap and delivery
 
 The [project roadmap](ROADMAP.md) records phases, milestones, accepted evidence,
-and unresolved requirements. Every pull request updates that record. Phase
-closeout updates this README, the Unreleased changelog, and affected documents.
-The [delivery workflow](docs/DELIVERY-WORKFLOW.md) defines local-first commits,
-Xcode workspace synchronization, owner review, and post-merge reconciliation.
+and unresolved requirements. Every direct `main` update records affected rows.
+Phase closeout updates this README, the Unreleased changelog, and affected
+documents. The [delivery workflow](docs/DELIVERY-WORKFLOW.md) defines local-first
+edits, Xcode workspace synchronization, owner-account publication, and readback.
 
 Current owner-directed verification covers immutable reset confirmation,
 recoverable content clearing, telemetry/manager ownership, production filesystem
@@ -122,10 +203,9 @@ That inventory is not a native-build or release-qualification result.
 
 ```bash
 cd /path/to/Forge-Conductor-MacOS
-# Reproducible native app build, bundle staging, and launch:
-./script/build_and_run.sh --verify
-# Build and stage the app without launching or touching the live Forge home:
-./script/build_and_run.sh --build-only
+# Build the native workspace without changing the installed app:
+xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor \
+  -configuration Debug -destination 'platform=macOS' build
 
 # Full Core/CLI/connector acceptance suite:
 swift test
@@ -137,8 +217,7 @@ forge-conductor manager start --open   # native dashboard / manager
 # LM Studio starts MCP via ~/.lmstudio/mcp.json → forge-conductor serve (Swift stdio)
 ```
 
-The build/run script stages a development smoke bundle. Its optional build
-override must equal the compiled canonical build; Developer ID distribution
+The Debug workspace build is compilation evidence. Developer ID distribution
 uses the Xcode archive/export path. Follow the deterministic
 [Xcode installation instructions](XCODE.md#install-the-exact-xcode-build) to
 install the complete matching app, CLI, runtime launcher and framework.
@@ -160,6 +239,13 @@ separate release requirements.
 | **Manager** | Start/Stop/Restart control, authorized folders, project-shell policy, protected-filesystem service controls, maintenance, and doctor |
 
 For a first managed run, register a Git repository in **Projects** with the folder picker or **Enter Project Path…** and an absolute path. Authorize that repository folder under **Manager** settings. Start the LM Studio local server, load the model variant selected in LM Studio, then save `http://127.0.0.1:1234` and its model identifier in **Provider** and run **Test Connection**. **Autonomy** starts runs after these prerequisites; the manager itself starts with the app or its LaunchAgent and is controlled from **Manager**. An idle model shown by `lms ps` can still appear unloaded to Forge when LM Studio's v1 model inventory lists a different selected variant.
+
+For deterministic completion, select the persisted Autonomy run and use
+**Import Native Validation Policy…** with a separately prepared schema-1 JSON
+policy and protected signed XCTest package. Forge binds the exact run, project
+generation, source, package, and gate set before installing the owner-only file;
+the manager still adjudicates actual native results. See the [native completion
+guide](docs/NATIVE-COMPLETION.md).
 
 Only Forge-managed LM Studio runtime entries appear in these surfaces; unrelated
 processes and foreign-project continuity remain excluded.
@@ -218,12 +304,16 @@ These results do not qualify every feature or close the remaining release gates.
   closure remain required. Production `fs_move` and recursive directory
   `fs_delete` now dispatch through the signed-helper recovery protocol and pass
   focused in-process contract/adversarial tests; root-service execution remains
-  unmeasured on this host because service approval requires owner interaction.
+  unmeasured on this host because the registered daemon still fails its launch
+  constraint check despite the Login Items service being enabled.
   Quarantine is mitigation, not elimination.
-- **Native development delivery:** the current-source Apple Development-signed
-  Release app, coherent nested bundle, isolated CLI checks and bounded direct GUI
-  launch pass. Developer ID Release, notarization, stapling, public Gatekeeper/
-  download acceptance and the broader UI/hardware matrix are owner-deferred.
+- **Native development delivery:** an earlier Apple Development-signed Release
+  app, coherent nested bundle, isolated CLI checks and bounded direct GUI launch
+  passed for its recorded source. The current local patch now has a universal
+  Developer ID archive/export and signed installer. The stapled app ZIP passes
+  local Gatekeeper execution after extraction; the installer, public-download
+  acceptance, and broader UI/hardware matrix remain open for the shippable
+  target.
 - **Shell qualification:** a bounded Apple Development-signed installed-app
   scenario executed the established `shell_exec` contract through both the app
   executable and installed raw CLI. It proved clean-install enablement,
@@ -235,7 +325,7 @@ These results do not qualify every feature or close the remaining release gates.
   runtime launcher. That installed-app run deliberately did not invoke System
   Events and remains partial. A separate Xcode run passed native Settings shell
   disable/re-enable and execution from fresh MCP processes. The complete
-  installed/native matrix, Developer ID Release signing and P10 exact-production
+  installed/native matrix and P10 exact-production
   qualification remain open.
 - **Managed provider setup:** Provider now saves endpoint, model and Keychain
   credential changes through authenticated manager controls. Save supports an
@@ -254,10 +344,11 @@ These results do not qualify every feature or close the remaining release gates.
   prevents duplicate tool execution, but the inference race is not eliminated.
   Deterministic tests cover two sequential rollovers and the broader crash matrix.
 - **Hardware and completion:** the broader representative physical-hardware and
-  RAM-tier matrix is owner-deferred and non-blocking for the functional
-  development build; it is not recorded as passed. Compatible macOS execution,
-  automated native tests and accurately labeled simulated conditions remain in
-  scope alongside current P10/G10, G09-G12 and functional completion evidence.
+  RAM-tier matrix was deferred under the functional-development acceptance
+  scope; it is now open for the shippable target and is not recorded as passed.
+  Compatible macOS execution, automated native tests and accurately labeled
+  simulated conditions remain in scope alongside current P10/G10, G09-G12 and
+  functional completion evidence.
 
 Legacy `memory_*` and `session_*`/`context_*` tools remain compatible. Current
 product behavior and qualification boundaries are in
@@ -265,9 +356,10 @@ product behavior and qualification boundaries are in
 records its own still-open evidence state and does not override current source
 or executable behavior.
 
-The functional development build is distinct from P10/G10 public-distribution
-qualification. Nothing in this snapshot claims filesystem root-service E2,
-Developer ID signing, notarization, public shipment, or universal installation.
+The historical functional development build is distinct from P10/G10
+distribution qualification. Nothing in this snapshot claims filesystem
+root-service E2, installer notarization, public shipment, or universal
+installation.
 
 ## Design principles
 

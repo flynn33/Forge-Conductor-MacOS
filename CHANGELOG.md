@@ -12,15 +12,44 @@ under **Unreleased** is not a new qualified release.
 ## [Unreleased]
 
 This is a 0.9.0 development snapshot, not a public release. Product version
-surfaces remain 0.9.0 build 1. The current target is the functional development
-build: an optimized Apple Development-signed Release application and coherent
-hashed package. Developer ID Release, notarization/stapling, public-download
-acceptance and the broader physical-hardware/RAM-tier matrix are owner-deferred
-and non-blocking for this delivery; they are not recorded as passed. The current
-functional source, one production-adapter managed rollover, a canonical workspace
-Release build, coherent signed bundle and bounded isolated launch are complete.
-Privileged root-service E2, exact existing-desktop attachment, public distribution
-qualification and the owner-controlled source merge remain separate boundaries.
+surfaces remain 0.9.0 build 1. The owner now targets a fully functional,
+feature-complete, shippable build through direct `main` updates and will ship
+separately. The earlier Apple Development-signed Release package remains valid
+evidence for its historical scope. Current patch-bound source now has a
+universal Developer ID archive, export, signed local package, and a notarized,
+stapled app ZIP that passes local Gatekeeper after extraction. Installer
+notarization, public-download Gatekeeper acceptance, physical-hardware
+qualification, privileged root-service E2, and exact existing-desktop attachment
+remain open. One production-adapter managed rollover and the earlier coherent
+signed development bundle are recorded without promoting them to release passes.
+The former ordinary Release build stopped with Xcode exit 65 because all five
+shipping targets lacked the Developer ID private-key identity for team
+`9AQ2C2838M`. The owner subsequently installed valid Developer ID Application
+and Installer identities on this host. An ordinary current-source archive and
+`developer-id` export now succeed; the signed package has a trusted timestamp.
+Xcode Organizer notarized the app; its stapled local export and extracted ZIP
+pass Gatekeeper. The separate installer remains unnotarized and rejected.
+The isolated current-source arm64 Apple Development-signed Release workspace
+build and `DevelopmentRelease` nested-bundle check passed. Its embedded CLI
+returned exit 0 for `version` and `status` from a scratch home; the candidate
+GUI process launched a separate manager on port 7789 and stopped within a
+bounded interval while the installed app remained running. This is startup
+evidence, not signed root-service or release qualification.
+The temporary same-identifier candidate app appeared in macOS Background Items
+after the isolated launch. Its local ZIP passed integrity verification (SHA-256
+`65eb184ae46333288fe526d96db876783d88873bfaccb4822d61845b5c2756df`),
+and its original `.app` path was renamed to a retained non-app bundle. The
+Background Items cache still records the former path; the installed app remains
+running and the root-service gate is open.
+A fresh current-source arm64 development-signed Release candidate after the
+native authorized-path accessibility repair passed the strict bundle checker;
+its embedded CLI `version` and isolated-home manager status returned exit 0.
+The ZIP at `/private/tmp/forge-current-source-ui-devrelease-candidate.zip`
+passed integrity testing (SHA-256
+`56cb77e5802843dbb55b51da4c38d2b532685f6789358e0db18baa48c7d27c10`).
+Its GUI bundle was not launched or installed. This is an unshipped local
+development candidate pending exact published-source rebuild, not Developer ID
+or privileged-service qualification.
 
 ### Release archive preparation
 
@@ -49,8 +78,86 @@ qualification and the owner-controlled source merge remain separate boundaries.
   signatures and the Release privileged-bundle checker, including every nested
   product and the daemon hash seal. A local installer package signed with his
   Developer ID Installer identity has a trusted timestamp and contains the
-  exported app. Notarization, stapling, public Gatekeeper acceptance, and
-  shipment remain unverified owner release steps.
+  exported app. Xcode Organizer then notarized that current archive. The local
+  stapled export, app ZIP integrity, extracted bundle checker, and Gatekeeper
+  execution assessment pass; the ZIP SHA-256 is
+  `a309b3a138d5ee986a0791bb425ffd736b6ea295e6d80f4fda541289e0489d2b`.
+  The separately signed installer is still unnotarized and fails Gatekeeper's
+  install assessment. Public-download acceptance, owner hardware qualification,
+  and shipment remain open.
+- A bounded direct GUI launch from the extracted stapled app ZIP served the
+  isolated home on port 7790. Manager Start reported success; its native folder
+  picker and Save settings authorized only a disposable project. The Projects
+  picker committed that folder with generation 1, confirmed by the manager
+  snapshot after the computer-use transport briefly disconnected. The app was
+  stopped and the listener closed; the launched duplicate app path was retained
+  as a non-app bundle. No installed app files were replaced. This is packaged
+  onboarding evidence, not Provider completion or signed root-service E2.
+- A newer universal Developer ID archive built from the policy-import source
+  passed strict nested signatures and the Release bundle checker. Organizer
+  notarized submission `F591014A-45A3-4BB2-AA3F-25A26CEB0932`; its stapled
+  app ZIP passed integrity, extracted-bundle inspection, and Gatekeeper as
+  `Notarized Developer ID` (SHA-256
+  `9d99e311b8471b2de46d1043cb2dbe03c1486f105fd9a1c4a9df720cdec3c4ed`).
+  The extracted app's fresh-home manager on port 7792 authorized and registered
+  one disposable project, saved/probed the loaded LM Studio Provider, then
+  completed a read-only run with an exact imported signed XCTest policy: one
+  required native case passed, zero failed/skipped, exit 0, no timeout or
+  output truncation. `tests` stayed passed after a full app/manager process
+  restart. The owner installation stayed running and unchanged; the candidate
+  stopped with its listener closed. The archive predates only a test-target
+  Core-framework link and later test/docs edits. An exact published-source
+  rebuild, installed root-service E2, package/public-download notarization
+  acceptance, hardware matrix, and shipment remain open.
+- The final current-local-workspace universal Developer ID archive included the
+  updated Xcode UI-test target graph. Its five production code-directory hashes
+  match the notarized archive; the exported app stapled with that ticket. The
+  final local ZIP passed integrity, extracted stapler/signature/Release checks,
+  and local Gatekeeper as `Notarized Developer ID` (SHA-256
+  `f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`).
+  The `productsign` signing route waited for keychain confirmation; read-only
+  Keychain Access inspection showed the Installer key already permits
+  `productbuild`. That Apple-native route signed the final local installer
+  product with a trusted timestamp (SHA-256
+  `1cfc438cf5e2b5d9dda8fafcb019c905abad1b0289f48c5f9f233796c3f03f79`).
+  Its expanded app passes strict nested signing, staple validation, and app
+  Gatekeeper. The outer package remains unnotarized and is rejected for
+  installation. No key ACL was changed; nothing was installed or shipped.
+- The final local direct `swift test` run completed 1,554 XCTest cases with 12
+  explicit skips and zero failures on this source; the terminal transcript is
+  retained in the functional-build receipt. This does not qualify the
+  distinct-process service, installer, public download, or hardware matrix.
+- The resource stress report now labels its actual Debug or Release compilation
+  configuration and refuses to emit a `passed` report after a recorded XCTest
+  failure. One focused Debug case passed on this 128 GiB M5 Max host with
+  injected 8 GiB limits. The canonical workspace compiled the exact Core case
+  in Release; after the full scheme stalled signing its unrelated UI test
+  bundle, the already-built optimized Core bundle was signed with an existing
+  Apple Development identity. Direct `xcrun xctest` ran one Release case with
+  zero failures/skips and exit 0. A target-only optimized Core rebuild and
+  re-signed final-source XCTest rerun passed the same selected case once with
+  zero failures/skips; the final Release report hash is retained in the
+  functional-build receipt. Its Developer ID runtime launcher and signed test
+  bundle passed strict validity checks. The initial SwiftPM Release
+  invalid-test-bundle failure remains a nonpass. A second physical-memory
+  capacity remains unqualified.
+- The qualification-status index now describes the current 0.9.0 build 1
+  candidate, packaged LM Studio completion, native UI coverage, signed and
+  notarized app evidence, signed Installer boundary, and the exact remaining
+  publication, protected-service, Installer-notarization, and physical-host
+  gates. It no longer presents the superseded September 5 rescue candidate and
+  its repaired CI failures as current release status.
+- Read-only protected-service evidence now distinguishes the older registered
+  installation from the final Developer ID candidate by exact daemon SHA-256.
+  The existing launchd job has 2,599 failed launches, exit 78, and `needs LWCR
+  update`; enabling that older background item alone cannot qualify current
+  source. A controlled candidate installation and ServiceManagement
+  registration are required before the root mutation/recovery matrix.
+- The existing macOS CI Release Swift lane now retains the guarded P11 resource
+  report and a bounded architecture, hardware-model, physical-memory, OS, and
+  Xcode inventory. This prepares source-bound second-capacity evidence on the
+  published revision; it does not predeclare the pending CI execution a pass or
+  replace the separate physical-host qualification boundary.
 
 ### Project tracking and verified baseline
 
@@ -62,9 +169,10 @@ qualification and the owner-controlled source merge remain separate boundaries.
   fresh local/remote `main` readback at `50d1821`. Recorded the current native
   host, toolchain, signing, provider, and hardware prerequisites without
   promoting them to product or distribution evidence.
-- Added a canonical phase/milestone roadmap and a local-first delivery contract:
-  every PR records progress and Xcode synchronization; phase closeout updates
-  README, changelog, and affected documents.
+- Added a canonical phase/milestone roadmap and a local-first delivery contract.
+  That historical PR workflow recorded progress and Xcode synchronization;
+  the owner now authorizes direct `main` updates with the same phase closeout
+  documentation.
 - Recorded the merged instruction cleanup and focused CLI, coherent-resume,
   read/edit/command, project-memory, and generation-reset verification.
   These are narrow recorded checks, not a claim that all application paths ran.
@@ -74,7 +182,58 @@ qualification and the owner-controlled source merge remain separate boundaries.
 
 ### Functional completion
 
+- **E0 — SwiftPM CLI resource relocation:** a copied CLI exited with signal 5
+  because `ForgeConductor_ForgeConductorCore.bundle` was absent; the LM Studio
+  primary, fallback, and CLU deployment smoke failed the same way. Manager
+  installation now stages that bundle transactionally beside a SwiftPM CLI and
+  under its app resources. A bare statically linked CLI without the bundle is
+  rejected before changing the Forge home. The identical MCP deployment smoke,
+  real relocated CLI status, missing-bundle rejection, 120 Manager tests, both
+  SwiftPM product builds, and the canonical Xcode Debug app build passed. The
+  macOS 27/Xcode 27 full suite after the fail-closed and completion-parser
+  additions ran 1,553 tests with 12 explicit skips and zero failures.
+- The installed 0.9.0 app's three LM Studio MCP registrations point to its
+  actual executable. Starting LM Studio's loopback server and loading the saved
+  `qwen/qwen3.8-27b` 4-bit variant made the authenticated manager provider
+  probes report `reachable` and `contract_valid`. A separate read-only managed
+  run was admitted, created a native session, invoked `fs_read` three times,
+  and received a completion-request object at the end of a longer LM Studio
+  reply. **E1 — Autonomy completion parsing:** Core required the whole reply
+  to be JSON, so the run yielded in `running` with no passed gate. A bounded
+  trailing-object parser now enters native validation for that live response
+  shape and rejects an object followed by more prose; its focused regression
+  passed. This host has no owner-installed per-run native completion policy, so
+  end-to-end completion and the installed root daemon remain unverified.
+  A live current-source development-signed candidate then admitted a separate
+  read-only LM Studio run, retained one `fs_read` evidence reference, recognized
+  the model's completion marker, and transitioned to `blocked_configuration`
+  at revision 8 with `completion_validation_failed`. This verifies the parser
+  end-to-end while preserving the missing-policy denial; it is not a completed
+  Autonomy run. A second isolated current-source run had a private per-run policy
+  and a preflighted signed XCTest package. Against the loaded LM Studio model it
+  read a disposable work product, requested completion, and ran the exact native
+  case once: one passed, zero failed or skipped, exit 0, and no output truncation.
+  The manager reached `completed` at revision 10 with `tests` passed; the same
+  state and gate survived a manager restart. An operator policy importer now
+  binds a selected persisted run, project generation, complete gate set,
+  source manifest, and protected signed XCTest package before an owner-only
+  atomic policy write. A focused Core case proved wrong-binding/changed-package
+  rejection and exact `0600` persistence. The signed fixture imported through
+  that service and executed three real native jobs for failed, stale, and
+  corrected effects. A Developer ID Release native UI case registered an
+  authorized project, reached live LM Studio, started a read-only run, opened
+  and canceled the policy picker, and confirmed the control re-enabled; its
+  final repeat passed one selected case with no skips/failures. An extended
+  Release native case also selected an exact run-bound manifest fixture in the
+  picker and read back the byte-identical protected file at mode `0600`: one
+  selected case, zero skips/failures. That fixture is not a passing signed
+  package; only the separate manager job test adjudicates native results.
+  Installed-stack
+  terminal completion, package-preparation UX, root-service E2, and
+  distribution qualification remain open.
 - Repaired native project registration after the folder picker: one atomic sheet draft now retains the selected path and display name across modal dismissal. Added absolute-path registration beside the picker; manager-side canonical project identity and authorization remain authoritative. Fresh Provider and Autonomy screens name their actual setup prerequisites instead of treating an untested provider snapshot as a failure.
+- **E0 — Manager authorized-folder accessibility crash:** on macOS 27, the native folder-authorization test and a combined Autonomy start test both crashed the signed GUI when XCTest queried the selectable authorized-path label after panel dismissal. The faulting main-thread stack recursed through SwiftUI and AppKit accessibility-label resolution. Removed the redundant explicit label from that path text; the identical Manager authorization/cancel/invalid-root/save/relaunch flow then passed with the path still readable, and the combined registered-project/live-Provider/Autonomy run-start test passed. The canonical Xcode source/test graph was already complete.
+- **E0 — Intermittent live Provider probe:** one seven-case signed native onboarding run had six passes and one Provider `unreachable` result before the combined Autonomy case reached its run-start controls. Its saved Provider configuration was correct. The same seven-case class subsequently passed all seven with no skips, and two exact combined-case repeats passed. The test now retains GUI probe controls and the manager's redacted provider error if the result recurs; no production retry or deadline change was made without that error evidence.
 - On the owner host, the existing manager accepted and cancelled a bounded read-only run after the repository was registered, its root was authorized, and the local LM Studio selected variant was loaded. The earlier provider failure came from an unsaved configuration and a loaded variant absent from LM Studio's v1 `loaded_instances`. Focused native picker, direct-path, offline Provider, live LM Studio Provider, and Autonomy UI tests passed. A development-signed optimized app passed bundle inspection and bounded isolated bootstrap; an earlier UI attempt was interrupted by the host's registered privileged daemon launch constraint and remains retained as a non-pass.
 - Recovered a local startup failure caused by a completed store migration
   manifest whose named historical backup was absent. The prior manifest and a

@@ -84,8 +84,24 @@ daemon, and UI-test targets use the valid **Apple Development: James Daley**
 identity on team `9AQ2C2838M`. Release configurations request **Developer ID
 Application** on that same team. Xcode's account has already cloud-signed an
 earlier, different product as `Developer ID Application: James Daley
-(9AQ2C2838M)`. James has now installed usable local Developer ID Application
-and Installer identities for the same team in the login keychain.
+(9AQ2C2838M)`. The archive host subsequently had usable local Developer ID
+Application and Installer identities for the same team in its login keychain.
+The owner has now installed those identities on this macOS 27/Xcode 27 build
+host. The former ordinary current-source Release build stopped with Xcode exit
+65 while all five shipping targets lacked a matching Developer ID Application
+private key. A new ordinary archive from the current local patch over `main`
+and its manual `developer-id` export both succeeded; the earlier archive still
+qualifies only its original source.
+The explicit arm64 Apple Development Release override built the current source
+successfully on this host. The `DevelopmentRelease` nested-bundle checker,
+embedded CLI `version` and `status`, and a bounded isolated GUI/manager launch
+on scratch port 7789 passed without replacing the working installation.
+After that launch, macOS Background Items indexed the temporary app under the
+same bundle identifier as the installed product. The local development
+candidate was preserved in an integrity-checked ZIP (SHA-256
+`65eb184ae46333288fe526d96db876783d88873bfaccb4822d61845b5c2756df`),
+and the original `.app` directory was renamed to a retained non-app bundle.
+Background Items still caches the former URL; this is not a root-service pass.
 The earlier `2Y25RTLZET` Developer ID team remains in the product trust policy
 for previously signed products. Entitlements live at
 `Sources/ForgeConductorApp/Resources/ForgeConductor.entitlements`.
@@ -160,6 +176,118 @@ trusted timestamp. The local review receipt under
 records the exact artifact hashes. Notarization and public acceptance remain
 separate release steps.
 
+On this build host, the current local patch over `main` produced
+`/private/tmp/forge-current-source-developerid-20260915.xcarchive` with the
+canonical scheme, one universal `com.forge-conductor.app` application product,
+version `0.9.0 (1)`, icon metadata/resources, and Developer ID Application team
+`9AQ2C2838M`. The archive passed strict deep signature verification and the
+`Release` privileged-bundle checker. Manual `developer-id` export to
+`/private/tmp/forge-current-source-developerid-export-20260915` succeeded; the
+exported app and the expanded package payload independently passed the same
+checker, including nested code and daemon hash seals. The exported CLI returned
+`0.9.0` for `version` and a stopped manager from an isolated scratch home.
+The local app ZIP passed integrity testing (SHA-256
+`5a23be1a0937b9af643ee20b159b8a4fc6be8e47afaaeda75eb86167a8aab85d`).
+The local installer package is signed with Developer ID Installer and a trusted
+timestamp (SHA-256
+`5b7296ef3bdeaaf8565e8784287861d82eb40767363dc0c2365f635b2c3855f0`).
+`spctl --assess` rejected both app execution and package installation with
+`source=Unnotarized Developer ID` before notarization; no `notarytool` keychain
+profile was identified on this host. Xcode Organizer's **Direct Distribution**
+flow authenticated with its existing Apple account and reported notarization
+success for this exact archive. Organizer records submission identifier
+`52F2FB87-5E36-45E8-AA11-9CE7A3019168` as **Ready to distribute** and its
+status log names the app, CLI, launcher, daemon, and Core framework as notarized.
+The local exported app at
+`/private/tmp/forge-current-source-notarized-export-20260915/Forge Conductor.app`
+passed strict all-architecture nested signatures, the `Release` checker,
+`stapler validate`, and Gatekeeper execution assessment (`accepted`,
+`source=Notarized Developer ID`). Its ZIP at
+`/private/tmp/forge-current-source-notarized-app-20260915.zip` passed integrity
+testing (SHA-256
+`a309b3a138d5ee986a0791bb425ffd736b6ea295e6d80f4fda541289e0489d2b`).
+After extraction, the app again passed stapler, Gatekeeper, and the bundle
+checker. The separately signed installer package remains unnotarized and is
+rejected for installation. Neither artifact was installed or shipped. This
+archive remains tied to the current uncommitted local patch until an identical-
+source direct `main` publication is verified.
+
+The later policy-import source produced another universal Developer ID archive
+at `/private/tmp/forge-policy-import-developerid-20260915.xcarchive` with one
+canonical app product. Archive, manual export, strict nested signing, and
+Release privileged-bundle checks passed. Xcode Organizer Direct Distribution
+notarized it as `F591014A-45A3-4BB2-AA3F-25A26CEB0932`. The stapled app ZIP
+at `/private/tmp/forge-policy-import-notarized-app-20260915.zip` passed full
+integrity (SHA-256
+`9d99e311b8471b2de46d1043cb2dbe03c1486f105fd9a1c4a9df720cdec3c4ed`);
+its extracted app passed stapler, strict bundle/signature checks, and local
+Gatekeeper execution assessment. A bounded direct packaged run on isolated
+port 7792 registered a project, reached live LM Studio, and completed after
+the exact signed native XCTest case passed; terminal `tests` state survived a
+full process restart. The archive predates only the native UI-test target's
+Core-framework link and later test/docs edits; rebuild from exact published
+`main` before calling an artifact source-bound. The installer and public
+download remain separate distribution checks.
+
+A final universal Developer ID Release archive from the current local workspace
+and updated Xcode test-target graph passed at
+`/private/tmp/forge-final-local-developerid-20260916.xcarchive`. The exported
+app's five app/Core/CLI/launcher/daemon code-directory hashes match the
+notarized archive above, and the existing ticket stapled to this exact-code
+export. The final local app ZIP at
+`/private/tmp/forge-final-local-notarized-app-20260916.zip` passed integrity
+(SHA-256 `f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`),
+extracted stapler validation, strict all-architecture signing and Release
+bundle checks, and local Gatekeeper execution as `Notarized Developer ID`.
+The initial `productsign` path waited during private-key authorization, but the
+Installer key's existing ACL already admitted Apple's `productbuild` tool.
+`productbuild --package --sign` produced the matching trusted-timestamp package
+at `/private/tmp/forge-final-local-productbuild-signed-installer-20260916.pkg`
+(SHA-256 `1cfc438cf5e2b5d9dda8fafcb019c905abad1b0289f48c5f9f233796c3f03f79`).
+`pkgutil --check-signature` validates its Developer ID Installer chain and
+timestamp. The expanded app retains its ticket and passes strict nested signing,
+the Release bundle checker, stapler validation, and app Gatekeeper execution.
+The outer package is not notarized and fails Gatekeeper's install assessment as
+`source=Unnotarized Developer ID`; the host has no `notarytool` keychain profile
+or App Store Connect API key in its standard locations, and the repository has
+no Actions secrets available for a private CI submission. This archive remains
+tied to the uncommitted local workspace until direct owner publication and exact
+GitHub `main` readback.
+
+When an existing Notary profile is supplied, submit and qualify this exact
+package without rebuilding or creating another credential:
+
+```bash
+PKG=/private/tmp/forge-final-local-productbuild-signed-installer-20260916.pkg
+PROFILE='<existing notarytool profile>'
+xcrun notarytool submit "$PKG" --keychain-profile "$PROFILE" --wait \
+  --output-format json
+xcrun stapler staple "$PKG"
+xcrun stapler validate "$PKG"
+spctl --assess --type install --verbose=4 "$PKG"
+shasum -a 256 "$PKG"
+```
+
+Retain the terminal submission identifier and result before stapling. A timeout,
+an `Invalid` response, a missing terminal response, a failed staple, or a failed
+Gatekeeper install assessment remains a nonpass.
+The final local direct `swift test` suite subsequently executed 1,554 XCTest
+cases with 12 explicit skips and zero failures; the terminal transcript is
+`/private/tmp/forge-final-local-swift-test-20260916.log`. The production
+source and code-directory hashes did not change after the archive.
+
+A bounded direct launch from that extracted notarized ZIP used a fresh
+`FORGE_CONDUCTOR_HOME` and loopback port 7790. The GUI and dashboard reported
+`0.9.0`, Manager Start returned **Service started**, the native folder picker
+saved a disposable authorized root, and Projects registration committed its
+manager-owned identity/generation. The computer-use connection dropped during
+the registration click, but the app process and listener remained healthy and
+the manager snapshot confirmed the committed project. The candidate was then
+terminated, port 7790 closed, and only its launched `.app` path was renamed to a
+retained non-app bundle. The installed application's signature remained valid;
+the owner installation was not replaced. The installed root service still has
+a category-3 launch constraint and is not qualified by this smoke.
+
 Omitting `FORGE_DEVELOPMENT_SIGNING` from an Apple Development-signed Release
 build intentionally fails the exact installer or peer-identity checks. The
 ordinary Release configuration remains pinned to Developer ID team
@@ -174,9 +302,11 @@ An earlier exact-revision focused signed Debug navigation qualification complete
 bounded direct launch from its isolated Release product. A current app-hosted
 gauge attempt could not activate a display link because the test environment
 reported zero valid displays; that result is unexecuted, not a product pass or
-failure. Developer ID Release, archive, notarization, staple, Gatekeeper,
-privileged root-service E2, and the broader native UI/hardware matrix are not
-required by this development-delivery scope and are not recorded as passed.
+failure. At that historical development-delivery checkpoint, Developer ID
+Release, archive, notarization, staple, Gatekeeper, privileged root-service E2,
+and the broader native UI/hardware matrix were not recorded as passes. The
+current patch-bound Developer ID app archive, notarization, staple, and local
+Gatekeeper checks are recorded above; the other gates remain open.
 
 The functional-development candidate now includes production move/recursive-
 directory deletion, one manager-owned real-provider forced rollover, the complete
@@ -303,7 +433,13 @@ The Core target includes the provider configuration contract and native LM Studi
 configuration service. Service/store tests run in `ForgeConductorTests`; native
 HTTP-client and manager-route tests run in `ForgeConductorAppTests`.
 `ProductionOnboardingUITests` is in the native UI target and uses the actual
-folder panel and normal app bootstrap. Run it serially with UI Automation enabled:
+folder panel and normal app bootstrap. The UI target now links the existing
+Core framework only to calculate the approved package manifest in its positive
+policy-picker fixture; source and resource memberships stay unchanged. Its
+Developer ID Release combined case opened/canceled the picker, selected an
+exact run-bound manifest fixture, and read back the owner-only policy at mode
+`0600`. The separate Core signed-package fixture verifies actual gate
+adjudication. Run UI cases serially with UI Automation enabled:
 
 ```bash
 xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor   -destination 'platform=macOS,arch=arm64' -parallel-testing-enabled NO   -only-testing:ForgeConductorUITests/ProductionOnboardingUITests test
@@ -317,6 +453,21 @@ records an explicit skip. Keep the result bundle, selected/executed counts and
 attachments. Build success and fixture UI tests do not qualify production
 onboarding. The qualification-support SwiftPM tests remain in their dedicated
 package target; Xcode builds the support library and native harness separately.
+On the current Xcode 27 host, a direct `FORGE_SHIPPING_PROVIDER_*` shell prefix
+selected one live Provider case but skipped it because those variables were
+absent in the runner. The passing current-source live Provider and combined
+Autonomy cases used `build-for-testing`, an inspected copied `.xctestrun` plan
+with the two variables in `ForgeConductorUITests.EnvironmentVariables`, and
+`test-without-building` with one exact selector each. The result bundles report
+one passed, zero skipped, zero failed. The Manager authorized-folder crash was
+reproduced in its exact native UI case before the redundant accessibility-label
+repair; the same case and combined Autonomy start case passed afterward.
+One broader seven-case onboarding run had six passes and one live Provider
+`unreachable` result before its combined Autonomy case reached run start. After
+failure-time probe diagnostics were added, the full class executed seven cases
+with no skip or failure, and two further exact combined-case repeats passed.
+Retain both `.xcresult` bundles; the first result is not a pass and does not
+establish a deterministic product defect without the provider error detail.
 
 The unhosted Core unit-test bundle also uses Apple Development team `9AQ2C2838M`
 to match its adjacent runtime launcher. Ad-hoc test signing is rejected by the

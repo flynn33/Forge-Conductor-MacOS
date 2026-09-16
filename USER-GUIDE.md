@@ -3,33 +3,55 @@
 Version **0.9.0**, build **1**. This guide is for operators who run Forge Conductor with
 [LM Studio](https://lmstudio.ai) on macOS.
 
-The current delivery target is the [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md):
-an optimized Release application signed with the available Apple Development
-identity. Developer ID distribution, notarization/stapling, public-download
-acceptance and the broader physical-hardware/RAM-tier matrix are owner-deferred
-and non-blocking for this delivery. They are not recorded as passed, and all
-functional product requirements remain in scope.
+The owner now targets a fully functional, shippable build and will ship it
+separately. The earlier [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
+retains its original scope. The current source has a Developer ID archive and a
+notarized, stapled app ZIP that passed local Gatekeeper assessment. Installer
+notarization, public-download acceptance, signed privileged filesystem execution,
+and the physical-hardware matrix remain open.
 
 ## Current status
 
 | Implemented and test-backed in this source | Still open or deferred before shipment |
 |---------------------------------|----------------------------------------|
 | The CLI reports 0.9.0; runtime constants, Xcode settings, and the built app bundle report 0.9.0 build 1. | Signed distinct-process filesystem E2 and recovery qualification. |
-| The current Apple Development-signed Release bundle is coherent and passed isolated CLI checks plus a bounded direct GUI launch; an earlier 100-cycle Rig/MCP navigation result remains supporting evidence. | Developer ID Release, full public-distribution UI/service matrix, archive, notarization, staple, and Gatekeeper validation are owner-deferred. |
-| Project memory, durable jobs and telemetry have regression coverage. Four native onboarding scenarios passed, including Settings shell disable/re-enable with fresh MCP processes. The shipping handoff records exact evidence and installed shell/manager checks. | Complete installed/native service matrix, Developer ID Release, and exact P10 production qualification. |
+| A current-source Developer ID Release archive, notarized/stapled app ZIP, strict nested-signature check, and local Gatekeeper execution assessment passed. The extracted app also started a separate manager and registered a disposable project. | Notarized installer, public-download acceptance, signed root-service execution, and hardware matrix. |
+| Project memory, durable jobs and telemetry have regression coverage. The final direct suite executed 1,554 cases with 12 explicit skips and zero failures. Signed native onboarding passed project, Manager, Provider, Autonomy, and policy-picker flows. | Complete installed protected-service matrix and a second physical-memory-capacity stress execution. |
 | Durable continuity state, provider receipt storage, successor/fencing models and tool-effect reconciliation are implemented; one manager-owned real-provider rollover completed exact acknowledgment, successor work, GUI-closed recovery and stable replay. | A second live attempt exceeded the provider deadline and is not a repeat pass; exact existing-desktop attachment remains unsupported without a host API. |
 | Protected regular-file, symbolic-link, empty-directory, no-replacement move and bounded recursive-delete operations have protocol-v5 capture and recovery machinery. | Signed distinct-process filesystem E2 and recovery qualification remain unmeasured pending owner-approved service execution. |
-| Provider controls save endpoint/model settings and Keychain credential changes through the manager. Native onboarding and disposable Keychain tests have executed. | Final installed-stack and complete provider/autonomy production acceptance. |
-| Package P10/G10 evidence remains available for qualification review. | Package P10/G10 and current G09-G12 remain open; representative physical-hardware qualification is owner-deferred. |
+| Provider controls save endpoint/model settings and Keychain credential changes through the manager. A signed native UI case registered a project, reached live LM Studio, started a read-only Autonomy run, canceled and reopened the native policy picker, then imported an exact run-bound manifest fixture at mode `0600`. Core import and a separate signed XCTest gate fixture passed. | Ordinary installed-stack terminal completion, package-preparation UX, and root-service execution. |
+| The universal Developer ID app is notarized and stapled; its exact-code ZIP passes local Gatekeeper. The matching Installer is Developer ID signed with a trusted timestamp and its expanded app payload passes signing and app Gatekeeper checks. | The outer Installer still needs notarization/stapling and a passing Gatekeeper install assessment. Publication/readback and shipment remain owner-controlled. |
 
 Where implementation has only unit, synthetic-host, simulator, focused Debug,
 or build-only evidence, that boundary is stated plainly. This guide does not
 mark a package or release gate complete. The [qualification summary](docs/QUALIFICATION-STATUS.md)
 binds local results and GitHub CI repairs to their tested revisions.
+The newer notarized Developer ID ZIP was also launched with a disposable Forge
+home. Its packaged manager registered an authorized project, passed a live LM
+Studio contract probe, and completed a read-only run using an exact imported
+signed XCTest policy. One required native case passed with no failure, skip,
+timeout, or truncated output; `tests` stayed passed after a full process
+restart. This is isolated packaged acceptance, while the owner installation's
+privileged root service and public download remain unqualified. The exact
+[receipt](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md#september-16-2026-packaged-native-completion-receipt)
+includes source and artifact hashes.
+The final local archive includes the current Xcode test-target graph and
+produces an exact-code stapled app ZIP that passed local Gatekeeper after
+extraction (SHA-256
+`f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`).
+Its Installer is signed with a trusted timestamp but its outer package has not
+completed notarization, and the privileged root service remains an open
+qualification gate.
 Manager-owned completion requires [installed native validation policy](docs/NATIVE-COMPLETION.md).
 A missing policy appears as a configuration block; a summary or result hash
 cannot substitute for required checks. Existing shell enable/disable controls
 and completion-request fields remain available.
+In **Autonomy**, select a persisted run and use **Import Native Validation
+Policy…** to choose a separately prepared schema-1 JSON policy for its exact
+run, project generation, and gates. The signed XCTest package must already be
+under Forge's protected native-validation directory. The importer verifies the
+binding and package/source digests; the manager alone decides whether actual
+native results pass. Canceling the picker leaves the run unchanged.
 
 Provider Save, model discovery, and credential controls are described in
 [Configure the managed provider](#configure-the-managed-provider).
@@ -101,33 +123,36 @@ Primary and fallback are two registrations of the **same** binary with `FORGE_MC
 For a complete signed Xcode installation or update, use the
 [explicit Xcode build and transactional installer](XCODE.md#install-the-exact-xcode-build).
 It selects one build directory and keeps the app, CLI, runtime launcher and
-framework together. The convenience build/run script produces a development
-smoke bundle; it rejects a build override that disagrees with the compiled
-identity. Release distribution uses Xcode archive/export and the owner’s manual
-shipping process after qualification.
+framework together. Release distribution uses Xcode archive/export and the
+owner’s manual shipping process after qualification.
 
-From this repository, after a successful build:
+For a separate source-built Debug app from this repository:
 
 ```bash
-cd /path/to/Forge-Conductor-MacOS-main
-swift test                          # optional but recommended
-swift build --product forge-conductor --configuration release
-# copy or:
-./script/build_and_run.sh --build-only
-
-# CLI into ~/.forge-conductor (does not write LM Studio by itself)
-forge-conductor install
-
-# Same effect as GUI → LM Studio MCP → Deploy to LM Studio
-forge-conductor install-lmstudio-plugin \
-  --binary "$HOME/.forge-conductor/bin/forge-conductor"
-
-forge-conductor doctor
+cd /path/to/Forge-Conductor-MacOS
+open ForgeConductor.xcworkspace
+xcodebuild -scheme ForgeConductor -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath /private/tmp/forge-conductor-user-guide build
 ```
 
-`install` does **not** replace `/Applications/Forge Conductor.app`. If that path is not writable (common on a locked-down Mac), keep using the staged GUI under `dist/Forge Conductor.app` or the home CLI for MCP.
+Run `/private/tmp/forge-conductor-user-guide/Build/Products/Debug/Forge
+Conductor.app` in Xcode or as a separate local candidate. Start **Manager**,
+authorize your project folder, register it in **Projects**, and save/probe the
+loaded model in **Provider**. For managed work, choose the registered project
+and completion gates in **Autonomy**; for an LM Studio desktop chat, deploy the
+MCP roles as described below. A SwiftPM CLI build by itself is not the complete
+signed app; its Core resource bundle must be adjacent before MCP initialization.
 
-`install-lmstudio-plugin` is the supported way to write `mcp.json` and both mcpBridge plugins. Do not hand-edit those files unless deploy failed and you are diagnosing.
+For the installed same-build CLI and signed app, use the
+[Xcode installer steps](XCODE.md#install-the-exact-xcode-build). The CLI's
+`install` command stages the selected signed CLI/resource/launcher set in the
+per-user Forge home; it does not replace `/Applications/Forge Conductor.app`.
+
+In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
+`forge-conductor install-lmstudio-plugin` command from the same-build installed
+CLI transactionally writes `mcp.json` and both mcpBridge roles. Do not hand-edit
+those files unless deploy failed and you are diagnosing.
 
 Confirm the registered command is a `serve`-capable 0.9.0 binary:
 
@@ -165,9 +190,10 @@ a new PID with predecessor exit. The raw installed CLI also passed `version`,
 `status`, and `doctor`, and the launcher beside it was signed and verified. The
 installed-app run deliberately did not invoke System Events and remains partial.
 A separate Xcode run passed native Settings shell disable/re-enable and execution
-from fresh MCP processes. Developer ID Release signing, exact P10 production
-qualification, the full installed/native service matrix, archive, notarization,
-and staple/Gatekeeper evidence remain open. The bounded
+from fresh MCP processes. The final current-local-workspace universal Developer
+ID archive and stapled app ZIP passed strict signatures and local Gatekeeper;
+the full installed/native root-service matrix, installer signing/notarization,
+public download, and broader hardware checks remain open. The bounded
 compatibility scenarios pass; shipment does not.
 
 ---
@@ -220,16 +246,20 @@ as required. Resolve the reported migration issue, then retry registration for
 the same project. See [Legacy migration](docs/CONTINUITY-INGRESS.md#legacy-migration-during-project-registration)
 for inventory limits and recovery behavior.
 
-The checkpoint and handoff behavior below is implemented. The current
-development snapshot has not yet proven autonomous session succession through a
-manager-owned, threshold-forced real-provider rollover. Until that test also
-proves exact successor acknowledgment, predecessor fencing, idempotent sealing,
-automatic continuation, GUI-closed operation, and crash-state recovery, use the
-new-chat recipe as the operational path rather than treating autonomous
-continuity as qualified.
+The checkpoint and handoff behavior below is implemented. Forge's native
+managed-host path has completed one threshold-forced real-provider rollover:
+the successor restored and acknowledged the exact durable handoff, ordinary
+work ran, its output was consumed by the following turn, the predecessor was
+fenced and sealed, and restart replay remained stable. Deterministic tests cover
+repeated rollovers and injected recovery transitions. A second live attempt hit
+the provider's bounded deadline and is retained as a nonpass, so the single
+live pass is not described as a broad provider reliability matrix.
 
-Unit and synthetic-host tests do not close this gate. The authority run must use
-the real provider with the GUI closed and recover from every durable crash state.
+LM Studio's desktop chat remains a separate host-owned mode. Its supported APIs
+do not let Forge attach to or replace an existing GUI conversation. Use the
+new-chat recipe below for an LM Studio-owned desktop chat. Forge-managed
+Autonomy uses the native session host for automatic rollover and does not claim
+to automate LM Studio's private GUI.
 
 For a native client with an explicit read-only task approval, use
 `forge-conductor manager task prepare --request /absolute/approval.json`.
@@ -432,11 +462,14 @@ LM Studio may send all `tools/call` traffic to one of them (often fallback). Tha
   transactions. Their focused protocol/adversarial tests pass, while approved
   root-service execution remains unmeasured on this host.
 - Configure the managed provider using Provider controls and test the saved
-  connection before starting Autonomy. Four native onboarding scenarios passed;
-  complete installed-stack and provider/autonomy qualification remain open.
-- Developer ID Release, public-distribution qualification, exact existing-desktop
-  attachment, privileged root-service E2 and the representative physical-hardware
-  matrix remain unproved or owner-deferred; this guide is not a ship authorization.
+  connection before starting Autonomy. The current signed combined native case
+  also canceled and reopened the policy picker, imported an exact run-bound
+  manifest fixture, and read back the protected policy; a completed installed-stack run
+  remains open.
+- The local notarized Developer ID app ZIP passed Gatekeeper, but Installer
+  notarization, public-download acceptance, unsupported existing-desktop attachment,
+  privileged root-service E2, and the representative physical-hardware matrix
+  remain open; this guide is not a ship authorization.
 - `/Applications/Forge Conductor.app` is not updated by `install` if the OS refuses the overwrite. Check **version** on the binary LM Studio actually spawns.
 - `forge-conductor install` from the CLI may stage a **CLI** binary inside `~/.forge-conductor/Forge Conductor.app`. That bundle is not a substitute for the SwiftUI GUI in `dist/` or a proper app-bundle install.
 - Read-only tools can list most of your home directory. Treat that as a real permission, not a sandbox.
