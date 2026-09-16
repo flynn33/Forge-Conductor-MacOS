@@ -3,6 +3,7 @@
 
 import Darwin
 import Foundation
+import ForgeConductorCore
 import XCTest
 
 /// The test runner must have macOS Automation permission and an unlocked session.
@@ -285,6 +286,95 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attach("real-provider-configuration-after-relaunch", persisted)
     }
 
+    func testNativeAutonomyStartPersistsExactReadOnlyAssignmentAgainstLoadedProvider() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let endpoint = environment["FORGE_SHIPPING_PROVIDER_ENDPOINT"], !endpoint.isEmpty,
+              let model = environment["FORGE_SHIPPING_PROVIDER_MODEL"], !model.isEmpty else {
+            throw XCTSkip("Requires the selected running local LM Studio endpoint and loaded model")
+        }
+        try OwnerOnlyAtomicFile.write(
+            Data("required native effect\n".utf8),
+            to: projectRoot.appendingPathComponent("work-product.txt")
+        )
+        _ = try await launchOrdinaryApplication()
+        try openManager()
+        try openFolderPicker()
+        try chooseFolderInNativePanel(projectRoot.path)
+        try click(app.buttons["settings-save"])
+        _ = try await waitForSettings(roots: [projectRoot.path])
+
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-register-by-path"])
+        try replace(app.textFields["project-register-path"], with: projectRoot.path)
+        try click(app.buttons["project-register-confirm"])
+        let projects: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
+        let project = try XCTUnwrap(projects.projects.first)
+        XCTAssertEqual(project.canonicalRoot, projectRoot.path)
+
+        try openProvider()
+        _ = try await saveProvider(endpoint: endpoint, model: model)
+        try await assertRealConnection(model: model)
+
+        try click(app.buttons["tab-autonomy"])
+        let start = app.buttons["autonomy-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        XCTAssertTrue(waitUntil { start.isEnabled })
+        try click(start)
+        let mission = "Read work-product.txt once, report its exact content, and request completion. Do not edit files."
+        try replace(element("run-start-mission"), with: mission)
+        try replace(element("run-start-tool-policy"), with: "fs_read")
+        try replace(element("run-start-completion-gates"), with: "tests")
+        XCTAssertEqual(element("run-start-model").value as? String, model)
+        try click(app.buttons["run-start-confirm"])
+        XCTAssertTrue(waitUntil(timeout: 20) { !self.app.buttons["run-start-confirm"].exists })
+
+        let snapshot: OnboardingManagedRunSnapshot = try await read("/api/manager/operator/snapshot?limit=5")
+        let run = try XCTUnwrap(snapshot.runs.first { $0.mission == mission })
+        XCTAssertEqual(run.projectID, project.projectID)
+        XCTAssertEqual(run.projectGeneration, project.projectGeneration)
+        XCTAssertEqual(run.modelKey, model)
+        XCTAssertEqual(run.completionGates, ["tests"])
+        XCTAssertTrue(element("autonomy-run-row-\(run.runID)").waitForExistence(timeout: 10))
+        let importPolicy = app.buttons["run-import-native-policy"]
+        XCTAssertTrue(importPolicy.waitForExistence(timeout: 10))
+        try click(importPolicy)
+        let policyPanel = app.windows["open-panel"]
+        XCTAssertTrue(policyPanel.waitForExistence(timeout: 10))
+        XCTAssertTrue(policyPanel.buttons["Import Policy"].exists)
+        try click(policyPanel.buttons["Cancel"])
+        XCTAssertTrue(waitUntil { !policyPanel.exists })
+        XCTAssertTrue(waitUntil { importPolicy.isEnabled })
+        let afterCancellation: OnboardingManagedRunSnapshot = try await read("/api/manager/operator/snapshot?limit=5")
+        XCTAssertTrue(afterCancellation.runs.contains(where: { $0.runID == run.runID }))
+
+        let preparedPolicy = try await prepareOperatorImportFixture(for: run)
+        let protectedPolicy = forgeHome.appendingPathComponent("native-validation/policies/\(run.runID).json")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: protectedPolicy.path))
+        try click(importPolicy)
+        XCTAssertTrue(policyPanel.waitForExistence(timeout: 10))
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        let policyGoToSheet = policyPanel.sheets["GoToWindow"]
+        guard policyGoToSheet.waitForExistence(timeout: 5) else {
+            throw OnboardingFailure.controlUnavailable(identifier: "policy GoToWindow")
+        }
+        try enterGoToPath(preparedPolicy.path, field: policyGoToSheet.textFields["PathTextField"])
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(waitUntil(timeout: 5) { !policyGoToSheet.exists })
+        try click(policyPanel.buttons["Import Policy"])
+        XCTAssertTrue(waitUntil(timeout: 10) { !policyPanel.exists })
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            self.contains(self.element("operator-notice"), "Native validation policy imported")
+        })
+        XCTAssertEqual(try Data(contentsOf: protectedPolicy), try Data(contentsOf: preparedPolicy))
+        let mode = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: protectedPolicy.path)[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(mode.intValue & 0o777, 0o600)
+        if environment["FORGE_NATIVE_GATE_TEST_PACKAGE"] != nil {
+            try await assertSignedNativeCompletion(runID: run.runID)
+        }
+        attach("native-autonomy-start-readback", snapshot)
+        attachScreenshot("native-autonomy-start")
+    }
+
     func testNativeSettingsShellOptOutAndReenablePersistIntoFreshMCPProcesses() async throws {
         _ = try await launchOrdinaryApplication()
         try openManager()
@@ -394,8 +484,8 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
             throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
         }
         let pathField = goToSheet.textFields["PathTextField"]
-        try replace(pathField, with: path)
-        pathField.typeKey(.return, modifierFlags: [])
+        try enterGoToPath(path, field: pathField)
+        app.typeKey(.return, modifierFlags: [])
         if !waitUntil(timeout: 5, { !goToSheet.exists }) {
             // AppKit can restore the previous directory into the still-open
             // sheet after submission. Re-enter once only when that stale value
@@ -405,14 +495,151 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                 throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
             }
             attachScreenshot("native-go-to-folder-stale-path")
-            try replace(pathField, with: path)
-            pathField.typeKey(.return, modifierFlags: [])
+            try enterGoToPath(path, field: pathField)
+            app.typeKey(.return, modifierFlags: [])
         }
         guard waitUntil(timeout: 5, { !goToSheet.exists }) else {
             throw OnboardingFailure.controlUnavailable(identifier: "GoToWindow")
         }
         try click(folderPanel.buttons[prompt])
         XCTAssertTrue(waitUntil { !self.folderPanel.exists })
+    }
+
+    private func enterGoToPath(_ path: String, field: XCUIElement) throws {
+        if field.isHittable {
+            try replace(field, with: path)
+        } else {
+            guard field.waitForExistence(timeout: 5) else {
+                throw OnboardingFailure.controlUnavailable(identifier: "PathTextField")
+            }
+            attach("native-go-to-keyboard-focus", folderPanel.debugDescription)
+            app.typeKey("a", modifierFlags: [.command])
+            app.typeText(path)
+        }
+        guard waitUntil(timeout: 5, { field.value as? String == path }) else {
+            throw OnboardingFailure.controlNotHittable(identifier: "PathTextField exact-path readback")
+        }
+    }
+
+    private func prepareOperatorImportFixture(for run: OnboardingManagedRunSnapshot.Run) async throws -> URL {
+        let environment = ProcessInfo.processInfo.environment
+        let packageID = UUID()
+        let packageRoot = forgeHome.appendingPathComponent(
+            "native-validation/packages/\(packageID.uuidString.lowercased())", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        let packageInputs: [String]
+        let signedProducts: [String]
+        let planName: String
+        let testIdentifier: String
+        let requiredCase: String
+        let xcodeVersion: String
+        let timeout: TimeInterval
+        if let sourcePath = environment["FORGE_NATIVE_GATE_TEST_PACKAGE"] {
+            let original = URL(fileURLWithPath: sourcePath, isDirectory: true)
+            let originalPlan = try XCTUnwrap(environment["FORGE_NATIVE_GATE_TEST_PLAN"])
+            let versionFile = try XCTUnwrap(environment["FORGE_NATIVE_GATE_XCODE_VERSION_FILE"])
+            xcodeVersion = try String(contentsOfFile: versionFile, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            try FileManager.default.copyItem(at: original.appendingPathComponent("Debug"),
+                                             to: packageRoot.appendingPathComponent("Debug"))
+            planName = "native-gate-\(UUID().uuidString.lowercased()).xctestrun"
+            var plan = try XCTUnwrap(PropertyListSerialization.propertyList(
+                from: Data(contentsOf: original.appendingPathComponent(originalPlan)), format: nil
+            ) as? [String: Any])
+            if var configurations = plan["TestConfigurations"] as? [[String: Any]] {
+                for index in configurations.indices {
+                    var targets = try XCTUnwrap(configurations[index]["TestTargets"] as? [[String: Any]])
+                    for target in targets.indices {
+                        var variables = targets[target]["EnvironmentVariables"] as? [String: String] ?? [:]
+                        variables["FORGE_NATIVE_GATE_FIXTURE_FILE"] = projectRoot.appendingPathComponent("work-product.txt").path
+                        targets[target]["EnvironmentVariables"] = variables
+                    }
+                    configurations[index]["TestTargets"] = targets
+                }
+                plan["TestConfigurations"] = configurations
+            } else {
+                var target = try XCTUnwrap(plan["ForgeConductorTests"] as? [String: Any])
+                var variables = target["EnvironmentVariables"] as? [String: String] ?? [:]
+                variables["FORGE_NATIVE_GATE_FIXTURE_FILE"] = projectRoot.appendingPathComponent("work-product.txt").path
+                target["EnvironmentVariables"] = variables
+                plan["ForgeConductorTests"] = target
+            }
+            let planData = try PropertyListSerialization.data(fromPropertyList: plan, format: .xml, options: 0)
+            try OwnerOnlyAtomicFile.write(planData, to: packageRoot.appendingPathComponent(planName))
+            let contents = "Debug/ForgeConductorTests.xctest/Contents/"
+            packageInputs = [planName, contents + "Info.plist", contents + "MacOS",
+                             contents + "_CodeSignature", contents + "Resources",
+                             contents + "Frameworks/ForgeConductorCore.framework/Versions/A",
+                             "Debug/ForgeConductorCore.framework/Versions/A", "Debug/forge-conductor",
+                             "Debug/forge-filesystem-daemon", "Debug/forge-runtime-launcher"]
+            signedProducts = ["Debug/ForgeConductorTests.xctest", "Debug/ForgeConductorCore.framework",
+                              "Debug/forge-conductor", "Debug/forge-filesystem-daemon", "Debug/forge-runtime-launcher"]
+            testIdentifier = "ForgeConductorTests/ProcessRunnerTests/testNativeGateEffectFixture"
+            requiredCase = "ProcessRunnerTests/testNativeGateEffectFixture()"
+            timeout = 60
+        } else {
+            planName = "plan.xctestrun"
+            try Data("fixed picker test plan".utf8).write(to: packageRoot.appendingPathComponent(planName))
+            try Data("manifest-only import fixture; execution must still verify signature".utf8)
+                .write(to: packageRoot.appendingPathComponent("product"))
+            packageInputs = [planName, "product"]
+            signedProducts = ["product"]
+            testIdentifier = "ForgeConductorTests/Effect/testWork"
+            requiredCase = "Effect/testWork()"
+            xcodeVersion = "Xcode fixture"
+            timeout = 30
+        }
+        let manifest = try await QualificationInputSnapshotter(
+            root: packageRoot, inputs: packageInputs, maximumFileBytes: 128 * 1_048_576
+        ).capture()
+        let runID = try XCTUnwrap(UUID(uuidString: run.runID))
+        let projectID = try XCTUnwrap(UUID(uuidString: run.projectID))
+        let policy = OnboardingNativeImportPolicy(
+            schemaVersion: 1,
+            policyRevision: CompletionGateAcceptancePolicy.correction001Revision,
+            runID: RunID(runID), projectID: ProjectID(projectID),
+            projectGeneration: ProjectGeneration(run.projectGeneration),
+            sourceInputs: ["work-product.txt"], candidateSourceSHA256: nil,
+            buildIdentity: manifest.sha256, xcodeVersion: xcodeVersion,
+            architecture: "arm64", correctionCaseBindings: [:],
+            gates: [.init(
+                id: "tests", version: 2, packageID: packageID,
+                packageInputs: packageInputs, packageSHA256: manifest.sha256,
+                signedProducts: signedProducts, testRunPath: planName,
+                testIdentifiers: [testIdentifier],
+                requiredCases: [requiredCase], minimumCaseCount: 1,
+                timeoutSeconds: timeout
+            )]
+        )
+        let file = fixture.appendingPathComponent("approved-policy.json")
+        try JSONEncoder().encode(policy).write(to: file, options: .atomic)
+        return file
+    }
+
+    private func assertSignedNativeCompletion(runID: String) async throws {
+        let deadline = Date().addingTimeInterval(240)
+        var retried = false
+        var latest: OnboardingManagedRunSnapshot.Run?
+        while Date() < deadline {
+            let snapshot: OnboardingManagedRunSnapshot = try await read("/api/manager/operator/snapshot?limit=5")
+            latest = snapshot.runs.first { $0.runID == runID }
+            if latest?.state == "completed" {
+                attach("native-picker-signed-completion", snapshot)
+                return
+            }
+            if latest?.state == "blocked_configuration", !retried {
+                retried = true
+                let retry = app.buttons["run-retry"]
+                if retry.waitForExistence(timeout: 5), retry.isEnabled {
+                    try click(retry)
+                }
+            }
+            try await Task.sleep(for: .seconds(1))
+        }
+        attach("native-picker-terminal-nonpass", latest)
+        XCTFail("Signed native policy was imported but the live managed run did not complete within 240 seconds")
     }
 
     private func saveProvider(endpoint: String, model: String) async throws -> OnboardingProviderConfiguration {
@@ -432,9 +659,27 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
 
     private func assertRealConnection(model: String) async throws {
         try click(app.buttons["provider-test-connection"])
-        XCTAssertTrue(waitUntil(timeout: 40) {
+        let reachable = waitUntil(timeout: 40) {
             self.contains(self.element("provider-probe-notice"), "The configured provider and model are reachable.")
-        })
+        }
+        if !reachable {
+            let notice = element("provider-probe-notice")
+            let error = element("operator-unavailable")
+            let lastProbeError = element("provider-last-probe-error")
+            let report = OnboardingProviderProbeFailureDiagnostics(
+                notice: notice.exists ? (notice.value as? String ?? notice.label) : nil,
+                error: error.exists ? error.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | ") : nil,
+                lastProbeError: lastProbeError.exists ? (lastProbeError.value as? String ?? lastProbeError.label) : nil,
+                operatorUnavailable: element("operator-unavailable").exists,
+                providerHealth: element("provider-health").value as? String
+            )
+            attach("real-provider-probe-failure-controls", report)
+            if let snapshot: OnboardingOperatorSnapshot = try? await read("/api/manager/operator/snapshot?limit=1") {
+                attach("real-provider-probe-failure-manager-state", snapshot.provider)
+            }
+            retainBootstrapDiagnostics("real-provider-probe-failure-bootstrap", home: forgeHome)
+        }
+        XCTAssertTrue(reachable, "Live Provider probe did not reach the loaded model; inspect retained failure controls and manager state")
         XCTAssertFalse(element("operator-unavailable").exists)
         let snapshot: OnboardingOperatorSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
         let provider = try XCTUnwrap(snapshot.provider)
@@ -694,6 +939,64 @@ private struct OnboardingProjectSnapshot: Codable, Sendable, Equatable {
         }
     }
     let projects: [Project]
+}
+
+private struct OnboardingManagedRunSnapshot: Codable, Sendable {
+    struct Run: Codable, Sendable {
+        let runID: String
+        let projectID: String
+        let projectGeneration: UInt64
+        let mission: String
+        let state: String?
+        let modelKey: String?
+        let completionGates: [String]
+        enum CodingKeys: String, CodingKey {
+            case runID = "run_id"
+            case projectID = "project_id"
+            case projectGeneration = "project_generation"
+            case mission
+            case state
+            case modelKey = "model_key"
+            case completionGates = "completion_gates"
+        }
+    }
+    let runs: [Run]
+}
+
+private struct OnboardingNativeImportPolicy: Encodable, Sendable {
+    struct Gate: Encodable, Sendable {
+        let id: String
+        let version: UInt64
+        let packageID: UUID
+        let packageInputs: [String]
+        let packageSHA256: String
+        let signedProducts: [String]
+        let testRunPath: String
+        let testIdentifiers: [String]
+        let requiredCases: Set<String>
+        let minimumCaseCount: Int
+        let timeoutSeconds: TimeInterval
+    }
+    let schemaVersion: Int
+    let policyRevision: String
+    let runID: RunID
+    let projectID: ProjectID
+    let projectGeneration: ProjectGeneration
+    let sourceInputs: [String]
+    let candidateSourceSHA256: String?
+    let buildIdentity: String
+    let xcodeVersion: String
+    let architecture: String
+    let correctionCaseBindings: [String: String]
+    let gates: [Gate]
+}
+
+private struct OnboardingProviderProbeFailureDiagnostics: Encodable, Sendable {
+    let notice: String?
+    let error: String?
+    let lastProbeError: String?
+    let operatorUnavailable: Bool
+    let providerHealth: String?
 }
 
 private struct OnboardingOperatorSnapshot: Decodable, Sendable {
