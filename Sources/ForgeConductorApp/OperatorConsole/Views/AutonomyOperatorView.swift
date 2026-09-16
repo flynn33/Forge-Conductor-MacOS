@@ -148,17 +148,29 @@ struct AutonomyOperatorView: View {
             }
 
             GroupBox("Deterministic completion") {
-                if run.completionGates.isEmpty {
-                    Text("No completion-gate projection was published.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(run.completionGates, id: \.self) { gate in
-                        Label(
-                            gate,
-                            systemImage: run.passedGates.contains(gate) ? "checkmark.circle.fill" : "circle"
-                        )
-                        .foregroundStyle(run.passedGates.contains(gate) ? .green : .secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    if run.completionGates.isEmpty {
+                        Text("No completion-gate projection was published.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(run.completionGates, id: \.self) { gate in
+                            Label(
+                                gate,
+                                systemImage: run.passedGates.contains(gate) ? "checkmark.circle.fill" : "circle"
+                            )
+                            .foregroundStyle(run.passedGates.contains(gate) ? .green : .secondary)
+                        }
                     }
+                    Button("Import Native Validation Policy…", action: viewModel.chooseNativePolicy)
+                        .disabled(viewModel.policyImportInFlight || run.completionGates.isEmpty)
+                        .accessibilityIdentifier("run-import-native-policy")
+                    if viewModel.policyImportInFlight {
+                        ProgressView("Preparing native policy import…")
+                            .controlSize(.small)
+                    }
+                    Text("Prepare the signed XCTest package in Forge's protected home first. The imported policy must match this run, project generation, and completion gates.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
