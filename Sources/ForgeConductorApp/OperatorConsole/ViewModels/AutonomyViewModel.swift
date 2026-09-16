@@ -2,6 +2,9 @@
 // Main-actor managed-run observation and duplicate-safe run start command state.
 
 import Foundation
+import AppKit
+import ForgeConductorCore
+import UniformTypeIdentifiers
 
 @MainActor
 final class AutonomyViewModel: ObservableObject {
@@ -24,10 +27,12 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var startRequiresReconciliation = false
     @Published private(set) var lastStartedRunID: String?
     @Published private(set) var controlInFlight: OperatorRunControlAction?
+    @Published private(set) var policyImportInFlight = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var notice: String?
 
     private let client: any OperatorManagerClientProtocol
+    private let policyInstaller = NativeValidationPolicyInstaller()
     private var loadTask: Task<Void, Never>?
     private var pendingStartRequest: OperatorRunStartRequest?
 
@@ -181,6 +186,65 @@ final class AutonomyViewModel: ObservableObject {
                 errorMessage = error.localizedDescription
             }
             isLoading = false
+        }
+    }
+
+    func chooseNativePolicy() {
+        guard !policyImportInFlight, let run = selectedRun,
+              projects.contains(where: { $0.projectID == run.projectID }) else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsOtherFileTypes = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Import Policy"
+        policyImportInFlight = true
+        panel.begin { [weak self] response in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard response == .OK, let file = panel.url else {
+                    self.policyImportInFlight = false
+                    return
+                }
+                self.importNativePolicy(file, selectedRunID: run.runID)
+            }
+        }
+    }
+
+    private func importNativePolicy(_ file: URL, selectedRunID: String) {
+        guard self.selectedRunID == selectedRunID else {
+            policyImportInFlight = false
+            return
+        }
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            defer { policyImportInFlight = false }
+            do {
+                let run = try await client.runStatus(runID: selectedRunID)
+                let project = try await client.projectStatus(projectID: run.projectID)
+                guard self.selectedRunID == run.runID,
+                      run.projectID == project.projectID,
+                      run.projectGeneration == project.projectGeneration,
+                      let runUUID = UUID(uuidString: run.runID),
+                      let projectUUID = UUID(uuidString: run.projectID) else {
+                    throw AutonomyError.invalidRequest("managed run or project generation changed before policy import")
+                }
+                let binding = NativeValidationPolicyInstaller.RunBinding(
+                    runID: RunID(runUUID), projectID: ProjectID(projectUUID),
+                    projectGeneration: ProjectGeneration(run.projectGeneration),
+                    completionGates: run.completionGates,
+                    projectRoot: URL(fileURLWithPath: project.canonicalRoot, isDirectory: true)
+                )
+                let receipt = try await policyInstaller.importPolicy(from: file, for: binding)
+                guard self.selectedRunID == run.runID else { return }
+                notice = "Native validation policy imported for run \(receipt.runID). The manager will verify signed test results before completion."
+                refreshSelectedRun()
+            } catch {
+                errorMessage = "Native policy import failed: \(error.localizedDescription)"
+            }
         }
     }
 
