@@ -67,7 +67,21 @@ jobs:
         env:
           FORGE_CI_OUTPUT_DIR: ${{ runner.temp }}/forge-native-${{ matrix.lane }}
           NATIVE_LANE: ${{ matrix.lane }}
-        run: bash .forge-codex/shipping/scripts/native_ci.sh "$NATIVE_LANE"
+        run: |
+          set -euo pipefail
+          if [ "$NATIVE_LANE" = "swift-release" ]; then
+            mkdir -p "$FORGE_CI_OUTPUT_DIR"
+            export FORGE_P11_OUTPUT="$FORGE_CI_OUTPUT_DIR/release-stress.json"
+            {
+              printf 'architecture=%s\n' "$(uname -m)"
+              printf 'hardware_model=%s\n' "$(sysctl -n hw.model)"
+              printf 'physical_memory_bytes=%s\n' "$(sysctl -n hw.memsize)"
+              printf 'os_version=%s\n' "$(sw_vers -productVersion)"
+              printf 'os_build=%s\n' "$(sw_vers -buildVersion)"
+              xcodebuild -version
+            } > "$FORGE_CI_OUTPUT_DIR/release-stress-host.txt"
+          fi
+          bash .forge-codex/shipping/scripts/native_ci.sh "$NATIVE_LANE"
       - name: Retain native results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
