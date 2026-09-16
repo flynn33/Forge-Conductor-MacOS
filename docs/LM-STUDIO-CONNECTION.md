@@ -69,6 +69,15 @@ Register the repository in **Projects** using the native picker or **Enter Proje
 
 The CLI normally resolves the installed CLI executable. The GUI deliberately supplies its own app executable. Primary and fallback never mix versions within one deployment.
 
+SwiftPM builds place `ForgeConductor_ForgeConductorCore.bundle` beside the CLI
+product. `forge-conductor install` stages that bundle in the same artifact
+transaction as the executable and runtime launcher, and copies it into the
+staged app's `Contents/Resources`. Installing a bare SwiftPM binary without
+the bundle now fails before changing the Forge home. A relocated CLI lacking
+the bundle previously aborted before MCP `initialize`, so both role smokes
+failed with an incomplete handshake. The focused deployment acceptance test
+now exercises the relocated executable with its complete resource boundary.
+
 **Ship path (when deliberately registering an installed app):**
 
 ```bash
@@ -125,6 +134,7 @@ Source of truth in code:
 | Unique `FORGE_DEPLOYMENT_ID` in both role entries forces every `mcp.json` deploy to be observable | `LMStudioEnvironment` / installer |
 | Hot reload, scoped LM Studio relaunch fallback, exact-revision synchronization gate, and runtime evidence | `NativeLMStudioHostActivator` |
 | `PRAGMA busy_timeout=3000` | `SQLiteStore` |
+| Transactional SwiftPM Core resource-bundle staging and bare-binary rejection | `ManagerInstaller` |
 | Registration never writes `forge-serve` | `LMStudioEnvironment` / installer |
 | Default spawn target = CLI `forge-conductor` | `resolveBinaryURL` / Install Plugin |
 

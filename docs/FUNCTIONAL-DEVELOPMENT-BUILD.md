@@ -1,12 +1,20 @@
 # Functional development build acceptance
 
-The current owner-authorized target is `functional_development_build`: a usable,
+This document retains the earlier Apple Development-signed candidate scope and
+its exact evidence. On September 15, 2026, the owner changed the active target
+to a fully functional, feature-complete, shippable build, authorized direct
+GitHub `main` updates under the owner's account, and reserved shipment for the
+owner. The Developer ID, notarization, Gatekeeper, physical-hardware, and
+privileged root-service gates deferred below are now open for that active
+target. See [ROADMAP.md](../ROADMAP.md) and [the delivery workflow](DELIVERY-WORKFLOW.md).
+
+The earlier owner-authorized target was `functional_development_build`: a usable,
 fully functional native macOS application built in optimized Release
 configuration and signed with the available legitimate Apple Development
 identity. This scope changes delivery qualification, not required product
 features.
 
-## Active acceptance scope
+## Historical development acceptance scope
 
 | Gate | Functional development build requirement |
 |---|---|
@@ -27,12 +35,14 @@ notarization fields for this development artifact, and do not treat their
 expected rejection of a development-signed package as a product failure. No new
 validation framework is introduced by this scoped contract.
 
-## Authority retained by the owner
+## Authority retained by the owner for that historical scope
 
-Protected merges, public publication, new credential creation and replacement
-of the working installation require separate authorization. Development may
-continue across independent completion phases while one of those actions or CI
-is pending. Branch, PR, merge and artifact states must remain distinct.
+At the time, protected merges, public publication, new credential creation and
+replacement of the working installation required separate authorization.
+Development could continue across independent completion phases while one of
+those actions or CI was pending. Branch, PR, merge and artifact states were
+kept distinct. The current owner direction instead uses direct GitHub `main`
+updates with no pull requests; shipment remains reserved for the owner.
 
 Git commit signing is separate from application code signing. Subsequent pushed
 commits require an existing authorized SSH or GPG signing setup; published
@@ -178,3 +188,261 @@ When all functional gates above pass, the handoff label is:
   failure in the host's registered requirement and approval transition. It
   does not prove that a clean installation would pass, and it does not justify
   weakening the daemon signature, trust policy, or launch plist.
+
+## September 15, 2026 current-source completion qualification
+
+The current source passed both direct SwiftPM product builds, the canonical
+workspace Debug build, and the full macOS 27/Xcode 27 Swift suite: 1,553 tests,
+12 explicit skips, zero failures. An isolated arm64 Apple Development-signed
+Release candidate passed strict nested-bundle inspection and a bounded GUI and
+manager launch without replacing the installed app. A disposable read-only run
+against the loaded LM Studio `qwen/qwen3.8-27b` model first proved the missing
+owner-policy denial. A second run with a private policy and preflighted signed
+XCTest package reached `completed` revision 10 after one exact native case
+passed with no skip, failure, timeout, or truncated output; `tests` remained
+passed after manager restart. See [native completion](NATIVE-COMPLETION.md) for
+the policy, result path, and scope. The scratch manager was stopped and its
+disposable control credential removed; the native result was retained.
+
+Focused current-source signed GUI checks executed one exact native case each:
+project registration by folder picker passed; live LM Studio Provider save,
+model discovery, connection, and relaunch passed after the runner received its
+explicit test-plan environment. The first selected Provider case skipped when
+shell variables were not forwarded and is not counted. Manager folder
+authorization initially crashed during a macOS accessibility query after the
+panel closed. The same failure reproduced in its narrower test. Removing a
+redundant explicit label from the authorized-path text preserved the path and
+identifier while the identical authorization/cancel/invalid-root/save/relaunch
+test passed. A combined authorized-project/live-Provider/Autonomy start test
+then passed and verified the manager's exact persisted read-only assignment.
+The first broader signed production-onboarding class executed seven cases:
+six passed, none skipped, and the combined case failed after its saved Provider
+probe reported `unreachable`, before Autonomy run start. That result remains a
+non-pass at `/private/tmp/forge-current-full-onboarding-ui.xcresult`. The
+same class rebuilt with retained probe controls and manager state passed all
+seven native cases with no skips or failures at
+`/private/tmp/forge-current-full-onboarding-ui-diagnostics.xcresult`.
+Two further exact combined-case repeats passed at
+`/private/tmp/forge-current-autonomy-probe-repeat-{1,2}.xcresult`. The
+original failure lacks the provider's full error detail, so current source
+records it as intermittent E0 rather than changing the production probe
+without a same-flow diagnosis. The added UI diagnostics preserve that detail
+if the result recurs.
+The new operator policy importer separately passed a focused Core test: wrong
+run binding and changed package bytes left the protected policy absent, and an
+exact prepared policy was installed byte-for-byte at mode `0600`. The existing
+native-gate fixture now imports its policy through that service and executes
+three signed XCTest jobs for incorrect, stale, and corrected effects; one focused
+case passed with no skip or failure. A Developer ID Release native UI test
+registered an authorized project, reached the loaded LM Studio Provider,
+started a read-only run, opened the policy picker, canceled it, and verified the
+control re-enabled with the run retained. The final selected case passed once
+with no skips or failures at
+`/private/tmp/forge-policy-import-native-release-final.xcresult`. An extended
+Release case then selected a run-bound manifest fixture through NSOpenPanel
+and read back byte-identical protected content at mode `0600`: one selected
+case, zero skips/failures at
+`/private/tmp/forge-policy-import-native-positive-20260915.xcresult`. The
+fixture is not a signed executable package and the GUI run did not finish.
+Package-preparation UX, ordinary
+installed-stack terminal completion, root-service E2, and distribution gates
+remain open.
+After the native UI repair, a fresh isolated arm64 Apple Development-signed
+Release workspace build passed the `DevelopmentRelease` nested-bundle checker.
+Its embedded CLI returned `0.9.0` for `version` and a clean stopped-manager
+status from a separate scratch home. The local, unshipped candidate is
+`/private/tmp/forge-current-source-ui-devrelease-candidate.zip` (13,484,337
+bytes; SHA-256
+`56cb77e5802843dbb55b51da4c38d2b532685f6789358e0db18baa48c7d27c10`);
+the ZIP passed full integrity testing. Its exact source is the current
+uncommitted local `main` patch over `808efaae06dc616aa8dbb29765433e7b8ae227e2`.
+The GUI bundle was not launched or installed, avoiding another same-identifier
+Background Items registration. After a direct `main` update, rebuild from the
+published source and record a new revision-bound archive receipt.
+
+This isolated candidate remains a development-signing artifact. After the owner
+installed valid team `9AQ2C2838M` Developer ID identities on this host, the
+ordinary current patch-bound source produced a universal Release archive, a
+manual `developer-id` export, and a locally signed installer. The exported app
+and package passed strict signature, bundle, and payload checks; Gatekeeper
+rejected both as unnotarized. The unshipped local app ZIP is
+`/private/tmp/forge-current-source-developerid-app-20260915.zip` (SHA-256
+`5a23be1a0937b9af643ee20b159b8a4fc6be8e47afaaeda75eb86167a8aab85d`),
+and the signed installer is
+`/private/tmp/forge-current-source-developerid-20260915.pkg` (SHA-256
+`5b7296ef3bdeaaf8565e8784287861d82eb40767363dc0c2365f635b2c3855f0`).
+Xcode Organizer subsequently notarized that exact archive through Direct
+Distribution. The locally exported app is stapled; `stapler validate`, strict
+nested signatures, the `Release` bundle checker, and Gatekeeper execution
+assessment pass. The notarized app ZIP at
+`/private/tmp/forge-current-source-notarized-app-20260915.zip` has SHA-256
+`a309b3a138d5ee986a0791bb425ffd736b6ea295e6d80f4fda541289e0489d2b`.
+After extraction, its stapled ticket, bundle checker, and Gatekeeper assessment
+again passed. The separately signed installer package is still unnotarized and
+Gatekeeper rejects installation. Neither artifact was installed or shipped.
+A bounded direct launch from the extracted notarized ZIP served a fresh Forge
+home on port 7790. Its native Manager Start control reported success, the
+folder picker and Save settings authorized only the disposable
+`/tmp/forge-current-notarized-demo-project`, and the Projects picker committed
+that project with identity `2d58ea78-32f0-0943-0e3a-61ed7985a3cb` and
+generation 1. The computer-use transport closed during the click; the app
+process/listener stayed healthy, and the manager operator snapshot confirmed
+the commit. The candidate was stopped, the listener closed, and its launched
+`.app` path renamed to a retained non-app bundle. The working installed app
+files remained signed and were not replaced. Provider setup and Autonomy run
+start were not repeated from this candidate; the signed native seven-case
+onboarding suite remains the relevant current-source evidence.
+At that earlier candidate checkpoint, GUI policy enrollment, installed
+root-service E2, installer qualification, public-download acceptance, and
+physical-hardware qualification remained open. The policy-import UI and the
+newer packaged completion path are recorded below. Rebuild from exact
+published `main` after publication.
+
+## September 16, 2026 packaged native completion receipt
+
+The local policy-import source produced a new universal Developer ID archive at
+`/private/tmp/forge-policy-import-developerid-20260915.xcarchive` and a manual
+export. Strict all-architecture nested code-signing and the `Release`
+privileged-bundle checker passed. Xcode Organizer Direct Distribution notarized
+this archive as submission `F591014A-45A3-4BB2-AA3F-25A26CEB0932`; its exported
+app was stapled, and both the export and ZIP extraction passed `stapler validate`,
+the checker, and local Gatekeeper execution as `Notarized Developer ID`. The
+unshipped ZIP is `/private/tmp/forge-policy-import-notarized-app-20260915.zip`
+(22,088,388 bytes; SHA-256
+`9d99e311b8471b2de46d1043cb2dbe03c1486f105fd9a1c4a9df720cdec3c4ed`).
+This archive predates only the Xcode UI-test target's Core-framework link and
+later test/documentation edits; the production app/Core files are unchanged.
+The final current-local-workspace universal Developer ID archive at
+`/private/tmp/forge-final-local-developerid-20260916.xcarchive` then passed the
+ordinary Release archive, strict all-architecture nested-signature check, and
+privileged-bundle checker with the updated Xcode test-target graph. Its manual
+`developer-id` export at
+`/private/tmp/forge-final-local-developerid-export-20260916/Forge Conductor.app`
+has identical code-directory hashes to the notarized app above for the app,
+Core framework, embedded CLI, runtime launcher, and filesystem daemon. Apple's
+existing ticket stapled successfully to this exact-code export. The final
+unshipped local ZIP is
+`/private/tmp/forge-final-local-notarized-app-20260916.zip` (22,088,716 bytes;
+SHA-256 `f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`).
+ZIP integrity, extracted-bundle stapler validation, strict nested signing,
+Release privileged-bundle checks, and local Gatekeeper execution assessment
+(`source=Notarized Developer ID`) all passed. Its unsigned installer payload
+expanded and passed the same app checks. The final component package was
+wrapped and signed through Apple's `productbuild --package --sign` path at
+`/private/tmp/forge-final-local-productbuild-signed-installer-20260916.pkg`
+(SHA-256 `1cfc438cf5e2b5d9dda8fafcb019c905abad1b0289f48c5f9f233796c3f03f79`).
+`pkgutil --check-signature` reported the valid Developer ID Installer chain and
+trusted timestamp. Its expanded app payload retained valid strict nested
+signatures, the app's staple ticket, and `source=Notarized Developer ID` app
+Gatekeeper acceptance. The outer installer remains unnotarized:
+`spctl --type install` rejected it as `source=Unnotarized Developer ID`.
+
+**E0 signing diagnosis:** a second bounded `productsign --timestamp=none`
+attempt reached the same 4.2 KiB partial package and waited inside
+`SecKeyCreateSignature` → `SecurityServer::generateSignature` → `mach_msg` in a
+three-second process sample. Disabling the trusted timestamp did not remove
+the wait. Read-only Keychain Access inspection found the Installer private
+key's Confirm-before-allowing policy already permits Xcode, `codesign`, and
+`productbuild`, but not `productsign`. No key ACL was changed. Both terminated
+`productsign` partial outputs were renamed `.pkg.partial-not-signed` and are not
+distribution artifacts. A no-timestamp signature would not qualify the final
+installer in any case; the allowed `productbuild` path supplied a trusted one.
+
+**E0 resource-tier limit:** the focused deterministic stress test executed on
+this 128 GiB Apple M5 Max/macOS 27 host with the high-capacity policy and an
+injected 8 GiB constrained policy. It passed one Debug XCTest case and wrote
+`/private/tmp/forge-final-hardware-stress-debug-20260916.json`; the test report's
+previous hard-coded `release` label was corrected to the actual compilation
+configuration. An optimized SwiftPM Release repeat compiled but failed before
+the workload because its linker-signed test bundle was invalid on disk
+(`SecStaticCodeCheckValidity` status `-67056`); the adjacent runtime launcher
+itself verified. The canonical workspace compiled the exact selected Core test
+in Release, but the full scheme stalled while signing its unrelated UI test
+bundle. Its already-built optimized Core test bundle was then signed locally
+with the host's existing Apple Development identity, without changing the
+Developer ID runtime launcher or any product trust rule. `codesign --verify
+--strict --all-architectures` passed for that test bundle and launcher;
+direct `xcrun xctest -XCTest
+ReleaseStressTests/testDeterministicReleaseStressAndResourceBudgets` executed
+the same case with one pass, zero failures/skips and exit 0. A subsequent
+target-only Xcode Release rebuild compiled the final source, including a guard
+that refuses to write a `passed` report after a recorded XCTest failure. The
+re-signed optimized test bundle passed strict nested validation; the selected
+case again passed once with zero failures/skips, exit 0, and no truncated output
+in 5.052 seconds. Its final Release report is
+`/private/tmp/forge-final-hardware-xcode-release-guarded-20260916.json`
+(SHA-256 `4430cfbe48a37517841daa74d92d7a45fb2a090d526e6c400c43ef5eccc4bc04`).
+It records 100 manager restarts, 100 project cycles, 500 memory records, 100
+MCP requests, 25 process cycles, 50 rollovers, a 158,564,352-byte resident
+peak, flat five-sample post-release RSS, at most two telemetry delivery slots,
+zero post-shutdown coordinator owners, and p99 under the asserted 2-second
+latency ceilings. This host and an injected lower-tier policy still do not
+prove execution on a second physical-memory capacity.
+The existing macOS CI Release Swift lane is now configured to retain the same
+guarded JSON report plus architecture, hardware-model, physical-memory, OS, and
+Xcode inventory for the exact published revision. That run has not happened on
+this local patch and is not recorded as a pass; a hosted-runner observation also
+does not replace the remaining second physical-host qualification.
+
+Direct owner publication and a readback of
+the exact published `main` source remain required before this artifact can be
+called published-source-bound.
+
+A direct bounded launch of that extracted ZIP used a fresh Forge home on port
+7792. Manager's native folder panel and Save settings authorized only
+`/tmp/forge-policy-import-packaged-live-project-20260915`; the Projects
+absolute-path sheet committed its identity
+`75f477bd-1009-b855-5de4-5f46cb811c5d` at generation 1. The computer-use
+pipe closed during the registration click, but the manager snapshot showed the
+committed project while the app and listener remained healthy. The same
+packaged manager saved `qwen/qwen3.8-27b` on LM Studio's loopback server and its
+live native-host contract probe returned `contract_valid`, tool capability, and
+the loaded 262144-token instance. A separately prepared signed arm64 XCTest
+package and schema-1 policy were imported into this isolated protected home
+with exact run/project/generation/source/package binding. The manager admitted
+read-only run `6e895323-f3d3-401c-be8d-002c7f11a297`, created a real native
+model session, consumed `fs_read`, accepted its completion request, and reached
+`completed` at revision 8 with `tests` passed. The retained child result at
+`/private/tmp/forge-policy-import-packaged-live-home-20260915/native-validation/results/6e895323-f3d3-401c-be8d-002c7f11a297/tests/fd53053a-40e2-4d58-8e36-9bd2e0d976c3/result.xcresult`
+has one exact `ProcessRunnerTests/testNativeGateEffectFixture()` pass, zero
+failures/skips, exit 0, and no timeout/output truncation. After a full app and
+manager process restart, the new PID returned the same terminal run revision
+and passed gate. The candidate was stopped again, port 7792 closed, and its
+launched duplicate app path retained as a non-app bundle. The owner installation
+stayed running and unchanged. The installed signed root service, package
+notarization, public-download acceptance, hardware matrix, and published-source
+rebuild remain open. Three later attempts to run the signed-package combined
+XCUI test stopped before executing a selected case because macOS `testmanagerd`
+did not grant automation mode within 60 seconds; those are retained as
+non-passes, not product-result passes.
+
+A September 16 read-only System Settings check showed **Forge Conductor
+Autonomous** Background App Activity **off** while the installed Manager
+reported **Approval required**. The existing system daemon registration also
+retains development-signing validation category `3`; the packaged Developer
+ID daemon is category `6`. Enabling the owner installation's background
+activity and safely re-registering its daemon are separate OS transitions.
+No distinct-process root-service pass is inferred from the notarized candidate
+or an app-local status read. This observation did not change the installation.
+The current read-only comparison also confirms that the registered installation
+is not the final candidate: its daemon SHA-256 is
+`5d0b6e715bb71a96fb692715948f062f46d622bd2e829791a48478468513e73b`, while
+the final Developer ID export's daemon SHA-256 is
+`7036c62dc866d39369ca646a4a6972c6432f29eccaf3f7ee23fb4c88c5e8b6c4`.
+Both use the exact service identifier and team and pass strict signature
+validation, but `launchctl` reports 2,599 failed launches, exit 78, and
+`needs LWCR update` for the existing registration. Turning on the existing
+background item alone would exercise the older installed daemon. Final-source
+root qualification therefore requires a controlled candidate installation and
+ServiceManagement registration; the working owner installation remains
+unchanged until that separately authorized transition.
+
+The final local source also completed the direct `swift test` suite on this
+host on September 16: the XCTest `All tests` terminal summary executed
+**1,554 tests**, with **12 explicit skips** and **zero failures** in 298.717
+seconds. The successful process exit and full transcript are retained at
+`/private/tmp/forge-final-local-swift-test-20260916.log`. The later Swift
+Testing runner lines selected zero tests in their separate libraries; they do
+not replace or inflate the executed XCTest result. This suite validates the
+current local source and focused package/policy regressions, not the signed
+root service, installer, public download, or an exact published revision.

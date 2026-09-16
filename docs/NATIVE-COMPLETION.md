@@ -1,7 +1,10 @@
 # Native completion validation
 
-This development snapshot uses `InstalledNativeGateRegistry` as the manager's
-completion dependency. A model can request completion with a bounded summary.
+Current source uses `InstalledNativeGateRegistry` as the manager's
+completion dependency. A model can request completion with a bounded summary,
+either as the complete JSON reply or as a valid completion-request JSON object
+at the end of a longer reply. An object followed by additional prose is not a
+request.
 It cannot supply authoritative gate results. Legacy `gate_evidence` fields are
 accepted as non-authoritative input, and historical result hashes remain useful
 only as provenance.
@@ -11,6 +14,97 @@ A failed assertion leaves work available for correction. Completion requires a
 fresh native result under the current run, lease, generation, specification,
 source inputs, and policy. Restart discards process-local approval authority and
 requires validation again; decoding an old receipt does not restore approval.
+The September 15 owner-host read-only LM Studio run invoked project-bound
+`fs_read` three times and emitted a completion object after explanatory prose.
+The installed manager did not parse that suffix and yielded the run in `running`
+with no active coordinator or passed gate. Current source accepts the bounded
+suffix and a focused regression passes. No per-run policy is installed on this
+host, so the run is not recorded as completed.
+A separate current-source development-signed candidate run on the same loaded
+LM Studio model persisted an `fs_read` evidence reference, recognized the
+model's completion marker, and reached native validation. The manager recorded
+`blocked_configuration` with `completion_validation_failed` because the
+owner-only per-run policy was absent. No gate was approved or passed.
+A second disposable read-only run used a private schema-1 policy bound to its
+run and project generation. An arm64 signed XCTest package, built from the
+canonical workspace, passed its exact preflight case. The current-source
+development-signed manager then consumed one LM Studio `fs_read` evidence,
+accepted the model's completion request, and executed the same native case:
+one passed, zero failed or skipped, exit 0, no timeout or output truncation.
+The manager recorded `completed` at revision 10 with `tests` passed, and that
+state remained after restart. The result bundle and process record are retained
+under the isolated home at
+`/private/tmp/forge-current-source-devrelease-home/native-validation/results/e58073b3-c597-497b-95b3-d541db749531/tests/2fa89a7c-9369-431a-b6e2-b76f21c73878/`.
+This proves a disposable native completion path. The new operator import path
+below separately verifies policy enrollment from the native GUI and from Core;
+the installed root-service and an ordinary GUI run reaching terminal completion
+remain open.
+The notarized Developer ID ZIP built from the policy-import source also ran a
+separate packaged, isolated-home LM Studio flow. Its manager saved the loaded
+model, passed the live contract probe, consumed `fs_read`, and used an exact
+imported signed XCTest policy before admitting the run. It reached `completed`
+revision 8 with `tests` passed; the child `.xcresult` recorded one required case
+passed, zero failed/skipped, process exit 0, and no timeout/truncation. The
+same terminal state survived a full app/manager process restart. The exact
+paths and artifact hash are in the [packaged native completion receipt](FUNCTIONAL-DEVELOPMENT-BUILD.md#september-16-2026-packaged-native-completion-receipt).
+The final current-local-workspace archive then included the updated canonical
+Xcode UI-test target graph. Its five production code-directory hashes match
+that notarized submission; the export stapled, and the extracted ZIP passed
+strict Release checks and local Gatekeeper. The final unshipped ZIP SHA-256 is
+`f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`.
+The test-run receipt above applies to identical production code, while direct
+GitHub `main` publication and root-service qualification remain open.
+The signed production onboarding GUI also admitted and persisted a read-only
+Autonomy assignment after native project registration, folder authorization,
+and live LM Studio Provider setup. Its seven-case class passed with no skips or
+failures, followed by two exact combined-case passes. One earlier full-class
+attempt returned a live Provider `unreachable` result before Autonomy run start;
+that non-pass and its incomplete probe error record are retained in the
+[functional-build evidence](FUNCTIONAL-DEVELOPMENT-BUILD.md). The GUI run-start
+test now opens and cancels the policy picker, then selects a prepared run-bound
+manifest fixture through that picker. It reads back byte-identical protected
+policy data at mode `0600`. That fixture is not a signed executable package and
+does not qualify terminal completion; the separate signed-package case proves
+manager adjudication.
+
+## Native operator policy import
+
+Select a persisted run in **Autonomy** and use **Import Native Validation
+Policy…** in Deterministic completion. Choose a separately approved schema-1
+JSON policy. Its signed XCTest package must already be under the exact protected
+`native-validation/packages/<package UUID>/` path. Forge's native importer does
+not compile arbitrary tests, take executable or shell selectors, or grant gate
+approval. The GUI reloads the current manager run and project generation before
+calling the actor. The actor reads at most 256 KiB without following the chosen
+file's final link and requires the
+policy's run, project, generation, and complete gate set to match. It captures
+the named project inputs and each approved package manifest, requires signed
+product paths to be covered by those manifests, rejects aliased protected
+directories, and rechecks the input/policy bytes before an atomic owner-only
+write. A canceled picker leaves the run and protected policy unchanged and
+re-enables the import control.
+
+**E0 — focused comparison:** the wrong run binding and a changed package digest
+each left the protected policy path absent; the exact prepared policy persisted
+byte-for-byte with mode `0600`. The existing signed native gate fixture now
+imports through that production service and executes three real child XCTest
+jobs: an incorrect effect fails, stale source remains non-approving, and the
+corrected effect passes. One focused Core import test and one signed-fixture
+test each executed with zero skips/failures. A Developer ID Release native UI
+test registered the exact authorized folder, reached the loaded LM Studio
+Provider, started a read-only run, opened the policy picker, canceled it, and
+retained that run. Its first focused pass executed one case with no skips or
+failures at `/private/tmp/forge-policy-import-native-release-picker-cancel.xcresult`.
+The exact Release UI picker-cancel test was repeated with the import button
+re-enabled and the persisted run retained at
+`/private/tmp/forge-policy-import-native-release-final.xcresult`: one selected
+case, zero skips or failures. An extended Release native case then selected the
+prepared run-bound fixture through NSOpenPanel and read back the exact policy
+at mode `0600`: one selected test, zero skips or failures at
+`/private/tmp/forge-policy-import-native-positive-20260915.xcresult`. Its
+manifest-only product cannot pass native execution. The ordinary installed-stack terminal run, package preparation UX, and root
+service remain unqualified; import is not an assertion that the package's
+native cases have passed.
 
 ## Installed policy and ownership
 
@@ -25,8 +119,8 @@ Approved prebuilt test packages reside below
 `native-validation/results/<run UUID>/<gate ID>/<job UUID>/`. The installed
 policy is operator-owned data. There is no model tool for installing definitions,
 selecting an executable, supplying a shell command, or approving a result.
-Rollover retains the run identity and its policy. CLU enrollment integration is
-separate work under the active correction contract.
+Rollover retains the run identity and its policy. Other enrollment workflows
+must preserve the same installed-policy and manager-adjudication boundary.
 
 `InstalledNativeGatePolicy` in the Core module defines schema version 1:
 
