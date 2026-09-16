@@ -1251,18 +1251,41 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         let summary: String
     }
 
-    private static func completionRequest(from messages: [String]) -> CompletionRequest? {
+    static func completionRequestSummary(from messages: [String]) -> String? {
         for message in messages.reversed() {
-            guard let data = message.data(using: .utf8),
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  object["forge_run_status"] as? String == "completion_requested",
-                  let summary = object["summary"] as? String,
-                  !summary.isEmpty else { continue }
-            return CompletionRequest(
-                summary: String(summary.prefix(2_048))
-            )
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let summary = completionSummary(in: trimmed) { return summary }
+            // LM Studio can place a concise explanation before the requested
+            // JSON object. Only an object that ends the reply may request native
+            // validation; prose after the object has no completion meaning.
+            let tail = String(trimmed.suffix(16_384))
+            guard let marker = tail.range(of: "\"forge_run_status\"", options: .backwards) else {
+                continue
+            }
+            var cursor = marker.lowerBound
+            for _ in 0..<8 {
+                guard let opening = tail[..<cursor].lastIndex(of: "{") else { break }
+                if let summary = completionSummary(in: String(tail[opening...])) {
+                    return summary
+                }
+                cursor = opening
+            }
         }
         return nil
+    }
+
+    private static func completionSummary(in json: String) -> String? {
+        guard json.utf8.count <= 8 * 1_024,
+              let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["forge_run_status"] as? String == "completion_requested",
+              let summary = object["summary"] as? String,
+              !summary.isEmpty else { return nil }
+        return String(summary.prefix(2_048))
+    }
+
+    private static func completionRequest(from messages: [String]) -> CompletionRequest? {
+        completionRequestSummary(from: messages).map { CompletionRequest(summary: $0) }
     }
 
     private static func arguments(_ data: Data) throws -> [String: Any] {

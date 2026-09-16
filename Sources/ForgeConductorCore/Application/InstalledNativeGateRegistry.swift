@@ -34,9 +34,16 @@ struct InstalledNativeGatePolicy: Codable, Sendable {
     let gates: [Gate]
 
     func validate(for run: AutonomousRunRecord) throws {
+        try validate(runID: run.runID, projectID: run.projectID,
+                     projectGeneration: run.projectGeneration)
+    }
+
+    func validate(runID: RunID, projectID: ProjectID,
+                  projectGeneration: ProjectGeneration) throws {
         guard schemaVersion == 1,
               policyRevision == CompletionGateAcceptancePolicy.correction001Revision,
-              runID == run.runID, projectID == run.projectID, projectGeneration == run.projectGeneration,
+              self.runID == runID, self.projectID == projectID,
+              self.projectGeneration == projectGeneration,
               !buildIdentity.isEmpty, buildIdentity.utf8.count <= 512,
               !xcodeVersion.isEmpty, xcodeVersion.utf8.count <= 512,
               ["arm64", "x86_64"].contains(architecture),
@@ -56,6 +63,139 @@ struct InstalledNativeGatePolicy: Codable, Sendable {
             }
         }
         _ = try CompletionGateAcceptancePolicy.correction001(caseBindings: correctionCaseBindings)
+    }
+}
+
+/// Installs a separately prepared operator policy into the protected Forge home.
+/// Import checks the immutable run binding and approved package/source manifests;
+/// only the manager's compiled native handler can adjudicate test results.
+public actor NativeValidationPolicyInstaller {
+    public struct RunBinding: Sendable {
+        public let runID: RunID
+        public let projectID: ProjectID
+        public let projectGeneration: ProjectGeneration
+        public let completionGates: [String]
+        public let projectRoot: URL
+
+        public init(runID: RunID, projectID: ProjectID,
+                    projectGeneration: ProjectGeneration,
+                    completionGates: [String], projectRoot: URL) {
+            self.runID = runID
+            self.projectID = projectID
+            self.projectGeneration = projectGeneration
+            self.completionGates = completionGates
+            self.projectRoot = projectRoot
+        }
+    }
+
+    public struct Receipt: Sendable {
+        public let runID: String
+        public let policySHA256: String
+        public let installedPath: String
+    }
+
+    private let root: URL
+
+    public init(paths: AppPaths = AppPaths()) {
+        root = paths.nativeValidationDir
+    }
+
+    public func importPolicy(from sourceFile: URL, for binding: RunBinding) async throws -> Receipt {
+        guard sourceFile.isFileURL, sourceFile.path.hasPrefix("/"),
+              binding.projectRoot.isFileURL, binding.projectRoot.path.hasPrefix("/"),
+              !binding.completionGates.isEmpty, binding.completionGates.count <= 32,
+              Set(binding.completionGates).count == binding.completionGates.count,
+              root.resolvingSymlinksInPath().path == root.standardizedFileURL.path,
+              !Self.overlap(root, binding.projectRoot) else {
+            throw AutonomyError.invalidRequest("native policy import requires a separate protected home and exact run gates")
+        }
+        let data = try OwnerOnlyAtomicFile.read(from: sourceFile, maximumBytes: 256 * 1_024)
+        let policy = try JSONDecoder().decode(InstalledNativeGatePolicy.self, from: data)
+        try policy.validate(runID: binding.runID, projectID: binding.projectID,
+                            projectGeneration: binding.projectGeneration)
+        guard Set(policy.gates.map(\.id)) == Set(binding.completionGates) else {
+            throw AutonomyError.invalidRequest("native policy gates do not match the managed run")
+        }
+
+        let source = try QualificationInputSnapshotter(root: binding.projectRoot,
+                                                       inputs: policy.sourceInputs)
+        let sourceSnapshot = try await source.capture()
+        guard !sourceSnapshot.files.isEmpty, sourceSnapshot.absentInputs.isEmpty,
+              policy.candidateSourceSHA256 == nil
+                || sourceSnapshot.sha256 == policy.candidateSourceSHA256 else {
+            throw AutonomyError.invalidRequest("native policy source inputs are missing or stale")
+        }
+
+        var packages: [(QualificationInputSnapshotter, String)] = []
+        for gate in policy.gates {
+            try Task.checkCancellation()
+            let packageRoot = root.appendingPathComponent("packages/\(gate.packageID.uuidString.lowercased())")
+            guard packageRoot.resolvingSymlinksInPath().path == packageRoot.standardizedFileURL.path else {
+                throw AutonomyError.invalidRequest("native policy package root is aliased")
+            }
+            let snapshotter = try QualificationInputSnapshotter(
+                root: packageRoot, inputs: gate.packageInputs,
+                maximumFileBytes: 128 * 1_048_576
+            )
+            let snapshot = try await snapshotter.capture()
+            guard !snapshot.files.isEmpty, snapshot.absentInputs.isEmpty,
+                  snapshot.sha256 == gate.packageSHA256 else {
+                throw AutonomyError.invalidRequest("approved native test package is missing or changed")
+            }
+            guard gate.signedProducts.allSatisfy({ product in
+                gate.packageInputs.contains(where: { input in
+                    input == product || input.hasPrefix(product + "/")
+                })
+            }) else {
+                throw AutonomyError.invalidRequest("signed native products are outside the approved package manifest")
+            }
+            let inputs = try NativeGateInputs(
+                sourceManifestSHA256: sourceSnapshot.sha256,
+                buildIdentity: policy.buildIdentity,
+                policyRevision: policy.policyRevision,
+                environmentIdentity: "\(policy.xcodeVersion):\(policy.architecture)"
+            )
+            _ = try NativeXCTestJobPolicy(
+                packageRoot: packageRoot, packageInputs: gate.packageInputs,
+                packageSHA256: gate.packageSHA256, signedProducts: gate.signedProducts,
+                testRunPath: gate.testRunPath,
+                artifactRoot: root.appendingPathComponent("results/\(binding.runID.description)/\(gate.id)"),
+                developerDirectory: AppPaths.nativeValidationDeveloperDirectory,
+                xcodeVersion: policy.xcodeVersion, testIdentifiers: gate.testIdentifiers,
+                inputs: inputs, architecture: policy.architecture,
+                timeoutSeconds: gate.timeoutSeconds
+            )
+            packages.append((snapshotter, snapshot.sha256))
+        }
+
+        guard try await source.capture() == sourceSnapshot,
+              try OwnerOnlyAtomicFile.read(from: sourceFile, maximumBytes: 256 * 1_024) == data else {
+            throw AutonomyError.invalidRequest("native policy or source changed during import")
+        }
+        for (snapshotter, digest) in packages {
+            guard try await snapshotter.capture().sha256 == digest else {
+                throw AutonomyError.invalidRequest("native test package changed during import")
+            }
+        }
+        try Task.checkCancellation()
+        let destination = root.appendingPathComponent("policies/\(binding.runID.description).json")
+        guard destination.deletingLastPathComponent().resolvingSymlinksInPath().path
+                == destination.deletingLastPathComponent().standardizedFileURL.path else {
+            throw AutonomyError.invalidRequest("native policy directory is aliased")
+        }
+        try OwnerOnlyAtomicFile.write(data, to: destination)
+        guard try OwnerOnlyAtomicFile.read(from: destination, maximumBytes: 256 * 1_024) == data else {
+            throw AutonomyError.invalidRequest("native policy import did not persist exact bytes")
+        }
+        return Receipt(runID: binding.runID.description,
+                       policySHA256: JSONSupport.sha256Hex(data),
+                       installedPath: destination.path)
+    }
+
+    private static func overlap(_ lhs: URL, _ rhs: URL) -> Bool {
+        let first = lhs.standardizedFileURL.pathComponents
+        let second = rhs.standardizedFileURL.pathComponents
+        return first.starts(with: second) || second.starts(with: first)
     }
 }
 
