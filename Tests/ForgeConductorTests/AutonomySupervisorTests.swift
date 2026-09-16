@@ -1560,6 +1560,77 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testOperatorPolicyImportRejectsWrongBindingAndChangedPackageBeforePrivateCommit() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root)
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            try Data("approved work product".utf8).write(to: projectRoot.appendingPathComponent("source.txt"))
+
+            let paths = AppPaths(home: root.appendingPathComponent("manager", isDirectory: true))
+            let packageID = UUID()
+            let packageRoot = paths.nativeValidationDir.appendingPathComponent("packages/\(packageID.uuidString.lowercased())")
+            try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true)
+            try Data("fixed test plan".utf8).write(to: packageRoot.appendingPathComponent("plan.xctestrun"))
+            try Data("fixed signed product fixture".utf8).write(to: packageRoot.appendingPathComponent("product"))
+            let packageSnapshot = try await QualificationInputSnapshotter(
+                root: packageRoot, inputs: ["plan.xctestrun", "product"]
+            ).capture()
+            let gate = InstalledNativeGatePolicy.Gate(
+                id: "tests", version: 2, packageID: packageID,
+                packageInputs: ["plan.xctestrun", "product"], packageSHA256: packageSnapshot.sha256,
+                signedProducts: ["product"], testRunPath: "plan.xctestrun",
+                testIdentifiers: ["ForgeConductorTests/Effect/testWork"],
+                requiredCases: ["Effect/testWork()"], minimumCaseCount: 1, timeoutSeconds: 30
+            )
+            let policy = InstalledNativeGatePolicy(
+                schemaVersion: 1, policyRevision: CompletionGateAcceptancePolicy.correction001Revision,
+                runID: fixture.run.runID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration,
+                sourceInputs: ["source.txt"], candidateSourceSHA256: nil,
+                buildIdentity: "operator-import-fixture", xcodeVersion: "Xcode fixture",
+                architecture: "arm64", correctionCaseBindings: [:], gates: [gate]
+            )
+            let sourceFile = root.appendingPathComponent("approved-policy.json")
+            try JSONEncoder().encode(policy).write(to: sourceFile)
+            let binding = NativeValidationPolicyInstaller.RunBinding(
+                runID: fixture.run.runID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration,
+                completionGates: fixture.run.specification.completionGates,
+                projectRoot: projectRoot
+            )
+            let destination = paths.nativeValidationDir.appendingPathComponent(
+                "policies/\(fixture.run.runID.description).json"
+            )
+            let installer = NativeValidationPolicyInstaller(paths: paths)
+
+            let wrongBinding = NativeValidationPolicyInstaller.RunBinding(
+                runID: RunID(), projectID: binding.projectID,
+                projectGeneration: binding.projectGeneration,
+                completionGates: binding.completionGates, projectRoot: projectRoot
+            )
+            await assertAutonomyError(code: "autonomy_invalid_request") {
+                _ = try await installer.importPolicy(from: sourceFile, for: wrongBinding)
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+
+            try Data("changed package".utf8).write(to: packageRoot.appendingPathComponent("product"))
+            await assertAutonomyError(code: "autonomy_invalid_request") {
+                _ = try await installer.importPolicy(from: sourceFile, for: binding)
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+
+            try Data("fixed signed product fixture".utf8).write(to: packageRoot.appendingPathComponent("product"))
+            let receipt = try await installer.importPolicy(from: sourceFile, for: binding)
+            XCTAssertEqual(receipt.runID, fixture.run.runID.description)
+            XCTAssertEqual(receipt.policySHA256, JSONSupport.sha256Hex(try Data(contentsOf: sourceFile)))
+            XCTAssertEqual(try OwnerOnlyAtomicFile.read(from: destination, maximumBytes: 256 * 1_024),
+                           try Data(contentsOf: sourceFile))
+            let mode = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: destination.path)[.posixPermissions] as? NSNumber)
+            XCTAssertEqual(mode.intValue & 0o777, 0o600)
+        }
+    }
+
     func testNativeJobFailurePreventsCompletionUntilActualEffectIsCorrected() async throws {
         try await qualifyNativeGateEffect(useInstalledPolicy: false)
     }
@@ -1608,17 +1679,24 @@ final class AutonomySupervisorTests: XCTestCase {
                 from: OwnerOnlyAtomicFile.read(from: originalPackageRoot.appendingPathComponent(planName), maximumBytes: 4 * 1_048_576),
                 format: nil
             ) as? [String: Any])
-            var configurations = try XCTUnwrap(plan["TestConfigurations"] as? [[String: Any]])
-            for index in configurations.indices {
-                var targets = try XCTUnwrap(configurations[index]["TestTargets"] as? [[String: Any]])
-                for target in targets.indices {
-                    var variables = targets[target]["EnvironmentVariables"] as? [String: String] ?? [:]
-                    variables["FORGE_NATIVE_GATE_FIXTURE_FILE"] = workProduct.path
-                    targets[target]["EnvironmentVariables"] = variables
+            if var configurations = plan["TestConfigurations"] as? [[String: Any]] {
+                for index in configurations.indices {
+                    var targets = try XCTUnwrap(configurations[index]["TestTargets"] as? [[String: Any]])
+                    for target in targets.indices {
+                        var variables = targets[target]["EnvironmentVariables"] as? [String: String] ?? [:]
+                        variables["FORGE_NATIVE_GATE_FIXTURE_FILE"] = workProduct.path
+                        targets[target]["EnvironmentVariables"] = variables
+                    }
+                    configurations[index]["TestTargets"] = targets
                 }
-                configurations[index]["TestTargets"] = targets
+                plan["TestConfigurations"] = configurations
+            } else {
+                var target = try XCTUnwrap(plan["ForgeConductorTests"] as? [String: Any])
+                var variables = target["EnvironmentVariables"] as? [String: String] ?? [:]
+                variables["FORGE_NATIVE_GATE_FIXTURE_FILE"] = workProduct.path
+                target["EnvironmentVariables"] = variables
+                plan["ForgeConductorTests"] = target
             }
-            plan["TestConfigurations"] = configurations
             let planData = try PropertyListSerialization.data(fromPropertyList: plan, format: .xml, options: 0)
             try OwnerOnlyAtomicFile.write(planData, to: fixturePlan)
             defer { if !useInstalledPolicy { try? FileManager.default.removeItem(at: fixturePlan) } }
@@ -1659,8 +1737,19 @@ final class AutonomySupervisorTests: XCTestCase {
                     sourceInputs: ["work-product.txt", "qualification-state.txt"], candidateSourceSHA256: nil, buildIdentity: buildIdentity, xcodeVersion: xcodeVersion,
                     architecture: architecture, correctionCaseBindings: [:], gates: [definition]
                 )
-                try OwnerOnlyAtomicFile.write(try JSONEncoder().encode(policy),
-                    to: installedPaths.nativeValidationDir.appendingPathComponent("policies/\(fixture.run.runID.description).json"))
+                try OwnerOnlyAtomicFile.write(Data("incorrect effect\n".utf8), to: workProduct)
+                try OwnerOnlyAtomicFile.write(Data("before-failed".utf8), to: sourceMarker)
+                let importFile = evidenceRoot.appendingPathComponent("approved-policy-\(fixture.run.runID.description).json")
+                try OwnerOnlyAtomicFile.write(try JSONEncoder().encode(policy), to: importFile)
+                let binding = NativeValidationPolicyInstaller.RunBinding(
+                    runID: fixture.run.runID, projectID: fixture.run.projectID,
+                    projectGeneration: fixture.run.projectGeneration,
+                    completionGates: fixture.run.specification.completionGates,
+                    projectRoot: projectRoot
+                )
+                let imported = try await NativeValidationPolicyInstaller(paths: installedPaths)
+                    .importPolicy(from: importFile, for: binding)
+                XCTAssertEqual(imported.runID, fixture.run.runID.description)
             }
             let stages = useInstalledPolicy ? ["failed", "stale", "corrected"] : ["failed", "corrected"]
             for stage in stages {

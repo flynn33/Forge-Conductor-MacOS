@@ -5,6 +5,11 @@
 import XCTest
 @testable import ForgeConductorCore
 
+private struct AcceptanceStagingValidator: ManagerArtifactValidating {
+    func prepareAndSign(_ url: URL, kind: ManagerArtifactKind) throws {}
+    func verify(_ url: URL, kind: ManagerArtifactKind) throws {}
+}
+
 /// Automated acceptance for G1–G10. No human/LM Studio UI required.
 final class G1G10AcceptanceTests: XCTestCase {
     private var scratch: URL!
@@ -75,6 +80,20 @@ final class G1G10AcceptanceTests: XCTestCase {
         try FileManager.default.copyItem(at: src, to: dest)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
 
+        // The SwiftPM CLI reads its sealed Core resources from a sibling bundle.
+        // Relocation must preserve the same executable product boundary that
+        // ManagerInstaller stages for a real installation.
+        let resourceName = "ForgeConductor_ForgeConductorCore.bundle"
+        let sourceResources = src.deletingLastPathComponent()
+            .appendingPathComponent(resourceName, isDirectory: true)
+        if FileManager.default.fileExists(atPath: sourceResources.path) {
+            let installedResources = bin.appendingPathComponent(resourceName, isDirectory: true)
+            if FileManager.default.fileExists(atPath: installedResources.path) {
+                try FileManager.default.removeItem(at: installedResources)
+            }
+            try FileManager.default.copyItem(at: sourceResources, to: installedResources)
+        }
+
         // The CLI and launcher are one executable product boundary. Keep the
         // helper beside the relocated CLI so the child process can verify the
         // exact signed sibling before staging its private runtime copy.
@@ -109,6 +128,61 @@ final class G1G10AcceptanceTests: XCTestCase {
         }
         return dest
     }
+
+    func testInstallerRelocatedSwiftPMCLIRetainsResourceBundleAndStarts() throws {
+        guard let source = locateBuiltCLI() else {
+            throw XCTSkip("No active forge-conductor product; build the CLI target first")
+        }
+        let forgeHome = scratch.appendingPathComponent("installed-cli", isDirectory: true)
+        let paths = AppPaths(home: forgeHome)
+        let installer = ManagerInstaller(
+            paths: paths,
+            config: ConfigStore(paths: paths),
+            artifactValidator: AcceptanceStagingValidator()
+        )
+        let installed = try installer.stageInstalledArtifacts(from: source)
+        let result = try ProcessRunner().run(
+            executable: installed.path,
+            arguments: ["status"],
+            environment: ["FORGE_CONDUCTOR_HOME": forgeHome.path],
+            timeoutSec: 15
+        )
+        XCTAssertFalse(result.timedOut)
+        XCTAssertFalse(result.stdoutTruncated)
+        XCTAssertFalse(result.stderrTruncated)
+        XCTAssertEqual(result.exitCode, 0, result.stderr)
+        let snapshot = try JSONSupport.object(from: Data(result.stdout.utf8))
+        XCTAssertEqual(snapshot["version"] as? String, ForgeApp.version)
+    }
+
+    #if SWIFT_PACKAGE
+    func testInstallerRejectsBareSwiftPMCLIWithoutChangingHome() throws {
+        guard let source = locateBuiltCLI() else {
+            throw XCTSkip("No active forge-conductor product; build the CLI target first")
+        }
+        let sourceDir = scratch.appendingPathComponent("bare-source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDir, withIntermediateDirectories: true)
+        let bareCLI = sourceDir.appendingPathComponent("forge-conductor")
+        try FileManager.default.copyItem(at: source, to: bareCLI)
+        let launcherName = RuntimeLaunchGate.executableName
+        try FileManager.default.copyItem(
+            at: source.deletingLastPathComponent().appendingPathComponent(launcherName),
+            to: sourceDir.appendingPathComponent(launcherName)
+        )
+        let forgeHome = scratch.appendingPathComponent("rejected-install", isDirectory: true)
+        let paths = AppPaths(home: forgeHome)
+        let installer = ManagerInstaller(
+            paths: paths,
+            config: ConfigStore(paths: paths),
+            artifactValidator: AcceptanceStagingValidator()
+        )
+
+        XCTAssertThrowsError(try installer.stageInstalledArtifacts(from: bareCLI)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("ForgeConductor_ForgeConductorCore.bundle"))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: installer.installedBinaryURL.path))
+    }
+    #endif
 
     // MARK: G1 + G2 + G7 + G9 — full deploy product path (hermetic)
 

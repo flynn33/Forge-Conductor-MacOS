@@ -381,17 +381,23 @@ final class ReleaseStressTests: XCTestCase {
                 constrained.executionLimits(for: .critical)
             ),
         ]
+        #if DEBUG
+        let buildConfiguration = "debug"
+        #else
+        let buildConfiguration = "release"
+        #endif
         let report: [String: Any] = [
             "schema_version": 1,
             "phase": "P11",
             "status": "passed",
-            "build": "release",
+            "build": buildConfiguration,
             "fixture": fixture,
             "latency_ms": summarized,
             "resource": resource,
             "hard_invariants": hardInvariants,
             "memory_tiers": memoryTiers,
         ]
+        guard testRun?.totalFailureCount == 0 else { return }
         try writeReport(report)
     }
 

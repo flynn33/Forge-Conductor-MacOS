@@ -6185,6 +6185,36 @@ final class ManagerTests: XCTestCase {
         try assertNoTransactionArtifactsRemain()
     }
 
+    func testManagerStagingPreservesCoreResourceBundleForRelocatedCLI() throws {
+        let fixture = try makeArtifactFixture(validator: TestManagerArtifactValidator())
+        let resourceName = "ForgeConductor_ForgeConductorCore.bundle"
+        let sourceApplication = fixture.sourceExecutable
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceResources = sourceApplication
+            .appendingPathComponent("Contents/Resources/" + resourceName, isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceResources, withIntermediateDirectories: true)
+        try "sealed-agent-catalog".write(
+            to: sourceResources.appendingPathComponent("revision.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        _ = try fixture.installer.stageInstalledArtifacts(from: fixture.sourceExecutable)
+
+        let installedResources = fixture.installer.installedBinaryURL
+            .deletingLastPathComponent().appendingPathComponent(resourceName, isDirectory: true)
+        let appResources = fixture.installer.appBundleURL
+            .appendingPathComponent("Contents/Resources/" + resourceName, isDirectory: true)
+        for directory in [installedResources, appResources] {
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("revision.txt"), encoding: .utf8),
+                "sealed-agent-catalog"
+            )
+        }
+        try assertNoTransactionArtifactsRemain()
+    }
+
     func testLoginItemStagingFromAppUsesValidatedEmbeddedManagerCLI() throws {
         let identityValidator = TestManagerPrivilegedApplicationIdentityValidator()
         let artifactValidator = TestManagerArtifactValidator()

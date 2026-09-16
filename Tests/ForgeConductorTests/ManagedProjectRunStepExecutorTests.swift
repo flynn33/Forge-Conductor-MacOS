@@ -177,6 +177,27 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         XCTAssertEqual(stored.specification.work.metadata["provider_response_id"], "resp-final")
     }
 
+    func testCompletionRequestAtEndOfLMStudioProseEntersNativeValidation() {
+        let request = """
+        {"forge_run_status":"completion_requested","summary":"README.md read verified; no files edited."}
+        """
+        let liveShape = "README access confirmed (ok:true). No files were edited.\n\n" + request
+        XCTAssertEqual(
+            ManagedProjectRunStepExecutor.completionRequestSummary(from: [liveShape]),
+            "README.md read verified; no files edited."
+        )
+        XCTAssertEqual(
+            ManagedProjectRunStepExecutor.completionRequestSummary(from: [request]),
+            "README.md read verified; no files edited."
+        )
+        XCTAssertNil(ManagedProjectRunStepExecutor.completionRequestSummary(from: [
+            request + "\nMore work remains."
+        ]))
+        XCTAssertNil(ManagedProjectRunStepExecutor.completionRequestSummary(from: [
+            "README access confirmed. {\"forge_run_status\":\"completion_requested\",\"summary\":\""
+        ]))
+    }
+
     func testTemporaryProviderFailurePersistsWaitingStateAndAmbiguousTurn() async throws {
         let result = try await runFailureCase(
             ManagedStepProviderFailure(
