@@ -1656,6 +1656,24 @@ private struct LMStudioModelsEnvelope: Decodable {
     var models: [LMStudioModel]
 }
 
+private struct LMStudioLegacyModelsEnvelope: Decodable {
+    var data: [LMStudioLegacyModel]
+}
+
+private struct LMStudioLegacyModel: Decodable {
+    var id: String
+    var state: String
+    var loadedContextLength: Int?
+    var maxContextLength: Int?
+    var capabilities: [String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, state, capabilities
+        case loadedContextLength = "loaded_context_length"
+        case maxContextLength = "max_context_length"
+    }
+}
+
 private struct LMStudioModelInventory {
     var models: [LMStudioModel]
     var providerVersion: String
@@ -1778,14 +1796,73 @@ public actor LMStudioRESTClient {
             guard envelope.models.count <= 512 else {
                 throw LMStudioProviderError.limitExceeded("model count")
             }
+            let models = await reconcileLoadedStateIfNeeded(envelope.models)
             return LMStudioModelInventory(
-                models: envelope.models,
+                models: models,
                 providerVersion: providerVersion(from: response)
             )
         } catch let error as LMStudioProviderError {
             throw error
         } catch {
             throw LMStudioProviderError.malformedResponse("model list is not valid JSON")
+        }
+    }
+
+    /// LM Studio's native v1 inventory is authoritative for model metadata. Some
+    /// desktop releases can temporarily return an empty `loaded_instances` list
+    /// while the same server's v0 inventory and `lms ps` report the model as
+    /// loaded. Reconcile only that missing state through the bounded, authenticated
+    /// v0 endpoint; a missing or malformed compatibility response leaves v1 intact.
+    private func reconcileLoadedStateIfNeeded(_ models: [LMStudioModel]) async -> [LMStudioModel] {
+        let selectedIsMissingLoadedState = configuration.modelKey.flatMap { selected in
+            models.first(where: { $0.key == selected })?.loadedInstances.isEmpty
+        } ?? false
+        guard selectedIsMissingLoadedState || models.allSatisfy({ $0.loadedInstances.isEmpty }) else {
+            return models
+        }
+
+        do {
+            var request = URLRequest(url: try configuration.endpoint("api/v0/models"))
+            request.httpMethod = "GET"
+            try await authorize(&request)
+            let runner = LMStudioBoundedRequest(
+                configuration: sessionConfiguration,
+                providerConfiguration: configuration,
+                mode: .data(maximumBytes: configuration.maximumJSONBytes)
+            )
+            guard case .data(let data, _) = try await runner.run(request) else { return models }
+            let legacy = try JSONDecoder().decode(LMStudioLegacyModelsEnvelope.self, from: data)
+            guard legacy.data.count <= 512 else { return models }
+            var loadedByKey: [String: LMStudioLegacyModel] = [:]
+            for model in legacy.data where model.state == "loaded" {
+                guard !model.id.isEmpty, model.id.utf8.count <= 512,
+                      loadedByKey[model.id] == nil else { continue }
+                loadedByKey[model.id] = model
+            }
+            return models.map { model in
+                guard model.loadedInstances.isEmpty,
+                      let observed = loadedByKey[model.key],
+                      let contextLength = observed.loadedContextLength ?? observed.maxContextLength,
+                      (1...ManagedModelProviderContract.maximumContextTokens).contains(contextLength),
+                      model.maxContextLength.map({ contextLength <= $0 }) ?? true else {
+                    return model
+                }
+                var reconciled = model
+                reconciled.loadedInstances = [LMStudioLoadedInstance(
+                    id: observed.id,
+                    config: .init(contextLength: contextLength, parallel: nil, flashAttention: nil)
+                )]
+                if reconciled.maxContextLength == nil {
+                    reconciled.maxContextLength = observed.maxContextLength
+                }
+                if reconciled.capabilities == nil,
+                   observed.capabilities?.contains("tool_use") == true {
+                    reconciled.capabilities = .init(trainedForToolUse: true)
+                }
+                return reconciled
+            }
+        } catch {
+            return models
         }
     }
 
