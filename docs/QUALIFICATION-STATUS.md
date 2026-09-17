@@ -21,21 +21,21 @@ and icon. A standalone SwiftPM CLI is not a substitute for that signed bundle.
 
 ## Current source and functional evidence
 
-The current local candidate starts from published `main`
-`808efaae06dc616aa8dbb29765433e7b8ae227e2` plus the exact modified files listed
-by the current worktree. Direct owner publication and remote readback remain
-pending, so no later commit identifier is claimed yet.
+The current local source and owner-authored remote `main` are synchronized at
+`b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
+`6c03f40e2b04ae6dfd689c9347a84014f7ebe496`. The final GitHub workflow passed
+native source integrity plus Swift and Xcode Debug/Release lanes.
 
 | Surface | Current result | Boundary |
 |---|---|---|
 | Swift/Core suite | The final direct `swift test` terminal run executed **1,554 XCTest cases**, with **12 explicit skips and zero failures**. | Declared skips remain distinct from passes; the transcript is identified in the functional-build record. |
-| Projects and Manager | Signed native flows registered a picker-selected project and an absolute-path project, authorized and saved its canonical root, survived relaunch, and exercised Manager start/stop behavior. | The installed protected filesystem service still requires distinct-process qualification. |
-| LM Studio Provider | The packaged candidate saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, and passed the tool-capability contract probe. Offline save/error and relaunch durability also passed native tests. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. |
-| Managed Autonomy | A packaged isolated-home run used LM Studio, consumed a real `fs_read` tool call, recognized a trailing structured completion request, executed one required signed native XCTest case, reached `completed`, and retained the passed `tests` gate after app/manager restart. | Completion remains fail closed without an exact owner-installed native-validation policy and approved signed package. |
+| Projects and Manager | The published-tree Xcode **My Mac** product registered picker-selected and absolute-path projects, authorized and saved canonical roots, rejected filesystem root, and retained state across relaunch. | The installed protected filesystem service still requires distinct-process qualification. |
+| LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Offline save/error and invalid endpoint handling also passed. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. |
+| Managed Autonomy | The published-tree native UI authorized and registered an isolated project, connected to LM Studio, admitted the exact read-only assignment, and imported its run-bound policy. A separate current-source live run consumed `fs_read`, retried repaired completion validation without provider/tool replay, executed one signed XCTest case, reached `completed`, and retained `tests`. | Completion remains fail closed without an exact owner-installed native-validation policy and approved signed package. |
 | Native policy import | Core and Developer ID Release UI evidence covers run/project/gate/source/package binding, picker cancellation, exact import, mode `0600`, changed-package rejection, and protected readback. | The app does not silently approve model text or a hand-edited result as native evidence. |
 | Continuity | Deterministic recovery and repeated rollover coverage passes; one live real-provider threshold rollover created, acknowledged, and consumed the successor before sealing the predecessor. | LM Studio does not expose a supported authenticated API for attaching to or replacing an existing desktop GUI chat. Forge-managed native host mode is the supported automatic rollover path. |
 | Resource policy | Focused Debug and final-source, Xcode-compiled signed Release Core stress each passed on this **128 GiB Apple M5 Max** host while also executing the injected **8 GiB constrained policy**. The final Release report refuses to write `passed` after a recorded XCTest failure. | A second physical-memory-capacity execution is not yet recorded. |
-| Native GUI | The signed production-onboarding class passed seven cases; focused Provider-to-Autonomy repeats, policy-picker behavior, and the authorization crash regression also passed. | Earlier runner timeouts and the one retained transient live Provider failure remain nonpasses, not hidden passes. |
+| Native GUI | The published-tree production-onboarding surface passed all seven cases: five in the class run and the two live LM Studio cases in an exact zero-skip rerun after correcting Xcode environment inheritance. | The initial two explicit skips, earlier runner timeouts, and one retained transient live Provider failure remain nonpasses, not hidden passes. |
 
 ## Current distribution evidence
 
@@ -70,24 +70,22 @@ as local evidence and is not a shippable installer yet.
 The following results are still required before declaring the owner target
 complete:
 
-1. Publish the exact current worktree to owner `main`, read it back, and bind a
-   fresh source revision to the final build receipt.
-2. Install the final candidate under a controlled owner-approved transition,
+1. Install the final candidate under a controlled owner-approved transition,
    then enable and qualify its Developer ID protected filesystem service as a
    distinct process, including successful authorized mutation and recovery
    behavior. The current System Settings readback shows Forge background
    activity off and Manager reports **Approval required**; read-only hashes
    prove that registered installation contains an older daemon.
-3. Notarize and staple the signed outer Installer, then pass local Gatekeeper's
+2. Notarize and staple the signed outer Installer, then pass local Gatekeeper's
    install assessment. Existing Notary credentials are required; none are
    created by this workflow. No local `notarytool` profile/API key or repository
    Actions secret is currently available for that submission.
-4. Record the resource/stress case on another representative physical-memory
+3. Record the resource/stress case on another representative physical-memory
    capacity. The injected constrained policy is valuable coverage but is not a
-   second physical host. The existing macOS CI Release lane is configured to
-   retain the guarded stress JSON and its host capacity after publication; that
-   future run is not yet evidence and does not replace the physical-host gate.
-5. Rebuild or attest the final artifact from the exact published revision.
+   second physical host. The published revision's macOS CI Release lane passed
+   and retained the guarded stress JSON and its host capacity; that hosted
+   observation does not replace the physical-host gate.
+4. Rebuild or attest the final artifact from the exact published revision.
    Public download and shipment remain owner actions after qualification.
 
 The owner installation has not been replaced, and neither the app ZIP nor the

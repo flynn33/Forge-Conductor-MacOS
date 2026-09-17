@@ -378,15 +378,13 @@ peak, flat five-sample post-release RSS, at most two telemetry delivery slots,
 zero post-shutdown coordinator owners, and p99 under the asserted 2-second
 latency ceilings. This host and an injected lower-tier policy still do not
 prove execution on a second physical-memory capacity.
-The existing macOS CI Release Swift lane is now configured to retain the same
-guarded JSON report plus architecture, hardware-model, physical-memory, OS, and
-Xcode inventory for the exact published revision. That run has not happened on
-this local patch and is not recorded as a pass; a hosted-runner observation also
-does not replace the remaining second physical-host qualification.
-
-Direct owner publication and a readback of
-the exact published `main` source remain required before this artifact can be
-called published-source-bound.
+The existing macOS CI Release Swift lane retains the same guarded JSON report
+plus architecture, hardware-model, physical-memory, OS, and Xcode inventory.
+The final workflow for published revision
+`b756b243d24d7dd06098dbbafcdfaa77ab7c97e0` completed successfully in all five
+lanes: native source integrity, Swift Debug, Swift Release, Xcode Debug, and
+Xcode Release. A hosted-runner observation does not replace the remaining
+second physical-host qualification.
 
 A direct bounded launch of that extracted ZIP used a fresh Forge home on port
 7792. Manager's native folder panel and Save settings authorized only
@@ -446,3 +444,44 @@ Testing runner lines selected zero tests in their separate libraries; they do
 not replace or inflate the executed XCTest result. This suite validates the
 current local source and focused package/policy regressions, not the signed
 root service, installer, public download, or an exact published revision.
+
+## September 17, 2026 published-main Xcode My Mac receipt
+
+The owner published the repaired source directly to `main`. Local `HEAD` and
+`origin/main` read back as
+`b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, with exact tree
+`6c03f40e2b04ae6dfd689c9347a84014f7ebe496` and no worktree difference. The
+source/test/resource graph is unchanged: every affected Swift file was already
+in its canonical target and this closeout changes documentation only.
+
+The canonical workspace then built and ran its native production-onboarding
+tests on the **My Mac** arm64 destination. The isolated Debug app has identifier
+`com.forge-conductor.app`, Apple Development authority James Daley, team
+`9AQ2C2838M`, hardened runtime, and passes strict deep code-signature
+verification. The first result bundle at
+`/private/tmp/forge-published-main-ui-20260917.xcresult` executed seven cases:
+five passed and the two live LM Studio cases skipped because Xcode did not
+inherit shell-only provider variables. Those skips are retained as a non-pass.
+
+The loopback endpoint and already loaded `qwen/qwen3.8-27b` model were then
+supplied through the user launch environment, the inheritance boundary used by
+the Xcode UI runner. The exact two previously skipped cases executed in
+`/private/tmp/forge-published-main-live-ui-20260917.xcresult` with two passes,
+zero failures, and zero skips. The live Provider case saved configuration,
+reconciled the selected model as loaded, refreshed native inventory, passed the
+connection probe, replaced the manager process, retained configuration, and
+passed the probe again. The live Autonomy case authorized and registered an
+isolated project, passed the same Provider probe, admitted the exact read-only
+run, retained its project/generation/model/gate assignment, canceled and
+reopened the policy picker, and imported the run-bound manifest at mode `0600`.
+The other five cases verified folder and direct-path registration, relaunch
+persistence, invalid-root rejection, offline and invalid Provider handling,
+and shell opt-out/re-enable in fresh MCP processes. The temporary launch
+variables were removed afterward. No candidate was installed and the owner
+installation was not changed.
+
+This receipt binds the repaired onboarding and managed-run admission paths to
+published source. It is development-signed native execution, not a rebuilt
+Developer ID distribution artifact. Distinct-process root-service execution,
+installer notarization, public-download acceptance, a second physical-memory
+capacity, and final published-source archive attestation remain open.
