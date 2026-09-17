@@ -15,10 +15,11 @@ This is a 0.9.0 development snapshot, not a public release. Product version
 surfaces remain 0.9.0 build 1. The owner now targets a fully functional,
 feature-complete, shippable build through direct `main` updates and will ship
 separately. The earlier Apple Development-signed Release package remains valid
-evidence for its historical scope. Current patch-bound source now has a
-universal Developer ID archive, export, signed local package, and a notarized,
-stapled app ZIP that passes local Gatekeeper after extraction. Installer
-notarization, public-download Gatekeeper acceptance, physical-hardware
+evidence for its historical scope. The exact published source now has a
+universal Developer ID archive, export, integrity-checked app ZIP, and signed
+local Installer. Earlier source also has a notarized, stapled app ZIP that
+passes local Gatekeeper after extraction. Exact-artifact notarization,
+public-download Gatekeeper acceptance, physical-hardware
 qualification, privileged root-service E2, and exact existing-desktop attachment
 remain open. One production-adapter managed rollover and the earlier coherent
 signed development bundle are recorded without promoting them to release passes.
@@ -167,6 +168,21 @@ Developer ID or privileged-service qualification artifact.
   Its expanded app passes strict nested signing, staple validation, and app
   Gatekeeper. The outer package remains unnotarized and is rejected for
   installation. No key ACL was changed; nothing was installed or shipped.
+- The exact owner-authored published tree at `f02abeb8`, including the tested
+  production revision and documentation-only closeout, produced a fresh
+  universal Developer ID Release archive and manual export. The archive has one
+  canonical `com.forge-conductor.app` product, both architectures, the icon
+  assets, embedded CLI, launcher, Core framework, and sealed filesystem daemon.
+  Strict nested signing and the Release privileged-bundle checker pass on the
+  archive, export, ZIP extraction, and expanded Installer payload. The app ZIP
+  SHA-256 is
+  `a171d88409c2ef36816b5ccbc4bb304a3855b5fc7f3972492259adcd143ec338`;
+  the trusted-timestamp Developer ID Installer package SHA-256 is
+  `21a0dc3d68dfbd410408c38cb8e3ce1ee9a395269a30bbeba89d94ab13a16d28`.
+  Both exact artifacts remain unnotarized and Gatekeeper rejects them as
+  `source=Unnotarized Developer ID`. The embedded CLI alone returned its
+  version and isolated stopped-manager status; no GUI or Installer was opened,
+  installed, uploaded, or shipped.
 - The final local direct `swift test` run completed 1,554 XCTest cases with 12
   explicit skips and zero failures on this source; the terminal transcript is
   retained in the functional-build receipt. This does not qualify the

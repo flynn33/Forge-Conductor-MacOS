@@ -251,14 +251,30 @@ The outer package is not notarized and fails Gatekeeper's install assessment as
 `source=Unnotarized Developer ID`; the host has no `notarytool` keychain profile
 or App Store Connect API key in its standard locations, and the repository has
 no Actions secrets available for a private CI submission. This archive remains
-tied to the uncommitted local workspace until direct owner publication and exact
-GitHub `main` readback.
+tied to its recorded pre-publication workspace and remains historical evidence.
+
+The exact owner-authored published tree at
+`f02abeb8c940c8d998f822fd4f1cad5c20c7765e`, tree
+`c6475126b54c8ff8de1465940e3ecc3c702a00eb`, then produced a fresh universal
+Developer ID archive at
+`/private/tmp/forge-published-main-developerid-20260917.xcarchive` and manual
+export. The archive, export, ZIP extraction, and expanded Installer payload pass
+strict nested signing and the Release privileged-bundle checker. The app ZIP at
+`/private/tmp/forge-published-main-developerid-app-20260917.zip` is 22,112,426
+bytes with SHA-256
+`a171d88409c2ef36816b5ccbc4bb304a3855b5fc7f3972492259adcd143ec338`.
+The matching trusted-timestamp Installer at
+`/private/tmp/forge-published-main-signed-installer-20260917.pkg` is 22,099,582
+bytes with SHA-256
+`21a0dc3d68dfbd410408c38cb8e3ce1ee9a395269a30bbeba89d94ab13a16d28`.
+Gatekeeper rejects both as `source=Unnotarized Developer ID`; they have not
+been installed or shipped.
 
 When an existing Notary profile is supplied, submit and qualify this exact
 package without rebuilding or creating another credential:
 
 ```bash
-PKG=/private/tmp/forge-final-local-productbuild-signed-installer-20260916.pkg
+PKG=/private/tmp/forge-published-main-signed-installer-20260917.pkg
 PROFILE='<existing notarytool profile>'
 xcrun notarytool submit "$PKG" --keychain-profile "$PROFILE" --wait \
   --output-format json

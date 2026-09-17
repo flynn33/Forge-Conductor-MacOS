@@ -81,6 +81,13 @@ Debug/Release jobs all passed.
 The post-repair arm64 development-signed Release candidate passed strict nested
 bundle checks and ZIP integrity; its retained local archive and SHA-256 are in
 the [functional-build evidence](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md).
+The exact owner-authored published tree subsequently produced a universal
+Developer ID Release archive, manual export, integrity-checked app ZIP, and
+trusted-timestamp Developer ID Installer package. Strict nested signing and the
+Release privileged-bundle checker pass on the archive, export, ZIP extraction,
+and expanded package payload. The exact app and Installer remain unnotarized,
+so Gatekeeper correctly rejects them until that separate distribution gate is
+completed. Nothing was installed or shipped.
 
 The current delivery target is a shippable build with functional product paths,
 signed distinct-process filesystem evidence, Developer ID packaging,
@@ -110,8 +117,10 @@ installer package remains unnotarized and fails Gatekeeper's install assessment.
 The extracted notarized app launched with a fresh Forge home on port 7790;
 Manager Start, native folder authorization/save, and disposable project
 registration committed under that isolated home before bounded shutdown.
-Functional root-service, hardware, package, and exact published-source
-distribution-artifact qualification remain open.
+The exact published-source distribution rebuild is complete. Functional
+root-service execution, exact-artifact notarization/stapling and Gatekeeper
+acceptance, public-download acceptance, and the second physical-hardware case
+remain open.
 The newer notarized policy-import candidate also used an isolated home and
 fresh port 7792. After native folder authorization and project registration,
 its packaged manager saved and probed the loaded LM Studio model, admitted a
@@ -120,8 +129,8 @@ read-only run with an exact imported signed XCTest policy, and reached
 timeout/truncation. The same terminal state survived a full process restart.
 Its [artifact and result receipt](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md#september-16-2026-packaged-native-completion-receipt)
 records the ZIP hash and qualification limits. The current installed root
-service and an archive rebuilt or attested from the published revision remain
-separate release gates.
+service remains a separate release gate; the exact published-source archive is
+now rebuilt and recorded above.
 The September 16 System Settings readback showed the owner installation's
 background activity off and its Manager status **Approval required**; the old
 OS daemon registration also has a development signing-category constraint.
