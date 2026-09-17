@@ -305,6 +305,90 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         }
     }
 
+    func testRetryAfterCompletionPolicyRepairRevalidatesWithoutContinuityOrProviderReplay() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("completion-retry-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [root.path]], save: true)
+        let validator = try GateValidatorRegistry(validators: [
+            CompletionGateValidator(gate: "fixture_read") { _ in
+                return CompletionGateResult(
+                    gate: "fixture_read", passed: true,
+                    summary: "Repaired native completion policy passed",
+                    evidenceReferences: ["fixture:completion-policy-repaired"]
+                )
+            },
+        ])
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Completion Retry Fixture",
+            canonicalRoot: root
+        )
+        var blocked = try await app.projectContexts.repository.createAutonomousRun(managedRuntimeRunRequest(
+            projectID: project.projectID,
+            generation: project.generation,
+            projectRoot: root
+        ))
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: blocked.runID,
+            ownerID: "completion-policy-retry-fixture"
+        )
+        for nextState in [
+            AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion,
+        ] {
+            blocked = try await app.projectContexts.repository.transitionAutonomousRun(
+                runID: blocked.runID,
+                lease: lease,
+                transition: AutonomousRunTransition(
+                    expectedState: blocked.state,
+                    expectedRevision: blocked.revision,
+                    nextState: nextState,
+                    eventType: "completion_policy_retry_fixture_\(nextState.rawValue)",
+                    eventSummary: "Prepare a durable completion validation retry fixture",
+                    completionRequestJSON: nextState == .validatingCompletion
+                        ? #"{"request":"complete after policy repair"}"# : nil
+                )
+            )
+        }
+        blocked = try await app.projectContexts.repository.transitionAutonomousRun(
+            runID: blocked.runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: blocked.state,
+                expectedRevision: blocked.revision,
+                nextState: .blockedConfiguration,
+                eventType: "completion_policy_retry_fixture_blocked",
+                eventSummary: "Native completion policy is unavailable",
+                errorCode: AutonomyError.completionValidationFailed.code,
+                errorSummary: "Install the required native gate policy"
+            )
+        )
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+        XCTAssertEqual(blocked.lastErrorCode, AutonomyError.completionValidationFailed.code)
+        XCTAssertNotNil(blocked.completionRequestJSON)
+        XCTAssertNil(blocked.specification.work.pendingIntent)
+
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            registry: HostAdapterRegistry(),
+            maximumConcurrentRuns: 1,
+            completionValidator: validator
+        )
+        _ = try await runtime.start()
+        let retry = try await runtime.controlRun(blocked.runID, action: .retry)
+        XCTAssertEqual(retry.state, .validatingCompletion)
+        let completed = try await waitForRun(
+            repository: app.projectContexts.repository,
+            runID: blocked.runID,
+            state: .completed
+        )
+        XCTAssertEqual(completed.state, .completed)
+        let events = try await app.projectContexts.repository.autonomyEvents(runID: blocked.runID)
+        XCTAssertFalse(events.contains { $0.eventType == "run_side_effect_intent_persisted" })
+        await runtime.shutdown()
+    }
+
     func testManagerRecoversDurableRunBeforeDashboardAndCompletesThroughProductionComposition() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)

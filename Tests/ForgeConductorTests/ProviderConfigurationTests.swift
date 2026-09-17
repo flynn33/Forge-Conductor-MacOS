@@ -10,20 +10,36 @@ private final class ProviderInventoryFixture: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host?.hasSuffix("provider.fixture") == true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        guard let url = request.url, url.path == "/api/v1/models",
+        guard let url = request.url,
               let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": "application/json", "X-LM-Studio-Version": "0.3.fixture"]) else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL)); return
         }
-        let models: [[String: Any]]
-        if url.host == "empty.provider.fixture" { models = [] }
-        else {
-            models = [["key": "fixture/tool-model", "capabilities": ["trained_for_tool_use": true],
-                       "loaded_instances": url.host == "unloaded.provider.fixture" ? [] : [
-                           ["id": "fixture/tool-model@32768", "config": ["context_length": 32768]]
-                       ]]]
+        let body: [String: Any]
+        switch url.path {
+        case "/api/v1/models":
+            let models: [[String: Any]]
+            if url.host == "empty.provider.fixture" { models = [] }
+            else {
+                let v1OmitsLoadedState = url.host == "unloaded.provider.fixture"
+                    || url.host == "legacy-loaded.provider.fixture"
+                models = [["key": "fixture/tool-model", "capabilities": ["trained_for_tool_use": true],
+                           "max_context_length": 131_072,
+                           "loaded_instances": v1OmitsLoadedState ? [] : [
+                               ["id": "fixture/tool-model@32768", "config": ["context_length": 32768]]
+                           ]]]
+            }
+            body = ["models": models]
+        case "/api/v0/models" where url.host == "legacy-loaded.provider.fixture":
+            body = ["object": "list", "data": [[
+                "id": "fixture/tool-model", "state": "loaded",
+                "loaded_context_length": 65_536, "max_context_length": 131_072,
+                "capabilities": ["tool_use"],
+            ]]]
+        default:
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL)); return
         }
-        let data = try! JSONSerialization.data(withJSONObject: ["models": models])
+        let data = try! JSONSerialization.data(withJSONObject: body)
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -278,6 +294,20 @@ final class ProviderConfigurationTests: XCTestCase {
         let saved = try await service.update(request(endpoint: "https://loaded.provider.fixture"))
         let inventory = try await service.models()
         XCTAssertEqual(inventory.revision, saved.revision)
+        XCTAssertEqual(inventory.models.first?.key, "fixture/tool-model")
+        XCTAssertEqual(inventory.models.first?.loaded, true)
+        XCTAssertEqual(inventory.models.first?.toolUseCapable, true)
+    }
+
+    func testModelInventoryReconcilesLoadedStateWhenNativeV1OmitsInstances() async throws {
+        let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials, inventory: { config in
+            let session = URLSessionConfiguration.ephemeral
+            session.protocolClasses = [ProviderInventoryFixture.self]
+            return try await LMStudioRESTClient(configuration: config, sessionConfiguration: session).listModels()
+        })
+        _ = try await service.update(request(endpoint: "https://legacy-loaded.provider.fixture"))
+        let inventory = try await service.models()
+        XCTAssertEqual(inventory.models.count, 1)
         XCTAssertEqual(inventory.models.first?.key, "fixture/tool-model")
         XCTAssertEqual(inventory.models.first?.loaded, true)
         XCTAssertEqual(inventory.models.first?.toolUseCapable, true)
