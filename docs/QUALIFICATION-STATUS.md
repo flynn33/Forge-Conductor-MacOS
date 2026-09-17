@@ -21,10 +21,14 @@ and icon. A standalone SwiftPM CLI is not a substitute for that signed bundle.
 
 ## Current source and functional evidence
 
-The current local source and owner-authored remote `main` are synchronized at
+The tested production source is owner-authored revision
 `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
-`6c03f40e2b04ae6dfd689c9347a84014f7ebe496`. The final GitHub workflow passed
-native source integrity plus Swift and Xcode Debug/Release lanes.
+`6c03f40e2b04ae6dfd689c9347a84014f7ebe496`; its final GitHub workflow passed
+native source integrity plus Swift and Xcode Debug/Release lanes. Local and
+remote `main` were then synchronized at documentation closeout revision
+`f02abeb8c940c8d998f822fd4f1cad5c20c7765e`, tree
+`c6475126b54c8ff8de1465940e3ecc3c702a00eb`. That closeout changes
+documentation only and leaves the tested native graph unchanged.
 
 | Surface | Current result | Boundary |
 |---|---|---|
@@ -39,31 +43,34 @@ native source integrity plus Swift and Xcode Debug/Release lanes.
 
 ## Current distribution evidence
 
-The final local universal Developer ID archive and export contain the current
-production code. Xcode Organizer notarized the matching production code, and
-the final exported app retained those exact code-directory hashes. The stapled
-app passed strict nested signing, the Release bundle checker, ZIP integrity,
-stapler validation, and local Gatekeeper execution before and after extraction.
+The exact owner-authored published tree at `f02abeb8`, including the tested
+production source and documentation-only closeout, produced a universal
+Developer ID Release archive and manual export. The archive has one canonical
+`com.forge-conductor.app` product, version `0.9.0` build `1`, both `x86_64` and
+`arm64` architectures, the required icon assets, and all four nested products.
+Strict deep signing and the Release privileged-bundle checker pass on the
+archive, export, ZIP extraction, and expanded Installer payload.
 
-The unshipped app ZIP is:
+The unshipped source-bound app ZIP is:
 
-- `/private/tmp/forge-final-local-notarized-app-20260916.zip`
-- 22,088,716 bytes
-- SHA-256 `f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`
+- `/private/tmp/forge-published-main-developerid-app-20260917.zip`
+- 22,112,426 bytes
+- SHA-256 `a171d88409c2ef36816b5ccbc4bb304a3855b5fc7f3972492259adcd143ec338`
 
-The matching local Installer was signed through Apple's `productbuild` path
-with the team's Developer ID Installer identity and a trusted timestamp. Its
-expanded app payload retains the notarized app ticket and passes strict nested
-signing and app Gatekeeper checks.
+The matching Installer was signed through Apple's `productbuild` path with
+James Daley's Developer ID Installer identity and a trusted timestamp. Its
+expanded payload retains the exact exported signatures and bundle contents.
 
-The unshipped signed Installer is:
+The unshipped source-bound Installer is:
 
-- `/private/tmp/forge-final-local-productbuild-signed-installer-20260916.pkg`
-- SHA-256 `1cfc438cf5e2b5d9dda8fafcb019c905abad1b0289f48c5f9f233796c3f03f79`
+- `/private/tmp/forge-published-main-signed-installer-20260917.pkg`
+- 22,099,582 bytes
+- SHA-256 `21a0dc3d68dfbd410408c38cb8e3ce1ee9a395269a30bbeba89d94ab13a16d28`
 
-The **outer Installer package is not notarized**. Gatekeeper correctly rejects
-its installation as `source=Unnotarized Developer ID`. This package is retained
-as local evidence and is not a shippable installer yet.
+Neither exact published-tree artifact is notarized. Gatekeeper correctly
+rejects the app and Installer as `source=Unnotarized Developer ID`. Earlier
+notarized app receipts remain valid for their recorded source, but they do not
+replace notarization of these exact artifacts.
 
 ## Remaining gates
 
@@ -76,17 +83,18 @@ complete:
    behavior. The current System Settings readback shows Forge background
    activity off and Manager reports **Approval required**; read-only hashes
    prove that registered installation contains an older daemon.
-2. Notarize and staple the signed outer Installer, then pass local Gatekeeper's
-   install assessment. Existing Notary credentials are required; none are
-   created by this workflow. No local `notarytool` profile/API key or repository
-   Actions secret is currently available for that submission.
+2. Notarize the exact published-tree archive/app and signed outer Installer,
+   staple both artifacts, then pass local Gatekeeper execution and installation
+   assessments. Existing Notary credentials are required; none are created by
+   this workflow. No local `notarytool` profile/API key or repository Actions
+   secret is currently available for a command-line submission.
 3. Record the resource/stress case on another representative physical-memory
    capacity. The injected constrained policy is valuable coverage but is not a
    second physical host. The published revision's macOS CI Release lane passed
    and retained the guarded stress JSON and its host capacity; that hosted
    observation does not replace the physical-host gate.
-4. Rebuild or attest the final artifact from the exact published revision.
-   Public download and shipment remain owner actions after qualification.
+4. Pass public-download acceptance on the notarized artifacts. Shipment remains
+   the owner's separate action after qualification.
 
 The owner installation has not been replaced, and neither the app ZIP nor the
 Installer has been shipped or publicly published.

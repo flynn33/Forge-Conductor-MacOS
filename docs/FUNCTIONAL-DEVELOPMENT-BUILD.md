@@ -481,7 +481,60 @@ variables were removed afterward. No candidate was installed and the owner
 installation was not changed.
 
 This receipt binds the repaired onboarding and managed-run admission paths to
-published source. It is development-signed native execution, not a rebuilt
-Developer ID distribution artifact. Distinct-process root-service execution,
-installer notarization, public-download acceptance, a second physical-memory
-capacity, and final published-source archive attestation remain open.
+published source. At this checkpoint it was development-signed native
+execution, and the Developer ID rebuild recorded in the next receipt had not
+yet run. Distinct-process root-service execution, artifact notarization,
+public-download acceptance, and a second physical-memory capacity remained
+open.
+
+## September 17, 2026 published-main Developer ID receipt
+
+After the native receipt was published, local and remote `main` were synchronized
+at owner-authored revision `f02abeb8c940c8d998f822fd4f1cad5c20c7765e`,
+tree `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. The changes after the tested
+production revision are documentation only; the canonical Xcode source,
+resource, and test graph is unchanged.
+
+The ordinary `ForgeConductor` Release archive completed from that exact tree at
+`/private/tmp/forge-published-main-developerid-20260917.xcarchive`. Its archive
+metadata identifies one `com.forge-conductor.app` application, version `0.9.0`
+build `1`, universal `x86_64` and `arm64` architectures, and
+`Developer ID Application: James Daley (9AQ2C2838M)`. `AppIcon.icns`,
+`Assets.car`, both icon keys, the embedded CLI, runtime launcher, Core
+framework, filesystem daemon, and daemon code-directory seals are present.
+Strict deep signature verification and the repository's `Release` privileged
+filesystem bundle checker pass on the archive and manual `developer-id` export.
+Every executable carries hardened runtime, team `9AQ2C2838M`, and a secure
+timestamp.
+
+The unshipped exported app ZIP is
+`/private/tmp/forge-published-main-developerid-app-20260917.zip` (22,112,426
+bytes; SHA-256
+`a171d88409c2ef36816b5ccbc4bb304a3855b5fc7f3972492259adcd143ec338`).
+ZIP integrity testing, extraction, strict nested verification, and the Release
+bundle checker pass. The embedded CLI reports `0.9.0` and a clean stopped
+manager from a new owner-only scratch home. Gatekeeper rejects this exact app
+as `source=Unnotarized Developer ID`; no notarization or stapling pass is
+claimed.
+
+Apple's `productbuild --package --sign` path produced the matching unshipped
+Installer at
+`/private/tmp/forge-published-main-signed-installer-20260917.pkg` (22,099,582
+bytes; SHA-256
+`21a0dc3d68dfbd410408c38cb8e3ce1ee9a395269a30bbeba89d94ab13a16d28`).
+`pkgutil --check-signature` reports James Daley's Developer ID Installer
+identity, the Apple certificate chain, and a trusted timestamp at
+`2026-09-17T12:50:49Z`. The expanded payload is byte-equivalent at the app
+bundle boundary, passes strict nested verification and the Release checker, and
+retains the exact exported code-directory hashes. Gatekeeper rejects the outer
+package as `source=Unnotarized Developer ID`, which remains a required gate.
+
+The machine-readable local receipt is
+`/private/tmp/forge-published-main-artifact-receipt-20260917.json`. This work
+closes the requirement to rebuild a Developer ID archive and signed Installer
+from published `main`. It does not close notarization/stapling, Gatekeeper
+acceptance, distinct-process root-service execution, public-download
+acceptance, or the second physical-memory-capacity requirement. No artifact was
+installed, uploaded, or shipped; the only direct execution was the embedded CLI
+version and isolated stopped-manager check. The GUI remained closed and the
+owner installation was not changed.
