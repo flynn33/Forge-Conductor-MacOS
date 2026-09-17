@@ -48,8 +48,8 @@ The ZIP at `/private/tmp/forge-current-source-ui-devrelease-candidate.zip`
 passed integrity testing (SHA-256
 `56cb77e5802843dbb55b51da4c38d2b532685f6789358e0db18baa48c7d27c10`).
 Its GUI bundle was not launched or installed. This is an unshipped local
-development candidate pending exact published-source rebuild, not Developer ID
-or privileged-service qualification.
+development candidate that predates the published repair revision, not a current
+Developer ID or privileged-service qualification artifact.
 
 ### LM Studio loaded-state and completion retry
 
@@ -78,6 +78,22 @@ or privileged-service qualification.
   certificate-free CI. Both SwiftPM products and the ordinary Debug workspace
   build pass. All five affected source/test files were already members of the
   canonical Xcode graph; no project-graph edit was required.
+- Owner-authored `main` now contains the exact tested source at
+  `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0` (tree
+  `6c03f40e2b04ae6dfd689c9347a84014f7ebe496`). Local and remote `main` read
+  back identically. GitHub's final Native Build and Tests run passed native
+  source integrity plus Swift and Xcode Debug/Release lanes.
+- **E0:** the Apple Development-signed Xcode **My Mac** app built from that
+  published tree passed all seven production-onboarding cases. Five independent
+  cases passed in the class run; Xcode did not inherit the two live-provider
+  variables, so those skips remain a non-pass. After supplying the loopback
+  endpoint and already loaded model through the user launch environment, the
+  exact live Provider and Autonomy cases executed again with two passes, zero
+  failures, and zero skips. Together they verify folder and direct-path project
+  registration, relaunch persistence, offline Provider errors, loaded-model
+  discovery and connection across manager replacement, Autonomy run admission,
+  policy-picker cancellation/import, and fresh-MCP shell opt-out/re-enable. The
+  temporary launch variables were removed and the installed app was untouched.
 
 ### Release archive preparation
 
@@ -184,8 +200,9 @@ or privileged-service qualification.
 - The existing macOS CI Release Swift lane now retains the guarded P11 resource
   report and a bounded architecture, hardware-model, physical-memory, OS, and
   Xcode inventory. This prepares source-bound second-capacity evidence on the
-  published revision; it does not predeclare the pending CI execution a pass or
-  replace the separate physical-host qualification boundary.
+  published revision. The final CI execution passed and retained that evidence;
+  the hosted observation does not replace the separate physical-host qualification
+  boundary.
 
 ### Project tracking and verified baseline
 

@@ -67,6 +67,17 @@ with no skips or failures; two further exact Provider-to-Autonomy repeats passed
 An earlier full-class attempt had one live Provider probe return unreachable
 before Autonomy start. The failure is retained as a non-pass and the native test
 now captures provider controls and manager state if it recurs.
+The repaired source is now published on owner-authored `main` at
+`b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`. Its exact tree passed the Xcode
+**My Mac** production-onboarding surface again: five environment-independent
+cases passed, and the two live LM Studio cases passed separately with zero
+skips after Xcode received the loopback endpoint and loaded model through the
+user launch environment. The current Provider case refreshed the live model
+inventory, connected, relaunched the manager, and connected again. The current
+Autonomy case registered and authorized an isolated project, connected to LM
+Studio, admitted the exact read-only assignment, and exercised policy import.
+The same revision's GitHub source-integrity, Swift Debug/Release, and Xcode
+Debug/Release jobs all passed.
 The post-repair arm64 development-signed Release candidate passed strict nested
 bundle checks and ZIP integrity; its retained local archive and SHA-256 are in
 the [functional-build evidence](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md).
@@ -99,8 +110,8 @@ installer package remains unnotarized and fails Gatekeeper's install assessment.
 The extracted notarized app launched with a fresh Forge home on port 7790;
 Manager Start, native folder authorization/save, and disposable project
 registration committed under that isolated home before bounded shutdown.
-Functional root-service, hardware, package, and published-source qualification
-remain open.
+Functional root-service, hardware, package, and exact published-source
+distribution-artifact qualification remain open.
 The newer notarized policy-import candidate also used an isolated home and
 fresh port 7792. After native folder authorization and project registration,
 its packaged manager saved and probed the loaded LM Studio model, admitted a
@@ -109,7 +120,8 @@ read-only run with an exact imported signed XCTest policy, and reached
 timeout/truncation. The same terminal state survived a full process restart.
 Its [artifact and result receipt](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md#september-16-2026-packaged-native-completion-receipt)
 records the ZIP hash and qualification limits. The current installed root
-service and exact published-source archive remain separate release gates.
+service and an archive rebuilt or attested from the published revision remain
+separate release gates.
 The September 16 System Settings readback showed the owner installation's
 background activity off and its Manager status **Approval required**; the old
 OS daemon registration also has a development signing-category constraint.
@@ -130,9 +142,9 @@ passed on this 128 GiB host with injected 8 GiB limits. Another physical-memory
 capacity remains unqualified. The final optimized XCTest rerun compiled the
 report-failure guard, passed one selected case with zero failures, and wrote a
 Release-labeled report. The functional-build receipt records its exact path,
-hash, and open gates. The existing macOS CI Release lane will retain the same
-guarded report and bounded host-capacity inventory after publication; that
-future result is not yet counted as a pass or a second physical host.
+hash, and open gates. The published revision's macOS CI Release lane retained
+the guarded report and bounded host-capacity inventory and passed. That hosted
+result is not counted as a second physical host.
 An isolated arm64 Apple Development-signed current-source Release build passed
 the `DevelopmentRelease` nested-bundle check, embedded CLI checks, and a
 bounded candidate GUI/manager startup on scratch port 7789 without replacing
