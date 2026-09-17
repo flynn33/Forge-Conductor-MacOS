@@ -707,7 +707,15 @@ public actor ManagedAutonomyRuntime {
                     "only a waiting, blocked, or recoverable run can be retried"
                 )
             }
-            nextState = .recovering
+            // Completion validation persists the exact request before a native
+            // gate can block on missing policy or environment. Once that blocker
+            // is repaired, retry the same durable request without manufacturing a
+            // continuity step that would require an unrelated budget observation.
+            let resumesCompletionValidation = run.state == .blockedConfiguration
+                && run.lastErrorCode == AutonomyError.completionValidationFailed.code
+                && run.completionRequestJSON != nil
+                && run.specification.work.pendingIntent == nil
+            nextState = resumesCompletionValidation ? .validatingCompletion : .recovering
         case .checkpoint, .rollover:
             preconditionFailure("operator continuity actions are handled before generic controls")
         }
