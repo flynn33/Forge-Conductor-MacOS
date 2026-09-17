@@ -286,6 +286,13 @@ until they are saved. **Test Connection** checks the saved endpoint
 and loaded model. **Run Contract Probe** also checks the provider capabilities
 required for managed execution. Load models in LM Studio itself.
 
+Forge uses LM Studio's native v1 inventory for model metadata. Some desktop
+versions can briefly return no `loaded_instances` there even though the native
+v0 inventory reports the exact selected model as `loaded`. Forge checks that
+bounded compatibility response and accepts only an exact model identifier with
+a valid loaded context length. A different identifier, an unloaded state, or an
+invalid response remains unavailable.
+
 Finish or cancel existing managed runs before changing settings. An in-flight
 probe or active run blocks a conflicting save. Invalid settings leave the last
 saved revision intact; if another control changed that revision, refresh and
@@ -294,6 +301,12 @@ refresh to reconcile the persisted result. A credential cleanup notice means
 settings were saved but Keychain cleanup needs a retry after Keychain is unlocked.
 These controls configure Forge-managed sessions; LM Studio MCP deployment remains
 in **LM Studio MCP**.
+
+If a run reaches **Blocked configuration** because its native completion policy
+is missing or its required environment is unavailable, repair or import the
+policy for that exact run and select **Retry**. Forge revalidates the persisted
+completion request without repeating the model turn or its tool calls. Provider,
+resource, and other recoverable failures continue through normal recovery.
 
 ### 6.1 Provider-response recovery boundary
 

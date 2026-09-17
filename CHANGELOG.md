@@ -51,6 +51,34 @@ Its GUI bundle was not launched or installed. This is an unshipped local
 development candidate pending exact published-source rebuild, not Developer ID
 or privileged-service qualification.
 
+### LM Studio loaded-state and completion retry
+
+- Reconciled LM Studio's native model inventories when `/api/v1/models`
+  temporarily omits `loaded_instances` for the selected model while the bounded
+  `/api/v0/models` response reports that exact model as `loaded`. The v1 response
+  remains authoritative for model metadata; the compatibility response can add
+  only exact loaded state and a validated context length. Missing, malformed, or
+  mismatched compatibility data remains unloaded and fails closed.
+- A retry after repairing a native completion-policy blocker now resumes the
+  persisted completion request in `validating_completion`. It no longer enters
+  continuity recovery or repeats provider/tool work. Other waiting, provider,
+  resource, and recoverable failures retain their existing recovery behavior.
+- **E0:** an isolated Apple Development-signed Debug app built from the canonical
+  workspace on **My Mac** registered a project, discovered the live
+  `qwen/qwen3.8-27b` model as loaded with a 262144-token context, passed the
+  connection probe, and completed a manager-owned LM Studio run. The model made
+  one `fs_read`, returned the exact 23-byte fixture, requested completion, then
+  stopped at the expected missing-policy blocker. Importing the exact run-bound
+  signed policy and selecting Retry returned `validating_completion`; one
+  required XCTest case passed with zero failures/skips and the run reached
+  `completed` with `tests` passed. The installed app was not replaced.
+- The two focused Swift regressions and the same two canonical Xcode tests pass.
+  The Xcode unit run used the installed Apple Development identity as a local
+  command-line override because the repository keeps the unit bundle ad hoc for
+  certificate-free CI. Both SwiftPM products and the ordinary Debug workspace
+  build pass. All five affected source/test files were already members of the
+  canonical Xcode graph; no project-graph edit was required.
+
 ### Release archive preparation
 
 - Inspected September 15 Xcode archives: the `Forge Conductor` scheme's

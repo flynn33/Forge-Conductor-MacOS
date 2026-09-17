@@ -47,6 +47,15 @@ state persisted after a manager restart. This qualifies that isolated path;
 the operator policy importer is now Core- and native-UI-tested, including an
 exact run-bound file selection and owner-only readback; an ordinary
 installed-stack terminal run and the root daemon remain open.
+The current Xcode **My Mac** Debug candidate also handles the live LM Studio
+desktop response in which native v1 model metadata omitted loaded instances
+while native v0 reported the selected `qwen/qwen3.8-27b` model loaded. Forge
+reconciled that exact model and its 262144-token context, passed the connection
+probe, executed one project-bound `fs_read`, and reached its native completion
+gate. After an exact policy import, Retry revalidated the persisted completion
+request without another model or tool turn; one signed XCTest case passed with
+zero failures or skips and the run reached `completed`. This was an isolated
+candidate flow and did not replace the installed app.
 The current-source signed GUI also passed focused native project registration,
 live Provider save/connection/relaunch, Manager folder authorization, and
 Autonomy run-start tests on macOS 27. The Manager test initially reproduced an
@@ -330,9 +339,13 @@ These results do not qualify every feature or close the remaining release gates.
 - **Managed provider setup:** Provider now saves endpoint, model and Keychain
   credential changes through authenticated manager controls. Save supports an
   offline server; Refresh Models and Test Connection separately verify the
-  saved configuration. The four native onboarding scenarios passed; complete
-  installed-stack and provider/autonomy qualification remain open. A successful
-  save or connection test alone does not qualify managed Autonomy.
+  saved configuration. Native v1 metadata remains authoritative; when it omits
+  loaded instances, Forge can reconcile only an exact model that native v0
+  reports as loaded with a valid context length. The current Xcode **My Mac**
+  candidate passed live discovery, connection, project-bound tool execution,
+  repaired-policy retry, and terminal completion. Installed-stack and protected
+  root-service qualification remain open. A successful save or connection test
+  alone does not qualify managed Autonomy.
 - **Provider continuity:** one real 131,072-token threshold rollover completed
   durable handoff, exact acknowledgment, predecessor sealing, successor `fs_read`,
   output consumption, injected crash recovery and stable replay. A second attempt
