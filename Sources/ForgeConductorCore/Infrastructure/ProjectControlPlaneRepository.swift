@@ -11804,7 +11804,7 @@ public actor ProjectControlPlaneRepository {
                      .waitingResource, .paused, .cancelRequested, .failedTerminal],
         .paused: [.validating, .ready, .recovering, .validatingCompletion,
                   .cancelRequested, .failedTerminal],
-        .blockedConfiguration: [.validating, .recovering, .paused,
+        .blockedConfiguration: [.validating, .recovering, .validatingCompletion, .paused,
                                 .cancelRequested, .failedTerminal],
         .failedRecoverable: [.recovering, .retryWait, .paused,
                              .cancelRequested, .failedTerminal],
