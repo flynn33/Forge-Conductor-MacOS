@@ -441,6 +441,14 @@ public actor ProjectControlPlaneRepository {
                         state: .staged,
                         connection: connection
                     )
+                case (.archived, .awaitingIdentityPublication):
+                    guard case .existing(let expectedGeneration) = controlExpectation,
+                          expectedGeneration == current.generation,
+                          current.repositoryFingerprint == fingerprint,
+                          transitionMetadata != nil,
+                          transitionAuthority != nil else {
+                        throw ProjectContextError.projectTransitionConflict(projectID)
+                    }
                 case (.maintenance, .active):
                     throw ProjectContextError.projectTransitionConflict(projectID)
                 default:
@@ -463,7 +471,7 @@ public actor ProjectControlPlaneRepository {
                 guard changed == 1 else {
                     throw ProjectContextError.projectTransitionConflict(projectID)
                 }
-                if priorLifecycle == .active,
+                if (priorLifecycle == .active || priorLifecycle == .archived),
                    disposition == .awaitingIdentityPublication,
                    let transitionMetadata,
                    let transitionAuthority {
@@ -1210,11 +1218,128 @@ public actor ProjectControlPlaneRepository {
             """
             SELECT project_id,display_name,canonical_root,generation,lifecycle_state,
                    repository_fingerprint,bookmark_reference,created_at,updated_at
-            FROM control_projects ORDER BY updated_at DESC,project_id DESC LIMIT ?
+            FROM control_projects
+            WHERE lifecycle_state!='archived'
+            ORDER BY updated_at DESC,project_id DESC LIMIT ?
             """,
             bindings: [.int64(Int64(limit))],
             map: Self.decodeProject
         )
+    }
+
+    /// Removes a project from active operator use without deleting its durable memory
+    /// or historical evidence. The generation advance permanently fences every prior
+    /// binding; a later registration may reactivate this identity at the new generation.
+    @discardableResult
+    public func archiveProject(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectArchiveReceipt {
+        try cancellation?.checkCancellation()
+        try Self.validate(expectedGeneration)
+        guard expectedGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectContextError.invalidGeneration(expectedGeneration.rawValue)
+        }
+        let next = ProjectGeneration(expectedGeneration.rawValue + 1)
+        let timestamp = ISO8601.string(from: clock.now())
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            guard let current = try projectUnlocked(projectID, connection: connection) else {
+                throw ProjectContextError.projectNotFound(projectID)
+            }
+            if current.lifecycleState == .archived,
+               current.generation == next {
+                return ProjectArchiveReceipt(
+                    projectID: projectID,
+                    priorGeneration: expectedGeneration,
+                    archivedGeneration: next,
+                    invalidatedBindingCount: 0,
+                    completedAt: current.updatedAt,
+                    replayed: true
+                )
+            }
+            guard current.generation == expectedGeneration else {
+                throw ProjectContextError.staleProjectGeneration(
+                    expected: expectedGeneration,
+                    actual: current.generation
+                )
+            }
+            guard current.lifecycleState == .active else {
+                throw ProjectContextError.projectNotActive(current.lifecycleState)
+            }
+            let activeRuns = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM autonomous_runs
+                WHERE project_id=? AND project_generation=?
+                  AND state NOT IN ('completed','cancelled','failed_terminal')
+                """,
+                bindings: [
+                    .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)),
+                ]
+            )
+            guard activeRuns == 0 else { throw ProjectContextError.projectRemovalBusy(projectID) }
+            let stagedTransitions = try connection.scalarInt(
+                "SELECT COUNT(*) FROM project_transition_authority WHERE project_id=? AND state='staged'",
+                bindings: [.text(projectID.description)]
+            )
+            guard stagedTransitions == 0 else {
+                throw ProjectContextError.projectTransitionConflict(projectID)
+            }
+            let invalidated = try connection.execute(
+                """
+                UPDATE project_bindings
+                SET active=0,lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+                WHERE project_id=? AND project_generation=? AND active=1
+                """,
+                bindings: [
+                    .text(timestamp), .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)),
+                ]
+            )
+            try revokeContinuityTasksUnlocked(
+                projectID: projectID,
+                generation: expectedGeneration,
+                taskID: nil,
+                timestamp: timestamp,
+                connection: connection
+            )
+            let changed = try connection.execute(
+                """
+                UPDATE control_projects
+                SET generation=?,lifecycle_state='archived',updated_at=?
+                WHERE project_id=? AND generation=? AND lifecycle_state='active'
+                """,
+                bindings: [
+                    .int64(try Self.sqliteGeneration(next)), .text(timestamp),
+                    .text(projectID.description),
+                    .int64(try Self.sqliteGeneration(expectedGeneration)),
+                ]
+            )
+            guard changed == 1 else {
+                throw ProjectContextError.projectTransitionConflict(projectID)
+            }
+            try appendEventUnlocked(
+                projectID: projectID,
+                eventType: "project_archived",
+                severity: "info",
+                summary: "Project registration was removed from active operator use",
+                metadata: [
+                    "prior_generation": String(expectedGeneration.rawValue),
+                    "archived_generation": String(next.rawValue),
+                    "invalidated_bindings": String(invalidated),
+                ],
+                connection: connection
+            )
+            return ProjectArchiveReceipt(
+                projectID: projectID,
+                priorGeneration: expectedGeneration,
+                archivedGeneration: next,
+                invalidatedBindingCount: invalidated,
+                completedAt: timestamp,
+                replayed: false
+            )
+        }
     }
 
     /// Active bindings are bounded per selected project so one busy project cannot crowd
@@ -9621,6 +9746,22 @@ public actor ProjectControlPlaneRepository {
         return try requiredConnection().all(
             Self.toolInvocationSelect
                 + " WHERE run_id=? AND state IN ('intent','executing','ambiguous') ORDER BY created_at LIMIT ?",
+            bindings: [.text(runID.description), .int64(Int64(limit))],
+            map: Self.decodeToolInvocation
+        )
+    }
+
+    /// Bounded complete invocation history used only by manager-owned completion
+    /// validators. Payloads remain bounded summaries already committed by the broker.
+    public func toolInvocations(
+        runID: RunID,
+        limit: Int = 1_024
+    ) throws -> [ToolInvocationRecord] {
+        guard (1...1_024).contains(limit) else {
+            throw AutonomyError.invalidRequest("tool invocation query limit must be between 1 and 1024")
+        }
+        return try requiredConnection().all(
+            Self.toolInvocationSelect + " WHERE run_id=? ORDER BY created_at,invocation_id LIMIT ?",
             bindings: [.text(runID.description), .int64(Int64(limit))],
             map: Self.decodeToolInvocation
         )

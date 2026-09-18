@@ -15,6 +15,14 @@ final class ProjectsViewModel: ObservableObject {
         var id: String { "\(projectID.lowercased()):\(generation)" }
     }
 
+    struct RemoveConfirmation: Sendable, Equatable, Identifiable {
+        let projectID: String
+        let displayName: String
+        let generation: UInt64
+
+        var id: String { "\(projectID.lowercased()):\(generation)" }
+    }
+
     struct ClearConfirmation: Sendable, Equatable, Identifiable {
         let operationID: UUID
         let projectID: String
@@ -48,6 +56,7 @@ final class ProjectsViewModel: ObservableObject {
 
     @Published private(set) var projects: [OperatorProject] = []
     @Published var selectedProjectID: String?
+    @Published private(set) var instructionQueue: OperatorInstructionQueue?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var notice: String?
@@ -163,6 +172,167 @@ final class ProjectsViewModel: ObservableObject {
             displayName: project.displayName,
             generation: project.projectGeneration
         )
+    }
+
+    func removeConfirmationForSelectedProject() -> RemoveConfirmation? {
+        guard !isLoading, let project = selectedProject else { return nil }
+        return RemoveConfirmation(
+            projectID: project.projectID,
+            displayName: project.displayName,
+            generation: project.projectGeneration
+        )
+    }
+
+    func loadInstructionQueue() {
+        guard !isLoading, let project = selectedProject else {
+            instructionQueue = nil
+            return
+        }
+        let identity = project.projectID
+        let generation = project.projectGeneration
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let queue = try await client.instructionQueue(
+                    projectID: identity,
+                    generation: generation
+                )
+                guard selectedProjectID?.caseInsensitiveCompare(identity) == .orderedSame else {
+                    return
+                }
+                instructionQueue = queue
+            } catch {
+                guard selectedProjectID?.caseInsensitiveCompare(identity) == .orderedSame else {
+                    return
+                }
+                instructionQueue = nil
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func removeProject(_ confirmation: RemoveConfirmation) {
+        guard !isLoading,
+              let current = selectedProject,
+              current.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame,
+              current.projectGeneration == confirmation.generation else {
+            errorMessage = "The selected project or generation changed. Confirm removal again."
+            return
+        }
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let receipt = try await client.removeProject(
+                    projectID: confirmation.projectID,
+                    generation: confirmation.generation
+                )
+                projects.removeAll {
+                    $0.projectID.caseInsensitiveCompare(confirmation.projectID) == .orderedSame
+                }
+                selectedProjectID = projects.first?.projectID
+                instructionQueue = nil
+                notice = "Removed \(confirmation.displayName) from Projects and fenced generation \(receipt.priorGeneration). Its durable memory and history remain available if the repository is registered again."
+                lastUpdated = Date()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
+    }
+
+    func importInstructionPackage(path: String) {
+        guard !isLoading, let project = selectedProject else { return }
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                instructionQueue = try await client.importInstructionPackage(
+                    projectID: project.projectID,
+                    generation: project.projectGeneration,
+                    sourcePath: path
+                )
+                notice = "Added the instruction package to \(project.displayName). Drag packages to set autonomous execution order."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
+    }
+
+    func reorderInstructionPackages(_ packageIDs: [String]) {
+        guard !isLoading, let project = selectedProject,
+              let queue = instructionQueue,
+              packageIDs != queue.packages.map(\.id) else { return }
+        isLoading = true
+        errorMessage = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                instructionQueue = try await client.reorderInstructionPackages(
+                    projectID: project.projectID,
+                    generation: project.projectGeneration,
+                    packageIDs: packageIDs,
+                    expectedRevision: queue.revision
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+                loadInstructionQueue()
+            }
+            isLoading = false
+        }
+    }
+
+    func removeInstructionPackage(_ packageID: String) {
+        guard !isLoading, let project = selectedProject else { return }
+        isLoading = true
+        errorMessage = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                instructionQueue = try await client.removeInstructionPackage(
+                    projectID: project.projectID,
+                    generation: project.projectGeneration,
+                    packageID: packageID
+                )
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
+    }
+
+    func toggleInstructionQueue() {
+        guard !isLoading, let project = selectedProject,
+              let queue = instructionQueue else { return }
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                if queue.running {
+                    instructionQueue = try await client.stopInstructionQueue(
+                        projectID: project.projectID,
+                        generation: project.projectGeneration
+                    )
+                    notice = "Stopped automatic package advancement. The active run, if any, remains visible in Autonomy."
+                } else {
+                    instructionQueue = try await client.startInstructionQueue(
+                        projectID: project.projectID,
+                        generation: project.projectGeneration
+                    )
+                    notice = "Started ordered autonomy for \(project.displayName)."
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
     }
 
     func clearConfirmationForSelectedProject(

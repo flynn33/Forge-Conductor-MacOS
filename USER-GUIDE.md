@@ -233,6 +233,39 @@ scope, units, persistence and requested/effective behavior.
 
 LM Studio only starts the `serve` processes when a chat has those MCP servers selected. Idle “MCP not running” on the dashboard with no chat open is expected.
 
+### Managed project setup and ordered instruction packages
+
+The built-in setup guide opens on first launch and remains available from the
+question-mark toolbar button. For a Forge-managed autonomous queue:
+
+1. Start LM Studio's local server with a loaded tool-capable model.
+2. In **Provider**, save the loopback endpoint and loaded model, then run the
+   connection and contract checks. Provider is the manager-owned connection
+   Forge uses to create model sessions; it is separate from the MCP servers
+   enabled in an ordinary LM Studio desktop chat.
+3. In **Manager**, add the repository or its parent directory to **Allowed
+   Roots**, apply the settings, and start the manager if it is stopped.
+4. In **Projects**, register the local repository folder.
+5. Under **Instruction packages**, add a Markdown/text file, a folder of
+   instructions, or a `.forgepackage`/`forge-package.json` manifest. Drag rows
+   up or down to establish the execution order.
+6. Choose **Start Ordered Autonomy**. Forge starts one managed run at a time for
+   that project and advances only when the prior package completes. A failed,
+   cancelled, paused, or configuration-blocked run stops advancement.
+
+Each accepted package is copied to protected, content-addressed storage and
+bound to the selected project UUID and generation. The model's filesystem scope
+is the registered repository, even when the imported instruction file lives
+elsewhere. **Stop Queue** prevents the next package from starting while leaving
+an already admitted run visible in **Autonomy**.
+
+Use **Remove Project…** to remove a registration from the Projects tab. Removal
+advances the project generation and invalidates bindings; durable project memory
+and historical run evidence remain. Registering the same repository again
+reconnects its durable identity. Package formats, manifest fields, limits, and
+storage behavior are documented in
+[Project instruction packages](docs/INSTRUCTION-PACKAGES.md).
+
 ---
 
 ## 6. Continuity (packet automation and current boundary)

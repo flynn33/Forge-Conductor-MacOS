@@ -52,6 +52,40 @@ Its GUI bundle was not launched or installed. This is an unshipped local
 development candidate that predates the published repair revision, not a current
 Developer ID or privileged-service qualification artifact.
 
+### Project removal, ordered instruction packages, and setup guide
+
+- Added **Remove Project…** to the Projects tab. The authenticated manager
+  archive operation advances the project generation, invalidates bindings,
+  revokes continuity authority, closes the open memory store, hides the
+  registration, and preserves durable memory and historical evidence. Exact
+  retries are idempotent, and unsettled autonomous runs block removal.
+- Added project-scoped instruction package ingestion for Markdown/text files,
+  document folders, `.forgepackage` files, and manifest folders. Accepted input
+  is bounded, rejects symbolic links and path traversal, and is copied into an
+  owner-only content-addressed snapshot before the queue record is published.
+- Added a durable queue to the Projects tab with native drag ordering, package
+  removal, and **Start Ordered Autonomy** / **Stop Queue** controls. The queue
+  binds every package to the registered project UUID and generation, starts one
+  managed LM Studio run at a time, and advances only after the prior run reaches
+  completed. Failure, cancellation, pause, or configuration blocking stops
+  automatic advancement.
+- Added the fixed manager-owned `forge.package.tool-success` completion gate for
+  ordinary instruction documents. It accepts only bounded, broker-committed
+  successful tool results from the exact run/project generation; model text and
+  caller-selected hashes do not approve completion.
+- Added a first-launch setup tutorial, permanently reopenable from the toolbar,
+  that explains LM Studio server setup, Provider endpoint/model selection,
+  Manager allowed roots, project registration, instruction package formats,
+  drag ordering, and queue execution.
+- Matched the Xcode Manager test bundle to the existing Apple Development team
+  so My Mac service tests exercise the same signed runtime-launch identity gate
+  as the development application and helper.
+- Added the [project instruction package guide](docs/INSTRUCTION-PACKAGES.md),
+  updated the README and user guide, and synchronized the two new Swift sources
+  with the canonical Xcode project. Focused queue, completion-gate, project
+  archive, typed operator-client, SwiftPM app build, and Xcode validation are
+  recorded with this change; distribution and shipment remain separate.
+
 ### LM Studio loaded-state and completion retry
 
 - Reconciled LM Studio's native model inventories when `/api/v1/models`

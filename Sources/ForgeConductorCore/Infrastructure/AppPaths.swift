@@ -79,6 +79,17 @@ public final class AppPaths: @unchecked Sendable {
     public var managedProvidersDir: URL {
         home.appendingPathComponent("managed-providers", isDirectory: true)
     }
+    /// Immutable instruction content and its durable project-scoped queue.
+    /// Provider tools receive only the accepted snapshot, never the selected source path.
+    public var instructionPackagesDir: URL {
+        home.appendingPathComponent("instruction-packages", isDirectory: true)
+    }
+    public var instructionPackageStoreDir: URL {
+        instructionPackagesDir.appendingPathComponent("Store", isDirectory: true)
+    }
+    public var instructionPackageQueue: URL {
+        instructionPackagesDir.appendingPathComponent("queue.json")
+    }
 
     @discardableResult
     public func ensureLayout() throws -> URL {
@@ -86,7 +97,8 @@ public final class AppPaths: @unchecked Sendable {
         for dir in [
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
             memoryDir, memoryHandoffsDir, projectsDir, runtimeArtifactsDir,
-            managedProvidersDir, configMigrationsDir,
+            managedProvidersDir, instructionPackagesDir, instructionPackageStoreDir,
+            configMigrationsDir,
             cacheDir.appendingPathComponent("browser", isDirectory: true),
         ] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)

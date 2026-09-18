@@ -195,6 +195,77 @@ struct OperatorResetReceipt: Decodable, Sendable, Equatable {
     }
 }
 
+struct OperatorProjectArchiveReceipt: Decodable, Sendable, Equatable {
+    let projectID: String
+    let priorGeneration: UInt64
+    let archivedGeneration: UInt64
+    let invalidatedBindingCount: Int
+    let completedAt: String
+    let replayed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case priorGeneration = "prior_generation"
+        case archivedGeneration = "archived_generation"
+        case invalidatedBindingCount = "invalidated_binding_count"
+        case completedAt = "completed_at"
+        case replayed
+    }
+}
+
+struct OperatorInstructionPackage: Decodable, Sendable, Equatable, Identifiable {
+    let id: String
+    let projectID: String
+    let projectGeneration: UInt64
+    let packageID: String
+    let version: String
+    let displayName: String
+    let mission: String
+    let sourcePath: String
+    let contentSHA256: String
+    let allowedTools: [String]
+    let completionGates: [String]
+    let position: Int
+    let state: String
+    let runID: String?
+    let lastError: String?
+    let createdAt: String
+    let updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case packageID = "package_id"
+        case version
+        case displayName = "display_name"
+        case mission
+        case sourcePath = "source_path"
+        case contentSHA256 = "content_sha256"
+        case allowedTools = "allowed_tools"
+        case completionGates = "completion_gates"
+        case position, state
+        case runID = "run_id"
+        case lastError = "last_error"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct OperatorInstructionQueue: Decodable, Sendable, Equatable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let revision: UInt64
+    let running: Bool
+    let packages: [OperatorInstructionPackage]
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case revision, running, packages
+    }
+}
+
 enum OperatorProjectContentClearMode: String, Codable, Sendable, CaseIterable, Identifiable {
     case memory
     case continuity

@@ -99,6 +99,30 @@ cannot silently replace that configuration. The router forwards these controls
 to the current manager after replacement. See the
 [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
 
+## Project instruction queue ownership
+
+`ProjectInstructionQueueStore` owns bounded instruction ingestion and queue
+metadata. A selected file or directory is validated without following symbolic
+links, hashed, and copied to an owner-only content-addressed snapshot before an
+atomic queue-file commit makes it visible. Every record carries the project UUID
+and generation; the autonomous run receives the registered repository root as
+its tool scope rather than authority over the instruction source location.
+
+`ManagerNode` is the single scheduler. Its existing bounded autonomy watchdog
+reconciles durable package/run links, observes terminal run state, and starts at
+most the next queued package for a project. The run identifier is persisted in
+the package queue before creation, so a restart can replay the exact idempotent
+run request. Completed runs advance the queue. Failure, cancellation, pause, or
+configuration blocking stops it. The compiled
+`forge.package.tool-success` validator accepts only bounded durable tool results
+for the exact run/project generation.
+
+Project generation reset cancels unfinished records from the old generation.
+Project removal archives the control-plane identity, advances its generation,
+invalidates bindings, and removes its active queue metadata while leaving
+project memory and historical run evidence intact. See the
+[instruction package guide](INSTRUCTION-PACKAGES.md).
+
 ## LM Studio fail-forward lifecycle
 
 ```text
@@ -198,6 +222,8 @@ and synthetic-host results remain accurately distinguished from the live result.
 - `agents/*.md` for replaceable playbook modules
 - `memory/handoffs/*` and `memory/current-task.md` as rebuildable continuity projections
 - `config.json` for local configuration
+- `instruction-packages/Store/<sha256>/` for immutable accepted instruction content
+- `instruction-packages/queue.json` for the owner-only project package order and durable run links
 
 ## Build and run
 

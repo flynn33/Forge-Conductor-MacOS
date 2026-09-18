@@ -7,6 +7,58 @@ import SQLite3
 @testable import ForgeConductorCore
 
 final class ProjectControlPlaneRepositoryTests: XCTestCase {
+    func testArchiveProjectHidesRegistrationAndFencesExistingBinding() async throws {
+        try await withRepository { repository, root in
+            let projectID = ProjectID()
+            let projectRoot = root.appendingPathComponent("archived-project", isDirectory: true)
+            let project = try await repository.registerProjectUnchecked(
+                projectID: projectID,
+                displayName: "Archived Project",
+                canonicalRoot: projectRoot,
+                repositoryFingerprint: "repository-fingerprint"
+            )
+            let owner = ProjectBindingOwner(kind: .guiSelection, id: "projects-tab")
+            _ = try await repository.bind(
+                owner: owner,
+                projectID: projectID,
+                generation: project.generation,
+                authorizationScope: scope(root: projectRoot)
+            )
+
+            let receipt = try await repository.archiveProject(
+                projectID: projectID,
+                expectedGeneration: project.generation
+            )
+
+            XCTAssertEqual(receipt.projectID, projectID)
+            XCTAssertEqual(receipt.priorGeneration, .initial)
+            XCTAssertEqual(receipt.archivedGeneration, ProjectGeneration(2))
+            XCTAssertEqual(receipt.invalidatedBindingCount, 1)
+            XCTAssertFalse(receipt.replayed)
+            let operatorProjects = try await repository.operatorProjects(limit: 10)
+            XCTAssertTrue(operatorProjects.isEmpty)
+            let archivedValue = try await repository.project(projectID)
+            let archived = try XCTUnwrap(archivedValue)
+            XCTAssertEqual(archived.lifecycleState, .archived)
+            XCTAssertEqual(archived.generation, ProjectGeneration(2))
+            let archivedBinding = try await repository.binding(
+                for: owner,
+                includeInactive: true
+            )
+            XCTAssertEqual(
+                archivedBinding?.active,
+                false
+            )
+
+            let replay = try await repository.archiveProject(
+                projectID: projectID,
+                expectedGeneration: .initial
+            )
+            XCTAssertTrue(replay.replayed)
+            XCTAssertEqual(replay.archivedGeneration, ProjectGeneration(2))
+        }
+    }
+
     func testLockedRegistrationHonorsCancellationAndDeadlineWithoutPartialWrite() async throws {
         try await withRepository(busyTimeoutMilliseconds: 3_000) { repository, root in
             let writeLock = try ControlPlaneWriteLock(

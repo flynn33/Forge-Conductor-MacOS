@@ -1104,6 +1104,101 @@ final class ManagerTests: XCTestCase {
         XCTAssertNotNil(replay["reset_receipt"] as? [String: Any])
     }
 
+    func testInstructionPackageAndProjectRemovalRoutesPersistExactProjectOrder() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = Int.random(in: 39_001...49_000)
+        try app.config.update([
+            "dashboard": ["port": port] as [String: Any],
+            "allowed_roots": [home.path],
+        ], save: true)
+        let projectRoot = home.appendingPathComponent("instruction-route-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        try writeGitRemote("ssh://git@example.test/team/instruction-route.git", to: projectRoot)
+        let firstDocument = projectRoot.appendingPathComponent("first.md")
+        let secondDocument = projectRoot.appendingPathComponent("second.md")
+        try Data("First package mission".utf8).write(to: firstDocument)
+        try Data("Second package mission".utf8).write(to: secondDocument)
+
+        let node = ManagerNode(app: app)
+        defer {
+            _ = try? node.stopService()
+            app.shutdown()
+        }
+        let registered = try node.registerProject(path: projectRoot.path, displayName: "Instruction Routes")
+        let projectID = try XCTUnwrap(registered["project_id"] as? String)
+        _ = try node.startService()
+        try await Task.sleep(for: .milliseconds(150))
+
+        let credential = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
+        let base = "http://127.0.0.1:\(port)"
+        func post(
+            _ path: String,
+            _ object: [String: Any],
+            expectedStatus: Int = 200
+        ) throws -> [String: Any] {
+            var request = URLRequest(url: try XCTUnwrap(URL(string: base + path)))
+            request.httpMethod = "POST"
+            request.httpBody = try JSONSupport.data(from: object)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try HTTPTestHelpers.fetch(request)
+            XCTAssertEqual(response.statusCode, expectedStatus)
+            return try JSONSupport.object(from: data)
+        }
+        let projectRequest: [String: Any] = [
+            "project_id": projectID,
+            "project_generation": UInt64(1),
+        ]
+
+        let firstImport = try post(
+            "/api/manager/projects/instruction-packages/import",
+            projectRequest.merging(["source_path": firstDocument.path]) { _, source in source }
+        )
+        XCTAssertEqual((firstImport["packages"] as? [[String: Any]])?.count, 1)
+        let secondImport = try post(
+            "/api/manager/projects/instruction-packages/import",
+            projectRequest.merging(["source_path": secondDocument.path]) { _, source in source }
+        )
+        let importedPackages = try XCTUnwrap(secondImport["packages"] as? [[String: Any]])
+        XCTAssertEqual(importedPackages.map { $0["display_name"] as? String }, ["first", "second"])
+        let importedIDs = try importedPackages.map { try XCTUnwrap($0["id"] as? String) }
+        let revision = try XCTUnwrap((secondImport["revision"] as? NSNumber)?.uint64Value)
+
+        let reordered = try post(
+            "/api/manager/projects/instruction-packages/reorder",
+            projectRequest.merging([
+                "package_ids": Array(importedIDs.reversed()),
+                "expected_revision": revision,
+            ]) { _, value in value }
+        )
+        XCTAssertEqual(
+            (reordered["packages"] as? [[String: Any]])?.compactMap { $0["id"] as? String },
+            Array(importedIDs.reversed())
+        )
+        let refreshed = try post("/api/manager/projects/instruction-packages", projectRequest)
+        XCTAssertEqual(
+            (refreshed["packages"] as? [[String: Any]])?.compactMap { $0["id"] as? String },
+            Array(importedIDs.reversed())
+        )
+
+        let removed = try post("/api/manager/projects/remove", projectRequest)
+        XCTAssertEqual(removed["project_id"] as? String, projectID)
+        XCTAssertEqual((removed["prior_generation"] as? NSNumber)?.uint64Value, 1)
+        XCTAssertEqual((removed["archived_generation"] as? NSNumber)?.uint64Value, 2)
+        let unavailableQueue = try post(
+            "/api/manager/projects/instruction-packages",
+            projectRequest,
+            expectedStatus: 409
+        )
+        XCTAssertEqual(unavailableQueue["ok"] as? Bool, false)
+        let snapshot = try HTTPTestHelpers.fetchJSON(
+            try XCTUnwrap(URL(string: base + "/api/manager/operator/snapshot?limit=10"))
+        )
+        XCTAssertFalse((snapshot["projects"] as? [[String: Any]] ?? []).contains {
+            $0["project_id"] as? String == projectID
+        })
+    }
+
     func testOperatorSnapshotSerializesPersistedContinuityCheckpointAndAcknowledgement() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }

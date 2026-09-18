@@ -13,7 +13,27 @@ protocol OperatorManagerClientProtocol: Sendable {
         _ request: OperatorProjectRegistrationRequest
     ) async throws -> OperatorProjectRegistrationOutcome
     func projectStatus(projectID: String) async throws -> OperatorProject
+    func removeProject(projectID: String, generation: UInt64) async throws -> OperatorProjectArchiveReceipt
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt
+    func instructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue
+    func importInstructionPackage(
+        projectID: String,
+        generation: UInt64,
+        sourcePath: String
+    ) async throws -> OperatorInstructionQueue
+    func reorderInstructionPackages(
+        projectID: String,
+        generation: UInt64,
+        packageIDs: [String],
+        expectedRevision: UInt64
+    ) async throws -> OperatorInstructionQueue
+    func removeInstructionPackage(
+        projectID: String,
+        generation: UInt64,
+        packageID: String
+    ) async throws -> OperatorInstructionQueue
+    func startInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue
+    func stopInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue
     func clearProjectContent(
         operationID: UUID,
         projectID: String,
@@ -39,6 +59,48 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func removeProject(projectID: String, generation: UInt64) async throws -> OperatorProjectArchiveReceipt {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Project removal is unavailable from this manager client."
+        )
+    }
+
+    func instructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Instruction packages are unavailable from this manager client."
+        )
+    }
+
+    func importInstructionPackage(projectID: String, generation: UInt64, sourcePath: String) async throws -> OperatorInstructionQueue {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Instruction package import is unavailable from this manager client."
+        )
+    }
+
+    func reorderInstructionPackages(projectID: String, generation: UInt64, packageIDs: [String], expectedRevision: UInt64) async throws -> OperatorInstructionQueue {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Instruction package ordering is unavailable from this manager client."
+        )
+    }
+
+    func removeInstructionPackage(projectID: String, generation: UInt64, packageID: String) async throws -> OperatorInstructionQueue {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Instruction package removal is unavailable from this manager client."
+        )
+    }
+
+    func startInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Ordered autonomy is unavailable from this manager client."
+        )
+    }
+
+    func stopInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Ordered autonomy is unavailable from this manager client."
+        )
+    }
+
     func clearProjectContent(
         operationID: UUID,
         projectID: String,
@@ -247,6 +309,178 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             )
         }
         return project
+    }
+
+    func removeProject(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> OperatorProjectArchiveReceipt {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        let receipt: OperatorProjectArchiveReceipt = try await request(
+            method: "POST",
+            path: "/api/manager/projects/remove",
+            body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation),
+            timeoutInterval: 12
+        )
+        guard receipt.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              receipt.priorGeneration == generation,
+              receipt.archivedGeneration == generation + 1,
+              receipt.invalidatedBindingCount >= 0 else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project removal receipt did not match the selected project generation"
+            )
+        }
+        return receipt
+    }
+
+    func instructionQueue(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> OperatorInstructionQueue {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        let queue: OperatorInstructionQueue = try await request(
+            method: "POST",
+            path: "/api/manager/projects/instruction-packages",
+            body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation)
+        )
+        return try validated(queue, projectID: projectID, generation: generation)
+    }
+
+    func importInstructionPackage(
+        projectID: String,
+        generation: UInt64,
+        sourcePath: String
+    ) async throws -> OperatorInstructionQueue {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
+              (sourcePath as NSString).isAbsolutePath else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction package path must be a bounded absolute path"
+            )
+        }
+        let queue: OperatorInstructionQueue = try await request(
+            method: "POST",
+            path: "/api/manager/projects/instruction-packages/import",
+            body: InstructionPackageImportBody(
+                projectID: projectID,
+                projectGeneration: generation,
+                sourcePath: sourcePath
+            ),
+            timeoutInterval: 12
+        )
+        return try validated(queue, projectID: projectID, generation: generation)
+    }
+
+    func reorderInstructionPackages(
+        projectID: String,
+        generation: UInt64,
+        packageIDs: [String],
+        expectedRevision: UInt64
+    ) async throws -> OperatorInstructionQueue {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        guard packageIDs.count <= ProjectInstructionQueueStore.maximumPackages,
+              Set(packageIDs.map { $0.lowercased() }).count == packageIDs.count,
+              packageIDs.allSatisfy({ UUID(uuidString: $0) != nil }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction package order must contain each package UUID once"
+            )
+        }
+        let queue: OperatorInstructionQueue = try await request(
+            method: "POST",
+            path: "/api/manager/projects/instruction-packages/reorder",
+            body: InstructionPackageReorderBody(
+                projectID: projectID,
+                projectGeneration: generation,
+                packageIDs: packageIDs,
+                expectedRevision: expectedRevision
+            )
+        )
+        return try validated(queue, projectID: projectID, generation: generation)
+    }
+
+    func removeInstructionPackage(
+        projectID: String,
+        generation: UInt64,
+        packageID: String
+    ) async throws -> OperatorInstructionQueue {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        guard UUID(uuidString: packageID) != nil else {
+            throw OperatorManagerClientError.invalidPayload("instruction package identifier must be a UUID")
+        }
+        let queue: OperatorInstructionQueue = try await request(
+            method: "POST",
+            path: "/api/manager/projects/instruction-packages/remove",
+            body: InstructionPackageIdentityBody(
+                projectID: projectID,
+                projectGeneration: generation,
+                packageID: packageID
+            )
+        )
+        return try validated(queue, projectID: projectID, generation: generation)
+    }
+
+    func startInstructionQueue(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> OperatorInstructionQueue {
+        try await instructionQueueCommand(
+            "start", projectID: projectID, generation: generation
+        )
+    }
+
+    func stopInstructionQueue(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> OperatorInstructionQueue {
+        try await instructionQueueCommand(
+            "stop", projectID: projectID, generation: generation
+        )
+    }
+
+    private func instructionQueueCommand(
+        _ action: String,
+        projectID: String,
+        generation: UInt64
+    ) async throws -> OperatorInstructionQueue {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        let queue: OperatorInstructionQueue = try await request(
+            method: "POST",
+            path: "/api/manager/projects/instruction-packages/\(action)",
+            body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation),
+            timeoutInterval: 12
+        )
+        return try validated(queue, projectID: projectID, generation: generation)
+    }
+
+    private func validateProjectGeneration(projectID: String, generation: UInt64) throws {
+        guard UUID(uuidString: projectID) != nil,
+              generation > 0,
+              generation < UInt64(Int64.max) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "project command requires one valid project identity and generation"
+            )
+        }
+    }
+
+    private func validated(
+        _ queue: OperatorInstructionQueue,
+        projectID: String,
+        generation: UInt64
+    ) throws -> OperatorInstructionQueue {
+        guard queue.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              queue.projectGeneration == generation,
+              queue.packages.count <= ProjectInstructionQueueStore.maximumPackages,
+              queue.packages.enumerated().allSatisfy({ index, package in
+                  package.projectID.caseInsensitiveCompare(projectID) == .orderedSame
+                      && package.projectGeneration == generation
+                      && UUID(uuidString: package.id) != nil
+                      && package.position == index
+              }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction queue response did not match the selected project and order"
+            )
+        }
+        return queue
     }
 
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt {
@@ -570,7 +804,14 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
         throw error
     }
     func projectStatus(projectID: String) async throws -> OperatorProject { throw error }
+    func removeProject(projectID: String, generation: UInt64) async throws -> OperatorProjectArchiveReceipt { throw error }
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt { throw error }
+    func instructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue { throw error }
+    func importInstructionPackage(projectID: String, generation: UInt64, sourcePath: String) async throws -> OperatorInstructionQueue { throw error }
+    func reorderInstructionPackages(projectID: String, generation: UInt64, packageIDs: [String], expectedRevision: UInt64) async throws -> OperatorInstructionQueue { throw error }
+    func removeInstructionPackage(projectID: String, generation: UInt64, packageID: String) async throws -> OperatorInstructionQueue { throw error }
+    func startInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue { throw error }
+    func stopInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue { throw error }
     func clearProjectContent(
         operationID: UUID,
         projectID: String,
@@ -642,8 +883,45 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.projectStatus(projectID: projectID)
     }
 
+    func removeProject(projectID: String, generation: UInt64) async throws -> OperatorProjectArchiveReceipt {
+        try await current.removeProject(projectID: projectID, generation: generation)
+    }
+
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt {
         try await current.resetProject(projectID: projectID, generation: generation)
+    }
+
+    func instructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
+        try await current.instructionQueue(projectID: projectID, generation: generation)
+    }
+
+    func importInstructionPackage(projectID: String, generation: UInt64, sourcePath: String) async throws -> OperatorInstructionQueue {
+        try await current.importInstructionPackage(projectID: projectID, generation: generation, sourcePath: sourcePath)
+    }
+
+    func reorderInstructionPackages(projectID: String, generation: UInt64, packageIDs: [String], expectedRevision: UInt64) async throws -> OperatorInstructionQueue {
+        try await current.reorderInstructionPackages(
+            projectID: projectID,
+            generation: generation,
+            packageIDs: packageIDs,
+            expectedRevision: expectedRevision
+        )
+    }
+
+    func removeInstructionPackage(projectID: String, generation: UInt64, packageID: String) async throws -> OperatorInstructionQueue {
+        try await current.removeInstructionPackage(
+            projectID: projectID,
+            generation: generation,
+            packageID: packageID
+        )
+    }
+
+    func startInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
+        try await current.startInstructionQueue(projectID: projectID, generation: generation)
+    }
+
+    func stopInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
+        try await current.stopInstructionQueue(projectID: projectID, generation: generation)
     }
 
     func clearProjectContent(
@@ -726,6 +1004,41 @@ private struct ProjectGenerationBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
+    }
+}
+
+private struct InstructionPackageImportBody: Encodable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let sourcePath: String
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case sourcePath = "source_path"
+    }
+}
+
+private struct InstructionPackageReorderBody: Encodable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let packageIDs: [String]
+    let expectedRevision: UInt64
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case packageIDs = "package_ids"
+        case expectedRevision = "expected_revision"
+    }
+}
+
+private struct InstructionPackageIdentityBody: Encodable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let packageID: String
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case packageID = "package_id"
     }
 }
 

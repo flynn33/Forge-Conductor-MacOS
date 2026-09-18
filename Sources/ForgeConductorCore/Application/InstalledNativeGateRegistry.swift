@@ -232,6 +232,22 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
         guard !stopped, active.count < 4 else {
             return try blocked(run, summary: "Native validation is stopped or at its concurrency limit")
         }
+        if run.specification.completionGates == [ProjectInstructionQueueStore.builtInCompletionGate] {
+            let invocations = try await repository.toolInvocations(runID: run.runID, limit: 257)
+            let validator = CompletionGateValidator(
+                gate: ProjectInstructionQueueStore.builtInCompletionGate,
+                version: 1
+            ) { current in
+                ProjectInstructionCompletionGate.result(
+                    run: current,
+                    invocations: invocations
+                )
+            }
+            return try await GateValidatorRegistry(
+                validators: [validator],
+                clock: clock
+            ).validate(run)
+        }
         let activation = UUID()
         active[activation] = []
         do {
@@ -336,5 +352,57 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
         }
         return try GateValidatorRegistry(validators: validators, clock: clock,
                                         acceptancePolicy: .correction001(caseBindings: policy.correctionCaseBindings))
+    }
+}
+
+/// Fixed manager-owned validator for quick instruction packages. It accepts only
+/// broker-committed successful tool results from the exact run. Model text and
+/// model-selected hashes have no approval authority.
+enum ProjectInstructionCompletionGate {
+    static func result(
+        run: AutonomousRunRecord,
+        invocations: [ToolInvocationRecord]
+    ) -> CompletionGateResult {
+        let exact = invocations.filter {
+            $0.runID == run.runID
+                && $0.projectID == run.projectID
+                && $0.projectGeneration == run.projectGeneration
+        }
+        guard !exact.isEmpty else {
+            return CompletionGateResult(
+                gate: ProjectInstructionQueueStore.builtInCompletionGate,
+                passed: false,
+                summary: "The package requested completion without a committed project tool result"
+            )
+        }
+        guard exact.count <= 256 else {
+            return CompletionGateResult(
+                gate: ProjectInstructionQueueStore.builtInCompletionGate,
+                passed: false,
+                summary: "The package exceeded the bounded completion evidence limit"
+            )
+        }
+        for invocation in exact {
+            guard invocation.state == .completed,
+                  invocation.lastErrorCode == nil,
+                  invocation.lastErrorSummary == nil,
+                  let summary = invocation.resultSummary,
+                  let data = summary.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  object["ok"] as? Bool == true,
+                  object["is_error"] as? Bool == false else {
+                return CompletionGateResult(
+                    gate: ProjectInstructionQueueStore.builtInCompletionGate,
+                    passed: false,
+                    summary: "At least one package tool invocation is unresolved or failed"
+                )
+            }
+        }
+        return CompletionGateResult(
+            gate: ProjectInstructionQueueStore.builtInCompletionGate,
+            passed: true,
+            summary: "Every durable package tool invocation completed successfully",
+            evidenceReferences: exact.compactMap(\.resultSHA256)
+        )
     }
 }

@@ -66,15 +66,18 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
     let registration: OperatorProjectRegistrationOutcome
     let status: OperatorProject
     let resetReceipt: OperatorResetReceipt
+    let archiveReceipt: OperatorProjectArchiveReceipt?
 
     init(
         registration: OperatorProjectRegistrationOutcome,
         status: OperatorProject,
-        resetReceipt: OperatorResetReceipt
+        resetReceipt: OperatorResetReceipt,
+        archiveReceipt: OperatorProjectArchiveReceipt? = nil
     ) {
         self.registration = registration
         self.status = status
         self.resetReceipt = resetReceipt
+        self.archiveReceipt = archiveReceipt
     }
 
     func snapshot(limit: Int, cursor: String?) async throws -> OperatorSnapshot {
@@ -97,6 +100,13 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
         projectID: String,
         generation: UInt64
     ) async throws -> OperatorResetReceipt { resetReceipt }
+    func removeProject(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> OperatorProjectArchiveReceipt {
+        guard let archiveReceipt else { throw OperatorProjectContractFixtureError.unexpectedCall }
+        return archiveReceipt
+    }
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -137,6 +147,77 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
 }
 
 final class OperatorProjectContractTests: XCTestCase {
+    func testProjectRemovalAndInstructionQueueUseTypedManagerContracts() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let packageID = UUID().uuidString.lowercased()
+        let queue: [String: Any] = [
+            "ok": true,
+            "project_id": projectID,
+            "project_generation": 3,
+            "revision": 8,
+            "running": false,
+            "packages": [[
+                "id": packageID,
+                "project_id": projectID,
+                "project_generation": 3,
+                "package_id": "first-package",
+                "version": "1",
+                "display_name": "First Package",
+                "mission": "Complete the first package.",
+                "source_path": "/tmp/first.md",
+                "content_sha256": String(repeating: "a", count: 64),
+                "allowed_tools": ["fs_read"],
+                "completion_gates": ["forge.package.tool-success"],
+                "position": 0,
+                "state": "queued",
+                "created_at": "2026-09-18T00:00:00Z",
+                "updated_at": "2026-09-18T00:00:00Z",
+            ]],
+        ]
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/projects/remove": try JSONSupport.data(from: [
+                "ok": true,
+                "project_id": projectID,
+                "prior_generation": 3,
+                "archived_generation": 4,
+                "invalidated_binding_count": 2,
+                "completed_at": "2026-09-18T00:00:00Z",
+                "replayed": false,
+            ]),
+            "/api/manager/projects/instruction-packages": try JSONSupport.data(from: queue),
+            "/api/manager/projects/instruction-packages/start": try JSONSupport.data(
+                from: queue.merging(["running": true]) { _, latest in latest }
+            ),
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        )
+
+        let loaded = try await client.instructionQueue(projectID: projectID, generation: 3)
+        XCTAssertEqual(loaded.packages.map(\.id), [packageID])
+        XCTAssertEqual(loaded.packages.first?.position, 0)
+        let started = try await client.startInstructionQueue(projectID: projectID, generation: 3)
+        XCTAssertTrue(started.running)
+        let removed = try await client.removeProject(projectID: projectID, generation: 3)
+        XCTAssertEqual(removed.archivedGeneration, 4)
+        XCTAssertEqual(removed.invalidatedBindingCount, 2)
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedPaths(),
+            [
+                "/api/manager/projects/instruction-packages",
+                "/api/manager/projects/instruction-packages/start",
+                "/api/manager/projects/remove",
+            ]
+        )
+    }
+
     func testCommittedRegistrationFetchesFullProjectWithoutLosingReconciledFlag() async throws {
         let projectID = UUID().uuidString.lowercased()
         let project = try Self.project(
@@ -242,6 +323,48 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedProject?.resetReceipt?.newGeneration, 8)
         XCTAssertEqual(viewModel.selectedProject?.bindings.count, 1)
         XCTAssertEqual(viewModel.selectedProject?.continuity?.state, "queued")
+    }
+
+    @MainActor
+    func testProjectsViewModelRemovesConfirmedProjectFromVisibleList() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let project = try Self.project(
+            projectID: projectID,
+            generation: 7,
+            root: "/tmp/operator-project",
+            resetPriorGeneration: 6
+        )
+        let client = OperatorProjectContractClient(
+            registration: .committed(project: project, reconciled: false),
+            status: project,
+            resetReceipt: OperatorResetReceipt(
+                projectID: projectID,
+                priorGeneration: 7,
+                newGeneration: 8,
+                invalidatedBindingCount: 0,
+                completedAt: "2026-09-18T00:00:00Z"
+            ),
+            archiveReceipt: OperatorProjectArchiveReceipt(
+                projectID: projectID,
+                priorGeneration: 7,
+                archivedGeneration: 8,
+                invalidatedBindingCount: 1,
+                completedAt: "2026-09-18T00:00:00Z",
+                replayed: false
+            )
+        )
+        let viewModel = ProjectsViewModel(client: client)
+
+        viewModel.register(path: project.canonicalRoot, displayName: project.displayName)
+        try await Self.waitUntilIdle(viewModel)
+        let confirmation = try XCTUnwrap(viewModel.removeConfirmationForSelectedProject())
+        viewModel.removeProject(confirmation)
+        try await Self.waitUntilIdle(viewModel)
+
+        XCTAssertTrue(viewModel.projects.isEmpty)
+        XCTAssertNil(viewModel.selectedProjectID)
+        XCTAssertNil(viewModel.instructionQueue)
+        XCTAssertTrue(viewModel.notice?.contains("Removed Operator Project") == true)
     }
 
     private static func project(

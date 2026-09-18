@@ -203,6 +203,27 @@ public struct ProjectGenerationResetReceipt: Codable, Sendable, Equatable {
     public let completedAt: String
 }
 
+public struct ProjectArchiveReceipt: Codable, Sendable, Equatable {
+    public let projectID: ProjectID
+    public let priorGeneration: ProjectGeneration
+    public let archivedGeneration: ProjectGeneration
+    public let invalidatedBindingCount: Int
+    public let completedAt: String
+    public let replayed: Bool
+
+    public func asDictionary() -> [String: Any] {
+        [
+            "ok": true,
+            "project_id": projectID.description,
+            "prior_generation": priorGeneration.rawValue,
+            "archived_generation": archivedGeneration.rawValue,
+            "invalidated_binding_count": invalidatedBindingCount,
+            "completed_at": completedAt,
+            "replayed": replayed,
+        ]
+    }
+}
+
 public enum ProjectContentClearMode: String, Codable, Sendable, CaseIterable {
     case memory
     case continuity
@@ -311,6 +332,7 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
     case projectRootAlreadyRegistered(String)
     case projectRelinkRequired(ProjectID)
     case projectRelinkBusy(ProjectID)
+    case projectRemovalBusy(ProjectID)
     case projectRegistrationTargetChanged(ProjectID)
     case projectRepositoryIdentityMismatch(ProjectID)
     case projectRelinkTargetChanged(ProjectID)
@@ -341,6 +363,7 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
         case .projectRootAlreadyRegistered: "project_root_already_registered"
         case .projectRelinkRequired: "project_relink_required"
         case .projectRelinkBusy: "project_relink_busy"
+        case .projectRemovalBusy: "project_removal_busy"
         case .projectRegistrationTargetChanged: "project_registration_target_changed"
         case .projectRepositoryIdentityMismatch: "project_repository_identity_mismatch"
         case .projectRelinkTargetChanged: "project_relink_target_changed"
@@ -381,6 +404,8 @@ public enum ProjectContextError: Error, LocalizedError, Equatable, Sendable {
             "Project root changed and requires an explicit relink: \(projectID)"
         case .projectRelinkBusy(let projectID):
             "Project relink requires all project bindings and autonomous runs to be inactive: \(projectID)"
+        case .projectRemovalBusy(let projectID):
+            "Finish or cancel active autonomous runs before removing this project: \(projectID)"
         case .projectRegistrationTargetChanged(let projectID):
             "Project registration target changed after it was selected: \(projectID)"
         case .projectRepositoryIdentityMismatch(let projectID):

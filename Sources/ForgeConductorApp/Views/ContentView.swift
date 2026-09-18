@@ -12,6 +12,8 @@ import SwiftUI
 /// presentation while `AppModel.AppTab` supplies the single navigation state.
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
+    @AppStorage("forge.setupTutorial.completed.v1") private var setupTutorialCompleted = false
+    @State private var showingSetupTutorial = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -48,6 +50,24 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.16), value: model.isNavigationVisible)
         .accessibilityIdentifier("root-split")
+        .onAppear {
+            if !setupTutorialCompleted,
+               !CommandLine.arguments.contains("--uitesting") {
+                showingSetupTutorial = true
+            }
+        }
+        .sheet(isPresented: $showingSetupTutorial) {
+            SetupTutorialView(
+                onOpen: { tab in
+                    model.selectTab(tab)
+                    showingSetupTutorial = false
+                },
+                onComplete: {
+                    setupTutorialCompleted = true
+                    showingSetupTutorial = false
+                }
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
@@ -87,6 +107,16 @@ struct ContentView: View {
                 .controlSize(.small)
                 .help("Auto-refresh")
                 .accessibilityIdentifier("toolbar-auto-refresh")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingSetupTutorial = true
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+                .controlSize(.small)
+                .help("Open setup guide")
+                .accessibilityIdentifier("toolbar-setup-guide")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -141,6 +171,150 @@ struct ContentView: View {
             retry: model.bootstrap,
             content: content
         )
+    }
+}
+
+private struct SetupTutorialView: View {
+    private struct Step {
+        let title: String
+        let symbol: String
+        let summary: String
+        let details: [String]
+        let destination: AppModel.AppTab?
+        let destinationLabel: String?
+    }
+
+    private let steps: [Step] = [
+        Step(
+            title: "Start LM Studio",
+            symbol: "server.rack",
+            summary: "Forge Conductor uses LM Studio as its local model provider.",
+            details: [
+                "In LM Studio, download and load a model that supports tool use.",
+                "Open LM Studio's Developer screen and start the local server.",
+                "The common local endpoint is http://127.0.0.1:1234.",
+            ],
+            destination: nil,
+            destinationLabel: nil
+        ),
+        Step(
+            title: "Configure Provider",
+            symbol: "network",
+            summary: "Provider tells Forge which LM Studio server and loaded model to use.",
+            details: [
+                "Open Provider and enter the LM Studio endpoint.",
+                "Load Models, choose the model you loaded in LM Studio, then save.",
+                "Run the connection and contract checks. Both should pass before autonomy starts.",
+            ],
+            destination: .provider,
+            destinationLabel: "Open Provider"
+        ),
+        Step(
+            title: "Authorize and Register",
+            symbol: "folder.badge.gearshape",
+            summary: "Forge limits model tools to project folders you explicitly authorize.",
+            details: [
+                "In Manager, add the parent folder that contains your repositories to Allowed Roots and apply the setting.",
+                "Start the manager if it is stopped.",
+                "In Projects, choose Register Project and select the local repository folder.",
+            ],
+            destination: .manager,
+            destinationLabel: "Open Manager"
+        ),
+        Step(
+            title: "Add Instruction Packages",
+            symbol: "list.number",
+            summary: "Instruction packages are durable, ordered work assignments linked to one registered repository.",
+            details: [
+                "In Projects, select the repository and choose Add Instructions.",
+                "You can select one Markdown/text file, a folder of instruction documents, or a .forgepackage manifest.",
+                "Forge copies accepted content into protected storage. Drag package rows up or down to set execution order.",
+            ],
+            destination: .projects,
+            destinationLabel: "Open Projects"
+        ),
+        Step(
+            title: "Run in Order",
+            symbol: "play.circle",
+            summary: "Ordered autonomy runs one package at a time for the selected project.",
+            details: [
+                "Choose Start Ordered Autonomy in the project's Instruction Packages section.",
+                "Forge starts the first queued package with the saved provider and repository scope.",
+                "The next package starts only after the prior run completes its required gate. A failure or block stops advancement for review.",
+            ],
+            destination: .projects,
+            destinationLabel: "Open Package Queue"
+        ),
+    ]
+
+    let onOpen: (AppModel.AppTab) -> Void
+    let onComplete: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var index = 0
+
+    var body: some View {
+        let step = steps[index]
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: step.symbol)
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tint)
+                    .frame(width: 44)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Forge Conductor Setup")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(step.title)
+                        .font(.title2.bold())
+                    Text(step.summary)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(step.details.enumerated()), id: \.offset) { offset, detail in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("\(offset + 1)")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Color.accentColor))
+                        Text(detail)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            if let destination = step.destination,
+               let label = step.destinationLabel {
+                Button(label) { onOpen(destination) }
+                    .accessibilityIdentifier("setup-guide-open-\(destination.accessibilityID)")
+            }
+
+            Spacer(minLength: 0)
+
+            HStack {
+                Text("Step \(index + 1) of \(steps.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Close") { dismiss() }
+                Button("Back") { index -= 1 }
+                    .disabled(index == 0)
+                if index == steps.count - 1 {
+                    Button("Finish Setup Guide", action: onComplete)
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("setup-guide-finish")
+                } else {
+                    Button("Next") { index += 1 }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("setup-guide-next")
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 620, height: 470)
+        .accessibilityIdentifier("setup-guide")
     }
 }
 

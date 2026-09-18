@@ -177,10 +177,30 @@ public final class ProjectContextService: @unchecked Sendable {
                 "canonical root and repository identity belong to different projects"
             )
         }
-        let controlled = identityOwner ?? rootOwner
+        var controlled = identityOwner ?? rootOwner
+        if controlled == nil {
+            let preliminary = try identities.prepareRegistration(
+                target: target,
+                requestedProjectID: requestedProjectID,
+                displayName: displayName,
+                allowUnregisteredRequestedID: false,
+                expectedControlGeneration: nil,
+                expectedControlLifecycleState: nil,
+                expectedControlRepositoryIdentity: nil,
+                cancellation: cancellation
+            )
+            if let rawProjectID = UUID(uuidString: preliminary.descriptor.id),
+               let archived = try project(ProjectID(rawProjectID), cancellation: cancellation),
+               archived.lifecycleState == .archived,
+               archived.canonicalRoot == target.canonicalRoot,
+               archived.repositoryFingerprint == target.repositoryIdentity {
+                controlled = archived
+            }
+        }
         if let controlled {
             guard controlled.lifecycleState == .active
-                    || controlled.lifecycleState == .maintenance else {
+                    || controlled.lifecycleState == .maintenance
+                    || controlled.lifecycleState == .archived else {
                 throw ProjectContextError.projectNotActive(controlled.lifecycleState)
             }
             guard controlled.canonicalRoot == target.canonicalRoot else {

@@ -125,6 +125,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var providerConfigurationService: (any ProviderConfigurationServicing)?
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
+    private var instructionQueueStoreResult: Result<ProjectInstructionQueueStore, Error>?
     private var continuityIngress: ContinuityIngressDeliveryService?
     private var nativeSourceConversation: NativeSourceConversationService?
     private let nativeSourceManagerInstanceID = UUID()
@@ -1422,6 +1423,158 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     @discardableResult
+    public func removeProject(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> [String: Any] {
+        let filesystemRecovery = SecureFilesystemRecoveryLedger(paths: app.paths)
+        do {
+            return try filesystemRecovery.withRetainedAuthorityFence(
+                projectID: projectID,
+                generation: expectedGeneration
+            ) { assertNoRetainedAuthority in
+                try assertNoRetainedAuthority()
+                guard try app.projectMemory.identities.pendingRegistration(
+                    projectID: projectID.description
+                ) == nil else {
+                    throw ProjectContextError.projectTransitionConflict(projectID)
+                }
+                let receipt = try Self.waitForAsync(timeoutSeconds: 10) {
+                    try await self.app.projectContexts.repository.archiveProject(
+                        projectID: projectID,
+                        expectedGeneration: expectedGeneration
+                    )
+                }
+                try assertNoRetainedAuthority()
+                app.projectMemory.closeProject(projectID.description)
+                do {
+                    _ = try instructionQueueStore().removeProject(projectID: projectID)
+                } catch {
+                    app.diagnostics.warn(
+                        "manager_removed_project_queue_cleanup_deferred",
+                        ["project_id": projectID.description],
+                        category: .manager
+                    )
+                }
+                app.diagnostics.info(
+                    "manager_project_removed",
+                    [
+                        "project_id": projectID.description,
+                        "prior_generation": "\(expectedGeneration.rawValue)",
+                        "archived_generation": "\(receipt.archivedGeneration.rawValue)",
+                        "invalidated_bindings": "\(receipt.invalidatedBindingCount)",
+                    ],
+                    category: .manager
+                )
+                return receipt.asDictionary()
+            }
+        } catch SecureFilesystemRecoveryLedgerError.retainedAuthority {
+            throw ProjectContextError.retainedFilesystemRecovery(projectID)
+        }
+    }
+
+    public func instructionQueue(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> [String: Any] {
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        return try instructionQueueStore().snapshot(
+            projectID: projectID,
+            generation: expectedGeneration
+        ).asDictionary()
+    }
+
+    @discardableResult
+    public func importInstructionPackage(
+        sourcePath: String,
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> [String: Any] {
+        guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
+              (sourcePath as NSString).isAbsolutePath else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction package import requires one bounded absolute path."
+            )
+        }
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        let result = try instructionQueueStore().importPackage(
+            sourceURL: URL(fileURLWithPath: sourcePath),
+            projectID: projectID,
+            generation: expectedGeneration
+        )
+        app.diagnostics.info(
+            "manager_instruction_package_imported",
+            ["project_id": projectID.description, "source": sourcePath],
+            category: .manager
+        )
+        return result.asDictionary()
+    }
+
+    @discardableResult
+    public func reorderInstructionPackages(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        packageIDs: [UUID],
+        expectedRevision: UInt64
+    ) throws -> [String: Any] {
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        return try instructionQueueStore().reorder(
+            projectID: projectID,
+            generation: expectedGeneration,
+            packageIDs: packageIDs,
+            expectedRevision: expectedRevision
+        ).asDictionary()
+    }
+
+    @discardableResult
+    public func removeInstructionPackage(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        packageID: UUID
+    ) throws -> [String: Any] {
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        return try instructionQueueStore().remove(
+            projectID: projectID,
+            generation: expectedGeneration,
+            packageID: packageID
+        ).asDictionary()
+    }
+
+    @discardableResult
+    public func startInstructionQueue(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> [String: Any] {
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        lock.lock(); let autonomyAvailable = managedAutonomy != nil && !managedAutonomyClosing; lock.unlock()
+        guard autonomyAvailable else { throw AutonomyError.shutdown }
+        let provider = try readProviderConfiguration()
+        guard provider.saved, let model = provider.modelKey, !model.isEmpty else {
+            throw ProjectInstructionQueueError.queueBlocked(
+                "Save an LM Studio endpoint and model in Provider before starting the instruction queue."
+            )
+        }
+        let snapshot = try instructionQueueStore().start(
+            projectID: projectID,
+            generation: expectedGeneration
+        )
+        scheduleAutonomyTick()
+        return snapshot.asDictionary()
+    }
+
+    @discardableResult
+    public func stopInstructionQueue(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> [String: Any] {
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        return try instructionQueueStore().stop(
+            projectID: projectID,
+            generation: expectedGeneration
+        ).asDictionary()
+    }
+
+    @discardableResult
     public func resetProjectGeneration(
         projectID: ProjectID,
         expectedGeneration: ProjectGeneration
@@ -1453,6 +1606,19 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                         projectID: projectID,
                         expectedGeneration: expectedGeneration
                     )
+                    do {
+                        _ = try instructionQueueStore().fenceProject(
+                            projectID: projectID,
+                            generation: expectedGeneration,
+                            reason: "Project generation was reset"
+                        )
+                    } catch {
+                        app.diagnostics.warn(
+                            "manager_reset_instruction_queue_cleanup_deferred",
+                            ["project_id": projectID.description],
+                            category: .manager
+                        )
+                    }
                     app.diagnostics.info(
                         "manager_project_generation_reset",
                         [
@@ -2149,6 +2315,200 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             throw ProjectContextError.projectRootNotAuthorized(projectRoot)
         }
         return authorized
+    }
+
+    private func instructionQueueStore() throws -> ProjectInstructionQueueStore {
+        lock.lock(); defer { lock.unlock() }
+        if let result = instructionQueueStoreResult { return try result.get() }
+        let result = Result { try ProjectInstructionQueueStore(paths: app.paths, clock: app.clock) }
+        instructionQueueStoreResult = result
+        return try result.get()
+    }
+
+    private func requireActiveProject(
+        _ projectID: ProjectID,
+        generation: ProjectGeneration
+    ) throws {
+        guard let project = try app.projectContexts.project(projectID) else {
+            throw ProjectContextError.projectNotFound(projectID)
+        }
+        guard project.generation == generation else {
+            throw ProjectContextError.staleProjectGeneration(
+                expected: generation,
+                actual: project.generation
+            )
+        }
+        guard project.lifecycleState == .active else {
+            throw ProjectContextError.projectNotActive(project.lifecycleState)
+        }
+    }
+
+    private func instructionRunRequest(
+        package: ProjectInstructionPackage,
+        runID: RunID
+    ) throws -> AutonomousRunRequest {
+        try requireActiveProject(package.projectID, generation: package.projectGeneration)
+        guard let project = try app.projectContexts.project(package.projectID) else {
+            throw ProjectContextError.projectNotFound(package.projectID)
+        }
+        let provider = try readProviderConfiguration()
+        guard provider.saved, let modelKey = provider.modelKey, !modelKey.isEmpty else {
+            throw ProjectInstructionQueueError.queueBlocked(
+                "Save an LM Studio endpoint and model in Provider before starting the instruction queue."
+            )
+        }
+        let allowedTools = Set(package.allowedTools)
+        do {
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            _ = try catalog.providerToolDefinitions(allowedToolNames: allowedTools)
+        } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
+            throw AutonomyError.invalidToolConfiguration(tools)
+        } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
+            throw AutonomyError.invalidToolConfiguration(tools)
+        }
+        let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
+        return AutonomousRunRequest(
+            runID: runID,
+            projectID: package.projectID,
+            projectGeneration: package.projectGeneration,
+            assignmentID: "instruction-package:\(package.id.uuidString.lowercased())",
+            mission: package.mission,
+            providerID: "lmstudio",
+            adapterID: Self.nativeSessionHostAdapterID,
+            modelKey: modelKey,
+            specification: AutonomousRunSpecification(
+                allowedTools: package.allowedTools,
+                completionGates: package.completionGates,
+                work: AutonomousRunWork(metadata: [
+                    "instruction_package_id": package.id.uuidString.lowercased(),
+                    "instruction_package_name": package.packageID,
+                    "instruction_package_version": package.version,
+                    "instruction_package_sha256": package.contentSHA256,
+                ])
+            ),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [authorizedRoot],
+                allowedTools: allowedTools,
+                networkAllowed: false,
+                maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
+            )
+        )
+    }
+
+    private func reconcileInstructionQueue(
+        autonomy: ManagedAutonomyRuntime
+    ) async {
+        let store: ProjectInstructionQueueStore
+        do { store = try instructionQueueStore() }
+        catch {
+            app.diagnostics.warn(
+                "manager_instruction_queue_unavailable",
+                ["error": String(error.localizedDescription.prefix(2_048))],
+                category: .manager
+            )
+            return
+        }
+
+        for package in store.runningPackages() {
+            guard !Task.isCancelled, let runID = package.runID else { return }
+            do {
+                if let run = try await app.projectContexts.repository.autonomousRun(runID) {
+                    if run.state.isTerminal || run.state == .paused || run.state == .blockedConfiguration {
+                        _ = try store.reconcile(
+                            packageID: package.id,
+                            runID: runID,
+                            runState: run.state,
+                            error: run.lastErrorSummary
+                        )
+                    }
+                } else {
+                    let request = try instructionRunRequest(package: package, runID: runID)
+                    try beginProviderRunOperation()
+                    do {
+                        _ = try await autonomy.createRun(request)
+                        finishProviderRunOperation()
+                    } catch {
+                        finishProviderRunOperation()
+                        await blockInstructionPackageIfRunWasNotCommitted(
+                            store: store,
+                            packageID: package.id,
+                            runID: runID,
+                            error: error
+                        )
+                        throw error
+                    }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    app.diagnostics.warn(
+                        "manager_instruction_package_recovery_failed",
+                        [
+                            "package_id": package.id.uuidString.lowercased(),
+                            "error": String(error.localizedDescription.prefix(2_048)),
+                        ],
+                        category: .manager
+                    )
+                }
+            }
+        }
+
+        guard !Task.isCancelled, let package = store.nextRunnable() else { return }
+        do {
+            let runID = RunID()
+            let request = try instructionRunRequest(package: package, runID: runID)
+            _ = try store.markStarted(packageID: package.id, runID: runID)
+            try beginProviderRunOperation()
+            do {
+                _ = try await autonomy.createRun(request)
+                finishProviderRunOperation()
+            } catch {
+                finishProviderRunOperation()
+                await blockInstructionPackageIfRunWasNotCommitted(
+                    store: store,
+                    packageID: package.id,
+                    runID: runID,
+                    error: error
+                )
+                throw error
+            }
+        } catch {
+            if !Task.isCancelled {
+                app.diagnostics.warn(
+                    "manager_instruction_package_start_failed",
+                    [
+                        "package_id": package.id.uuidString.lowercased(),
+                        "error": String(error.localizedDescription.prefix(2_048)),
+                    ],
+                    category: .manager
+                )
+            }
+        }
+    }
+
+    /// A queue record is committed before its autonomous run so a process crash can
+    /// recover the exact run identity. A returned creation failure receives one
+    /// repository reconciliation; when no run committed, the package is blocked and
+    /// automatic advancement stops instead of retrying forever on every watchdog tick.
+    private func blockInstructionPackageIfRunWasNotCommitted(
+        store: ProjectInstructionQueueStore,
+        packageID: UUID,
+        runID: RunID,
+        error: Error
+    ) async {
+        do {
+            guard try await app.projectContexts.repository.autonomousRun(runID) == nil else {
+                return
+            }
+            _ = try store.reconcile(
+                packageID: packageID,
+                runID: runID,
+                runState: .blockedConfiguration,
+                error: String(error.localizedDescription.prefix(2_048))
+            )
+        } catch {
+            // Leave the committed queue/run identity intact when reconciliation is
+            // unavailable. A later watchdog tick can safely resume the exact run ID.
+        }
     }
 
     public func autonomousRunStatus(runID: RunID) throws -> [String: Any] {
@@ -3388,6 +3748,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     category: .manager
                 )
             }
+            guard !Task.isCancelled else { return }
+            await self?.reconcileInstructionQueue(autonomy: autonomy)
             if !sourceFirst, !Task.isCancelled { await recoverSource() }
         }
         lock.unlock()

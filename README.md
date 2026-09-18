@@ -255,6 +255,12 @@ Native CI covers source integrity, Debug/Release Swift tests, and native app/CLI
 compilation. Signed UI, service lifecycle and distribution evidence remain
 separate release requirements.
 
+On first launch, Forge Conductor opens a built-in setup guide. The question-mark
+toolbar button reopens it at any time. The guide walks through starting LM Studio,
+saving the Provider endpoint and loaded model, authorizing a repository root,
+registering the project, adding instruction packages, and starting ordered
+autonomy.
+
 ## What the UI shows
 
 | Surface | Meaning |
@@ -262,13 +268,13 @@ separate release requirements.
 | **FORGE RIG** | Host telemetry (CPU/GPU/RAM/disk) + LM Studio-oriented load |
 | **LM Studio MCP** | LM Studio host, model backends, Forge MCP from `mcp.json` / live processes |
 | **Agents / Tools / Feed** | Playbooks and tool audit for local-model agent runs |
-| **Projects** | Durable project identity, generation, bindings, memory, and continuity state |
+| **Projects** | Durable project identity, removal, generation, bindings, memory, continuity, and drag-ordered instruction packages |
 | **Autonomy / Continuity** | Manager-owned runs, provider leases, budgets, handoffs, successor acknowledgment, and fencing state |
 | **Runtimes / Provider** | Effective shell policy, durable jobs, editable provider settings, redacted credentials, and contract health |
 | **Events & Evidence / Diagnostics** | Bounded manager events, durable evidence references, logs, and doctor signals |
 | **Manager** | Start/Stop/Restart control, authorized folders, project-shell policy, protected-filesystem service controls, maintenance, and doctor |
 
-For a first managed run, register a Git repository in **Projects** with the folder picker or **Enter Project Path…** and an absolute path. Authorize that repository folder under **Manager** settings. Start the LM Studio local server, load the model variant selected in LM Studio, then save `http://127.0.0.1:1234` and its model identifier in **Provider** and run **Test Connection**. **Autonomy** starts runs after these prerequisites; the manager itself starts with the app or its LaunchAgent and is controlled from **Manager**. An idle model shown by `lms ps` can still appear unloaded to Forge when LM Studio's v1 model inventory lists a different selected variant.
+For a first managed run, register a Git repository in **Projects** with the folder picker or **Enter Project Path…** and an absolute path. Authorize that repository folder under **Manager** settings. Start the LM Studio local server, load the model variant selected in LM Studio, then save `http://127.0.0.1:1234` and its model identifier in **Provider** and run the connection and contract checks. Add Markdown/text instructions, a folder, or a manifest package to the selected project, drag packages into the desired order, and choose **Start Ordered Autonomy**. Forge runs one package at a time and stops advancement on a failed or blocked run. See the [instruction package guide](docs/INSTRUCTION-PACKAGES.md). The manager itself starts with the app or its LaunchAgent and is controlled from **Manager**. An idle model shown by `lms ps` can still appear unloaded to Forge when LM Studio's v1 model inventory lists a different selected variant.
 
 For deterministic completion, select the persisted Autonomy run and use
 **Import Native Validation Policy…** with a separately prepared schema-1 JSON

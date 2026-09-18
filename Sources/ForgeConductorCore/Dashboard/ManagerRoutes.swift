@@ -250,6 +250,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     public static let maximumProjectRelinkPathBytes = 4_096
     static let maximumProjectRelinkBodyBytes = 16_384
     static let maximumProjectContentClearBodyBytes = 512
+    static let maximumInstructionQueueBodyBytes = 16_384
     static let maximumRuntimeJobCancelBodyBytes = 256
     static let maximumProviderProbeBodyBytes = 512
     static let maximumRunControlBodyBytes = 256
@@ -623,6 +624,15 @@ public final class ManagerRoutes: @unchecked Sendable {
                 uniquingKeysWith: { receipt, _ in receipt }
             )
             http.respondJSON(connection, status: 200, object: result)
+        case ("POST", "/api/manager/projects/remove"):
+            dispatchProjectRemoval(body: body, connection: connection)
+        case ("POST", "/api/manager/projects/instruction-packages"),
+             ("POST", "/api/manager/projects/instruction-packages/import"),
+             ("POST", "/api/manager/projects/instruction-packages/reorder"),
+             ("POST", "/api/manager/projects/instruction-packages/remove"),
+             ("POST", "/api/manager/projects/instruction-packages/start"),
+             ("POST", "/api/manager/projects/instruction-packages/stop"):
+            dispatchInstructionQueue(path: target.path, body: body, connection: connection)
         case ("POST", "/api/manager/projects/clear-content"):
             guard target.queryItems.isEmpty,
                   body.count <= Self.maximumProjectContentClearBodyBytes else {
@@ -927,6 +937,152 @@ public final class ManagerRoutes: @unchecked Sendable {
             }
         default:
             http.respond(connection, status: 404, body: "Not Found", contentType: "text/plain")
+        }
+    }
+
+    private func dispatchProjectRemoval(body: Data, connection: NWConnection) {
+        guard body.count <= Self.maximumInstructionQueueBodyBytes,
+              let object = try? JSONSupport.object(from: body),
+              object.count == 2,
+              Set(object.keys) == ["project_id", "project_generation"] else {
+            http.respondJSON(connection, status: 400, object: [
+                "ok": false, "code": "invalid_project_removal",
+                "message": "Project removal requires exactly one project UUID and generation.",
+            ])
+            return
+        }
+        do {
+            http.respondJSON(
+                connection,
+                status: 200,
+                object: try manager.removeProject(
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object)
+                )
+            )
+        } catch let error as ProjectContextError {
+            let status: Int = error == .databaseBusy ? 503 : 409
+            http.respondJSON(connection, status: status, object: [
+                "ok": false, "code": error.code, "message": error.localizedDescription,
+            ])
+        } catch {
+            http.respondJSON(connection, status: 500, object: [
+                "ok": false, "code": "project_removal_failed",
+                "message": error.localizedDescription,
+            ])
+        }
+    }
+
+    private func dispatchInstructionQueue(
+        path: String,
+        body: Data,
+        connection: NWConnection
+    ) {
+        guard body.count <= Self.maximumInstructionQueueBodyBytes,
+              let object = try? JSONSupport.object(from: body) else {
+            http.respondJSON(connection, status: 400, object: [
+                "ok": false, "code": "invalid_instruction_queue_request",
+                "message": "Instruction queue commands require one bounded JSON object.",
+            ])
+            return
+        }
+        do {
+            let selectedProject = try projectID(object)
+            let generation = try projectGeneration(object)
+            let result: [String: Any]
+            switch path {
+            case "/api/manager/projects/instruction-packages":
+                guard Set(object.keys) == ["project_id", "project_generation"] else {
+                    throw ProjectInstructionQueueError.invalidRequest("Queue refresh accepts only project_id and project_generation.")
+                }
+                result = try manager.instructionQueue(
+                    projectID: selectedProject,
+                    expectedGeneration: generation
+                )
+            case "/api/manager/projects/instruction-packages/import":
+                guard Set(object.keys) == ["project_id", "project_generation", "source_path"],
+                      let sourcePath = object["source_path"] as? String else {
+                    throw ProjectInstructionQueueError.invalidRequest("Package import requires source_path.")
+                }
+                result = try manager.importInstructionPackage(
+                    sourcePath: sourcePath,
+                    projectID: selectedProject,
+                    expectedGeneration: generation
+                )
+            case "/api/manager/projects/instruction-packages/reorder":
+                guard Set(object.keys) == ["project_id", "project_generation", "package_ids", "expected_revision"],
+                      let rawIDs = object["package_ids"] as? [String],
+                      rawIDs.count <= ProjectInstructionQueueStore.maximumPackages,
+                      rawIDs.allSatisfy({ UUID(uuidString: $0) != nil }),
+                      let revisionValue = integer(object["expected_revision"]), revisionValue >= 0 else {
+                    throw ProjectInstructionQueueError.invalidRequest("Package reorder requires every package UUID and the expected queue revision.")
+                }
+                result = try manager.reorderInstructionPackages(
+                    projectID: selectedProject,
+                    expectedGeneration: generation,
+                    packageIDs: rawIDs.compactMap(UUID.init(uuidString:)),
+                    expectedRevision: UInt64(revisionValue)
+                )
+            case "/api/manager/projects/instruction-packages/remove":
+                guard Set(object.keys) == ["project_id", "project_generation", "package_id"],
+                      let rawID = object["package_id"] as? String,
+                      let packageID = UUID(uuidString: rawID) else {
+                    throw ProjectInstructionQueueError.invalidRequest("Package removal requires one package UUID.")
+                }
+                result = try manager.removeInstructionPackage(
+                    projectID: selectedProject,
+                    expectedGeneration: generation,
+                    packageID: packageID
+                )
+            case "/api/manager/projects/instruction-packages/start":
+                guard Set(object.keys) == ["project_id", "project_generation"] else {
+                    throw ProjectInstructionQueueError.invalidRequest("Queue start accepts only project_id and project_generation.")
+                }
+                result = try manager.startInstructionQueue(
+                    projectID: selectedProject,
+                    expectedGeneration: generation
+                )
+            case "/api/manager/projects/instruction-packages/stop":
+                guard Set(object.keys) == ["project_id", "project_generation"] else {
+                    throw ProjectInstructionQueueError.invalidRequest("Queue stop accepts only project_id and project_generation.")
+                }
+                result = try manager.stopInstructionQueue(
+                    projectID: selectedProject,
+                    expectedGeneration: generation
+                )
+            default:
+                throw ProjectInstructionQueueError.invalidRequest("Unknown instruction queue command.")
+            }
+            http.respondJSON(connection, status: 200, object: result)
+        } catch let error as ProjectInstructionQueueError {
+            let status: Int
+            switch error {
+            case .packageNotFound: status = 404
+            case .storageFailure: status = 500
+            default: status = 409
+            }
+            http.respondJSON(connection, status: status, object: [
+                "ok": false, "code": "instruction_queue_error",
+                "message": error.localizedDescription,
+            ])
+        } catch let error as ProjectContextError {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": error.code, "message": error.localizedDescription,
+            ])
+        } catch let error as AutonomyError {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": error.code, "message": error.localizedDescription,
+            ])
+        } catch let error as ProviderConfigurationError {
+            http.respondJSON(connection, status: 409, object: [
+                "ok": false, "code": "provider_configuration_\(error.rawValue)",
+                "message": error.localizedDescription,
+            ])
+        } catch {
+            http.respondJSON(connection, status: 500, object: [
+                "ok": false, "code": "instruction_queue_unavailable",
+                "message": error.localizedDescription,
+            ])
         }
     }
 

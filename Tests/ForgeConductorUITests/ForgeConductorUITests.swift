@@ -117,6 +117,40 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.windows.firstMatch.exists)
     }
 
+    func testSetupGuideExplainsProviderProjectsAndOrderedPackages() throws {
+        let guideButton = app.buttons["toolbar-setup-guide"]
+        XCTAssertTrue(
+            guideButton.waitForExistence(timeout: 8),
+            "The setup guide must remain available after first launch"
+        )
+        guideButton.click()
+
+        let guide = app.descendants(matching: .any)["setup-guide"]
+        XCTAssertTrue(guide.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Start LM Studio"].exists)
+
+        let next = app.buttons["Next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 3))
+        next.click()
+        XCTAssertTrue(app.staticTexts["Configure Provider"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Open Provider"].exists)
+
+        next.click()
+        XCTAssertTrue(app.staticTexts["Authorize and Register"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Open Manager"].exists)
+
+        next.click()
+        XCTAssertTrue(app.staticTexts["Add Instruction Packages"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Open Projects"].exists)
+
+        next.click()
+        XCTAssertTrue(app.staticTexts["Run in Order"].waitForExistence(timeout: 3))
+        let finish = app.buttons["Finish Setup Guide"]
+        XCTAssertTrue(finish.exists)
+        finish.click()
+        XCTAssertFalse(guide.waitForExistence(timeout: 2))
+    }
+
     func testManagerShowsProjectShellPolicyControls() throws {
         let managerTab = app.buttons["tab-manager"]
         XCTAssertTrue(managerTab.waitForExistence(timeout: 8))

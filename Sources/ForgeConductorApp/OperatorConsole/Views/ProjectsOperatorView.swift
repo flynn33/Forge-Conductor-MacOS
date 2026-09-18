@@ -9,6 +9,7 @@ struct ProjectsOperatorView: View {
     @State private var registrationDraft: ProjectRegistrationDraft?
     @State private var registrationPickerErrorMessage: String?
     @State private var resetConfirmation: ProjectsViewModel.ResetConfirmation?
+    @State private var removeConfirmation: ProjectsViewModel.RemoveConfirmation?
     @State private var clearConfirmation: ProjectsViewModel.ClearConfirmation?
     @State private var clearMode: OperatorProjectContentClearMode = .memory
 
@@ -137,6 +138,22 @@ struct ProjectsOperatorView: View {
             ProjectRegistrationSheet(draft: draft, viewModel: viewModel)
         }
         .alert(
+            "Remove project from Forge Conductor?",
+            isPresented: Binding(
+                get: { removeConfirmation != nil },
+                set: { if !$0 { removeConfirmation = nil } }
+            ),
+            presenting: removeConfirmation
+        ) { confirmation in
+            Button("Cancel", role: .cancel) {}
+            Button("Remove Project", role: .destructive) {
+                removeConfirmation = nil
+                viewModel.removeProject(confirmation)
+            }
+        } message: { confirmation in
+            Text("\(confirmation.displayName)\n\(confirmation.projectID)\nThis removes the registration from the Projects tab and fences generation \(confirmation.generation). Durable project memory and historical evidence are preserved. Registering the same repository again reconnects it.")
+        }
+        .alert(
             "Reset project generation?",
             isPresented: Binding(
                 get: { resetConfirmation != nil },
@@ -169,6 +186,7 @@ struct ProjectsOperatorView: View {
             Text("\(confirmation.displayName)\n\(confirmation.projectID)\nGeneration \(confirmation.generation)\n\(confirmation.mode.effectDescription) This removes content from active retrieval, not secure physical storage. Minimal recovery metadata is retained.")
         }
         .task { viewModel.load() }
+        .task(id: viewModel.selectedProjectID) { viewModel.loadInstructionQueue() }
         .accessibilityIdentifier("projects-operator-view")
     }
 
@@ -188,6 +206,8 @@ struct ProjectsOperatorView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            instructionPackages(project)
 
             GroupBox("Active bindings") {
                 if project.bindings.isEmpty {
@@ -332,6 +352,11 @@ struct ProjectsOperatorView: View {
             }
 
             HStack {
+                Button("Remove Project…", role: .destructive) {
+                    removeConfirmation = viewModel.removeConfirmationForSelectedProject()
+                }
+                .disabled(viewModel.isLoading || project.lifecycleState != "active")
+                .accessibilityIdentifier("project-remove")
                 Button("Relink…") {
                     chooseRelinkFolder(for: project)
                 }
@@ -346,6 +371,120 @@ struct ProjectsOperatorView: View {
                 .accessibilityIdentifier("project-reset")
             }
         }
+    }
+
+    @ViewBuilder
+    private func instructionPackages(_ project: OperatorProject) -> some View {
+        GroupBox("Instruction packages") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Add a Markdown/text file, a folder of instructions, or a .forgepackage manifest. Forge stores an immutable copy linked to this project. Drag rows to set the order used by autonomous runs.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let queue = viewModel.instructionQueue {
+                    if queue.packages.isEmpty {
+                        ContentUnavailableView(
+                            "No Instruction Packages",
+                            systemImage: "list.number",
+                            description: Text("Add package instructions for this repository, then arrange their execution order.")
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 100)
+                    } else {
+                        List {
+                            ForEach(queue.packages) { package in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "line.3.horizontal")
+                                        .foregroundStyle(.tertiary)
+                                        .accessibilityHidden(true)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(package.displayName)
+                                            .fontWeight(.medium)
+                                        Text("\(package.packageID) · v\(package.version)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        if let error = package.lastError {
+                                            Text(error)
+                                                .font(.caption)
+                                                .foregroundStyle(.red)
+                                                .lineLimit(2)
+                                        }
+                                    }
+                                    Spacer()
+                                    OperatorStateBadge(state: package.state)
+                                    Button(role: .destructive) {
+                                        viewModel.removeInstructionPackage(package.id)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.isLoading || package.state == "running")
+                                    .help("Remove this instruction package")
+                                    .accessibilityIdentifier("instruction-package-remove-\(package.id)")
+                                }
+                                .padding(.vertical, 4)
+                                .accessibilityIdentifier("instruction-package-row-\(package.id)")
+                            }
+                            .onMove { offsets, destination in
+                                var packages = queue.packages
+                                packages.move(fromOffsets: offsets, toOffset: destination)
+                                viewModel.reorderInstructionPackages(packages.map(\.id))
+                            }
+                            .moveDisabled(viewModel.isLoading || queue.running)
+                        }
+                        .frame(height: min(max(CGFloat(queue.packages.count) * 62, 124), 310))
+                        .accessibilityIdentifier("instruction-package-list")
+                    }
+
+                    HStack {
+                        Button("Add Instructions…", systemImage: "plus") {
+                            chooseInstructionPackage()
+                        }
+                        .disabled(viewModel.isLoading || queue.running)
+                        .accessibilityIdentifier("instruction-package-add")
+                        Spacer()
+                        Text(queue.running ? "Running in order" : "Queue stopped")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button(queue.running ? "Stop Queue" : "Start Ordered Autonomy") {
+                            viewModel.toggleInstructionQueue()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(
+                            viewModel.isLoading
+                                || (!queue.running && !queue.packages.contains(where: { $0.state == "queued" }))
+                        )
+                        .accessibilityIdentifier("instruction-queue-toggle")
+                    }
+                } else {
+                    HStack {
+                        ProgressView().controlSize(.small)
+                        Text("Loading instruction packages…")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("project-instruction-packages")
+    }
+
+    private func chooseInstructionPackage() {
+        let environment = ProcessInfo.processInfo.environment
+        if CommandLine.arguments.contains("--uitesting"),
+           let path = environment["FORGE_INSTRUCTION_PACKAGE_UI_TEST_SELECTION"] {
+            viewModel.importInstructionPackage(path: path)
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Add Instructions"
+        panel.message = "Choose Markdown/text instructions, a package manifest, or a folder of instruction documents."
+        guard panel.runModal() == .OK, let url = panel.urls.first,
+              url.isFileURL, (url.path as NSString).isAbsolutePath else { return }
+        viewModel.importInstructionPackage(path: url.path)
     }
 
     private func chooseProjectFolder() {
