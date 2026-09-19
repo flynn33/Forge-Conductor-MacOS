@@ -40,6 +40,8 @@ Product versions do not by themselves claim shipment.
   drift from compiled or Xcode product identity.
 - Kept the runtime-launch signing gate compatible with the current and legacy
   SwiftPM XCTest product identifiers without widening accepted products.
+- Updated isolated build-entrypoint fixtures to exercise the root version and
+  build-number authorities and reject missing or drifting values.
 
 ### Preserved behavior
 

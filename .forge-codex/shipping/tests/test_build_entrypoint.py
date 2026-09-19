@@ -19,9 +19,13 @@ class BuildEntrypointTests(unittest.TestCase):
         (self.root / 'script').mkdir()
         self.script = self.root / 'script/build_and_run.sh'
         shutil.copyfile(ROOT / 'script/build_and_run.sh', self.script)
+        self.version = self.root / 'VERSION'
+        self.version.write_text('0.10.0\n')
+        self.build_number = self.root / 'BUILD_NUMBER'
+        self.build_number.write_text('2\n')
         self.source = self.root / 'Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift'
         self.source.parent.mkdir(parents=True)
-        self.source.write_text('public static let productVersion = "0.9.0"\n'
+        self.source.write_text('public static let productVersion = "0.10.0"\n'
                                'public static let productBuildVersion = "2"\n')
         self.log = self.root / 'compiler-calls.jsonl'
         binaries = self.root / 'bin'; binaries.mkdir()
@@ -74,8 +78,20 @@ class BuildEntrypointTests(unittest.TestCase):
         self.assertFalse(self.log.exists())
 
     def test_ambiguous_marketing_version_is_rejected(self):
-        self.source.write_text(self.source.read_text().replace('0.9.0', '0.09.0'))
+        self.source.write_text(self.source.read_text().replace('0.10.0', '0.010.0'))
         self.assertEqual(self.run_entrypoint('--build-only').returncode, 1)
+        self.assertFalse(self.log.exists())
+
+    def test_missing_root_version_authority_is_rejected(self):
+        self.version.unlink()
+        self.assertEqual(self.run_entrypoint('--build-only').returncode, 1)
+        self.assertFalse(self.log.exists())
+
+    def test_root_and_compiled_version_drift_is_rejected(self):
+        self.version.write_text('0.10.1\n')
+        result = self.run_entrypoint('--build-only')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('must match the compiled product identity', result.stderr)
         self.assertFalse(self.log.exists())
 
     def test_signed_release_without_development_policy_is_rejected(self):
