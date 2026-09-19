@@ -38,11 +38,12 @@ struct ProviderOperatorView: View {
         }
         .task { viewModel.load() }
         .onDisappear { viewModel.clearCredentialEntry() }
+        .guidedHelpState(viewModel.guidedHelpState, for: .provider)
         .accessibilityIdentifier("provider-operator-view")
     }
 
     private var configurationEditor: some View {
-        GroupBox("Provider settings") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 12) {
                 TextField("Endpoint", text: $viewModel.endpoint)
                     .textFieldStyle(.roundedBorder)
@@ -107,6 +108,12 @@ struct ProviderOperatorView: View {
             if viewModel.isSaving || viewModel.isFetchingModels {
                 Button("Cancel request", action: viewModel.cancelConfigurationRequest)
                     .accessibilityIdentifier("provider-cancel-configuration")
+            }
+        } label: {
+            HStack {
+                Text("Provider settings")
+                Spacer()
+                GuidedHelpButton(context: .providerCredential)
             }
         }
     }

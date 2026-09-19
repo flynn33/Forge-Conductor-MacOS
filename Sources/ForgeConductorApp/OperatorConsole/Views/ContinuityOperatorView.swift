@@ -80,6 +80,7 @@ struct ContinuityOperatorView: View {
             viewModel.selectRun(forOperationID: operationID)
         }
         .task { viewModel.load() }
+        .guidedHelpState(viewModel.guidedHelpState, for: .continuity)
         .accessibilityIdentifier("continuity-operator-view")
     }
 
@@ -114,9 +115,11 @@ struct ContinuityOperatorView: View {
                     Button("Checkpoint Now", action: viewModel.requestCheckpoint)
                         .disabled(!viewModel.canRequestCheckpoint)
                         .accessibilityIdentifier("checkpoint-command")
+                    GuidedHelpButton(context: .continuitySaveProgress)
                     Button("Request Early Rollover", action: viewModel.requestRollover)
                         .disabled(!viewModel.canRequestRollover)
                         .accessibilityIdentifier("rollover-command")
+                    GuidedHelpButton(context: .continuityFreshSession)
                     if let action = viewModel.controlInFlight {
                         ProgressView()
                             .controlSize(.small)

@@ -10,7 +10,22 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Added
+
+- Added persistent contextual Guided Mode with complete offline help for all 13
+  application tabs and typed guides for Start Task, task capabilities,
+  completion checks, project registration/import/queue/relink/reset/clear,
+  continuity actions, runtime jobs, and provider credentials.
+- Added state-aware Autonomy, Continuity, Provider, and Runtimes guidance plus
+  optional inline help that remains non-blocking and non-mutating.
+
 ### Changed
+
+- Changed the persistent question-mark toolbar action from the generic setup
+  slideshow to the current tab or active sheet guide while retaining the
+  first-use setup guide as onboarding.
+- Restored the Start Task mission field's stable accessibility identity by
+  separating it from the file/folder/ZIP drop-target annotation.
 
 - Simplified configured Autonomy start to Project and Instructions by applying
   manager-owned saved-model, registered-tool, completion-check, and continuity

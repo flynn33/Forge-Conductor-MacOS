@@ -9,6 +9,7 @@ is retained for auditability, but it is not current operating guidance.
 | --- | --- |
 | [User guide](../USER-GUIDE.md) | Install, configure, and operate Forge Conductor |
 | [Xcode guide](../XCODE.md) | Build, test, archive, sign, and inspect the native app |
+| [Guided Mode](GUIDED-MODE.md) | Use contextual offline help for views, sheets, and current state |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Deploy and diagnose the LM Studio MCP connection |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Queue ordered project work |
 | [Native completion](NATIVE-COMPLETION.md) | Configure protected completion gates |

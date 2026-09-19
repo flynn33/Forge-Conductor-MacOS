@@ -79,7 +79,16 @@ let package = Package(
                 "ForgeRuntimeLauncher",
             ],
             path: "Sources/ForgeConductorApp",
-            exclude: ["Resources"]
+            exclude: [
+                "Resources/Assets.xcassets",
+                "Resources/Forge-Conductor.icns",
+                "Resources/ForgeConductor.entitlements",
+                "Resources/Info.plist",
+                "Resources/com.forge-conductor.filesystem-daemon.plist",
+            ],
+            resources: [
+                .process("Resources/GuidedHelpCatalog.json"),
+            ]
         ),
         .testTarget(
             name: "ForgeConductorTests",

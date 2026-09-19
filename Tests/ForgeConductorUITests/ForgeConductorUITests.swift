@@ -17,6 +17,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     var app: XCUIApplication!
     var testHome: URL!
     private var operatorFixture: OperatorManagerUITestFixture?
+    private var guidedModeDefaultsSuite: String?
 
     nonisolated override func setUpWithError() throws {
         MainActor.assumeIsolated {
@@ -27,6 +28,8 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app.launchArguments += ["--uitesting"]
             app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = testHome.path
             app.launchEnvironment["FORGE_SKIP_PS"] = "1"
+            guidedModeDefaultsSuite = "com.forge-conductor.guided-ui.\(testHome.lastPathComponent)"
+            app.launchEnvironment["FORGE_GUIDED_MODE_DEFAULTS_SUITE"] = guidedModeDefaultsSuite
             app.launch()
         }
     }
@@ -37,6 +40,11 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app = nil
             operatorFixture?.stop()
             operatorFixture = nil
+            if let guidedModeDefaultsSuite {
+                UserDefaults(suiteName: guidedModeDefaultsSuite)?
+                    .removePersistentDomain(forName: guidedModeDefaultsSuite)
+            }
+            guidedModeDefaultsSuite = nil
             if let testHome {
                 try? FileManager.default.removeItem(at: testHome)
             }
@@ -117,38 +125,118 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.windows.firstMatch.exists)
     }
 
-    func testSetupGuideExplainsProviderProjectsAndOrderedPackages() throws {
+    func testGuidedModeRoutesEveryPrimaryViewToItsOwnGuide() throws {
+        let guidedMode = app.descendants(matching: .any)["toolbar-guided-mode"]
+        XCTAssertTrue(guidedMode.waitForExistence(timeout: 8))
+
+        let tabs: [(id: String, title: String)] = [
+            ("tab-rig", "FORGE RIG guide"),
+            ("tab-mcp", "LM Studio MCP guide"),
+            ("tab-agents", "Agents guide"),
+            ("tab-tools", "Tools guide"),
+            ("tab-feed", "Live Feed guide"),
+            ("tab-projects", "Projects guide"),
+            ("tab-autonomy", "Autonomy guide"),
+            ("tab-continuity", "Continuity guide"),
+            ("tab-runtimes", "Runtimes guide"),
+            ("tab-provider", "Model connection guide"),
+            ("tab-evidence", "Events & Evidence guide"),
+            ("tab-diagnostics", "Diagnostics guide"),
+            ("tab-manager", "Manager guide"),
+        ]
         let guideButton = app.buttons["toolbar-setup-guide"]
         XCTAssertTrue(
             guideButton.waitForExistence(timeout: 8),
-            "The setup guide must remain available after first launch"
+            "Contextual help must remain available after first launch"
         )
-        guideButton.click()
 
-        let guide = app.descendants(matching: .any)["setup-guide"]
-        XCTAssertTrue(guide.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Start LM Studio"].exists)
+        for tab in tabs {
+            let tabButton = app.buttons[tab.id]
+            XCTAssertTrue(tabButton.waitForExistence(timeout: 5), "Missing \(tab.id)")
+            tabButton.click()
+            guideButton.click()
+            XCTAssertTrue(
+                app.descendants(matching: .any)["guided-help-sheet"].waitForExistence(timeout: 5),
+                "Guide sheet did not open for \(tab.id)"
+            )
+            XCTAssertTrue(
+                app.staticTexts[tab.title].waitForExistence(timeout: 3),
+                "Wrong guide routed for \(tab.id)"
+            )
+            app.buttons["guided-help-close"].click()
+            XCTAssertTrue(waitUntil(timeout: 2) {
+                !self.app.descendants(matching: .any)["guided-help-sheet"].exists
+            })
+        }
+    }
 
-        let next = app.buttons["Next"]
-        XCTAssertTrue(next.waitForExistence(timeout: 3))
-        next.click()
-        XCTAssertTrue(app.staticTexts["Configure Provider"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Open Provider"].exists)
+    func testGuidedModePersistsAndGuideClosesFromKeyboard() throws {
+        var toggle = app.descendants(matching: .any)["toolbar-guided-mode"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8))
+        let wasEnabled = guidedModeIsEnabled(toggle)
+        if !wasEnabled { toggle.click() }
 
-        next.click()
-        XCTAssertTrue(app.staticTexts["Authorize and Register"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Open Manager"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["guided-inline-rig"].waitForExistence(timeout: 3)
+        )
 
-        next.click()
-        XCTAssertTrue(app.staticTexts["Add Instruction Packages"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Open Projects"].exists)
+        app.terminate()
+        app.launch()
+        toggle = app.descendants(matching: .any)["toolbar-guided-mode"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(guidedModeIsEnabled(toggle))
+        XCTAssertTrue(app.descendants(matching: .any)["guided-inline-rig"].waitForExistence(timeout: 3))
 
-        next.click()
-        XCTAssertTrue(app.staticTexts["Run in Order"].waitForExistence(timeout: 3))
-        let finish = app.buttons["Finish Setup Guide"]
-        XCTAssertTrue(finish.exists)
-        finish.click()
-        XCTAssertFalse(guide.waitForExistence(timeout: 2))
+        let help = app.buttons["toolbar-setup-guide"]
+        XCTAssertTrue(help.waitForExistence(timeout: 3))
+        help.click()
+        XCTAssertTrue(app.staticTexts["FORGE RIG guide"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["What Forge handles automatically"].exists)
+        XCTAssertTrue(app.staticTexts["Controls"].exists)
+        XCTAssertTrue(app.staticTexts["Status meanings"].exists)
+        XCTAssertTrue(app.buttons["guided-help-close"].exists)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(waitUntil(timeout: 3) {
+            !self.app.descendants(matching: .any)["guided-help-sheet"].exists
+        })
+
+        if !wasEnabled { toggle.click() }
+    }
+
+    private func guidedModeIsEnabled(_ element: XCUIElement) -> Bool {
+        if let number = element.value as? NSNumber {
+            return number.boolValue
+        }
+        return (element.value as? String) == "1"
+    }
+
+    func testStartTaskGuidePreservesEnteredInstructions() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let autonomy = app.buttons["tab-autonomy"]
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+        let start = app.buttons["autonomy-start"]
+        XCTAssertTrue(waitForEnabled(start, timeout: 5))
+        start.click()
+
+        let mission = app.descendants(matching: .any)["run-start-mission"]
+        XCTAssertTrue(
+            mission.waitForExistence(timeout: 5),
+            "Start Task draft field was not accessibility-visible:\n\(app.debugDescription)"
+        )
+        mission.click()
+        mission.typeText("Preserve this task draft")
+
+        let help = app.buttons["guided-help-autonomyStartTask"]
+        XCTAssertTrue(help.waitForExistence(timeout: 3))
+        help.click()
+        XCTAssertTrue(app.staticTexts["Start Task guide"].waitForExistence(timeout: 3))
+        app.buttons["guided-help-close"].click()
+
+        XCTAssertEqual(mission.value as? String, "Preserve this task draft")
+        app.buttons["run-start-cancel"].click()
     }
 
     func testManagerShowsProjectShellPolicyControls() throws {

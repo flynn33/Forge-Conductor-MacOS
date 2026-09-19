@@ -107,8 +107,14 @@ product set.
    changes apply only to future preparations.
 7. Review the run's events and evidence.
 
-The current setup guide can be reopened from the question-mark toolbar button.
-Comprehensive current-view help is tracked as an open remediation milestone.
+Use the **Guided Mode** toolbar toggle to show or hide concise, state-aware
+guidance in the current view. The setting persists across relaunch. The
+question-mark toolbar button opens the complete offline guide for the selected
+tab; help buttons inside Start Task, project registration, task capabilities,
+completion checks, instruction queues, provider credentials, runtime jobs, and
+project lifecycle controls open their more specific guides without changing the
+underlying form or task state. The first-use setup guide remains a separate
+onboarding index. See [Guided Mode](docs/GUIDED-MODE.md).
 
 ## Project lifecycle
 

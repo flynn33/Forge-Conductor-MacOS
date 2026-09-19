@@ -177,6 +177,15 @@
 		A26B00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift */; };
 		A26B00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift */; };
 		A26B00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift */; };
+		R3B000000000000000000001 /* GuidedMode/GuidedHelpContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000001 /* GuidedMode/GuidedHelpContext.swift */; };
+		R3B000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift */; };
+		R3B000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift */; };
+		R3B000000000000000000004 /* GuidedMode/GuidedModeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000004 /* GuidedMode/GuidedModeCoordinator.swift */; };
+		R3B000000000000000000005 /* GuidedMode/GuidedHelpState.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000005 /* GuidedMode/GuidedHelpState.swift */; };
+		R3B000000000000000000006 /* GuidedMode/GuidedInlineHelp.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000006 /* GuidedMode/GuidedInlineHelp.swift */; };
+		R3B000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift */; };
+		R3B000000000000000000008 /* Resources/GuidedHelpCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */; };
+		R3B000000000000000000009 /* GuidedModeAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000009 /* GuidedModeAppTests.swift */; };
 		A38C1D60A02CC1E25BD6C7B1 /* ManagerNativeTaskAttachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */; };
 		A462A9FF129C4AACAD2912CC /* ForgeConductorMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC7D134862743548715243E /* ForgeConductorMain.swift */; };
 		A965A476C3D44982C5B43365 /* ContinuityControlRoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7BA1F3E45BC2FB4CF4C30A4 /* ContinuityControlRoleTests.swift */; };
@@ -731,6 +740,15 @@
 		A26F00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/ProjectsOperatorView.swift; sourceTree = "<group>"; };
 		A26F00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/ProviderOperatorView.swift; sourceTree = "<group>"; };
 		A26F00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/RuntimesOperatorView.swift; sourceTree = "<group>"; };
+		R3F000000000000000000001 /* GuidedMode/GuidedHelpContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedHelpContext.swift; sourceTree = "<group>"; };
+		R3F000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedControlAnchor.swift; sourceTree = "<group>"; };
+		R3F000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedHelpCatalog.swift; sourceTree = "<group>"; };
+		R3F000000000000000000004 /* GuidedMode/GuidedModeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedModeCoordinator.swift; sourceTree = "<group>"; };
+		R3F000000000000000000005 /* GuidedMode/GuidedHelpState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedHelpState.swift; sourceTree = "<group>"; };
+		R3F000000000000000000006 /* GuidedMode/GuidedInlineHelp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedInlineHelp.swift; sourceTree = "<group>"; };
+		R3F000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedHelpSheet.swift; sourceTree = "<group>"; };
+		R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Resources/GuidedHelpCatalog.json; sourceTree = "<group>"; };
+		R3F000000000000000000009 /* GuidedModeAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedModeAppTests.swift; sourceTree = "<group>"; };
 		A315ED797874434C8A261B11 /* Application/AgentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AgentCatalog.swift; sourceTree = "<group>"; };
 		A3A912701042491E96B07D2B /* Views/Rig/RigDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Rig/RigDashboardView.swift; sourceTree = "<group>"; };
 		A42DFDE9DBABDC4C5BB05379 /* Domain/NativeContinuitySourceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/NativeContinuitySourceModels.swift; sourceTree = "<group>"; };
@@ -1040,6 +1058,7 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				R3F000000000000000000009 /* GuidedModeAppTests.swift */,
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
 				B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */,
@@ -1211,6 +1230,13 @@
 		DB59238523D446A9AC5B2534 /* ForgeConductorApp */ = {
 			isa = PBXGroup;
 			children = (
+				R3F000000000000000000001 /* GuidedMode/GuidedHelpContext.swift */,
+				R3F000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift */,
+				R3F000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift */,
+				R3F000000000000000000004 /* GuidedMode/GuidedModeCoordinator.swift */,
+				R3F000000000000000000005 /* GuidedMode/GuidedHelpState.swift */,
+				R3F000000000000000000006 /* GuidedMode/GuidedInlineHelp.swift */,
+				R3F000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift */,
 				A26F00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift */,
 				A26F00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift */,
 				A26F00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift */,
@@ -1251,6 +1277,7 @@
 				402D3A8F1F4E4EA3B641F2F2 /* Metal/MetalGaugeKit.swift */,
 				D43949241CEC4465B715CE8A /* Resources/Assets.xcassets */,
 				0E4AA80EB2DB42C2A4F5D96F /* Resources/Forge-Conductor.icns */,
+				R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */,
 			);
 			path = ForgeConductorApp;
 			sourceTree = "<group>";
@@ -1793,6 +1820,7 @@
 			files = (
 				B074848A95504C7C892A2AA3 /* Resources/Assets.xcassets in Resources */,
 				EA0B411478214153ACFF0171 /* Resources/Forge-Conductor.icns in Resources */,
+				R3B000000000000000000008 /* Resources/GuidedHelpCatalog.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1968,6 +1996,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				R3B000000000000000000009 /* GuidedModeAppTests.swift in Sources */,
 				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
 				B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */,
 				B09B00000000000000000056 /* NativeGaugeLifecycleTests.swift in Sources */,
@@ -1980,6 +2009,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				R3B000000000000000000001 /* GuidedMode/GuidedHelpContext.swift in Sources */,
+				R3B000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift in Sources */,
+				R3B000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift in Sources */,
+				R3B000000000000000000004 /* GuidedMode/GuidedModeCoordinator.swift in Sources */,
+				R3B000000000000000000005 /* GuidedMode/GuidedHelpState.swift in Sources */,
+				R3B000000000000000000006 /* GuidedMode/GuidedInlineHelp.swift in Sources */,
+				R3B000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift in Sources */,
 				A26B00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift in Sources */,
 				A26B00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift in Sources */,
 				A26B00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift in Sources */,

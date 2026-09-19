@@ -120,6 +120,7 @@ struct AutonomyOperatorView: View {
             Text("Run \(run.runID)\n\(run.mission)\nThe manager will persist cancellation, stop active provider work and runtime jobs, and fence late results.")
         }
         .task { viewModel.load() }
+        .guidedHelpState(viewModel.guidedHelpState, for: .autonomy)
         .accessibilityIdentifier("autonomy-operator-view")
     }
 
@@ -158,7 +159,7 @@ struct AutonomyOperatorView: View {
                 }
             }
 
-            GroupBox("Completion checks") {
+            GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     if run.completionGates.isEmpty {
                         Text("No completion-gate projection was published.")
@@ -182,6 +183,12 @@ struct AutonomyOperatorView: View {
                     Text("Prepare the signed XCTest package in Forge's protected home first. The imported policy must match this run, project generation, and completion gates.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            } label: {
+                HStack {
+                    Text("Completion checks")
+                    Spacer()
+                    GuidedHelpButton(context: .autonomyCompletionChecks)
                 }
             }
 
@@ -226,7 +233,11 @@ struct AutonomyOperatorView: View {
 
     private var startSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Start Task").font(.title2.bold())
+            HStack {
+                Text("Start Task").font(.title2.bold())
+                Spacer()
+                GuidedHelpButton(context: .autonomyStartTask)
+            }
             Text("Choose the project, then type, paste, drop, or select the instructions and start. Forge supplies the saved model, task capabilities, completion checks, and continuity defaults.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -262,6 +273,7 @@ struct AutonomyOperatorView: View {
                     } else {
                         Text("Drop a file, folder, or ZIP here")
                             .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("run-start-instruction-drop-target")
                     }
                 }
                 .font(.caption)
@@ -271,7 +283,6 @@ struct AutonomyOperatorView: View {
                 guard let source = urls.first else { return false }
                 return viewModel.setInstructionSource(source)
             }
-            .accessibilityIdentifier("run-start-instruction-drop-target")
 
             GroupBox("Forge preparation") {
                 VStack(alignment: .leading, spacing: 7) {
@@ -358,10 +369,11 @@ struct AutonomyOperatorView: View {
         }
         .padding(22)
         .frame(width: 620)
+        .guidedHelpContext(.autonomyStartTask)
     }
 
     private var toolPermissionEditor: some View {
-        GroupBox("Task capabilities") {
+        GroupBox {
             if let permissions = viewModel.toolPermissions {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack(spacing: 12) {
@@ -466,6 +478,12 @@ struct AutonomyOperatorView: View {
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityIdentifier("run-tools-loading")
+            }
+        } label: {
+            HStack {
+                Text("Task capabilities")
+                Spacer()
+                GuidedHelpButton(context: .autonomyToolSelection)
             }
         }
     }

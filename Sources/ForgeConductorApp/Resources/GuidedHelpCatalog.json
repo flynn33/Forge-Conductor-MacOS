@@ -1,0 +1,1149 @@
+{
+  "schema_version": "1.0.0",
+  "baseline_commit": "5e0ffcc15624ac37afe34bf3047620efae2d1437",
+  "required_sections": [
+    "purpose",
+    "forge_handles_automatically",
+    "controls",
+    "status_meanings",
+    "normal_workflow",
+    "troubleshooting",
+    "advanced_details"
+  ],
+  "contexts": [
+    {
+      "id": "rig",
+      "title": "FORGE RIG guide",
+      "purpose": "Understand live system, model, tool, and orchestration telemetry without treating it as setup.",
+      "forge_handles_automatically": [
+        "Collect and coalesce supported telemetry",
+        "Mark unavailable or stale measurements",
+        "Keep active automation manager-owned"
+      ],
+      "controls": [
+        "Refresh",
+        "Auto-refresh",
+        "Instrument panels",
+        "History traces",
+        "Activity panels"
+      ],
+      "status_meanings": [
+        "live: recent measurements",
+        "stale: last sample exceeded freshness window",
+        "unavailable: collector or source cannot provide a verified value",
+        "disconnected: source is not currently reachable"
+      ],
+      "normal_workflow": [
+        "Use the Rig to observe health and load",
+        "Open the relevant feature tab to change behavior"
+      ],
+      "troubleshooting": [
+        "No data: check Manager and provider status",
+        "Stale data: refresh and inspect source age",
+        "A missing metric is not evidence of zero usage"
+      ],
+      "advanced_details": [
+        "Sampling cadence",
+        "Measurement source and scope",
+        "Raw identifiers and collector diagnostics"
+      ],
+      "control_anchors": [
+        "toolbar-refresh",
+        "toolbar-auto-refresh"
+      ]
+    },
+    {
+      "id": "mcp",
+      "title": "LM Studio MCP guide",
+      "purpose": "Explain Forge MCP registration, primary/fallback roles, connection state, and repair actions.",
+      "forge_handles_automatically": [
+        "Inspect installed registration",
+        "Preserve valid registrations",
+        "Report exact missing/changed configuration"
+      ],
+      "controls": [
+        "Install or repair integration",
+        "Refresh status",
+        "Open registration details"
+      ],
+      "status_meanings": [
+        "connected",
+        "partially configured",
+        "missing",
+        "stale registration",
+        "process unavailable"
+      ],
+      "normal_workflow": [
+        "Start LM Studio if needed",
+        "Use the repair action only when status requires it",
+        "Return to the task; normal Autonomy preparation rechecks readiness"
+      ],
+      "troubleshooting": [
+        "LM Studio closed",
+        "registration points to missing binary",
+        "primary/fallback mismatch"
+      ],
+      "advanced_details": [
+        "Exact command, arguments, binary path, and process identity"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "agents",
+      "title": "Agents guide",
+      "purpose": "Explain managed roles, playbooks, sessions, grants, and their limits.",
+      "forge_handles_automatically": [
+        "Load available playbooks",
+        "Track active sessions and current role binding"
+      ],
+      "controls": [
+        "Inspect role",
+        "Start role session",
+        "Complete or end session"
+      ],
+      "status_meanings": [
+        "available",
+        "active",
+        "closed",
+        "superseded",
+        "blocked by permissions"
+      ],
+      "normal_workflow": [
+        "Choose a role only when a specialized playbook is useful",
+        "Understand that a role is not automatically a separate model worker"
+      ],
+      "troubleshooting": [
+        "Unexpected restrictions: inspect the active role grant",
+        "Old session: select current project/run context"
+      ],
+      "advanced_details": [
+        "Playbook body",
+        "Tool grants",
+        "Session IDs and reports"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "tools",
+      "title": "Tools guide",
+      "purpose": "Explain the registered tool catalog, availability, project permissions, and frozen run grants.",
+      "forge_handles_automatically": [
+        "Discover authoritative tool catalog",
+        "Reconcile project preferences with availability",
+        "Freeze exact grants per run"
+      ],
+      "controls": [
+        "Search tools",
+        "Inspect category",
+        "Open project tool selector",
+        "Allow all tools",
+        "Restore recommended"
+      ],
+      "status_meanings": [
+        "available",
+        "selected",
+        "denied by policy",
+        "runtime unavailable",
+        "not authorized",
+        "removed from catalog"
+      ],
+      "normal_workflow": [
+        "Ordinary tasks use saved recommended permissions",
+        "Customize with checkboxes when desired",
+        "Use Allow all to select all eligible tools"
+      ],
+      "troubleshooting": [
+        "Visible but unusable: inspect denial reason",
+        "Missing runtime: open Runtimes only if current task needs it"
+      ],
+      "advanced_details": [
+        "Tool ID",
+        "catalog revision",
+        "authorization scope",
+        "schema exposure"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "liveFeed",
+      "title": "Live Feed guide",
+      "purpose": "Interpret manager, provider, tool, runtime, continuity, and completion events.",
+      "forge_handles_automatically": [
+        "Persist authoritative events",
+        "Order and timestamp events",
+        "Redact protected values"
+      ],
+      "controls": [
+        "Filter",
+        "Refresh",
+        "Select event",
+        "Open related run/project"
+      ],
+      "status_meanings": [
+        "info",
+        "warning",
+        "error",
+        "retry",
+        "completed",
+        "quarantined"
+      ],
+      "normal_workflow": [
+        "Use the feed to understand what happened",
+        "Open the owning feature for corrective action"
+      ],
+      "troubleshooting": [
+        "Activity without completion: inspect Completion checks",
+        "Repeated retry: inspect the latest classified error"
+      ],
+      "advanced_details": [
+        "Event IDs",
+        "operation IDs",
+        "hash chain and raw metadata"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "projects",
+      "title": "Projects guide",
+      "purpose": "Register project folders, manage exact project identity, add instruction packages, and inspect memory/continuity health.",
+      "forge_handles_automatically": [
+        "Authorize the selected folder during registration",
+        "Create durable project identity and generation",
+        "Initialize memory and instruction queue"
+      ],
+      "controls": [
+        "Register Project",
+        "Add Instructions",
+        "Reorder packages",
+        "Start ordered work",
+        "Relink",
+        "Remove",
+        "Reset generation",
+        "Clear content"
+      ],
+      "status_meanings": [
+        "active",
+        "maintenance",
+        "removed",
+        "generation fenced",
+        "memory healthy",
+        "instruction ready",
+        "instruction unresolved"
+      ],
+      "normal_workflow": [
+        "Register the folder",
+        "Add package(s)",
+        "Review import report",
+        "Arrange order",
+        "Start"
+      ],
+      "troubleshooting": [
+        "Folder moved: Relink",
+        "Import unresolved: open file-specific details",
+        "Unknown registration outcome: Reconcile Registration"
+      ],
+      "advanced_details": [
+        "Project UUID",
+        "repository fingerprint",
+        "generation",
+        "bindings",
+        "reset receipts"
+      ],
+      "control_anchors": [
+        "project-register",
+        "project-remove",
+        "project-reset"
+      ]
+    },
+    {
+      "id": "projectRegistration",
+      "title": "Register Project guide",
+      "purpose": "Select a repository folder and let Forge authorize and register it in one operation.",
+      "forge_handles_automatically": [
+        "Canonicalize path",
+        "Preserve existing authorized roots",
+        "Detect repository identity",
+        "Create/reconcile durable registration"
+      ],
+      "controls": [
+        "Choose folder",
+        "Optional display name",
+        "Register",
+        "Cancel",
+        "Reconcile"
+      ],
+      "status_meanings": [
+        "ready to register",
+        "registering",
+        "registered",
+        "already registered",
+        "reconciliation required",
+        "not a usable folder"
+      ],
+      "normal_workflow": [
+        "Choose the project root",
+        "Confirm",
+        "Wait for exact receipt"
+      ],
+      "troubleshooting": [
+        "Permission denied: choose again",
+        "Lost response: Reconcile",
+        "Different repository at old path: do not relink blindly"
+      ],
+      "advanced_details": [
+        "Canonical path",
+        "bookmark/authorization",
+        "fingerprint",
+        "project UUID"
+      ],
+      "control_anchors": [
+        "project-register"
+      ]
+    },
+    {
+      "id": "instructionImport",
+      "title": "Add Instructions guide",
+      "purpose": "Import files, folders, pasted text, or archives while preserving every source and reporting conversion coverage.",
+      "forge_handles_automatically": [
+        "Preserve original bytes",
+        "Inventory every item",
+        "Convert supported content",
+        "Hash and publish immutable artifact",
+        "Create bounded catalog"
+      ],
+      "controls": [
+        "Choose file/folder/archive",
+        "Drop items",
+        "Paste quick instructions",
+        "Review import report",
+        "Cancel"
+      ],
+      "status_meanings": [
+        "converted instruction",
+        "retained attachment",
+        "unrepresented content",
+        "unresolved conversion",
+        "ready"
+      ],
+      "normal_workflow": [
+        "Add source",
+        "Review every-file accounting",
+        "Resolve only named conversion issues",
+        "Queue the ready artifact"
+      ],
+      "troubleshooting": [
+        "Encrypted file: provide credential when supported",
+        "Malformed file: replace or repair source",
+        "Unknown format: install/implement decoder; original remains preserved"
+      ],
+      "advanced_details": [
+        "SHA-256",
+        "converter version",
+        "canonical references",
+        "byte counts"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "instructionQueue",
+      "title": "Instruction Queue guide",
+      "purpose": "Order imported assignments and understand queue state and autonomous advancement.",
+      "forge_handles_automatically": [
+        "Persist order",
+        "Reserve one eligible package",
+        "Bind run to project generation",
+        "Advance only after accepted outcome"
+      ],
+      "controls": [
+        "Drag to reorder",
+        "Start",
+        "Pause",
+        "Retry",
+        "Cancel",
+        "Remove non-running item"
+      ],
+      "status_meanings": [
+        "queued",
+        "reserved",
+        "running",
+        "checking",
+        "completed",
+        "blocked",
+        "failed",
+        "cancelled"
+      ],
+      "normal_workflow": [
+        "Arrange packages",
+        "Start ordered autonomy",
+        "Review current item and blockers"
+      ],
+      "troubleshooting": [
+        "Blocked import: inspect unresolved documents",
+        "Failed run: open Autonomy and Evidence",
+        "Stale generation: refresh project"
+      ],
+      "advanced_details": [
+        "Queue revision",
+        "lease",
+        "package hash",
+        "run binding"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "projectRelink",
+      "title": "Relink Project guide",
+      "purpose": "Reconnect an existing durable project identity after its repository folder moves.",
+      "forge_handles_automatically": [
+        "Verify the replacement repository identity",
+        "Advance and fence the project generation transactionally",
+        "Preserve memory, history, and exact project ownership"
+      ],
+      "controls": [
+        "Choose replacement folder",
+        "Relink",
+        "Reconcile",
+        "Cancel"
+      ],
+      "status_meanings": [
+        "ready",
+        "relinking",
+        "relinked",
+        "identity mismatch",
+        "reconciliation required",
+        "busy"
+      ],
+      "normal_workflow": [
+        "Choose the moved repository folder",
+        "Confirm its identity",
+        "Wait for the committed generation receipt"
+      ],
+      "troubleshooting": [
+        "Identity mismatch: choose the original repository, not a different checkout",
+        "Lost response: use Reconcile without submitting a different path",
+        "Busy: wait for the current project transition to finish"
+      ],
+      "advanced_details": [
+        "Repository fingerprint",
+        "prior and new generation",
+        "transition authority and receipt"
+      ],
+      "control_anchors": [
+        "project-relink",
+        "project-relink-reconcile"
+      ]
+    },
+    {
+      "id": "projectReset",
+      "title": "Reset Project guide",
+      "purpose": "Start a new fenced project generation while preserving durable history and protected state.",
+      "forge_handles_automatically": [
+        "Fence the prior generation",
+        "Invalidate stale bindings and prepared work",
+        "Publish a durable reset receipt"
+      ],
+      "controls": [
+        "Reset generation",
+        "Confirm",
+        "Dismiss receipt"
+      ],
+      "status_meanings": [
+        "ready",
+        "resetting",
+        "reset complete",
+        "busy",
+        "reconciliation required"
+      ],
+      "normal_workflow": [
+        "Use reset only when existing project execution state must be fenced",
+        "Confirm the selected project",
+        "Review the new generation receipt"
+      ],
+      "troubleshooting": [
+        "Active transition: wait or reconcile it first",
+        "Unexpected generation: refresh before retrying"
+      ],
+      "advanced_details": [
+        "Prior and new generation",
+        "invalidated bindings",
+        "reset receipt identity"
+      ],
+      "control_anchors": [
+        "project-reset",
+        "project-reset-receipt"
+      ]
+    },
+    {
+      "id": "projectContentClear",
+      "title": "Clear Project Content guide",
+      "purpose": "Remove selected project-owned content through an explicit durable maintenance operation.",
+      "forge_handles_automatically": [
+        "Apply the selected clear mode only to the exact project",
+        "Preserve protected identities and unrelated projects",
+        "Return a reconciled maintenance receipt"
+      ],
+      "controls": [
+        "Clear content",
+        "Clear mode",
+        "Confirm",
+        "Reconcile",
+        "Cancel"
+      ],
+      "status_meanings": [
+        "ready",
+        "clearing",
+        "completed",
+        "partially reconciled",
+        "failed"
+      ],
+      "normal_workflow": [
+        "Select the narrowest clear mode",
+        "Review the affected content",
+        "Confirm and retain the receipt"
+      ],
+      "troubleshooting": [
+        "Unknown outcome: reconcile the exact maintenance request",
+        "Busy project: allow active ownership to quiesce"
+      ],
+      "advanced_details": [
+        "Maintenance operation identity",
+        "generation scope",
+        "removed content counts"
+      ],
+      "control_anchors": [
+        "project-clear-content",
+        "project-clear-mode",
+        "project-clear-reconcile"
+      ]
+    },
+    {
+      "id": "autonomy",
+      "title": "Autonomy guide",
+      "purpose": "Start and monitor manager-owned tasks with automatic provider preparation, tool selection, completion checks, and continuity.",
+      "forge_handles_automatically": [
+        "Prepare provider/model",
+        "Resolve project tool grant",
+        "Select runtimes",
+        "Create completion plan",
+        "Enable managed continuity",
+        "Persist and recover the run"
+      ],
+      "controls": [
+        "Start Task",
+        "Customize tools",
+        "View completion checks",
+        "Pause",
+        "Resume",
+        "Cancel",
+        "Retry",
+        "Refresh"
+      ],
+      "status_meanings": [
+        "preparing",
+        "ready",
+        "starting",
+        "running",
+        "saving progress",
+        "switching session",
+        "checking",
+        "completed",
+        "needs attention",
+        "waiting"
+      ],
+      "normal_workflow": [
+        "Choose project",
+        "Choose/add instructions",
+        "Review Ready summary",
+        "Start",
+        "Monitor progress"
+      ],
+      "troubleshooting": [
+        "Start disabled: open preparation explanation",
+        "Provider missing: use the one offered recovery action",
+        "Run blocked: inspect classified reason and Retry"
+      ],
+      "advanced_details": [
+        "Run UUID",
+        "provider/adapter/model revision",
+        "lease",
+        "session/operation IDs"
+      ],
+      "control_anchors": [
+        "autonomy-start",
+        "run-pause",
+        "run-resume",
+        "run-cancel",
+        "run-retry"
+      ]
+    },
+    {
+      "id": "autonomyStartTask",
+      "title": "Start Task guide",
+      "purpose": "Create a task using only a project and instruction artifact; all technical defaults are manager-owned.",
+      "forge_handles_automatically": [
+        "Resolve saved/default model",
+        "Load project permissions",
+        "Derive checks",
+        "Establish continuity",
+        "Fence stale preparation"
+      ],
+      "controls": [
+        "Project selector",
+        "Instructions selector/Add Instructions",
+        "Customize tools",
+        "Optional model override",
+        "Network override",
+        "Start Task"
+      ],
+      "status_meanings": [
+        "checking",
+        "preparing automatically",
+        "ready",
+        "one action required",
+        "blocked external dependency",
+        "failed"
+      ],
+      "normal_workflow": [
+        "Select project",
+        "Select/add instructions",
+        "Wait for Ready",
+        "Start"
+      ],
+      "troubleshooting": [
+        "Unresolved package: open import report",
+        "Multiple equally suitable models: choose one",
+        "Lost start response: Forge reconciles same run identity"
+      ],
+      "advanced_details": [
+        "Prepared descriptor revision",
+        "catalog revision",
+        "provider configuration revision"
+      ],
+      "control_anchors": [
+        "run-start-project",
+        "run-start-confirm",
+        "run-preparation-recovery"
+      ]
+    },
+    {
+      "id": "autonomyToolSelection",
+      "title": "Task capabilities guide",
+      "purpose": "Choose tools through checkboxes; never type tool identifiers.",
+      "forge_handles_automatically": [
+        "Load authoritative catalog",
+        "Apply project preference",
+        "Explain exclusions",
+        "Freeze exact run grant"
+      ],
+      "controls": [
+        "Allow all tools",
+        "Category checkboxes",
+        "Individual checkboxes",
+        "Search",
+        "Select none",
+        "Restore recommended"
+      ],
+      "status_meanings": [
+        "checked",
+        "unchecked",
+        "mixed",
+        "unavailable",
+        "denied",
+        "selected but now unavailable"
+      ],
+      "normal_workflow": [
+        "Use recommended by default",
+        "Choose Allow all for all eligible tools",
+        "Deselect exceptions",
+        "Return to Start Task"
+      ],
+      "troubleshooting": [
+        "Cannot select: read the eligibility reason",
+        "Catalog changed: refresh preparation"
+      ],
+      "advanced_details": [
+        "Tool IDs",
+        "catalog revision",
+        "authorization scope"
+      ],
+      "control_anchors": [
+        "run-tools-allow-all",
+        "run-tools-select-none",
+        "run-tools-restore-recommended",
+        "run-tools-search"
+      ]
+    },
+    {
+      "id": "autonomyCompletionChecks",
+      "title": "Completion checks guide",
+      "purpose": "Explain the task-specific checks Forge will run and the evidence needed for completion.",
+      "forge_handles_automatically": [
+        "Derive obligations",
+        "Execute built-in checks",
+        "Bind evidence to final work",
+        "Retain failed attempts as history"
+      ],
+      "controls": [
+        "View checks",
+        "Retry failed check",
+        "Open evidence",
+        "Advanced custom policy"
+      ],
+      "status_meanings": [
+        "pending",
+        "running",
+        "passed",
+        "failed recoverable",
+        "blocked dependency",
+        "review required"
+      ],
+      "normal_workflow": [
+        "Review automatic plan",
+        "Let Forge execute task",
+        "Inspect only when a check needs attention"
+      ],
+      "troubleshooting": [
+        "Earlier passing evidence stale after changes",
+        "Custom policy missing",
+        "Subjective requirement needs review"
+      ],
+      "advanced_details": [
+        "Obligation IDs",
+        "validator versions",
+        "evidence hashes"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "continuity",
+      "title": "Continuity guide",
+      "purpose": "Explain how Forge saves progress, creates a fresh managed session, restores exact task state, and continues automatically.",
+      "forge_handles_automatically": [
+        "Monitor context",
+        "Save checkpoints",
+        "Quiesce predecessor",
+        "Create and validate successor",
+        "Fence predecessor",
+        "Recover after restart"
+      ],
+      "controls": [
+        "Save progress now",
+        "Start a fresh session and continue",
+        "Select task",
+        "Open Technical details"
+      ],
+      "status_meanings": [
+        "ready",
+        "monitoring",
+        "saving progress",
+        "rollover queued",
+        "quiescing",
+        "creating successor",
+        "restoring",
+        "continuing",
+        "waiting for provider",
+        "blocked",
+        "external-only"
+      ],
+      "normal_workflow": [
+        "No setup required",
+        "Open to observe protection",
+        "Use advanced actions only when desired or instructed"
+      ],
+      "troubleshooting": [
+        "Provider unavailable: progress remains saved",
+        "Duplicate successor: Forge accepts one and quarantines others",
+        "External host: automatic chat creation unavailable"
+      ],
+      "advanced_details": [
+        "Budget source/confidence",
+        "checkpoint/handoff IDs",
+        "checksums",
+        "nonce",
+        "predecessor/successor",
+        "fencing"
+      ],
+      "control_anchors": [
+        "checkpoint-command",
+        "rollover-command",
+        "context-gauge"
+      ]
+    },
+    {
+      "id": "continuitySaveProgress",
+      "title": "Save progress now guide",
+      "purpose": "Request a durable checkpoint without ending the active managed session.",
+      "forge_handles_automatically": [
+        "Validate active run/session and current observation",
+        "Persist exact run/package progress"
+      ],
+      "controls": [
+        "Save progress now",
+        "Cancel"
+      ],
+      "status_meanings": [
+        "eligible",
+        "saving",
+        "saved",
+        "not eligible",
+        "failed"
+      ],
+      "normal_workflow": [
+        "Select running managed task",
+        "Request save",
+        "Continue work"
+      ],
+      "troubleshooting": [
+        "No accepted session",
+        "another continuity action active",
+        "run not running"
+      ],
+      "advanced_details": [
+        "Checkpoint ID",
+        "observation binding",
+        "action epoch"
+      ],
+      "control_anchors": [
+        "checkpoint-command"
+      ]
+    },
+    {
+      "id": "continuityFreshSession",
+      "title": "Fresh session and continue guide",
+      "purpose": "Request an early managed rollover while preserving and automatically resuming the task.",
+      "forge_handles_automatically": [
+        "Quiesce",
+        "reconcile tools",
+        "persist handoff",
+        "create successor",
+        "acknowledge",
+        "fence",
+        "continue"
+      ],
+      "controls": [
+        "Start a fresh session and continue",
+        "Cancel"
+      ],
+      "status_meanings": [
+        "eligible",
+        "queued",
+        "switching",
+        "restoring",
+        "continued",
+        "blocked"
+      ],
+      "normal_workflow": [
+        "Use only when an early fresh context is desirable",
+        "Observe progress; no IDs need to be copied"
+      ],
+      "troubleshooting": [
+        "In-flight ambiguous tool",
+        "provider unavailable",
+        "external compatibility mode"
+      ],
+      "advanced_details": [
+        "Operation ID",
+        "handoff SHA",
+        "successor receipt"
+      ],
+      "control_anchors": [
+        "rollover-command"
+      ]
+    },
+    {
+      "id": "runtimes",
+      "title": "Runtimes guide",
+      "purpose": "Explain the programs Forge uses for builds, tests, scripts, and commands and which ones the selected task needs.",
+      "forge_handles_automatically": [
+        "Probe runtime capabilities",
+        "Classify required/optional/not needed",
+        "Select suitable runtime for jobs"
+      ],
+      "controls": [
+        "Task selector",
+        "Shell policy",
+        "Runtime rows",
+        "Job list",
+        "Cancel job",
+        "Technical details"
+      ],
+      "status_meanings": [
+        "available",
+        "not installed",
+        "disabled by policy",
+        "not authorized",
+        "probe failed",
+        "unknown",
+        "not required"
+      ],
+      "normal_workflow": [
+        "Review runtimes for current task",
+        "Act only on a required missing item",
+        "Inspect jobs when a task runs commands"
+      ],
+      "troubleshooting": [
+        "Python missing but not required: no action",
+        "Required runtime missing: follow the exact install/select action",
+        "Unknown: retry probe"
+      ],
+      "advanced_details": [
+        "Executable path/version",
+        "timeouts",
+        "quotas",
+        "network policy",
+        "job IDs"
+      ],
+      "control_anchors": [
+        "runtime-shell-enabled",
+        "runtime-job-cancel"
+      ]
+    },
+    {
+      "id": "runtimeJob",
+      "title": "Runtime job guide",
+      "purpose": "Inspect one durable process/build/test/script execution and its outcome.",
+      "forge_handles_automatically": [
+        "Persist job state",
+        "Capture bounded output",
+        "Register artifacts",
+        "Recover/cancel according to state"
+      ],
+      "controls": [
+        "Read output",
+        "Open artifact",
+        "Cancel job",
+        "Open related run"
+      ],
+      "status_meanings": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "timed out",
+        "cancelled",
+        "ambiguous"
+      ],
+      "normal_workflow": [
+        "Read purpose and state",
+        "Inspect output when needed",
+        "Return to task"
+      ],
+      "troubleshooting": [
+        "Timed out is not a compile failure",
+        "Missing result requires reconciliation"
+      ],
+      "advanced_details": [
+        "Job ID",
+        "process identifiers",
+        "working directory",
+        "replay class"
+      ],
+      "control_anchors": [
+        "runtime-job-cancel"
+      ]
+    },
+    {
+      "id": "provider",
+      "title": "Model connection guide",
+      "purpose": "Explain and prepare the LM Studio connection used automatically by managed tasks.",
+      "forge_handles_automatically": [
+        "Reuse saved healthy configuration",
+        "Discover models",
+        "Select/load compatible model when permitted",
+        "Probe required contract"
+      ],
+      "controls": [
+        "Connect and check",
+        "Choose model when necessary",
+        "Credential action",
+        "Advanced connection settings"
+      ],
+      "status_meanings": [
+        "ready",
+        "checking",
+        "server unavailable",
+        "model missing",
+        "authentication required",
+        "contract incomplete",
+        "busy"
+      ],
+      "normal_workflow": [
+        "Usually do nothing; Start Task invokes preparation",
+        "Use Connect and check to prepare manually or diagnose"
+      ],
+      "troubleshooting": [
+        "LM Studio stopped",
+        "no compatible model installed",
+        "credential rejected",
+        "pinned model unavailable"
+      ],
+      "advanced_details": [
+        "Endpoint",
+        "provider/adapter IDs",
+        "instance ID",
+        "context capacity",
+        "contract fingerprint"
+      ],
+      "control_anchors": [
+        "provider-test-connection",
+        "provider-run-contract-probe"
+      ]
+    },
+    {
+      "id": "providerCredential",
+      "title": "Provider credential guide",
+      "purpose": "Add, replace, preserve, or clear the provider credential without exposing it.",
+      "forge_handles_automatically": [
+        "Store secrets in Keychain",
+        "Never return credential value in snapshots"
+      ],
+      "controls": [
+        "Keep existing",
+        "Replace",
+        "Clear",
+        "Secure entry",
+        "Save"
+      ],
+      "status_meanings": [
+        "configured",
+        "not configured",
+        "authentication not required",
+        "rejected"
+      ],
+      "normal_workflow": [
+        "Choose action",
+        "Enter credential only when replacing",
+        "Save and Connect and check"
+      ],
+      "troubleshooting": [
+        "Credential rejected: verify provider configuration",
+        "Lost Keychain access: re-enter"
+      ],
+      "advanced_details": [
+        "Keychain item identity and redacted status only"
+      ],
+      "control_anchors": [
+        "provider-token",
+        "provider-credential-action"
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "Events & Evidence guide",
+      "purpose": "Inspect authoritative receipts that support task state and completion.",
+      "forge_handles_automatically": [
+        "Bind evidence to project/run/generation/source",
+        "Retain provenance and failures",
+        "Reject stale/wrong-scope evidence"
+      ],
+      "controls": [
+        "Filter",
+        "Select event/receipt",
+        "Open related run/job/artifact"
+      ],
+      "status_meanings": [
+        "pending",
+        "accepted",
+        "passed",
+        "failed",
+        "stale",
+        "quarantined"
+      ],
+      "normal_workflow": [
+        "Open from a run/check when investigating",
+        "Confirm source and freshness"
+      ],
+      "troubleshooting": [
+        "No evidence: check whether operation executed",
+        "Stale evidence: rerun affected check"
+      ],
+      "advanced_details": [
+        "Hashes",
+        "validator versions",
+        "event chain",
+        "artifact references"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "diagnostics",
+      "title": "Diagnostics guide",
+      "purpose": "Collect redacted operational information for troubleshooting without changing work.",
+      "forge_handles_automatically": [
+        "Redact protected data",
+        "Collect service/config/version summaries",
+        "Package bounded export"
+      ],
+      "controls": [
+        "Refresh",
+        "Preview",
+        "Export diagnostics",
+        "Open location"
+      ],
+      "status_meanings": [
+        "ready",
+        "collecting",
+        "exported",
+        "failed"
+      ],
+      "normal_workflow": [
+        "Preview",
+        "Export when reporting a problem",
+        "Share only the intended file"
+      ],
+      "troubleshooting": [
+        "Export failed: check destination permission",
+        "Missing section: service may be unavailable"
+      ],
+      "advanced_details": [
+        "Envelope schemas",
+        "log categories",
+        "redaction rules"
+      ],
+      "control_anchors": []
+    },
+    {
+      "id": "manager",
+      "title": "Manager guide",
+      "purpose": "Explain the durable service that owns projects, runs, provider sessions, jobs, memory, and continuity.",
+      "forge_handles_automatically": [
+        "Start/attach manager",
+        "Recover durable work",
+        "Enforce one control-plane owner"
+      ],
+      "controls": [
+        "Start/stop/restart",
+        "Allowed roots",
+        "Shell policy",
+        "Budgets",
+        "Watchdog",
+        "Advanced settings"
+      ],
+      "status_meanings": [
+        "running",
+        "stopped",
+        "starting",
+        "restarting",
+        "failed",
+        "attached to external manager"
+      ],
+      "normal_workflow": [
+        "Ordinary users leave Manager running",
+        "Use settings only for application-wide preferences"
+      ],
+      "troubleshooting": [
+        "Port held by other Forge manager",
+        "restart loop",
+        "allowed root missing"
+      ],
+      "advanced_details": [
+        "PID",
+        "port",
+        "LaunchAgent",
+        "watchdog",
+        "configuration revisions"
+      ],
+      "control_anchors": []
+    }
+  ]
+}

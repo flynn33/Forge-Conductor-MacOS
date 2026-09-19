@@ -69,6 +69,7 @@ struct RuntimesOperatorView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .task { viewModel.load() }
+        .guidedHelpState(viewModel.guidedHelpState, for: .runtimes)
         .accessibilityIdentifier("runtimes-operator-view")
     }
 
@@ -120,7 +121,7 @@ struct RuntimesOperatorView: View {
     }
 
     private func jobDetail(_ job: OperatorRuntimeJob) -> some View {
-        GroupBox("Selected job") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 9) {
                 LabeledContent("State") { OperatorStateBadge(state: job.state) }
                     .accessibilityIdentifier("runtime-job-state")
@@ -148,6 +149,12 @@ struct RuntimesOperatorView: View {
                             : "Only queued or running jobs can be cancelled."
                     )
                     .accessibilityIdentifier("runtime-job-cancel")
+            }
+        } label: {
+            HStack {
+                Text("Selected job")
+                Spacer()
+                GuidedHelpButton(context: .runtimeJob)
             }
         }
     }

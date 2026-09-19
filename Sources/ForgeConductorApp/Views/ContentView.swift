@@ -13,7 +13,20 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @AppStorage("forge.setupTutorial.completed.v1") private var setupTutorialCompleted = false
+    @StateObject private var guidedMode = GuidedModeCoordinator()
     @State private var showingSetupTutorial = false
+
+    private var rootPresentedGuide: Binding<GuidedHelpContext?> {
+        Binding<GuidedHelpContext?>(
+            get: {
+                guard !guidedMode.hasNestedContext else { return nil }
+                return guidedMode.presentedContext
+            },
+            set: { value in
+                if value == nil { guidedMode.dismiss() }
+            }
+        )
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -38,8 +51,20 @@ struct ContentView: View {
             // accessibility element. Applying an identifier directly to a
             // complex SwiftUI child is unreliable on macOS because the child
             // may flatten into its descendants and disappear from the AX tree.
-            ZStack {
-                selectedDetail
+            VStack(spacing: 0) {
+                if guidedMode.isEnabled,
+                   let entry = guidedMode.catalog?.entry(for: guidedMode.currentContext) {
+                    GuidedInlineHelp(
+                        entry: entry,
+                        state: guidedMode.state(for: entry.context),
+                        openGuide: { guidedMode.present() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                }
+                ZStack {
+                    selectedDetail
+                }
             }
             .id(model.selectedTab)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -51,11 +76,16 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.16), value: model.isNavigationVisible)
         .accessibilityIdentifier("root-split")
         .onAppear {
+            guidedMode.select(model.selectedTab.guidedHelpContext)
             if !setupTutorialCompleted,
                !CommandLine.arguments.contains("--uitesting") {
                 showingSetupTutorial = true
             }
         }
+        .onChange(of: model.selectedTab) { _, tab in
+            guidedMode.select(tab.guidedHelpContext)
+        }
+        .environmentObject(guidedMode)
         .sheet(isPresented: $showingSetupTutorial) {
             SetupTutorialView(
                 onOpen: { tab in
@@ -67,6 +97,23 @@ struct ContentView: View {
                     showingSetupTutorial = false
                 }
             )
+        }
+        .sheet(item: rootPresentedGuide) { context in
+            if let guidedCatalog = guidedMode.catalog {
+                GuidedHelpSheet(
+                    coordinator: guidedMode,
+                    catalog: guidedCatalog,
+                    context: context
+                )
+            } else {
+                ContentUnavailableView(
+                    "Guide unavailable",
+                    systemImage: "questionmark.circle",
+                    description: Text(guidedMode.catalogError ?? "The bundled guide could not be loaded.")
+                )
+                .padding(24)
+                .frame(width: 520, height: 320)
+            }
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -109,13 +156,23 @@ struct ContentView: View {
                 .accessibilityIdentifier("toolbar-auto-refresh")
             }
             ToolbarItem(placement: .primaryAction) {
+                Toggle(isOn: $guidedMode.isEnabled) {
+                    Image(systemName: "sparkles.rectangle.stack")
+                }
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("Show or hide contextual Guided Mode")
+                .accessibilityLabel("Guided Mode")
+                .accessibilityIdentifier("toolbar-guided-mode")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showingSetupTutorial = true
+                    guidedMode.present()
                 } label: {
                     Image(systemName: "questionmark.circle")
                 }
                 .controlSize(.small)
-                .help("Open setup guide")
+                .help("Open the guide for the current view")
                 .accessibilityIdentifier("toolbar-setup-guide")
             }
             ToolbarItem(placement: .primaryAction) {

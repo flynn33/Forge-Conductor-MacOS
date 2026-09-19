@@ -297,7 +297,7 @@ struct ProjectsOperatorView: View {
             }
 
             if let pendingPath = viewModel.pendingRelinkPath {
-                GroupBox("Relink reconciliation") {
+                GroupBox {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(
                             "The last relink did not return a confirmed receipt. "
@@ -326,11 +326,17 @@ struct ProjectsOperatorView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    HStack {
+                        Text("Relink reconciliation")
+                        Spacer()
+                        GuidedHelpButton(context: .projectRelink)
+                    }
                 }
                 .accessibilityIdentifier("project-relink-reconciliation")
             }
 
-            GroupBox("Clear project content") {
+            GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     Picker("Scope", selection: $clearMode) {
                         ForEach(OperatorProjectContentClearMode.allCases) { mode in
@@ -365,6 +371,12 @@ struct ProjectsOperatorView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } label: {
+                HStack {
+                    Text("Clear project content")
+                    Spacer()
+                    GuidedHelpButton(context: .projectContentClear)
+                }
             }
 
             HStack {
@@ -379,12 +391,14 @@ struct ProjectsOperatorView: View {
                 .disabled(viewModel.isLoading || project.lifecycleState != "active")
                 .help("Choose another location for this same Git repository.")
                 .accessibilityIdentifier("project-relink")
+                GuidedHelpButton(context: .projectRelink)
                 Spacer()
                 Button("Reset Generation…", role: .destructive) {
                     resetConfirmation = viewModel.resetConfirmationForSelectedProject()
                 }
                 .disabled(viewModel.isLoading)
                 .accessibilityIdentifier("project-reset")
+                GuidedHelpButton(context: .projectReset)
             }
         }
     }
@@ -395,7 +409,7 @@ struct ProjectsOperatorView: View {
 
     @ViewBuilder
     private func instructionPackages(_ project: OperatorProject) -> some View {
-        GroupBox("Instruction packages") {
+        GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows to set the order used by autonomous runs.")
                     .font(.caption)
@@ -476,6 +490,7 @@ struct ProjectsOperatorView: View {
                         }
                         .disabled(viewModel.isLoading || queue.running)
                         .accessibilityIdentifier("instruction-package-add")
+                        GuidedHelpButton(context: .instructionImport)
                         Spacer()
                         Text(queue.running ? "Running in order" : "Queue stopped")
                             .font(.caption)
@@ -503,6 +518,12 @@ struct ProjectsOperatorView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            HStack {
+                Text("Instruction packages")
+                Spacer()
+                GuidedHelpButton(context: .instructionQueue)
+            }
         }
         .accessibilityIdentifier("project-instruction-packages")
     }
@@ -594,7 +615,11 @@ private struct ProjectRegistrationSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Register Project").font(.title2.bold())
+            HStack {
+                Text("Register Project").font(.title2.bold())
+                Spacer()
+                GuidedHelpButton(context: .projectRegistration)
+            }
             Text("Registration authorizes this exact folder, resolves its canonical root, and creates or reconnects the manager-owned project identity.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -634,5 +659,6 @@ private struct ProjectRegistrationSheet: View {
         }
         .padding(22)
         .frame(width: 520)
+        .guidedHelpContext(.projectRegistration)
     }
 }
