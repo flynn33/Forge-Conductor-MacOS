@@ -397,7 +397,7 @@ struct ProjectsOperatorView: View {
     private func instructionPackages(_ project: OperatorProject) -> some View {
         GroupBox("Instruction packages") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Add a Markdown/text file, a folder of instructions, or a .forgepackage manifest. Forge stores an immutable copy linked to this project. Drag rows to set the order used by autonomous runs.")
+                Text("Add a file or folder in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows to set the order used by autonomous runs.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -422,6 +422,21 @@ struct ProjectsOperatorView: View {
                                         Text("\(package.packageID) · v\(package.version)")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
+                                        if let count = package.documentCount,
+                                           let bytes = package.instructionByteCount {
+                                            Text("\(count) source document\(count == 1 ? "" : "s") · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) converted instructions")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if let unresolved = package.unresolvedDocumentCount,
+                                           unresolved > 0 {
+                                            Label(
+                                                "\(unresolved) source document\(unresolved == 1 ? " needs" : "s need") conversion before this package can run",
+                                                systemImage: "exclamationmark.triangle.fill"
+                                            )
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
+                                        }
                                         if let error = package.lastError {
                                             Text(error)
                                                 .font(.caption)
@@ -451,7 +466,7 @@ struct ProjectsOperatorView: View {
                             }
                             .moveDisabled(viewModel.isLoading || queue.running)
                         }
-                        .frame(height: min(max(CGFloat(queue.packages.count) * 62, 124), 310))
+                        .frame(height: min(max(CGFloat(queue.packages.count) * 88, 132), 360))
                         .accessibilityIdentifier("instruction-package-list")
                     }
 
@@ -472,6 +487,10 @@ struct ProjectsOperatorView: View {
                         .disabled(
                             viewModel.isLoading
                                 || (!queue.running && !queue.packages.contains(where: { $0.state == "queued" }))
+                                || (!queue.running && queue.packages
+                                    .filter { $0.state == "queued" }
+                                    .sorted { $0.position < $1.position }
+                                    .first?.importReady == false)
                         )
                         .accessibilityIdentifier("instruction-queue-toggle")
                     }
@@ -501,7 +520,7 @@ struct ProjectsOperatorView: View {
         panel.canCreateDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Add Instructions"
-        panel.message = "Choose Markdown/text instructions, a package manifest, or a folder of instruction documents."
+        panel.message = "Choose an instruction file or folder. Forge preserves the originals and reports unsupported content without executing imported files."
         guard panel.runModal() == .OK, let url = panel.urls.first,
               url.isFileURL, (url.path as NSString).isAbsolutePath else { return }
         viewModel.importInstructionPackage(path: url.path)

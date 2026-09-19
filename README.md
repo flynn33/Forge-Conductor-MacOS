@@ -74,7 +74,13 @@ product set.
    authorizes that exact selected folder and preserves existing authorized
    roots; the same path does not need to be entered in Manager first.
 4. In **Provider**, save and test the LM Studio endpoint and selected model.
-5. Add instruction packages to the registered project.
+5. Add instruction packages to the registered project. Files are admitted by
+   inspected content rather than a filename whitelist. Forge preserves the
+   originals, normalizes UTF-8/UTF-16 and supported native PDF, DOCX, RTF, and
+   HTML text into an immutable catalog, includes hidden files in folder
+   inventories, and reports opaque or malformed content instead of dropping it.
+   Large instruction bodies remain in the artifact rather than the run mission;
+   managed runs page them through project/run-bound read-only tools.
 6. In **Autonomy**, select the project, enter the instructions, and choose
    **Start Task**. Forge uses the saved model plus manager-owned capability and
    completion defaults; unchanged technical defaults are omitted from the start
@@ -103,6 +109,9 @@ The **Projects** tab exposes the complete registration lifecycle:
 
 - **Register Project…** selects a folder with the native picker.
 - **Enter Project Path…** accepts a validated absolute path.
+- **Add Instructions…** accepts a file or folder in its current format, shows
+  converted document/byte counts, and prevents queue start when required source
+  content remains unresolved.
 - Both registration actions authorize only the selected canonical folder and
   preserve existing authorized roots before establishing project identity.
 - **Remove Selected Project…** is available below the project list and from a

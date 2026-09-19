@@ -239,6 +239,7 @@
 		B50B00000000000000000004 /* Application/InstalledNativeGateRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50F00000000000000000004 /* Application/InstalledNativeGateRegistry.swift */; };
 		C91B00000000000000000001 /* Application/ProjectInstructionQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91F00000000000000000001 /* Application/ProjectInstructionQueue.swift */; };
 		C91B00000000000000000002 /* ProjectInstructionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91F00000000000000000002 /* ProjectInstructionQueueTests.swift */; };
+		C92B00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92F00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift */; };
 		B7162E741EA347FB8F514562 /* Manager/ManagerNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A626CD58794CBA8653E369 /* Manager/ManagerNode.swift */; };
 		B7B90B27524E81EB0AD25192 /* Tests/ForgeConductorTests/SourceDerivedSuccessorPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412855DBF6BBCBA7B8BFCE0D /* Tests/ForgeConductorTests/SourceDerivedSuccessorPreflightTests.swift */; };
 		B881296BC1244D6685D5375E /* ManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0979CF0B142F49538AE2E025 /* ManagerTests.swift */; };
@@ -766,6 +767,7 @@
 		B50F00000000000000000004 /* Application/InstalledNativeGateRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/InstalledNativeGateRegistry.swift; sourceTree = "<group>"; };
 		C91F00000000000000000001 /* Application/ProjectInstructionQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectInstructionQueue.swift; sourceTree = "<group>"; };
 		C91F00000000000000000002 /* ProjectInstructionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInstructionQueueTests.swift; sourceTree = "<group>"; };
+		C92F00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/InstructionArtifactToolPack.swift; sourceTree = "<group>"; };
 		B675EB7EC65A4B04AEC791D6 /* Infrastructure/DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/DiagnosticLog.swift; sourceTree = "<group>"; };
 		B69FA2615DDB4C2B3449731F /* Manager/NativeTaskOperatorCommandLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/NativeTaskOperatorCommandLine.swift; sourceTree = "<group>"; };
 		B7F98A7D9399485B8508C67B /* Domain/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/Models.swift; sourceTree = "<group>"; };
@@ -1321,6 +1323,7 @@
 				B50F00000000000000000002 /* Application/NativeXCTestGateHandler.swift */,
 				B50F00000000000000000004 /* Application/InstalledNativeGateRegistry.swift */,
 				C91F00000000000000000001 /* Application/ProjectInstructionQueue.swift */,
+				C92F00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift */,
 				A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */,
 				A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */,
 				A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */,
@@ -2111,6 +2114,7 @@
 				B50B00000000000000000002 /* Application/NativeXCTestGateHandler.swift in Sources */,
 				B50B00000000000000000004 /* Application/InstalledNativeGateRegistry.swift in Sources */,
 				C91B00000000000000000001 /* Application/ProjectInstructionQueue.swift in Sources */,
+				C92B00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift in Sources */,
 				A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */,
 				A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */,
 				A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */,

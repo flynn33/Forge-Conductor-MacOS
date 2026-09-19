@@ -2,6 +2,12 @@
 // Durable project-scoped instruction package ingestion, ordering, and run linkage.
 
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
+#if canImport(PDFKit)
+import PDFKit
+#endif
 
 public enum ProjectInstructionPackageState: String, Codable, Sendable, CaseIterable {
     case queued
@@ -28,6 +34,9 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
     public let contentSHA256: String
     public let allowedTools: [String]
     public let completionGates: [String]
+    public let documentCount: Int?
+    public let instructionByteCount: Int?
+    public let unresolvedDocumentCount: Int?
     public var position: Int
     public var state: ProjectInstructionPackageState
     public var runID: RunID?
@@ -47,6 +56,9 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
         case contentSHA256 = "content_sha256"
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
+        case documentCount = "document_count"
+        case instructionByteCount = "instruction_byte_count"
+        case unresolvedDocumentCount = "unresolved_document_count"
         case position, state
         case runID = "run_id"
         case lastError = "last_error"
@@ -67,6 +79,10 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
             "content_sha256": contentSHA256,
             "allowed_tools": allowedTools,
             "completion_gates": completionGates,
+            "document_count": documentCount as Any,
+            "instruction_byte_count": instructionByteCount as Any,
+            "unresolved_document_count": unresolvedDocumentCount as Any,
+            "import_ready": unresolvedDocumentCount.map { $0 == 0 } as Any,
             "position": position,
             "state": state.rawValue,
             "run_id": runID?.description as Any,
@@ -142,14 +158,15 @@ public enum ProjectInstructionQueueError: Error, LocalizedError, Sendable, Equat
 /// The lock bounds all mutations, and every accepted source becomes a content-addressed,
 /// owner-only snapshot before the queue record is published atomically.
 public final class ProjectInstructionQueueStore: @unchecked Sendable {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     public static let builtInCompletionGate = "forge.package.tool-success"
-    public static let maximumPackages = 256
-    public static let maximumStoredSnapshots = 512
-    public static let maximumSourceFiles = 64
-    public static let maximumSourceFileBytes = 1_048_576
-    public static let maximumAggregateBytes = 8 * 1_048_576
+    public static let maximumPackages = 4_096
+    public static let maximumSourceFiles = 4_096
+    public static let maximumSourceFileBytes = 128 * 1_048_576
+    public static let maximumAggregateBytes = 512 * 1_048_576
     public static let maximumMissionBytes = 32_768
+    public static let maximumQueueStateBytes = 64 * 1_048_576
+    public static let maximumDeliveryBytes = 64 * 1_024
 
     private struct PersistedState: Codable {
         var schemaVersion: Int
@@ -223,13 +240,87 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let digest: String
         let allowedTools: [String]
         let completionGates: [String]
-        let documents: [(path: String, data: Data)]
+        let documents: [IngestedDocument]
+        let instructionByteCount: Int
+        let unresolvedDocumentCount: Int
     }
 
-    private static let plainDocumentExtensions: Set<String> = ["md", "markdown", "txt"]
+    private struct IngestedDocument {
+        let path: String
+        let original: Data
+        let canonicalText: String?
+        let encoding: String?
+        let converter: String
+        let status: InstructionDocumentStatus
+        let detail: String
+    }
+
+    public enum InstructionDocumentStatus: String, Codable, Sendable {
+        case convertedInstruction = "converted_instruction"
+        case retainedAttachment = "retained_attachment"
+        case unresolvedConversion = "unresolved_conversion"
+    }
+
+    private struct StoredDocument: Codable {
+        let id: String
+        let sourcePath: String
+        let originalReference: String
+        let originalByteCount: Int
+        let originalSHA256: String
+        let canonicalReference: String?
+        let canonicalByteCount: Int?
+        let canonicalSHA256: String?
+        let encoding: String?
+        let converter: String
+        let status: InstructionDocumentStatus
+        let detail: String
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case sourcePath = "source_path"
+            case originalReference = "original_reference"
+            case originalByteCount = "original_byte_count"
+            case originalSHA256 = "original_sha256"
+            case canonicalReference = "canonical_reference"
+            case canonicalByteCount = "canonical_byte_count"
+            case canonicalSHA256 = "canonical_sha256"
+            case encoding, converter, status, detail
+        }
+    }
+
+    private struct StoredCatalog: Codable {
+        let schemaVersion: Int
+        let contentSHA256: String
+        let documents: [StoredDocument]
+
+        enum CodingKeys: String, CodingKey {
+            case schemaVersion = "schema_version"
+            case contentSHA256 = "content_sha256"
+            case documents
+        }
+    }
+
+    public struct InstructionCatalogPage: Sendable, Equatable {
+        public let contentSHA256: String
+        public let totalDocuments: Int
+        public let cursor: Int
+        public let nextCursor: Int?
+        public let documents: [[String: String]]
+    }
+
+    public struct InstructionDocumentPage: Sendable, Equatable {
+        public let documentID: String
+        public let sourcePath: String
+        public let content: String
+        public let byteOffset: Int
+        public let nextByteOffset: Int?
+        public let totalBytes: Int
+        public let sha256: String
+    }
     public static let ordinaryDefaultAllowedTools = [
         "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_move",
-        "search_text", "shell_exec", "git_status", "git_diff", "git_log", "git_add", "git_commit",
+        "search_text", "instruction_catalog", "instruction_read", "shell_exec",
+        "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "project_memory.remember", "project_memory.search", "project_memory.get",
         "project_memory.update", "project_memory.list_recent", "project_memory.status",
     ]
@@ -243,15 +334,22 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         self.paths = paths
         self.clock = clock
         try paths.ensureLayout()
+        Self.cleanupAbandonedStages(paths.instructionPackageStoreDir)
         if FileManager.default.fileExists(atPath: paths.instructionPackageQueue.path) {
             let data = try OwnerOnlyAtomicFile.read(
                 from: paths.instructionPackageQueue,
-                maximumBytes: 4 * 1_048_576
+                maximumBytes: Self.maximumQueueStateBytes
             )
-            let decoded = try JSONDecoder().decode(PersistedState.self, from: data)
-            guard decoded.schemaVersion == Self.schemaVersion,
+            var decoded = try JSONDecoder().decode(PersistedState.self, from: data)
+            guard (1...Self.schemaVersion).contains(decoded.schemaVersion),
                   decoded.packages.count <= Self.maximumPackages else {
                 throw ProjectInstructionQueueError.storageFailure("unsupported or oversized queue state")
+            }
+            if decoded.schemaVersion < Self.schemaVersion {
+                decoded.schemaVersion = Self.schemaVersion
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+                try OwnerOnlyAtomicFile.write(try encoder.encode(decoded), to: paths.instructionPackageQueue)
             }
             state = decoded
         } else {
@@ -273,35 +371,34 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         projectID: ProjectID,
         generation: ProjectGeneration
     ) throws -> ProjectInstructionQueueSnapshot {
+        // Conversion and hashing intentionally happen outside the queue mutation lock.
+        // Only atomic publication and metadata linkage serialize queue writers.
+        let ingested = try Self.ingest(sourceURL: sourceURL, projectID: projectID)
+        let snapshotURL = paths.instructionPackageStoreDir.appendingPathComponent(
+            ingested.digest, isDirectory: true
+        )
+        let published = try Self.publish(ingested, storeRoot: paths.instructionPackageStoreDir)
         lock.lock(); defer { lock.unlock() }
         guard state.packages.count < Self.maximumPackages else {
+            if published, !state.packages.contains(where: { $0.contentSHA256 == ingested.digest }) {
+                try? FileManager.default.removeItem(at: snapshotURL)
+            }
             throw ProjectInstructionQueueError.invalidRequest("The instruction queue is limited to \(Self.maximumPackages) packages.")
-        }
-        let ingested = try Self.ingest(sourceURL: sourceURL, projectID: projectID)
-        let snapshotURL = paths.instructionPackageStoreDir
-            .appendingPathComponent(ingested.digest, isDirectory: true)
-        if !FileManager.default.fileExists(atPath: snapshotURL.path),
-           try Self.storedSnapshotCount(paths.instructionPackageStoreDir)
-                >= Self.maximumStoredSnapshots {
-            throw ProjectInstructionQueueError.storageFailure(
-                "instruction snapshot storage reached its bounded capacity"
-            )
         }
         let existing = state.packages.filter {
             $0.projectID == projectID && $0.projectGeneration == generation
         }
         let timestamp = ISO8601.string(from: clock.now())
         let prior = state
-        let published = try Self.publish(
-            ingested,
-            storeRoot: paths.instructionPackageStoreDir
-        )
         let record = ProjectInstructionPackage(
             id: UUID(), projectID: projectID, projectGeneration: generation,
             packageID: ingested.packageID, version: ingested.version,
             displayName: ingested.displayName, mission: ingested.mission,
             sourcePath: ingested.sourcePath, contentSHA256: ingested.digest,
             allowedTools: ingested.allowedTools, completionGates: ingested.completionGates,
+            documentCount: ingested.documents.count,
+            instructionByteCount: ingested.instructionByteCount,
+            unresolvedDocumentCount: ingested.unresolvedDocumentCount,
             position: existing.count, state: .queued, runID: nil, lastError: nil,
             createdAt: timestamp, updatedAt: timestamp
         )
@@ -309,7 +406,9 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         do {
             try commitUnlocked(restoring: prior)
         } catch {
-            if published { try? FileManager.default.removeItem(at: snapshotURL) }
+            if published, !state.packages.contains(where: { $0.contentSHA256 == ingested.digest }) {
+                try? FileManager.default.removeItem(at: snapshotURL)
+            }
             throw error
         }
         return try snapshotUnlocked(projectID: projectID, generation: generation)
@@ -319,18 +418,22 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         contentSHA256: String
     ) throws -> [ManagerPreparedRunDocumentReference] {
         lock.lock(); defer { lock.unlock() }
-        guard contentSHA256.utf8.count == 64,
-              contentSHA256.utf8.allSatisfy({
-                  (48...57).contains($0) || (97...102).contains($0)
-              }),
-              state.packages.contains(where: { $0.contentSHA256 == contentSHA256 }) else {
-            throw ProjectInstructionQueueError.storageFailure(
-                "instruction snapshot identity is invalid or unreferenced"
-            )
-        }
+        try validateDigestReferenceUnlocked(contentSHA256)
         let root = paths.instructionPackageStoreDir
             .appendingPathComponent(contentSHA256, isDirectory: true)
             .standardizedFileURL
+        if let catalog = try Self.storedCatalog(root: root) {
+            return catalog.documents.compactMap { document in
+                guard let canonicalReference = document.canonicalReference,
+                      let byteCount = document.canonicalByteCount,
+                      let sha256 = document.canonicalSHA256 else { return nil }
+                return ManagerPreparedRunDocumentReference(
+                    reference: "instruction-snapshot:\(contentSHA256)/\(canonicalReference)",
+                    byteCount: byteCount,
+                    sha256: sha256
+                )
+            }
+        }
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
@@ -379,6 +482,127 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             )
         }
         return references.sorted { $0.reference < $1.reference }
+    }
+
+    public func catalogPage(
+        contentSHA256: String,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID?,
+        cursor: Int,
+        limit: Int
+    ) throws -> InstructionCatalogPage {
+        lock.lock(); defer { lock.unlock() }
+        try validatePackageAccessUnlocked(
+            contentSHA256: contentSHA256,
+            projectID: projectID,
+            generation: generation,
+            runID: runID
+        )
+        guard cursor >= 0, (1...128).contains(limit) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction catalog cursor or page size is outside its supported range."
+            )
+        }
+        let root = paths.instructionPackageStoreDir.appendingPathComponent(
+            contentSHA256, isDirectory: true
+        )
+        guard let catalog = try Self.storedCatalog(root: root) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "This legacy snapshot has no document catalog; re-import it to enable scoped delivery."
+            )
+        }
+        guard cursor <= catalog.documents.count else {
+            throw ProjectInstructionQueueError.invalidRequest("Instruction catalog cursor is past the end.")
+        }
+        let end = min(catalog.documents.count, cursor + limit)
+        let documents = catalog.documents[cursor..<end].map { document in
+            [
+                "id": document.id,
+                "source_path": document.sourcePath,
+                "status": document.status.rawValue,
+                "detail": document.detail,
+                "original_sha256": document.originalSHA256,
+                "canonical_sha256": document.canonicalSHA256 ?? "",
+                "canonical_bytes": document.canonicalByteCount.map(String.init) ?? "0",
+            ]
+        }
+        return InstructionCatalogPage(
+            contentSHA256: contentSHA256,
+            totalDocuments: catalog.documents.count,
+            cursor: cursor,
+            nextCursor: end < catalog.documents.count ? end : nil,
+            documents: documents
+        )
+    }
+
+    public func readDocument(
+        contentSHA256: String,
+        documentID: String,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID?,
+        byteOffset: Int,
+        maximumBytes: Int
+    ) throws -> InstructionDocumentPage {
+        lock.lock(); defer { lock.unlock() }
+        try validatePackageAccessUnlocked(
+            contentSHA256: contentSHA256,
+            projectID: projectID,
+            generation: generation,
+            runID: runID
+        )
+        guard byteOffset >= 0, (1...Self.maximumDeliveryBytes).contains(maximumBytes) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction delivery offset or byte budget is outside its supported range."
+            )
+        }
+        let root = paths.instructionPackageStoreDir.appendingPathComponent(
+            contentSHA256, isDirectory: true
+        ).standardizedFileURL
+        guard let catalog = try Self.storedCatalog(root: root),
+              let document = catalog.documents.first(where: { $0.id == documentID }),
+              let reference = document.canonicalReference,
+              let expectedSHA256 = document.canonicalSHA256 else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "The requested document has no converted instruction text."
+            )
+        }
+        let url = root.appendingPathComponent(reference).standardizedFileURL
+        guard try Self.relativePath(url, root: root) == reference else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction document escaped its content-addressed root"
+            )
+        }
+        let data = try OwnerOnlyAtomicFile.read(
+            from: url, maximumBytes: Self.maximumSourceFileBytes
+        )
+        guard JSONSupport.sha256Hex(data) == expectedSHA256, byteOffset <= data.count,
+              String(data: data.prefix(byteOffset), encoding: .utf8) != nil else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction document integrity or UTF-8 cursor validation failed"
+            )
+        }
+        var end = min(data.count, byteOffset + maximumBytes)
+        while end > byteOffset,
+              String(data: data[byteOffset..<end], encoding: .utf8) == nil {
+            end -= 1
+        }
+        guard end > byteOffset || byteOffset == data.count,
+              let content = String(data: data[byteOffset..<end], encoding: .utf8) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction delivery could not preserve a UTF-8 scalar boundary"
+            )
+        }
+        return InstructionDocumentPage(
+            documentID: document.id,
+            sourcePath: document.sourcePath,
+            content: content,
+            byteOffset: byteOffset,
+            nextByteOffset: end < data.count ? end : nil,
+            totalBytes: data.count,
+            sha256: expectedSHA256
+        )
     }
 
     @discardableResult
@@ -462,6 +686,12 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         guard packages.contains(where: { $0.state == .queued }) else {
             throw ProjectInstructionQueueError.queueBlocked("No queued instruction packages remain.")
         }
+        if let next = packages.filter({ $0.state == .queued }).sorted(by: Self.packageOrder).first,
+           let unresolved = next.unresolvedDocumentCount, unresolved > 0 {
+            throw ProjectInstructionQueueError.queueBlocked(
+                "Resolve or remove the \(unresolved) unconverted instruction document(s) in \(next.displayName) before starting this queue."
+            )
+        }
         let prior = state
         let timestamp = ISO8601.string(from: clock.now())
         for index in state.packages.indices where state.packages[index].projectID == projectID
@@ -505,7 +735,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             if let package = state.packages
                 .filter({ $0.projectID == ProjectID(projectUUID) && $0.state == .queued })
                 .sorted(by: Self.packageOrder)
-                .first {
+                .first, package.unresolvedDocumentCount ?? 0 == 0 {
                 return package
             }
         }
@@ -531,7 +761,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             throw ProjectInstructionQueueError.packageNotFound(packageID)
         }
         guard state.runningProjects.contains(state.packages[index].projectID.description),
-              state.packages[index].state == .queued else {
+              state.packages[index].state == .queued,
+              state.packages[index].unresolvedDocumentCount ?? 0 == 0 else {
             throw ProjectInstructionQueueError.activePackage(packageID)
         }
         let prior = state
@@ -664,6 +895,37 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         for (position, index) in ordered.enumerated() { state.packages[index].position = position }
     }
 
+    private func validateDigestReferenceUnlocked(_ contentSHA256: String) throws {
+        guard contentSHA256.utf8.count == 64,
+              contentSHA256.utf8.allSatisfy({
+                  (48...57).contains($0) || (97...102).contains($0)
+              }),
+              state.packages.contains(where: { $0.contentSHA256 == contentSHA256 }) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction snapshot identity is invalid or unreferenced"
+            )
+        }
+    }
+
+    private func validatePackageAccessUnlocked(
+        contentSHA256: String,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID?
+    ) throws {
+        try validateDigestReferenceUnlocked(contentSHA256)
+        guard state.packages.contains(where: {
+            $0.contentSHA256 == contentSHA256
+                && $0.projectID == projectID
+                && $0.projectGeneration == generation
+                && (runID == nil || $0.runID == runID)
+        }) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction snapshot access is not authorized for this project, generation, or run."
+            )
+        }
+    }
+
     private func removeSnapshotIfUnreferencedUnlocked(_ digest: String) {
         guard !state.packages.contains(where: { $0.contentSHA256 == digest }) else { return }
         try? FileManager.default.removeItem(
@@ -715,28 +977,30 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         guard values.isSymbolicLink != true else { throw ProjectInstructionQueueError.sourceContainsLink }
         let package: IngestedPackage
         if values.isRegularFile == true {
-            if plainDocumentExtensions.contains(source.pathExtension.lowercased()) {
-                let data = try readRegularFile(source)
-                let mission = try boundedMission(try decodedDocument(data))
+            if source.pathExtension.lowercased() == "forgepackage"
+                || (source.lastPathComponent == "forge-package.json"
+                    && (try? compatibleManifest(at: source)) == true) {
+                package = try manifestPackage(manifestURL: source, root: source.deletingLastPathComponent(), projectID: projectID)
+            } else {
                 let name = source.deletingPathExtension().lastPathComponent
                 package = try makePackage(
                     packageID: slug(name), version: "1", displayName: name,
-                    mission: mission, sourcePath: source.path,
+                    sourcePath: source.path,
+                    bootstrapGoal: "Follow the imported instructions in \(source.lastPathComponent).",
                     allowedTools: ordinaryDefaultAllowedTools,
                     completionGates: [builtInCompletionGate],
-                    documents: [(source.lastPathComponent, data)]
+                    documents: [try ingestDocument(path: source.lastPathComponent, url: source)]
                 )
-            } else if source.pathExtension.lowercased() == "forgepackage"
-                        || source.lastPathComponent == "forge-package.json" {
-                package = try manifestPackage(manifestURL: source, root: source.deletingLastPathComponent(), projectID: projectID)
-            } else {
-                throw ProjectInstructionQueueError.sourceTypeUnsupported
             }
         } else if values.isDirectory == true {
             let manifestURLs = ["forge-package.json", "package.forgepackage"].map {
                 source.appendingPathComponent($0)
             }
-            if let manifest = manifestURLs.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+            if let manifest = manifestURLs.first(where: {
+                guard FileManager.default.fileExists(atPath: $0.path) else { return false }
+                return $0.pathExtension.lowercased() == "forgepackage"
+                    || (try? compatibleManifest(at: $0)) == true
+            }) {
                 package = try manifestPackage(manifestURL: manifest, root: source, projectID: projectID)
             } else {
                 package = try directoryPackage(source)
@@ -751,34 +1015,42 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
+            options: []
         ) else { throw ProjectInstructionQueueError.sourceUnavailable }
-        var documents: [(String, Data)] = []
+        var documents: [IngestedDocument] = []
         while let url = enumerator.nextObject() as? URL {
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             if values.isSymbolicLink == true { throw ProjectInstructionQueueError.sourceContainsLink }
-            guard values.isRegularFile == true,
-                  plainDocumentExtensions.contains(url.pathExtension.lowercased()) else { continue }
+            guard values.isRegularFile == true else { continue }
             guard documents.count < maximumSourceFiles else {
-                throw ProjectInstructionQueueError.invalidRequest("Instruction package contains too many documents.")
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "Instruction package exceeds the \(maximumSourceFiles)-file import resource budget. Split the import without rewriting individual instructions."
+                )
             }
             let relative = try relativePath(url, root: root)
-            documents.append((relative, try readRegularFile(url)))
+            documents.append(try ingestDocument(path: relative, url: url))
         }
-        documents.sort { $0.0 < $1.0 }
+        documents.sort { $0.path < $1.path }
         guard !documents.isEmpty else { throw ProjectInstructionQueueError.sourceTypeUnsupported }
-        var missionParts: [String] = []
-        missionParts.reserveCapacity(documents.count)
-        for (path, data) in documents {
-            missionParts.append("# \(path)\n\n\(try decodedDocument(data))")
-        }
-        let mission = try boundedMission(missionParts.joined(separator: "\n\n"))
         return try makePackage(
             packageID: slug(root.lastPathComponent), version: "1",
-            displayName: root.lastPathComponent, mission: mission, sourcePath: root.path,
+            displayName: root.lastPathComponent, sourcePath: root.path,
+            bootstrapGoal: "Follow the imported instructions in \(root.lastPathComponent).",
             allowedTools: ordinaryDefaultAllowedTools, completionGates: [builtInCompletionGate],
             documents: documents
         )
+    }
+
+    private static func compatibleManifest(at url: URL) throws -> Bool {
+        let data = try readRegularFile(url)
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return object["schema_version"] is NSNumber
+            && object["package_id"] is String
+            && object["entry_documents"] is [Any]
+            && object["requested_capabilities"] is [Any]
+            && object["completion_gates"] is [Any]
     }
 
     private static func manifestPackage(
@@ -810,8 +1082,10 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
            binding.caseInsensitiveCompare(projectID.description) != .orderedSame {
             throw ProjectInstructionQueueError.manifestInvalid("project_id does not match the selected project")
         }
-        var documents: [(String, Data)] = [(manifestURL.lastPathComponent, data)]
-        var mission = manifest.mission
+        var documents: [IngestedDocument] = [try ingestDocument(
+            path: manifestURL.lastPathComponent,
+            data: data
+        )]
         for entry in manifest.entryDocuments {
             guard validRelativePath(entry) else {
                 throw ProjectInstructionQueueError.manifestInvalid("entry document path is invalid")
@@ -820,14 +1094,14 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             guard try relativePath(url, root: root) == entry else {
                 throw ProjectInstructionQueueError.manifestInvalid("entry document escapes the package root")
             }
-            let content = try readRegularFile(url)
-            documents.append((entry, content))
-            mission += "\n\n# \(entry)\n\n\(try decodedDocument(content))"
+            documents.append(try ingestDocument(path: entry, url: url))
         }
         return try makePackage(
             packageID: manifest.packageID, version: manifest.version,
-            displayName: manifest.packageID, mission: try boundedMission(mission),
-            sourcePath: root.path, allowedTools: manifest.requestedCapabilities,
+            displayName: manifest.packageID, sourcePath: root.path,
+            bootstrapGoal: try boundedBootstrapGoal(manifest.mission),
+            allowedTools: Array(Set(manifest.requestedCapabilities)
+                .union(["instruction_catalog", "instruction_read"])).sorted(),
             completionGates: manifest.completionGateStrings, documents: documents
         )
     }
@@ -836,31 +1110,60 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         packageID: String,
         version: String,
         displayName: String,
-        mission: String,
         sourcePath: String,
+        bootstrapGoal: String,
         allowedTools: [String],
         completionGates: [String],
-        documents: [(String, Data)]
+        documents: [IngestedDocument]
     ) throws -> IngestedPackage {
-        let total = documents.reduce(0) { $0 + $1.1.count }
-        guard total <= maximumAggregateBytes else {
-            throw ProjectInstructionQueueError.invalidRequest("Instruction package exceeds the \(maximumAggregateBytes)-byte limit.")
+        let total = documents.reduce(0) { partial, document in
+            partial > maximumAggregateBytes - document.original.count
+                ? maximumAggregateBytes + 1 : partial + document.original.count
         }
-        let manifest: [[String: Any]] = documents.sorted(by: { $0.0 < $1.0 }).map {
-            ["path": $0.0, "bytes": $0.1.count, "sha256": JSONSupport.sha256Hex($0.1)]
+        guard total <= maximumAggregateBytes else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction package exceeds the \(maximumAggregateBytes)-byte import resource budget. Free storage or split the import without rewriting its instructions."
+            )
+        }
+        let instructionBytes = documents.reduce(0) {
+            $0 + ($1.canonicalText.map { Data($0.utf8).count } ?? 0)
+        }
+        let unresolved = documents.filter { $0.status == .unresolvedConversion }.count
+        if instructionBytes == 0, unresolved == 0 {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "No non-whitespace instructions were found in the selected source."
+            )
+        }
+        let manifest: [[String: Any]] = documents.sorted(by: { $0.path < $1.path }).map {
+            [
+                "path": $0.path,
+                "bytes": $0.original.count,
+                "sha256": JSONSupport.sha256Hex($0.original),
+                "canonical_sha256": $0.canonicalText.map { JSONSupport.sha256Hex(Data($0.utf8)) } as Any,
+                "status": $0.status.rawValue,
+            ].compactNSNull()
         }
         let identity: [String: Any] = [
-            "package_id": packageID, "version": version, "mission": mission,
+            "package_id": packageID, "version": version, "bootstrap_goal": bootstrapGoal,
             "allowed_tools": allowedTools, "completion_gates": completionGates,
             "documents": manifest,
         ]
         let digest = JSONSupport.sha256Hex(
             try JSONSerialization.data(withJSONObject: identity, options: [.sortedKeys, .withoutEscapingSlashes])
         )
+        let mission = try boundedMission(
+            """
+            \(bootstrapGoal)
+
+            The complete authoritative instructions are stored in an immutable project-scoped artifact. Before modifying the project, call instruction_catalog and inspect every converted instruction document with instruction_read, including late global constraints and acceptance criteria. Do not treat retained unresolved content as understood. Snapshot: \(digest)
+            """
+        )
         return IngestedPackage(
             packageID: packageID, version: version, displayName: displayName,
             mission: mission, sourcePath: sourcePath, digest: digest,
-            allowedTools: allowedTools, completionGates: completionGates, documents: documents
+            allowedTools: allowedTools, completionGates: completionGates, documents: documents,
+            instructionByteCount: instructionBytes,
+            unresolvedDocumentCount: unresolved
         )
     }
 
@@ -876,20 +1179,76 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 withIntermediateDirectories: false,
                 attributes: [.posixPermissions: 0o700]
             )
-            for (relative, data) in package.documents {
-                let target = staging.appendingPathComponent(relative)
+            var storedDocuments: [StoredDocument] = []
+            for (index, document) in package.documents.enumerated() {
+                let originalReference = "originals/\(document.path)"
+                let target = staging.appendingPathComponent(originalReference)
                 try FileManager.default.createDirectory(
                     at: target.deletingLastPathComponent(),
                     withIntermediateDirectories: true,
                     attributes: [.posixPermissions: 0o700]
                 )
-                try data.write(to: target, options: [.atomic])
+                try document.original.write(to: target, options: [.atomic])
                 try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: target.path)
+                let documentID = String(format: "document-%06d", index + 1)
+                var canonicalReference: String?
+                var canonicalBytes: Int?
+                var canonicalSHA256: String?
+                if let text = document.canonicalText {
+                    let data = Data(text.utf8)
+                    let relative = ".forge/canonical/\(documentID).txt"
+                    let canonicalURL = staging.appendingPathComponent(relative)
+                    try FileManager.default.createDirectory(
+                        at: canonicalURL.deletingLastPathComponent(),
+                        withIntermediateDirectories: true,
+                        attributes: [.posixPermissions: 0o700]
+                    )
+                    try data.write(to: canonicalURL, options: [.atomic])
+                    try FileManager.default.setAttributes(
+                        [.posixPermissions: 0o400], ofItemAtPath: canonicalURL.path
+                    )
+                    canonicalReference = relative
+                    canonicalBytes = data.count
+                    canonicalSHA256 = JSONSupport.sha256Hex(data)
+                }
+                storedDocuments.append(StoredDocument(
+                    id: documentID,
+                    sourcePath: document.path,
+                    originalReference: originalReference,
+                    originalByteCount: document.original.count,
+                    originalSHA256: JSONSupport.sha256Hex(document.original),
+                    canonicalReference: canonicalReference,
+                    canonicalByteCount: canonicalBytes,
+                    canonicalSHA256: canonicalSHA256,
+                    encoding: document.encoding,
+                    converter: document.converter,
+                    status: document.status,
+                    detail: document.detail
+                ))
             }
+            let catalog = StoredCatalog(
+                schemaVersion: Self.schemaVersion,
+                contentSHA256: package.digest,
+                documents: storedDocuments
+            )
+            let catalogURL = staging.appendingPathComponent(".forge/catalog.json")
+            try FileManager.default.createDirectory(
+                at: catalogURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            try encoder.encode(catalog).write(to: catalogURL, options: [.atomic])
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o400], ofItemAtPath: catalogURL.path
+            )
             let receipt: [String: Any] = [
-                "schema_version": 1, "content_sha256": package.digest,
+                "schema_version": Self.schemaVersion, "content_sha256": package.digest,
                 "package_id": package.packageID, "version": package.version,
                 "document_count": package.documents.count,
+                "instruction_byte_count": package.instructionByteCount,
+                "unresolved_document_count": package.unresolvedDocumentCount,
             ]
             let receiptURL = staging.appendingPathComponent("accepted.json")
             try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys])
@@ -909,20 +1268,6 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         }
     }
 
-    private static func storedSnapshotCount(_ root: URL) throws -> Int {
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
-        ) else { throw ProjectInstructionQueueError.storageFailure("instruction snapshot storage is unavailable") }
-        var count = 0
-        while enumerator.nextObject() != nil {
-            count += 1
-            if count > maximumStoredSnapshots { break }
-        }
-        return count
-    }
-
     private static func readRegularFile(_ url: URL) throws -> Data {
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
         guard values.isSymbolicLink != true else { throw ProjectInstructionQueueError.sourceContainsLink }
@@ -930,11 +1275,43 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
               let size = values.fileSize,
               size >= 0,
               size <= maximumSourceFileBytes else {
-            throw ProjectInstructionQueueError.invalidRequest("Instruction documents must be regular files no larger than \(maximumSourceFileBytes) bytes.")
+            throw ProjectInstructionQueueError.invalidRequest(
+                "The selected file exceeds the \(maximumSourceFileBytes)-byte import resource budget."
+            )
         }
         let data = try Data(contentsOf: url, options: [.mappedIfSafe])
         guard data.count == size else { throw ProjectInstructionQueueError.sourceUnavailable }
         return data
+    }
+
+    private static func storedCatalog(root: URL) throws -> StoredCatalog? {
+        let url = root.appendingPathComponent(".forge/catalog.json")
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: 32 * 1_048_576)
+        let catalog = try JSONDecoder().decode(StoredCatalog.self, from: data)
+        guard catalog.schemaVersion == Self.schemaVersion,
+              catalog.documents.count <= Self.maximumSourceFiles else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction document catalog is unsupported or oversized"
+            )
+        }
+        return catalog
+    }
+
+    private static func cleanupAbandonedStages(_ root: URL) {
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsSubdirectoryDescendants]
+        ) else { return }
+        for entry in entries where entry.lastPathComponent.hasPrefix(".") {
+            let identifier = String(entry.lastPathComponent.dropFirst())
+            guard UUID(uuidString: identifier) != nil,
+                  (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                continue
+            }
+            try? FileManager.default.removeItem(at: entry)
+        }
     }
 
     private static func boundedMission(_ value: String) throws -> String {
@@ -945,13 +1322,147 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         return trimmed
     }
 
-    private static func decodedDocument(_ data: Data) throws -> String {
-        guard let value = String(data: data, encoding: .utf8) else {
+    private static func boundedBootstrapGoal(_ value: String) throws -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             throw ProjectInstructionQueueError.invalidRequest(
-                "Instruction documents must contain valid UTF-8 text."
+                "No non-whitespace instructions were found in the selected source."
             )
         }
-        return value
+        let limit = 8 * 1_024
+        guard trimmed.utf8.count <= limit else {
+            return "Follow the imported manifest and its ordered entry documents."
+        }
+        return trimmed
+    }
+
+    private static func ingestDocument(path: String, url: URL) throws -> IngestedDocument {
+        try ingestDocument(path: path, data: readRegularFile(url))
+    }
+
+    private static func ingestDocument(path: String, data: Data) throws -> IngestedDocument {
+        if let rich = try decodedRichDocument(path: path, data: data) {
+            let normalized = normalizeText(rich.text)
+            guard !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return IngestedDocument(
+                    path: path, original: data, canonicalText: nil, encoding: nil,
+                    converter: rich.converter, status: .unresolvedConversion,
+                    detail: rich.emptyDetail
+                )
+            }
+            return IngestedDocument(
+                path: path, original: data, canonicalText: normalized, encoding: nil,
+                converter: rich.converter, status: .convertedInstruction,
+                detail: rich.detail
+            )
+        }
+        if let decoded = decodedDocument(data) {
+            let normalized = normalizeText(decoded.text)
+            if normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return IngestedDocument(
+                    path: path, original: data, canonicalText: nil,
+                    encoding: decoded.encoding, converter: "forge-native-text-v1",
+                    status: .retainedAttachment,
+                    detail: "The source contains no non-whitespace instructions."
+                )
+            }
+            return IngestedDocument(
+                path: path, original: data, canonicalText: normalized,
+                encoding: decoded.encoding, converter: "forge-native-text-v1",
+                status: .convertedInstruction,
+                detail: "Decoded as \(decoded.encoding) and normalized to UTF-8."
+            )
+        }
+        return IngestedDocument(
+            path: path, original: data, canonicalText: nil, encoding: nil,
+            converter: "forge-native-text-v1",
+            status: .unresolvedConversion,
+            detail: "The original bytes were retained, but no supported text decoder could interpret this content."
+        )
+    }
+
+    private static func normalizeText(_ text: String) -> String {
+        text.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+    }
+
+    private static func decodedRichDocument(
+        path: String,
+        data: Data
+    ) throws -> (text: String, converter: String, detail: String, emptyDetail: String)? {
+        #if canImport(PDFKit)
+        if data.starts(with: Data("%PDF-".utf8)) {
+            guard let document = PDFDocument(data: data), !document.isEncrypted else {
+                return (
+                    "", "pdfkit-text-v1", "", "The PDF is encrypted or malformed; original bytes were retained."
+                )
+            }
+            let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }
+                .joined(separator: "\n\n")
+            return (
+                text, "pdfkit-text-v1", "Extracted page text with PDFKit; the original PDF remains source-linked.",
+                "PDFKit found no extractable text. The original PDF was retained for OCR or visual review."
+            )
+        }
+        #endif
+        #if canImport(AppKit)
+        let lower = path.lowercased()
+        let prefix = String(decoding: data.prefix(256), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let type: NSAttributedString.DocumentType?
+        let converter: String
+        if lower.hasSuffix(".rtf") || prefix.hasPrefix("{\\rtf") {
+            type = .rtf
+            converter = "appkit-rtf-v1"
+        } else if lower.hasSuffix(".html") || lower.hasSuffix(".htm")
+                    || prefix.hasPrefix("<!doctype html") || prefix.hasPrefix("<html") {
+            type = .html
+            converter = "appkit-html-v1"
+        } else if lower.hasSuffix(".docx") {
+            type = .officeOpenXML
+            converter = "appkit-docx-v1"
+        } else {
+            return nil
+        }
+        do {
+            let attributed = try NSAttributedString(
+                data: data,
+                options: [.documentType: type as Any],
+                documentAttributes: nil
+            )
+            return (
+                attributed.string, converter,
+                "Converted with the native AppKit \(type?.rawValue ?? "document") adapter; original bytes remain source-linked.",
+                "The native document adapter produced no usable text; original bytes were retained."
+            )
+        } catch {
+            return (
+                "", converter, "",
+                "The native document adapter could not convert this file: \(String(error.localizedDescription.prefix(512))). Original bytes were retained."
+            )
+        }
+        #else
+        return nil
+        #endif
+    }
+
+    private static func decodedDocument(_ data: Data) -> (text: String, encoding: String)? {
+        if data.starts(with: [0xEF, 0xBB, 0xBF]),
+           let value = String(data: data.dropFirst(3), encoding: .utf8) {
+            return (value, "utf-8-bom")
+        }
+        if data.starts(with: [0xFF, 0xFE]),
+           let value = String(data: data.dropFirst(2), encoding: .utf16LittleEndian) {
+            return (value, "utf-16le-bom")
+        }
+        if data.starts(with: [0xFE, 0xFF]),
+           let value = String(data: data.dropFirst(2), encoding: .utf16BigEndian) {
+            return (value, "utf-16be-bom")
+        }
+        guard !data.contains(0), let value = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return (value, "utf-8")
     }
 
     private static func relativePath(_ url: URL, root: URL) throws -> String {

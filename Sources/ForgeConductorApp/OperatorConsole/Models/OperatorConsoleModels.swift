@@ -256,6 +256,10 @@ struct OperatorInstructionPackage: Decodable, Sendable, Equatable, Identifiable 
     let contentSHA256: String
     let allowedTools: [String]
     let completionGates: [String]
+    let documentCount: Int?
+    let instructionByteCount: Int?
+    let unresolvedDocumentCount: Int?
+    let importReady: Bool?
     let position: Int
     let state: String
     let runID: String?
@@ -275,6 +279,10 @@ struct OperatorInstructionPackage: Decodable, Sendable, Equatable, Identifiable 
         case contentSHA256 = "content_sha256"
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
+        case documentCount = "document_count"
+        case instructionByteCount = "instruction_byte_count"
+        case unresolvedDocumentCount = "unresolved_document_count"
+        case importReady = "import_ready"
         case position, state
         case runID = "run_id"
         case lastError = "last_error"

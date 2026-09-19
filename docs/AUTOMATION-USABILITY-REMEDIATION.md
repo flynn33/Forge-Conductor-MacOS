@@ -134,9 +134,49 @@ prepared descriptor. Existing prepared and running descriptors are immutable,
 so a later install, removal, or policy change cannot silently widen them.
 Advanced raw identifiers remain available as an exact compatibility override.
 
+## Implemented M3 artifact-storage slice
+
+Instruction import no longer concatenates source bodies into the 32 KiB run
+mission. Schema-2 snapshots retain each original at its source-relative path,
+store separately normalized canonical UTF-8 text with hashes and converter
+identity, and publish a complete paged catalog before the compact queue record.
+The mission is now only a bounded bootstrap naming the immutable snapshot and
+requiring a package-level catalog pass before mutation.
+
+Single files are inspected without an extension admission whitelist. Plain and
+structured text decode as UTF-8 or BOM-marked UTF-16; native PDFKit and AppKit
+adapters extract PDF, DOCX, RTF, and HTML text. Folder enumeration includes
+hidden configuration/instruction files. Empty selections report a specific
+no-instructions error. Opaque, malformed, encrypted, or image-only content is
+retained byte-for-byte and reported unresolved rather than silently omitted or
+misrepresented as understood; an unresolved next package cannot start.
+
+The registered read-only `instruction_catalog` and `instruction_read` tools
+require the active project, generation, and run identity. Catalog results page;
+document reads use bounded byte windows, validate hashes and UTF-8 cursor
+boundaries, and reassemble canonical content exactly after the original source
+is moved or deleted. Import conversion and immutable staging occur outside the
+queue mutation lock; atomic publication precedes the compact queue link, failed
+links remove only unreferenced new snapshots, and restart removes only
+UUID-named abandoned staging directories.
+
+Queue metadata migrates transactionally from schema 1 to schema 2 while new
+optional fields keep legacy package identities, ordering, active run linkage,
+and snapshots intact. The fixed 512-snapshot admission count is removed in
+favor of reference-aware removal. The current explicit safety budgets are
+4,096 source files, 128 MiB per file, 512 MiB per import, 4,096 queue rows,
+64 MiB queue metadata, and 64 KiB per delivery window; these are resource
+backpressure limits rather than instructions-authoring limits.
+
+This slice closes the artifact-backed text/rich-document storage and scoped
+retrieval foundation of M3. Safe ZIP-container extraction, paste/drop parity,
+durable delivery progress and token-aware planning, catalog/history paging
+beyond the transitional queue metadata budget, and decisive non-text asset
+representation remain open before M3 can be declared complete.
+
 These focused contracts complete M1 shared preparation and M2 native tool
-selection; they do not complete the overall remediation or claim live provider
-lifecycle automation. Document-backed format-neutral import remains M3;
+selection and begin M3; they do not complete the overall remediation or claim
+live provider lifecycle automation. The remaining M3 work is listed above;
 automatic task-aware completion remains M4; provider lifecycle, continuity
 presentation, and contextual Guided Mode remain M5; whole-journey acceptance
 and the source-bound candidate remain M6 and M7.
@@ -182,6 +222,16 @@ and the source-bound candidate remain M6 and M7.
   provider/catalog/budget revisions, continuity mode, and immutable package
   snapshot hash. The storage regression independently hashes the accepted
   owner-only document after the original source changes.
+- Fifteen instruction-queue tests cover the 1/32,767/32,768/32,769-byte
+  boundaries and a 1.1 MiB file, a 66-document folder above 8 MiB including a
+  hidden file, UTF-16 and multi-scalar seven-byte delivery windows, exact
+  reassembly, native RTF/HTML/DOCX conversion, malformed PDF and opaque-binary
+  unresolved states, project/generation/run isolation, schema-1 queue migration,
+  immutable originals, ordering, restart, and completion advance behavior.
+- Seven catalog, nine provider/preparation, eight operator-contract, and 122
+  Manager tests passed after the scoped readers entered the production catalog;
+  Manager retained two explicit environment/helper skips. Both SwiftPM products
+  and the canonical Apple Development-signed Debug Xcode build passed.
 - The authenticated project-registration regression first failed because the
   new authorization field was rejected. It now proves that one request retains
   an existing root, adds only the selected canonical directory, persists the

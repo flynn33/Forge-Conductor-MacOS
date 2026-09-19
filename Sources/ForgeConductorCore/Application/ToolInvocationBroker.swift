@@ -96,6 +96,8 @@ public enum ProductionToolReplayCatalog {
         "clu_cancel": .reconciled,
 
         "fs_read": .readOnly,
+        "instruction_catalog": .readOnly,
+        "instruction_read": .readOnly,
         "fs_write": .idempotent,
         "fs_edit": .reconciled,
         "fs_list": .readOnly,

@@ -661,6 +661,8 @@ private enum ProductionToolDefinitionSource {
         "session_handoff": "Finalize context/agent handoff for a new chat; returns resume_seed. Prefer before context is full.",
         "context_get": "Load latest (or id) handoff packet — call first in every new chat bootstrap.",
         "context_list": "List recent context handoff packets.",
+        "instruction_catalog": "Page the complete project/run-bound inventory for an immutable imported instruction snapshot before beginning work.",
+        "instruction_read": "Read a byte-bounded UTF-8 window from one converted project/run-bound instruction document with a durable continuation cursor.",
         "fs_read": "Read a UTF-8 text file. Optional 1-based line window: offset (start line) + length/limit (line count). Response includes total_lines, start_line, end_line, has_more, next_offset. Do not re-call with the same offset when content was returned.",
         "fs_write": "Write a UTF-8 text file.",
         "fs_edit": "Replace occurrences of old with new in a file.",
@@ -690,6 +692,32 @@ private enum ProductionToolDefinitionSource {
         guard baseDescriptions[name] != nil else { return nil }
         let object: [String: Any] = ["type": "object"]
         switch name {
+        case "instruction_catalog":
+            return [
+                "type": "object",
+                "properties": [
+                    "snapshot_sha256": ["type": "string"],
+                    "cursor": ["type": "integer", "minimum": 0],
+                    "limit": ["type": "integer", "minimum": 1, "maximum": 128],
+                ] as [String: Any],
+                "required": ["snapshot_sha256"],
+                "additionalProperties": false,
+            ]
+        case "instruction_read":
+            return [
+                "type": "object",
+                "properties": [
+                    "snapshot_sha256": ["type": "string"],
+                    "document_id": ["type": "string"],
+                    "byte_offset": ["type": "integer", "minimum": 0],
+                    "maximum_bytes": [
+                        "type": "integer", "minimum": 1,
+                        "maximum": ProjectInstructionQueueStore.maximumDeliveryBytes,
+                    ],
+                ] as [String: Any],
+                "required": ["snapshot_sha256", "document_id"],
+                "additionalProperties": false,
+            ]
         case "agent_run_start":
             return [
                 "type": "object",

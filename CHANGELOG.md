@@ -45,6 +45,16 @@ Product versions do not by themselves claim shipment.
   updates. Explicit denials survive catalog expansion, removed or disabled tools
   are explained without being granted, Allow all follows the eligible catalog
   only for future preparations, and every run freezes its exact resolved grant.
+- Replaced concatenated instruction missions with schema-2 immutable source and
+  canonical-text catalogs plus bounded `instruction_catalog` and
+  `instruction_read` delivery. Imports now accept content-aware UTF-8/UTF-16
+  text regardless of suffix, inventory hidden files, and use native PDFKit and
+  AppKit adapters for PDF, DOCX, RTF, and HTML while retaining every original.
+- Raised the old 32 KiB/1 MiB/8 MiB/64-item authoring boundaries into separate
+  bounded bootstrap, delivery, and import resource budgets. Opaque, malformed,
+  or encrypted content remains preserved with an actionable unresolved state
+  that prevents execution; legacy queue metadata migrates without losing
+  package identity, ordering, or snapshots.
 
 ### Pending qualification
 

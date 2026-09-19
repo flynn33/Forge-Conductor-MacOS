@@ -38,6 +38,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             AgentToolPack(),
             MemoryToolPack(),
             ProjectMemoryToolPack(),
+            InstructionArtifactToolPack(),
             ContinuityToolPack(),
             ContinuityControlToolPack(),
             ContinuityLifecycleToolPack(),
@@ -928,6 +929,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     }
 
     private static let contextRequiredTools: Set<String> = [
+        "instruction_catalog", "instruction_read",
         "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "shell_exec", "pdf_write", "pdf_from_file",
