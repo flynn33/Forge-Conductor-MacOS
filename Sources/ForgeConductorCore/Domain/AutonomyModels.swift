@@ -731,6 +731,23 @@ public struct ToolInvocationRecord: Codable, Sendable, Equatable {
     public let updatedAt: String
 }
 
+/// Stable keyset cursor for bounded traversal of one run's durable tool
+/// evidence. The database ordering is `(created_at, invocation_id)`.
+public struct ToolInvocationPageCursor: Codable, Sendable, Equatable {
+    public let createdAt: String
+    public let invocationID: UUID
+
+    public init(createdAt: String, invocationID: UUID) {
+        self.createdAt = createdAt
+        self.invocationID = invocationID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case createdAt = "created_at"
+        case invocationID = "invocation_id"
+    }
+}
+
 /// Identity of one manager-created validation invocation. The serialized value
 /// is auditable provenance; it is not a bearer token for completion authority.
 public struct CompletionGateInvocation: Codable, Sendable, Equatable {

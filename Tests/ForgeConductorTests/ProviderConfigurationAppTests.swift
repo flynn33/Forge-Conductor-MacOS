@@ -423,6 +423,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
             durable.specification.work.metadata["completion_plan_id"],
             automaticPlan.planID.uuidString.lowercased()
         )
+        let projected = try XCTUnwrap(
+            manager.operatorSnapshot(limit: 10).runs.first { $0.runID == acceptedRunID.description }
+        )
+        XCTAssertEqual(projected.completionPlan, automaticPlan)
     }
 
     func testProjectBoundPreparationPublishesEveryTypedReadinessAndRecoveryState() throws {

@@ -145,6 +145,25 @@ public enum AutomaticCompletionPlanResolver {
         )
     }
 
+    public static func hasValidIdentity(_ plan: AutomaticCompletionPlan) -> Bool {
+        guard plan.schemaVersion == AutomaticCompletionPlan.schemaVersion,
+              plan.revision > 0,
+              !plan.instructionArtifactSHA256.isEmpty,
+              plan.instructionArtifactSHA256.count <= maximumInstructionSnapshots,
+              plan.instructionArtifactSHA256.allSatisfy(validDigest),
+              !plan.obligations.isEmpty,
+              plan.obligations.count <= maximumObligations,
+              Set(plan.obligations.map(\.id)).count == plan.obligations.count,
+              let expected = try? stablePlanID(
+                projectID: plan.projectID,
+                projectGeneration: plan.projectGeneration,
+                instructionArtifactSHA256: plan.instructionArtifactSHA256,
+                obligations: plan.obligations,
+                source: plan.source
+              ) else { return false }
+        return expected == plan.planID
+    }
+
     private struct ProjectInspection {
         let hasBuildDefinition: Bool
         let hasTests: Bool

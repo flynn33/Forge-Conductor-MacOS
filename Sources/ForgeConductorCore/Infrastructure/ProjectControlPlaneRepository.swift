@@ -9767,6 +9767,38 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Keyset-paged history for completion validation. Validation retains only
+    /// its bounded obligation aggregate rather than the run's complete history.
+    public func toolInvocations(
+        runID: RunID,
+        after cursor: ToolInvocationPageCursor?,
+        limit: Int
+    ) throws -> [ToolInvocationRecord] {
+        guard (1...256).contains(limit) else {
+            throw AutonomyError.invalidRequest("tool invocation page limit must be between 1 and 256")
+        }
+        if let cursor {
+            guard !cursor.createdAt.isEmpty, cursor.createdAt.utf8.count <= 128 else {
+                throw AutonomyError.invalidRequest("tool invocation cursor is invalid")
+            }
+            return try requiredConnection().all(
+                Self.toolInvocationSelect
+                    + " WHERE run_id=? AND (created_at>? OR (created_at=? AND invocation_id>?))"
+                    + " ORDER BY created_at,invocation_id LIMIT ?",
+                bindings: [
+                    .text(runID.description), .text(cursor.createdAt), .text(cursor.createdAt),
+                    .text(cursor.invocationID.uuidString.lowercased()), .int64(Int64(limit)),
+                ],
+                map: Self.decodeToolInvocation
+            )
+        }
+        return try requiredConnection().all(
+            Self.toolInvocationSelect + " WHERE run_id=? ORDER BY created_at,invocation_id LIMIT ?",
+            bindings: [.text(runID.description), .int64(Int64(limit))],
+            map: Self.decodeToolInvocation
+        )
+    }
+
     @discardableResult
     public func quarantineStaleResult(
         context: ToolInvocationContext,

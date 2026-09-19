@@ -59,6 +59,9 @@ final class AutonomyViewModel: ObservableObject {
 
     var selectedRun: OperatorRun? { runs.first { $0.runID == selectedRunID } }
     var selectedProject: OperatorProject? { projects.first { $0.projectID == selectedProjectID } }
+    var preparedCompletionPlan: AutomaticCompletionPlan? {
+        projectRunPreparation?.descriptor?.validationPlan.automaticPlan
+    }
 
     var taskDraft: AutonomyTaskDraft {
         AutonomyTaskDraft(

@@ -233,16 +233,18 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
             return try blocked(run, summary: "Native validation is stopped or at its concurrency limit")
         }
         if run.specification.completionGates == [ProjectInstructionQueueStore.builtInCompletionGate] {
-            let invocations = try await repository.toolInvocations(runID: run.runID, limit: 257)
+            let result = try await ProjectInstructionCompletionGate.result(
+                run: run,
+                repository: repository
+            )
             let validator = CompletionGateValidator(
                 gate: ProjectInstructionQueueStore.builtInCompletionGate,
-                version: 1
-            ) { current in
-                ProjectInstructionCompletionGate.result(
-                    run: current,
-                    invocations: invocations
-                )
-            }
+                version: 1,
+                operation: { current in
+                    guard current == run else { throw AutonomyError.transitionConflict }
+                    return result
+                }
+            )
             return try await GateValidatorRegistry(
                 validators: [validator],
                 clock: clock
@@ -355,54 +357,271 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
     }
 }
 
-/// Fixed manager-owned validator for quick instruction packages. It accepts only
-/// broker-committed successful tool results from the exact run. Model text and
-/// model-selected hashes have no approval authority.
+/// Fixed manager-owned validator for ordinary instruction packages. It pages
+/// exact durable records and retains only the latest bounded evidence needed by
+/// each typed obligation. Failed attempts remain history; a later relevant pass
+/// may supersede them without allowing an unrelated success to prove the task.
 enum ProjectInstructionCompletionGate {
+    static let pageSize = 128
+    static let maximumEvidenceRecords = 65_536
+
     static func result(
         run: AutonomousRunRecord,
-        invocations: [ToolInvocationRecord]
-    ) -> CompletionGateResult {
-        let exact = invocations.filter {
-            $0.runID == run.runID
-                && $0.projectID == run.projectID
-                && $0.projectGeneration == run.projectGeneration
+        repository: ProjectControlPlaneRepository
+    ) async throws -> CompletionGateResult {
+        var accumulator = EvidenceAccumulator(run: run)
+        var cursor: ToolInvocationPageCursor?
+        repeat {
+            let page = try await repository.toolInvocations(
+                runID: run.runID,
+                after: cursor,
+                limit: pageSize
+            )
+            try accumulator.consume(page)
+            guard let last = page.last, page.count == pageSize else { break }
+            cursor = ToolInvocationPageCursor(
+                createdAt: last.createdAt,
+                invocationID: last.invocationID
+            )
+        } while true
+        return accumulator.result()
+    }
+
+    struct EvidenceAccumulator {
+        private struct LatestEvidence {
+            let successful: Bool
+            let reference: String?
         }
-        guard !exact.isEmpty else {
+
+        private let run: AutonomousRunRecord
+        private var recordCount = 0
+        private var invalidScope = false
+        private var unresolvedInvocation = false
+        private var latestRelevantRead: LatestEvidence?
+        private var latestBuild: LatestEvidence?
+        private var latestTests: LatestEvidence?
+        private var latestLegacyEvidence: LatestEvidence?
+
+        init(run: AutonomousRunRecord) {
+            self.run = run
+        }
+
+        mutating func consume(_ records: [ToolInvocationRecord]) throws {
+            guard records.count <= ProjectInstructionCompletionGate.pageSize else {
+                throw AutonomyError.invalidRequest("completion evidence page exceeded its bound")
+            }
+            guard recordCount <= ProjectInstructionCompletionGate.maximumEvidenceRecords - records.count else {
+                throw AutonomyError.completionValidationFailed
+            }
+            recordCount += records.count
+            for invocation in records {
+                guard invocation.runID == run.runID,
+                      invocation.projectID == run.projectID,
+                      invocation.projectGeneration == run.projectGeneration else {
+                    invalidScope = true
+                    continue
+                }
+                if [.intent, .executing, .ambiguous].contains(invocation.state) {
+                    unresolvedInvocation = true
+                }
+                let evidence = Self.evidence(invocation)
+                latestLegacyEvidence = evidence
+                if Self.isRelevantRead(invocation.toolName, plan: run.specification.completionPlan) {
+                    latestRelevantRead = evidence
+                }
+                guard invocation.toolName == "shell_exec",
+                      let command = Self.shellCommand(invocation) else { continue }
+                let categories = Self.shellCategories(command)
+                if categories.contains(.build) { latestBuild = evidence }
+                if categories.contains(.tests) { latestTests = evidence }
+            }
+        }
+
+        func result() -> CompletionGateResult {
+            let gate = ProjectInstructionQueueStore.builtInCompletionGate
+            guard !invalidScope else {
+                return CompletionGateResult(
+                    gate: gate,
+                    passed: false,
+                    summary: "Completion evidence included a different project, generation, or run"
+                )
+            }
+            guard !unresolvedInvocation, run.specification.work.pendingIntent == nil else {
+                return CompletionGateResult(
+                    gate: gate,
+                    passed: false,
+                    summary: "A relevant operation remains in flight or ambiguous"
+                )
+            }
+            guard let plan = run.specification.completionPlan else {
+                guard latestLegacyEvidence?.successful == true else {
+                    return CompletionGateResult(
+                        gate: gate,
+                        passed: false,
+                        summary: "The legacy task has no successful committed project tool result"
+                    )
+                }
+                return CompletionGateResult(
+                    gate: gate,
+                    passed: true,
+                    summary: "The legacy task has resolved history and a successful durable tool result",
+                    evidenceReferences: Self.references([latestLegacyEvidence])
+                )
+            }
+            guard Self.plan(plan, matches: run) else {
+                return CompletionGateResult(
+                    gate: gate,
+                    passed: false,
+                    summary: "The completion plan does not match the final project, source, or plan revision"
+                )
+            }
+
+            var unsatisfied: [String] = []
+            var references: [String] = []
+            for obligation in plan.obligations where obligation.kind != .customNativeGate {
+                let evidence: LatestEvidence?
+                let satisfied: Bool
+                switch obligation.kind {
+                case .artifactRegistered:
+                    evidence = nil
+                    satisfied = Self.artifactRegistrationMatches(plan, run: run)
+                case .projectBuild:
+                    evidence = latestBuild
+                    satisfied = latestBuild?.successful == true
+                case .projectTests:
+                    evidence = latestTests
+                    satisfied = latestTests?.successful == true
+                case .readOnlyReportDelivered:
+                    evidence = latestRelevantRead
+                    satisfied = run.completionRequestJSON != nil
+                        && latestRelevantRead?.successful == true
+                case .noRelevantUnresolvedSideEffect:
+                    evidence = nil
+                    satisfied = true
+                case .requestedFileExists, .requestedContentAssertion,
+                     .structuredDocumentValid, .runtimeJobSucceeded:
+                    evidence = nil
+                    satisfied = false
+                case .customNativeGate:
+                    evidence = nil
+                    satisfied = true
+                }
+                if let reference = evidence?.reference, satisfied, !references.contains(reference),
+                   references.count < 256 {
+                    references.append(reference)
+                }
+                if !satisfied || obligation.humanReviewRequired {
+                    unsatisfied.append(obligation.id)
+                }
+            }
+            guard unsatisfied.isEmpty else {
+                return CompletionGateResult(
+                    gate: gate,
+                    passed: false,
+                    summary: "Unsatisfied automatic completion obligations: "
+                        + unsatisfied.prefix(16).joined(separator: ", "),
+                    evidenceReferences: references
+                )
+            }
             return CompletionGateResult(
-                gate: ProjectInstructionQueueStore.builtInCompletionGate,
-                passed: false,
-                summary: "The package requested completion without a committed project tool result"
+                gate: gate,
+                passed: true,
+                summary: "All \(plan.obligations.filter { $0.kind != .customNativeGate }.count) automatic completion obligations passed using \(recordCount) paged evidence records",
+                evidenceReferences: references
             )
         }
-        guard exact.count <= 256 else {
-            return CompletionGateResult(
-                gate: ProjectInstructionQueueStore.builtInCompletionGate,
-                passed: false,
-                summary: "The package exceeded the bounded completion evidence limit"
-            )
-        }
-        for invocation in exact {
+
+        private enum ShellCategory: Hashable { case build, tests }
+
+        private static func evidence(_ invocation: ToolInvocationRecord) -> LatestEvidence {
             guard invocation.state == .completed,
                   invocation.lastErrorCode == nil,
                   invocation.lastErrorSummary == nil,
                   let summary = invocation.resultSummary,
+                  let digest = invocation.resultSHA256,
+                  JSONSupport.sha256Hex(summary) == digest,
                   let data = summary.data(using: .utf8),
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   object["ok"] as? Bool == true,
                   object["is_error"] as? Bool == false else {
-                return CompletionGateResult(
-                    gate: ProjectInstructionQueueStore.builtInCompletionGate,
-                    passed: false,
-                    summary: "At least one package tool invocation is unresolved or failed"
-                )
+                return LatestEvidence(successful: false, reference: nil)
             }
+            return LatestEvidence(successful: true, reference: digest)
         }
-        return CompletionGateResult(
-            gate: ProjectInstructionQueueStore.builtInCompletionGate,
-            passed: true,
-            summary: "Every durable package tool invocation completed successfully",
-            evidenceReferences: exact.compactMap(\.resultSHA256)
-        )
+
+        private static func isRelevantRead(
+            _ toolName: String,
+            plan: AutomaticCompletionPlan?
+        ) -> Bool {
+            let names = plan?.obligations
+                .filter { $0.kind == .readOnlyReportDelivered }
+                .flatMap(\.relevantToolNames) ?? []
+            return names.contains(toolName)
+        }
+
+        private static func shellCommand(_ invocation: ToolInvocationRecord) -> String? {
+            guard let summary = invocation.resultSummary,
+                  let data = summary.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let payload = object["payload"] as? [String: Any],
+                  let command = payload["command"] as? String,
+                  !command.isEmpty, command.utf8.count <= 16_384 else { return nil }
+            return command
+        }
+
+        private static func shellCategories(_ command: String) -> Set<ShellCategory> {
+            let words = command.lowercased().split { character in
+                !character.isLetter && !character.isNumber && character != "-"
+            }.map(String.init)
+            let pairs = zip(words, words.dropFirst())
+            var categories: Set<ShellCategory> = []
+            if pairs.contains(where: { $0 == "swift" && $1 == "build" }) {
+                categories.insert(.build)
+            }
+            if pairs.contains(where: { $0 == "swift" && $1 == "test" }) {
+                categories.insert(.tests)
+            }
+            if words.contains("xcodebuild") {
+                if words.contains("build") || words.contains("archive")
+                    || words.contains("build-for-testing") {
+                    categories.insert(.build)
+                }
+                if words.contains("test") || words.contains("test-without-building") {
+                    categories.insert(.tests)
+                }
+            }
+            return categories
+        }
+
+        private static func plan(
+            _ plan: AutomaticCompletionPlan,
+            matches run: AutonomousRunRecord
+        ) -> Bool {
+            let metadata = run.specification.work.metadata
+            return AutomaticCompletionPlanResolver.hasValidIdentity(plan)
+                && plan.projectID == run.projectID
+                && plan.projectGeneration == run.projectGeneration
+                && !plan.instructionArtifactSHA256.isEmpty
+                && !plan.obligations.isEmpty
+                && metadata["completion_plan_id"] == plan.planID.uuidString.lowercased()
+                && metadata["completion_plan_revision"] == String(plan.revision)
+        }
+
+        private static func artifactRegistrationMatches(
+            _ plan: AutomaticCompletionPlan,
+            run: AutonomousRunRecord
+        ) -> Bool {
+            let metadata = run.specification.work.metadata
+            let registered = Set([
+                metadata["source_snapshot_sha256"],
+                metadata["instruction_package_sha256"],
+            ].compactMap { $0 })
+            return !registered.isEmpty
+                && Set(plan.instructionArtifactSHA256).isSubset(of: registered)
+        }
+
+        private static func references(_ evidence: [LatestEvidence?]) -> [String] {
+            Array(Set(evidence.compactMap { $0?.reference })).sorted()
+        }
     }
 }

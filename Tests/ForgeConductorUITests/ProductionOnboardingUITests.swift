@@ -386,6 +386,10 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(run.completionGates, ["tests"])
         XCTAssertTrue(element("autonomy-run-row-\(run.runID)").waitForExistence(timeout: 10))
         let importPolicy = app.buttons["run-import-native-policy"]
+        XCTAssertFalse(importPolicy.exists)
+        let advancedCompletion = element("run-completion-advanced-toggle")
+        XCTAssertTrue(advancedCompletion.waitForExistence(timeout: 10))
+        try click(advancedCompletion)
         XCTAssertTrue(importPolicy.waitForExistence(timeout: 10))
         try click(importPolicy)
         let policyPanel = app.windows["open-panel"]

@@ -29,6 +29,16 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Replaced the built-in instruction-run perfect-history completion rule with
+  outcome-aware obligation evidence. Corrected build/test passes supersede older
+  failures, later regressions invalidate earlier passes, unrelated reads cannot
+  satisfy repair work, and unresolved effects remain fail-closed.
+- Paged durable completion evidence in 128-record keyset windows with a bounded
+  65,536-record validation ceiling, removing the former 256-record task-failure
+  limit without retaining an unbounded run history.
+- Showed automatic obligation titles and reasons in Start Task and run detail,
+  and moved signed custom completion-policy import behind collapsed
+  **Advanced controls** so routine tasks require no policy package.
 - Changed every quick-text task input, including short paste, to publish through
   the same immutable run-artifact pipeline as files, folders, ZIPs, and selected
   project packages before preparation or Start.

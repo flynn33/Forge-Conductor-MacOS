@@ -1078,6 +1078,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             4,
             "Artifact publication, the typed permission update, and both identical start submissions must be authorized"
         )
+        XCTAssertTrue(app.staticTexts["Instruction artifact is registered"].exists)
+        XCTAssertFalse(app.buttons["run-import-native-policy"].exists)
+        let advancedCompletion = app.descendants(matching: .any)["run-completion-advanced-toggle"]
+        XCTAssertTrue(advancedCompletion.waitForExistence(timeout: 5))
+        advancedCompletion.click()
+        XCTAssertTrue(app.buttons["run-import-native-policy"].waitForExistence(timeout: 5))
     }
 
     func testOrdinaryStartHasNoRawTechnicalEditors() throws {
@@ -1115,6 +1121,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app.descendants(matching: .any)["run-completion-automatic"].waitForExistence(timeout: 5)
                 || app.buttons["run-completion-done"].waitForExistence(timeout: 5)
         )
+        XCTAssertTrue(app.staticTexts["Instruction artifact is registered"].exists)
         app.buttons["run-completion-done"].click()
         app.buttons["run-start-cancel"].click()
 
@@ -1996,8 +2003,12 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "allowed_tools": resolvedToolIDs(from: object).sorted(),
             "network_allowed": object["network_allowed"] as? Bool ?? false,
             "validation_plan": [
-                "mode": "manager_completion_gates",
+                "mode": "automatic_completion_plan",
                 "completion_gates": object["completion_gates"] as? [String] ?? ["tests"],
+                "automatic_plan": automaticCompletionPlan(
+                    sourceSHA: sourceSHA,
+                    generation: generation
+                ),
             ],
             "continuity_mode": "managedAutonomous",
             "budget_policy": [
@@ -2303,7 +2314,43 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "active_session_id": "fixture-active-session",
             "continuation_pending": false,
             "completion_gates": ["tests"],
+            "completion_plan": automaticCompletionPlan(
+                sourceSHA: String(repeating: "c", count: 64),
+                generation: 4
+            ),
             "passed_gates": [],
+        ]
+    }
+
+    private func automaticCompletionPlan(
+        sourceSHA: String,
+        generation: UInt64
+    ) -> [String: Any] {
+        [
+            "schema_version": 1,
+            "plan_id": "11111111-1111-5111-a111-111111111111",
+            "project_id": ["rawValue": projectID],
+            "project_generation": ["rawValue": generation],
+            "instruction_artifact_sha256": [sourceSHA],
+            "obligations": [[
+                "id": "artifact-registered",
+                "kind": "artifact_registered",
+                "title": "Instruction artifact is registered",
+                "reason": "The task remains bound to the prepared instruction snapshot.",
+                "evidence_requirements": ["prepared_source"],
+                "relevant_tool_names": [],
+                "human_review_required": false,
+            ], [
+                "id": "no-unresolved-side-effects",
+                "kind": "no_relevant_unresolved_side_effect",
+                "title": "No relevant operation remains unresolved",
+                "reason": "Completion reconciles in-flight or ambiguous task effects.",
+                "evidence_requirements": ["reconciled_side_effects"],
+                "relevant_tool_names": [],
+                "human_review_required": false,
+            ]],
+            "source": "automatic",
+            "revision": 1,
         ]
     }
 

@@ -11,6 +11,7 @@ struct AutonomyOperatorView: View {
     @State private var showingAdvancedOverrides = false
     @State private var showingToolSelection = false
     @State private var showingCompletionChecks = false
+    @State private var showingAdvancedCompletionControls = false
     private let onOpenProjects: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -157,7 +158,23 @@ struct AutonomyOperatorView: View {
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
-                    if run.completionGates.isEmpty {
+                    if let plan = run.completionPlan, !plan.obligations.isEmpty {
+                        ForEach(plan.obligations) { obligation in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Label(
+                                    obligation.title,
+                                    systemImage: completionPassed(obligation, run: run)
+                                        ? "checkmark.circle.fill" : "circle"
+                                )
+                                .foregroundStyle(
+                                    completionPassed(obligation, run: run) ? .green : .secondary
+                                )
+                                Text(obligation.reason)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } else if run.completionGates.isEmpty {
                         Text("No completion-gate projection was published.")
                             .foregroundStyle(.secondary)
                     } else {
@@ -169,16 +186,39 @@ struct AutonomyOperatorView: View {
                             .foregroundStyle(run.passedGates.contains(gate) ? .green : .secondary)
                         }
                     }
-                    Button("Advanced: Import Custom Validation…", action: viewModel.chooseNativePolicy)
-                        .disabled(viewModel.policyImportInFlight || run.completionGates.isEmpty)
-                        .accessibilityIdentifier("run-import-native-policy")
-                    if viewModel.policyImportInFlight {
-                        ProgressView("Preparing native policy import…")
-                            .controlSize(.small)
+                    Button {
+                        showingAdvancedCompletionControls.toggle()
+                    } label: {
+                        Label(
+                            "Advanced controls",
+                            systemImage: showingAdvancedCompletionControls
+                                ? "chevron.down" : "chevron.right"
+                        )
                     }
-                    Text("Prepare the signed XCTest package in Forge's protected home first. The imported policy must match this run, project generation, and completion gates.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("run-completion-advanced-toggle")
+                    if showingAdvancedCompletionControls {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Custom completion policy")
+                                .font(.headline)
+                            Text("Use an explicitly prepared signed native policy for specialized organizational checks. Routine tasks use the automatic plan above.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button(
+                                "Import Custom Completion Policy…",
+                                action: viewModel.chooseNativePolicy
+                            )
+                            .disabled(viewModel.policyImportInFlight || run.completionGates.isEmpty)
+                            .accessibilityIdentifier("run-import-native-policy")
+                            if viewModel.policyImportInFlight {
+                                ProgressView("Preparing custom policy import…")
+                                    .controlSize(.small)
+                            }
+                            Text("Prepare the signed XCTest package in Forge's protected home first. The imported policy must match this run, project generation, and explicitly selected custom checks.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } label: {
                 HStack {
@@ -477,7 +517,17 @@ struct AutonomyOperatorView: View {
                 }
                 Text("Forge derives checks from the selected instructions and project structure. Custom signed policies remain available for specialized tasks after a run is prepared.")
                     .foregroundStyle(.secondary)
-                if viewModel.completionGates.isEmpty {
+                if let plan = viewModel.preparedCompletionPlan, !plan.obligations.isEmpty {
+                    ForEach(plan.obligations) { obligation in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Label(obligation.title, systemImage: "checkmark.seal")
+                            Text(obligation.reason)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("run-completion-automatic")
+                } else if viewModel.completionGates.isEmpty {
                     Text("Checks will be derived during task preparation.")
                         .accessibilityIdentifier("run-completion-automatic")
                 } else {
@@ -520,6 +570,16 @@ struct AutonomyOperatorView: View {
         default:
             "Unavailable"
         }
+    }
+
+    private func completionPassed(
+        _ obligation: CompletionObligation,
+        run: OperatorRun
+    ) -> Bool {
+        if let customGateID = obligation.customGateID {
+            return run.passedGates.contains(customGateID)
+        }
+        return run.passedGates.contains(ProjectInstructionQueueStore.builtInCompletionGate)
     }
 
     private func recoveryTitle(_ action: ManagerRunRecoveryAction) -> String {

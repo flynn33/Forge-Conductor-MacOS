@@ -405,6 +405,7 @@ struct OperatorRun: Decodable, Sendable, Equatable, Identifiable {
     let lastModelTurnAt: String?
     let lastToolActivityAt: String?
     let completionGates: [String]
+    let completionPlan: AutomaticCompletionPlan?
     let passedGates: [String]
     let lastErrorCode: String?
     let lastErrorSummary: String?
@@ -434,6 +435,7 @@ struct OperatorRun: Decodable, Sendable, Equatable, Identifiable {
         case lastModelTurnAt = "last_model_turn_at"
         case lastToolActivityAt = "last_tool_activity_at"
         case completionGates = "completion_gates"
+        case completionPlan = "completion_plan"
         case passedGates = "passed_gates"
         case lastErrorCode = "last_error_code"
         case lastErrorSummary = "last_error_summary"
@@ -464,6 +466,7 @@ struct OperatorRun: Decodable, Sendable, Equatable, Identifiable {
         lastModelTurnAt = try container.decodeIfPresent(String.self, forKey: .lastModelTurnAt)
         lastToolActivityAt = try container.decodeIfPresent(String.self, forKey: .lastToolActivityAt)
         completionGates = try container.decodeIfPresent([String].self, forKey: .completionGates) ?? []
+        completionPlan = try container.decodeIfPresent(AutomaticCompletionPlan.self, forKey: .completionPlan)
         passedGates = try container.decodeIfPresent([String].self, forKey: .passedGates) ?? []
         lastErrorCode = try container.decodeIfPresent(String.self, forKey: .lastErrorCode)
         lastErrorSummary = try container.decodeIfPresent(String.self, forKey: .lastErrorSummary)

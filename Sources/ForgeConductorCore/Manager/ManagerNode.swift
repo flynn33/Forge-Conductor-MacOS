@@ -3578,6 +3578,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             lastModelTurnAt: detail.latestProviderTurn?.updatedAt,
             lastToolActivityAt: detail.latestToolInvocation?.updatedAt,
             completionGates: Array(run.specification.completionGates.prefix(128)),
+            completionPlan: run.specification.completionPlan,
             passedGates: Array(passedGates.prefix(128)),
             lastErrorCode: run.lastErrorCode.map { operatorIdentifier($0, maximumCharacters: 128) },
             lastErrorSummary: operatorSummary(run.lastErrorSummary, maximumCharacters: 512),

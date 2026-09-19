@@ -1148,6 +1148,7 @@ public struct ManagerOperatorRun: Encodable, Sendable, Equatable {
     public let lastModelTurnAt: String?
     public let lastToolActivityAt: String?
     public let completionGates: [String]
+    public let completionPlan: AutomaticCompletionPlan?
     public let passedGates: [String]
     public let lastErrorCode: String?
     public let lastErrorSummary: String?
@@ -1175,6 +1176,7 @@ public struct ManagerOperatorRun: Encodable, Sendable, Equatable {
         case lastModelTurnAt = "last_model_turn_at"
         case lastToolActivityAt = "last_tool_activity_at"
         case completionGates = "completion_gates"
+        case completionPlan = "completion_plan"
         case passedGates = "passed_gates"
         case lastErrorCode = "last_error_code"
         case lastErrorSummary = "last_error_summary"

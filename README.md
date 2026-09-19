@@ -113,6 +113,12 @@ product set.
    unavailable reasons, and saved per-project defaults. Each admitted run keeps
    the exact resolved grant and catalog revision it prepared with; later catalog
    changes apply only to future preparations.
+   During completion, Forge evaluates the latest relevant durable result for
+   each automatic obligation. A corrected build or test can supersede an earlier
+   failure, while an unrelated successful read cannot complete repair work and
+   unresolved effects remain fail-closed. Long run histories are read in bounded
+   pages. The run detail shows the derived checks and keeps the signed custom
+   policy importer collapsed under **Advanced controls** for specialized use.
 7. Review the run's events and evidence.
 
 The run view leads with the task, current state/work, recent model and tool

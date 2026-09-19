@@ -36,21 +36,144 @@ final class ProjectInstructionQueueTests: XCTestCase {
             projectID: projectID,
             result: #"{"is_error":false,"ok":true,"payload":{"ok":true}}"#
         )
-        XCTAssertTrue(
-            ProjectInstructionCompletionGate.result(run: run, invocations: [successful]).passed
-        )
+        var successfulAccumulator = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try successfulAccumulator.consume([successful])
+        XCTAssertTrue(successfulAccumulator.result().passed)
 
         let failed = toolInvocation(
             runID: runID,
             projectID: projectID,
             result: #"{"is_error":true,"ok":false,"payload":{"ok":false}}"#
         )
-        XCTAssertFalse(
-            ProjectInstructionCompletionGate.result(run: run, invocations: [failed]).passed
+        var failedAccumulator = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try failedAccumulator.consume([failed])
+        XCTAssertFalse(failedAccumulator.result().passed)
+        XCTAssertFalse(ProjectInstructionCompletionGate.EvidenceAccumulator(run: run).result().passed)
+    }
+
+    func testOutcomeAwareCompletionSupersedesFailedBuildAndRejectsUnrelatedRead() throws {
+        let projectID = ProjectID()
+        let runID = RunID()
+        let digest = String(repeating: "c", count: 64)
+        let plan = try completionPlan(
+            projectID: projectID,
+            digest: digest,
+            kinds: [.artifactRegistered, .projectBuild, .projectTests, .noRelevantUnresolvedSideEffect]
         )
-        XCTAssertFalse(
-            ProjectInstructionCompletionGate.result(run: run, invocations: []).passed
+        let run = completionRun(runID: runID, projectID: projectID, digest: digest, plan: plan)
+        let failedBuild = toolInvocation(
+            runID: runID,
+            projectID: projectID,
+            toolName: "shell_exec",
+            result: try shellResult(command: "swift build", ok: false),
+            createdAt: "2027-01-15T08:00:00Z"
         )
+        let passingBuild = toolInvocation(
+            runID: runID,
+            projectID: projectID,
+            toolName: "shell_exec",
+            result: try shellResult(command: "swift build", ok: true),
+            createdAt: "2027-01-15T08:00:01Z"
+        )
+        let passingTests = toolInvocation(
+            runID: runID,
+            projectID: projectID,
+            toolName: "shell_exec",
+            result: try shellResult(command: "swift test --filter FixtureTests", ok: true),
+            createdAt: "2027-01-15T08:00:02Z"
+        )
+        var recovered = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try recovered.consume([failedBuild, passingBuild, passingTests])
+        XCTAssertTrue(recovered.result().passed)
+        XCTAssertEqual(recovered.result().evidenceReferences.count, 2)
+
+        let laterFailedBuild = toolInvocation(
+            runID: runID,
+            projectID: projectID,
+            toolName: "shell_exec",
+            result: try shellResult(command: "swift build", ok: false),
+            createdAt: "2027-01-15T08:00:03Z"
+        )
+        try recovered.consume([laterFailedBuild])
+        XCTAssertFalse(recovered.result().passed)
+
+        let read = toolInvocation(
+            runID: runID,
+            projectID: projectID,
+            result: #"{"is_error":false,"ok":true,"payload":{"ok":true}}"#
+        )
+        var unrelated = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try unrelated.consume([read])
+        XCTAssertFalse(unrelated.result().passed)
+        XCTAssertTrue(unrelated.result().summary.contains("project-build"))
+    }
+
+    func testReadOnlyCompletionPagesMoreThan256RecordsAndRejectsWrongScope() throws {
+        let projectID = ProjectID()
+        let runID = RunID()
+        let digest = String(repeating: "e", count: 64)
+        let plan = try completionPlan(
+            projectID: projectID,
+            digest: digest,
+            kinds: [.artifactRegistered, .readOnlyReportDelivered, .noRelevantUnresolvedSideEffect]
+        )
+        let run = completionRun(runID: runID, projectID: projectID, digest: digest, plan: plan)
+        let records = (0..<300).map { index in
+            toolInvocation(
+                runID: runID,
+                projectID: projectID,
+                result: #"{"is_error":false,"ok":true,"payload":{"ok":true}}"#,
+                createdAt: String(format: "2027-01-15T08:%02d:%02dZ", index / 60, index % 60)
+            )
+        }
+        var paged = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        for offset in stride(from: 0, to: records.count, by: 128) {
+            try paged.consume(Array(records[offset..<min(offset + 128, records.count)]))
+        }
+        XCTAssertTrue(paged.result().passed)
+        XCTAssertTrue(paged.result().summary.contains("300 paged evidence records"))
+
+        var wrongScope = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try wrongScope.consume([
+            toolInvocation(
+                runID: runID,
+                projectID: ProjectID(),
+                result: #"{"is_error":false,"ok":true,"payload":{"ok":true}}"#
+            ),
+        ])
+        XCTAssertFalse(wrongScope.result().passed)
+        XCTAssertTrue(wrongScope.result().summary.contains("different project"))
+
+        let staleSourceRun = completionRun(
+            runID: runID,
+            projectID: projectID,
+            digest: String(repeating: "f", count: 64),
+            plan: plan
+        )
+        var staleSource = ProjectInstructionCompletionGate.EvidenceAccumulator(run: staleSourceRun)
+        try staleSource.consume([records[0]])
+        XCTAssertFalse(staleSource.result().passed)
+        XCTAssertTrue(staleSource.result().summary.contains("artifact-registered"))
+
+        let tamperedPlan = AutomaticCompletionPlan(
+            planID: UUID(),
+            projectID: plan.projectID,
+            projectGeneration: plan.projectGeneration,
+            instructionArtifactSHA256: plan.instructionArtifactSHA256,
+            obligations: plan.obligations,
+            source: plan.source,
+            revision: plan.revision
+        )
+        let tamperedRun = completionRun(
+            runID: runID,
+            projectID: projectID,
+            digest: digest,
+            plan: tamperedPlan
+        )
+        var tampered = ProjectInstructionCompletionGate.EvidenceAccumulator(run: tamperedRun)
+        try tampered.consume([records[0]])
+        XCTAssertFalse(tampered.result().passed)
+        XCTAssertTrue(tampered.result().summary.contains("plan revision"))
     }
 
     func testAutomaticCompletionPlanIsStableAndDistinguishesReadOnlyFromRepair() throws {
@@ -1022,7 +1145,9 @@ final class ProjectInstructionQueueTests: XCTestCase {
     private func toolInvocation(
         runID: RunID,
         projectID: ProjectID,
-        result: String
+        toolName: String = "fs_read",
+        result: String,
+        createdAt: String = "2027-01-15T08:00:00Z"
     ) -> ToolInvocationRecord {
         ToolInvocationRecord(
             invocationID: UUID(),
@@ -1032,7 +1157,7 @@ final class ProjectInstructionQueueTests: XCTestCase {
             projectID: projectID,
             projectGeneration: .initial,
             providerCallID: UUID().uuidString.lowercased(),
-            toolName: "fs_read",
+            toolName: toolName,
             replayClass: .readOnly,
             idempotencyKey: nil,
             argumentsSHA256: String(repeating: "a", count: 64),
@@ -1042,8 +1167,99 @@ final class ProjectInstructionQueueTests: XCTestCase {
             resultSummary: result,
             lastErrorCode: nil,
             lastErrorSummary: nil,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+    }
+
+    private func shellResult(command: String, ok: Bool) throws -> String {
+        let object: [String: Any] = [
+            "is_error": !ok,
+            "ok": ok,
+            "payload": [
+                "command": command,
+                "cwd": "/tmp/fixture",
+                "exit_code": ok ? 0 : 1,
+                "ok": ok,
+                "timed_out": false,
+            ],
+        ]
+        return String(
+            decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+            as: UTF8.self
+        )
+    }
+
+    private func completionPlan(
+        projectID: ProjectID,
+        digest: String,
+        kinds: [CompletionObligationKind]
+    ) throws -> AutomaticCompletionPlan {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-completion-evidence-plan-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Tests", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("// swift-tools-version: 6.2\n".utf8).write(
+            to: root.appendingPathComponent("Package.swift"),
+            options: .atomic
+        )
+        let readOnly = kinds.contains(.readOnlyReportDelivered)
+        let plan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: projectID,
+            projectGeneration: .initial,
+            projectRoot: root,
+            instructionArtifactSHA256: [digest],
+            instructionText: readOnly
+                ? "Audit the project and deliver a read-only report."
+                : "Repair the Swift defect and run the affected tests.",
+            documentCount: 1,
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+        ))
+        XCTAssertEqual(Set(plan.obligations.map(\.kind)), Set(kinds))
+        return plan
+    }
+
+    private func completionRun(
+        runID: RunID,
+        projectID: ProjectID,
+        digest: String,
+        plan: AutomaticCompletionPlan
+    ) -> AutonomousRunRecord {
+        AutonomousRunRecord(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            assignmentID: "package-fixture",
+            mission: "Fixture mission",
+            state: .validatingCompletion,
+            continuityMode: .managedAutonomous,
+            providerID: "lmstudio",
+            modelKey: "fixture",
+            activeSessionID: nil,
+            activeOperationID: nil,
+            specification: AutonomousRunSpecification(
+                allowedTools: ["fs_read", "shell_exec"],
+                completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
+                completionPlan: plan,
+                work: AutonomousRunWork(metadata: [
+                    "source_snapshot_sha256": digest,
+                    "completion_plan_id": plan.planID.uuidString.lowercased(),
+                    "completion_plan_revision": String(plan.revision),
+                ])
+            ),
+            completionRequestJSON: "{}",
+            lastErrorCode: nil,
+            lastErrorSummary: nil,
+            retryAt: nil,
+            continuationPending: false,
+            revision: 8,
             createdAt: "2027-01-15T08:00:00Z",
-            updatedAt: "2027-01-15T08:00:01Z"
+            updatedAt: "2027-01-15T08:00:03Z"
         )
     }
 }
