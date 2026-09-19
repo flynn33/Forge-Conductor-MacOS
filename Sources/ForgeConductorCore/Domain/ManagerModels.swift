@@ -589,6 +589,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     public let projects: [ManagerOperatorProject]
     public let pendingProjectRegistrations: [ManagerOperatorPendingProjectRegistration]
     public let runs: [ManagerOperatorRun]
+    public let continuityReadiness: [ManagerContinuityReadiness]
     public let continuityOperations: [ManagerOperatorContinuity]
     public let runtimeJobs: [ManagerOperatorRuntimeJob]
     public let provider: ManagerOperatorProvider
@@ -600,6 +601,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey {
         case generatedAt = "generated_at"
         case limit, projects, runs
+        case continuityReadiness = "continuity_readiness"
         case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
         case runtimeJobs = "runtime_jobs"

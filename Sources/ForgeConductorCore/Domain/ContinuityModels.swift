@@ -5,6 +5,157 @@
 
 import Foundation
 
+public enum ManagedContinuityDisplayState: String, Codable, Sendable, CaseIterable {
+    case ready
+    case monitoring
+    case savingProgress = "saving_progress"
+    case rolloverQueued = "rollover_queued"
+    case quiescing
+    case creatingSuccessor = "creating_successor"
+    case restoring
+    case continuing
+    case waitingForProvider = "waiting_for_provider"
+    case blocked
+    case externalCompatibilityOnly = "external_compatibility_only"
+    case unavailable
+}
+
+public enum ContinuityRecoveryAction: String, Codable, Sendable, CaseIterable {
+    case none
+    case retryAutomatically = "retry_automatically"
+    case reviewProvider = "review_provider"
+    case reviewRun = "review_run"
+}
+
+/// Bounded run-centric status for the native operator surface. Custom coding
+/// keeps project/run identifiers flat on the manager wire while retaining typed
+/// identities inside Core and the app.
+public struct ManagerContinuityReadiness: Codable, Sendable, Equatable {
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let runID: RunID?
+    public let state: ManagedContinuityDisplayState
+    public let automatic: Bool
+    public let detail: String
+    public let latestCheckpointAt: String?
+    public let latestCheckpointID: UUID?
+    public let capacityTokens: Int?
+    public let usedTokens: Int?
+    public let remainingTokens: Int?
+    public let confidence: Double?
+    public let source: String?
+    public let nextAutomaticAction: String?
+    public let recoveryAction: ContinuityRecoveryAction?
+
+    public init(
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        runID: RunID?,
+        state: ManagedContinuityDisplayState,
+        automatic: Bool,
+        detail: String,
+        latestCheckpointAt: String? = nil,
+        latestCheckpointID: UUID? = nil,
+        capacityTokens: Int? = nil,
+        usedTokens: Int? = nil,
+        remainingTokens: Int? = nil,
+        confidence: Double? = nil,
+        source: String? = nil,
+        nextAutomaticAction: String? = nil,
+        recoveryAction: ContinuityRecoveryAction? = nil
+    ) {
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.runID = runID
+        self.state = state
+        self.automatic = automatic
+        self.detail = detail
+        self.latestCheckpointAt = latestCheckpointAt
+        self.latestCheckpointID = latestCheckpointID
+        self.capacityTokens = capacityTokens
+        self.usedTokens = usedTokens
+        self.remainingTokens = remainingTokens
+        self.confidence = confidence
+        self.source = source
+        self.nextAutomaticAction = nextAutomaticAction
+        self.recoveryAction = recoveryAction
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case state, automatic, detail, confidence, source
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case runID = "run_id"
+        case latestCheckpointAt = "latest_checkpoint_at"
+        case latestCheckpointID = "latest_checkpoint_id"
+        case capacityTokens = "capacity_tokens"
+        case usedTokens = "used_tokens"
+        case remainingTokens = "remaining_tokens"
+        case nextAutomaticAction = "next_automatic_action"
+        case recoveryAction = "recovery_action"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        guard let projectUUID = UUID(
+            uuidString: try values.decode(String.self, forKey: .projectID)
+        ) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .projectID,
+                in: values,
+                debugDescription: "continuity project_id is not a UUID"
+            )
+        }
+        projectID = ProjectID(projectUUID)
+        projectGeneration = ProjectGeneration(
+            try values.decode(UInt64.self, forKey: .projectGeneration)
+        )
+        if let rawRunID = try values.decodeIfPresent(String.self, forKey: .runID) {
+            guard let runUUID = UUID(uuidString: rawRunID) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .runID,
+                    in: values,
+                    debugDescription: "continuity run_id is not a UUID"
+                )
+            }
+            runID = RunID(runUUID)
+        } else {
+            runID = nil
+        }
+        state = try values.decode(ManagedContinuityDisplayState.self, forKey: .state)
+        automatic = try values.decode(Bool.self, forKey: .automatic)
+        detail = try values.decode(String.self, forKey: .detail)
+        latestCheckpointAt = try values.decodeIfPresent(String.self, forKey: .latestCheckpointAt)
+        latestCheckpointID = try values.decodeIfPresent(UUID.self, forKey: .latestCheckpointID)
+        capacityTokens = try values.decodeIfPresent(Int.self, forKey: .capacityTokens)
+        usedTokens = try values.decodeIfPresent(Int.self, forKey: .usedTokens)
+        remainingTokens = try values.decodeIfPresent(Int.self, forKey: .remainingTokens)
+        confidence = try values.decodeIfPresent(Double.self, forKey: .confidence)
+        source = try values.decodeIfPresent(String.self, forKey: .source)
+        nextAutomaticAction = try values.decodeIfPresent(String.self, forKey: .nextAutomaticAction)
+        recoveryAction = try values.decodeIfPresent(ContinuityRecoveryAction.self, forKey: .recoveryAction)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(projectGeneration.rawValue, forKey: .projectGeneration)
+        try values.encodeIfPresent(runID?.description, forKey: .runID)
+        try values.encode(state, forKey: .state)
+        try values.encode(automatic, forKey: .automatic)
+        try values.encode(detail, forKey: .detail)
+        try values.encodeIfPresent(latestCheckpointAt, forKey: .latestCheckpointAt)
+        try values.encodeIfPresent(latestCheckpointID, forKey: .latestCheckpointID)
+        try values.encodeIfPresent(capacityTokens, forKey: .capacityTokens)
+        try values.encodeIfPresent(usedTokens, forKey: .usedTokens)
+        try values.encodeIfPresent(remainingTokens, forKey: .remainingTokens)
+        try values.encodeIfPresent(confidence, forKey: .confidence)
+        try values.encodeIfPresent(source, forKey: .source)
+        try values.encodeIfPresent(nextAutomaticAction, forKey: .nextAutomaticAction)
+        try values.encodeIfPresent(recoveryAction, forKey: .recoveryAction)
+    }
+}
+
 public enum ContinuityState: String, CaseIterable, Codable, Sendable {
     case active
     case checkpointPreparing

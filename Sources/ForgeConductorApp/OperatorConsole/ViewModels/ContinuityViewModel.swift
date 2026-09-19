@@ -2,10 +2,12 @@
 // Main-actor continuity and budget projection; all transitions remain manager-owned.
 
 import Foundation
+import ForgeConductorCore
 
 @MainActor
 final class ContinuityViewModel: ObservableObject {
     @Published private(set) var operations: [OperatorContinuity] = []
+    @Published private(set) var readiness: [ManagerContinuityReadiness] = []
     @Published private(set) var runs: [OperatorRun] = []
     @Published private(set) var events: [OperatorEvent] = []
     @Published var selectedOperationID: String?
@@ -29,6 +31,14 @@ final class ContinuityViewModel: ObservableObject {
 
     var selectedRun: OperatorRun? {
         runs.first { $0.runID == selectedRunID }
+    }
+
+    var selectedReadiness: ManagerContinuityReadiness? {
+        if let selectedRunID,
+           let match = readiness.first(where: { $0.runID?.description == selectedRunID }) {
+            return match
+        }
+        return readiness.first(where: { $0.runID == nil }) ?? readiness.first
     }
 
     var selectedEvents: [OperatorEvent] {
@@ -68,6 +78,7 @@ final class ContinuityViewModel: ObservableObject {
                 let loadedOperations = snapshot.continuityOperations
                 let loadedRuns = snapshot.runs
                 operations = loadedOperations
+                readiness = snapshot.continuityReadiness
                 runs = loadedRuns
                 events = Array(snapshot.events.prefix(100))
                 let priorSelection = selectedOperationID

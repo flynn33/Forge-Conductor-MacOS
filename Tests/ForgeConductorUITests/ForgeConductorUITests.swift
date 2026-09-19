@@ -565,10 +565,19 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(continuity.waitForExistence(timeout: 8))
         continuity.click()
 
+        XCTAssertTrue(app.staticTexts["Automatic continuity"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Automatic continuity is monitoring this managed task."].exists)
+        XCTAssertTrue(app.staticTexts["Working context"].exists)
+        let advanced = app.buttons["continuity-advanced-toggle"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["checkpoint-command"].exists)
+        advanced.click()
         let checkpoint = app.buttons["checkpoint-command"]
         let rollover = app.buttons["rollover-command"]
         XCTAssertTrue(waitForEnabled(checkpoint, timeout: 5))
         XCTAssertTrue(waitForEnabled(rollover, timeout: 5))
+        XCTAssertEqual(checkpoint.label, "Save progress now")
+        XCTAssertEqual(rollover.label, "Start a fresh session and continue")
         XCTAssertTrue(app.descendants(matching: .any)["continuity-controls-authority"].exists)
         XCTAssertTrue(
             element(
@@ -2072,6 +2081,21 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         return [
             "projects": [project()],
             "runs": runs,
+            "continuity_readiness": [[
+                "project_id": projectID,
+                "project_generation": 4,
+                "run_id": acceptedStartRunID ?? runID,
+                "state": "monitoring",
+                "automatic": true,
+                "detail": "Automatic continuity is monitoring this managed task.",
+                "capacity_tokens": 32_768,
+                "used_tokens": 9_216,
+                "remaining_tokens": 23_552,
+                "confidence": 1.0,
+                "source": "provider_exact",
+                "next_automatic_action": "Forge will save progress before the rollover threshold.",
+                "recovery_action": "none",
+            ]],
             "continuity_operations": [],
             "runtime_jobs": [runtimeJob()],
             "provider": provider(),

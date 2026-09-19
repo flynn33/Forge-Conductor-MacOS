@@ -8,6 +8,7 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
     let projects: [OperatorProject]
     let pendingProjectRegistrations: [OperatorProjectRegistrationTransition]
     let runs: [OperatorRun]
+    let continuityReadiness: [ManagerContinuityReadiness]
     let continuityOperations: [OperatorContinuity]
     let runtimeJobs: [OperatorRuntimeJob]
     let provider: OperatorProvider?
@@ -18,6 +19,7 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case projects, runs, provider, runtime, events
+        case continuityReadiness = "continuity_readiness"
         case runPreparation = "run_preparation"
         case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
@@ -33,6 +35,10 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
             forKey: .pendingProjectRegistrations
         ) ?? []
         runs = try container.decodeIfPresent([OperatorRun].self, forKey: .runs) ?? []
+        continuityReadiness = try container.decodeIfPresent(
+            [ManagerContinuityReadiness].self,
+            forKey: .continuityReadiness
+        ) ?? []
         continuityOperations = try container.decodeIfPresent(
             [OperatorContinuity].self,
             forKey: .continuityOperations

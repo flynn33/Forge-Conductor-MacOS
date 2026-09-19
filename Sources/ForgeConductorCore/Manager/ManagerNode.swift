@@ -587,6 +587,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 )
             }
         let runRows = persisted.runs.map(Self.operatorRun)
+        let continuityReadinessRows = Self.operatorContinuityReadiness(
+            projects: persisted.projects,
+            runs: persisted.runs,
+            continuity: persisted.continuity,
+            limit: limit
+        )
         let continuityRows = persisted.continuity.map(Self.operatorContinuity)
         let jobRows = persisted.runtimeJobs.map(Self.operatorRuntimeJob)
         let visibleEvents = Array(persisted.events.prefix(limit))
@@ -643,6 +649,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projects: projectRows,
             pendingProjectRegistrations: pendingProjectRegistrations,
             runs: runRows,
+            continuityReadiness: continuityReadinessRows,
             continuityOperations: continuityRows,
             runtimeJobs: jobRows,
             provider: provider,
@@ -3586,6 +3593,235 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             createdAt: run.createdAt,
             updatedAt: run.updatedAt
         )
+    }
+
+    private static func operatorContinuityReadiness(
+        projects: [ProjectControlRecord],
+        runs: [ManagerOperatorRunReadModel],
+        continuity: [ManagerOperatorContinuityReadModel],
+        limit: Int
+    ) -> [ManagerContinuityReadiness] {
+        let operationByRun = Dictionary(
+            continuity.map { ($0.command.runID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var projected: [ManagerContinuityReadiness] = []
+        var projectsWithCurrentRuns = Set<ProjectID>()
+        for detail in runs where !detail.run.state.isTerminal {
+            projectsWithCurrentRuns.insert(detail.run.projectID)
+            projected.append(
+                operatorContinuityReadiness(
+                    run: detail,
+                    continuity: operationByRun[detail.run.runID]
+                )
+            )
+        }
+        for project in projects where project.lifecycleState == .active
+            && !projectsWithCurrentRuns.contains(project.projectID) {
+            projected.append(ManagerContinuityReadiness(
+                projectID: project.projectID,
+                projectGeneration: project.generation,
+                runID: nil,
+                state: .ready,
+                automatic: true,
+                detail: "Automatic continuity is ready. It starts with the next managed task; no setup is required.",
+                nextAutomaticAction: "Forge will begin monitoring when the next managed task starts.",
+                recoveryAction: ContinuityRecoveryAction.none
+            ))
+        }
+        return Array(projected.prefix(limit))
+    }
+
+    private static func operatorContinuityReadiness(
+        run detail: ManagerOperatorRunReadModel,
+        continuity: ManagerOperatorContinuityReadModel?
+    ) -> ManagerContinuityReadiness {
+        let run = detail.run
+        let budget = continuity?.budgetObservation ?? detail.budgetState?.latestObservation
+        let presentation = continuityPresentation(run: run, continuity: continuity)
+        return ManagerContinuityReadiness(
+            projectID: run.projectID,
+            projectGeneration: run.projectGeneration,
+            runID: run.runID,
+            state: presentation.state,
+            automatic: run.continuityMode == .managedAutonomous,
+            detail: presentation.detail,
+            latestCheckpointAt: continuity?.checkpointID == nil
+                ? nil : continuity?.command.updatedAt,
+            latestCheckpointID: continuity?.checkpointID.flatMap(UUID.init(uuidString:)),
+            capacityTokens: budget?.capacity,
+            usedTokens: budget?.used,
+            remainingTokens: budget?.remaining,
+            confidence: budget?.confidence,
+            source: budget?.source.rawValue,
+            nextAutomaticAction: presentation.nextAction,
+            recoveryAction: presentation.recoveryAction
+        )
+    }
+
+    static func continuityPresentation(
+        run: AutonomousRunRecord,
+        continuity: ManagerOperatorContinuityReadModel?
+    ) -> (
+        state: ManagedContinuityDisplayState,
+        detail: String,
+        nextAction: String,
+        recoveryAction: ContinuityRecoveryAction
+    ) {
+        if run.continuityMode == .externalMCPCompatibility {
+            return (
+                .externalCompatibilityOnly,
+                "Forge can save a handoff, but the external host owns its chat session.",
+                "Automatic fresh-session creation is unavailable in this mode.",
+                .none
+            )
+        }
+        if let continuity {
+            switch continuity.command.state {
+            case .queued:
+                if continuity.command.type == .checkpoint {
+                    return (
+                        .savingProgress,
+                        "Forge queued a durable progress save for this task.",
+                        "Work continues after the checkpoint is committed.",
+                        .none
+                    )
+                }
+                return (
+                    .rolloverQueued,
+                    "A fresh-session rollover is queued for this task.",
+                    "Forge will quiesce the predecessor before creating one successor.",
+                    .none
+                )
+            case .claimed, .running:
+                if continuity.command.type == .checkpoint {
+                    return (
+                        .savingProgress,
+                        "Forge is saving durable task progress.",
+                        "Productive work resumes when the checkpoint is committed.",
+                        .none
+                    )
+                }
+                if continuity.successor != nil {
+                    if continuity.acknowledgementSHA256 != nil {
+                        return (
+                            .continuing,
+                            "The successor acknowledged the exact saved handoff.",
+                            "Forge will continue the same task and seal the predecessor.",
+                            .none
+                        )
+                    }
+                    return (
+                        .restoring,
+                        "A fresh managed session exists and is restoring saved task state.",
+                        "Forge is waiting for exact handoff acknowledgment.",
+                        .retryAutomatically
+                    )
+                }
+                if continuity.checkpointID != nil {
+                    return (
+                        .creatingSuccessor,
+                        "Task progress is durable and Forge is creating a fresh managed session.",
+                        "The successor must acknowledge the exact handoff before work continues.",
+                        .retryAutomatically
+                    )
+                }
+                return (
+                    .quiescing,
+                    "Forge is stopping new predecessor work and reconciling in-flight effects.",
+                    "A durable handoff will be committed before successor creation.",
+                    .retryAutomatically
+                )
+            case .retryWait:
+                return (
+                    .waitingForProvider,
+                    "Continuity is waiting before a bounded automatic retry.",
+                    continuity.command.retryAt.map { "Forge will retry after \($0)." }
+                        ?? "Forge will retry automatically.",
+                    .retryAutomatically
+                )
+            case .failed:
+                return (
+                    .blocked,
+                    operatorSummary(
+                        continuity.command.lastErrorSummary,
+                        maximumCharacters: 512
+                    ) ?? "Automatic continuity needs attention.",
+                    "Review the current task and provider before retrying continuity.",
+                    .reviewRun
+                )
+            case .completed:
+                if continuity.command.type == .checkpoint {
+                    return (
+                        .monitoring,
+                        "Task progress is saved and automatic continuity is monitoring.",
+                        "Forge will save again before the rollover threshold.",
+                        .none
+                    )
+                }
+                return (
+                    .continuing,
+                    "The accepted successor is continuing the same managed task.",
+                    "Forge will keep monitoring the fresh session automatically.",
+                    .none
+                )
+            case .cancelled:
+                break
+            }
+        }
+        switch run.state {
+        case .checkpointing:
+            return (
+                .savingProgress,
+                "Forge is saving durable task progress.",
+                "Automatic monitoring continues after the checkpoint.",
+                .none
+            )
+        case .rollingOver:
+            return (
+                .rolloverQueued,
+                "Forge is preparing a fresh session for this task.",
+                "New predecessor work will stop before successor creation.",
+                .retryAutomatically
+            )
+        case .recovering, .awaitingBootstrap:
+            return (
+                .restoring,
+                "Forge is restoring the same task from durable continuity state.",
+                "Automatic work continues after exact state validation.",
+                .retryAutomatically
+            )
+        case .waitingProvider:
+            return (
+                .waitingForProvider,
+                "The task is protected while Forge waits for the configured provider.",
+                "Forge will resume automatically when the provider is available.",
+                .reviewProvider
+            )
+        case .blockedConfiguration, .failedRecoverable, .waitingResource, .retryWait:
+            return (
+                .blocked,
+                operatorSummary(run.lastErrorSummary, maximumCharacters: 512)
+                    ?? "The task is protected, but automatic continuity cannot advance yet.",
+                "Resolve the task's reported dependency; Forge retains its durable state.",
+                .reviewRun
+            )
+        case .created, .validating, .ready, .starting, .running, .paused,
+             .validatingCompletion, .cancelRequested:
+            return (
+                .monitoring,
+                "Automatic continuity is monitoring this managed task.",
+                "Forge will save progress before the rollover threshold.",
+                .none
+            )
+        case .completed, .cancelled, .failedTerminal:
+            return (
+                .ready,
+                "This task no longer needs active continuity monitoring.",
+                "Automatic continuity is ready for the next managed task.",
+                .none
+            )
+        }
     }
 
     private static func operatorContinuity(

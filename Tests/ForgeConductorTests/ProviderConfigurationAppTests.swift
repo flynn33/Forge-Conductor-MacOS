@@ -348,6 +348,15 @@ final class ProviderConfigurationAppTests: XCTestCase {
         ))
         _ = try manager.recoverManagedAutonomy()
 
+        let idleContinuity = try XCTUnwrap(
+            manager.operatorSnapshot(limit: 10).continuityReadiness.first {
+                $0.projectID == projectID && $0.runID == nil
+            }
+        )
+        XCTAssertEqual(idleContinuity.state, .ready)
+        XCTAssertTrue(idleContinuity.automatic)
+        XCTAssertTrue(idleContinuity.detail.contains("no setup is required"))
+
         let mission = "Use the exact prepared source snapshot."
         let prepared = try manager.prepareAutonomousRun(
             projectID: projectID,
@@ -423,10 +432,20 @@ final class ProviderConfigurationAppTests: XCTestCase {
             durable.specification.work.metadata["completion_plan_id"],
             automaticPlan.planID.uuidString.lowercased()
         )
+        let operatorSnapshot = try manager.operatorSnapshot(limit: 10)
         let projected = try XCTUnwrap(
-            manager.operatorSnapshot(limit: 10).runs.first { $0.runID == acceptedRunID.description }
+            operatorSnapshot.runs.first { $0.runID == acceptedRunID.description }
         )
         XCTAssertEqual(projected.completionPlan, automaticPlan)
+        let continuity = try XCTUnwrap(
+            operatorSnapshot.continuityReadiness.first { $0.runID == acceptedRunID }
+        )
+        XCTAssertEqual(continuity.projectID, projectID)
+        XCTAssertEqual(continuity.projectGeneration, generation)
+        XCTAssertEqual(continuity.state, .waitingForProvider)
+        XCTAssertTrue(continuity.automatic)
+        XCTAssertTrue(continuity.detail.contains("waits for the configured provider"))
+        XCTAssertEqual(continuity.recoveryAction, .reviewProvider)
     }
 
     func testProjectBoundPreparationPublishesEveryTypedReadinessAndRecoveryState() throws {
@@ -916,5 +935,222 @@ final class ProviderConfigurationAppTests: XCTestCase {
         client.replace(with: transport)
         let reconnected = try await client.providerConfiguration()
         XCTAssertEqual(reconnected, saved)
+    }
+
+    func testContinuityReadinessPresentationCoversAutomaticAndExternalStates() throws {
+        let projectID = ProjectID()
+        let runID = RunID()
+        let timestamp = "2027-01-15T08:00:00Z"
+        func run(
+            _ state: AutonomousRunState = .running,
+            mode: ContinuityMode = .managedAutonomous
+        ) -> AutonomousRunRecord {
+            AutonomousRunRecord(
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                assignmentID: nil,
+                mission: "Continuity fixture",
+                state: state,
+                continuityMode: mode,
+                providerID: "fixture-provider",
+                modelKey: "fixture-model",
+                activeSessionID: "predecessor-session",
+                activeOperationID: nil,
+                specification: AutonomousRunSpecification(
+                    allowedTools: [],
+                    completionGates: [],
+                    work: AutonomousRunWork(metadata: [
+                        "adapter_id": "forge.native-session-host"
+                    ])
+                ),
+                completionRequestJSON: nil,
+                lastErrorCode: state == .blockedConfiguration ? "fixture_blocked" : nil,
+                lastErrorSummary: state == .blockedConfiguration
+                    ? "Fixture continuity dependency is unavailable." : nil,
+                retryAt: nil,
+                continuationPending: false,
+                revision: 4,
+                createdAt: timestamp,
+                updatedAt: timestamp
+            )
+        }
+        func operation(
+            type: ContinuityCommandType,
+            state: ContinuityCommandState,
+            checkpointID: String? = nil,
+            successor: Bool = false,
+            acknowledged: Bool = false
+        ) -> ManagerOperatorContinuityReadModel {
+            let operationID = UUID()
+            let successorRecord = successor ? ProviderSessionRecord(
+                sessionID: "successor-session",
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                providerID: "fixture-provider",
+                adapterID: "forge.native-session-host",
+                modelKey: "fixture-model",
+                providerResponseID: "fixture-response",
+                predecessorSessionID: "predecessor-session",
+                handoffID: checkpointID.flatMap(UUID.init(uuidString:)),
+                operationID: operationID,
+                idempotencyKey: "fixture-successor",
+                bootstrapNonceSHA256: String(repeating: "a", count: 64),
+                handoffSHA256: String(repeating: "b", count: 64),
+                status: .active,
+                accepted: true,
+                contextCapacity: 32_768,
+                createdAt: timestamp,
+                updatedAt: timestamp
+            ) : nil
+            return ManagerOperatorContinuityReadModel(
+                command: ContinuityCommand(
+                    commandID: UUID(),
+                    operationID: operationID,
+                    runID: runID,
+                    projectID: projectID,
+                    projectGeneration: .initial,
+                    type: type,
+                    requestedBy: "fixture",
+                    reason: "fixture",
+                    state: state,
+                    idempotencyKey: "fixture-command",
+                    payloadSHA256: String(repeating: "c", count: 64),
+                    attempt: 1,
+                    retryAt: state == .retryWait ? "2027-01-15T08:01:00Z" : nil,
+                    lastErrorCode: state == .failed ? "fixture_failure" : nil,
+                    lastErrorSummary: state == .failed ? "Fixture rollover failed." : nil,
+                    createdAt: timestamp,
+                    updatedAt: timestamp
+                ),
+                run: run(),
+                predecessor: nil,
+                successor: successorRecord,
+                automaticContinuation: nil,
+                budgetObservation: nil,
+                checkpointID: checkpointID,
+                acknowledgementSHA256: acknowledged ? String(repeating: "d", count: 64) : nil
+            )
+        }
+
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(run: run(), continuity: nil).state,
+            .monitoring
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(mode: .externalMCPCompatibility),
+                continuity: nil
+            ).state,
+            .externalCompatibilityOnly
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(run: run(.waitingProvider), continuity: nil).state,
+            .waitingForProvider
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(.blockedConfiguration),
+                continuity: nil
+            ).state,
+            .blocked
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(type: .checkpoint, state: .queued)
+            ).state,
+            .savingProgress
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(type: .rollover, state: .queued)
+            ).state,
+            .rolloverQueued
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(type: .rollover, state: .running)
+            ).state,
+            .quiescing
+        )
+        let checkpointID = UUID().uuidString.lowercased()
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(
+                    type: .rollover,
+                    state: .running,
+                    checkpointID: checkpointID
+                )
+            ).state,
+            .creatingSuccessor
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(
+                    type: .rollover,
+                    state: .running,
+                    checkpointID: checkpointID,
+                    successor: true
+                )
+            ).state,
+            .restoring
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(
+                    type: .rollover,
+                    state: .running,
+                    checkpointID: checkpointID,
+                    successor: true,
+                    acknowledged: true
+                )
+            ).state,
+            .continuing
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(type: .rollover, state: .retryWait)
+            ).recoveryAction,
+            .retryAutomatically
+        )
+        XCTAssertEqual(
+            ManagerNode.continuityPresentation(
+                run: run(),
+                continuity: operation(type: .rollover, state: .failed)
+            ).state,
+            .blocked
+        )
+
+        let wireFixture = ManagerContinuityReadiness(
+            projectID: projectID,
+            projectGeneration: .initial,
+            runID: runID,
+            state: .monitoring,
+            automatic: true,
+            detail: "Automatic continuity is monitoring this task.",
+            capacityTokens: 32_768,
+            usedTokens: 9_216,
+            remainingTokens: 23_552,
+            confidence: 0.95,
+            source: "fixture",
+            recoveryAction: ContinuityRecoveryAction.none
+        )
+        let encoded = try JSONEncoder().encode(wireFixture)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        XCTAssertEqual(object["project_id"] as? String, projectID.description)
+        XCTAssertEqual((object["project_generation"] as? NSNumber)?.uint64Value, 1)
+        XCTAssertEqual(object["run_id"] as? String, runID.description)
+        XCTAssertNil(object["projectID"])
+        XCTAssertEqual(try JSONDecoder().decode(ManagerContinuityReadiness.self, from: encoded), wireFixture)
     }
 }

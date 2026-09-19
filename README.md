@@ -125,6 +125,15 @@ The run view leads with the task, current state/work, recent model and tool
 activity, automatic continuity, completion, and recovery. Provider, session,
 lease, project, and run identifiers remain available under **Technical details**.
 
+The **Continuity** view leads with automatic protection for the selected task:
+its plain-language state, most recent progress save, remaining working context,
+and Forge's next automatic action. Active rollover activity keeps its event
+timeline visible while operation identifiers, exact budget accounting, and
+handoff checksums remain under **Technical details**. Routine use requires no
+manual continuity action. **Optional manual actions** contains **Save progress
+now** and **Start a fresh session and continue** for administrative recovery or
+an intentionally early rollover.
+
 Use the **Guided Mode** toolbar toggle to show or hide concise, state-aware
 guidance in the current view. The setting persists across relaunch. The
 question-mark toolbar button opens the complete offline guide for the selected

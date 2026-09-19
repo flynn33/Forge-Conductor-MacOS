@@ -29,6 +29,16 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Redesigned Continuity around automatic task protection. The primary view now
+  shows the task, plain-language protection state, relative last-save time,
+  working-context availability, and next automatic action; technical operation,
+  budget, session, and handoff identities remain collapsed.
+- Moved manual continuity requests under **Optional manual actions** and renamed
+  them **Save progress now** and **Start a fresh session and continue** while
+  preserving the existing typed manager commands and eligibility checks.
+- Added a bounded project/run-scoped manager readiness projection covering
+  monitoring, progress save, rollover, restore, continuation, provider wait,
+  recovery, external-host limitation, and blocked states.
 - Replaced the built-in instruction-run perfect-history completion rule with
   outcome-aware obligation evidence. Corrected build/test passes supersede older
   failures, later regressions invalidate earlier passes, unrelated reads cannot
