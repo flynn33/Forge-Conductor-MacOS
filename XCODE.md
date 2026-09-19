@@ -1,8 +1,9 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.9.0**, build **1**. Xcode resolves those
-values from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime
-uses the matching constants in `ForgeFilesystemProtocolConstants`.
+Product identity: marketing version **0.10.0**, build **2**. `VERSION` and
+`BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
+from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
+the matching constants in `ForgeFilesystemProtocolConstants`.
 
 The current [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
 uses optimized Release configuration with the documented Apple Development
@@ -29,13 +30,13 @@ nor its bundled manager, launcher and filesystem helper.
 ## Schemes (pick the right one)
 
 | Scheme | What it is | How to run |
-|--------|------------|------------|
+| --- | --- | --- |
 | **ForgeConductor** | Native SwiftUI + Metal **app** | ⌘R — opens the GUI |
 | **forge-conductor** | CLI tool | ⌘R with args (`help`, `doctor`, `serve`) |
 
 ## Fix that was required
 
-`ForgeConductorCore.framework` is **embedded** in the app (`Contents/Frameworks/`).  
+`ForgeConductorCore.framework` is **embedded** in the app (`Contents/Frameworks/`).
 The CLI uses `@executable_path` so the framework must sit next to the binary when installed.
 The Xcode app embeds the manager CLI at
 `Contents/Helpers/forge-conductor`. The SwiftPM staging script also builds,

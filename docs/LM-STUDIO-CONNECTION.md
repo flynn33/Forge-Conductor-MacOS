@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.9.0**, build **1**. This connection document does
+Product identity: version **0.10.0**, build **2**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -14,7 +14,7 @@ not authorize release; the qualification boundary below remains controlling.
 | **App binary `…/Forge Conductor serve`** | Same MCP server over stdin/stdout (`ForgeProcessEntry` → `MCPServer.swift`) |
 | **CLI `forge-conductor serve`** | Same MCP server (default registration target) |
 
-There is **no** in-process link from the GUI into LM Studio’s address space.  
+There is **no** in-process link from the GUI into LM Studio’s address space.
 There is **no** LM Studio SDK client inside Core for chat/completions.
 Forge-managed sessions use a separate Foundation-native HTTP transport in the
 native session-host plugin; the stdio registration below serves externally
@@ -85,13 +85,13 @@ forge-conductor install-lmstudio-plugin \
   --binary "$HOME/.forge-conductor/Forge Conductor.app/Contents/MacOS/Forge Conductor"
 ```
 
-Only do this after the **shipped** app binary responds to `serve` with MCP initialize (smoke below).  
+Only do this after the **shipped** app binary responds to `serve` with MCP initialize (smoke below).
 Do **not** point LM Studio at an older GUI-only `/Applications/Forge Conductor.app` — it ignores `serve`, opens UI, and LM Studio reports a ~60s plugin timeout.
 
 LaunchAgent already uses the app as: `manager run --home …` (unrelated to MCP spawn).
 
-**Secondary (lockstep mirror on this Mac):**  
-`~/.lmstudio/extensions/plugins/mcp/<name>/` with `runner: "mcpBridge"`.  
+**Secondary (lockstep mirror on this Mac):**
+`~/.lmstudio/extensions/plugins/mcp/<name>/` with `runner: "mcpBridge"`.
 The Forge primary and fallback mirrors use the same command, arguments, and
 environment as `mcp.json`, and LM Studio reports them through
 `PluginProcess(mcp/…)` logs.
@@ -155,7 +155,7 @@ LM Studio then spawns the selected executable as:
 
 `~/.forge-conductor/bin/forge-conductor serve`
 
-That binary must be rebuilt and installed or selected explicitly.  
+That binary must be rebuilt and installed or selected explicitly.
 **Do not silently overwrite** `/Applications/Forge Conductor.app` or the LaunchAgent home app unless the operator explicitly ships.
 
 ### Evidence checklist (stdio — no LM Studio UI required)
@@ -247,5 +247,5 @@ See the [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
 
 ## Auto-heal
 
-On GUI bootstrap, registration is **not** auto-written (operator must Install Plugin).  
+On GUI bootstrap, registration is **not** auto-written (operator must Install Plugin).
 `LMStudioMCPPluginInstaller.ensureConnection` exists for explicit heal paths when registration is incomplete or drifted. Repairs use the same typed, transactional installation boundary rather than modifying only one role.

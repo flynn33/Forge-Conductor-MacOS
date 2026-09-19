@@ -43,16 +43,24 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 FILESYSTEM_DAEMON_PLIST="$APP_LAUNCH_DAEMONS/$FILESYSTEM_DAEMON_IDENTIFIER.plist"
 FILESYSTEM_DAEMON_PLIST_SOURCE="$ROOT_DIR/Sources/ForgeConductorApp/Resources/$FILESYSTEM_DAEMON_IDENTIFIER.plist"
 VERSION_SOURCE="$ROOT_DIR/Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift"
-APP_MARKETING_VERSION="$(sed -n 's/^[[:space:]]*public static let productVersion = "\([^"]*\)"[[:space:]]*$/\1/p' "$VERSION_SOURCE")"
-DEFAULT_BUILD_VERSION="$(sed -n 's/^[[:space:]]*public static let productBuildVersion = "\([^"]*\)"[[:space:]]*$/\1/p' "$VERSION_SOURCE")"
+VERSION_FILE="$ROOT_DIR/VERSION"
+BUILD_NUMBER_FILE="$ROOT_DIR/BUILD_NUMBER"
+APP_MARKETING_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+DEFAULT_BUILD_VERSION="$(tr -d '[:space:]' < "$BUILD_NUMBER_FILE")"
+COMPILED_MARKETING_VERSION="$(sed -n 's/^[[:space:]]*public static let productVersion = "\([^"]*\)"[[:space:]]*$/\1/p' "$VERSION_SOURCE")"
+COMPILED_BUILD_VERSION="$(sed -n 's/^[[:space:]]*public static let productBuildVersion = "\([^"]*\)"[[:space:]]*$/\1/p' "$VERSION_SOURCE")"
 APP_BUILD_VERSION="${FORGE_BUILD_NUMBER-$DEFAULT_BUILD_VERSION}"
 
 if [[ ! "$APP_MARKETING_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  echo "unable to read a semantic version from $VERSION_SOURCE" >&2
+  echo "unable to read a release.feature.patch version from $VERSION_FILE" >&2
   exit 1
 fi
 if [[ ! "$DEFAULT_BUILD_VERSION" =~ ^[1-9][0-9]*$ ]]; then
-  echo "unable to read a build version from $VERSION_SOURCE" >&2
+  echo "unable to read a build number from $BUILD_NUMBER_FILE" >&2
+  exit 1
+fi
+if [[ "$COMPILED_MARKETING_VERSION" != "$APP_MARKETING_VERSION" || "$COMPILED_BUILD_VERSION" != "$DEFAULT_BUILD_VERSION" ]]; then
+  echo "VERSION and BUILD_NUMBER must match the compiled product identity in $VERSION_SOURCE" >&2
   exit 1
 fi
 if [[ ! "$APP_BUILD_VERSION" =~ ^[1-9][0-9]*$ ]]; then
@@ -120,7 +128,12 @@ if [[ ! -f "$FILESYSTEM_DAEMON_PLIST_SOURCE" ]]; then
   echo "filesystem daemon property list was not found at $FILESYSTEM_DAEMON_PLIST_SOURCE" >&2
   exit 1
 fi
-if [[ ! -d "$CORE_RESOURCE_BUNDLE/Agents" || ! -d "$CORE_RESOURCE_BUNDLE/TelemetryStatic" ]]; then
+if [[ -d "$CORE_RESOURCE_BUNDLE/Contents/Resources" ]]; then
+  CORE_RESOURCE_ROOT="$CORE_RESOURCE_BUNDLE/Contents/Resources"
+else
+  CORE_RESOURCE_ROOT="$CORE_RESOURCE_BUNDLE"
+fi
+if [[ ! -d "$CORE_RESOURCE_ROOT/Agents" || ! -d "$CORE_RESOURCE_ROOT/TelemetryStatic" ]]; then
   echo "built Core resources are missing or have an incompatible layout at $CORE_RESOURCE_BUNDLE" >&2
   exit 1
 fi

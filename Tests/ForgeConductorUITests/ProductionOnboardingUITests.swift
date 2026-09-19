@@ -188,6 +188,47 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attach("direct-project-path-registration", snapshot)
     }
 
+    func testProjectRemovalIsAvailableFromSidebarAndPersists() async throws {
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-register-by-path"])
+        try replace(app.textFields["project-register-path"], with: projectRoot.path)
+        try click(app.buttons["project-register-confirm"])
+
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            self.app.buttons["project-remove-sidebar"].isEnabled
+        })
+        let registered: OnboardingProjectSnapshot = try await read(
+            "/api/manager/operator/snapshot?limit=1"
+        )
+        let project = try XCTUnwrap(registered.projects.first)
+        XCTAssertTrue(element("project-row-\(project.projectID)").exists)
+
+        try click(app.buttons["project-remove-sidebar"])
+        let alert = app.alerts["Remove project from Forge Conductor?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 10))
+        XCTAssertTrue(contains(alert, project.displayName))
+        try click(alert.buttons["Remove Project"])
+
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            !self.element("project-row-\(project.projectID)").exists
+                && !self.app.buttons["project-remove-sidebar"].isEnabled
+        })
+        let removed: OnboardingProjectSnapshot = try await read(
+            "/api/manager/operator/snapshot?limit=1"
+        )
+        XCTAssertTrue(removed.projects.isEmpty)
+
+        app.terminate()
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        XCTAssertFalse(element("project-row-\(project.projectID)").exists)
+        let restored: OnboardingProjectSnapshot = try await read(
+            "/api/manager/operator/snapshot?limit=1"
+        )
+        XCTAssertTrue(restored.projects.isEmpty)
+    }
+
     func testNativeProviderSaveOfflineFailureAndInvalidEndpointsSurviveManagerReplacement() async throws {
         // A bound, non-listening socket keeps the offline endpoint deterministic
         // without standing in for a model server or accepting provider requests.

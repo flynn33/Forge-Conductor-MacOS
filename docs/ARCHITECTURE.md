@@ -239,5 +239,5 @@ The staged bundle contains `Contents/Helpers/forge-conductor`,
 `Contents/MacOS/forge-filesystem-daemon`. Nested code is signed before the app
 seal and each artifact is strictly verified.
 
-Version: `0.9.0`
-Build: `1`
+Version: `0.10.0`
+Build: `2`

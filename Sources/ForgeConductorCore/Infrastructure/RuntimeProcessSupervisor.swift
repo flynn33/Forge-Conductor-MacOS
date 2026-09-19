@@ -548,7 +548,7 @@ enum RuntimeLaunchGate {
                 checkNestedCode: false,
                 requireValidity: false
             )
-            guard packageTestIdentity.identifier == "ForgeConductorPackageTests",
+            guard isSwiftPackageTestIdentity(packageTestIdentity.identifier),
                   packageTestIdentity.flags.contains(.adhoc),
                   packageTestIdentity.teamIdentifier == nil else { throw error }
             currentIdentity = packageTestIdentity
@@ -588,7 +588,7 @@ enum RuntimeLaunchGate {
                 currentIdentity.identifier == name
                     || currentIdentity.identifier.hasPrefix(name + "-")
             }
-        let currentIsPackageTest = currentIdentity.identifier == "ForgeConductorPackageTests"
+        let currentIsPackageTest = isSwiftPackageTestIdentity(currentIdentity.identifier)
         guard sourceIdentity.flags.contains(.adhoc),
               sourceIdentity.teamIdentifier == nil,
               helperIsSwiftPackageProduct,
@@ -604,6 +604,13 @@ enum RuntimeLaunchGate {
             )
         }
         return sourceIdentity
+    }
+
+    /// SwiftPM has used both the legacy aggregate-test identifier and the
+    /// package-and-target identifier for the same ad-hoc XCTest product.
+    static func isSwiftPackageTestIdentity(_ identifier: String) -> Bool {
+        identifier == "ForgeConductorPackageTests"
+            || identifier == "forge-conductor.ForgeConductorTests"
     }
 
     /// Binds the runtime launcher to the exact adjacent CLI product. Development

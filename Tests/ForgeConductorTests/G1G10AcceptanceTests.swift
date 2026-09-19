@@ -384,21 +384,34 @@ final class G1G10AcceptanceTests: XCTestCase {
     func testG3_VersionAndReleaseDocumentsAreAligned() throws {
         let version = ForgeApp.version
         let buildVersion = ForgeApp.buildVersion
-        XCTAssertEqual(version, "0.9.0")
-        XCTAssertEqual(buildVersion, "1")
+        XCTAssertEqual(version, "0.10.0")
+        XCTAssertEqual(buildVersion, "2")
 
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+        let trackedVersion = try String(
+            contentsOf: repository.appendingPathComponent("VERSION"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        let trackedBuild = try String(
+            contentsOf: repository.appendingPathComponent("BUILD_NUMBER"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(trackedVersion, version)
+        XCTAssertEqual(trackedBuild, buildVersion)
+
         let expectedReferences = [
             ("README.md", "**Version** | **\(version)**"),
             ("CHANGELOG.md", "## [\(version)]"),
             ("USER-GUIDE.md", "Version **\(version)**"),
+            ("XCODE.md", "version **\(version)**, build **\(buildVersion)**"),
             ("docs/ARCHITECTURE.md", "Version: `\(version)`"),
             ("docs/TELEMETRY.md", "`\(version)`"),
             ("docs/CONTEXT-AGENT-CONTINUITY.md", "(v\(version))"),
-            ("docs/G1-G10-STATUS.md", "(\(version))"),
+            ("docs/QUALIFICATION-STATUS.md", "**\(version), build \(buildVersion)**"),
+            ("docs/VERSIONING.md", "`VERSION` contains the product version"),
         ]
         for (path, marker) in expectedReferences {
             let contents = try String(contentsOf: repository.appendingPathComponent(path), encoding: .utf8)
@@ -419,7 +432,6 @@ final class G1G10AcceptanceTests: XCTestCase {
             project.components(separatedBy: "CURRENT_PROJECT_VERSION = \(buildVersion);").count - 1,
             shippingConfigurationCount + nonshippingQualificationConfigurationCount
         )
-
     }
 
     func testG9_ResolvePrefersExplicitBinary() {

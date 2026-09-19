@@ -284,7 +284,7 @@ final class ContinuityControlToolContractTests: XCTestCase {
         .init(deployed: verified ? true : nil, connected: verified ? true : nil, ready: ready,
             automaticHandoffEnabled: verified ? false : nil, exactIDSupport: true,
             providerMode: .nativeLMStudioResponses, taskIdentity: verified ? .verifiedNativeTask : .unavailable,
-            role: .primary, deploymentID: nil, buildVersion: "0.9.0",
+            role: .primary, deploymentID: nil, buildVersion: ForgeApp.version,
             qualification: .init(nativeAPI: .notObserved, desktopNewChat: .notObserved,
                 guiClosedRecovery: .notObserved, laterRollover: .notObserved),
             reasons: reasons ?? (verified ? [] : ["task_identity_unavailable"]))

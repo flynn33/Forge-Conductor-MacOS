@@ -1,6 +1,9 @@
 # Durable budget policy
 
-The manager persists version 1 budget preferences inside the existing `config.json` as `budget_policy`. Global defaults and overrides for an exact project ID and generation share one configuration transaction. Existing shell opt-outs and unrelated settings are preserved. Product identity remains 0.9.0 build 1.
+The manager persists version 1 budget preferences inside the existing
+`config.json` as `budget_policy`. Global defaults and overrides for an exact
+project ID and generation share one configuration transaction. Existing shell
+opt-outs and unrelated settings are preserved. Product identity is `0.10.0 (2)`.
 
 ## Settings contract
 

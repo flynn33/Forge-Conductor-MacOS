@@ -2009,6 +2009,17 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
     }
 
+    func testRuntimeLaunchGateRecognizesCurrentAndLegacySwiftPackageTestIdentities() {
+        XCTAssertTrue(RuntimeLaunchGate.isSwiftPackageTestIdentity("ForgeConductorPackageTests"))
+        XCTAssertTrue(RuntimeLaunchGate.isSwiftPackageTestIdentity(
+            "forge-conductor.ForgeConductorTests"
+        ))
+        XCTAssertFalse(RuntimeLaunchGate.isSwiftPackageTestIdentity(
+            "OtherPackage.ForgeConductorTests"
+        ))
+        XCTAssertFalse(RuntimeLaunchGate.isSwiftPackageTestIdentity("forge-conductor.OtherTests"))
+    }
+
     func testRuntimeLaunchGateMapsActiveAndEarlierTeamsToTheBuildCertificateClass() throws {
         let development = try XCTUnwrap(
             RuntimeLaunchGate.requiredProductCodeSigningRequirement(

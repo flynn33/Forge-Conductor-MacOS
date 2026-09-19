@@ -11,11 +11,11 @@ Build **from Xcode** (you build and test; agents do not overwrite live `/Applica
 
 ## Product path under test
 
-1. LM Studio installed  
+1. LM Studio installed
 2. Forge Conductor 0.5.1 installed / run from your Xcode build
-3. **LM Studio MCP** tab → **Deploy to LM Studio**  
-4. Wait for “Deployment complete”; Forge edits configuration, reloads/relaunches LM Studio when required, and verifies both hosted connections  
-5. Load a tool-capable local model; tools / agents available  
+3. **LM Studio MCP** tab → **Deploy to LM Studio**
+4. Wait for “Deployment complete”; Forge edits configuration, reloads/relaunches LM Studio when required, and verifies both hosted connections
+5. Load a tool-capable local model; tools / agents available
 
 ## Architecture delivered
 
@@ -51,5 +51,5 @@ xcodebuild -project ForgeConductor.xcodeproj -scheme forge-conductor -destinatio
 
 ## Out of scope for this build session
 
-- Silent overwrite of live production app  
-- Leaving LM Studio proxies as the long-term path (native protocol negotiation is in-tree)  
+- Silent overwrite of live production app
+- Leaving LM Studio proxies as the long-term path (native protocol negotiation is in-tree)

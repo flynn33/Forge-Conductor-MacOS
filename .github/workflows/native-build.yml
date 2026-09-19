@@ -32,6 +32,8 @@ jobs:
           set -euo pipefail
           test "$(uname -m)" = arm64
           test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
+      - name: Check repository hygiene and version alignment
+        run: script/check_repository_hygiene.sh
       - name: Check utility regressions, version identity, and native membership
         env:
           FORGE_CI_OUTPUT_DIR: ${{ runner.temp }}/forge-native-integrity

@@ -43,14 +43,17 @@ final class CLIContractTests: XCTestCase {
     func testHelpVersionStatusAndInvalidCommandsPreserveCLIContract() throws {
         let help = try run(executable, arguments: ["help"])
         XCTAssertEqual(help.status, 0)
-        XCTAssertTrue(help.stdout.contains("Forge-Conductor 0.9.0"))
+        XCTAssertTrue(help.stdout.contains("Forge-Conductor \(ForgeApp.version)"))
         XCTAssertTrue(help.stdout.contains("serve"))
         XCTAssertTrue(help.stdout.contains("manager"))
         XCTAssertTrue(help.stdout.contains("install"))
 
         let version = try run(executable, arguments: ["--version"])
         XCTAssertEqual(version.status, 0)
-        XCTAssertEqual(version.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "0.9.0")
+        XCTAssertEqual(
+            version.stdout.trimmingCharacters(in: .whitespacesAndNewlines),
+            ForgeApp.version
+        )
 
         let status = try run(
             executable,
@@ -58,7 +61,7 @@ final class CLIContractTests: XCTestCase {
         )
         XCTAssertEqual(status.status, 0, status.stderr)
         let statusObject = try JSONSupport.object(from: Data(status.stdout.utf8))
-        XCTAssertEqual(statusObject["version"] as? String, "0.9.0")
+        XCTAssertEqual(statusObject["version"] as? String, ForgeApp.version)
         XCTAssertEqual(statusObject["manager_running"] as? Bool, false)
 
         let managerHelp = try run(executable, arguments: ["manager", "--help"])

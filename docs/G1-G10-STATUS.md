@@ -54,15 +54,15 @@ signed E2 matrix and formal closure pass.
 
 ## Port ownership behavior
 
-1. `DashboardPortGuard` — detects who holds :7788  
-2. `DashboardServer.start` **waits for bind ready/failed** (no silent “listening” on conflict)  
-3. A second manager **fails with a clear error** instead of lying in manager state  
-4. The GUI detects and attaches to an existing LaunchAgent manager without binding again  
-5. The GUI retries transient manager connection loss and logs attach/recovery state  
-6. Deploy smoke-tests `serve`, revisions all required LM Studio configuration, activates the host, and requires both hosted tool lists  
+1. `DashboardPortGuard` — detects who holds :7788
+2. `DashboardServer.start` **waits for bind ready/failed** (no silent “listening” on conflict)
+3. A second manager **fails with a clear error** instead of lying in manager state
+4. The GUI detects and attaches to an existing LaunchAgent manager without binding again
+5. The GUI retries transient manager connection loss and logs attach/recovery state
+6. Deploy smoke-tests `serve`, revisions all required LM Studio configuration, activates the host, and requires both hosted tool lists
 
 ## What is still NOT claimed
 
-- Model-specific tool-selection quality inside a conversation  
-- Automatic killing of a foreign process that owns the configured port (unsafe without your OK)  
-- Hub marketplace card named “Forge-Conductor”  
+- Model-specific tool-selection quality inside a conversation
+- Automatic killing of a foreign process that owns the configured port (unsafe without your OK)
+- Hub marketplace card named “Forge-Conductor”

@@ -63,6 +63,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.9.0`
+`0.10.0`
 
-Build: `1`
+Build: `2`

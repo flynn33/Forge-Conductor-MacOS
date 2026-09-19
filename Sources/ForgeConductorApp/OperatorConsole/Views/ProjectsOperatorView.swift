@@ -35,6 +35,13 @@ struct ProjectsOperatorView: View {
                     }
                     .tag(project.projectID)
                     .accessibilityIdentifier("project-row-\(project.projectID)")
+                    .contextMenu {
+                        Button("Remove Project…", role: .destructive) {
+                            viewModel.selectedProjectID = project.projectID
+                            requestSelectedProjectRemoval()
+                        }
+                        .disabled(viewModel.isLoading || project.lifecycleState != "active")
+                    }
                 }
             }
             .listStyle(.sidebar)
@@ -50,6 +57,15 @@ struct ProjectsOperatorView: View {
                         )
                     }
                     .accessibilityIdentifier("project-register-by-path")
+                    Button("Remove Selected Project…", systemImage: "minus", role: .destructive) {
+                        requestSelectedProjectRemoval()
+                    }
+                    .disabled(
+                        viewModel.isLoading
+                            || viewModel.selectedProject?.lifecycleState != "active"
+                    )
+                    .help("Remove the selected registration while preserving durable memory and history.")
+                    .accessibilityIdentifier("project-remove-sidebar")
                 }
                 .padding(10)
             }
@@ -353,7 +369,7 @@ struct ProjectsOperatorView: View {
 
             HStack {
                 Button("Remove Project…", role: .destructive) {
-                    removeConfirmation = viewModel.removeConfirmationForSelectedProject()
+                    requestSelectedProjectRemoval()
                 }
                 .disabled(viewModel.isLoading || project.lifecycleState != "active")
                 .accessibilityIdentifier("project-remove")
@@ -371,6 +387,10 @@ struct ProjectsOperatorView: View {
                 .accessibilityIdentifier("project-reset")
             }
         }
+    }
+
+    private func requestSelectedProjectRemoval() {
+        removeConfirmation = viewModel.removeConfirmationForSelectedProject()
     }
 
     @ViewBuilder

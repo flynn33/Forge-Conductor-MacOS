@@ -10,7 +10,7 @@ This machine runs a corporate stack that can blank or block the local dashboard:
 | **GlobalProtect** | Network Extension | Network Extensions |
 | **macOS Application Firewall** | Host firewall | System Settings → Network → Firewall |
 
-We **do not** install a custom Endpoint Security extension (that requires Apple entitlements + IT signing).  
+We **do not** install a custom Endpoint Security extension (that requires Apple entitlements + IT signing).
 We install a normal **Login Item / LaunchAgent** and document allowlists for IT.
 
 ## Symptoms
@@ -25,7 +25,7 @@ We install a normal **Login Item / LaunchAgent** and document allowlists for IT.
 **Do not** use:
 
 - `~/.forge-conductor/bin/forge-serve` / `forge-serve-fallback` (removed legacy bash→Python launchers)
-- `~/.local/bin/forge-conductor` if it still symlinks to  
+- `~/.local/bin/forge-conductor` if it still symlinks to
   `~/Library/Application Support/ForgeConductor/app/.venv/bin/forge-conductor` (old Python)
 
 Canonical Swift binary after install:
@@ -90,7 +90,7 @@ open -a "Google Chrome" http://127.0.0.1:7788/
 
 1. Open **System Settings → General → Login Items & Extensions**.
 2. **Allow in the Background**: allow `forge-conductor` / `com.forge-conductor.manager` when macOS prompts after `install-login`.
-3. **Endpoint Security Extensions**: keep Falcon / Jamf Protect / Cortex **enabled** (IT requirement).  
+3. **Endpoint Security Extensions**: keep Falcon / Jamf Protect / Cortex **enabled** (IT requirement).
    If they are disabled, the Mac may be non-compliant — do not turn them off to “fix” Forge; request an **exception** instead.
 4. **Network Extensions**: GlobalProtect / Cortex can interfere with loopback. If localhost is blocked, open an IT ticket.
 

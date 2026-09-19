@@ -1,70 +1,23 @@
 # Forge Conductor user guide
 
-Version **0.9.0**, build **1**. This guide is for operators who run Forge Conductor with
-[LM Studio](https://lmstudio.ai) on macOS.
+Version **0.10.0**, build **2**. This guide covers the native Forge Conductor
+application and its LM Studio integration on macOS.
 
-The owner now targets a fully functional, shippable build and will ship it
-separately. The earlier [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
-retains its original scope. The current source has a Developer ID archive and a
-notarized, stapled app ZIP that passed local Gatekeeper assessment. Installer
-notarization, public-download acceptance, signed privileged filesystem execution,
-and the physical-hardware matrix remain open.
+> `0.10.0 (2)` is the current development identity. It has not inherited the
+> artifact qualification of earlier `0.9.0 (1)` candidates. See
+> [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
+> open release gates.
 
-## Current status
+## Find the right guide
 
-| Implemented and test-backed in this source | Still open or deferred before shipment |
-|---------------------------------|----------------------------------------|
-| The CLI reports 0.9.0; runtime constants, Xcode settings, and the built app bundle report 0.9.0 build 1. | Signed distinct-process filesystem E2 and recovery qualification. |
-| A current-source Developer ID Release archive, notarized/stapled app ZIP, strict nested-signature check, and local Gatekeeper execution assessment passed. The extracted app also started a separate manager and registered a disposable project. | Notarized installer, public-download acceptance, signed root-service execution, and hardware matrix. |
-| Project memory, durable jobs and telemetry have regression coverage. The final direct suite executed 1,554 cases with 12 explicit skips and zero failures. Signed native onboarding passed project, Manager, Provider, Autonomy, and policy-picker flows. | Complete installed protected-service matrix and a second physical-memory-capacity stress execution. |
-| Durable continuity state, provider receipt storage, successor/fencing models and tool-effect reconciliation are implemented; one manager-owned real-provider rollover completed exact acknowledgment, successor work, GUI-closed recovery and stable replay. | A second live attempt exceeded the provider deadline and is not a repeat pass; exact existing-desktop attachment remains unsupported without a host API. |
-| Protected regular-file, symbolic-link, empty-directory, no-replacement move and bounded recursive-delete operations have protocol-v5 capture and recovery machinery. | Signed distinct-process filesystem E2 and recovery qualification remain unmeasured pending owner-approved service execution. |
-| Provider controls save endpoint/model settings and Keychain credential changes through the manager. A signed native UI case registered a project, reached live LM Studio, started a read-only Autonomy run, canceled and reopened the native policy picker, then imported an exact run-bound manifest fixture at mode `0600`. Core import and a separate signed XCTest gate fixture passed. | Ordinary installed-stack terminal completion, package-preparation UX, and root-service execution. |
-| The universal Developer ID app is notarized and stapled; its exact-code ZIP passes local Gatekeeper. The matching Installer is Developer ID signed with a trusted timestamp and its expanded app payload passes signing and app Gatekeeper checks. | The outer Installer still needs notarization/stapling and a passing Gatekeeper install assessment. Publication/readback and shipment remain owner-controlled. |
-
-Where implementation has only unit, synthetic-host, simulator, focused Debug,
-or build-only evidence, that boundary is stated plainly. This guide does not
-mark a package or release gate complete. The [qualification summary](docs/QUALIFICATION-STATUS.md)
-binds local results and GitHub CI repairs to their tested revisions.
-The newer notarized Developer ID ZIP was also launched with a disposable Forge
-home. Its packaged manager registered an authorized project, passed a live LM
-Studio contract probe, and completed a read-only run using an exact imported
-signed XCTest policy. One required native case passed with no failure, skip,
-timeout, or truncated output; `tests` stayed passed after a full process
-restart. This is isolated packaged acceptance, while the owner installation's
-privileged root service and public download remain unqualified. The exact
-[receipt](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md#september-16-2026-packaged-native-completion-receipt)
-includes source and artifact hashes.
-The final local archive includes the current Xcode test-target graph and
-produces an exact-code stapled app ZIP that passed local Gatekeeper after
-extraction (SHA-256
-`f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`).
-Its Installer is signed with a trusted timestamp but its outer package has not
-completed notarization, and the privileged root service remains an open
-qualification gate.
-Manager-owned completion requires [installed native validation policy](docs/NATIVE-COMPLETION.md).
-A missing policy appears as a configuration block; a summary or result hash
-cannot substitute for required checks. Existing shell enable/disable controls
-and completion-request fields remain available.
-In **Autonomy**, select a persisted run and use **Import Native Validation
-Policy…** to choose a separately prepared schema-1 JSON policy for its exact
-run, project generation, and gates. The signed XCTest package must already be
-under Forge's protected native-validation directory. The importer verifies the
-binding and package/source digests; the manager alone decides whether actual
-native results pass. Canceling the picker leaves the run unchanged.
-
-Provider Save, model discovery, and credential controls are described in
-[Configure the managed provider](#configure-the-managed-provider).
-
-Related detail (developer-oriented):
-
-- [README.md](README.md) — build, CLI, architecture
-- [docs/LM-STUDIO-CONNECTION.md](docs/LM-STUDIO-CONNECTION.md) — how LM Studio spawns Forge
-- [docs/CONTEXT-AGENT-CONTINUITY.md](docs/CONTEXT-AGENT-CONTINUITY.md) — packet format and triggers
-- [docs/DURABLE-MEMORY.md](docs/DURABLE-MEMORY.md) — `memory_*` tools
-- [CHANGELOG.md](CHANGELOG.md)
-
----
+| Need | Guide |
+| --- | --- |
+| Build, archive, or sign the app | [Xcode guide](XCODE.md) |
+| Connect or repair LM Studio MCP | [LM Studio connection](docs/LM-STUDIO-CONNECTION.md) |
+| Queue project instructions | [Instruction packages](docs/INSTRUCTION-PACKAGES.md) |
+| Configure protected completion | [Native completion](docs/NATIVE-COMPLETION.md) |
+| Understand current release evidence | [Qualification status](docs/QUALIFICATION-STATUS.md) |
+| Browse all current and historical docs | [Documentation guide](docs/README.md) |
 
 ## 1. What this is
 
@@ -154,15 +107,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and both mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.9.0 binary:
+Confirm the registered command is a `serve`-capable 0.10.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.9.0
+forge-conductor version    # should print 0.10.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.9.0` and
-`CFBundleVersion` must be `1`.
+For an app bundle, `CFBundleShortVersionString` must be `0.10.0` and
+`CFBundleVersion` must be `2`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -259,11 +212,12 @@ is the registered repository, even when the imported instruction file lives
 elsewhere. **Stop Queue** prevents the next package from starting while leaving
 an already admitted run visible in **Autonomy**.
 
-Use **Remove Project…** to remove a registration from the Projects tab. Removal
-advances the project generation and invalidates bindings; durable project memory
-and historical run evidence remain. Registering the same repository again
-reconnects its durable identity. Package formats, manifest fields, limits, and
-storage behavior are documented in
+Use **Remove Selected Project…** below the project list, the row context menu,
+or **Remove Project…** in the detail pane to remove a registration. Forge asks
+for confirmation, advances the project generation, and invalidates bindings;
+durable project memory and historical run evidence remain. Registering the same
+repository again reconnects its durable identity. Package formats, manifest
+fields, limits, and storage behavior are documented in
 [Project instruction packages](docs/INSTRUCTION-PACKAGES.md).
 
 ---
@@ -412,7 +366,7 @@ Suggested keys: `project/<slug>/overview`, `project/<slug>/paths`, `project/<slu
 
 ### 7.1 Project-scoped memory
 
-Version 0.9.0 adds independent project stores for larger, structured working sets.
+Version 0.9.0 introduced independent project stores for larger, structured working sets.
 Call `project_memory.initialize` with an authorized project path, then use the
 returned project id with the remaining tools.
 
@@ -534,7 +488,7 @@ disposable copy before any recovery. A newer verified backup cannot restore the
 missing historical version. The CLI's `status` and `doctor` commands can confirm
 startup after the recovery record is reconciled.
 
-**MCP never starts / 60s timeout**  
+**MCP never starts / 60s timeout**
 The registered `command` is not a `serve` binary, or stdout is being buffered (0.5+ unbuffers it). Run:
 
 ```bash
@@ -544,16 +498,16 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 
 You should get a JSON-RPC initialize result immediately.
 
-**Dashboard empty / no MCP telemetry**  
+**Dashboard empty / no MCP telemetry**
 Open a chat with MCP enabled. Then check `/api/status` and `/api/snapshot`. `presence` is filled from live `serve` heartbeats (every 10s while the process is up).
 
-**Model keeps spinning with no tools**  
+**Model keeps spinning with no tools**
 That is LM Studio prompt processing (large context), not a dead Forge server. Check `lms ps` (`PROCESSINGPROMPT` vs `GENERATING`) and `~/.forge-conductor/logs/`.
 
-**Handoff looks stale**  
+**Handoff looks stale**
 Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing next-actions unless the model overwrites them. Status `source: auto` means Forge wrote the last persist, not that the goal changed.
 
-**Doctor complains about `~/.forge-conductor/bin/forge-conductor`**  
+**Doctor complains about `~/.forge-conductor/bin/forge-conductor`**
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 ---

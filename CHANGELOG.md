@@ -1,1033 +1,115 @@
 # Changelog
 
-All notable changes to **Forge Conductor (macOS)** are documented in this file.
+User-visible Forge Conductor changes are recorded here. Detailed test, signing,
+artifact, and gate receipts belong in the
+[roadmap](ROADMAP.md), [qualification status](docs/QUALIFICATION-STATUS.md), and
+[functional-build record](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-for marketing versions (`MAJOR.MINOR.PATCH`).
-
-Current product identity is marketing version **0.9.0**, build **1**. The work
-under **Unreleased** is not a new qualified release.
+The version format is documented in [versioning policy](docs/VERSIONING.md).
+Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-This is a 0.9.0 development snapshot, not a public release. Product version
-surfaces remain 0.9.0 build 1. The owner now targets a fully functional,
-feature-complete, shippable build through direct `main` updates and will ship
-separately. The earlier Apple Development-signed Release package remains valid
-evidence for its historical scope. The exact published source now has a
-universal Developer ID archive, export, integrity-checked app ZIP, and signed
-local Installer. Earlier source also has a notarized, stapled app ZIP that
-passes local Gatekeeper after extraction. Exact-artifact notarization,
-public-download Gatekeeper acceptance, physical-hardware
-qualification, privileged root-service E2, and exact existing-desktop attachment
-remain open. One production-adapter managed rollover and the earlier coherent
-signed development bundle are recorded without promoting them to release passes.
-The former ordinary Release build stopped with Xcode exit 65 because all five
-shipping targets lacked the Developer ID private-key identity for team
-`9AQ2C2838M`. The owner subsequently installed valid Developer ID Application
-and Installer identities on this host. An ordinary current-source archive and
-`developer-id` export now succeed; the signed package has a trusted timestamp.
-Xcode Organizer notarized the app; its stapled local export and extracted ZIP
-pass Gatekeeper. The separate installer remains unnotarized and rejected.
-The isolated current-source arm64 Apple Development-signed Release workspace
-build and `DevelopmentRelease` nested-bundle check passed. Its embedded CLI
-returned exit 0 for `version` and `status` from a scratch home; the candidate
-GUI process launched a separate manager on port 7789 and stopped within a
-bounded interval while the installed app remained running. This is startup
-evidence, not signed root-service or release qualification.
-The temporary same-identifier candidate app appeared in macOS Background Items
-after the isolated launch. Its local ZIP passed integrity verification (SHA-256
-`65eb184ae46333288fe526d96db876783d88873bfaccb4822d61845b5c2756df`),
-and its original `.app` path was renamed to a retained non-app bundle. The
-Background Items cache still records the former path; the installed app remains
-running and the root-service gate is open.
-A fresh current-source arm64 development-signed Release candidate after the
-native authorized-path accessibility repair passed the strict bundle checker;
-its embedded CLI `version` and isolated-home manager status returned exit 0.
-The ZIP at `/private/tmp/forge-current-source-ui-devrelease-candidate.zip`
-passed integrity testing (SHA-256
-`56cb77e5802843dbb55b51da4c38d2b532685f6789358e0db18baa48c7d27c10`).
-Its GUI bundle was not launched or installed. This is an unshipped local
-development candidate that predates the published repair revision, not a current
-Developer ID or privileged-service qualification artifact.
+### Pending qualification
 
-### Project removal, ordered instruction packages, and setup guide
+- Rebuild and qualify the `0.10.0 (2)` native product set.
+- Complete the remaining privileged-service, notarization, Gatekeeper,
+  public-download, and hardware gates recorded in the roadmap.
 
-- Added **Remove Project…** to the Projects tab. The authenticated manager
-  archive operation advances the project generation, invalidates bindings,
-  revokes continuity authority, closes the open memory store, hides the
-  registration, and preserves durable memory and historical evidence. Exact
-  retries are idempotent, and unsettled autonomous runs block removal.
-- Added project-scoped instruction package ingestion for Markdown/text files,
-  document folders, `.forgepackage` files, and manifest folders. Accepted input
-  is bounded, rejects symbolic links and path traversal, and is copied into an
-  owner-only content-addressed snapshot before the queue record is published.
-- Added a durable queue to the Projects tab with native drag ordering, package
-  removal, and **Start Ordered Autonomy** / **Stop Queue** controls. The queue
-  binds every package to the registered project UUID and generation, starts one
-  managed LM Studio run at a time, and advances only after the prior run reaches
-  completed. Failure, cancellation, pause, or configuration blocking stops
-  automatic advancement.
-- Added the fixed manager-owned `forge.package.tool-success` completion gate for
-  ordinary instruction documents. It accepts only bounded, broker-committed
-  successful tool results from the exact run/project generation; model text and
-  caller-selected hashes do not approve completion.
-- Added a first-launch setup tutorial, permanently reopenable from the toolbar,
-  that explains LM Studio server setup, Provider endpoint/model selection,
-  Manager allowed roots, project registration, instruction package formats,
-  drag ordering, and queue execution.
-- Matched the Xcode Manager test bundle to the existing Apple Development team
-  so My Mac service tests exercise the same signed runtime-launch identity gate
-  as the development application and helper.
-- Added the [project instruction package guide](docs/INSTRUCTION-PACKAGES.md),
-  updated the README and user guide, and synchronized the two new Swift sources
-  with the canonical Xcode project. Focused queue, completion-gate, project
-  archive, typed operator-client, SwiftPM app build, and Xcode validation are
-  recorded with this change; distribution and shipment remain separate.
+## [0.10.0] — 2026-09-19 (development)
 
-### LM Studio loaded-state and completion retry
+### Added
 
-- Reconciled LM Studio's native model inventories when `/api/v1/models`
-  temporarily omits `loaded_instances` for the selected model while the bounded
-  `/api/v0/models` response reports that exact model as `loaded`. The v1 response
-  remains authoritative for model metadata; the compatibility response can add
-  only exact loaded state and a validated context length. Missing, malformed, or
-  mismatched compatibility data remains unloaded and fails closed.
-- A retry after repairing a native completion-policy blocker now resumes the
-  persisted completion request in `validating_completion`. It no longer enters
-  continuity recovery or repeats provider/tool work. Other waiting, provider,
-  resource, and recoverable failures retain their existing recovery behavior.
-- **E0:** an isolated Apple Development-signed Debug app built from the canonical
-  workspace on **My Mac** registered a project, discovered the live
-  `qwen/qwen3.8-27b` model as loaded with a 262144-token context, passed the
-  connection probe, and completed a manager-owned LM Studio run. The model made
-  one `fs_read`, returned the exact 23-byte fixture, requested completion, then
-  stopped at the expected missing-policy blocker. Importing the exact run-bound
-  signed policy and selecting Retry returned `validating_completion`; one
-  required XCTest case passed with zero failures/skips and the run reached
-  `completed` with `tests` passed. The installed app was not replaced.
-- The two focused Swift regressions and the same two canonical Xcode tests pass.
-  The Xcode unit run used the installed Apple Development identity as a local
-  command-line override because the repository keeps the unit bundle ad hoc for
-  certificate-free CI. Both SwiftPM products and the ordinary Debug workspace
-  build pass. All five affected source/test files were already members of the
-  canonical Xcode graph; no project-graph edit was required.
-- Owner-authored `main` now contains the exact tested source at
-  `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0` (tree
-  `6c03f40e2b04ae6dfd689c9347a84014f7ebe496`). Local and remote `main` read
-  back identically. GitHub's final Native Build and Tests run passed native
-  source integrity plus Swift and Xcode Debug/Release lanes.
-- **E0:** the Apple Development-signed Xcode **My Mac** app built from that
-  published tree passed all seven production-onboarding cases. Five independent
-  cases passed in the class run; Xcode did not inherit the two live-provider
-  variables, so those skips remain a non-pass. After supplying the loopback
-  endpoint and already loaded model through the user launch environment, the
-  exact live Provider and Autonomy cases executed again with two passes, zero
-  failures, and zero skips. Together they verify folder and direct-path project
-  registration, relaunch persistence, offline Provider errors, loaded-model
-  discovery and connection across manager replacement, Autonomy run admission,
-  policy-picker cancellation/import, and fresh-MCP shell opt-out/re-enable. The
-  temporary launch variables were removed and the installed app was untouched.
-
-### Release archive preparation
-
-- Inspected September 15 Xcode archives: the `Forge Conductor` scheme's
-  `Raven-Forge-Software.Forge-Conductor` app had no icon metadata or icon
-  resources, while the canonical `ForgeConductor` archive contained `AppIcon.icns`,
-  `Assets.car` and matching `AppIcon` bundle keys. Documented the exact scheme,
-  bundle identifier and icon checks for the archive/export path.
-- Removed macOS-SDK Apple Development identity overrides from the five shipping
-  Release targets and set their distribution team to James Daley's
-  `9AQ2C2838M`. Ordinary Release now resolves Developer ID Application;
-  the earlier `2Y25RTLZET` Developer ID identity remains admitted for existing
-  products. The explicit development-signed Release override produced a
-  canonical universal archive with the icon,
-  manager, launcher and filesystem helper. Strict nested signature validation
-  and the `DevelopmentRelease` bundle checker passed. The first canonical
-  archive was generic because the CLI installed as a second product, and
-  `developer-id` export rejected it. Release now uses `SKIP_INSTALL = YES` for
-  the CLI while keeping it in `Contents/Helpers`; a rebuilt app-only archive
-  contains `ApplicationProperties`. Release also uses manual signing for the
-  five shipping targets, removing Xcode's conflict between automatic development
-  signing and a specified Developer ID identity. James Daley has since installed
-  local Developer ID Application and Installer identities for team
-  `9AQ2C2838M`, clearing the earlier build-time certificate error. A fresh
-  universal `0.9.0 (1)` Developer ID archive and export now pass strict deep
-  signatures and the Release privileged-bundle checker, including every nested
-  product and the daemon hash seal. A local installer package signed with his
-  Developer ID Installer identity has a trusted timestamp and contains the
-  exported app. Xcode Organizer then notarized that current archive. The local
-  stapled export, app ZIP integrity, extracted bundle checker, and Gatekeeper
-  execution assessment pass; the ZIP SHA-256 is
-  `a309b3a138d5ee986a0791bb425ffd736b6ea295e6d80f4fda541289e0489d2b`.
-  The separately signed installer is still unnotarized and fails Gatekeeper's
-  install assessment. Public-download acceptance, owner hardware qualification,
-  and shipment remain open.
-- A bounded direct GUI launch from the extracted stapled app ZIP served the
-  isolated home on port 7790. Manager Start reported success; its native folder
-  picker and Save settings authorized only a disposable project. The Projects
-  picker committed that folder with generation 1, confirmed by the manager
-  snapshot after the computer-use transport briefly disconnected. The app was
-  stopped and the listener closed; the launched duplicate app path was retained
-  as a non-app bundle. No installed app files were replaced. This is packaged
-  onboarding evidence, not Provider completion or signed root-service E2.
-- A newer universal Developer ID archive built from the policy-import source
-  passed strict nested signatures and the Release bundle checker. Organizer
-  notarized submission `F591014A-45A3-4BB2-AA3F-25A26CEB0932`; its stapled
-  app ZIP passed integrity, extracted-bundle inspection, and Gatekeeper as
-  `Notarized Developer ID` (SHA-256
-  `9d99e311b8471b2de46d1043cb2dbe03c1486f105fd9a1c4a9df720cdec3c4ed`).
-  The extracted app's fresh-home manager on port 7792 authorized and registered
-  one disposable project, saved/probed the loaded LM Studio Provider, then
-  completed a read-only run with an exact imported signed XCTest policy: one
-  required native case passed, zero failed/skipped, exit 0, no timeout or
-  output truncation. `tests` stayed passed after a full app/manager process
-  restart. The owner installation stayed running and unchanged; the candidate
-  stopped with its listener closed. The archive predates only a test-target
-  Core-framework link and later test/docs edits. An exact published-source
-  rebuild, installed root-service E2, package/public-download notarization
-  acceptance, hardware matrix, and shipment remain open.
-- The final current-local-workspace universal Developer ID archive included the
-  updated Xcode UI-test target graph. Its five production code-directory hashes
-  match the notarized archive; the exported app stapled with that ticket. The
-  final local ZIP passed integrity, extracted stapler/signature/Release checks,
-  and local Gatekeeper as `Notarized Developer ID` (SHA-256
-  `f77f63c19807be2522d245c9a6e827d0713c99a04cf76d6f14baaaaebe470b19`).
-  The `productsign` signing route waited for keychain confirmation; read-only
-  Keychain Access inspection showed the Installer key already permits
-  `productbuild`. That Apple-native route signed the final local installer
-  product with a trusted timestamp (SHA-256
-  `1cfc438cf5e2b5d9dda8fafcb019c905abad1b0289f48c5f9f233796c3f03f79`).
-  Its expanded app passes strict nested signing, staple validation, and app
-  Gatekeeper. The outer package remains unnotarized and is rejected for
-  installation. No key ACL was changed; nothing was installed or shipped.
-- The exact owner-authored published tree at `f02abeb8`, including the tested
-  production revision and documentation-only closeout, produced a fresh
-  universal Developer ID Release archive and manual export. The archive has one
-  canonical `com.forge-conductor.app` product, both architectures, the icon
-  assets, embedded CLI, launcher, Core framework, and sealed filesystem daemon.
-  Strict nested signing and the Release privileged-bundle checker pass on the
-  archive, export, ZIP extraction, and expanded Installer payload. The app ZIP
-  SHA-256 is
-  `a171d88409c2ef36816b5ccbc4bb304a3855b5fc7f3972492259adcd143ec338`;
-  the trusted-timestamp Developer ID Installer package SHA-256 is
-  `21a0dc3d68dfbd410408c38cb8e3ce1ee9a395269a30bbeba89d94ab13a16d28`.
-  Both exact artifacts remain unnotarized and Gatekeeper rejects them as
-  `source=Unnotarized Developer ID`. The embedded CLI alone returned its
-  version and isolated stopped-manager status; no GUI or Installer was opened,
-  installed, uploaded, or shipped.
-- The final local direct `swift test` run completed 1,554 XCTest cases with 12
-  explicit skips and zero failures on this source; the terminal transcript is
-  retained in the functional-build receipt. This does not qualify the
-  distinct-process service, installer, public download, or hardware matrix.
-- The resource stress report now labels its actual Debug or Release compilation
-  configuration and refuses to emit a `passed` report after a recorded XCTest
-  failure. One focused Debug case passed on this 128 GiB M5 Max host with
-  injected 8 GiB limits. The canonical workspace compiled the exact Core case
-  in Release; after the full scheme stalled signing its unrelated UI test
-  bundle, the already-built optimized Core bundle was signed with an existing
-  Apple Development identity. Direct `xcrun xctest` ran one Release case with
-  zero failures/skips and exit 0. A target-only optimized Core rebuild and
-  re-signed final-source XCTest rerun passed the same selected case once with
-  zero failures/skips; the final Release report hash is retained in the
-  functional-build receipt. Its Developer ID runtime launcher and signed test
-  bundle passed strict validity checks. The initial SwiftPM Release
-  invalid-test-bundle failure remains a nonpass. A second physical-memory
-  capacity remains unqualified.
-- The qualification-status index now describes the current 0.9.0 build 1
-  candidate, packaged LM Studio completion, native UI coverage, signed and
-  notarized app evidence, signed Installer boundary, and the exact remaining
-  publication, protected-service, Installer-notarization, and physical-host
-  gates. It no longer presents the superseded September 5 rescue candidate and
-  its repaired CI failures as current release status.
-- Read-only protected-service evidence now distinguishes the older registered
-  installation from the final Developer ID candidate by exact daemon SHA-256.
-  The existing launchd job has 2,599 failed launches, exit 78, and `needs LWCR
-  update`; enabling that older background item alone cannot qualify current
-  source. A controlled candidate installation and ServiceManagement
-  registration are required before the root mutation/recovery matrix.
-- The existing macOS CI Release Swift lane now retains the guarded P11 resource
-  report and a bounded architecture, hardware-model, physical-memory, OS, and
-  Xcode inventory. This prepares source-bound second-capacity evidence on the
-  published revision. The final CI execution passed and retained that evidence;
-  the hosted observation does not replace the separate physical-host qualification
-  boundary.
-
-### Project tracking and verified baseline
-
-- Adopted the owner-authorized continuous functional-development workflow and
-  its development-signed acceptance scope while retaining protected merge,
-  publication, credential, working-installation, feature, isolation and
-  evidence boundaries.
-- Reconciled merged PR #46 and its post-merge synchronization receipt with a
-  fresh local/remote `main` readback at `50d1821`. Recorded the current native
-  host, toolchain, signing, provider, and hardware prerequisites without
-  promoting them to product or distribution evidence.
-- Added a canonical phase/milestone roadmap and a local-first delivery contract.
-  That historical PR workflow recorded progress and Xcode synchronization;
-  the owner now authorizes direct `main` updates with the same phase closeout
-  documentation.
-- Recorded the merged instruction cleanup and focused CLI, coherent-resume,
-  read/edit/command, project-memory, and generation-reset verification.
-  These are narrow recorded checks, not a claim that all application paths ran.
-- Clarified that selected-project generation reset preserves durable records.
-  Selectable memory/continuity clearing and remaining native/live integration
-  qualification remain separately tracked.
-
-### Functional completion
-
-- **E0 — SwiftPM CLI resource relocation:** a copied CLI exited with signal 5
-  because `ForgeConductor_ForgeConductorCore.bundle` was absent; the LM Studio
-  primary, fallback, and CLU deployment smoke failed the same way. Manager
-  installation now stages that bundle transactionally beside a SwiftPM CLI and
-  under its app resources. A bare statically linked CLI without the bundle is
-  rejected before changing the Forge home. The identical MCP deployment smoke,
-  real relocated CLI status, missing-bundle rejection, 120 Manager tests, both
-  SwiftPM product builds, and the canonical Xcode Debug app build passed. The
-  macOS 27/Xcode 27 full suite after the fail-closed and completion-parser
-  additions ran 1,553 tests with 12 explicit skips and zero failures.
-- The installed 0.9.0 app's three LM Studio MCP registrations point to its
-  actual executable. Starting LM Studio's loopback server and loading the saved
-  `qwen/qwen3.8-27b` 4-bit variant made the authenticated manager provider
-  probes report `reachable` and `contract_valid`. A separate read-only managed
-  run was admitted, created a native session, invoked `fs_read` three times,
-  and received a completion-request object at the end of a longer LM Studio
-  reply. **E1 — Autonomy completion parsing:** Core required the whole reply
-  to be JSON, so the run yielded in `running` with no passed gate. A bounded
-  trailing-object parser now enters native validation for that live response
-  shape and rejects an object followed by more prose; its focused regression
-  passed. This host has no owner-installed per-run native completion policy, so
-  end-to-end completion and the installed root daemon remain unverified.
-  A live current-source development-signed candidate then admitted a separate
-  read-only LM Studio run, retained one `fs_read` evidence reference, recognized
-  the model's completion marker, and transitioned to `blocked_configuration`
-  at revision 8 with `completion_validation_failed`. This verifies the parser
-  end-to-end while preserving the missing-policy denial; it is not a completed
-  Autonomy run. A second isolated current-source run had a private per-run policy
-  and a preflighted signed XCTest package. Against the loaded LM Studio model it
-  read a disposable work product, requested completion, and ran the exact native
-  case once: one passed, zero failed or skipped, exit 0, and no output truncation.
-  The manager reached `completed` at revision 10 with `tests` passed; the same
-  state and gate survived a manager restart. An operator policy importer now
-  binds a selected persisted run, project generation, complete gate set,
-  source manifest, and protected signed XCTest package before an owner-only
-  atomic policy write. A focused Core case proved wrong-binding/changed-package
-  rejection and exact `0600` persistence. The signed fixture imported through
-  that service and executed three real native jobs for failed, stale, and
-  corrected effects. A Developer ID Release native UI case registered an
-  authorized project, reached live LM Studio, started a read-only run, opened
-  and canceled the policy picker, and confirmed the control re-enabled; its
-  final repeat passed one selected case with no skips/failures. An extended
-  Release native case also selected an exact run-bound manifest fixture in the
-  picker and read back the byte-identical protected file at mode `0600`: one
-  selected case, zero skips/failures. That fixture is not a passing signed
-  package; only the separate manager job test adjudicates native results.
-  Installed-stack
-  terminal completion, package-preparation UX, root-service E2, and
-  distribution qualification remain open.
-- Repaired native project registration after the folder picker: one atomic sheet draft now retains the selected path and display name across modal dismissal. Added absolute-path registration beside the picker; manager-side canonical project identity and authorization remain authoritative. Fresh Provider and Autonomy screens name their actual setup prerequisites instead of treating an untested provider snapshot as a failure.
-- **E0 — Manager authorized-folder accessibility crash:** on macOS 27, the native folder-authorization test and a combined Autonomy start test both crashed the signed GUI when XCTest queried the selectable authorized-path label after panel dismissal. The faulting main-thread stack recursed through SwiftUI and AppKit accessibility-label resolution. Removed the redundant explicit label from that path text; the identical Manager authorization/cancel/invalid-root/save/relaunch flow then passed with the path still readable, and the combined registered-project/live-Provider/Autonomy run-start test passed. The canonical Xcode source/test graph was already complete.
-- **E0 — Intermittent live Provider probe:** one seven-case signed native onboarding run had six passes and one Provider `unreachable` result before the combined Autonomy case reached its run-start controls. Its saved Provider configuration was correct. The same seven-case class subsequently passed all seven with no skips, and two exact combined-case repeats passed. The test now retains GUI probe controls and the manager's redacted provider error if the result recurs; no production retry or deadline change was made without that error evidence.
-- On the owner host, the existing manager accepted and cancelled a bounded read-only run after the repository was registered, its root was authorized, and the local LM Studio selected variant was loaded. The earlier provider failure came from an unsaved configuration and a loaded variant absent from LM Studio's v1 `loaded_instances`. Focused native picker, direct-path, offline Provider, live LM Studio Provider, and Autonomy UI tests passed. A development-signed optimized app passed bundle inspection and bounded isolated bootstrap; an earlier UI attempt was interrupted by the host's registered privileged daemon launch constraint and remains retained as a non-pass.
-- Recovered a local startup failure caused by a completed store migration
-  manifest whose named historical backup was absent. The prior manifest and a
-  private pre-recovery home copy were retained; the matching migration receipt
-  and database integrity were checked before a new verified 6-to-8 backup was
-  created. The missing 5-to-6 recovery artifact is not represented as restored.
-- Corrected the filesystem qualification-isolation test to inspect only the
-  shipping app's native-target block after Xcode reordered sibling targets.
-  Its exclusion assertions remain in force. The post-edit full Swift run
-  completed 1,578 tests with 12 explicit skips and zero failures; native UI
-  automation timed out before test execution and remains separately unverified.
-- Restored coherent ordinary Xcode Release signing defaults for the app, Core
-  framework, manager/CLI, filesystem daemon and runtime launcher. SDK-specific
-  Apple Development overrides had silently displaced the displayed Developer ID
-  setting. Development-signed Release remains available through the explicit
-  team, identity and compiled trust-policy override.
-- Pinned project-reset confirmation to the immutable captured project identity,
-  generation and operation; validated receipts and refreshed status before UI
-  replacement while preserving a deliberately changed selection.
-- Added recoverable selected-project memory, continuity, combined and terminal
-  run-history clearing. Continuity clearing removes project-memory and
-  control-plane payload copies while retaining bounded payload-free anti-replay
-  identities; unsettled effects fail closed.
-- Added the writable native source profile without widening the compatible
-  read-only profile. `fs_write` and `fs_edit` retain the normal project and tool
-  authorization path, durable request identity and task isolation.
-- Routed production no-replacement move and bounded bottom-up recursive delete
-  through the separately signed filesystem service and its retained recovery
-  ledger. Focused protocol and adversarial tests pass; owner-approved root
-  service execution remains unmeasured.
-- Added capability 10 migration for the versioned writable native-source profile.
-  Provider capability probes now require a tool call in the encoded Responses
-  request, preventing a permissive model answer from masquerading as tool support.
-- Repaired source-fence identity capture to retain the observed filesystem link
-  count. The complete Swift suite then executed 1,578 tests with 11 explicit
-  environment/fixture skips and no failures.
-- Built the canonical workspace in optimized Release configuration with the
-  Apple Development identity and matching peer-trust compilation policy. The
-  app, framework, manager/CLI, runtime launcher and filesystem daemon passed the
-  `DevelopmentRelease` bundle checker and strict signature verification.
-
-### Authorized handoff storage and admission
-
-- Native process tests now force termination after source commit, source claim,
-  manager acceptance and source acknowledgment, retaining evidence of exact
-  handoff recovery and one accepted run. Remote-provider crash recovery remains open.
-- Manager and MCP project registration now migrate attributable legacy handoffs
-  as read-only records and quarantine ambiguous records, with bounded inventory,
-  durable replay and explicit pending migration status.
-- Approved native tasks now accept source messages through the manager, with
-  bounded provider ownership, durable response/call identities and authenticated
-  send, status and cancellation commands.
-- Source bootstrap and successor requests retain exact local preflight receipts.
-  Unknown submissions remain lookup-only, and current limits cannot exceed the
-  original context, output and tool allowances.
-- Canonical JSON tool results use a measured twofold string-escaping bound,
-  preserving the full approved read allowance while checking the actual request envelope.
-- Verified control-plane capability 8-to-9 migration adds bounded pressure
-  metadata and exact logical-input retention without rewriting older requests.
-- Source tool quotas include reads admitted before conversation enrollment once,
-  including ready handoffs after current limits tighten.
-- Pressure storage now freezes one exact, uncharged handoff intent from retained
-  source facts. Bounded, durably consumed attempts read existing receipts before
-  writing and recover source commits after interrupted control-plane persistence.
-  Automatic opt-outs remain disabled across recovery and later re-enablement.
-- Retained pressure decisions now fence ordinary source work and issue bounded,
-  recoverable checkpoint-storage claims. The control plane recomputes each decision
-  from retained provider facts; cancellation and expired ownership roll back writes.
-- Exact source-commit reconciliation reads immutable receipts without creating a
-  revision, delivery row or write reservation, including retained invalidated data.
-- Pressure receipt recovery now works after cancellation, revocation or storage
-  expiry through a separate, short-lived audit claim. It preserves exact source
-  receipts without restoring execution authority or extending the storage deadline.
-- Tool-output pressure can now be persisted from a locally measured continuation
-  built from the exact pending call and retained output prefix. Full reads remain
-  uncharged until admission; checkpoint previews remain uncommitted, and ready
-  handoffs require no unused continuation headroom.
-- Successor budget carryover now verifies pressure-generated source receipts and
-  retains prior reads, admitted but untouched calls, and tightened ceilings across
-  bootstrap and restart. Pre-POST pressure carries no fabricated provider usage.
-- Added typed pressure evaluation and a deterministic recovery-packet builder.
-  Packets preserve full critical work and remaining budgets, bind compact pressure
-  facts to the complete decision digest, and enforce inherited retrieval limits.
-- The source owner now routes pressure decisions into the real handoff writer
-  before POST, after accepted answers and before tool effects. It joins inference
-  renewal before storage and passes measured checkpoint packets to execution.
-  The watchdog resumes storage and reconciles expired receipts without another
-  provider permit or POST, with durable retry bounds and retained shutdown ownership.
-- Successor budgets begin with the actual bootstrap acknowledgement. Actual
-  tool-output prefixes and completed response chains survive replay without
-  duplicate effects or repeated context charges.
-- Pressure handoff admission now validates stage order within each source message
-  while preserving the response chain across messages. Frozen recovery packets
-  that exceed their inherited limits stop with a durable reason before storage.
-- Source bootstrap instructions distinguish envelope schema 3.0 from acknowledgment
-  contract version 2. Multiple acknowledgment calls remain rejected even when a
-  later call corrects an earlier version.
-- The source bootstrap root supplies the complete expected acknowledgment as a
-  bounded challenge, including nonce and acceptance fields. Activation still
-  requires the model's actual complete, single-call acknowledgment.
-- Pending run intents now reject leases issued for another run before any
-  mutation, preserving the exact run boundary during ownership recovery.
-- Tool discovery now uses its own lease-bounded cancellation token, preserving
-  the renewable source exchange deadline during longer provider responses.
-- Source exchange failures now record bounded diagnostic codes and cancellation
-  state without retaining prompts, credentials or raw provider error messages.
-- Native Responses requests can now be checked locally against the transport's
-  exact encoded bytes and configured limits before dispatch. This preflight
-  performs no inference or credential lookup and does not certify cached receipts.
-- Managed and bootstrap coordinators share one bounded provider capacity owner.
-  Cancellation and shutdown retain active owners until they settle; incomplete
-  manager shutdown preserves the stores and reports failure.
-- Added native task prepare, reconcile, rotate and revoke commands plus an
-  authenticated loopback MCP source endpoint. The initial profile supports
-  explicitly approved file reads, checkpoint/handoff commits and CLU controls.
-- Source requests retain bounded debits and exact frozen commit intents;
-  recovery preserves packet identity and carries source usage into accepted runs.
-- Added exact CLU control schemas, native task dispatch and operation-scoped
-  cancellation recovery. The CLU connector exposes only its four controls;
-  installation now includes that role in commit, rollback and removal.
-- Task-owned handoffs now have immutable canonical revisions and an atomic,
-  bounded delivery outbox. Retries preserve the original bytes and delivery identity.
-- Native task authorization binds the approved assignment, project generation and
-  exact tool scope; revocation survives restart and generic binding reactivation.
-- Native control reattachment validates the original caller after restart while
-  preserving the transferred source's write fence and peer-task isolation.
-- Shared legacy context reads, memory pointers and file projections exclude owned
-  handoffs. Existing unowned legacy packets retain their compatibility path.
-- The persistent manager delivers bounded batches into one durable task-run
-  association. Accepted runs remain held from ordinary execution, with cancellation
-  available, until exact restoration and canonical successor sealing finish.
-- An internal native bootstrap now records a candidate, reads the frozen handoff
-  through the existing broker, and verifies its typed acknowledgment. Restart
-  reuses durable provider results and retrieval proof while retaining the hold.
-- Current model capacity and recovery tool limits are checked before root creation
-  and again at restoration. The existing watchdog now recovers authorized held
-  sources under the shared run limit, with live policy checks and bounded retries.
-- Recovery separates bootstrap from successor activation, retaining the hold until
-  canonical sealing and preventing duplicate root creation across restart.
-- Internal exact-ID submission retains one explicit start permit without changing
-  automatic-handoff settings. Source transfer checks the original caller's durable
-  scope; unsupported task mutation identity fails before activation.
-- Resumed status requires an authorized broker result and a provider turn consuming
-  its exact output. Existing-desktop attachment remains unsupported without an
-  authenticated host API. See
-  [Continuity ingress](docs/CONTINUITY-INGRESS.md) for integration boundaries.
-
-### Durable budget policy
-
-- Budget preferences now persist with global/project scope, revisions, inheritance
-  and conflict responses through the existing typed manager settings path.
-- Settings transactions preserve newer shell opt-outs and unrelated fields;
-  malformed stored policy remains recoverable with its original backup and error.
-- Runtime accounting applies requested policy at controlled boundaries, clamps to
-  verified loaded capacity, retains raw usage metadata and records effective
-  revisions. Retried input is counted once; overflow counts remain unknown.
-- [Budget policy](docs/BUDGET-POLICY.md) documents the settings contract and the
-  remaining tool-reservation, native controls and live continuity gates.
-
-### Completion authority and protected validation
-
-- Manager settings reject nonfinite, fractional, boolean and overflowing numeric
-  values with a field-specific error before writing any part of the request.
-  Shared configuration decoding no longer traps on an infinite number or rounds
-  a fractional decimal into an integer; valid legacy integer strings remain
-  supported at the settings boundary.
-- SwiftPM smoke staging now includes Core resources, preserving agent and
-  telemetry folders. The app and embedded CLI resolve the staged resource
-  bundle without requiring the checkout's build directory.
-- Telemetry asset lookup also supports Xcode's flat framework resources;
-  fresh installations no longer return 404 for the packaged dashboard assets.
-  The flat lookup excludes agent playbooks and bundle metadata.
-- Native candidate checks inspect signed helpers and distinguish an older
-  same-version process by its actual executable path and code identity.
-  Version drift diagnostics identify the candidate Info.plist path.
-- The native graph guard now rejects omitted production resources. An actual
-  telemetry-resource omission reproduced the prior false pass; regression
-  coverage also rejects wrong-target and duplicate resource membership.
-- Git-hook regression fixtures resolve native Git through the scoped toolchain
-  path, supporting runners with versioned Xcode installations. Native validation
-  instructions distinguish Release app testability and clean candidate builds.
-- Completion now runs installed native validators. Model-selected hashes and
-  decoded receipts cannot approve a run; missing policy blocks completion.
-  Prebuilt package gates bind the approved candidate source, test package,
-  generation, lease, policy, job identity, and actual XCTest semantics.
-- Native regressions execute failure, stale success, and fresh success through
-  the installed registry. Only a fresh qualified result permits completion.
-  These disposable work-product checks do not qualify live CLU or desktop use.
-- Validation storage and Xcode's complete toolchain are protected from project
-  writes. Text operations reject swapped parent links. Git/search/glob and
-  compatibility shell children use project sandboxing; Git recovery keeps its
-  existing effect checks with private scratch and native tool binaries.
-- [Native completion policy](docs/NATIVE-COMPLETION.md) documents ownership,
-  compatibility, limits, and evidence boundaries. Version remains 0.9.0 build 1.
-
-### Verified current-source evidence
-
-- Native Xcode tests now include the provider bridge and continuity cases that
-  were previously compiled only by SwiftPM. Live-provider cases remain explicit
-  opt-ins and cannot qualify an unavailable environment through omission.
-- Dashboard contention tests wait for an externally held configuration lock
-  using a separate bounded startup deadline. A delayed-start regression proves
-  real lock ownership; product request deadlines and assertions are unchanged.
-- The CLI `version` output reports marketing version **0.9.0**. The Swift
-  runtime constants, the versioned Xcode configurations, and the built app
-  bundle report marketing version **0.9.0**, build **1**.
-- The Xcode unit-test target now consumes `ForgeFilesystemProtocol` through
-  `ForgeConductorCore` instead of loading a second static copy. All seven
-  focused protocol tests pass without duplicate-class or decode warnings.
-- Persistent sidebar controls no longer rebuild for unrelated telemetry field
-  publications. An earlier exact-revision Apple Development-signed native UI
-  test completed 100 Rig-to-MCP and 100 MCP-to-Rig transitions with zero
-  failures. That record is supporting evidence only because this Unreleased
-  tree has since changed operator navigation and must be rerun from the final
-  source checkpoint.
-- Focused current-source protected-filesystem and managed-provider receipt/
-  recovery regressions pass. These are supporting source tests, not the signed
-  E2 matrix or real-provider rollover authority run; the final source matrix
-  must be rerun after all Unreleased changes settle.
-- The initial September 4 source baseline passed 1,001 SwiftPM tests in both
-  Debug and Release, with five declared skips. Subsequent fixes add provider,
-  startup, subprocess and gauge coverage. Exact checkpoint counts and source
-  identities are retained in the shipping handoff; earlier results do not
-  qualify later source changes.
-- All four native production onboarding scenarios passed: real folder
-  authorization and validation, provider save/discovery and manager replacement,
-  and native Settings shell disable/re-enable with fresh MCP processes. This
-  focused result does not close the full installed/native or P10 matrix.
-
-### Fixed
-
-- Run-state updates now require the target run's own lease and preserve an
-  unfinished source handoff's operation and accepted session identifiers until
-  verified output consumption completes the transfer.
-- Native gauge lifecycle observations now count the fixture's own production
-  surfaces separately from hidden host windows whose telemetry can change their
-  gauge lists. Shared counters, object-release checks and rendering/resource
-  quiescence remain part of the native test.
-- Runtime sandbox read rules now resolve the existing system runtime roots to
-  the same physical paths used by interpreter admission, allowing Xcode's
-  versioned Python framework through an existing Xcode.app alias. Authorized
-  roots, write limits and network controls remain enforced.
-- Native CI uses a single test worker to retain XCTest xUnit results; archive
-  dependency regressions cover both normal and deployment product selection.
-
-- Xcode Archive now supplies the actual filesystem daemon product to both
-  identity-sealing phases. The declared sandbox input and consumed binary agree
-  when Xcode creates a build-products symlink; signature verification and
-  symlink rejection remain enabled. Product identity stays 0.9.0, build 1.
+- Added a visible **Remove Selected Project…** action below the Projects list.
+- Added project-row context-menu removal with the same destructive confirmation.
+- Added a native UI regression that registers, removes, relaunches, and confirms
+  that the registration remains absent.
+- Added root `VERSION` and `BUILD_NUMBER` authorities.
+- Added a documented `<release>.<feature release>.<patch or hotfix>` policy.
+- Added repository hygiene and version-alignment checks to local tooling and CI.
+- Added a curated documentation index separating current guides from retained
+  historical evidence.
 
 ### Changed
 
-- Aligned repository documentation and the project wiki with the native provider
-  configuration controls, completed focused Settings/onboarding coverage, and
-  explicit Xcode build-directory installation. The qualification summary records
-  local test results and the separate GitHub Python-containment failure with
-  their source revisions. This documentation update keeps version 0.9.0 build 1
-  and does not change product behavior or release-gate status.
+- Advanced the development product identity from `0.9.0 (1)` to `0.10.0 (2)`.
+- Reworked the README into a concise product overview, setup path, project
+  lifecycle, architecture map, and verification boundary.
+- Reduced the changelog to user-visible changes and links to detailed evidence.
+- Made the root version files drive the standalone app build script and reject
+  drift from compiled or Xcode product identity.
+- Kept the runtime-launch signing gate compatible with the current and legacy
+  SwiftPM XCTest product identifiers without widening accepted products.
 
-- Metal renderers now stop draw submission when their window or an ancestor
-  is hidden and redraw pending values when shown. Native tests measure actual
-  draws, static quiescence, resource reuse and repeated object release.
-- Application startup, settings reads/writes, plugin status/deployment and
-  diagnostics export use bounded background operations. Delayed settings
-  responses preserve newer edits and update clients only after a committed save.
-  Operator screens wait for startup readiness before loading manager data,
-  keeping startup progress, failures and retry visible.
-- Continuity shutdown now cancels the execution's owned local provider request.
-  Interrupted operations remain retryable with the same handoff; accepted
-  receipts retain precedence and shared request waiters cannot cancel the owner.
-- Process execution owns nonblocking stdout/stderr drains directly, bounds each
-  drain turn and final capture, and continues draining during termination. This
-  removes the unbounded callback-shutdown wait while preserving output limits,
-  process-group cleanup and cancellation behavior.
-- The operator client router now forwards provider configuration methods across
-  manager replacement, so the native Save and discovery controls reach the
-  authenticated manager endpoints.
-- The feature qualifier includes a reviewed installed CLI version/help scenario
-  bound to its recorded ordinary build, actual installation, signatures and raw
-  process observations. The complete production-feature matrix remains required.
-- Gate discovery preserves the pinned historical inventory. Current package
-  validation reports are written under the evidence state directory so recording
-  a new check does not rewrite the original package report.
+### Preserved behavior
 
-- Provider request admission now rejects overlapping work before queuing
-  credential payloads. Unsaved provider edits must be saved before model refresh
-  or probing, so connection results correspond to the displayed saved revision.
-- The native Core test bundle uses the existing development signing identity to
-  match its runtime launcher. An explicit live-test budget policy supports
-  threshold qualification when a provider ignores its requested load context;
-  ordinary runtime defaults, exact capacity and the recovery fence are unchanged.
-
-- Filesystem recovery now rejects terminal receipts that contradict retained
-  protected entries, avoids recapturing replacement data after an interrupted
-  intent, and blocks fresh mutations while a prior effect is unresolved.
-  Signed recovery qualification and parent-relocation containment remain open.
-
-- Provider controls now persist endpoint/model settings and keep, replace or clear
-  Keychain credentials through authenticated manager routes. Revision checks,
-  active-run admission and recoverable credential updates protect saved state;
-  model discovery and connection tests remain explicit actions.
-- Native onboarding tests exercise the real folder picker, offline provider
-  saves and rejection, manager process replacement, and optional live-provider
-  discovery. They require actual Xcode execution before acceptance.
-
-- The development build/run script rejects inconsistent build-number overrides,
-  malformed identities and unsupported invocation modes before compilation. Its
-  signed optimized mode requires Apple Development and the matching development
-  trust policy; Developer ID distribution uses Xcode archive/export.
-- Xcode installation instructions now select one explicit build directory and
-  use the supported transactional installer for the complete matching app, CLI,
-  runtime launcher and framework, followed by installed-manager readback.
-- Added native source-integrity, Debug/Release Swift regression and native
-  app/CLI compilation CI. Documentation validation now reads the selected Git
-  snapshot and rejects removed or nonregular required documents, including when
-  a recreated working-tree file would otherwise conceal a staged deletion.
-
-- Manager project and run responses now use complete shared read-model
-  projections. Project bind and run start authority is limited to roots
-  configured by the operator. Provider probes execute outside dashboard
-  serialization with bounded admission; after a timeout, admission remains
-  fail-closed until the exact provider task exits so a cancellation-ignoring
-  provider cannot accumulate work. Feature operability and native
-  qualification remain open.
-- Added a dedicated app-hosted Xcode contract-test target and isolated shared
-  scheme. It exercises the production operator client and view-model module
-  boundary without changing the existing main Xcode test scheme.
-
-- Product staging and runtime launch now enforce an explicit Security.framework
-  requirement for every signed app, manager CLI, filesystem daemon, runtime
-  launcher, and core framework. Team `9AQ2C2838M` is accepted only with the
-  Apple Development certificate class; team `2Y25RTLZET` is accepted only with
-  the Developer ID Application certificate class. The outer bundle checker
-  applies the same identifier, team, Apple anchor, and certificate-class policy
-  across every architecture. This closes the signer-class admission gap but
-  does not establish whole-product rollback freshness or pass Developer ID,
-  native lifecycle, notarization, P10, or E2 qualification.
-- Added nonshipping, non-archived signed qualification-harness and adversary
-  targets plus a fail-closed H0 readiness runner. H0 binds repository, recorder,
-  signing, live-process, command-result, and local-APFS inode/change-time facts,
-  but exercises no production mutation: all 57 E2 rows and all 12 formal
-  predicates remain unexecuted and unproven. The path-replacement check is a
-  local-APFS mitigation, not elimination of same-UID interference.
-- Fresh configurations enable project shell tools by default. Migration enables
-  schema-v1 configurations whose disabled value had no provenance; schema-v1
-  could not distinguish the shipped default from a user-chosen false value.
-  Explicit schema-v2 user opt-outs remain disabled. The persisted policy is exposed in the
-  native Project shell settings.
-- `shell_exec` retains its registered MCP name, synchronous `/bin/bash -lc`
-  execution, authorization requirements, 120-second ceiling, cancellation
-  behavior, and established result contract. Clean-profile `bash.run` remains a
-  separate additive durable-job tool.
-- Filesystem destructive paths use descriptor-relative checks plus bounded
-  quarantine-and-verify around direct deletion, same-volume publication,
-  cross-volume staging publication, and post-copy source removal. This is a
-  mitigation, not elimination of substitution races. Rollback refuses a
-  quarantine occupant that no longer matches the recorded identity. Presence
-  inspection failures use JSON `null` plus a `*_presence_known=false` marker;
-  conservative cleanup requirements remain Boolean. A committed publication
-  whose requested namespace becomes unstable while durability is unconfirmed
-  returns its live receipt as required ledger recovery, merging any additional
-  retained staging-cleanup receipt into the same result.
-  The move and recursive-directory paths are hardened internal implementations
-  exercised by adversarial tests only in this snapshot. Production `fs_move`
-  and recursive directory `fs_delete` remain unavailable until an additive
-  signed-helper protocol and its recovery matrix are implemented and qualified.
-- The partial privileged leaf-delete boundary now uses protocol v5 and binds
-  the daemon requirement to exact per-architecture CodeDirectory hashes sealed
-  into each signed caller. The app-scheme build produces one matching
-  app/embedded-CLI/standalone-CLI/daemon artifact set, and app-origin manager
-  installation stages only the embedded CLI plus its signed framework. Missing,
-  symlinked, mismatched, or independently cross-paired artifacts fail closed.
-- Protocol v5 makes successful `renameatx_np(..., RENAME_EXCL)` capture the
-  mutation linearization point and records a canonical request digest plus an
-  explicit `currentEntry`, `namespaceVersionExact`, or `contentVersionExact`
-  contract. Production `fs_delete` uses `currentEntry`; namespace-exact recovery
-  disposes only a matching captured identity; and content-exact requests fail
-  closed because an existing writable descriptor, mapping, or hard link prevents
-  an exclusive-writer proof. Capture mismatch and post-capture metadata changes
-  enter durable protected quarantine instead of being described as eliminated.
-- Protocol v5 retains terminal committed, restored, rejected, and conflicted transactions in
-  32 fixed root-owned slots until durable exact acknowledgement. The additive,
-  pathless `fs_delete_recovery` tool queries, resumes, or acknowledges the
-  original transaction under its requester/project/generation/root authority;
-  a bounded owner-only caller ledger is durable before XPC submission. Existing
-  `fs_delete` and `shell_exec` contracts are unchanged.
-- Privileged rollback no longer restores a captured leaf through a source-parent
-  descriptor because a same-UID process can relocate that directory after it is
-  validated. The daemon durably enters rollback and retains the leaf in its
-  protected slot for explicit recovery. Project-generation reset now holds the
-  caller-ledger lock across checks before and after entering the resetting state
-  and through generation advance, failing closed when old-generation authority
-  is visible. Delete retention revalidates the current project generation while
-  holding that same lock, so a request delayed behind reset fails before caller
-  record publication or XPC dispatch. A failed reset cancellation is surfaced
-  as a distinct operator recovery error instead of being suppressed.
-- Crash recovery no longer depends on reopening a user-controlled source parent
-  after a protected capture exists. Persisted v5 records must recompute to their
-  canonical request digest from an explicit schema-3 protocol and digest-
-  canonicalization version; mixed legacy/v5 record shapes fail closed. A valid
-  transaction-bound pending capture-identity receipt is published on recovery
-  instead of discarded. Documented atomic-capture errors that leave both names
-  unchanged, including immutable/no-unlink denial and an unrenameable mount,
-  become durable rejected outcomes instead of indefinitely occupying a slot.
-  A legacy
-  rollback reports restored only when the source still has the exact recorded
-  identity, while an absent v5 protected capture or unprovable legacy restore
-  becomes a durable conflict.
-- Accepted managed-provider receipts survive manager restart. An unresolved
-  provider-response crash is fenced for 660 seconds before retry. LM Studio
-  exposes no request-ID receipt lookup, so one retry can create at most one
-  duplicate model inference per attempt and repeated operator or recovery
-  retries can repeat inference. Manager reconciliation prevents duplicate tool
-  execution. This mitigates the race; it does not eliminate it.
-- Project registration and relink now stage bounded, owner-only recovery intents
-  before control-plane mutation. A dedicated bounded
-  `project_transition_authority` row, not diagnostic audit events, binds the
-  exact operation, generation, root, repository identity, and directory
-  device/inode in the same transaction as control state. Registration and
-  relink publish aliases only after that authority is accepted, activate only
-  the exact staged operation, and remove the intent only after active,
-  published authority is reverified. Lost native-client responses receive one
-  bounded retry using the same encoded body and captured authorization header;
-  exact concurrent registration requests converge on one durable project
-  identity. Restart and crash-boundary regressions cover control commit, alias
-  publication, activation, response loss, intent cleanup, and two concurrent
-  callers. A bounded top-level operator projection now reconstructs an exact
-  registration request after a crash between intent persistence and the first
-  control-plane row; it returns at most 100 intents and fails closed after a
-  4,096-entry project-directory scan. Same-UID mutation of the owner-only
-  recovery files or SQLite store remains outside this integrity boundary. A
-  same-UID writer can also remove or coherently replace an intent, or inflate
-  the directory to deny the operator snapshot. The current development-signed
-  candidate has bounded native launch evidence; public shipment remains separate.
-- The project build entrypoint now builds and stages the manager CLI at
-  `Contents/Helpers/forge-conductor`, signs it before the enclosing app, and
-  performs strict signature verification of the CLI, runtime launcher,
-  filesystem daemon, and app bundle. Source and focused product-path tests are
-  green. The current-source development-signed bundle now passes coherent bundle,
-  isolated CLI and bounded direct-launch checks.
-
-### Open qualification and security boundaries
-
-- A same-user writer can still substitute the source before exclusive capture
-  or relocate the validated source parent outside the authorized root before
-  capture. The latter race can make one eligible regular file or symbolic link
-  outside the configured root be deleted; that file can contain unbounded
-  bytes. An ineligible captured directory can quarantine an unbounded subtree.
-  A same-user writer can also alter ACL/BSD authorization metadata between
-  final verification and root `unlinkat`. A winning terminal race can delete
-  the one captured expected regular file or symbolic link after its metadata
-  changed; a regular file can
-  contain an unbounded number of bytes. A pre-capture substitution can make one
-  entry temporarily unavailable or recovery-required; an unsupported directory
-  can represent an unbounded subtree but is not eligible for terminal deletion.
-  Writable descriptors and hard links retain content residuals. The full signed
-  distinct-process atomic-swap, every-durable-phase crash, recovery, volume,
-  lifecycle, hard-link, and writable-descriptor matrix remains unexecuted, so
-  E2 remains mandatory and release-blocking. This is mitigation, not elimination.
-- Terminal-outcome receipts are not yet reconciled against every possible
-  crash/corruption mismatch in the physical protected leaf. A committed,
-  restored, rejected, or conflicted receipt paired with a retained leaf, or a
-  quarantined receipt whose leaf is absent or has the wrong identity, must not
-  be treated as truthful closure. Defining and qualifying those repair
-  transitions remains release-blocking.
-- Disabling automatic privileged restore prevents the known out-of-root write
-  path, but it increases bounded slot availability impact: one captured entry per
-  affected transaction can remain unavailable, up to the 32 protected slots per
-  volume. A captured entry can be a directory substituted immediately before
-  capture, so one occupied slot can isolate an unbounded subtree; the 32-slot
-  limit is not a byte or descendant bound. There is not yet an independently
-  authorized restore/release/purge disposition, so repeated conflicts can
-  exhaust the slots and disable later protected deletes. The reset fence and
-  in-lock generation check reject normal delayed
-  retainers, but the caller ledger remains same-UID-owned. Hostile removal or
-  relocation of an already-retained caller record can hide the sole handle from
-  reset while its daemon transaction remains, allowing generation advance while
-  old authority can still complete. A same-UID process can also replace the
-  locked inode after a retainer validates but before slot publication, splitting
-  retention from reset and permitting stale dispatch. Maximum post-reset impact
-  is up to 32
-  captured or terminally deleted expected leaves per protected volume; each
-  regular file can contain unbounded bytes. Both rows require signed adversarial
-  execution and remain part of open E2.
-- The shell policy, migration, MCP registration, execution, compatibility
-  contract, and restart paths pass current-source Debug and Release regressions.
-  Developer Mode is enabled and Apple Development signing uses James Daley on
-  team `9AQ2C2838M`. An earlier bounded signed Release installed-app run
-  corrected the false-success LaunchAgent fallback and passed clean-install
-  enablement, accidental legacy-disabled migration, explicit opt-out and denial,
-  `tools/list`, established login-Bash/result compatibility through both the app
-  and installed raw CLI, app relaunch, and installed-manager PID replacement
-  with predecessor exit. The guarded run deliberately did not invoke System
-  Events and restored the prior manager job, plist, command link, and launchd
-  enablement state exactly. Its result remains partial: native Settings control
-  and post-Settings re-enable were not exercised by that run. The separate native
-  onboarding result above covers those controls. The installer now stages,
-  signs, verifies, and commits
-  the runtime launcher transactionally beside the raw CLI, embeds it in synthesized
-  app layouts, and fails closed on missing or symlinked launcher payloads. A
-  prior-source Apple Development-signed Release smoke run also passed
-  installed raw-CLI `version`, `status`, and `doctor`. Exact P10 qualification,
-  the complete installed/native matrix, privileged-service lifecycle, Developer ID
-  Release signing, and notarization remain deferred and release-blocking.
-- Exact caller-sealed helper identity prevents helper-only substitution against
-  a current caller, but it does not establish whole-product rollback freshness.
-  A monotonic root-owned receipt is not implemented; a rolled-back allowlisted
-  daemon retains its full bounded root mutation authority and its vulnerabilities.
-  Distinct installed signed app/manager/CLI XPC, stale-helper, wrong-signer,
-  approval/update/restart, and crash-recovery matrices remain unexecuted.
-- An interrupted managed query/resume/acknowledge call is left ambiguous and
-  blocked from replay if its exact result cannot be reconciled. Explicit
-  transaction recovery remains available. An interrupted `fs_delete` whose
-  previously existing path is now absent also remains ambiguous; pathname
-  absence is not converted into synthetic success and the mutation is not
-  redispatched. Automatic post-broker durable acknowledgement and discovery are
-  not implemented. The caller recovery ledger remains under same-UID-owned
-  application storage, so another same-UID process can rename or remove the
-  only caller handle without gaining daemon authority. Up to 32 lost handles per
-  protected volume can strand normal recovery and then make later mutations
-  fail closed on capacity. This availability risk remains part of open E2.
-- Historical G09 evidence covers an exact-revision, directly invoked live
-  provider adapter. Current autonomous-continuity authority still requires one
-  manager-owned, threshold-forced real-provider rollover proving exact successor
-  acknowledgment, predecessor fencing and idempotent sealing, automatic
-  continuation, GUI-closed operation, and recovery from every durable crash
-  state. Unit and synthetic-host tests do not satisfy this gate.
-- The managed-provider receipt fence does not prove exactly-once inference.
-  Accepted receipts are restart-durable and reconciled tool effects are not
-  executed twice, but an unresolved response has no LM Studio request-ID lookup.
-  Retrying after 660 seconds can repeat one inference per attempt; repeated
-  recovery attempts can therefore repeat inference.
-- Current G09-G12 remain nonpassing. Historical compatibility, direct-adapter,
-  build, unit, synthetic-host, or simulator evidence does not replace the
-  current-source parity, signed native, real-provider continuity, and
-  owner-deferred physical-hardware evidence required by those gates.
+- Project removal still fences the selected generation and preserves durable
+  memory and historical evidence for later re-registration.
+- Removal still requires an exact selected project and generation plus explicit
+  operator confirmation.
+- Existing project registration, relink, reset, content clearing, memory,
+  continuity, and instruction-package contracts remain available.
 
 ## [0.9.0] — 2026-08-23
 
 ### Added
 
-- **Project-scoped memory MCP tools** — initialize, remember, batch, search, get,
-  update, forget, recent-list, link, export, import, and status operations backed
-  by independently managed SQLite stores.
-- Checksummed project-memory import/export, deterministic bounded pagination,
-  optimistic record versions, tombstones, typed links, and repository identity.
-- A serialized continuity coordinator with durable checkpoints, handoffs, session
-  lifecycle transitions, and a native session-host adapter plug-in.
-- Resource-policy tiers, runtime diagnostics, signposts, release stress coverage,
-  bounded latest-value telemetry mailboxes, and shared Metal gauge resources.
-- Recovery, migration, architecture, security, and qualification evidence for the
-  complete runtime repair program.
+- Durable project-scoped memory with bounded search and migration support.
+- Continuity checkpoints, handoffs, successor acknowledgement, and recovery.
+- Native manager-owned autonomy, provider configuration, and runtime jobs.
+- Privileged filesystem protocol and signed-helper qualification surfaces.
+- Metal-backed gauges and bounded telemetry delivery.
 
 ### Changed
 
-- Marketing version **0.8.0 → 0.9.0** across the Swift runtime, Xcode targets,
-  acceptance tests, README, user guide, and current architecture/status documents.
-- Workspace and session paths may narrow authorization but can no longer create
-  new trusted authorization roots.
-- `shell_exec` is disabled by default, requires trusted local configuration when
-  enabled, rejects invalid timeouts, and enforces a 120-second maximum.
-- Filesystem listing is capped at 1,000 sorted entries with truncation metadata;
-  text edits retain the existing 2 MiB file ceiling.
-- Telemetry, process readers, dashboard connections, persistence, UI observation,
-  and Metal resources now have explicit bounded ownership and shutdown behavior.
+- Consolidated the native app, CLI, runtime launcher, Core framework, and
+  filesystem daemon into one coordinated product identity.
+- Expanded project generation, binding, reset, relink, and content-clear
+  contracts.
+- Added native completion policy and signed XCTest gate support.
 
-### Fixed
+### Qualification boundary
 
-- Continuity rollover and restart races that could lose or duplicate transitions.
-- Telemetry and gauge update paths that could retain work or perform excess
-  observation/render activity.
-- Persistence migration and project-memory recovery behavior under interruption,
-  concurrency, corrupt input, and import/export round trips.
-- Primary/fallback MCP process lifecycle and native host-adapter parity.
-
-### Qualification
-
-- Swift package, strict-concurrency, and Xcode unit/integration matrices each
-  passed 269 tests with two intentional environment skips and no failures.
-- Five native UI tests passed, including 100 navigation cycles; unsigned and
-  local ad-hoc Xcode Release builds also passed.
-- Address and Thread Sanitizer hosts built, but the installed platform runtime
-  blocked entry into product tests, so no sanitizer pass is claimed.
-- Developer ID signing, notarization, and distribution remain operator-owned.
+- Historical `0.9.0 (1)` build, test, signing, archive, and notarization evidence
+  remains in the repository's evidence documents.
+- Those receipts apply only to the exact source and artifact identities named in
+  each record; they do not qualify `0.10.0 (2)`.
 
 ## [0.8.0] — 2026-08-14
 
 ### Added
 
-- **Hard context budget** — after auto-handoff (20 progress tools) or a hard identical-call loop, further filesystem/shell/git tools on that MCP client return `context_budget_exceeded` until `context_get`. Writes `memory/NEXT-CHAT.md`. LM Studio has no API to open a GUI chat; this is the enforcement.
-- **Runtime continuity** — Forge checkpoints and handoffs from tool progress.
-  The model no longer has to remember `session_checkpoint` / `session_handoff`.
-  Default: checkpoint every 5 progress tools, handoff every 20 or 12 minutes.
-- **Workspace resume** — latest handoff `cwd` / `key_files` become implicit roots.
-  `context_get` adopts them for the calling client.
-- **Home read-only paths** — `fs_list` / `fs_read` / `fs_glob` / `search_text` may
-  read under the interactive user's home (excluding Library, ssh, and similar).
-- Idle MCP **presence heartbeat** every 10s so a quiet serve stays live on the dashboard.
-- Snapshot now reports real `presence` rows and `primary_alive` / `fallback_alive`.
-- `shell_exec` failures persist `exit_code` / stderr in the audit error field.
-
-### Changed
-
-- Implement playbook includes continuity and memory tools.
-- Manager heartbeat age is 0 while the manager process is alive (no longer the
-  stale `manager-state.json` mtime capped at 120s).
-- Soft auto-checkpoints no longer change a model packet's source, status, or
-  client id, and no longer append diagnostic lines to the narrative.
-- MCP server cards omit LM Studio host helpers and model backends.
+- Managed runtime ownership and native host-adapter foundations.
+- Project-aware filesystem, shell, memory, and continuity controls.
+- Recovery-oriented diagnostics and evidence retention.
 
 ## [0.7.0] — 2026-08-01
 
 ### Added
 
-- **Context and agent continuity MCP tools** on the existing stdio server:
-  - `session_checkpoint` — soft-save task context while work continues
-  - `session_handoff` — finalize a resume-ready packet for a new chat
-  - `context_get` — load the latest or a selected handoff packet
-  - `context_list` — list recent handoff packets
-- SQLite `context_handoffs` storage as the authoritative handoff record, with
-  rebuildable JSON, `LATEST`, and `current-task.md` projections.
-- Transactional durable-memory pointers at `continuity/latest` and
-  `continuity/resume_ready`; these internal keys are hidden from default memory
-  list, search, and count results.
-- Agent-session snapshots and compare-and-swap reattachment so an open durable
-  run can transfer safely to the resumed MCP client.
-- Repeated-call context budget: the fourth identical non-continuity call writes
-  a soft resume-ready handoff; the ninth is blocked after persisting the handoff.
-- Process-level deployment verification for the complete continuity and durable-
-  memory product tool surfaces.
-- Continuity integration, recovery, multi-process, MCP, loop-budget, and
-  new-chat process tests.
-
-### Changed
-
-- `fs_read` supports 1-based `offset` plus `length`/`limit` pagination and returns
-  line-window metadata to prevent accidental full-file reread loops.
-- `forge_status` reports continuity state while retaining `memory_note_count`.
-- Tool auditing redacts continuity narrative, resume, decision, blocker, and
-  working-set fields in addition to durable-memory bodies.
-- Marketing version **0.6.0 → 0.7.0**.
-
-### Notes
-
-- Continuity uses the same primary/fallback mcpBridge deployment path as the
-  existing tool packs; it does not add an HTTP service or sidecar.
-- Opening a new LM Studio chat remains an operator/host action. The handoff
-  packet and returned resume seed provide the Phase 1 bootstrap.
-- Durable `memory_*` tools and their 0.6 behavior remain intact.
+- Native dashboard, telemetry, gauges, and manager console expansion.
+- LM Studio primary and fallback MCP registration.
+- Bounded process execution and audit logging improvements.
 
 ## [0.6.0] — 2026-07-31
 
 ### Added
 
-- **Durable memory MCP tools** for cross-session continuity in LM Studio:
-  - `memory_set` — upsert a key/value note (optional tags)
-  - `memory_get` — read a note by key
-  - `memory_list` — list notes (prefix/tag filters; hides agent system keys by default)
-  - `memory_delete` — delete a note by key
-  - `memory_search` — substring search over key, body, and tags
-- SQLite-backed note storage in `memory_notes` under `FORGE_CONDUCTOR_HOME`
-  (default `~/.forge-conductor/store.sqlite`)
-- `MemoryNote` domain type and store list/search/count APIs
-- `MemoryToolPack` wired into the tool router, authorization lifecycle allow-list,
-  MCP schemas/descriptions, and telemetry pack map
-- `forge_status` now reports `memory_note_count`
-- Documentation: [`docs/DURABLE-MEMORY.md`](docs/DURABLE-MEMORY.md)
-- Unit tests: `MemoryToolTests`
-
-### Changed
-
-- Marketing version **0.5.3 → 0.6.0** (minor bump for a new MCP tool surface)
-- Xcode project includes `MemoryToolPack.swift` and `MemoryToolTests.swift` in the
-  native targets (SwiftPM already discovered them)
-
-### Notes
-
-- Memory tools work **without** an active agent session and remain available
-  **during** agent runs.
-- Internal keys `agent_run/*` and `agent_active/*` are hidden from list/search
-  unless `include_system` is true.
-- Note bodies are redacted in audit logs.
+- Durable storage, agent sessions, and continuity packet foundations.
+- Native application and CLI integration.
 
 ## [0.5.3] — 2026-07
 
-### Summary
+### Added
 
-- Swift control plane and MCP server for local models in LM Studio
-- Primary + fallback MCP deploy path (`Deploy to LM Studio`)
-- Specialist agent playbooks and durable agent sessions
-- Filesystem, shell, git, search, and PDF tool packs
-- Native SwiftUI + Metal rig / dashboard and LaunchAgent manager
-- Apache 2.0 license and closed contribution policy
+- Initial native MCP server, project tools, and LM Studio deployment path.
 
-See [`docs/AUDIT-2026-07-27.md`](docs/AUDIT-2026-07-27.md) and related audits for
-0.5.x verification evidence.
+## Maintenance rules
 
-[0.9.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/f47dae3...main
-[0.8.0]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/f47dae3354101bde0a7f0365e2ba058b18cc2c78
-[0.7.0]: https://github.com/flynn33/Forge-Conductor-MacOS/compare/6fe03e0...f47dae3
-[0.6.0]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/6fe03e0626273ced4211ed4e1bbef8c70cfb36b8
-[0.5.3]: https://github.com/flynn33/Forge-Conductor-MacOS/commit/90fc5757dbf7acf629e16184c5347760dbff4a47
+- Keep one `Unreleased` section at the top.
+- Record user-visible behavior, compatibility changes, migrations, and release
+  boundaries; do not paste terminal transcripts into this file.
+- Move detailed evidence to the roadmap or a focused document and link it here.
+- Update `VERSION`, `BUILD_NUMBER`, runtime constants, Xcode settings, README,
+  and active guides in the same change.
+- Never rewrite a historical receipt to imply it tested a newer version.

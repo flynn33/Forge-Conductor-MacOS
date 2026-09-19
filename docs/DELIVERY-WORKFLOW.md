@@ -12,6 +12,11 @@ Confirm the exact repository and `main` revision. Preserve unrelated or uncommit
 
 Read only relevant source and tests. Reuse native modules and existing focused checks. Make a small evidence-supported repair or record verified existing behavior without unnecessary source changes. Use direct native tools and inspected narrow build/test/evidence utilities; do not create or revive task selectors or broad archived gate runners. Existing repository CI and internal build phases remain intact.
 
+Run `script/check_repository_hygiene.sh` before publication. Product versions
+follow the [versioning policy](VERSIONING.md): `VERSION`, `BUILD_NUMBER`, native
+runtime constants, Xcode settings, the changelog, and current guides advance
+together. Historical receipts keep their tested identity.
+
 ## Xcode synchronization on every source update
 
 The canonical entry is `ForgeConductor.xcworkspace`, containing the existing `ForgeConductor.xcodeproj`. `Package.swift` describes overlapping native products; it is not a substitute for Xcode target membership or bundle layout.
