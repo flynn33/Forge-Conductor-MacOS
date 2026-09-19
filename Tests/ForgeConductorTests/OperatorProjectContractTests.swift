@@ -11,18 +11,21 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
     nonisolated(unsafe) private static var responses: [String: Data] = [:]
     nonisolated(unsafe) private static var statuses: [String: Int] = [:]
     nonisolated(unsafe) private static var failuresRemaining: [String: Int] = [:]
+    nonisolated(unsafe) private static var responseSequences: [String: [Data]] = [:]
     nonisolated(unsafe) private static var paths: [String] = []
     nonisolated(unsafe) private static var bodies: [String: [Data]] = [:]
 
     static func configure(
         responses: [String: Data],
         statuses: [String: Int] = [:],
-        failures: [String: Int] = [:]
+        failures: [String: Int] = [:],
+        responseSequences: [String: [Data]] = [:]
     ) {
         lock.lock()
         self.responses = responses
         self.statuses = statuses
         failuresRemaining = failures
+        self.responseSequences = responseSequences
         paths = []
         bodies = [:]
         lock.unlock()
@@ -49,7 +52,13 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
         Self.paths.append(path)
         let requestBody = Self.bodyData(from: request)
         Self.bodies[path, default: []].append(requestBody)
-        var data = Self.responses[path]
+        var data: Data?
+        if var sequence = Self.responseSequences[path], !sequence.isEmpty {
+            data = sequence.removeFirst()
+            Self.responseSequences[path] = sequence
+        } else {
+            data = Self.responses[path]
+        }
         let status = Self.statuses[path] ?? 200
         let shouldFail = (Self.failuresRemaining[path] ?? 0) > 0
         if shouldFail {
@@ -395,6 +404,197 @@ final class OperatorProjectContractTests: XCTestCase {
             submittedStart["expected_provider_configuration_revision"] as? String,
             "fixture-provider-revision-2"
         )
+    }
+
+    @MainActor
+    func testMissingModelReturnsFocusedRecoveryWithoutSubmittingRun() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let project = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: Self.projectData(
+                    projectID: projectID,
+                    generation: 1,
+                    root: "/tmp/operator-waiting-project",
+                    resetPriorGeneration: 0
+                )
+            ) as? [String: Any]
+        )
+        let detail = "Save a local model in Model connection. Forge will reuse it automatically for this task."
+        let readiness = ManagerRunPreparationResult(
+            projectID: projectID,
+            projectGeneration: 1,
+            readiness: .waitingDependency,
+            detail: detail,
+            recoveryAction: .configureProvider
+        )
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                "projects": [project],
+                "runs": [],
+                "provider": [
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "health": "unavailable",
+                ],
+                "run_preparation": [
+                    "state": "waiting_dependency",
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "schema_version": 1,
+                    "allowed_tools": ["fs_read"],
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "network_allowed": false,
+                    "detail": "A saved local model is not available yet.",
+                ],
+            ]),
+            "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                "started": true,
+                "active_run_ids": [],
+                "deferred_run_ids": [],
+            ]),
+            "/api/manager/runs/prepare": try JSONSupport.data(from: readiness.asDictionary()),
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let viewModel = AutonomyViewModel(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        ))
+
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+        viewModel.mission = "Prepare with minimal ordinary inputs."
+        XCTAssertTrue(viewModel.canStart)
+        XCTAssertNil(viewModel.makeStartRequest()?.modelKey)
+
+        viewModel.startRun()
+        try await Self.waitUntilStartIdle(viewModel)
+        XCTAssertEqual(viewModel.projectRunPreparation?.readiness, .waitingDependency)
+        XCTAssertEqual(viewModel.preparationRecoveryAction, .configureProvider)
+        XCTAssertEqual(viewModel.notice, detail)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.startRequiresReconciliation)
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/start"
+            ).count,
+            0
+        )
+    }
+
+    @MainActor
+    func testStaleProjectGenerationIsAutomaticallyRepreparedBeforeOneStart() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let project = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: Self.projectData(
+                    projectID: projectID,
+                    generation: 1,
+                    root: "/tmp/operator-generation-project",
+                    resetPriorGeneration: 0
+                )
+            ) as? [String: Any]
+        )
+        let mission = "Continue from the current project generation."
+        let stale = ManagerRunPreparationResult(
+            projectID: projectID,
+            projectGeneration: 2,
+            readiness: .automaticallyPreparing,
+            detail: "The selected project changed. Forge is refreshing its current generation before Start.",
+            recoveryAction: .retryPreparation
+        )
+        OperatorProjectContractURLProtocol.configure(
+            responses: [
+                "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                    "projects": [project],
+                    "runs": [],
+                    "provider": [
+                        "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                        "provider_id": "lmstudio",
+                        "health": "contract_valid",
+                        "model_key": "fixture/generation-model",
+                    ],
+                    "run_preparation": [
+                        "state": "ready",
+                        "provider_id": "lmstudio",
+                        "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                        "model_key": "fixture/generation-model",
+                        "schema_version": 1,
+                        "provider_configuration_revision": "fixture-generation-provider",
+                        "tool_catalog_revision": String(repeating: "a", count: 64),
+                        "allowed_tools": ["fs_read"],
+                        "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                        "network_allowed": false,
+                    ],
+                ]),
+                "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                    "started": true,
+                    "active_run_ids": [],
+                    "deferred_run_ids": [],
+                ]),
+                "/api/manager/runs/start": try JSONSupport.data(from: [
+                    "run_id": "__REQUEST_RUN_ID__",
+                    "project_id": projectID,
+                    "project_generation": UInt64(2),
+                    "mission": mission,
+                    "state": "created",
+                    "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
+                    "provider_id": "lmstudio",
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "model_key": "fixture/generation-model",
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "passed_gates": [],
+                ]),
+            ],
+            responseSequences: [
+                "/api/manager/runs/prepare": [
+                    try JSONSupport.data(from: stale.asDictionary()),
+                    try Self.preparedRunData(
+                        projectID: projectID,
+                        generation: 2,
+                        mission: mission,
+                        providerConfigurationRevision: "fixture-generation-provider",
+                        modelKey: "fixture/generation-model",
+                        allowedTools: ["fs_read"],
+                        completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
+                        networkAllowed: false
+                    ),
+                ],
+            ]
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let viewModel = AutonomyViewModel(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        ))
+
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+        viewModel.mission = mission
+        viewModel.startRun()
+        try await Self.waitUntilStartIdle(viewModel)
+
+        let prepareBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/runs/prepare"
+        )
+        XCTAssertEqual(prepareBodies.count, 2)
+        let refreshedPreparation = try JSONSupport.object(from: prepareBodies[1])
+        XCTAssertEqual((refreshedPreparation["project_generation"] as? NSNumber)?.uint64Value, 2)
+        let startBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/runs/start"
+        )
+        XCTAssertEqual(startBodies.count, 1)
+        let submittedStart = try JSONSupport.object(from: startBodies[0])
+        XCTAssertEqual((submittedStart["project_generation"] as? NSNumber)?.uint64Value, 2)
+        XCTAssertEqual(viewModel.lastStartedRunID, submittedStart["run_id"] as? String)
+        XCTAssertFalse(viewModel.startRequiresReconciliation)
     }
 
     @MainActor
@@ -885,6 +1085,14 @@ final class OperatorProjectContractTests: XCTestCase {
             ),
             maximumInlineOutputBytes: 64 * 1_024
         )
-        return try JSONSupport.data(from: descriptor.asDictionary())
+        let result = ManagerRunPreparationResult(
+            projectID: projectID,
+            projectGeneration: generation,
+            readiness: .ready,
+            detail: descriptor.detail,
+            recoveryAction: .none,
+            descriptor: descriptor
+        )
+        return try JSONSupport.data(from: result.asDictionary())
     }
 }

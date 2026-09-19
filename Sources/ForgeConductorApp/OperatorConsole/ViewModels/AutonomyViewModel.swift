@@ -12,6 +12,7 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var projects: [OperatorProject] = []
     @Published private(set) var provider: OperatorProvider?
     @Published private(set) var runPreparation: OperatorRunPreparation?
+    @Published private(set) var projectRunPreparation: ManagerRunPreparationResult?
     @Published private(set) var autonomyStarted = false
     @Published var selectedRunID: String?
     @Published var selectedProjectID: String?
@@ -51,11 +52,13 @@ final class AutonomyViewModel: ObservableObject {
             && !startRequiresReconciliation
             && selectedProject != nil
             && !mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !providerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !adapterID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !modelKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !parsedList(allowedTools).isEmpty
-            && !parsedList(completionGates).isEmpty
+    }
+
+    var preparationRecoveryAction: ManagerRunRecoveryAction? {
+        guard let action = projectRunPreparation?.recoveryAction, action != .none else {
+            return nil
+        }
+        return action
     }
 
     func load() {
@@ -127,6 +130,7 @@ final class AutonomyViewModel: ObservableObject {
         startRequiresReconciliation = true
         errorMessage = nil
         notice = nil
+        projectRunPreparation = nil
         pendingStartRequest = request
         submitStart(request)
     }
@@ -145,12 +149,17 @@ final class AutonomyViewModel: ObservableObject {
             projectGeneration: project.projectGeneration,
             assignmentID: assignmentID.nilIfBlank,
             mission: mission.trimmingCharacters(in: .whitespacesAndNewlines),
-            providerID: providerID == preparation?.providerID ? nil : providerID,
-            adapterID: adapterID == preparation?.adapterID ? nil : adapterID,
-            modelKey: modelKey == preparation?.modelKey ? nil : modelKey,
-            allowedTools: Set(allowedTools) == Set(preparation?.allowedTools ?? [])
+            providerID: providerID.isEmpty || providerID == preparation?.providerID
+                ? nil : providerID,
+            adapterID: adapterID.isEmpty || adapterID == preparation?.adapterID
+                ? nil : adapterID,
+            modelKey: modelKey.isEmpty || modelKey == preparation?.modelKey
+                ? nil : modelKey,
+            allowedTools: allowedTools.isEmpty
+                || Set(allowedTools) == Set(preparation?.allowedTools ?? [])
                 ? nil : allowedTools,
-            completionGates: completionGates == preparation?.completionGates
+            completionGates: completionGates.isEmpty
+                || completionGates == preparation?.completionGates
                 ? nil : completionGates,
             networkAllowed: networkAllowed == preparation?.networkAllowed
                 ? nil : networkAllowed,
@@ -177,15 +186,33 @@ final class AutonomyViewModel: ObservableObject {
                 var admittedRequest = request
                 if request.expectedPreparedRunRevision == nil {
                     do {
-                        let prepared = try await client.prepareRun(request)
-                        guard prepared.readiness == .ready
-                                || prepared.readiness == .automaticallyPreparing else {
-                            throw OperatorManagerClientError.configurationRejected(
-                                code: "run_preparation_not_ready",
-                                message: prepared.detail
+                        var preparationResult = try await client.prepareRun(request)
+                        if preparationResult.readiness == .automaticallyPreparing,
+                           preparationResult.projectID == request.projectID,
+                           preparationResult.projectGeneration != request.projectGeneration {
+                            admittedRequest = request.replacingProjectGeneration(
+                                preparationResult.projectGeneration
+                            )
+                            preparationResult = try await client.prepareRun(admittedRequest)
+                        }
+                        projectRunPreparation = preparationResult
+                        guard preparationResult.readiness == .ready,
+                              let prepared = preparationResult.descriptor else {
+                            pendingStartRequest = nil
+                            startRequiresReconciliation = false
+                            errorMessage = preparationResult.readiness == .failed
+                                ? preparationResult.detail : nil
+                            notice = preparationResult.detail
+                            isStarting = false
+                            return
+                        }
+                        guard prepared.projectID == admittedRequest.projectID,
+                              prepared.projectGeneration == admittedRequest.projectGeneration else {
+                            throw OperatorManagerClientError.invalidPayload(
+                                "manager returned preparation for a different project generation"
                             )
                         }
-                        admittedRequest = request.expectingPreparedDescriptor(prepared)
+                        admittedRequest = admittedRequest.expectingPreparedDescriptor(prepared)
                         pendingStartRequest = admittedRequest
                     } catch OperatorManagerClientError.capabilityUnavailable {
                         // A legacy in-process client may not expose preparation yet.
@@ -237,6 +264,7 @@ final class AutonomyViewModel: ObservableObject {
         notice = "Run \(run.runID) accepted by the manager."
         lastStartedRunID = run.runID
         pendingStartRequest = nil
+        projectRunPreparation = nil
         mission = ""
         assignmentID = ""
         startRequiresReconciliation = false
@@ -257,6 +285,22 @@ final class AutonomyViewModel: ObservableObject {
             networkAllowed = false
         } else {
             networkOverrideForNextPreparation = networkAllowed
+        }
+    }
+
+    func refreshPreparationRecovery() {
+        guard !isStarting, let action = preparationRecoveryAction else { return }
+        switch action {
+        case .selectProject:
+            load()
+        case .retryPreparation:
+            startRun()
+        case .reviewPermissions:
+            notice = "Review the Advanced overrides, then try Start again."
+        case .authorizeProject, .configureProvider:
+            break
+        case .none:
+            break
         }
     }
 

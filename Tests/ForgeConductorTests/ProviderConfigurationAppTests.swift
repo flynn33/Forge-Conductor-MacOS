@@ -156,7 +156,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
             expectedToolCatalogRevision: preparation.toolCatalogRevision,
             maximumInlineOutputBytes: 64 * 1_024
         )
-        let prepared = try await client.prepareRun(startRequest)
+        let preparationResult = try await client.prepareRun(startRequest)
+        XCTAssertEqual(preparationResult.readiness, .ready)
+        XCTAssertEqual(preparationResult.recoveryAction, .none)
+        let prepared = try XCTUnwrap(preparationResult.descriptor)
         XCTAssertEqual(prepared.projectID, projectID.description)
         XCTAssertEqual(prepared.projectGeneration, generation.rawValue)
         XCTAssertEqual(prepared.modelKey, "fixture/tool-model")
@@ -406,6 +409,96 @@ final class ProviderConfigurationAppTests: XCTestCase {
             durable.specification.work.metadata["source_snapshot_sha256"],
             prepared.source.snapshotSHA256
         )
+    }
+
+    func testProjectBoundPreparationPublishesEveryTypedReadinessAndRecoveryState() throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        let projectRoot = directory.appendingPathComponent("readiness-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = manager.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+
+        let waiting = manager.inspectAutonomousRunPreparation(
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: "Prepare without a saved model."
+        )
+        XCTAssertEqual(waiting.readiness, .waitingDependency)
+        XCTAssertEqual(waiting.recoveryAction, .configureProvider)
+        XCTAssertNil(waiting.descriptor)
+
+        let current = try manager.readProviderConfiguration()
+        _ = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: current.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/readiness-model"
+        ))
+        let ready = manager.inspectAutonomousRunPreparation(
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: "Prepare all exact run inputs."
+        )
+        XCTAssertEqual(ready.readiness, .ready)
+        XCTAssertEqual(ready.recoveryAction, .none)
+        XCTAssertNotNil(ready.descriptor)
+
+        let stale = manager.inspectAutonomousRunPreparation(
+            projectID: projectID,
+            expectedGeneration: ProjectGeneration(generation.rawValue + 1),
+            mission: "Refresh stale project state."
+        )
+        XCTAssertEqual(stale.readiness, .automaticallyPreparing)
+        XCTAssertEqual(stale.recoveryAction, .retryPreparation)
+        XCTAssertEqual(stale.projectGeneration, generation.rawValue)
+        XCTAssertNil(stale.descriptor)
+
+        let missing = manager.inspectAutonomousRunPreparation(
+            projectID: ProjectID(),
+            expectedGeneration: ProjectGeneration(1),
+            mission: "Choose a registered project."
+        )
+        XCTAssertEqual(missing.readiness, .needsChoice)
+        XCTAssertEqual(missing.recoveryAction, .selectProject)
+
+        let permissionChoice = manager.inspectAutonomousRunPreparation(
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: "Reject unknown permissions.",
+            allowedTools: ["fixture_unknown_tool"]
+        )
+        XCTAssertEqual(permissionChoice.readiness, .needsChoice)
+        XCTAssertEqual(permissionChoice.recoveryAction, .reviewPermissions)
+
+        try app.config.update(["allowed_roots": []], save: true)
+        let authorization = manager.inspectAutonomousRunPreparation(
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: "Require exact project authority."
+        )
+        XCTAssertEqual(authorization.readiness, .needsAuthorization)
+        XCTAssertEqual(authorization.recoveryAction, .authorizeProject)
+
+        let failed = manager.inspectAutonomousRunPreparation(
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: "  invalid padded instructions  "
+        )
+        XCTAssertEqual(failed.readiness, .failed)
+        XCTAssertEqual(failed.recoveryAction, .retryPreparation)
+        XCTAssertNil(failed.descriptor)
     }
 
     func testInstructionQueuePersistsSharedPreparedDescriptorIdentity() async throws {

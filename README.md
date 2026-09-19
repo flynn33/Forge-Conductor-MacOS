@@ -83,7 +83,9 @@ product set.
    descriptor covering the source snapshot, model/configuration, exact grants,
    completion checks, automatic continuity, and resource budget. Start verifies
    that descriptor again; changed inputs refresh preparation before any run is
-   persisted.
+   persisted. If a prerequisite is missing, the sheet reports an exact
+   readiness state and offers the focused Projects, Model connection,
+   permissions, or refresh action without submitting a run.
 7. Review the run's events and evidence.
 
 The current setup guide can be reopened from the question-mark toolbar button.

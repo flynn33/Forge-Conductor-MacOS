@@ -2259,6 +2259,148 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ).descriptor
     }
 
+    public func inspectAutonomousRunPreparation(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        assignmentID: String? = nil,
+        mission: String,
+        providerID: String? = nil,
+        adapterID: String? = nil,
+        modelKey: String? = nil,
+        allowedTools: Set<String>? = nil,
+        completionGates: [String]? = nil,
+        networkAllowed: Bool = false,
+        maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
+    ) -> ManagerRunPreparationResult {
+        do {
+            try Self.validatePreparedMission(mission)
+        } catch {
+            return ManagerRunPreparationResult(
+                projectID: projectID.description,
+                projectGeneration: expectedGeneration.rawValue,
+                readiness: .failed,
+                detail: error.localizedDescription,
+                recoveryAction: .retryPreparation
+            )
+        }
+        let result: (
+            ManagerRunReadinessState,
+            String,
+            ManagerRunRecoveryAction,
+            ManagerPreparedRunDescriptor?
+        )
+        var resultProjectGeneration = expectedGeneration.rawValue
+        do {
+            let descriptor = try prepareAutonomousRun(
+                projectID: projectID,
+                expectedGeneration: expectedGeneration,
+                assignmentID: assignmentID,
+                mission: mission,
+                providerID: providerID,
+                adapterID: adapterID,
+                modelKey: modelKey,
+                allowedTools: allowedTools,
+                completionGates: completionGates,
+                networkAllowed: networkAllowed,
+                maximumInlineOutputBytes: maximumInlineOutputBytes
+            )
+            result = (.ready, descriptor.detail, .none, descriptor)
+        } catch let error as ProjectContextError {
+            switch error {
+            case .projectRootNotAuthorized:
+                result = (
+                    .needsAuthorization,
+                    "Authorize the selected project folder in Projects before starting this task.",
+                    .authorizeProject,
+                    nil
+                )
+            case .projectNotFound, .projectNotActive:
+                result = (
+                    .needsChoice,
+                    "Choose a currently registered project before starting this task.",
+                    .selectProject,
+                    nil
+                )
+            case .staleProjectGeneration(_, let actual):
+                resultProjectGeneration = actual.rawValue
+                result = (
+                    .automaticallyPreparing,
+                    "The selected project changed. Forge is refreshing its current generation before Start.",
+                    .retryPreparation,
+                    nil
+                )
+            case .databaseBusy, .projectTransitionConflict, .projectRelinkBusy,
+                 .projectRemovalBusy:
+                result = (
+                    .failed,
+                    "Project state is changing. Refresh preparation after the current project operation finishes.",
+                    .retryPreparation,
+                    nil
+                )
+            default:
+                result = (
+                    .failed,
+                    error.localizedDescription,
+                    .retryPreparation,
+                    nil
+                )
+            }
+        } catch let error as AutonomyError {
+            switch error {
+            case .invalidToolConfiguration:
+                result = (
+                    .needsChoice,
+                    error.localizedDescription,
+                    .reviewPermissions,
+                    nil
+                )
+            case .invalidRequest:
+                let configuration = try? readProviderConfiguration()
+                let savedModel = configuration?.modelKey?.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                if modelKey == nil,
+                   configuration?.saved != true || savedModel?.isEmpty != false {
+                    result = (
+                        .waitingDependency,
+                        "Save a local model in Model connection. Forge will reuse it automatically for this task.",
+                        .configureProvider,
+                        nil
+                    )
+                } else {
+                    result = (
+                        .needsChoice,
+                        error.localizedDescription,
+                        .reviewPermissions,
+                        nil
+                    )
+                }
+            default:
+                result = (
+                    .failed,
+                    error.localizedDescription,
+                    .retryPreparation,
+                    nil
+                )
+            }
+        } catch {
+            result = (
+                .failed,
+                "Forge could not prepare this task: \(error.localizedDescription)",
+                .retryPreparation,
+                nil
+            )
+        }
+        return ManagerRunPreparationResult(
+            projectID: projectID.description,
+            projectGeneration: resultProjectGeneration,
+            readiness: result.0,
+            detail: result.1,
+            recoveryAction: result.2,
+            descriptor: result.3
+        )
+    }
+
     private func resolvedRunPreparation(
         projectID: ProjectID,
         expectedGeneration: ProjectGeneration,

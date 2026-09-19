@@ -98,11 +98,18 @@ Instruction-queue admission calls the same descriptor builder and inventories
 the owner-only content-addressed package snapshot rather than the mutable
 original source path.
 
-This is a narrow M1 slice, not completion of M1 or the overall remediation.
-Project-bound non-ready results still need to return every required typed
-readiness and recovery state instead of relying on route errors for all missing
-dependencies. That remaining readiness work keeps M1 open.
-Native catalog checkboxes and saved project preferences remain M2;
+Project-bound preparation now returns one manager-owned result envelope with
+the required `ready`, `automatically_preparing`, `needs_choice`,
+`needs_authorization`, `waiting_dependency`, and `failed` states, a bounded
+plain-language explanation, and a typed recovery action. Only `ready` carries
+an authority-bearing descriptor. The Start sheet remains enabled with Project
+and Instructions when setup is incomplete, displays the exact result, and
+routes recovery to Projects, Model connection, Advanced permissions, or a
+manager refresh. No non-ready result reaches Start or creates a durable run.
+
+These focused contracts complete the M1 shared-preparation implementation; they
+do not complete the overall remediation or claim live provider lifecycle
+automation. Native catalog checkboxes and saved project preferences remain M2;
 document-backed format-neutral import remains M3; automatic task-aware
 completion remains M4; provider lifecycle, continuity presentation, and
 contextual Guided Mode remain M5; whole-journey acceptance and the source-bound
@@ -138,6 +145,13 @@ candidate remain M6 and M7.
 - The native client regression verifies prepare-before-start, double-click
   suppression, one preparation request, and byte-identical replay of the same
   prepared run UUID after a lost Start reply.
+- The project-bound readiness regression exercises all six required states and
+  their exact typed recovery actions. The native client regression separately
+  proves a missing saved model returns `waiting_dependency` with
+  `configure_provider`, keeps minimal Start enabled, and submits no run.
+- The stale-generation client regression proves `automatically_preparing`
+  returns the committed generation, performs one bounded automatic
+  re-preparation, and submits exactly one Start with that refreshed generation.
 - The queue regression verifies that queued work persists the same descriptor,
   provider/catalog/budget revisions, continuity mode, and immutable package
   snapshot hash. The storage regression independently hashes the accepted
@@ -151,7 +165,7 @@ candidate remain M6 and M7.
   the byte-identical body and credential, including the explicit project-root
   authorization. Native picker and direct-path UI coverage now read back the
   authorized root, including after relaunch.
-- Six operator-project/app-contract tests, seven provider-configuration tests,
+- Eight operator-project/app-contract tests, eight provider-configuration tests,
   six queue tests, seven dashboard-security tests, and 122 Manager tests passed.
   The Manager class retained two explicit environment/helper skips and had zero
   failures.

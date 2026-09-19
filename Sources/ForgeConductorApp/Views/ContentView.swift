@@ -147,7 +147,13 @@ struct ContentView: View {
         case .projects:
             operatorContent { ProjectsOperatorView(client: model.operatorManagerClient) }
         case .autonomy:
-            operatorContent { AutonomyOperatorView(client: model.operatorManagerClient) }
+            operatorContent {
+                AutonomyOperatorView(
+                    client: model.operatorManagerClient,
+                    onOpenProjects: { model.selectTab(.projects) },
+                    onOpenProvider: { model.selectTab(.provider) }
+                )
+            }
         case .continuity:
             operatorContent { ContinuityOperatorView(client: model.operatorManagerClient) }
         case .runtimes:

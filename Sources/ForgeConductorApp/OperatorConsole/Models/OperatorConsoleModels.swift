@@ -884,6 +884,26 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             maximumInlineOutputBytes: maximumInlineOutputBytes
         )
     }
+
+    func replacingProjectGeneration(_ generation: UInt64) -> Self {
+        Self(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: generation,
+            assignmentID: assignmentID,
+            mission: mission,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed,
+            expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
+            expectedToolCatalogRevision: expectedToolCatalogRevision,
+            expectedPreparedRunRevision: expectedPreparedRunRevision,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+    }
 }
 
 struct OperatorProjectRegistrationRequest: Encodable, Sendable, Equatable {

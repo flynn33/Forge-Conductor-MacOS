@@ -28,6 +28,11 @@ Product versions do not by themselves claim shipment.
   provider/model configuration, exact grants, completion checks, automatic
   continuity, and project-scoped resource budget; Start revalidates it before
   durable creation and preserves exact-identity replay after a lost response.
+- Added project-bound `ready`, `automatically_preparing`, `needs_choice`,
+  `needs_authorization`, `waiting_dependency`, and `failed` preparation
+  results with typed recovery actions. Ordinary Start now needs only Project
+  and Instructions even when setup is incomplete; non-ready results submit no
+  run and route recovery to the relevant native surface.
 - Combined Projects registration with durable authorization of the exact
   selected canonical folder. Existing roots are preserved, parent authority is
   not widened, and legacy registration-only API requests keep their behavior.

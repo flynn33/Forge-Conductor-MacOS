@@ -912,6 +912,56 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
     }
 }
 
+/// Project-bound preparation outcome consumed before run admission. A ready
+/// result carries the exact descriptor Start must revalidate; every non-ready
+/// result carries only an explanation and a typed operator recovery action.
+public struct ManagerRunPreparationResult: Codable, Sendable, Equatable {
+    public static let schemaVersion = 1
+
+    public let schemaVersion: Int
+    public let projectID: String
+    public let projectGeneration: UInt64
+    public let readiness: ManagerRunReadinessState
+    public let detail: String
+    public let recoveryAction: ManagerRunRecoveryAction
+    public let descriptor: ManagerPreparedRunDescriptor?
+
+    public init(
+        projectID: String,
+        projectGeneration: UInt64,
+        readiness: ManagerRunReadinessState,
+        detail: String,
+        recoveryAction: ManagerRunRecoveryAction,
+        descriptor: ManagerPreparedRunDescriptor? = nil
+    ) {
+        schemaVersion = Self.schemaVersion
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.readiness = readiness
+        self.detail = detail
+        self.recoveryAction = recoveryAction
+        self.descriptor = descriptor
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case readiness, detail, descriptor
+        case schemaVersion = "schema_version"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case recoveryAction = "recovery_action"
+    }
+}
+
 /// One validated, non-authoritative registration intent that is durable before
 /// its first control-plane row exists. The top-level shape keeps that exact
 /// request discoverable after restart without pretending it is a project.

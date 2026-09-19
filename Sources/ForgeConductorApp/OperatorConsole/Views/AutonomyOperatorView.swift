@@ -2,14 +2,24 @@
 // Native managed-run source list, detail inspector, and duplicate-safe start sheet.
 
 import SwiftUI
+import ForgeConductorCore
 
 struct AutonomyOperatorView: View {
     @StateObject private var viewModel: AutonomyViewModel
     @State private var showingStartSheet = false
     @State private var showingCancelConfirmation = false
+    @State private var showingAdvancedOverrides = false
+    private let onOpenProjects: () -> Void
+    private let onOpenProvider: () -> Void
 
-    init(client: any OperatorManagerClientProtocol) {
+    init(
+        client: any OperatorManagerClientProtocol,
+        onOpenProjects: @escaping () -> Void = {},
+        onOpenProvider: @escaping () -> Void = {}
+    ) {
         _viewModel = StateObject(wrappedValue: AutonomyViewModel(client: client))
+        self.onOpenProjects = onOpenProjects
+        self.onOpenProvider = onOpenProvider
     }
 
     var body: some View {
@@ -234,17 +244,30 @@ struct AutonomyOperatorView: View {
 
             GroupBox("Forge preparation") {
                 VStack(alignment: .leading, spacing: 7) {
-                    LabeledContent("Status", value: viewModel.runPreparation?.state.replacingOccurrences(of: "_", with: " ") ?? "checking")
+                    LabeledContent(
+                        "Status",
+                        value: (viewModel.projectRunPreparation?.readiness.rawValue
+                            ?? viewModel.runPreparation?.state
+                            ?? "checking").replacingOccurrences(of: "_", with: " ")
+                    )
                     LabeledContent("Model", value: viewModel.modelKey.isEmpty ? "Waiting for saved model" : viewModel.modelKey)
                     LabeledContent("Capabilities", value: "\(viewModel.allowedTools.split(whereSeparator: { $0 == "," || $0.isNewline }).count) selected")
                     LabeledContent("Completion", value: viewModel.completionGates.isEmpty ? "Waiting for checks" : "Automatic")
-                    Text(viewModel.runPreparation?.detail ?? "Forge is loading manager-owned defaults.")
+                    Text(viewModel.projectRunPreparation?.detail
+                        ?? viewModel.runPreparation?.detail
+                        ?? "Forge is loading manager-owned defaults.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if let recovery = viewModel.preparationRecoveryAction {
+                        Button(recoveryTitle(recovery)) {
+                            performRecovery(recovery)
+                        }
+                        .accessibilityIdentifier("run-preparation-recovery")
+                    }
                 }
             }
 
-            DisclosureGroup("Advanced overrides") {
+            DisclosureGroup("Advanced overrides", isExpanded: $showingAdvancedOverrides) {
                 VStack(alignment: .leading, spacing: 10) {
                     TextField("Assignment ID (optional)", text: $viewModel.assignmentID)
                     HStack {
@@ -303,6 +326,33 @@ struct AutonomyOperatorView: View {
             "External: handoff persisted; host session control unavailable"
         default:
             "Unavailable"
+        }
+    }
+
+    private func recoveryTitle(_ action: ManagerRunRecoveryAction) -> String {
+        switch action {
+        case .none: "No action required"
+        case .selectProject: "Refresh Projects"
+        case .authorizeProject: "Open Projects"
+        case .configureProvider: "Open Model connection"
+        case .reviewPermissions: "Review permissions"
+        case .retryPreparation: "Refresh preparation"
+        }
+    }
+
+    private func performRecovery(_ action: ManagerRunRecoveryAction) {
+        switch action {
+        case .none:
+            break
+        case .selectProject, .retryPreparation:
+            viewModel.refreshPreparationRecovery()
+        case .authorizeProject:
+            onOpenProjects()
+        case .configureProvider:
+            onOpenProvider()
+        case .reviewPermissions:
+            showingAdvancedOverrides = true
+            viewModel.refreshPreparationRecovery()
         }
     }
 }

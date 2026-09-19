@@ -45,7 +45,7 @@ protocol OperatorManagerClientProtocol: Sendable {
         generation: UInt64,
         path: String
     ) async throws -> OperatorRelinkReceipt
-    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerPreparedRunDescriptor
+    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun
     func runStatus(runID: String) async throws -> OperatorRun
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun
@@ -60,7 +60,7 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
-    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerPreparedRunDescriptor {
+    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Project-bound run preparation is unavailable from this manager client."
         )
@@ -626,7 +626,7 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         )
     }
 
-    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerPreparedRunDescriptor {
+    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult {
         try await self.request(
             method: "POST",
             path: "/api/manager/runs/prepare",
@@ -850,7 +850,7 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
         generation: UInt64,
         path: String
     ) async throws -> OperatorRelinkReceipt { throw error }
-    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerPreparedRunDescriptor { throw error }
+    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult { throw error }
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun { throw error }
     func runStatus(runID: String) async throws -> OperatorRun { throw error }
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun { throw error }
@@ -982,7 +982,7 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.startRun(request)
     }
 
-    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerPreparedRunDescriptor {
+    func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult {
         try await current.prepareRun(request)
     }
 

@@ -837,43 +837,25 @@ public final class ManagerRoutes: @unchecked Sendable {
             let allowedTools = try optionalStringSet(object, key: "allowed_tools")
             let completionGates = try optionalStringArray(object, key: "completion_gates")
             let networkAllowed = try optionalBoolean(object, key: "network_allowed") ?? false
-            do {
-                let descriptor = try manager.prepareAutonomousRun(
-                    projectID: try projectID(object),
-                    expectedGeneration: try projectGeneration(object),
-                    assignmentID: try optionalString(
-                        object,
-                        key: "assignment_id",
-                        maximumBytes: 1_024
-                    ),
-                    mission: mission,
-                    providerID: providerID,
-                    adapterID: adapterID,
-                    modelKey: modelKey,
-                    allowedTools: allowedTools,
-                    completionGates: completionGates,
-                    networkAllowed: networkAllowed,
-                    maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
-                        ?? ProjectContextService.defaultInlineOutputLimit
-                )
-                http.respondJSON(connection, status: 200, object: try descriptor.asDictionary())
-            } catch let error as AutonomyError {
-                guard case .invalidToolConfiguration = error else { throw error }
-                http.respondJSON(connection, status: 422, object: [
-                    "ok": false,
-                    "code": error.code,
-                    "message": error.localizedDescription,
-                    "retryable": false,
-                ])
-            } catch let error as ProjectContextError {
-                guard case .projectRootNotAuthorized = error else { throw error }
-                http.respondJSON(connection, status: 403, object: [
-                    "ok": false,
-                    "code": error.code,
-                    "message": error.localizedDescription,
-                    "retryable": false,
-                ])
-            }
+            let result = manager.inspectAutonomousRunPreparation(
+                projectID: try projectID(object),
+                expectedGeneration: try projectGeneration(object),
+                assignmentID: try optionalString(
+                    object,
+                    key: "assignment_id",
+                    maximumBytes: 1_024
+                ),
+                mission: mission,
+                providerID: providerID,
+                adapterID: adapterID,
+                modelKey: modelKey,
+                allowedTools: allowedTools,
+                completionGates: completionGates,
+                networkAllowed: networkAllowed,
+                maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
+                    ?? ProjectContextService.defaultInlineOutputLimit
+            )
+            http.respondJSON(connection, status: 200, object: try result.asDictionary())
         case ("POST", "/api/manager/runs/start"):
             let object = try JSONSupport.object(from: body)
             guard let runIDValue = object["run_id"] as? String,
