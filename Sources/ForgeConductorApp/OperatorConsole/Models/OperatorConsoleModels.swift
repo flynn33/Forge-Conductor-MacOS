@@ -2,6 +2,7 @@
 // Typed, bounded projections returned by the manager's native operator endpoint.
 
 import Foundation
+import ForgeConductorCore
 
 struct OperatorSnapshot: Decodable, Sendable, Equatable {
     let projects: [OperatorProject]
@@ -789,7 +790,42 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let networkAllowed: Bool?
     let expectedProviderConfigurationRevision: String?
     let expectedToolCatalogRevision: String?
+    let expectedPreparedRunRevision: String?
     let maximumInlineOutputBytes: Int
+
+    init(
+        runID: String,
+        projectID: String,
+        projectGeneration: UInt64,
+        assignmentID: String?,
+        mission: String,
+        providerID: String?,
+        adapterID: String?,
+        modelKey: String?,
+        allowedTools: [String]?,
+        completionGates: [String]?,
+        networkAllowed: Bool?,
+        expectedProviderConfigurationRevision: String?,
+        expectedToolCatalogRevision: String?,
+        expectedPreparedRunRevision: String? = nil,
+        maximumInlineOutputBytes: Int
+    ) {
+        self.runID = runID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.assignmentID = assignmentID
+        self.mission = mission
+        self.providerID = providerID
+        self.adapterID = adapterID
+        self.modelKey = modelKey
+        self.allowedTools = allowedTools
+        self.completionGates = completionGates
+        self.networkAllowed = networkAllowed
+        self.expectedProviderConfigurationRevision = expectedProviderConfigurationRevision
+        self.expectedToolCatalogRevision = expectedToolCatalogRevision
+        self.expectedPreparedRunRevision = expectedPreparedRunRevision
+        self.maximumInlineOutputBytes = maximumInlineOutputBytes
+    }
 
     enum CodingKeys: String, CodingKey {
         case runID = "run_id"
@@ -805,7 +841,48 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         case networkAllowed = "network_allowed"
         case expectedProviderConfigurationRevision = "expected_provider_configuration_revision"
         case expectedToolCatalogRevision = "expected_tool_catalog_revision"
+        case expectedPreparedRunRevision = "expected_prepared_run_revision"
         case maximumInlineOutputBytes = "maximum_inline_output_bytes"
+    }
+
+    func expectingPreparedRevision(_ revision: String) -> Self {
+        Self(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            assignmentID: assignmentID,
+            mission: mission,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed,
+            expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
+            expectedToolCatalogRevision: expectedToolCatalogRevision,
+            expectedPreparedRunRevision: revision,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+    }
+
+    func expectingPreparedDescriptor(_ descriptor: ManagerPreparedRunDescriptor) -> Self {
+        Self(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            assignmentID: assignmentID,
+            mission: mission,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed,
+            expectedProviderConfigurationRevision: descriptor.providerConfigurationRevision,
+            expectedToolCatalogRevision: descriptor.toolCatalogRevision,
+            expectedPreparedRunRevision: descriptor.revision,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
     }
 }
 

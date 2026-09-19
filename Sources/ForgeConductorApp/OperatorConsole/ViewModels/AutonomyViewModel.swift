@@ -172,16 +172,41 @@ final class AutonomyViewModel: ObservableObject {
     private func submitStart(_ request: OperatorRunStartRequest) {
         Task { [weak self] in
             guard let self else { return }
+            var startWasSubmitted = false
             do {
-                let run = try await client.startRun(request)
-                guard run.runID == request.runID else {
+                var admittedRequest = request
+                if request.expectedPreparedRunRevision == nil {
+                    do {
+                        let prepared = try await client.prepareRun(request)
+                        guard prepared.readiness == .ready
+                                || prepared.readiness == .automaticallyPreparing else {
+                            throw OperatorManagerClientError.configurationRejected(
+                                code: "run_preparation_not_ready",
+                                message: prepared.detail
+                            )
+                        }
+                        admittedRequest = request.expectingPreparedDescriptor(prepared)
+                        pendingStartRequest = admittedRequest
+                    } catch OperatorManagerClientError.capabilityUnavailable {
+                        // A legacy in-process client may not expose preparation yet.
+                        // The manager Start route still performs its existing validation.
+                    }
+                }
+                startWasSubmitted = true
+                let run = try await client.startRun(admittedRequest)
+                guard run.runID == admittedRequest.runID else {
                     throw OperatorManagerClientError.invalidPayload(
-                        "manager returned run \(run.runID) for request \(request.runID)"
+                        "manager returned run \(run.runID) for request \(admittedRequest.runID)"
                     )
                 }
                 acceptStartedRun(run)
             } catch let clientError as OperatorManagerClientError {
-                if case .configurationRejected(let code, _) = clientError {
+                if !startWasSubmitted {
+                    pendingStartRequest = nil
+                    startRequiresReconciliation = false
+                    errorMessage = clientError.localizedDescription
+                    notice = "Run preparation did not complete. No run was submitted."
+                } else if case .configurationRejected(let code, _) = clientError {
                     pendingStartRequest = nil
                     startRequiresReconciliation = false
                     errorMessage = clientError.localizedDescription

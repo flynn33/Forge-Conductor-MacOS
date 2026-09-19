@@ -23,6 +23,11 @@ Product versions do not by themselves claim shipment.
 - Added provider-configuration and canonical tool-catalog revision fencing to
   run preparation. Stale previews create no durable run and refresh automatic
   values without erasing explicit Advanced choices.
+- Added a versioned project-bound prepared-run descriptor for direct and queued
+  starts. Its revision covers the source snapshot and document references,
+  provider/model configuration, exact grants, completion checks, automatic
+  continuity, and project-scoped resource budget; Start revalidates it before
+  durable creation and preserves exact-identity replay after a lost response.
 - Combined Projects registration with durable authorization of the exact
   selected canonical folder. Existing roots are preserved, parent authority is
   not widened, and legacy registration-only API requests keep their behavior.

@@ -10,13 +10,19 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var responses: [String: Data] = [:]
     nonisolated(unsafe) private static var statuses: [String: Int] = [:]
+    nonisolated(unsafe) private static var failuresRemaining: [String: Int] = [:]
     nonisolated(unsafe) private static var paths: [String] = []
     nonisolated(unsafe) private static var bodies: [String: [Data]] = [:]
 
-    static func configure(responses: [String: Data], statuses: [String: Int] = [:]) {
+    static func configure(
+        responses: [String: Data],
+        statuses: [String: Int] = [:],
+        failures: [String: Int] = [:]
+    ) {
         lock.lock()
         self.responses = responses
         self.statuses = statuses
+        failuresRemaining = failures
         paths = []
         bodies = [:]
         lock.unlock()
@@ -41,10 +47,27 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
         let path = request.url?.path ?? ""
         Self.lock.lock()
         Self.paths.append(path)
-        Self.bodies[path, default: []].append(Self.bodyData(from: request))
-        let data = Self.responses[path]
+        let requestBody = Self.bodyData(from: request)
+        Self.bodies[path, default: []].append(requestBody)
+        var data = Self.responses[path]
         let status = Self.statuses[path] ?? 200
+        let shouldFail = (Self.failuresRemaining[path] ?? 0) > 0
+        if shouldFail {
+            Self.failuresRemaining[path, default: 0] -= 1
+        }
         Self.lock.unlock()
+        if shouldFail {
+            client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
+            return
+        }
+        if let responseData = data,
+           var object = try? JSONSupport.object(from: responseData),
+           object["run_id"] as? String == "__REQUEST_RUN_ID__",
+           let requestObject = try? JSONSupport.object(from: requestBody),
+           let runID = requestObject["run_id"] as? String {
+            object["run_id"] = runID
+            data = try? JSONSupport.data(from: object)
+        }
         guard let data,
               let url = request.url,
               let response = HTTPURLResponse(
@@ -316,6 +339,16 @@ final class OperatorProjectContractTests: XCTestCase {
                     "active_run_ids": [],
                     "deferred_run_ids": [],
                 ]),
+                "/api/manager/runs/prepare": try Self.preparedRunData(
+                    projectID: projectID,
+                    generation: 1,
+                    mission: "Repair the selected project.",
+                    providerConfigurationRevision: "fixture-provider-revision-2",
+                    modelKey: "fixture/pinned-model",
+                    allowedTools: ["fs_read"],
+                    completionGates: ["fixture-check"],
+                    networkAllowed: true
+                ),
                 "/api/manager/runs/start": try JSONSupport.data(from: [
                     "ok": false,
                     "code": "run_preparation_stale",
@@ -345,6 +378,136 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.allowedTools, "fs_read")
         XCTAssertEqual(viewModel.completionGates, "fixture-check")
         XCTAssertTrue(viewModel.networkAllowed)
+        let preparedBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/runs/prepare"
+        )
+        XCTAssertEqual(preparedBodies.count, 1)
+        let startBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/runs/start"
+        )
+        XCTAssertEqual(startBodies.count, 1)
+        let submittedStart = try JSONSupport.object(from: try XCTUnwrap(startBodies.first))
+        XCTAssertEqual(
+            (submittedStart["expected_prepared_run_revision"] as? String)?.count,
+            64
+        )
+        XCTAssertEqual(
+            submittedStart["expected_provider_configuration_revision"] as? String,
+            "fixture-provider-revision-2"
+        )
+    }
+
+    @MainActor
+    func testPreparedStartDoubleClickAndLostReplyReplayOneExactRunIdentity() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let project = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: Self.projectData(
+                    projectID: projectID,
+                    generation: 1,
+                    root: "/tmp/operator-replay-project",
+                    resetPriorGeneration: 0
+                )
+            ) as? [String: Any]
+        )
+        let mission = "Replay this exact prepared start."
+        OperatorProjectContractURLProtocol.configure(
+            responses: [
+                "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                    "projects": [project],
+                    "runs": [],
+                    "provider": [
+                        "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                        "provider_id": "lmstudio",
+                        "health": "contract_valid",
+                        "model_key": "fixture/replay-model",
+                    ],
+                    "run_preparation": [
+                        "state": "ready",
+                        "provider_id": "lmstudio",
+                        "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                        "model_key": "fixture/replay-model",
+                        "schema_version": 1,
+                        "provider_configuration_revision": "fixture-replay-provider",
+                        "tool_catalog_revision": String(repeating: "a", count: 64),
+                        "allowed_tools": ["fs_read"],
+                        "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                        "network_allowed": false,
+                    ],
+                ]),
+                "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                    "started": true,
+                    "active_run_ids": [],
+                    "deferred_run_ids": [],
+                ]),
+                "/api/manager/runs/prepare": try Self.preparedRunData(
+                    projectID: projectID,
+                    generation: 1,
+                    mission: mission,
+                    providerConfigurationRevision: "fixture-replay-provider",
+                    modelKey: "fixture/replay-model",
+                    allowedTools: ["fs_read"],
+                    completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
+                    networkAllowed: false
+                ),
+                "/api/manager/runs/start": try JSONSupport.data(from: [
+                    "run_id": "__REQUEST_RUN_ID__",
+                    "project_id": projectID,
+                    "project_generation": UInt64(1),
+                    "mission": mission,
+                    "state": "created",
+                    "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
+                    "provider_id": "lmstudio",
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "model_key": "fixture/replay-model",
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "passed_gates": [],
+                ]),
+            ],
+            failures: ["/api/manager/runs/start": 1]
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let viewModel = AutonomyViewModel(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        ))
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+        viewModel.mission = mission
+
+        viewModel.startRun()
+        viewModel.startRun()
+        try await Self.waitUntilStartIdle(viewModel)
+        XCTAssertTrue(viewModel.startRequiresReconciliation)
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/start"
+            ).count,
+            1
+        )
+
+        viewModel.reconcileStart()
+        try await Self.waitUntilStartIdle(viewModel)
+        let startBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/runs/start"
+        )
+        XCTAssertEqual(startBodies.count, 2)
+        XCTAssertEqual(startBodies[0], startBodies[1])
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/prepare"
+            ).count,
+            1
+        )
+        let submitted = try JSONSupport.object(from: startBodies[0])
+        XCTAssertEqual(viewModel.lastStartedRunID, submitted["run_id"] as? String)
+        XCTAssertFalse(viewModel.startRequiresReconciliation)
+        XCTAssertNil(viewModel.errorMessage)
     }
 
     func testProjectRemovalAndInstructionQueueUseTypedManagerContracts() async throws {
@@ -661,5 +824,67 @@ final class OperatorProjectContractTests: XCTestCase {
         }
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertNil(viewModel.errorMessage)
+    }
+
+    @MainActor
+    private static func waitUntilStartIdle(_ viewModel: AutonomyViewModel) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while viewModel.isStarting, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(viewModel.isStarting)
+    }
+
+    private static func preparedRunData(
+        projectID: String,
+        generation: UInt64,
+        mission: String,
+        providerConfigurationRevision: String,
+        modelKey: String,
+        allowedTools: [String],
+        completionGates: [String],
+        networkAllowed: Bool
+    ) throws -> Data {
+        let missionData = Data(mission.utf8)
+        let sourceSHA256 = JSONSupport.sha256Hex(missionData)
+        let descriptor = try ManagerPreparedRunDescriptor.make(
+            detail: "The exact run inputs are ready.",
+            projectID: projectID,
+            projectGeneration: generation,
+            source: ManagerPreparedRunSource(
+                kind: .inlineMission,
+                reference: "inline-mission:\(sourceSHA256)",
+                snapshotSHA256: sourceSHA256
+            ),
+            documents: [ManagerPreparedRunDocumentReference(
+                reference: "inline:mission",
+                byteCount: missionData.count,
+                sha256: sourceSHA256
+            )],
+            providerID: "lmstudio",
+            adapterID: ManagerNode.nativeSessionHostAdapterID,
+            modelKey: modelKey,
+            providerConfigurationRevision: providerConfigurationRevision,
+            toolCatalogRevision: String(repeating: "a", count: 64),
+            allowedTools: allowedTools,
+            networkAllowed: networkAllowed,
+            validationPlan: ManagerPreparedRunValidationPlan(
+                completionGates: completionGates
+            ),
+            continuityMode: .managedAutonomous,
+            budgetPolicy: BudgetPolicySelection(
+                scope: BudgetPolicyScope(
+                    kind: .projectOverride,
+                    projectID: projectID,
+                    projectGeneration: Int(generation)
+                ),
+                revision: 0,
+                globalRevision: 1,
+                inherited: true,
+                policy: .default
+            ),
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        return try JSONSupport.data(from: descriptor.asDictionary())
     }
 }

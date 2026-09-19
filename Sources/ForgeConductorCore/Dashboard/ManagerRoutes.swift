@@ -822,6 +822,58 @@ public final class ManagerRoutes: @unchecked Sendable {
                 status: 200,
                 object: try manager.managedAutonomyStatus()
             )
+        case ("POST", "/api/manager/runs/prepare"):
+            let object = try JSONSupport.object(from: body)
+            guard let mission = object["mission"] as? String, !mission.isEmpty else {
+                throw AutonomyError.invalidRequest("mission is required")
+            }
+            let providerID = try optionalString(object, key: "provider_id", maximumBytes: 256)
+            let adapterID = try optionalString(
+                object,
+                key: "adapter_id",
+                maximumBytes: ManagerNode.maximumProviderAdapterIDBytes
+            )
+            let modelKey = try optionalString(object, key: "model_key", maximumBytes: 1_024)
+            let allowedTools = try optionalStringSet(object, key: "allowed_tools")
+            let completionGates = try optionalStringArray(object, key: "completion_gates")
+            let networkAllowed = try optionalBoolean(object, key: "network_allowed") ?? false
+            do {
+                let descriptor = try manager.prepareAutonomousRun(
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object),
+                    assignmentID: try optionalString(
+                        object,
+                        key: "assignment_id",
+                        maximumBytes: 1_024
+                    ),
+                    mission: mission,
+                    providerID: providerID,
+                    adapterID: adapterID,
+                    modelKey: modelKey,
+                    allowedTools: allowedTools,
+                    completionGates: completionGates,
+                    networkAllowed: networkAllowed,
+                    maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
+                        ?? ProjectContextService.defaultInlineOutputLimit
+                )
+                http.respondJSON(connection, status: 200, object: try descriptor.asDictionary())
+            } catch let error as AutonomyError {
+                guard case .invalidToolConfiguration = error else { throw error }
+                http.respondJSON(connection, status: 422, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": false,
+                ])
+            } catch let error as ProjectContextError {
+                guard case .projectRootNotAuthorized = error else { throw error }
+                http.respondJSON(connection, status: 403, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": false,
+                ])
+            }
         case ("POST", "/api/manager/runs/start"):
             let object = try JSONSupport.object(from: body)
             guard let runIDValue = object["run_id"] as? String,
@@ -896,6 +948,19 @@ public final class ManagerRoutes: @unchecked Sendable {
                 }
                 expectedToolCatalogRevision = typed
             } else { expectedToolCatalogRevision = nil }
+            let expectedPreparedRunRevision: String?
+            if let value = object["expected_prepared_run_revision"] {
+                guard let typed = value as? String,
+                      typed.utf8.count == 64,
+                      typed.utf8.allSatisfy({
+                          (48...57).contains($0) || (97...102).contains($0)
+                      }) else {
+                    throw AutonomyError.invalidRequest(
+                        "expected_prepared_run_revision must be a SHA-256 string when supplied"
+                    )
+                }
+                expectedPreparedRunRevision = typed
+            } else { expectedPreparedRunRevision = nil }
             do {
                 let result = try manager.startAutonomousRun(
                     runID: RunID(runUUID),
@@ -911,6 +976,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                     expectedProviderConfigurationRevision:
                         expectedProviderConfigurationRevision,
                     expectedToolCatalogRevision: expectedToolCatalogRevision,
+                    expectedPreparedRunRevision: expectedPreparedRunRevision,
                     networkAllowed: networkAllowed,
                     maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
                         ?? ProjectContextService.defaultInlineOutputLimit
@@ -1410,6 +1476,49 @@ public final class ManagerRoutes: @unchecked Sendable {
         if let value = value as? NSNumber { return value.intValue }
         if let value = value as? String { return Int(value) }
         return nil
+    }
+
+    private func optionalString(
+        _ object: [String: Any],
+        key: String,
+        maximumBytes: Int
+    ) throws -> String? {
+        guard let value = object[key] else { return nil }
+        guard let typed = value as? String, typed.utf8.count <= maximumBytes else {
+            throw AutonomyError.invalidRequest(
+                "\(key) must be a bounded string when supplied"
+            )
+        }
+        return typed
+    }
+
+    private func optionalStringArray(
+        _ object: [String: Any],
+        key: String
+    ) throws -> [String]? {
+        guard let value = object[key] else { return nil }
+        guard let typed = value as? [String] else {
+            throw AutonomyError.invalidRequest("\(key) must be a string array when supplied")
+        }
+        return typed
+    }
+
+    private func optionalStringSet(
+        _ object: [String: Any],
+        key: String
+    ) throws -> Set<String>? {
+        try optionalStringArray(object, key: key).map(Set.init)
+    }
+
+    private func optionalBoolean(
+        _ object: [String: Any],
+        key: String
+    ) throws -> Bool? {
+        guard let value = object[key] else { return nil }
+        guard let typed = value as? Bool else {
+            throw AutonomyError.invalidRequest("\(key) must be a boolean when supplied")
+        }
+        return typed
     }
 
     private static func routeTarget(_ rawTarget: String) throws -> ManagerRouteTarget {

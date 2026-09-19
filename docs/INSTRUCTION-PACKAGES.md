@@ -78,6 +78,14 @@ The durable queue metadata is stored in:
 
 Editing or deleting the original selected file after import does not change the accepted snapshot. Package records include the source path for operator provenance, but autonomous tools receive the registered repository as their filesystem scope.
 
+Queue admission inventories the immutable snapshot's documents and records each
+content-addressed reference, byte count, and SHA-256 in the manager-owned
+prepared-run descriptor. The durable run also records the descriptor revision,
+package snapshot hash, provider and tool-catalog revisions, continuity mode,
+and applicable budget-policy revisions. Direct starts use the same preparation
+contract, so queued work does not bypass ordinary grant, validation, or stale
+input checks.
+
 Resetting a project generation fences unfinished packages from the old generation. Removing a project deletes its active package queue, advances the control-plane generation, invalidates bindings, and hides the registration while preserving project memory and historical run evidence. Registering the same repository again reconnects its durable project identity.
 
 ## Limits

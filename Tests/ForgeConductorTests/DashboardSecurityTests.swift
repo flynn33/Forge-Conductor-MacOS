@@ -49,6 +49,7 @@ final class DashboardSecurityTests: XCTestCase {
             "/api/manager/projects/relink",
             "/api/manager/projects/bind",
             "/api/manager/projects/reset-generation",
+            "/api/manager/runs/prepare",
             "/api/manager/runs/start",
             "/api/manager/runs/control",
             "/api/manager/runtime-jobs/cancel",

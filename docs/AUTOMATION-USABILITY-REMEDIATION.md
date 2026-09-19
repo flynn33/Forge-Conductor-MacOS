@@ -79,9 +79,29 @@ is idempotent. The Projects sheet explains that Register authorizes the selected
 folder; the normal workflow no longer requires entering the same path in
 Manager first.
 
+The Manager now builds a versioned, project-bound prepared-run descriptor for
+both direct and queued admission. Its canonical revision covers the exact
+project and generation, assignment, inline or package source snapshot,
+content-addressed document references, saved provider revision and model,
+production tool-catalog revision and effective grant set, completion plan,
+automatic continuity mode, project-scoped budget selection, network authority,
+and inline output boundary. Presentation text and readiness wording are excluded
+from the authority hash.
+
+Autonomy obtains that descriptor immediately before Start and submits its
+revision with the same durable run UUID. Start reconstructs the descriptor from
+current manager state and rejects any mismatch before durable creation. A
+double-click cannot dispatch a second request while the first is active; a lost
+reply retains the exact prepared body and run UUID for explicit reconciliation.
+The core admission path accepts an exact duplicate as the same durable run.
+Instruction-queue admission calls the same descriptor builder and inventories
+the owner-only content-addressed package snapshot rather than the mutable
+original source path.
+
 This is a narrow M1 slice, not completion of M1 or the overall remediation.
-The full project/package/document, validation-plan, continuity, and budget
-prepared descriptor remains open in M1.
+Project-bound non-ready results still need to return every required typed
+readiness and recovery state instead of relying on route errors for all missing
+dependencies. That remaining readiness work keeps M1 open.
 Native catalog checkboxes and saved project preferences remain M2;
 document-backed format-neutral import remains M3; automatic task-aware
 completion remains M4; provider lifecycle, continuity presentation, and
@@ -110,6 +130,18 @@ candidate remain M6 and M7.
   gate, and network overrides.
 - Direct and queue construction both use `ManagerRunPreparationResolver`; its
   focused test covers defaults, exact overrides, and explicit-empty rejection.
+- The project-bound descriptor regression verifies exact project/generation,
+  inline source hash and document reference, saved provider revision/model,
+  catalog and grant selection, completion plan, automatic continuity, and the
+  project-scoped budget. A changed source is rejected before persistence; an
+  exact duplicate run UUID resolves to the same durable run.
+- The native client regression verifies prepare-before-start, double-click
+  suppression, one preparation request, and byte-identical replay of the same
+  prepared run UUID after a lost Start reply.
+- The queue regression verifies that queued work persists the same descriptor,
+  provider/catalog/budget revisions, continuity mode, and immutable package
+  snapshot hash. The storage regression independently hashes the accepted
+  owner-only document after the original source changes.
 - The authenticated project-registration regression first failed because the
   new authorization field was rejected. It now proves that one request retains
   an existing root, adds only the selected canonical directory, persists the
@@ -119,10 +151,10 @@ candidate remain M6 and M7.
   the byte-identical body and credential, including the explicit project-root
   authorization. Native picker and direct-path UI coverage now read back the
   authorized root, including after relaunch.
-- Five operator-project/app-contract tests, five provider-configuration tests,
-  the focused HTTP runtime-control test, six queue tests, and 122 Manager tests
-  passed. The Manager class retained two explicit environment/helper skips and
-  had zero failures.
+- Six operator-project/app-contract tests, seven provider-configuration tests,
+  six queue tests, seven dashboard-security tests, and 122 Manager tests passed.
+  The Manager class retained two explicit environment/helper skips and had zero
+  failures.
 - Both SwiftPM products and the canonical `ForgeConductor` Debug Xcode scheme
   built successfully. Repository hygiene and `git diff --check` passed.
 - Unexecuted revision-2 acceptance tests remain `not_run`; this record does not

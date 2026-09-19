@@ -44,6 +44,12 @@ struct ManagerResolvedRunPreparation: Sendable, Equatable {
     let networkAllowed: Bool
 }
 
+private struct ManagerPreparedRunContext: Sendable {
+    let descriptor: ManagerPreparedRunDescriptor
+    let authorizedRoot: URL
+    let resolved: ManagerResolvedRunPreparation
+}
+
 enum ManagerRunPreparationResolver {
     static func resolve(
         configuration: ProviderConfigurationSnapshot?,
@@ -117,6 +123,7 @@ enum ManagerRunPreparationResolver {
 enum ManagerRunPreparationError: Error, LocalizedError, Sendable, Equatable {
     case staleProviderConfiguration
     case staleToolCatalog
+    case staleDescriptor
 
     var errorDescription: String? {
         switch self {
@@ -124,6 +131,8 @@ enum ManagerRunPreparationError: Error, LocalizedError, Sendable, Equatable {
             "The saved provider configuration changed after this run was prepared. Refresh preparation and retry."
         case .staleToolCatalog:
             "The registered tool catalog changed after this run was prepared. Refresh preparation and retry."
+        case .staleDescriptor:
+            "The project, source, permissions, validation plan, continuity settings, or resource budget changed after this run was prepared. Refresh preparation and retry."
         }
     }
 }
@@ -2208,6 +2217,169 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     // MARK: - Autonomous run controls
 
+    public func prepareAutonomousRun(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        assignmentID: String? = nil,
+        mission: String,
+        providerID: String? = nil,
+        adapterID: String? = nil,
+        modelKey: String? = nil,
+        allowedTools: Set<String>? = nil,
+        completionGates: [String]? = nil,
+        networkAllowed: Bool = false,
+        maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
+    ) throws -> ManagerPreparedRunDescriptor {
+        try Self.validatePreparedMission(mission)
+        let missionData = Data(mission.utf8)
+        let sourceSHA256 = JSONSupport.sha256Hex(missionData)
+        let source = ManagerPreparedRunSource(
+            kind: .inlineMission,
+            reference: "inline-mission:\(sourceSHA256)",
+            snapshotSHA256: sourceSHA256
+        )
+        let documents = [ManagerPreparedRunDocumentReference(
+            reference: "inline:mission",
+            byteCount: missionData.count,
+            sha256: sourceSHA256
+        )]
+        return try resolvedRunPreparation(
+            projectID: projectID,
+            expectedGeneration: expectedGeneration,
+            assignmentID: assignmentID,
+            source: source,
+            documents: documents,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        ).descriptor
+    }
+
+    private func resolvedRunPreparation(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        assignmentID: String?,
+        source: ManagerPreparedRunSource,
+        documents: [ManagerPreparedRunDocumentReference],
+        providerID: String?,
+        adapterID: String?,
+        modelKey: String?,
+        allowedTools: Set<String>?,
+        completionGates: [String]?,
+        expectedProviderConfigurationRevision: String? = nil,
+        expectedToolCatalogRevision: String? = nil,
+        networkAllowed: Bool,
+        maximumInlineOutputBytes: Int
+    ) throws -> ManagerPreparedRunContext {
+        guard assignmentID?.utf8.count ?? 0 <= 1_024 else {
+            throw ProjectContextError.invalidIdentifier("assignment identifier")
+        }
+        guard (1...16 * 1_024 * 1_024).contains(maximumInlineOutputBytes) else {
+            throw ProjectContextError.invalidAuthorizationScope(
+                "inline output limit is outside the supported range"
+            )
+        }
+        guard let project = try app.projectContexts.project(projectID) else {
+            throw ProjectContextError.projectNotFound(projectID)
+        }
+        guard project.generation == expectedGeneration else {
+            throw ProjectContextError.staleProjectGeneration(
+                expected: expectedGeneration,
+                actual: project.generation
+            )
+        }
+        let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
+        let providerConfiguration = try readProviderConfiguration()
+        if let expectedProviderConfigurationRevision,
+           providerConfiguration.revision != expectedProviderConfigurationRevision {
+            throw ManagerRunPreparationError.staleProviderConfiguration
+        }
+        let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        if let expectedToolCatalogRevision,
+           catalog.canonicalSHA256 != expectedToolCatalogRevision {
+            throw ManagerRunPreparationError.staleToolCatalog
+        }
+        let resolved = try ManagerRunPreparationResolver.resolve(
+            configuration: providerConfiguration,
+            registeredToolNames: app.tools.toolNames,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed
+        )
+        do {
+            _ = try catalog.providerToolDefinitions(allowedToolNames: resolved.allowedTools)
+        } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
+            throw AutonomyError.invalidToolConfiguration(tools)
+        } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
+            throw AutonomyError.invalidToolConfiguration(tools)
+        }
+        guard let generation = Int(exactly: expectedGeneration.rawValue) else {
+            throw ProjectContextError.invalidGeneration(expectedGeneration.rawValue)
+        }
+        let budgetPolicy = try app.config.budgetPolicySelection(scope: .init(
+            kind: .projectOverride,
+            projectID: projectID.description,
+            projectGeneration: generation
+        ))
+        let descriptor = try ManagerPreparedRunDescriptor.make(
+            detail: "The exact project, source, provider, permissions, completion checks, continuity mode, and resource budget are ready.",
+            projectID: projectID.description,
+            projectGeneration: expectedGeneration.rawValue,
+            assignmentID: assignmentID,
+            source: source,
+            documents: documents.sorted { $0.reference < $1.reference },
+            providerID: resolved.providerID,
+            adapterID: resolved.adapterID,
+            modelKey: resolved.modelKey,
+            providerConfigurationRevision: providerConfiguration.revision,
+            toolCatalogRevision: catalog.canonicalSHA256,
+            allowedTools: resolved.allowedTools.sorted(),
+            networkAllowed: resolved.networkAllowed,
+            validationPlan: ManagerPreparedRunValidationPlan(
+                completionGates: resolved.completionGates
+            ),
+            continuityMode: .managedAutonomous,
+            budgetPolicy: budgetPolicy,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+        return ManagerPreparedRunContext(
+            descriptor: descriptor,
+            authorizedRoot: authorizedRoot,
+            resolved: resolved
+        )
+    }
+
+    private static func preparedRunMetadata(
+        _ descriptor: ManagerPreparedRunDescriptor
+    ) -> [String: String] {
+        [
+            "prepared_run_revision": descriptor.revision,
+            "source_snapshot_sha256": descriptor.source.snapshotSHA256,
+            "provider_configuration_revision": descriptor.providerConfigurationRevision,
+            "tool_catalog_revision": descriptor.toolCatalogRevision,
+            "budget_policy_revision": String(descriptor.budgetPolicy.revision),
+            "budget_policy_global_revision": String(descriptor.budgetPolicy.globalRevision),
+            "continuity_mode": descriptor.continuityMode.rawValue,
+        ]
+    }
+
+    private static func validatePreparedMission(_ mission: String) throws {
+        guard mission == mission.trimmingCharacters(in: .whitespacesAndNewlines),
+              !mission.isEmpty,
+              mission.utf8.count <= 65_536 else {
+            throw AutonomyError.invalidRequest(
+                "mission must contain 1 through 65536 trimmed bytes"
+            )
+        }
+    }
+
     @discardableResult
     public func startAutonomousRun(
         runID: RunID = RunID(),
@@ -2222,6 +2394,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         completionGates: [String]? = nil,
         expectedProviderConfigurationRevision: String? = nil,
         expectedToolCatalogRevision: String? = nil,
+        expectedPreparedRunRevision: String? = nil,
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) throws -> [String: Any] {
@@ -2229,43 +2402,36 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let autonomy = managedAutonomy
         lock.unlock()
         guard let autonomy else { throw AutonomyError.shutdown }
-        guard let project = try app.projectContexts.project(projectID) else {
-            throw ProjectContextError.projectNotFound(projectID)
-        }
-        guard project.generation == expectedGeneration else {
-            throw ProjectContextError.staleProjectGeneration(
-                expected: expectedGeneration,
-                actual: project.generation
-            )
-        }
-        let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
-        let providerConfiguration = modelKey == nil || expectedProviderConfigurationRevision != nil
-            ? try readProviderConfiguration() : nil
-        if let expectedProviderConfigurationRevision,
-           providerConfiguration?.revision != expectedProviderConfigurationRevision {
-            throw ManagerRunPreparationError.staleProviderConfiguration
-        }
-        let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
-        if let expectedToolCatalogRevision,
-           catalog.canonicalSHA256 != expectedToolCatalogRevision {
-            throw ManagerRunPreparationError.staleToolCatalog
-        }
-        let preparation = try ManagerRunPreparationResolver.resolve(
-            configuration: providerConfiguration,
-            registeredToolNames: app.tools.toolNames,
+        try Self.validatePreparedMission(mission)
+        let missionData = Data(mission.utf8)
+        let sourceSHA256 = JSONSupport.sha256Hex(missionData)
+        let context = try resolvedRunPreparation(
+            projectID: projectID,
+            expectedGeneration: expectedGeneration,
+            assignmentID: assignmentID,
+            source: ManagerPreparedRunSource(
+                kind: .inlineMission,
+                reference: "inline-mission:\(sourceSHA256)",
+                snapshotSHA256: sourceSHA256
+            ),
+            documents: [ManagerPreparedRunDocumentReference(
+                reference: "inline:mission",
+                byteCount: missionData.count,
+                sha256: sourceSHA256
+            )],
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
-            networkAllowed: networkAllowed
+            expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
+            expectedToolCatalogRevision: expectedToolCatalogRevision,
+            networkAllowed: networkAllowed,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
         )
-        do {
-            _ = try catalog.providerToolDefinitions(allowedToolNames: preparation.allowedTools)
-        } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
-            throw AutonomyError.invalidToolConfiguration(tools)
-        } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
-            throw AutonomyError.invalidToolConfiguration(tools)
+        if let expectedPreparedRunRevision,
+           context.descriptor.revision != expectedPreparedRunRevision {
+            throw ManagerRunPreparationError.staleDescriptor
         }
         let request = AutonomousRunRequest(
             runID: runID,
@@ -2273,17 +2439,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectGeneration: expectedGeneration,
             assignmentID: assignmentID,
             mission: mission,
-            providerID: preparation.providerID,
-            adapterID: preparation.adapterID,
-            modelKey: preparation.modelKey,
+            providerID: context.resolved.providerID,
+            adapterID: context.resolved.adapterID,
+            modelKey: context.resolved.modelKey,
             specification: AutonomousRunSpecification(
-                allowedTools: preparation.allowedTools.sorted(),
-                completionGates: preparation.completionGates
+                allowedTools: context.resolved.allowedTools.sorted(),
+                completionGates: context.resolved.completionGates,
+                work: AutonomousRunWork(
+                    metadata: Self.preparedRunMetadata(context.descriptor)
+                )
             ),
             authorizationScope: ToolAuthorizationScope(
-                canonicalRoots: [authorizedRoot],
-                allowedTools: preparation.allowedTools,
-                networkAllowed: preparation.networkAllowed,
+                canonicalRoots: [context.authorizedRoot],
+                allowedTools: context.resolved.allowedTools,
+                networkAllowed: context.resolved.networkAllowed,
                 maximumInlineOutputBytes: maximumInlineOutputBytes
             )
         )
@@ -2527,53 +2696,60 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         runID: RunID
     ) throws -> AutonomousRunRequest {
         try requireActiveProject(package.projectID, generation: package.projectGeneration)
-        guard let project = try app.projectContexts.project(package.projectID) else {
-            throw ProjectContextError.projectNotFound(package.projectID)
-        }
         let provider = try readProviderConfiguration()
         guard provider.saved, provider.modelKey?.isEmpty == false else {
             throw ProjectInstructionQueueError.queueBlocked(
                 "Save an LM Studio endpoint and model in Provider before starting the instruction queue."
             )
         }
-        let preparation = try ManagerRunPreparationResolver.resolve(
-            configuration: provider,
-            registeredToolNames: app.tools.toolNames,
-            allowedTools: Set(package.allowedTools),
-            completionGates: package.completionGates
+        let documents = try instructionQueueStore().documentReferences(
+            contentSHA256: package.contentSHA256
         )
-        do {
-            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
-            _ = try catalog.providerToolDefinitions(allowedToolNames: preparation.allowedTools)
-        } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
-            throw AutonomyError.invalidToolConfiguration(tools)
-        } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
-            throw AutonomyError.invalidToolConfiguration(tools)
-        }
-        let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
+        let context = try resolvedRunPreparation(
+            projectID: package.projectID,
+            expectedGeneration: package.projectGeneration,
+            assignmentID: "instruction-package:\(package.id.uuidString.lowercased())",
+            source: ManagerPreparedRunSource(
+                kind: .instructionPackage,
+                reference: "instruction-package:\(package.id.uuidString.lowercased())",
+                snapshotSHA256: package.contentSHA256,
+                packageID: package.packageID,
+                packageVersion: package.version
+            ),
+            documents: documents,
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: Set(package.allowedTools),
+            completionGates: package.completionGates,
+            networkAllowed: false,
+            maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
+        )
+        var metadata = Self.preparedRunMetadata(context.descriptor)
+        metadata.merge([
+            "instruction_package_id": package.id.uuidString.lowercased(),
+            "instruction_package_name": package.packageID,
+            "instruction_package_version": package.version,
+            "instruction_package_sha256": package.contentSHA256,
+        ]) { _, packageValue in packageValue }
         return AutonomousRunRequest(
             runID: runID,
             projectID: package.projectID,
             projectGeneration: package.projectGeneration,
             assignmentID: "instruction-package:\(package.id.uuidString.lowercased())",
             mission: package.mission,
-            providerID: preparation.providerID,
-            adapterID: preparation.adapterID,
-            modelKey: preparation.modelKey,
+            providerID: context.resolved.providerID,
+            adapterID: context.resolved.adapterID,
+            modelKey: context.resolved.modelKey,
             specification: AutonomousRunSpecification(
-                allowedTools: preparation.allowedTools.sorted(),
-                completionGates: preparation.completionGates,
-                work: AutonomousRunWork(metadata: [
-                    "instruction_package_id": package.id.uuidString.lowercased(),
-                    "instruction_package_name": package.packageID,
-                    "instruction_package_version": package.version,
-                    "instruction_package_sha256": package.contentSHA256,
-                ])
+                allowedTools: context.resolved.allowedTools.sorted(),
+                completionGates: context.resolved.completionGates,
+                work: AutonomousRunWork(metadata: metadata)
             ),
             authorizationScope: ToolAuthorizationScope(
-                canonicalRoots: [authorizedRoot],
-                allowedTools: preparation.allowedTools,
-                networkAllowed: preparation.networkAllowed,
+                canonicalRoots: [context.authorizedRoot],
+                allowedTools: context.resolved.allowedTools,
+                networkAllowed: context.resolved.networkAllowed,
                 maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
             )
         )

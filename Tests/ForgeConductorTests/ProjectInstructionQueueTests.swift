@@ -89,6 +89,15 @@ final class ProjectInstructionQueueTests: XCTestCase {
             try FileManager.default.attributesOfItem(atPath: accepted.path)[.posixPermissions] as? NSNumber,
             NSNumber(value: Int16(0o400))
         )
+        let references = try fixture.store.documentReferences(
+            contentSHA256: package.contentSHA256
+        )
+        XCTAssertEqual(references.count, 1)
+        XCTAssertTrue(references[0].reference.hasSuffix("/First.md"))
+        XCTAssertEqual(
+            references[0].sha256,
+            JSONSupport.sha256Hex(Data("Inspect the repository and repair the first defect.".utf8))
+        )
     }
 
     func testManifestDirectoryReordersAndSurvivesRestart() throws {

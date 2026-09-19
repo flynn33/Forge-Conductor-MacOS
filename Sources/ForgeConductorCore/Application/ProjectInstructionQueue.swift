@@ -315,6 +315,72 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         return try snapshotUnlocked(projectID: projectID, generation: generation)
     }
 
+    public func documentReferences(
+        contentSHA256: String
+    ) throws -> [ManagerPreparedRunDocumentReference] {
+        lock.lock(); defer { lock.unlock() }
+        guard contentSHA256.utf8.count == 64,
+              contentSHA256.utf8.allSatisfy({
+                  (48...57).contains($0) || (97...102).contains($0)
+              }),
+              state.packages.contains(where: { $0.contentSHA256 == contentSHA256 }) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction snapshot identity is invalid or unreferenced"
+            )
+        }
+        let root = paths.instructionPackageStoreDir
+            .appendingPathComponent(contentSHA256, isDirectory: true)
+            .standardizedFileURL
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction snapshot cannot be enumerated"
+            )
+        }
+        var references: [ManagerPreparedRunDocumentReference] = []
+        var aggregateBytes = 0
+        for case let file as URL in enumerator {
+            let values = try file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            guard values.isRegularFile == true else { continue }
+            let rootComponents = root.pathComponents
+            let fileComponents = file.standardizedFileURL.pathComponents
+            guard fileComponents.starts(with: rootComponents) else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction snapshot escaped its content-addressed root"
+                )
+            }
+            let relative = fileComponents.dropFirst(rootComponents.count).joined(separator: "/")
+            guard relative != "accepted.json", !relative.isEmpty else { continue }
+            let byteCount = values.fileSize ?? 0
+            guard byteCount >= 0,
+                  byteCount <= Self.maximumSourceFileBytes,
+                  aggregateBytes <= Self.maximumAggregateBytes - byteCount else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction snapshot exceeds its bounded document limits"
+                )
+            }
+            let data = try OwnerOnlyAtomicFile.read(
+                from: file,
+                maximumBytes: Self.maximumSourceFileBytes
+            )
+            aggregateBytes += data.count
+            references.append(ManagerPreparedRunDocumentReference(
+                reference: "instruction-snapshot:\(contentSHA256)/\(relative)",
+                byteCount: data.count,
+                sha256: JSONSupport.sha256Hex(data)
+            ))
+        }
+        guard !references.isEmpty, references.count <= Self.maximumSourceFiles else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction snapshot has no bounded instruction documents"
+            )
+        }
+        return references.sorted { $0.reference < $1.reference }
+    }
+
     @discardableResult
     public func reorder(
         projectID: ProjectID,

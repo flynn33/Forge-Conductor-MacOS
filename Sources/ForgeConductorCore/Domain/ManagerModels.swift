@@ -650,6 +650,268 @@ public struct ManagerOperatorRunPreparation: Codable, Sendable, Equatable {
     }
 }
 
+public enum ManagerRunReadinessState: String, Codable, Sendable, Equatable, CaseIterable {
+    case ready
+    case automaticallyPreparing = "automatically_preparing"
+    case needsChoice = "needs_choice"
+    case needsAuthorization = "needs_authorization"
+    case waitingDependency = "waiting_dependency"
+    case failed
+}
+
+public enum ManagerRunRecoveryAction: String, Codable, Sendable, Equatable, CaseIterable {
+    case none
+    case selectProject = "select_project"
+    case authorizeProject = "authorize_project"
+    case configureProvider = "configure_provider"
+    case reviewPermissions = "review_permissions"
+    case retryPreparation = "retry_preparation"
+}
+
+public enum ManagerPreparedRunSourceKind: String, Codable, Sendable, Equatable {
+    case inlineMission = "inline_mission"
+    case instructionPackage = "instruction_package"
+}
+
+public struct ManagerPreparedRunSource: Codable, Sendable, Equatable {
+    public let kind: ManagerPreparedRunSourceKind
+    public let reference: String
+    public let snapshotSHA256: String
+    public let packageID: String?
+    public let packageVersion: String?
+
+    public init(
+        kind: ManagerPreparedRunSourceKind,
+        reference: String,
+        snapshotSHA256: String,
+        packageID: String? = nil,
+        packageVersion: String? = nil
+    ) {
+        self.kind = kind
+        self.reference = reference
+        self.snapshotSHA256 = snapshotSHA256
+        self.packageID = packageID
+        self.packageVersion = packageVersion
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case kind, reference
+        case snapshotSHA256 = "snapshot_sha256"
+        case packageID = "package_id"
+        case packageVersion = "package_version"
+    }
+}
+
+public struct ManagerPreparedRunDocumentReference: Codable, Sendable, Equatable {
+    public let reference: String
+    public let byteCount: Int
+    public let sha256: String
+
+    public init(reference: String, byteCount: Int, sha256: String) {
+        self.reference = reference
+        self.byteCount = byteCount
+        self.sha256 = sha256
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case reference, sha256
+        case byteCount = "byte_count"
+    }
+}
+
+public struct ManagerPreparedRunValidationPlan: Codable, Sendable, Equatable {
+    public let mode: String
+    public let completionGates: [String]
+
+    public init(mode: String = "manager_completion_gates", completionGates: [String]) {
+        self.mode = mode
+        self.completionGates = completionGates
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case mode
+        case completionGates = "completion_gates"
+    }
+}
+
+/// Exact, reproducible manager-owned inputs for one run admission. The revision
+/// excludes presentation text and is recomputed from every authority-bearing
+/// field so Start can reject a stale preview before a durable run is created.
+public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
+    public static let schemaVersion = 1
+
+    public let schemaVersion: Int
+    public let revision: String
+    public let readiness: ManagerRunReadinessState
+    public let detail: String
+    public let recoveryAction: ManagerRunRecoveryAction
+    public let projectID: String
+    public let projectGeneration: UInt64
+    public let assignmentID: String?
+    public let source: ManagerPreparedRunSource
+    public let documents: [ManagerPreparedRunDocumentReference]
+    public let providerID: String
+    public let adapterID: String
+    public let modelKey: String
+    public let providerConfigurationRevision: String
+    public let toolCatalogRevision: String
+    public let allowedTools: [String]
+    public let networkAllowed: Bool
+    public let validationPlan: ManagerPreparedRunValidationPlan
+    public let continuityMode: ContinuityMode
+    public let budgetPolicy: BudgetPolicySelection
+    public let maximumInlineOutputBytes: Int
+
+    private init(
+        revision: String,
+        readiness: ManagerRunReadinessState,
+        detail: String,
+        recoveryAction: ManagerRunRecoveryAction,
+        projectID: String,
+        projectGeneration: UInt64,
+        assignmentID: String?,
+        source: ManagerPreparedRunSource,
+        documents: [ManagerPreparedRunDocumentReference],
+        providerID: String,
+        adapterID: String,
+        modelKey: String,
+        providerConfigurationRevision: String,
+        toolCatalogRevision: String,
+        allowedTools: [String],
+        networkAllowed: Bool,
+        validationPlan: ManagerPreparedRunValidationPlan,
+        continuityMode: ContinuityMode,
+        budgetPolicy: BudgetPolicySelection,
+        maximumInlineOutputBytes: Int
+    ) {
+        schemaVersion = Self.schemaVersion
+        self.revision = revision
+        self.readiness = readiness
+        self.detail = detail
+        self.recoveryAction = recoveryAction
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.assignmentID = assignmentID
+        self.source = source
+        self.documents = documents
+        self.providerID = providerID
+        self.adapterID = adapterID
+        self.modelKey = modelKey
+        self.providerConfigurationRevision = providerConfigurationRevision
+        self.toolCatalogRevision = toolCatalogRevision
+        self.allowedTools = allowedTools
+        self.networkAllowed = networkAllowed
+        self.validationPlan = validationPlan
+        self.continuityMode = continuityMode
+        self.budgetPolicy = budgetPolicy
+        self.maximumInlineOutputBytes = maximumInlineOutputBytes
+    }
+
+    public static func make(
+        readiness: ManagerRunReadinessState = .ready,
+        detail: String,
+        recoveryAction: ManagerRunRecoveryAction = .none,
+        projectID: String,
+        projectGeneration: UInt64,
+        assignmentID: String? = nil,
+        source: ManagerPreparedRunSource,
+        documents: [ManagerPreparedRunDocumentReference],
+        providerID: String,
+        adapterID: String,
+        modelKey: String,
+        providerConfigurationRevision: String,
+        toolCatalogRevision: String,
+        allowedTools: [String],
+        networkAllowed: Bool,
+        validationPlan: ManagerPreparedRunValidationPlan,
+        continuityMode: ContinuityMode,
+        budgetPolicy: BudgetPolicySelection,
+        maximumInlineOutputBytes: Int
+    ) throws -> Self {
+        let orderedDocuments = documents.sorted { $0.reference < $1.reference }
+        let draft = Self(
+            revision: "",
+            readiness: readiness,
+            detail: detail,
+            recoveryAction: recoveryAction,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            assignmentID: assignmentID,
+            source: source,
+            documents: orderedDocuments,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            providerConfigurationRevision: providerConfigurationRevision,
+            toolCatalogRevision: toolCatalogRevision,
+            allowedTools: allowedTools.sorted(),
+            networkAllowed: networkAllowed,
+            validationPlan: validationPlan,
+            continuityMode: continuityMode,
+            budgetPolicy: budgetPolicy,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+        var authority = try draft.asDictionary()
+        authority.removeValue(forKey: "revision")
+        authority.removeValue(forKey: "detail")
+        authority.removeValue(forKey: "readiness")
+        authority.removeValue(forKey: "recovery_action")
+        let revision = try ForgeJSONCanonicalizationV1.sha256Hex(of: authority)
+        return Self(
+            revision: revision,
+            readiness: readiness,
+            detail: detail,
+            recoveryAction: recoveryAction,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            assignmentID: assignmentID,
+            source: source,
+            documents: orderedDocuments,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            providerConfigurationRevision: providerConfigurationRevision,
+            toolCatalogRevision: toolCatalogRevision,
+            allowedTools: allowedTools.sorted(),
+            networkAllowed: networkAllowed,
+            validationPlan: validationPlan,
+            continuityMode: continuityMode,
+            budgetPolicy: budgetPolicy,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case revision, readiness, detail, source, documents
+        case schemaVersion = "schema_version"
+        case recoveryAction = "recovery_action"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case assignmentID = "assignment_id"
+        case providerID = "provider_id"
+        case adapterID = "adapter_id"
+        case modelKey = "model_key"
+        case providerConfigurationRevision = "provider_configuration_revision"
+        case toolCatalogRevision = "tool_catalog_revision"
+        case allowedTools = "allowed_tools"
+        case networkAllowed = "network_allowed"
+        case validationPlan = "validation_plan"
+        case continuityMode = "continuity_mode"
+        case budgetPolicy = "budget_policy"
+        case maximumInlineOutputBytes = "maximum_inline_output_bytes"
+    }
+}
+
 /// One validated, non-authoritative registration intent that is durable before
 /// its first control-plane row exists. The top-level shape keeps that exact
 /// request discoverable after restart without pretending it is a project.

@@ -139,7 +139,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
             port: port,
             credentials: ManagerControlCredentialStore(paths: app.paths)
         )
-        let started = try await client.startRun(OperatorRunStartRequest(
+        let startRequest = OperatorRunStartRequest(
             runID: UUID().uuidString.lowercased(),
             projectID: projectID.description,
             projectGeneration: generation.rawValue,
@@ -155,7 +155,14 @@ final class ProviderConfigurationAppTests: XCTestCase {
                 preparation.providerConfigurationRevision,
             expectedToolCatalogRevision: preparation.toolCatalogRevision,
             maximumInlineOutputBytes: 64 * 1_024
-        ))
+        )
+        let prepared = try await client.prepareRun(startRequest)
+        XCTAssertEqual(prepared.projectID, projectID.description)
+        XCTAssertEqual(prepared.projectGeneration, generation.rawValue)
+        XCTAssertEqual(prepared.modelKey, "fixture/tool-model")
+        let started = try await client.startRun(
+            startRequest.expectingPreparedRevision(prepared.revision)
+        )
         XCTAssertEqual(started.providerID, "lmstudio")
         XCTAssertEqual(started.modelKey, "fixture/tool-model")
         let runID = try RunID(XCTUnwrap(UUID(uuidString: started.runID)))
@@ -169,6 +176,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(
             durable?.specification.completionGates,
             [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        XCTAssertEqual(
+            durable?.specification.work.metadata["prepared_run_revision"],
+            prepared.revision
         )
     }
 
@@ -302,6 +313,184 @@ final class ProviderConfigurationAppTests: XCTestCase {
         ))
         XCTAssertEqual(accepted.runID, runID)
         XCTAssertEqual(accepted.modelKey, "fixture/second-model")
+    }
+
+    func testPreparedRunDescriptorBindsSourceAuthorityValidationContinuityAndBudget() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        let projectRoot = directory.appendingPathComponent("prepared-project", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = manager.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        let current = try manager.readProviderConfiguration()
+        let configured = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: current.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/prepared-model"
+        ))
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+        _ = try manager.recoverManagedAutonomy()
+
+        let mission = "Use the exact prepared source snapshot."
+        let prepared = try manager.prepareAutonomousRun(
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: mission
+        )
+        XCTAssertEqual(prepared.readiness, .ready)
+        XCTAssertEqual(prepared.recoveryAction, .none)
+        XCTAssertEqual(prepared.projectID, projectID.description)
+        XCTAssertEqual(prepared.projectGeneration, generation.rawValue)
+        XCTAssertEqual(prepared.source.kind, .inlineMission)
+        XCTAssertEqual(prepared.source.snapshotSHA256, JSONSupport.sha256Hex(Data(mission.utf8)))
+        XCTAssertEqual(prepared.providerConfigurationRevision, configured.revision)
+        XCTAssertEqual(prepared.modelKey, "fixture/prepared-model")
+        XCTAssertEqual(prepared.continuityMode, .managedAutonomous)
+        XCTAssertEqual(prepared.validationPlan.completionGates, [ProjectInstructionQueueStore.builtInCompletionGate])
+        XCTAssertEqual(prepared.budgetPolicy.scope.projectID, projectID.description)
+        XCTAssertEqual(prepared.budgetPolicy.scope.projectGeneration, Int(generation.rawValue))
+        XCTAssertEqual(prepared.documents.count, 1)
+        XCTAssertEqual(prepared.documents.first?.sha256, prepared.source.snapshotSHA256)
+
+        let rejectedRunID = RunID()
+        XCTAssertThrowsError(try manager.startAutonomousRun(
+            runID: rejectedRunID,
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: mission + " Changed",
+            expectedPreparedRunRevision: prepared.revision
+        )) { error in
+            XCTAssertEqual(error as? ManagerRunPreparationError, .staleDescriptor)
+        }
+        let rejectedRun = try await app.projectContexts.repository.autonomousRun(rejectedRunID)
+        XCTAssertNil(rejectedRun)
+
+        let acceptedRunID = RunID()
+        let accepted = try manager.startAutonomousRun(
+            runID: acceptedRunID,
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: mission,
+            expectedPreparedRunRevision: prepared.revision
+        )
+        let replayed = try manager.startAutonomousRun(
+            runID: acceptedRunID,
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: mission,
+            expectedPreparedRunRevision: prepared.revision
+        )
+        XCTAssertEqual(accepted["run_id"] as? String, acceptedRunID.description)
+        XCTAssertEqual(replayed["run_id"] as? String, acceptedRunID.description)
+        let storedRun = try await app.projectContexts.repository.autonomousRun(acceptedRunID)
+        let durable = try XCTUnwrap(storedRun)
+        XCTAssertEqual(
+            durable.specification.work.metadata["prepared_run_revision"],
+            prepared.revision
+        )
+        XCTAssertEqual(
+            durable.specification.work.metadata["source_snapshot_sha256"],
+            prepared.source.snapshotSHA256
+        )
+    }
+
+    func testInstructionQueuePersistsSharedPreparedDescriptorIdentity() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        defer { Self.makeInstructionSnapshotsRemovable(app.paths.instructionPackageStoreDir) }
+        let projectRoot = directory.appendingPathComponent("queued-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
+        let instruction = directory.appendingPathComponent("queued-instructions.md")
+        let instructionData = Data("Inspect the project and complete the queued work.".utf8)
+        try instructionData.write(to: instruction, options: .atomic)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = manager.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        let current = try manager.readProviderConfiguration()
+        _ = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: current.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/queue-model"
+        ))
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+        _ = try manager.importInstructionPackage(
+            sourcePath: instruction.path,
+            projectID: projectID,
+            expectedGeneration: generation
+        )
+        _ = try manager.recoverManagedAutonomy()
+        _ = try manager.startInstructionQueue(
+            projectID: projectID,
+            expectedGeneration: generation
+        )
+
+        var durable: AutonomousRunRecord?
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while durable == nil, ContinuousClock.now < deadline {
+            let queue = try manager.instructionQueue(
+                projectID: projectID,
+                expectedGeneration: generation
+            )
+            if let package = (queue["packages"] as? [[String: Any]])?.first,
+               let runValue = package["run_id"] as? String,
+               let runUUID = UUID(uuidString: runValue) {
+                durable = try await app.projectContexts.repository.autonomousRun(RunID(runUUID))
+            }
+            if durable == nil { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        let run = try XCTUnwrap(durable)
+        let metadata = run.specification.work.metadata
+        XCTAssertEqual(metadata["source_snapshot_sha256"], metadata["instruction_package_sha256"])
+        XCTAssertEqual(metadata["continuity_mode"], ContinuityMode.managedAutonomous.rawValue)
+        XCTAssertEqual(metadata["provider_configuration_revision"]?.isEmpty, false)
+        XCTAssertEqual(metadata["tool_catalog_revision"]?.count, 64)
+        XCTAssertEqual(metadata["prepared_run_revision"]?.count, 64)
+        XCTAssertEqual(run.modelKey, "fixture/queue-model")
+    }
+
+    private static func makeInstructionSnapshotsRemovable(_ root: URL) {
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: root.path
+        )
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: []
+        ) else { return }
+        var entries: [URL] = []
+        for case let entry as URL in enumerator { entries.append(entry) }
+        for entry in entries.reversed() {
+            let isDirectory = (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: isDirectory == true ? 0o700 : 0o600],
+                ofItemAtPath: entry.path
+            )
+        }
     }
 
     func testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations() async throws {
