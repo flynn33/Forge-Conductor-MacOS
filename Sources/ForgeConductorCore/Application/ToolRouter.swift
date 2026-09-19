@@ -923,6 +923,10 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "job.cancel",
     ]
 
+    static func isMutatingTool(_ tool: String) -> Bool {
+        mutatingTools.contains(tool)
+    }
+
     private static let contextRequiredTools: Set<String> = [
         "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",

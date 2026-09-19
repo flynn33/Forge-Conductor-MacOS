@@ -254,6 +254,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumRuntimeJobCancelBodyBytes = 256
     static let maximumProviderProbeBodyBytes = 512
     static let maximumRunControlBodyBytes = 256
+    static let maximumToolPermissionBodyBytes = 128 * 1_024
     /// Provider I/O is intentionally isolated from `DashboardServer`'s serial
     /// listener queue. The active-connection cap bounds submitted work, while
     /// `ManagerNode` rejects overlapping probes and owns the operation deadline.
@@ -822,6 +823,61 @@ public final class ManagerRoutes: @unchecked Sendable {
                 status: 200,
                 object: try manager.managedAutonomyStatus()
             )
+        case ("POST", "/api/manager/projects/tool-permissions/status"):
+            guard body.count <= Self.maximumToolPermissionBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "tool_permission_body_too_large",
+                    "message": "Tool permission requests must remain bounded",
+                ])
+                return
+            }
+            let object = try JSONSupport.object(from: body)
+            let snapshot = try manager.projectToolPermissions(
+                projectID: try projectID(object),
+                expectedGeneration: try projectGeneration(object)
+            )
+            http.respondJSON(connection, status: 200, object: try snapshot.asDictionary())
+        case ("PUT", "/api/manager/projects/tool-permissions"):
+            guard body.count <= Self.maximumToolPermissionBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "tool_permission_body_too_large",
+                    "message": "Tool permission updates must remain bounded",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(
+                    ManagerToolPermissionUpdate.self,
+                    from: body
+                )
+                let snapshot = try manager.updateProjectToolPermissions(request)
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try snapshot.asDictionary()
+                )
+            } catch let error as ToolPermissionStoreError {
+                let status: Int
+                let code: String
+                switch error {
+                case .staleRevision:
+                    status = 409
+                    code = "tool_permission_revision_stale"
+                case .invalidPersistence:
+                    status = 503
+                    code = "tool_permission_store_unavailable"
+                case .invalidSelection:
+                    status = 422
+                    code = "tool_permission_selection_invalid"
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": code,
+                    "message": error.localizedDescription,
+                ])
+            }
         case ("POST", "/api/manager/runs/prepare"):
             let object = try JSONSupport.object(from: body)
             guard let mission = object["mission"] as? String, !mission.isEmpty else {

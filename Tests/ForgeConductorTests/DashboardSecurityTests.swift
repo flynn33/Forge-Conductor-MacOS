@@ -49,6 +49,7 @@ final class DashboardSecurityTests: XCTestCase {
             "/api/manager/projects/relink",
             "/api/manager/projects/bind",
             "/api/manager/projects/reset-generation",
+            "/api/manager/projects/tool-permissions/status",
             "/api/manager/runs/prepare",
             "/api/manager/runs/start",
             "/api/manager/runs/control",
@@ -65,6 +66,12 @@ final class DashboardSecurityTests: XCTestCase {
             ManagerMutationAuthorizer.requiresAuthorization(
                 method: "PUT",
                 path: "/api/manager/settings"
+            )
+        )
+        XCTAssertTrue(
+            ManagerMutationAuthorizer.requiresAuthorization(
+                method: "PUT",
+                path: "/api/manager/projects/tool-permissions"
             )
         )
         XCTAssertFalse(

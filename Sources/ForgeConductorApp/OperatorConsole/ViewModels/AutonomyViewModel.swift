@@ -6,6 +6,12 @@ import AppKit
 import ForgeConductorCore
 import UniformTypeIdentifiers
 
+enum ToolCheckboxState: Equatable {
+    case unchecked
+    case mixed
+    case checked
+}
+
 @MainActor
 final class AutonomyViewModel: ObservableObject {
     @Published private(set) var runs: [OperatorRun] = []
@@ -13,6 +19,8 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var provider: OperatorProvider?
     @Published private(set) var runPreparation: OperatorRunPreparation?
     @Published private(set) var projectRunPreparation: ManagerRunPreparationResult?
+    @Published private(set) var toolPermissions: ManagerToolPermissionSnapshot?
+    @Published var toolSearch = ""
     @Published private(set) var autonomyStarted = false
     @Published var selectedRunID: String?
     @Published var selectedProjectID: String?
@@ -30,6 +38,7 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var lastStartedRunID: String?
     @Published private(set) var controlInFlight: OperatorRunControlAction?
     @Published private(set) var policyImportInFlight = false
+    @Published private(set) var toolPermissionUpdateInFlight = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var notice: String?
 
@@ -59,6 +68,150 @@ final class AutonomyViewModel: ObservableObject {
             return nil
         }
         return action
+    }
+
+    var filteredToolEntries: [ManagerToolCatalogEntry] {
+        guard let toolPermissions else { return [] }
+        let query = toolSearch.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return toolPermissions.tools }
+        return toolPermissions.tools.filter {
+            $0.id.lowercased().contains(query)
+                || $0.displayName.lowercased().contains(query)
+                || $0.description.lowercased().contains(query)
+                || $0.categoryDisplayName.lowercased().contains(query)
+        }
+    }
+
+    var visibleToolCategories: [ManagerToolCategory] {
+        let categories = Set(filteredToolEntries.map(\.category))
+        return ManagerToolCategory.allCases.filter(categories.contains)
+    }
+
+    var allToolSelectionState: ToolCheckboxState {
+        selectionState(for: toolPermissions?.tools.filter(\.available) ?? [])
+    }
+
+    func categorySelectionState(_ category: ManagerToolCategory) -> ToolCheckboxState {
+        selectionState(for: toolPermissions?.tools.filter {
+            $0.category == category && $0.available
+        } ?? [])
+    }
+
+    func isToolSelected(_ toolID: String) -> Bool {
+        toolPermissions?.selectedToolIDs.contains(toolID) == true
+            || toolPermissions?.effectiveToolIDs.contains(toolID) == true
+    }
+
+    func refreshToolPermissionsForSelection() {
+        guard let project = selectedProject else {
+            toolPermissions = nil
+            return
+        }
+        toolPermissions = nil
+        Task { [weak self] in
+            await self?.refreshToolPermissions(for: project, reportErrors: true)
+        }
+    }
+
+    func setTool(_ toolID: String, selected: Bool) {
+        guard let snapshot = toolPermissions,
+              let tool = snapshot.tools.first(where: { $0.id == toolID }),
+              tool.available || (!selected && snapshot.selectedToolIDs.contains(toolID)) else {
+            return
+        }
+        var selectedIDs = Set(snapshot.selectedToolIDs)
+        if selected { selectedIDs.insert(toolID) } else { selectedIDs.remove(toolID) }
+        saveToolPermissions(mode: .explicit, selectedToolIDs: selectedIDs)
+    }
+
+    func setCategory(_ category: ManagerToolCategory, selected: Bool) {
+        guard let snapshot = toolPermissions else { return }
+        let categoryIDs = Set(snapshot.tools.filter {
+            $0.category == category && $0.available
+        }.map(\.id))
+        var selectedIDs = Set(snapshot.selectedToolIDs)
+        if selected {
+            selectedIDs.formUnion(categoryIDs)
+        } else {
+            selectedIDs.subtract(categoryIDs)
+        }
+        saveToolPermissions(mode: .explicit, selectedToolIDs: selectedIDs)
+    }
+
+    func setAllTools(selected: Bool) {
+        saveToolPermissions(
+            mode: selected ? .allEligible : .explicit,
+            selectedToolIDs: []
+        )
+    }
+
+    func restoreRecommendedTools() {
+        saveToolPermissions(mode: .recommended, selectedToolIDs: [])
+    }
+
+    private func selectionState(for entries: [ManagerToolCatalogEntry]) -> ToolCheckboxState {
+        guard !entries.isEmpty else { return .unchecked }
+        let selected = Set(toolPermissions?.effectiveToolIDs ?? [])
+        let count = entries.lazy.filter { selected.contains($0.id) }.count
+        if count == 0 { return .unchecked }
+        return count == entries.count ? .checked : .mixed
+    }
+
+    private func refreshToolPermissions(
+        for project: OperatorProject,
+        reportErrors: Bool
+    ) async {
+        do {
+            let snapshot = try await client.projectToolPermissions(
+                projectID: project.projectID,
+                generation: project.projectGeneration
+            )
+            guard selectedProjectID == project.projectID else { return }
+            applyToolPermissions(snapshot)
+        } catch OperatorManagerClientError.capabilityUnavailable(_) {
+            if selectedProjectID == project.projectID { toolPermissions = nil }
+        } catch {
+            if reportErrors { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func saveToolPermissions(
+        mode: ManagerToolSelectionMode,
+        selectedToolIDs: Set<String>
+    ) {
+        guard !toolPermissionUpdateInFlight,
+              let snapshot = toolPermissions,
+              selectedProjectID == snapshot.projectID else { return }
+        toolPermissionUpdateInFlight = true
+        errorMessage = nil
+        Task { [weak self] in
+            guard let self else { return }
+            defer { toolPermissionUpdateInFlight = false }
+            do {
+                let updated = try await client.updateProjectToolPermissions(
+                    ManagerToolPermissionUpdate(
+                        projectID: snapshot.projectID,
+                        projectGeneration: snapshot.projectGeneration,
+                        expectedPreferenceRevision: snapshot.preferenceRevision,
+                        selectionMode: mode,
+                        selectedToolIDs: selectedToolIDs.sorted()
+                    )
+                )
+                guard selectedProjectID == updated.projectID else { return }
+                applyToolPermissions(updated)
+                notice = "Saved project capability defaults. New runs will freeze this exact resolved grant."
+            } catch {
+                errorMessage = error.localizedDescription
+                if let project = selectedProject {
+                    await refreshToolPermissions(for: project, reportErrors: false)
+                }
+            }
+        }
+    }
+
+    private func applyToolPermissions(_ snapshot: ManagerToolPermissionSnapshot) {
+        toolPermissions = snapshot
+        allowedTools = snapshot.effectiveToolIDs.joined(separator: "\n")
     }
 
     func load() {
@@ -111,6 +264,11 @@ final class AutonomyViewModel: ObservableObject {
                     if providerID.isEmpty { providerID = snapshot.provider?.providerID ?? "" }
                     if modelKey.isEmpty { modelKey = snapshot.provider?.modelKey ?? "" }
                 }
+                if let project = selectedProject {
+                    await refreshToolPermissions(for: project, reportErrors: false)
+                } else {
+                    toolPermissions = nil
+                }
                 if let pending = pendingStartRequest,
                    let accepted = loadedRuns.first(where: { $0.runID == pending.runID }) {
                     acceptStartedRun(accepted)
@@ -143,6 +301,10 @@ final class AutonomyViewModel: ObservableObject {
         let allowedTools = parsedList(allowedTools)
         let completionGates = parsedList(completionGates)
         let preparation = runPreparation
+        let projectPermissions = toolPermissions.flatMap {
+            $0.projectID == project.projectID
+                && $0.projectGeneration == project.projectGeneration ? $0 : nil
+        }
         return OperatorRunStartRequest(
             runID: UUID().uuidString.lowercased(),
             projectID: project.projectID,
@@ -156,7 +318,8 @@ final class AutonomyViewModel: ObservableObject {
             modelKey: modelKey.isEmpty || modelKey == preparation?.modelKey
                 ? nil : modelKey,
             allowedTools: allowedTools.isEmpty
-                || Set(allowedTools) == Set(preparation?.allowedTools ?? [])
+                || Set(allowedTools) == Set(projectPermissions?.effectiveToolIDs
+                    ?? preparation?.allowedTools ?? [])
                 ? nil : allowedTools,
             completionGates: completionGates.isEmpty
                 || completionGates == preparation?.completionGates
@@ -165,7 +328,8 @@ final class AutonomyViewModel: ObservableObject {
                 ? nil : networkAllowed,
             expectedProviderConfigurationRevision:
                 preparation?.providerConfigurationRevision,
-            expectedToolCatalogRevision: preparation?.toolCatalogRevision,
+            expectedToolCatalogRevision: projectPermissions?.catalogRevision
+                ?? preparation?.toolCatalogRevision,
             maximumInlineOutputBytes: 64 * 1_024
         )
     }

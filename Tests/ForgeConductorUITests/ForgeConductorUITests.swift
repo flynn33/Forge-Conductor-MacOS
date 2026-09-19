@@ -856,6 +856,78 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(reconcile.exists)
     }
 
+    func testToolPermissionCatalogSupportsMixedKeyboardAndSavedProjectDefaults() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let autonomy = app.buttons["tab-autonomy"]
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+        let start = app.buttons["autonomy-start"]
+        XCTAssertTrue(waitForEnabled(start, timeout: 5))
+        start.click()
+
+        let read = app.checkBoxes["run-tool-fs_read"]
+        let fileCategory = app.checkBoxes["run-tools-category-files"]
+        XCTAssertTrue(read.waitForExistence(timeout: 5))
+        XCTAssertTrue(fileCategory.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForCheckboxState(.off, on: read))
+
+        read.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.selectedToolIDs == ["fs_read"]
+                && fixture.toolPermissionUpdateCount == 1
+        })
+        XCTAssertTrue(waitForCheckboxState(.on, on: read))
+        XCTAssertTrue(
+            waitForCheckboxState(.mixed, on: fileCategory),
+            "One of two file tools should publish mixed state"
+        )
+
+        read.typeKey(.space, modifierFlags: [])
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.selectedToolIDs.isEmpty
+                && fixture.toolPermissionUpdateCount == 2
+        })
+        XCTAssertTrue(waitForCheckboxState(.off, on: read))
+        XCTAssertTrue(waitForCheckboxState(.off, on: fileCategory))
+
+        let allowAll = app.checkBoxes["run-tools-allow-all"]
+        XCTAssertTrue(allowAll.waitForExistence(timeout: 5))
+        allowAll.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.toolSelectionMode == "all_eligible"
+                && fixture.toolPermissionUpdateCount == 3
+        })
+        XCTAssertTrue(waitForCheckboxState(.on, on: allowAll))
+
+        let selectNone = app.buttons["run-tools-select-none"]
+        XCTAssertTrue(selectNone.waitForExistence(timeout: 5))
+        selectNone.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.toolSelectionMode == "explicit"
+                && fixture.selectedToolIDs.isEmpty
+                && fixture.toolPermissionUpdateCount == 4
+        })
+
+        let recommended = app.buttons["run-tools-restore-recommended"]
+        recommended.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.toolSelectionMode == "recommended"
+                && fixture.toolPermissionUpdateCount == 5
+        })
+        app.buttons["run-start-cancel"].click()
+        app.terminate()
+        app.launch()
+        app.buttons["tab-autonomy"].click()
+        let reopenedStart = app.buttons["autonomy-start"]
+        XCTAssertTrue(waitForEnabled(reopenedStart, timeout: 5))
+        reopenedStart.click()
+        XCTAssertTrue(app.checkBoxes["run-tool-fs_read"].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForCheckboxState(.on, on: app.checkBoxes["run-tool-fs_read"]))
+        XCTAssertEqual(fixture.toolSelectionMode, "recommended")
+    }
+
     func testUncertainStartReusesExactClientRunIdentityDuringReconciliation() throws {
         let fixture = try OperatorManagerUITestFixture(failStartResponse: true)
         relaunch(with: fixture)
@@ -1023,6 +1095,40 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    private enum CheckboxState {
+        case off
+        case mixed
+        case on
+    }
+
+    private func waitForCheckboxState(
+        _ expected: CheckboxState,
+        on element: XCUIElement,
+        timeout: TimeInterval = 5
+    ) -> Bool {
+        waitUntil(timeout: timeout) {
+            let observed: CheckboxState?
+            if let number = element.value as? NSNumber {
+                switch number.intValue {
+                case 0: observed = .off
+                case 1: observed = .on
+                case -1, 2: observed = .mixed
+                default: observed = nil
+                }
+            } else if let raw = element.value as? String {
+                switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                case "0", "false", "off", "no": observed = .off
+                case "1", "true", "on", "yes": observed = .on
+                case "-1", "2", "mixed": observed = .mixed
+                default: observed = nil
+                }
+            } else {
+                observed = nil
+            }
+            return observed == expected
+        }
+    }
+
     private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         guard element.waitForExistence(timeout: timeout) else { return false }
         let expectation = XCTNSPredicateExpectation(
@@ -1110,6 +1216,10 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableRuntimeCancellationBodies: [Data] = []
     private var mutableRuntimeCancellationAuthorizationCount = 0
     private var mutableRejectNextRuntimeCancellation = false
+    private var mutableToolPreferenceRevision: UInt64 = 0
+    private var mutableToolSelectionMode = "explicit"
+    private var mutableSelectedToolIDs: [String] = []
+    private var mutableToolPermissionUpdateCount = 0
     private(set) var port: UInt16 = 0
 
     var startRequestCount: Int { locked { mutableStartRequestCount } }
@@ -1137,6 +1247,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var runtimeCancellationAuthorizationCount: Int {
         locked { mutableRuntimeCancellationAuthorizationCount }
     }
+    var selectedToolIDs: [String] { locked { mutableSelectedToolIDs } }
+    var toolSelectionMode: String { locked { mutableToolSelectionMode } }
+    var toolPermissionUpdateCount: Int { locked { mutableToolPermissionUpdateCount } }
 
     init(
         failStartResponse: Bool = false,
@@ -1314,6 +1427,39 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             )
         case "/api/manager/projects/status":
             respond(status: 200, object: project(), to: connection)
+        case "/api/manager/projects/tool-permissions/status":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true else {
+                respond(status: 401, object: ["message": "missing tool permission authorization"], to: connection)
+                return
+            }
+            respond(status: 200, object: toolPermissionSnapshot(), to: connection)
+        case "/api/manager/projects/tool-permissions":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  let generation = (object["project_generation"] as? NSNumber)?.uint64Value,
+                  generation == locked({ mutableProjectGeneration }),
+                  let expected = (object["expected_preference_revision"] as? NSNumber)?.uint64Value,
+                  let mode = object["selection_mode"] as? String,
+                  ["recommended", "all_eligible", "explicit"].contains(mode),
+                  let selected = object["selected_tool_ids"] as? [String] else {
+                respond(status: 401, object: ["message": "missing or invalid tool permission update"], to: connection)
+                return
+            }
+            let updated = locked { () -> Bool in
+                guard expected == mutableToolPreferenceRevision else { return false }
+                mutableToolPreferenceRevision += 1
+                mutableToolSelectionMode = mode
+                mutableSelectedToolIDs = mode == "explicit" ? selected.sorted() : []
+                mutableToolPermissionUpdateCount += 1
+                mutableMutationAuthorizationCount += 1
+                return true
+            }
+            guard updated else {
+                respond(status: 409, object: ["message": "stale tool permission revision"], to: connection)
+                return
+            }
+            respond(status: 200, object: toolPermissionSnapshot(), to: connection)
         case "/api/manager/projects/relink":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
@@ -1698,6 +1844,69 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "memory": ["state": "healthy", "database_bytes": 4_096, "record_count": 2],
             "continuity": ["state": "ready", "migration_state": "not_required"],
             "migration_warnings": [],
+        ]
+    }
+
+    private func toolPermissionSnapshot() -> [String: Any] {
+        let state = locked {
+            (
+                mutableProjectGeneration,
+                mutableToolPreferenceRevision,
+                mutableToolSelectionMode,
+                mutableSelectedToolIDs,
+                mutableShellEnabled
+            )
+        }
+        let allToolIDs = ["fs_edit", "fs_read", "git_status", "project_memory.search", "search_text", "shell_exec"]
+        let availableToolIDs = state.4 ? allToolIDs : allToolIDs.filter { $0 != "shell_exec" }
+        let selected: [String]
+        switch state.2 {
+        case "all_eligible": selected = availableToolIDs
+        case "recommended": selected = ["fs_read", "git_status", "project_memory.search", "search_text"]
+        default: selected = state.3
+        }
+        let effective = selected.filter { availableToolIDs.contains($0) }.sorted()
+        func entry(
+            _ id: String,
+            _ name: String,
+            _ description: String,
+            _ category: String,
+            _ categoryName: String,
+            highImpact: Bool = false
+        ) -> [String: Any] {
+            var value: [String: Any] = [
+                "id": id,
+                "display_name": name,
+                "description": description,
+                "category": category,
+                "category_display_name": categoryName,
+                "recommended": ["fs_read", "git_status", "project_memory.search", "search_text"].contains(id),
+                "available": id != "shell_exec" || state.4,
+                "high_impact": highImpact,
+            ]
+            if id == "shell_exec", !state.4 {
+                value["unavailable_reason"] = "Shell access is disabled in Manager settings."
+            }
+            return value
+        }
+        return [
+            "schema_version": 1,
+            "project_id": projectID,
+            "project_generation": state.0,
+            "preference_revision": state.1,
+            "catalog_revision": String(repeating: "b", count: 64),
+            "selection_mode": state.2,
+            "selected_tool_ids": selected.sorted(),
+            "effective_tool_ids": effective,
+            "tools": [
+                entry("fs_edit", "Fs Edit", "Edit a UTF-8 text file.", "files", "Files", highImpact: true),
+                entry("fs_read", "Fs Read", "Read a UTF-8 text file.", "files", "Files"),
+                entry("git_status", "Git Status", "Read repository status.", "source_control", "Source control"),
+                entry("project_memory.search", "Project Memory Search", "Search project-scoped memory.", "project_memory", "Project memory"),
+                entry("search_text", "Search Text", "Search text recursively.", "search", "Search"),
+                entry("shell_exec", "Shell Exec", "Run a bounded shell command.", "commands", "Build and commands", highImpact: true),
+            ],
+            "updated_at": NSNull(),
         ]
     }
 

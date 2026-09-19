@@ -238,6 +238,399 @@ public enum ToolDefinitionCatalogError: Error, LocalizedError, Sendable, Equatab
     }
 }
 
+public enum ManagerToolSelectionMode: String, Codable, Sendable, Equatable, CaseIterable {
+    case recommended
+    case allEligible = "all_eligible"
+    case explicit
+}
+
+public enum ManagerToolCategory: String, Codable, Sendable, Equatable, CaseIterable {
+    case files
+    case search
+    case sourceControl = "source_control"
+    case commands
+    case projectMemory = "project_memory"
+    case continuity
+    case agents
+    case documents
+    case runtime
+    case other
+
+    public var displayName: String {
+        switch self {
+        case .files: "Files"
+        case .search: "Search"
+        case .sourceControl: "Source control"
+        case .commands: "Build and commands"
+        case .projectMemory: "Project memory"
+        case .continuity: "Continuity"
+        case .agents: "Agent support"
+        case .documents: "Documents"
+        case .runtime: "Runtime jobs"
+        case .other: "Other"
+        }
+    }
+
+    static func classify(_ toolID: String) -> Self {
+        if toolID.hasPrefix("fs_") { return .files }
+        if toolID.hasPrefix("search_") { return .search }
+        if toolID.hasPrefix("git_") { return .sourceControl }
+        if toolID == "shell_exec" { return .commands }
+        if toolID.hasPrefix("project_memory.") || toolID.hasPrefix("memory_") {
+            return .projectMemory
+        }
+        if toolID.hasPrefix("continuity.") || toolID.hasPrefix("session_")
+            || toolID.hasPrefix("context_") {
+            return .continuity
+        }
+        if toolID.hasPrefix("agent_") || toolID == "forge_status" { return .agents }
+        if toolID.hasPrefix("pdf_") { return .documents }
+        if toolID.hasPrefix("runtime_") { return .runtime }
+        return .other
+    }
+}
+
+public struct ManagerToolCatalogEntry: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let displayName: String
+    public let description: String
+    public let category: ManagerToolCategory
+    public let categoryDisplayName: String
+    public let recommended: Bool
+    public let available: Bool
+    public let unavailableReason: String?
+    public let highImpact: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, description, category, recommended, available
+        case displayName = "display_name"
+        case categoryDisplayName = "category_display_name"
+        case unavailableReason = "unavailable_reason"
+        case highImpact = "high_impact"
+    }
+}
+
+public struct ManagerToolPermissionSnapshot: Codable, Sendable, Equatable {
+    public static let schemaVersion = 1
+
+    public let schemaVersion: Int
+    public let projectID: String
+    public let projectGeneration: UInt64
+    public let preferenceRevision: UInt64
+    public let catalogRevision: String
+    public let selectionMode: ManagerToolSelectionMode
+    /// User intent. Explicit selections remain here even while a tool is unavailable.
+    public let selectedToolIDs: [String]
+    /// Exact currently registered and available grant used when a run is prepared.
+    public let effectiveToolIDs: [String]
+    public let tools: [ManagerToolCatalogEntry]
+    public let updatedAt: String?
+
+    public var selectedCount: Int { selectedToolIDs.count }
+    public var effectiveCount: Int { effectiveToolIDs.count }
+    public var availableCount: Int { tools.lazy.filter(\.available).count }
+
+    enum CodingKeys: String, CodingKey {
+        case tools
+        case schemaVersion = "schema_version"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case preferenceRevision = "preference_revision"
+        case catalogRevision = "catalog_revision"
+        case selectionMode = "selection_mode"
+        case selectedToolIDs = "selected_tool_ids"
+        case effectiveToolIDs = "effective_tool_ids"
+        case updatedAt = "updated_at"
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ToolPermissionStoreError.invalidPersistence
+        }
+        return object
+    }
+}
+
+public struct ManagerToolPermissionUpdate: Codable, Sendable, Equatable {
+    public let projectID: String
+    public let projectGeneration: UInt64
+    public let expectedPreferenceRevision: UInt64
+    public let selectionMode: ManagerToolSelectionMode
+    public let selectedToolIDs: [String]
+
+    public init(
+        projectID: String,
+        projectGeneration: UInt64,
+        expectedPreferenceRevision: UInt64,
+        selectionMode: ManagerToolSelectionMode,
+        selectedToolIDs: [String]
+    ) {
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.expectedPreferenceRevision = expectedPreferenceRevision
+        self.selectionMode = selectionMode
+        self.selectedToolIDs = selectedToolIDs
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case expectedPreferenceRevision = "expected_preference_revision"
+        case selectionMode = "selection_mode"
+        case selectedToolIDs = "selected_tool_ids"
+    }
+}
+
+public enum ToolPermissionStoreError: Error, LocalizedError, Sendable, Equatable {
+    case invalidPersistence
+    case invalidSelection
+    case staleRevision(expected: UInt64, actual: UInt64)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidPersistence:
+            "Project tool preferences are unavailable or invalid"
+        case .invalidSelection:
+            "Tool selections must be unique bounded registered identifiers"
+        case .staleRevision(let expected, let actual):
+            "Tool preferences changed (expected revision \(expected), current revision \(actual))"
+        }
+    }
+}
+
+/// One owner-only durable store for project defaults. Run preparation resolves
+/// these defaults against the live catalog and freezes the exact resulting grant.
+final class ProjectToolPermissionStore: @unchecked Sendable {
+    private struct Record: Codable, Sendable, Equatable {
+        let revision: UInt64
+        let selectionMode: ManagerToolSelectionMode
+        let selectedToolIDs: [String]
+        let updatedAt: String
+
+        enum CodingKeys: String, CodingKey {
+            case revision
+            case selectionMode = "selection_mode"
+            case selectedToolIDs = "selected_tool_ids"
+            case updatedAt = "updated_at"
+        }
+    }
+
+    private struct State: Codable, Sendable, Equatable {
+        let schemaVersion: Int
+        var projects: [String: Record]
+
+        enum CodingKeys: String, CodingKey {
+            case schemaVersion = "schema_version"
+            case projects
+        }
+    }
+
+    private static let maximumProjects = 2_048
+    private let url: URL
+    private let clock: any Clock
+    private let lock = NSLock()
+    private var state: State
+
+    init(paths: AppPaths, clock: any Clock) throws {
+        url = paths.projectToolPermissions
+        self.clock = clock
+        if FileManager.default.fileExists(atPath: url.path) {
+            let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: 2 * 1_024 * 1_024)
+            let decoded = try JSONDecoder().decode(State.self, from: data)
+            guard decoded.schemaVersion == ManagerToolPermissionSnapshot.schemaVersion,
+                  decoded.projects.count <= Self.maximumProjects,
+                  decoded.projects.allSatisfy({ projectID, record in
+                      UUID(uuidString: projectID) != nil
+                          && record.selectedToolIDs.count <= ToolDefinitionCatalog.maximumDefinitions
+                          && record.selectedToolIDs.count == Set(record.selectedToolIDs).count
+                          && record.selectedToolIDs.allSatisfy(Self.isValidToolID)
+                  }) else {
+                throw ToolPermissionStoreError.invalidPersistence
+            }
+            state = decoded
+        } else {
+            state = State(schemaVersion: ManagerToolPermissionSnapshot.schemaVersion, projects: [:])
+        }
+    }
+
+    func snapshot(
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        catalog: ToolDefinitionCatalog,
+        unavailableReasons: [String: String]
+    ) throws -> ManagerToolPermissionSnapshot {
+        lock.lock(); defer { lock.unlock() }
+        return try snapshotUnlocked(
+            projectID: projectID,
+            generation: generation,
+            catalog: catalog,
+            unavailableReasons: unavailableReasons
+        )
+    }
+
+    func update(
+        _ request: ManagerToolPermissionUpdate,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        catalog: ToolDefinitionCatalog,
+        unavailableReasons: [String: String]
+    ) throws -> ManagerToolPermissionSnapshot {
+        let selected = request.selectedToolIDs
+        guard selected.count <= ToolDefinitionCatalog.maximumDefinitions,
+              selected.count == Set(selected).count,
+              selected.allSatisfy(Self.isValidToolID),
+              request.projectID == projectID.description,
+              request.projectGeneration == generation.rawValue,
+              request.selectionMode == .explicit || selected.isEmpty else {
+            throw ToolPermissionStoreError.invalidSelection
+        }
+
+        lock.lock(); defer { lock.unlock() }
+        let current = state.projects[projectID.description]
+        let known = Set(catalog.definitions.map(\.name))
+            .subtracting(ToolDefinitionCatalog.controlPlaneOnlyToolNames)
+        let retainedMissing = Set(current?.selectedToolIDs ?? [])
+        guard request.selectionMode != .explicit
+                || Set(selected).isSubset(of: known.union(retainedMissing)) else {
+            throw ToolPermissionStoreError.invalidSelection
+        }
+        let actualRevision = current?.revision ?? 0
+        guard request.expectedPreferenceRevision == actualRevision else {
+            throw ToolPermissionStoreError.staleRevision(
+                expected: request.expectedPreferenceRevision,
+                actual: actualRevision
+            )
+        }
+        guard state.projects[projectID.description] != nil
+                || state.projects.count < Self.maximumProjects else {
+            throw ToolPermissionStoreError.invalidPersistence
+        }
+        let (nextRevision, overflow) = actualRevision.addingReportingOverflow(1)
+        guard !overflow else { throw ToolPermissionStoreError.invalidPersistence }
+        let retainedSelection = request.selectionMode == .explicit ? selected.sorted() : []
+        var nextState = state
+        nextState.projects[projectID.description] = Record(
+            revision: nextRevision,
+            selectionMode: request.selectionMode,
+            selectedToolIDs: retainedSelection,
+            updatedAt: ISO8601.string(from: clock.now())
+        )
+        try persistUnlocked(nextState)
+        state = nextState
+        return try snapshotUnlocked(
+            projectID: projectID,
+            generation: generation,
+            catalog: catalog,
+            unavailableReasons: unavailableReasons
+        )
+    }
+
+    private func snapshotUnlocked(
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        catalog: ToolDefinitionCatalog,
+        unavailableReasons: [String: String]
+    ) throws -> ManagerToolPermissionSnapshot {
+        let record = state.projects[projectID.description]
+        let mode = record?.selectionMode ?? .recommended
+        let definitions = catalog.definitions.filter {
+            !ToolDefinitionCatalog.controlPlaneOnlyToolNames.contains($0.name)
+        }
+        let registered = Set(definitions.map(\.name))
+        let available = registered.subtracting(unavailableReasons.keys)
+        let recommended = Set(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools)
+            .intersection(registered)
+        let selected: Set<String>
+        switch mode {
+        case .recommended: selected = recommended
+        case .allEligible: selected = available
+        case .explicit: selected = Set(record?.selectedToolIDs ?? [])
+        }
+        let missingSelections = selected.subtracting(registered).sorted().map { toolID in
+            ManagerToolCatalogEntry(
+                id: toolID,
+                displayName: Self.displayName(toolID),
+                description: "This previously selected tool is not registered by the current build.",
+                category: .other,
+                categoryDisplayName: ManagerToolCategory.other.displayName,
+                recommended: false,
+                available: false,
+                unavailableReason: "Not registered by the current Forge tool catalog.",
+                highImpact: Self.isHighImpact(toolID)
+            )
+        }
+        let entries = definitions.map { definition in
+            let category = ManagerToolCategory.classify(definition.name)
+            let unavailableReason = unavailableReasons[definition.name]
+            return ManagerToolCatalogEntry(
+                id: definition.name,
+                displayName: Self.displayName(definition.name),
+                description: definition.description,
+                category: category,
+                categoryDisplayName: category.displayName,
+                recommended: recommended.contains(definition.name),
+                available: unavailableReason == nil,
+                unavailableReason: unavailableReason,
+                highImpact: Self.isHighImpact(definition.name)
+            )
+        } + missingSelections
+        let orderedEntries = entries.sorted {
+            if $0.category.rawValue != $1.category.rawValue {
+                return $0.category.rawValue < $1.category.rawValue
+            }
+            return $0.id < $1.id
+        }
+        let catalogRevision = try Self.catalogRevision(entries: orderedEntries)
+        return ManagerToolPermissionSnapshot(
+            schemaVersion: ManagerToolPermissionSnapshot.schemaVersion,
+            projectID: projectID.description,
+            projectGeneration: generation.rawValue,
+            preferenceRevision: record?.revision ?? 0,
+            catalogRevision: catalogRevision,
+            selectionMode: mode,
+            selectedToolIDs: selected.sorted(),
+            effectiveToolIDs: ToolGrantSemantics.expanded(selected)
+                .intersection(available)
+                .sorted(),
+            tools: orderedEntries,
+            updatedAt: record?.updatedAt
+        )
+    }
+
+    private func persistUnlocked(_ state: State) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        try OwnerOnlyAtomicFile.write(try encoder.encode(state), to: url)
+    }
+
+    private static func isValidToolID(_ toolID: String) -> Bool {
+        !toolID.isEmpty
+            && toolID == toolID.trimmingCharacters(in: .whitespacesAndNewlines)
+            && toolID.utf8.count <= CanonicalToolDefinition.maximumNameBytes
+    }
+
+    private static func catalogRevision(entries: [ManagerToolCatalogEntry]) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return JSONSupport.sha256Hex(try encoder.encode(entries))
+    }
+
+    private static func displayName(_ toolID: String) -> String {
+        toolID.replacingOccurrences(of: ".", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+    }
+
+    private static func isHighImpact(_ toolID: String) -> Bool {
+        ToolRouter.isMutatingTool(toolID)
+    }
+}
+
 private enum ProductionToolDefinitionSource {
     static func description(for name: String) -> String? {
         ContinuityControlToolName(rawValue: name)?.description

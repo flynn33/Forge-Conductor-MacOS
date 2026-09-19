@@ -228,6 +228,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
     private var instructionQueueStoreResult: Result<ProjectInstructionQueueStore, Error>?
+    private let toolPermissionStoreResult: Result<ProjectToolPermissionStore, Error>
     private var continuityIngress: ContinuityIngressDeliveryService?
     private var nativeSourceConversation: NativeSourceConversationService?
     private let nativeSourceManagerInstanceID = UUID()
@@ -386,6 +387,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     ) {
         self.app = app
         self.taskHTTPService = MCPTaskHTTPService(app: app)
+        self.toolPermissionStoreResult = Result {
+            try ProjectToolPermissionStore(paths: app.paths, clock: app.clock)
+        }
         self.managedAutonomyFactory = managedAutonomyFactory
         self.hostAdapterRegistry = hostAdapterRegistry
         self.providerProbeTimeoutSeconds = min(
@@ -601,12 +605,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
         let registeredToolNames = app.tools.toolNames
         let registeredTools = Set(registeredToolNames)
-        let ordinaryTools = ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter {
-            registeredTools.contains($0)
+        let catalog = try? ToolDefinitionCatalog.production(toolNames: registeredToolNames)
+        let defaultPermissionSnapshot = try? catalog.flatMap { catalog in
+            try toolPermissionStoreResult.get().snapshot(
+                projectID: ProjectID(UUID(uuidString: "00000000-0000-0000-0000-000000000000")!),
+                generation: .initial,
+                catalog: catalog,
+                unavailableReasons: toolUnavailableReasons()
+            )
         }
-        let toolCatalogRevision = try? ToolDefinitionCatalog.production(
-            toolNames: registeredToolNames
-        ).canonicalSHA256
+        let ordinaryTools = defaultPermissionSnapshot?.effectiveToolIDs
+            ?? ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter {
+                registeredTools.contains($0)
+            }
+        let toolCatalogRevision = defaultPermissionSnapshot?.catalogRevision
         let configuredModel = providerConfiguration?.modelKey?.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
@@ -2215,6 +2227,74 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
     }
 
+    // MARK: - Project tool permissions
+
+    public func projectToolPermissions(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> ManagerToolPermissionSnapshot {
+        guard let project = try app.projectContexts.project(projectID) else {
+            throw ProjectContextError.projectNotFound(projectID)
+        }
+        guard project.lifecycleState == .active else {
+            throw ProjectContextError.projectNotActive(project.lifecycleState)
+        }
+        guard project.generation == expectedGeneration else {
+            throw ProjectContextError.staleProjectGeneration(
+                expected: expectedGeneration,
+                actual: project.generation
+            )
+        }
+        let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        return try toolPermissionStoreResult.get().snapshot(
+            projectID: projectID,
+            generation: expectedGeneration,
+            catalog: catalog,
+            unavailableReasons: toolUnavailableReasons()
+        )
+    }
+
+    public func updateProjectToolPermissions(
+        _ request: ManagerToolPermissionUpdate
+    ) throws -> ManagerToolPermissionSnapshot {
+        guard let identifier = UUID(uuidString: request.projectID),
+              request.projectID.caseInsensitiveCompare(
+                  identifier.uuidString
+              ) == .orderedSame else {
+            throw ProjectContextError.invalidIdentifier("project identifier")
+        }
+        let projectID = ProjectID(identifier)
+        let generation = ProjectGeneration(request.projectGeneration)
+        guard let project = try app.projectContexts.project(projectID) else {
+            throw ProjectContextError.projectNotFound(projectID)
+        }
+        guard project.lifecycleState == .active else {
+            throw ProjectContextError.projectNotActive(project.lifecycleState)
+        }
+        guard project.generation == generation else {
+            throw ProjectContextError.staleProjectGeneration(
+                expected: generation,
+                actual: project.generation
+            )
+        }
+        let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        return try toolPermissionStoreResult.get().update(
+            request,
+            projectID: projectID,
+            generation: generation,
+            catalog: catalog,
+            unavailableReasons: toolUnavailableReasons()
+        )
+    }
+
+    private func toolUnavailableReasons() -> [String: String] {
+        var reasons: [String: String] = [:]
+        if !app.config.shellPolicyStatus.enabled {
+            reasons["shell_exec"] = "Shell access is disabled in Manager settings."
+        }
+        return reasons
+    }
+
     // MARK: - Autonomous run controls
 
     public func prepareAutonomousRun(
@@ -2441,8 +2521,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             throw ManagerRunPreparationError.staleProviderConfiguration
         }
         let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        let permissionSnapshot = try toolPermissionStoreResult.get().snapshot(
+            projectID: projectID,
+            generation: expectedGeneration,
+            catalog: catalog,
+            unavailableReasons: toolUnavailableReasons()
+        )
         if let expectedToolCatalogRevision,
-           catalog.canonicalSHA256 != expectedToolCatalogRevision {
+           permissionSnapshot.catalogRevision != expectedToolCatalogRevision {
             throw ManagerRunPreparationError.staleToolCatalog
         }
         let resolved = try ManagerRunPreparationResolver.resolve(
@@ -2451,7 +2537,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
-            allowedTools: allowedTools,
+            allowedTools: allowedTools ?? Set(permissionSnapshot.effectiveToolIDs),
             completionGates: completionGates,
             networkAllowed: networkAllowed
         )
@@ -2481,7 +2567,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             adapterID: resolved.adapterID,
             modelKey: resolved.modelKey,
             providerConfigurationRevision: providerConfiguration.revision,
-            toolCatalogRevision: catalog.canonicalSHA256,
+            toolCatalogRevision: permissionSnapshot.catalogRevision,
             allowedTools: resolved.allowedTools.sorted(),
             networkAllowed: resolved.networkAllowed,
             validationPlan: ManagerPreparedRunValidationPlan(

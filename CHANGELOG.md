@@ -36,6 +36,15 @@ Product versions do not by themselves claim shipment.
 - Combined Projects registration with durable authorization of the exact
   selected canonical folder. Existing roots are preserved, parent authority is
   not widened, and legacy registration-only API requests keep their behavior.
+- Replaced routine raw capability entry with a searchable registered-catalog
+  editor containing native individual/category checkboxes, mixed-state **Allow
+  all tools**, Select none, Restore recommended, counts, technical identifiers,
+  higher-impact labels, and explicit unavailable reasons. Network authority
+  remains a separate Advanced control.
+- Added owner-only saved project capability defaults with revision-checked
+  updates. Explicit denials survive catalog expansion, removed or disabled tools
+  are explained without being granted, Allow all follows the eligible catalog
+  only for future preparations, and every run freezes its exact resolved grant.
 
 ### Pending qualification
 

@@ -224,6 +224,152 @@ final class ToolDefinitionCatalogTests: XCTestCase {
         }
     }
 
+    func testProjectToolPreferencesPersistExplicitDenialsAndReconcileCatalogChanges() throws {
+        try withProductionApp("project-permissions") { app in
+            let projectID = ProjectID()
+            let generation = ProjectGeneration(7)
+            let initialCatalog = try ToolDefinitionCatalog.production(
+                toolNames: ["fs_read", "git_status"]
+            )
+            let expandedCatalog = try ToolDefinitionCatalog.production(
+                toolNames: ["fs_read", "fs_edit", "git_status", "shell_exec"]
+            )
+            var store: ProjectToolPermissionStore? = try ProjectToolPermissionStore(
+                paths: app.paths,
+                clock: app.clock
+            )
+            let initial = try XCTUnwrap(store).snapshot(
+                projectID: projectID,
+                generation: generation,
+                catalog: initialCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertEqual(initial.selectionMode, .recommended)
+            XCTAssertEqual(Set(initial.effectiveToolIDs), ["fs_read", "git_status"])
+
+            let explicit = try XCTUnwrap(store).update(
+                ManagerToolPermissionUpdate(
+                    projectID: projectID.description,
+                    projectGeneration: generation.rawValue,
+                    expectedPreferenceRevision: initial.preferenceRevision,
+                    selectionMode: .explicit,
+                    selectedToolIDs: ["fs_read"]
+                ),
+                projectID: projectID,
+                generation: generation,
+                catalog: initialCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertEqual(explicit.preferenceRevision, 1)
+            XCTAssertEqual(explicit.effectiveToolIDs, ["fs_read"])
+
+            store = nil
+            store = try ProjectToolPermissionStore(paths: app.paths, clock: app.clock)
+            let afterCatalogExpansion = try XCTUnwrap(store).snapshot(
+                projectID: projectID,
+                generation: generation,
+                catalog: expandedCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertEqual(afterCatalogExpansion.selectionMode, .explicit)
+            XCTAssertEqual(afterCatalogExpansion.selectedToolIDs, ["fs_read"])
+            XCTAssertEqual(afterCatalogExpansion.effectiveToolIDs, ["fs_read"])
+            XCTAssertFalse(afterCatalogExpansion.selectedToolIDs.contains("fs_edit"))
+
+            let reducedCatalog = try ToolDefinitionCatalog.production(
+                toolNames: ["git_status"]
+            )
+            let afterCatalogRemoval = try XCTUnwrap(store).snapshot(
+                projectID: projectID,
+                generation: generation,
+                catalog: reducedCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertEqual(afterCatalogRemoval.selectedToolIDs, ["fs_read"])
+            XCTAssertTrue(afterCatalogRemoval.effectiveToolIDs.isEmpty)
+            XCTAssertEqual(
+                afterCatalogRemoval.tools.first(where: { $0.id == "fs_read" })?.unavailableReason,
+                "Not registered by the current Forge tool catalog."
+            )
+            let removedStaleSelection = try XCTUnwrap(store).update(
+                ManagerToolPermissionUpdate(
+                    projectID: projectID.description,
+                    projectGeneration: generation.rawValue,
+                    expectedPreferenceRevision: afterCatalogRemoval.preferenceRevision,
+                    selectionMode: .explicit,
+                    selectedToolIDs: []
+                ),
+                projectID: projectID,
+                generation: generation,
+                catalog: reducedCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertTrue(removedStaleSelection.selectedToolIDs.isEmpty)
+
+            let expandedAfterRemoval = try XCTUnwrap(store).snapshot(
+                projectID: projectID,
+                generation: generation,
+                catalog: expandedCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertFalse(expandedAfterRemoval.selectedToolIDs.contains("fs_read"))
+            XCTAssertEqual(
+                expandedAfterRemoval.tools.first(where: { $0.id == "fs_edit" })?.highImpact,
+                true
+            )
+
+            let allEligible = try XCTUnwrap(store).update(
+                ManagerToolPermissionUpdate(
+                    projectID: projectID.description,
+                    projectGeneration: generation.rawValue,
+                    expectedPreferenceRevision: expandedAfterRemoval.preferenceRevision,
+                    selectionMode: .allEligible,
+                    selectedToolIDs: []
+                ),
+                projectID: projectID,
+                generation: generation,
+                catalog: expandedCatalog,
+                unavailableReasons: ["shell_exec": "Shell is disabled."]
+            )
+            XCTAssertEqual(allEligible.selectionMode, .allEligible)
+            XCTAssertEqual(
+                Set(allEligible.effectiveToolIDs),
+                ["fs_read", "fs_edit", "git_status"]
+            )
+            XCTAssertFalse(allEligible.effectiveToolIDs.contains("shell_exec"))
+            XCTAssertEqual(
+                allEligible.tools.first(where: { $0.id == "shell_exec" })?.unavailableReason,
+                "Shell is disabled."
+            )
+
+            let restoredAvailability = try XCTUnwrap(store).snapshot(
+                projectID: projectID,
+                generation: generation,
+                catalog: expandedCatalog,
+                unavailableReasons: [:]
+            )
+            XCTAssertTrue(restoredAvailability.effectiveToolIDs.contains("shell_exec"))
+            XCTAssertThrowsError(try XCTUnwrap(store).update(
+                ManagerToolPermissionUpdate(
+                    projectID: projectID.description,
+                    projectGeneration: generation.rawValue,
+                    expectedPreferenceRevision: 0,
+                    selectionMode: .recommended,
+                    selectedToolIDs: []
+                ),
+                projectID: projectID,
+                generation: generation,
+                catalog: expandedCatalog,
+                unavailableReasons: [:]
+            )) { error in
+                XCTAssertEqual(
+                    error as? ToolPermissionStoreError,
+                    .staleRevision(expected: 0, actual: 3)
+                )
+            }
+        }
+    }
+
     private func withProductionApp(
         _ label: String,
         operation: (ForgeApp) throws -> Void

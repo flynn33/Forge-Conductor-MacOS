@@ -90,6 +90,11 @@ public final class AppPaths: @unchecked Sendable {
     public var instructionPackageQueue: URL {
         instructionPackagesDir.appendingPathComponent("queue.json")
     }
+    /// Project-scoped default tool selections used by ordinary managed runs.
+    /// Exact run grants are still frozen in the control-plane run record.
+    public var projectToolPermissions: URL {
+        home.appendingPathComponent("project-tool-permissions.json")
+    }
 
     @discardableResult
     public func ensureLayout() throws -> URL {

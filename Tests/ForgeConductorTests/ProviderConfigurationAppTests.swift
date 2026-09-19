@@ -501,6 +501,104 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertNil(failed.descriptor)
     }
 
+    func testProjectToolPermissionRoutesPersistAndDriveManagerPreparation() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        let port = Int.random(in: 29_000...39_000)
+        let projectRoot = directory.appendingPathComponent(
+            "tool-permission-project",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        try app.config.update([
+            "allowed_roots": [projectRoot.path],
+            "dashboard": ["port": port],
+        ], save: true)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = try? manager.stopService()
+            app.shutdown()
+        }
+        let current = try manager.readProviderConfiguration()
+        _ = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: current.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/tool-model"
+        ))
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try XCTUnwrap(registered["project_id"] as? String)
+        let generation = try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        )
+        _ = try manager.startService()
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: port,
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
+
+        let initial = try await client.projectToolPermissions(
+            projectID: projectID,
+            generation: generation
+        )
+        XCTAssertEqual(initial.selectionMode, .recommended)
+        XCTAssertGreaterThan(initial.tools.count, initial.effectiveToolIDs.count)
+        XCTAssertTrue(initial.tools.allSatisfy { !$0.description.isEmpty })
+        XCTAssertTrue(initial.tools.contains { $0.category == .files })
+        XCTAssertTrue(initial.tools.contains { $0.category == .sourceControl })
+        XCTAssertTrue(initial.tools.contains { $0.category == .projectMemory })
+
+        let saved = try await client.updateProjectToolPermissions(
+            ManagerToolPermissionUpdate(
+                projectID: projectID,
+                projectGeneration: generation,
+                expectedPreferenceRevision: initial.preferenceRevision,
+                selectionMode: .explicit,
+                selectedToolIDs: ["fs_read"]
+            )
+        )
+        XCTAssertEqual(saved.selectionMode, .explicit)
+        XCTAssertEqual(saved.selectedToolIDs, ["fs_read"])
+        XCTAssertEqual(saved.effectiveToolIDs, ["fs_read"])
+        let reloaded = try await client.projectToolPermissions(
+            projectID: projectID,
+            generation: generation
+        )
+        XCTAssertEqual(reloaded, saved)
+
+        let prepared = manager.inspectAutonomousRunPreparation(
+            projectID: ProjectID(try XCTUnwrap(UUID(uuidString: projectID))),
+            expectedGeneration: ProjectGeneration(generation),
+            mission: "Use only the saved project capability."
+        )
+        XCTAssertEqual(prepared.readiness, .ready)
+        XCTAssertEqual(prepared.descriptor?.allowedTools, ["fs_read"])
+        XCTAssertEqual(prepared.descriptor?.toolCatalogRevision, saved.catalogRevision)
+
+        let none = try await client.updateProjectToolPermissions(
+            ManagerToolPermissionUpdate(
+                projectID: projectID,
+                projectGeneration: generation,
+                expectedPreferenceRevision: saved.preferenceRevision,
+                selectionMode: .explicit,
+                selectedToolIDs: []
+            )
+        )
+        XCTAssertTrue(none.effectiveToolIDs.isEmpty)
+        let denied = manager.inspectAutonomousRunPreparation(
+            projectID: ProjectID(try XCTUnwrap(UUID(uuidString: projectID))),
+            expectedGeneration: ProjectGeneration(generation),
+            mission: "Do not restore denied capabilities."
+        )
+        XCTAssertEqual(denied.readiness, .needsChoice)
+        XCTAssertEqual(denied.recoveryAction, .reviewPermissions)
+        XCTAssertNil(denied.descriptor)
+    }
+
     func testInstructionQueuePersistsSharedPreparedDescriptorIdentity() async throws {
         let app = try ForgeApp.bootstrap(home: directory)
         defer { Self.makeInstructionSnapshotsRemovable(app.paths.instructionPackageStoreDir) }

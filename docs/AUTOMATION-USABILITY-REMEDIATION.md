@@ -107,13 +107,39 @@ and Instructions when setup is incomplete, displays the exact result, and
 routes recovery to Projects, Model connection, Advanced permissions, or a
 manager refresh. No non-ready result reaches Start or creates a durable run.
 
-These focused contracts complete the M1 shared-preparation implementation; they
-do not complete the overall remediation or claim live provider lifecycle
-automation. Native catalog checkboxes and saved project preferences remain M2;
-document-backed format-neutral import remains M3; automatic task-aware
-completion remains M4; provider lifecycle, continuity presentation, and
-contextual Guided Mode remain M5; whole-journey acceptance and the source-bound
-candidate remain M6 and M7.
+## Implemented M2 slices
+
+The optional Task capabilities editor now derives every item from the canonical
+registered production catalog rather than a UI-owned tool-name list. It groups
+plain-language names, descriptions, and technical identifiers into the current
+catalog categories; search, individual and category checkboxes, mixed-state
+**Allow all tools**, Select none, Restore recommended, selected/available
+counts, and higher-impact labels are native controls. A narrow AppKit checkbox
+bridge supplies deterministic mixed state and keyboard activation. Network
+authority remains a separate Advanced control.
+
+The Manager owns one bounded, owner-only project preference store with
+optimistic revision checks. Recommended, all-eligible, and explicit modes are
+distinct: explicit selections never widen when the catalog grows; all-eligible
+is re-resolved only for a future preparation; and removed or policy-disabled
+tools retain a visible reason without entering the effective grant. A stale
+removed selection can still be unchecked. Select none remains an explicit
+denial and therefore returns `needs_choice` / `review_permissions` instead of
+silently restoring defaults.
+
+Direct run preparation resolves omitted capability input from the selected
+project preference, intersects it with current availability, and records that
+exact effective grant plus the availability-aware catalog revision in the
+prepared descriptor. Existing prepared and running descriptors are immutable,
+so a later install, removal, or policy change cannot silently widen them.
+Advanced raw identifiers remain available as an exact compatibility override.
+
+These focused contracts complete M1 shared preparation and M2 native tool
+selection; they do not complete the overall remediation or claim live provider
+lifecycle automation. Document-backed format-neutral import remains M3;
+automatic task-aware completion remains M4; provider lifecycle, continuity
+presentation, and contextual Guided Mode remain M5; whole-journey acceptance
+and the source-bound candidate remain M6 and M7.
 
 ## Verification
 
@@ -165,8 +191,17 @@ candidate remain M6 and M7.
   the byte-identical body and credential, including the explicit project-root
   authorization. Native picker and direct-path UI coverage now read back the
   authorized root, including after relaunch.
-- Eight operator-project/app-contract tests, eight provider-configuration tests,
-  six queue tests, seven dashboard-security tests, and 122 Manager tests passed.
+- Seven catalog tests verify durable explicit denials, add/remove/disable
+  reconciliation, current eligible Allow all behavior, unavailable explanations,
+  revision fencing, and the existing production catalog contract.
+- Nine provider-configuration tests include authenticated project-preference
+  read/update routes, exact project/generation binding, saved-grant preparation,
+  and fail-closed Select none behavior.
+- The focused signed native UI test verifies individual mouse and Space-key
+  interaction, mixed and checked states, category/all controls, Select none,
+  Restore recommended, update counts, and preference recovery after relaunch.
+- Eight operator-project/app-contract tests, nine provider-configuration tests,
+  seven catalog tests, seven dashboard-security tests, and 122 Manager tests passed.
   The Manager class retained two explicit environment/helper skips and had zero
   failures.
 - Both SwiftPM products and the canonical `ForgeConductor` Debug Xcode scheme

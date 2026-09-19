@@ -86,6 +86,12 @@ product set.
    persisted. If a prerequisite is missing, the sheet reports an exact
    readiness state and offers the focused Projects, Model connection,
    permissions, or refresh action without submitting a run.
+   The optional **Task capabilities** editor is populated from the registered
+   tool catalog. It supports searchable individual and category checkboxes,
+   mixed-state **Allow all tools**, Select none, Restore recommended, explicit
+   unavailable reasons, and saved per-project defaults. Each admitted run keeps
+   the exact resolved grant and catalog revision it prepared with; later catalog
+   changes apply only to future preparations.
 7. Review the run's events and evidence.
 
 The current setup guide can be reopened from the question-mark toolbar button.

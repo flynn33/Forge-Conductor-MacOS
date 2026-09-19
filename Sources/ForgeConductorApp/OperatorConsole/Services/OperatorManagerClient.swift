@@ -45,6 +45,13 @@ protocol OperatorManagerClientProtocol: Sendable {
         generation: UInt64,
         path: String
     ) async throws -> OperatorRelinkReceipt
+    func projectToolPermissions(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> ManagerToolPermissionSnapshot
+    func updateProjectToolPermissions(
+        _ update: ManagerToolPermissionUpdate
+    ) async throws -> ManagerToolPermissionSnapshot
     func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun
     func runStatus(runID: String) async throws -> OperatorRun
@@ -60,6 +67,23 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func projectToolPermissions(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> ManagerToolPermissionSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Project tool permissions are unavailable from this manager client."
+        )
+    }
+
+    func updateProjectToolPermissions(
+        _ update: ManagerToolPermissionUpdate
+    ) async throws -> ManagerToolPermissionSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Project tool permissions are unavailable from this manager client."
+        )
+    }
+
     func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Project-bound run preparation is unavailable from this manager client."
@@ -626,6 +650,27 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         )
     }
 
+    func projectToolPermissions(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> ManagerToolPermissionSnapshot {
+        try await request(
+            method: "POST",
+            path: "/api/manager/projects/tool-permissions/status",
+            body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation)
+        )
+    }
+
+    func updateProjectToolPermissions(
+        _ update: ManagerToolPermissionUpdate
+    ) async throws -> ManagerToolPermissionSnapshot {
+        try await request(
+            method: "PUT",
+            path: "/api/manager/projects/tool-permissions",
+            body: update
+        )
+    }
+
     func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult {
         try await self.request(
             method: "POST",
@@ -976,6 +1021,22 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
             generation: generation,
             path: path
         )
+    }
+
+    func projectToolPermissions(
+        projectID: String,
+        generation: UInt64
+    ) async throws -> ManagerToolPermissionSnapshot {
+        try await current.projectToolPermissions(
+            projectID: projectID,
+            generation: generation
+        )
+    }
+
+    func updateProjectToolPermissions(
+        _ update: ManagerToolPermissionUpdate
+    ) async throws -> ManagerToolPermissionSnapshot {
+        try await current.updateProjectToolPermissions(update)
     }
 
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun {
