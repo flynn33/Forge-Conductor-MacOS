@@ -53,6 +53,93 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
     }
 
+    func testAutomaticCompletionPlanIsStableAndDistinguishesReadOnlyFromRepair() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-completion-plan-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Tests", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("// swift-tools-version: 6.2\n".utf8).write(
+            to: root.appendingPathComponent("Package.swift"),
+            options: .atomic
+        )
+        let projectID = ProjectID()
+        let digest = String(repeating: "d", count: 64)
+
+        let readOnlyInput = AutomaticCompletionPlanResolver.Input(
+            projectID: projectID,
+            projectGeneration: .initial,
+            projectRoot: root,
+            instructionArtifactSHA256: [digest],
+            instructionText: "Audit the current implementation and deliver a read-only report.",
+            documentCount: 1,
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        let first = try AutomaticCompletionPlanResolver.resolve(readOnlyInput)
+        let replay = try AutomaticCompletionPlanResolver.resolve(readOnlyInput)
+        XCTAssertEqual(first, replay)
+        XCTAssertEqual(first.planID, replay.planID)
+        XCTAssertEqual(first.instructionArtifactSHA256, [digest])
+        XCTAssertEqual(
+            Set(first.obligations.map(\.kind)),
+            [.artifactRegistered, .readOnlyReportDelivered, .noRelevantUnresolvedSideEffect]
+        )
+        XCTAssertFalse(first.obligations.contains { $0.kind == .projectBuild })
+        XCTAssertFalse(first.obligations.contains { $0.kind == .projectTests })
+
+        let repair = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: projectID,
+            projectGeneration: .initial,
+            projectRoot: root,
+            instructionArtifactSHA256: [digest],
+            instructionText: "Repair the Swift defect and run the affected tests.",
+            documentCount: 1,
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate, "org.example.native"]
+        ))
+        XCTAssertNotEqual(repair.planID, first.planID)
+        XCTAssertEqual(repair.source, .automaticWithCustomPolicy)
+        XCTAssertTrue(repair.obligations.contains { $0.kind == .projectBuild })
+        XCTAssertTrue(repair.obligations.contains { $0.kind == .projectTests })
+        XCTAssertTrue(repair.obligations.contains {
+            $0.kind == .customNativeGate && $0.customGateID == "org.example.native"
+        })
+    }
+
+    func testLegacyRunAndValidationPlanDecodeWithoutAutomaticCompletionPlan() throws {
+        let specification = AutonomousRunSpecification(
+            allowedTools: ["fs_read"],
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        var specificationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(specification)) as? [String: Any]
+        )
+        specificationObject.removeValue(forKey: "completion_plan")
+        let legacySpecification = try JSONDecoder().decode(
+            AutonomousRunSpecification.self,
+            from: JSONSerialization.data(withJSONObject: specificationObject, options: [.sortedKeys])
+        )
+        XCTAssertNil(legacySpecification.completionPlan)
+        XCTAssertEqual(legacySpecification.allowedTools, ["fs_read"])
+
+        let validation = ManagerPreparedRunValidationPlan(
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        var validationObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(validation)) as? [String: Any]
+        )
+        validationObject.removeValue(forKey: "automatic_plan")
+        let legacyValidation = try JSONDecoder().decode(
+            ManagerPreparedRunValidationPlan.self,
+            from: JSONSerialization.data(withJSONObject: validationObject, options: [.sortedKeys])
+        )
+        XCTAssertNil(legacyValidation.automaticPlan)
+        XCTAssertEqual(legacyValidation.mode, "manager_completion_gates")
+    }
+
     func testPlainDocumentImportPublishesImmutableProjectScopedSnapshot() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }

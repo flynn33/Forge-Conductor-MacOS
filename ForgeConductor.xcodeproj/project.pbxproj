@@ -141,6 +141,7 @@
 		A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */; };
 		A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */; };
 		A26B00000000000000000014 /* Domain/AutonomyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000014 /* Domain/AutonomyModels.swift */; };
+		AC3B00000000000000000001 /* Application/AutomaticCompletionPlanResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC3F00000000000000000001 /* Application/AutomaticCompletionPlanResolver.swift */; };
 		A26B00000000000000000015 /* Domain/ContextBudgetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */; };
 		A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */; };
 		A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */; };
@@ -705,6 +706,7 @@
 		A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolInvocationBroker.swift; sourceTree = "<group>"; };
 		A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/RuntimeJobToolPack.swift; sourceTree = "<group>"; };
 		A26F00000000000000000014 /* Domain/AutonomyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/AutonomyModels.swift; sourceTree = "<group>"; };
+		AC3F00000000000000000001 /* Application/AutomaticCompletionPlanResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AutomaticCompletionPlanResolver.swift; sourceTree = "<group>"; };
 		A26F00000000000000000015 /* Domain/ContextBudgetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContextBudgetModels.swift; sourceTree = "<group>"; };
 		A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ContinuityV2Models.swift; sourceTree = "<group>"; };
 		A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ManagedModelProvider.swift; sourceTree = "<group>"; };
@@ -1345,6 +1347,7 @@
 				A26F00000000000000000003 /* Application/ExecutionJobService.swift */,
 				A26F00000000000000000004 /* Application/LegacyContinuityMigrator.swift */,
 				A26F00000000000000000005 /* Application/ManagedAutonomyRuntime.swift */,
+				AC3F00000000000000000001 /* Application/AutomaticCompletionPlanResolver.swift */,
 				A26F00000000000000000032 /* Application/ManagedContinuityWorker.swift */,
 				A26F00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift */,
 				A26F00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift */,
@@ -2147,6 +2150,7 @@
 				A26B00000000000000000003 /* Application/ExecutionJobService.swift in Sources */,
 				A26B00000000000000000004 /* Application/LegacyContinuityMigrator.swift in Sources */,
 				A26B00000000000000000005 /* Application/ManagedAutonomyRuntime.swift in Sources */,
+				AC3B00000000000000000001 /* Application/AutomaticCompletionPlanResolver.swift in Sources */,
 				A26B00000000000000000032 /* Application/ManagedContinuityWorker.swift in Sources */,
 				A26B00000000000000000006 /* Application/ManagedProjectRunStepExecutor.swift in Sources */,
 				A26B00000000000000000007 /* Application/PersistedManagedRunBudgetEvaluator.swift in Sources */,

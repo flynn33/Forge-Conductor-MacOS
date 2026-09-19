@@ -12,6 +12,11 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added manager-owned automatic completion plans bound to the exact project
+  generation and immutable instruction source. Direct and queued runs now
+  persist typed, reasoned obligations for available builds/tests, read-only
+  reports, artifact registration, unresolved work, and explicitly selected
+  custom native policies.
 - Added direct Start Task selection of existing project instruction packages,
   including ordered multi-package composition that remains usable after the
   original import paths are removed.
@@ -52,6 +57,9 @@ Product versions do not by themselves claim shipment.
 - Unified direct and queued technical preparation in the Manager. Configured
   starts now omit unchanged provider/model/tool/gate/network fields, while
   explicit typed choices remain exact and fail closed when invalid.
+- Made prepared-run revisions cover the deterministic automatic completion plan
+  and persist its ID/revision in durable run metadata. Older run and preparation
+  records without the new optional plan fields remain decodable.
 - Added provider-configuration and canonical tool-catalog revision fencing to
   run preparation. Stale previews create no durable run and refresh automatic
   values without erasing explicit typed choices.

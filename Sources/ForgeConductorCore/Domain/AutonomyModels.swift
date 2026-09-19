@@ -53,20 +53,131 @@ public enum AutonomyResourceProfile: String, Codable, Sendable, CaseIterable {
     case automatic
 }
 
+public enum CompletionObligationKind: String, Codable, Sendable, CaseIterable {
+    case projectBuild = "project_build"
+    case projectTests = "project_tests"
+    case requestedFileExists = "requested_file_exists"
+    case requestedContentAssertion = "requested_content_assertion"
+    case structuredDocumentValid = "structured_document_valid"
+    case artifactRegistered = "artifact_registered"
+    case readOnlyReportDelivered = "read_only_report_delivered"
+    case runtimeJobSucceeded = "runtime_job_succeeded"
+    case noRelevantUnresolvedSideEffect = "no_relevant_unresolved_side_effect"
+    case customNativeGate = "custom_native_gate"
+}
+
+public enum CompletionEvidenceRequirement: String, Codable, Sendable, CaseIterable {
+    case preparedSource = "prepared_source"
+    case successfulBuild = "successful_build"
+    case successfulTests = "successful_tests"
+    case requestedOutput = "requested_output"
+    case deliveredReport = "delivered_report"
+    case reconciledSideEffects = "reconciled_side_effects"
+    case customNativeReceipt = "custom_native_receipt"
+}
+
+public enum CompletionPlanSource: String, Codable, Sendable, CaseIterable {
+    case automatic
+    case automaticWithCustomPolicy = "automatic_with_custom_policy"
+}
+
+public struct CompletionObligation: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let kind: CompletionObligationKind
+    public let title: String
+    public let reason: String
+    public let evidenceRequirements: [CompletionEvidenceRequirement]
+    public let relevantToolNames: [String]
+    public let customGateID: String?
+    public let humanReviewRequired: Bool
+
+    public init(
+        id: String,
+        kind: CompletionObligationKind,
+        title: String,
+        reason: String,
+        evidenceRequirements: [CompletionEvidenceRequirement],
+        relevantToolNames: [String] = [],
+        customGateID: String? = nil,
+        humanReviewRequired: Bool = false
+    ) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.reason = reason
+        self.evidenceRequirements = evidenceRequirements
+        self.relevantToolNames = relevantToolNames
+        self.customGateID = customGateID
+        self.humanReviewRequired = humanReviewRequired
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, title, reason
+        case evidenceRequirements = "evidence_requirements"
+        case relevantToolNames = "relevant_tool_names"
+        case customGateID = "custom_gate_id"
+        case humanReviewRequired = "human_review_required"
+    }
+}
+
+public struct AutomaticCompletionPlan: Codable, Sendable, Equatable {
+    public static let schemaVersion = 1
+
+    public let schemaVersion: Int
+    public let planID: UUID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let instructionArtifactSHA256: [String]
+    public let obligations: [CompletionObligation]
+    public let source: CompletionPlanSource
+    public let revision: UInt64
+
+    public init(
+        planID: UUID,
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        instructionArtifactSHA256: [String],
+        obligations: [CompletionObligation],
+        source: CompletionPlanSource,
+        revision: UInt64 = 1
+    ) {
+        schemaVersion = Self.schemaVersion
+        self.planID = planID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.instructionArtifactSHA256 = instructionArtifactSHA256
+        self.obligations = obligations
+        self.source = source
+        self.revision = revision
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case planID = "plan_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case instructionArtifactSHA256 = "instruction_artifact_sha256"
+        case obligations, source, revision
+    }
+}
+
 public struct AutonomousRunSpecification: Codable, Sendable, Equatable {
     public let allowedTools: [String]
     public let completionGates: [String]
+    public let completionPlan: AutomaticCompletionPlan?
     public let resourceProfile: AutonomyResourceProfile
     public var work: AutonomousRunWork
 
     public init(
         allowedTools: [String],
         completionGates: [String],
+        completionPlan: AutomaticCompletionPlan? = nil,
         resourceProfile: AutonomyResourceProfile = .automatic,
         work: AutonomousRunWork = .init()
     ) {
         self.allowedTools = allowedTools
         self.completionGates = completionGates
+        self.completionPlan = completionPlan
         self.resourceProfile = resourceProfile
         self.work = work
     }
@@ -74,6 +185,7 @@ public struct AutonomousRunSpecification: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
+        case completionPlan = "completion_plan"
         case resourceProfile = "resource_profile"
         case work
     }

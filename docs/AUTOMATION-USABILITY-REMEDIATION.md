@@ -174,6 +174,32 @@ project generation reassembles a still-valid local or quick-text artifact under
 the same client run UUID before preparation is retried; a selected package from
 an obsolete generation remains fenced rather than silently rebound.
 
+## Revision-3 automatic completion planning — AC-01
+
+The Manager now derives one bounded `AutomaticCompletionPlan` during the shared
+direct and queued preparation path. The plan is deterministically identified
+from the exact project identity/generation, immutable instruction digest,
+reasoned obligation set, and whether an owner-selected custom policy is present.
+It records typed evidence requirements and human-review state for build, test,
+requested-output, artifact-registration, read-only-report, runtime-job,
+unresolved-side-effect, and custom-native-policy obligation kinds.
+
+The compiled resolver inspects the prepared instruction text and shallow native
+project structure. A read-only analysis receives report evidence without a
+mutation/build requirement; a repair in a SwiftPM or Xcode project receives the
+available build and test obligations. Every plan requires exact prepared-source
+registration and reconciliation of relevant unresolved effects. Custom native
+gates enter the plan only when explicitly configured. The resolver reads only
+bounded canonical instruction windows and never delegates approval of evidence
+or hashes to the model.
+
+The prepared descriptor and durable run specification both carry the same plan,
+and run metadata records its ID and revision. The fields are optional when
+decoding pre-r3 records, preserving existing durable runs. This AC-01 slice does
+not replace the historical-invocation validator: outcome-aware supersession,
+evidence paging beyond 256 records, exact final-work-revision binding, and the
+Advanced custom-policy presentation remain AC-02 through AC-04 work.
+
 ## Implemented M3 artifact-storage slice
 
 Instruction import no longer concatenates source bodies into the 32 KiB run
@@ -242,6 +268,16 @@ and the source-bound candidate remain M6 and M7.
 
 ## Verification
 
+- AC-01 verification covers deterministic replay, read-only versus repair
+  classification, SwiftPM build/test detection, explicit custom-policy
+  obligations, direct and queued persistence, exact source/project/generation
+  binding, and legacy decoding without the optional plan fields. The first full
+  queue run retained three failures because substring matching treated
+  “implementation” as the mutation verb “implement”; exact normalized token
+  matching corrected the classifier. The final queue suite passed 22/22, and
+  both focused preparation-path tests passed. Both SwiftPM products and the
+  canonical Apple Development-signed Debug Xcode build passed; Xcode compiled
+  the new resolver from the canonical Core target.
 - AU-01 focused verification covers exact-hash selection after deleting the
   original source, ordered multi-package composition, idempotent run binding,
   authenticated package-ID transport, concise quick-text artifact publication,

@@ -2364,6 +2364,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let mission: String
         let source: ManagerPreparedRunSource
         let documents: [ManagerPreparedRunDocumentReference]
+        let completionPlanningText: String
     }
 
     private func preparedInstructionInput(
@@ -2388,7 +2389,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     reference: "inline:mission",
                     byteCount: missionData.count,
                     sha256: sourceSHA256
-                )]
+                )],
+                completionPlanningText: mission
             )
         }
         guard let runID else {
@@ -2416,8 +2418,57 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 reference: "instruction-artifact:\(runID.description)",
                 snapshotSHA256: artifact.contentSHA256
             ),
-            documents: try store.documentReferences(contentSHA256: artifact.contentSHA256)
+            documents: try store.documentReferences(contentSHA256: artifact.contentSHA256),
+            completionPlanningText: try completionPlanningText(
+                store: store,
+                contentSHA256: artifact.contentSHA256,
+                projectID: projectID,
+                generation: expectedGeneration,
+                runID: runID
+            )
         )
+    }
+
+    private func completionPlanningText(
+        store: ProjectInstructionQueueStore,
+        contentSHA256: String,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID?
+    ) throws -> String {
+        var cursor = 0
+        var remaining = AutomaticCompletionPlanResolver.maximumPlanningTextBytes
+        var chunks: [String] = []
+        while remaining > 0 {
+            let page = try store.catalogPage(
+                contentSHA256: contentSHA256,
+                projectID: projectID,
+                generation: generation,
+                runID: runID,
+                cursor: cursor,
+                limit: 128
+            )
+            for document in page.documents where remaining > 0 {
+                guard document["status"] == ProjectInstructionQueueStore
+                    .InstructionDocumentStatus.convertedInstruction.rawValue,
+                      let documentID = document["id"] else { continue }
+                let byteBudget = min(8_192, remaining)
+                let content = try store.readDocument(
+                    contentSHA256: contentSHA256,
+                    documentID: documentID,
+                    projectID: projectID,
+                    generation: generation,
+                    runID: runID,
+                    byteOffset: 0,
+                    maximumBytes: byteBudget
+                ).content
+                chunks.append(content)
+                remaining -= content.utf8.count
+            }
+            guard let next = page.nextCursor else { break }
+            cursor = next
+        }
+        return chunks.joined(separator: "\n")
     }
 
     public func prepareAutonomousRun(
@@ -2448,6 +2499,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             assignmentID: assignmentID,
             source: instruction.source,
             documents: instruction.documents,
+            completionPlanningText: instruction.completionPlanningText,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -2612,6 +2664,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         assignmentID: String?,
         source: ManagerPreparedRunSource,
         documents: [ManagerPreparedRunDocumentReference],
+        completionPlanningText: String,
         providerID: String?,
         adapterID: String?,
         modelKey: String?,
@@ -2688,6 +2741,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectID: projectID.description,
             projectGeneration: generation
         ))
+        let automaticCompletionPlan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: projectID,
+            projectGeneration: expectedGeneration,
+            projectRoot: authorizedRoot,
+            instructionArtifactSHA256: [source.snapshotSHA256],
+            instructionText: completionPlanningText,
+            documentCount: documents.count,
+            completionGates: resolved.completionGates
+        ))
         let descriptor = try ManagerPreparedRunDescriptor.make(
             detail: "The exact project, source, provider, permissions, completion checks, continuity mode, and resource budget are ready.",
             projectID: projectID.description,
@@ -2703,7 +2765,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             allowedTools: resolved.allowedTools.sorted(),
             networkAllowed: resolved.networkAllowed,
             validationPlan: ManagerPreparedRunValidationPlan(
-                completionGates: resolved.completionGates
+                mode: "automatic_completion_plan",
+                completionGates: resolved.completionGates,
+                automaticPlan: automaticCompletionPlan
             ),
             continuityMode: .managedAutonomous,
             budgetPolicy: budgetPolicy,
@@ -2727,6 +2791,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             "budget_policy_revision": String(descriptor.budgetPolicy.revision),
             "budget_policy_global_revision": String(descriptor.budgetPolicy.globalRevision),
             "continuity_mode": descriptor.continuityMode.rawValue,
+            "completion_plan_id": descriptor.validationPlan.automaticPlan?.planID
+                .uuidString.lowercased() ?? "",
+            "completion_plan_revision": descriptor.validationPlan.automaticPlan
+                .map { String($0.revision) } ?? "",
         ]
     }
 
@@ -2776,6 +2844,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             assignmentID: assignmentID,
             source: instruction.source,
             documents: instruction.documents,
+            completionPlanningText: instruction.completionPlanningText,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -2802,6 +2871,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             specification: AutonomousRunSpecification(
                 allowedTools: context.resolved.allowedTools.sorted(),
                 completionGates: context.resolved.completionGates,
+                completionPlan: context.descriptor.validationPlan.automaticPlan,
                 work: AutonomousRunWork(
                     metadata: Self.preparedRunMetadata(context.descriptor)
                 )
@@ -3074,6 +3144,13 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 packageVersion: package.version
             ),
             documents: documents,
+            completionPlanningText: try completionPlanningText(
+                store: instructionQueueStore(),
+                contentSHA256: package.contentSHA256,
+                projectID: package.projectID,
+                generation: package.projectGeneration,
+                runID: nil
+            ),
             providerID: nil,
             adapterID: nil,
             modelKey: nil,
@@ -3101,6 +3178,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             specification: AutonomousRunSpecification(
                 allowedTools: context.resolved.allowedTools.sorted(),
                 completionGates: context.resolved.completionGates,
+                completionPlan: context.descriptor.validationPlan.automaticPlan,
                 work: AutonomousRunWork(metadata: metadata)
             ),
             authorizationScope: ToolAuthorizationScope(

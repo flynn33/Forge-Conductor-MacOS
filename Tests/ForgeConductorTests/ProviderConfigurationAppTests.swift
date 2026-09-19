@@ -364,6 +364,15 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(prepared.modelKey, "fixture/prepared-model")
         XCTAssertEqual(prepared.continuityMode, .managedAutonomous)
         XCTAssertEqual(prepared.validationPlan.completionGates, [ProjectInstructionQueueStore.builtInCompletionGate])
+        XCTAssertEqual(prepared.validationPlan.mode, "automatic_completion_plan")
+        let automaticPlan = try XCTUnwrap(prepared.validationPlan.automaticPlan)
+        XCTAssertEqual(automaticPlan.projectID, projectID)
+        XCTAssertEqual(automaticPlan.projectGeneration, generation)
+        XCTAssertEqual(automaticPlan.instructionArtifactSHA256, [prepared.source.snapshotSHA256])
+        XCTAssertEqual(
+            Set(automaticPlan.obligations.map(\.kind)),
+            [.artifactRegistered, .noRelevantUnresolvedSideEffect]
+        )
         XCTAssertEqual(prepared.budgetPolicy.scope.projectID, projectID.description)
         XCTAssertEqual(prepared.budgetPolicy.scope.projectGeneration, Int(generation.rawValue))
         XCTAssertEqual(prepared.documents.count, 1)
@@ -408,6 +417,11 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(
             durable.specification.work.metadata["source_snapshot_sha256"],
             prepared.source.snapshotSHA256
+        )
+        XCTAssertEqual(durable.specification.completionPlan, automaticPlan)
+        XCTAssertEqual(
+            durable.specification.work.metadata["completion_plan_id"],
+            automaticPlan.planID.uuidString.lowercased()
         )
     }
 
@@ -760,6 +774,16 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(metadata["tool_catalog_revision"]?.count, 64)
         XCTAssertEqual(metadata["prepared_run_revision"]?.count, 64)
         XCTAssertEqual(run.modelKey, "fixture/queue-model")
+        let automaticPlan = try XCTUnwrap(run.specification.completionPlan)
+        XCTAssertEqual(automaticPlan.projectID, projectID)
+        XCTAssertEqual(automaticPlan.projectGeneration, generation)
+        XCTAssertEqual(automaticPlan.instructionArtifactSHA256, [
+            try XCTUnwrap(metadata["instruction_package_sha256"]),
+        ])
+        XCTAssertEqual(
+            metadata["completion_plan_id"],
+            automaticPlan.planID.uuidString.lowercased()
+        )
     }
 
     private static func makeInstructionSnapshotsRemovable(_ root: URL) {

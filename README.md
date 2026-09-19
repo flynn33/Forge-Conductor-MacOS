@@ -99,7 +99,10 @@ product set.
    raw capability IDs, and raw completion-gate IDs are not routine inputs.
    Before admission, Forge prepares an inspectable project-bound
    descriptor covering the source snapshot, model/configuration, exact grants,
-   completion checks, automatic continuity, and resource budget. Start verifies
+   a deterministic typed completion plan, automatic continuity, and resource
+   budget. The plan is bound to the exact project generation and instruction
+   artifact and records why each build, test, report, artifact, unresolved-work,
+   or explicitly selected custom-policy obligation applies. Start verifies
    that descriptor again; changed inputs refresh preparation before any run is
    persisted. If a prerequisite is missing, the sheet reports an exact
    readiness state and offers the focused Projects, Model connection,

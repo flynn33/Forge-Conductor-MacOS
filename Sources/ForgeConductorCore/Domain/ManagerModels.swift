@@ -723,15 +723,22 @@ public struct ManagerPreparedRunDocumentReference: Codable, Sendable, Equatable 
 public struct ManagerPreparedRunValidationPlan: Codable, Sendable, Equatable {
     public let mode: String
     public let completionGates: [String]
+    public let automaticPlan: AutomaticCompletionPlan?
 
-    public init(mode: String = "manager_completion_gates", completionGates: [String]) {
+    public init(
+        mode: String = "manager_completion_gates",
+        completionGates: [String],
+        automaticPlan: AutomaticCompletionPlan? = nil
+    ) {
         self.mode = mode
         self.completionGates = completionGates
+        self.automaticPlan = automaticPlan
     }
 
     enum CodingKeys: String, CodingKey {
         case mode
         case completionGates = "completion_gates"
+        case automaticPlan = "automatic_plan"
     }
 }
 
