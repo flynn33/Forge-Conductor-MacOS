@@ -150,7 +150,8 @@ final class ProjectsViewModel: ObservableObject {
             OperatorProjectRegistrationRequest(
                 path: trimmedPath,
                 displayName: trimmedName?.isEmpty == false ? trimmedName : nil,
-                repositoryIdentity: nil
+                repositoryIdentity: nil,
+                authorizeProjectRoot: true
             )
         )
     }

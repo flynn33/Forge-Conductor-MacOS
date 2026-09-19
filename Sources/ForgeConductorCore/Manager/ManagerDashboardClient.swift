@@ -117,7 +117,8 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     public func registerProject(
         path: String,
         displayName: String? = nil,
-        repositoryIdentity: String? = nil
+        repositoryIdentity: String? = nil,
+        authorizeProjectRoot: Bool = false
     ) async throws -> ManagerProjectRegistrationResult {
         guard !path.isEmpty,
               path.utf8.count <= ManagerRoutes.maximumProjectRegistrationPathBytes,
@@ -131,6 +132,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         var body: [String: Any] = ["path": path]
         if let displayName { body["display_name"] = displayName }
         if let repositoryIdentity { body["repository_identity"] = repositoryIdentity }
+        if authorizeProjectRoot { body["authorize_project_root"] = true }
         let encodedBody = try JSONSupport.data(from: body)
         let authorizationHeader = "Bearer \(try credentials.bearerToken())"
 

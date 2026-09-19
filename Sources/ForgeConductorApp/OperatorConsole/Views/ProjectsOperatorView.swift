@@ -576,7 +576,7 @@ private struct ProjectRegistrationSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Register Project").font(.title2.bold())
-            Text("Registration resolves a canonical root and creates or reconnects the manager-owned project identity.")
+            Text("Registration authorizes this exact folder, resolves its canonical root, and creates or reconnects the manager-owned project identity.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if allowsPathEntry {
@@ -596,7 +596,7 @@ private struct ProjectRegistrationSheet: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("project-register-waiting-for-manager")
             }
-            Text("Forge resolves the canonical Git repository identity and checks the folder before registration.")
+            Text("Forge preserves existing authorized folders, adds only this selected folder, resolves its canonical Git repository identity, and checks it before registration.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField("Display name (optional)", text: $name)

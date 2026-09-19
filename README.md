@@ -70,17 +70,18 @@ product set.
 
 1. Start LM Studio and load a local model.
 2. Open Forge Conductor and start the Manager.
-3. In **Manager**, authorize the repository folder.
-4. In **Projects**, register the repository by picker or absolute path.
-5. In **Provider**, save and test the LM Studio endpoint and selected model.
-6. Add instruction packages to the registered project.
-7. In **Autonomy**, select the project, enter the instructions, and choose
+3. In **Projects**, register the repository by picker or absolute path. Forge
+   authorizes that exact selected folder and preserves existing authorized
+   roots; the same path does not need to be entered in Manager first.
+4. In **Provider**, save and test the LM Studio endpoint and selected model.
+5. Add instruction packages to the registered project.
+6. In **Autonomy**, select the project, enter the instructions, and choose
    **Start Task**. Forge uses the saved model plus manager-owned capability and
    completion defaults; unchanged technical defaults are omitted from the start
    request and resolved again by the Manager. Optional overrides remain under
    **Advanced**. If the saved provider or registered tool catalog changes after
    preview, Forge refreshes preparation before any run is persisted.
-8. Review the run's events and evidence.
+7. Review the run's events and evidence.
 
 The current setup guide can be reopened from the question-mark toolbar button.
 Comprehensive current-view help is tracked as an open remediation milestone.
@@ -91,6 +92,8 @@ The **Projects** tab exposes the complete registration lifecycle:
 
 - **Register Project…** selects a folder with the native picker.
 - **Enter Project Path…** accepts a validated absolute path.
+- Both registration actions authorize only the selected canonical folder and
+  preserve existing authorized roots before establishing project identity.
 - **Remove Selected Project…** is available below the project list and from a
   project row's context menu.
 - **Relink…** reconnects the same repository identity at another location.

@@ -11,12 +11,14 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
     nonisolated(unsafe) private static var responses: [String: Data] = [:]
     nonisolated(unsafe) private static var statuses: [String: Int] = [:]
     nonisolated(unsafe) private static var paths: [String] = []
+    nonisolated(unsafe) private static var bodies: [String: [Data]] = [:]
 
     static func configure(responses: [String: Data], statuses: [String: Int] = [:]) {
         lock.lock()
         self.responses = responses
         self.statuses = statuses
         paths = []
+        bodies = [:]
         lock.unlock()
     }
 
@@ -26,6 +28,12 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
         return paths
     }
 
+    static func requestedBodies(path: String) -> [Data] {
+        lock.lock()
+        defer { lock.unlock() }
+        return bodies[path] ?? []
+    }
+
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
@@ -33,6 +41,7 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
         let path = request.url?.path ?? ""
         Self.lock.lock()
         Self.paths.append(path)
+        Self.bodies[path, default: []].append(Self.bodyData(from: request))
         let data = Self.responses[path]
         let status = Self.statuses[path] ?? 200
         Self.lock.unlock()
@@ -53,6 +62,21 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
     }
 
     override func stopLoading() {}
+
+    private static func bodyData(from request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4_096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
 }
 
 private struct OperatorProjectContractCredential: ManagerMutationCredentialProviding {
@@ -438,7 +462,8 @@ final class OperatorProjectContractTests: XCTestCase {
             OperatorProjectRegistrationRequest(
                 path: "/tmp/operator-project",
                 displayName: "Operator Project",
-                repositoryIdentity: nil
+                repositoryIdentity: nil,
+                authorizeProjectRoot: true
             )
         )
         guard case .committed(let actual, let reconciled) = outcome else {
@@ -456,6 +481,14 @@ final class OperatorProjectContractTests: XCTestCase {
             OperatorProjectContractURLProtocol.requestedPaths(),
             ["/api/manager/projects/register", "/api/manager/projects/status"]
         )
+        let registrationBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/projects/register"
+        )
+        let registrationBody = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: XCTUnwrap(registrationBodies.first))
+                as? [String: Any]
+        )
+        XCTAssertEqual(registrationBody["authorize_project_root"] as? Bool, true)
     }
 
     @MainActor

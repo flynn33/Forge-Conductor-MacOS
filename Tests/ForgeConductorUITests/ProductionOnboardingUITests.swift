@@ -153,6 +153,8 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(project.canonicalRoot, projectRoot.path)
         XCTAssertEqual(project.lifecycleState, "active")
         XCTAssertGreaterThan(project.projectGeneration, 0)
+        let authorized: OnboardingManagerSettings = try await read("/api/manager/settings")
+        XCTAssertEqual(authorized.allowedRoots, [projectRoot.path])
         attach("native-project-registration", after)
 
         app.terminate()
@@ -161,6 +163,10 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(element("project-row-\(project.projectID)").waitForExistence(timeout: 10))
         let restored: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
         XCTAssertEqual(restored.projects, after.projects)
+        let restoredAuthorization: OnboardingManagerSettings = try await read(
+            "/api/manager/settings"
+        )
+        XCTAssertEqual(restoredAuthorization.allowedRoots, [projectRoot.path])
     }
 
     func testDirectProjectPathRegistrationChecksAbsolutePathAndCommits() async throws {
@@ -185,6 +191,8 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(snapshot.projects.count, 1)
         XCTAssertEqual(project.canonicalRoot, projectRoot.path)
         XCTAssertEqual(project.lifecycleState, "active")
+        let authorized: OnboardingManagerSettings = try await read("/api/manager/settings")
+        XCTAssertEqual(authorized.allowedRoots, [projectRoot.path])
         attach("direct-project-path-registration", snapshot)
     }
 

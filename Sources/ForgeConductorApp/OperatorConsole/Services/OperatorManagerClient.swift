@@ -235,7 +235,8 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             let result = try await managerClient.registerProject(
                 path: request.path,
                 displayName: request.displayName,
-                repositoryIdentity: request.repositoryIdentity
+                repositoryIdentity: request.repositoryIdentity,
+                authorizeProjectRoot: request.authorizeProjectRoot
             )
             switch result.registrationState {
             case .committed:
@@ -270,7 +271,8 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                         request: OperatorProjectRegistrationRequest(
                             path: result.requestPath,
                             displayName: result.requestedDisplayName,
-                            repositoryIdentity: result.repositoryIdentityAssertion
+                            repositoryIdentity: result.repositoryIdentityAssertion,
+                            authorizeProjectRoot: request.authorizeProjectRoot
                         ),
                         projectID: result.projectID,
                         code: result.code ?? "project_registration_reconciliation_required",

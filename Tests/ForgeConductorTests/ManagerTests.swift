@@ -2232,6 +2232,68 @@ final class ManagerTests: XCTestCase {
         )
     }
 
+    func testHTTPProjectRegistrationCanAuthorizeOnlyTheSelectedCanonicalRoot() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = try Self.availableLoopbackPort()
+        let retainedRoot = home.appendingPathComponent("retained-authorized-root", isDirectory: true)
+        let selectedRoot = home.appendingPathComponent("newly-selected-project", isDirectory: true)
+        for directory in [retainedRoot, selectedRoot] {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        }
+        try app.config.update([
+            "dashboard": ["port": port] as [String: Any],
+            "allowed_roots": [retainedRoot.path],
+        ], save: true)
+        let node = ManagerNode(app: app)
+        defer {
+            _ = try? node.stopService()
+            node.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        _ = try node.startService()
+        try await Task.sleep(for: .milliseconds(150))
+
+        let credential = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
+        var request = URLRequest(url: try XCTUnwrap(
+            URL(string: "http://127.0.0.1:\(port)/api/manager/projects/register")
+        ))
+        request.httpMethod = "POST"
+        request.httpBody = try JSONSupport.data(from: [
+            "path": selectedRoot.path,
+            "authorize_project_root": true,
+        ])
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try HTTPTestHelpers.fetch(request)
+        XCTAssertEqual(response.statusCode, 200, String(data: data, encoding: .utf8) ?? "")
+        let registration = try JSONSupport.object(from: data)
+        XCTAssertEqual(registration["registration_status"] as? String, "committed")
+        let expectedRoots = [retainedRoot, selectedRoot]
+            .compactMap { ManagerSettingsNormalizer.canonicalAllowedRoot($0.path) }
+            .sorted()
+        XCTAssertEqual(app.config.model.allowedRoots, expectedRoots)
+        XCTAssertFalse(app.config.model.allowedRoots.contains(home.path))
+
+        app.config.reload()
+        XCTAssertEqual(app.config.model.allowedRoots, expectedRoots)
+
+        request.httpBody = try JSONSupport.data(from: [
+            "path": selectedRoot.path,
+            "authorize_project_root": "true",
+        ])
+        let (invalidData, invalidResponse) = try HTTPTestHelpers.fetch(request)
+        XCTAssertEqual(invalidResponse.statusCode, 400)
+        XCTAssertEqual(
+            try JSONSupport.object(from: invalidData)["code"] as? String,
+            "invalid_project_registration"
+        )
+        XCTAssertEqual(app.config.model.allowedRoots, expectedRoots)
+    }
+
     func testMCPRegistrationTreatsRepositoryIdentityAsAssertionAndRequiresRelinkBeforePublication() throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
@@ -5239,7 +5301,8 @@ final class ManagerTests: XCTestCase {
         let actual = try await client.registerProject(
             path: projectRoot.path,
             displayName: "Lost response fixture",
-            repositoryIdentity: "git:" + String(repeating: "1", count: 64)
+            repositoryIdentity: "git:" + String(repeating: "1", count: 64),
+            authorizeProjectRoot: true
         )
 
         XCTAssertEqual(actual, expected)
@@ -5251,9 +5314,13 @@ final class ManagerTests: XCTestCase {
         let request = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: transcript.bodies[0]) as? [String: Any]
         )
-        XCTAssertEqual(Set(request.keys), ["path", "display_name", "repository_identity"])
+        XCTAssertEqual(
+            Set(request.keys),
+            ["path", "display_name", "repository_identity", "authorize_project_root"]
+        )
         XCTAssertEqual(request["path"] as? String, projectRoot.path)
         XCTAssertEqual(request["display_name"] as? String, "Lost response fixture")
+        XCTAssertEqual(request["authorize_project_root"] as? Bool, true)
         XCTAssertEqual(
             request["repository_identity"] as? String,
             "git:" + String(repeating: "1", count: 64)

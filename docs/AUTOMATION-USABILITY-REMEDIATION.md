@@ -68,9 +68,20 @@ unpersisted, and causes Autonomy to refresh manager defaults while retaining
 explicit Advanced overrides. Project generation remains independently fenced by
 the existing exact-generation admission contract.
 
+Project registration now carries an explicit native-operator authorization
+request. The Manager canonicalizes the selected directory and durably merges
+that exact root with the latest configured roots under the existing
+interprocess configuration lock before repository registration begins. It does
+not grant the parent directory, `/`, a missing directory, or any new root for
+legacy callers that omit the additive request field. The same encoded request
+and bearer credential are reused by the bounded lost-response retry, so replay
+is idempotent. The Projects sheet explains that Register authorizes the selected
+folder; the normal workflow no longer requires entering the same path in
+Manager first.
+
 This is a narrow M1 slice, not completion of M1 or the overall remediation.
 The full project/package/document, validation-plan, continuity, and budget
-prepared descriptor plus combined folder grant/registration remain open in M1.
+prepared descriptor remains open in M1.
 Native catalog checkboxes and saved project preferences remain M2;
 document-backed format-neutral import remains M3; automatic task-aware
 completion remains M4; provider lifecycle, continuity presentation, and
@@ -99,8 +110,17 @@ candidate remain M6 and M7.
   gate, and network overrides.
 - Direct and queue construction both use `ManagerRunPreparationResolver`; its
   focused test covers defaults, exact overrides, and explicit-empty rejection.
+- The authenticated project-registration regression first failed because the
+  new authorization field was rejected. It now proves that one request retains
+  an existing root, adds only the selected canonical directory, persists the
+  result across reload, and rejects a non-Boolean authorization value without
+  changing settings.
+- The registration transport regression proves that a lost response replays
+  the byte-identical body and credential, including the explicit project-root
+  authorization. Native picker and direct-path UI coverage now read back the
+  authorized root, including after relaunch.
 - Five operator-project/app-contract tests, five provider-configuration tests,
-  the focused HTTP runtime-control test, six queue tests, and 121 Manager tests
+  the focused HTTP runtime-control test, six queue tests, and 122 Manager tests
   passed. The Manager class retained two explicit environment/helper skips and
   had zero failures.
 - Both SwiftPM products and the canonical `ForgeConductor` Debug Xcode scheme

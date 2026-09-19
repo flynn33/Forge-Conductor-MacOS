@@ -415,7 +415,9 @@ public final class ManagerRoutes: @unchecked Sendable {
                 return
             }
             let object = try JSONSupport.object(from: body)
-            let allowedKeys = Set(["path", "display_name", "repository_identity"])
+            let allowedKeys = Set([
+                "path", "display_name", "repository_identity", "authorize_project_root",
+            ])
             guard Set(object.keys).isSubset(of: allowedKeys),
                   let path = object["path"] as? String,
                   !path.isEmpty,
@@ -426,15 +428,19 @@ public final class ManagerRoutes: @unchecked Sendable {
                   object["repository_identity"].map({ $0 is String }) ?? true,
                   (object["repository_identity"] as? String).map({
                       $0.utf8.count <= 2_048
-                  }) ?? true else {
+                  }) ?? true,
+                  object["authorize_project_root"].map({ $0 is Bool }) ?? true else {
                 http.respondJSON(connection, status: 400, object: [
                     "ok": false,
                     "code": "invalid_project_registration",
-                    "message": "Project registration requires one bounded absolute path and bounded optional identity fields",
+                    "message": "Project registration requires one bounded absolute path, bounded optional identity fields, and an optional Boolean project-root authorization",
                 ])
                 return
             }
             do {
+                if object["authorize_project_root"] as? Bool == true {
+                    _ = try manager.authorizeProjectRoot(path: path)
+                }
                 let result = try manager.registerProjectResult(
                     path: path,
                     displayName: object["display_name"] as? String,
@@ -454,6 +460,8 @@ public final class ManagerRoutes: @unchecked Sendable {
                     status: result.registrationState == .committed ? 200 : 202,
                     object: response
                 )
+            } catch let error as ManagerSettingsValidationError {
+                http.respondJSON(connection, status: 400, object: error.asDictionary())
             } catch let error as ProjectContextError {
                 let busy = error == .databaseBusy
                 http.respondJSON(connection, status: busy ? 503 : 409, object: [

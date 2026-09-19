@@ -868,6 +868,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     // MARK: - Project context controls
 
+    /// Persists the exact directory selected by the operator as an application
+    /// access root. This does not grant a parent directory and does not replace
+    /// registration's repository-identity validation.
+    @discardableResult
+    public func authorizeProjectRoot(path: String) throws -> String {
+        let canonicalRoot = try app.config.authorizeAllowedRoot(path)
+        app.diagnostics.info(
+            "manager_project_root_authorized",
+            ["canonical_root": canonicalRoot],
+            category: .manager
+        )
+        return canonicalRoot
+    }
+
     @discardableResult
     public func registerProject(
         path: String,

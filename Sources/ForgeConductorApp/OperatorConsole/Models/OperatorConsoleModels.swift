@@ -813,11 +813,25 @@ struct OperatorProjectRegistrationRequest: Encodable, Sendable, Equatable {
     let path: String
     let displayName: String?
     let repositoryIdentity: String?
+    let authorizeProjectRoot: Bool
+
+    init(
+        path: String,
+        displayName: String?,
+        repositoryIdentity: String?,
+        authorizeProjectRoot: Bool = false
+    ) {
+        self.path = path
+        self.displayName = displayName
+        self.repositoryIdentity = repositoryIdentity
+        self.authorizeProjectRoot = authorizeProjectRoot
+    }
 
     enum CodingKeys: String, CodingKey {
         case path
         case displayName = "display_name"
         case repositoryIdentity = "repository_identity"
+        case authorizeProjectRoot = "authorize_project_root"
     }
 }
 

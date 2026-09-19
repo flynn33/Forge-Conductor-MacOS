@@ -193,6 +193,53 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         return model
     }
 
+    /// Durably adds one exact canonical directory to the current allowed roots.
+    /// The read/merge/write happens under the same interprocess transaction as
+    /// other configuration mutations so a project-picker grant cannot replace
+    /// a concurrently persisted root with an earlier in-memory snapshot.
+    @discardableResult
+    public func authorizeAllowedRoot(_ path: String) throws -> String {
+        guard let canonicalRoot = ManagerSettingsNormalizer.canonicalAllowedRoot(path) else {
+            throw ManagerSettingsValidationError(
+                field: "allowed_roots",
+                reason: "selected_project_root_must_be_an_existing_directory"
+            )
+        }
+        return try withConfigurationMutation { deadline in
+            try Self.withConfigFileLock(paths: paths, deadline: deadline) {
+                let source = try Self.readConfiguration(paths: paths)
+                let currentPolicy = try Self.decodeBudgetPolicy(source.object)
+                let current = AppConfig.fromDictionary(source.object)
+                _ = try Self.statusForCurrentConfig(
+                    configData: source.data,
+                    config: current,
+                    paths: paths
+                )
+                var requested = pendingPatch
+                var staged = current.applying(patch: requested)
+                staged.budgetPolicy = currentPolicy
+                let roots = ManagerSettingsNormalizer.canonicalAllowedRoots(
+                    staged.allowedRoots + [canonicalRoot]
+                )
+                requested = Self.deepMergeStatic(
+                    requested,
+                    ["allowed_roots": roots]
+                )
+                var config = current.applying(patch: requested)
+                config.budgetPolicy = currentPolicy
+                try Self.validateForPersistence(config)
+                let object = Self.deepMergeStatic(
+                    Self.deepMergeStatic(source.object, requested),
+                    config.asDictionary()
+                )
+                try Self.commitConfiguration(object, config: config, paths: paths)
+                pendingPatch = [:]
+                publish(config)
+                return canonicalRoot
+            }
+        }
+    }
+
     /// Replace explicitly changed settings; policy revisions still require CAS.
     public func replace(_ config: AppConfig, save: Bool = true) throws {
         try withConfigurationMutation { deadline in
