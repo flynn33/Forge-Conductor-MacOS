@@ -670,6 +670,7 @@ public enum ManagerRunRecoveryAction: String, Codable, Sendable, Equatable, Case
 
 public enum ManagerPreparedRunSourceKind: String, Codable, Sendable, Equatable {
     case inlineMission = "inline_mission"
+    case instructionArtifact = "instruction_artifact"
     case instructionPackage = "instruction_package"
 }
 

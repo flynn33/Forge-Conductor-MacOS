@@ -21,6 +21,12 @@ protocol OperatorManagerClientProtocol: Sendable {
         generation: UInt64,
         sourcePath: String
     ) async throws -> OperatorInstructionQueue
+    func importRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        sourcePath: String
+    ) async throws -> ProjectRunInstructionArtifact
     func reorderInstructionPackages(
         projectID: String,
         generation: UInt64,
@@ -105,6 +111,17 @@ extension OperatorManagerClientProtocol {
     func importInstructionPackage(projectID: String, generation: UInt64, sourcePath: String) async throws -> OperatorInstructionQueue {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Instruction package import is unavailable from this manager client."
+        )
+    }
+
+    func importRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        sourcePath: String
+    ) async throws -> ProjectRunInstructionArtifact {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Run instruction artifact import is unavailable from this manager client."
         )
     }
 
@@ -402,6 +419,45 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             timeoutInterval: 12
         )
         return try validated(queue, projectID: projectID, generation: generation)
+    }
+
+    func importRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        sourcePath: String
+    ) async throws -> ProjectRunInstructionArtifact {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        guard UUID(uuidString: runID) != nil else {
+            throw OperatorManagerClientError.invalidPayload(
+                "run instruction artifact requires a run UUID"
+            )
+        }
+        guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
+              (sourcePath as NSString).isAbsolutePath else {
+            throw OperatorManagerClientError.invalidPayload(
+                "run instruction artifact path must be a bounded absolute path"
+            )
+        }
+        let artifact: ProjectRunInstructionArtifact = try await request(
+            method: "POST",
+            path: "/api/manager/runs/instruction-artifacts/import",
+            body: RunInstructionArtifactImportBody(
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: generation,
+                sourcePath: sourcePath
+            ),
+            timeoutInterval: 20
+        )
+        guard artifact.runID.description == runID.lowercased(),
+              artifact.projectID.description == projectID.lowercased(),
+              artifact.projectGeneration.rawValue == generation else {
+            throw OperatorManagerClientError.invalidPayload(
+                "manager returned an instruction artifact for a different run or project generation"
+            )
+        }
+        return artifact
     }
 
     func reorderInstructionPackages(
@@ -972,6 +1028,20 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.importInstructionPackage(projectID: projectID, generation: generation, sourcePath: sourcePath)
     }
 
+    func importRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        sourcePath: String
+    ) async throws -> ProjectRunInstructionArtifact {
+        try await current.importRunInstructionArtifact(
+            projectID: projectID,
+            generation: generation,
+            runID: runID,
+            sourcePath: sourcePath
+        )
+    }
+
     func reorderInstructionPackages(projectID: String, generation: UInt64, packageIDs: [String], expectedRevision: UInt64) async throws -> OperatorInstructionQueue {
         try await current.reorderInstructionPackages(
             projectID: projectID,
@@ -1105,6 +1175,19 @@ private struct InstructionPackageImportBody: Encodable {
     let projectGeneration: UInt64
     let sourcePath: String
     enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case sourcePath = "source_path"
+    }
+}
+
+private struct RunInstructionArtifactImportBody: Encodable {
+    let runID: String
+    let projectID: String
+    let projectGeneration: UInt64
+    let sourcePath: String
+    enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
         case projectID = "project_id"
         case projectGeneration = "project_generation"
         case sourcePath = "source_path"

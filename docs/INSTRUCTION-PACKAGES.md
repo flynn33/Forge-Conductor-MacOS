@@ -6,8 +6,10 @@ Instruction packages turn a registered local repository into an ordered work que
 
 1. In LM Studio, load a tool-capable model and start the local server from the Developer screen.
 2. In Forge Conductor **Provider**, enter the LM Studio endpoint (commonly `http://127.0.0.1:1234`), load the model list, choose the loaded model, save, and run the connection and contract checks.
-3. In **Manager**, add the repository or its parent folder to **Allowed Roots**, apply the setting, and start the manager if it is stopped.
-4. In **Projects**, register the local repository folder and select it.
+3. In **Manager**, start the manager if it is stopped.
+4. In **Projects**, register the local repository folder and select it. The
+   registration authorizes that exact canonical root without widening access to
+   its parent.
 5. Under **Instruction packages**, choose **Add Instructions…**, arrange packages by dragging rows, then choose **Start Ordered Autonomy**.
 
 The question-mark toolbar button opens the same setup sequence inside the app.
@@ -16,11 +18,29 @@ The question-mark toolbar button opens the same setup sequence inside the app.
 
 ### One document
 
-Select a UTF-8 Markdown or text file (`.md`, `.markdown`, or `.txt`). Its contents become the package mission. Forge assigns the standard project editing tool set and the built-in successful-tool completion gate.
+Select a document in its existing format. Admission is content-aware rather than
+based on a filename whitelist. Forge normalizes UTF-8 and BOM-marked UTF-16 text
+and uses native PDFKit/AppKit adapters for PDF, DOCX, RTF, and HTML. Every
+original is retained. Opaque, malformed, encrypted, image-only, or otherwise
+unconverted content is reported unresolved and prevents execution rather than
+being dropped or falsely marked understood.
 
 ### A folder of documents
 
-Select a folder containing Markdown or text files. Forge reads up to 64 non-hidden documents in stable path order and combines them into one mission. Symbolic links are rejected.
+Select a folder containing instruction and support files. Forge inventories
+hidden files, rejects symbolic links, preserves stable relative paths, and
+stores converted instruction text separately from originals. It creates a
+compact bootstrap mission; large documents remain in the artifact for bounded,
+project/run-scoped retrieval.
+
+### A ZIP archive
+
+Select or drop a ZIP in its existing form. Forge preflights the container before
+native extraction and rejects traversal, duplicate paths, links, encryption,
+unsupported compression, excessive entry or aggregate size, excessive expansion
+ratios, and local/central-header disagreement. It compares the extracted file
+inventory and sizes with the inspected container. Nested ZIPs are retained
+unresolved for separate bounded import rather than recursively expanded.
 
 ### A manifest package
 
@@ -84,17 +104,27 @@ prepared-run descriptor. The durable run also records the descriptor revision,
 package snapshot hash, provider and tool-catalog revisions, continuity mode,
 and applicable budget-policy revisions. Direct starts use the same preparation
 contract, so queued work does not bypass ordinary grant, validation, or stale
-input checks.
+input checks. In **Autonomy**, large pasted text plus every selected or dropped
+file, folder, or ZIP uses the same importer. A direct artifact is durably bound
+to its exact project generation and run UUID without entering or reordering the
+package queue. Prepare and Start carry only its compact bootstrap and snapshot
+digest, never the full large instruction body.
 
 Resetting a project generation fences unfinished packages from the old generation. Removing a project deletes its active package queue, advances the control-plane generation, invalidates bindings, and hides the registration while preserving project memory and historical run evidence. Registering the same repository again reconnects its durable project identity.
 
-## Limits
+## Resource budgets
 
-- 256 package records per queue store
-- 512 content-addressed snapshots, with unreferenced snapshots removed after queue deletion
-- 64 source documents per package
-- 1 MiB per source document
-- 8 MiB aggregate source bytes per package
-- 32 KiB combined mission text
+- 4,096 queued package records
+- 4,096 durable direct-run artifact records
+- 4,096 source files per import
+- 128 MiB per source file
+- 512 MiB aggregate source bytes per import
+- 32 KiB compact bootstrap mission
+- 64 KiB per scoped delivery window
+- 64 MiB queue metadata
+
+These are explicit resource backpressure budgets, not a 32 KiB limit on the
+user's total instructions. Referenced snapshots remain durable; unreferenced
+snapshots are removed when their owning package/project record is removed.
 
 All queue mutations use bounded authenticated manager requests. The queue file is written atomically with owner-only permissions, and an unsuccessful persistence write restores the prior in-memory state.

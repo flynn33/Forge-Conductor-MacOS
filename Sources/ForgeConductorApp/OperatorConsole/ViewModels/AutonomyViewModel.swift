@@ -25,6 +25,7 @@ final class AutonomyViewModel: ObservableObject {
     @Published var selectedRunID: String?
     @Published var selectedProjectID: String?
     @Published var mission = ""
+    @Published private(set) var instructionSourcePath: String?
     @Published var assignmentID = ""
     @Published var providerID = ""
     @Published var adapterID = "forge.native-session-host"
@@ -60,7 +61,41 @@ final class AutonomyViewModel: ObservableObject {
         !isStarting
             && !startRequiresReconciliation
             && selectedProject != nil
-            && !mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (instructionSourcePath != nil
+                || !mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    var instructionSourceName: String? {
+        instructionSourcePath.map { URL(fileURLWithPath: $0).lastPathComponent }
+    }
+
+    func chooseInstructionSource() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.resolvesAliases = false
+        panel.prompt = "Use Instructions"
+        panel.message = "Choose a file, folder, or ZIP. Forge will preserve and inspect it before Start."
+        if panel.runModal() == .OK, let url = panel.url {
+            setInstructionSource(url)
+        }
+    }
+
+    @discardableResult
+    func setInstructionSource(_ url: URL) -> Bool {
+        guard url.isFileURL else {
+            errorMessage = "Instruction sources must be local files or folders."
+            return false
+        }
+        instructionSourcePath = url.standardizedFileURL.path
+        errorMessage = nil
+        notice = "\(url.lastPathComponent) will use the same immutable artifact pipeline as pasted instructions."
+        return true
+    }
+
+    func clearInstructionSource() {
+        instructionSourcePath = nil
     }
 
     var preparationRecoveryAction: ManagerRunRecoveryAction? {
@@ -310,7 +345,10 @@ final class AutonomyViewModel: ObservableObject {
             projectID: project.projectID,
             projectGeneration: project.projectGeneration,
             assignmentID: assignmentID.nilIfBlank,
-            mission: mission.trimmingCharacters(in: .whitespacesAndNewlines),
+            mission: instructionSourceName.map {
+                "Follow the imported instructions in \($0)."
+            } ?? mission.trimmingCharacters(in: .whitespacesAndNewlines),
+            localInstructionSourcePath: instructionSourcePath,
             providerID: providerID.isEmpty || providerID == preparation?.providerID
                 ? nil : providerID,
             adapterID: adapterID.isEmpty || adapterID == preparation?.adapterID
@@ -348,13 +386,52 @@ final class AutonomyViewModel: ObservableObject {
             var startWasSubmitted = false
             do {
                 var admittedRequest = request
-                if request.expectedPreparedRunRevision == nil {
+                if request.instructionArtifactSHA256 == nil,
+                   (request.localInstructionSourcePath != nil
+                    || request.mission.utf8.count > ProjectInstructionQueueStore.maximumMissionBytes) {
+                    let staged: URL?
+                    let sourcePath: String
+                    if let selectedPath = request.localInstructionSourcePath {
+                        staged = nil
+                        sourcePath = selectedPath
+                    } else {
+                        let url = try await Self.stagePastedInstructions(
+                            request.mission,
+                            runID: request.runID
+                        )
+                        staged = url
+                        sourcePath = url.path
+                    }
+                    defer {
+                        if let staged {
+                            Task.detached(priority: .utility) {
+                                try? FileManager.default.removeItem(
+                                    at: staged.deletingLastPathComponent()
+                                )
+                            }
+                        }
+                    }
+                    let artifact = try await client.importRunInstructionArtifact(
+                        projectID: request.projectID,
+                        generation: request.projectGeneration,
+                        runID: request.runID,
+                        sourcePath: sourcePath
+                    )
+                    guard artifact.unresolvedDocumentCount == 0 else {
+                        throw OperatorManagerClientError.invalidPayload(
+                            "The instructions contain \(artifact.unresolvedDocumentCount) unresolved document(s)."
+                        )
+                    }
+                    admittedRequest = request.usingInstructionArtifact(artifact)
+                    pendingStartRequest = admittedRequest
+                }
+                if admittedRequest.expectedPreparedRunRevision == nil {
                     do {
-                        var preparationResult = try await client.prepareRun(request)
+                        var preparationResult = try await client.prepareRun(admittedRequest)
                         if preparationResult.readiness == .automaticallyPreparing,
                            preparationResult.projectID == request.projectID,
                            preparationResult.projectGeneration != request.projectGeneration {
-                            admittedRequest = request.replacingProjectGeneration(
+                            admittedRequest = admittedRequest.replacingProjectGeneration(
                                 preparationResult.projectGeneration
                             )
                             preparationResult = try await client.prepareRun(admittedRequest)
@@ -421,6 +498,35 @@ final class AutonomyViewModel: ObservableObject {
         }
     }
 
+    private nonisolated static func stagePastedInstructions(
+        _ instructions: String,
+        runID: String
+    ) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "forge-run-\(runID.lowercased())-\(UUID().uuidString.lowercased())",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700]
+            )
+            do {
+                let url = directory.appendingPathComponent("instructions.txt")
+                try Data(instructions.utf8).write(to: url, options: .atomic)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o600],
+                    ofItemAtPath: url.path
+                )
+                return url
+            } catch {
+                try? FileManager.default.removeItem(at: directory)
+                throw error
+            }
+        }.value
+    }
+
     private func acceptStartedRun(_ run: OperatorRun) {
         runs.removeAll { $0.runID == run.runID }
         runs.insert(run, at: 0)
@@ -430,6 +536,7 @@ final class AutonomyViewModel: ObservableObject {
         pendingStartRequest = nil
         projectRunPreparation = nil
         mission = ""
+        instructionSourcePath = nil
         assignmentID = ""
         startRequiresReconciliation = false
     }

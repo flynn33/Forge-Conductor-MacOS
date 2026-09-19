@@ -59,6 +59,10 @@ Product versions do not by themselves claim shipment.
   rejects traversal, links, encryption, unsupported compression, excessive
   expansion, and mismatched extraction results before accepting content, and
   retains nested archives without recursively expanding them.
+- Unified large paste, file selection, drag/drop, and ordered-queue instruction
+  admission on the immutable artifact importer. Direct artifacts are bound to
+  the exact project generation and run; prepare and Start receive only a compact
+  bootstrap and digest, and protected instruction reads remain run-scoped.
 
 ### Pending qualification
 

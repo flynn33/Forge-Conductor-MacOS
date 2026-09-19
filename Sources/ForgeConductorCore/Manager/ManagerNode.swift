@@ -1685,6 +1685,38 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     @discardableResult
+    public func importRunInstructionArtifact(
+        sourcePath: String,
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        runID: RunID
+    ) throws -> [String: Any] {
+        guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
+              (sourcePath as NSString).isAbsolutePath else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Run instruction import requires one bounded absolute path."
+            )
+        }
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        let artifact = try instructionQueueStore().importRunArtifact(
+            sourceURL: URL(fileURLWithPath: sourcePath),
+            projectID: projectID,
+            generation: expectedGeneration,
+            runID: runID
+        )
+        app.diagnostics.info(
+            "manager_run_instruction_artifact_imported",
+            [
+                "project_id": projectID.description,
+                "run_id": runID.description,
+                "snapshot_sha256": artifact.contentSHA256,
+            ],
+            category: .manager
+        )
+        return artifact.asDictionary()
+    }
+
+    @discardableResult
     public func reorderInstructionPackages(
         projectID: ProjectID,
         expectedGeneration: ProjectGeneration,
@@ -2297,11 +2329,73 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     // MARK: - Autonomous run controls
 
+    private struct PreparedInstructionInput {
+        let mission: String
+        let source: ManagerPreparedRunSource
+        let documents: [ManagerPreparedRunDocumentReference]
+    }
+
+    private func preparedInstructionInput(
+        runID: RunID?,
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        mission: String,
+        instructionArtifactSHA256: String?
+    ) throws -> PreparedInstructionInput {
+        guard let digest = instructionArtifactSHA256 else {
+            try Self.validatePreparedMission(mission)
+            let missionData = Data(mission.utf8)
+            let sourceSHA256 = JSONSupport.sha256Hex(missionData)
+            return PreparedInstructionInput(
+                mission: mission,
+                source: ManagerPreparedRunSource(
+                    kind: .inlineMission,
+                    reference: "inline-mission:\(sourceSHA256)",
+                    snapshotSHA256: sourceSHA256
+                ),
+                documents: [ManagerPreparedRunDocumentReference(
+                    reference: "inline:mission",
+                    byteCount: missionData.count,
+                    sha256: sourceSHA256
+                )]
+            )
+        }
+        guard let runID else {
+            throw AutonomyError.invalidRequest(
+                "A run-bound instruction artifact requires an exact run identifier."
+            )
+        }
+        let store = try instructionQueueStore()
+        let artifact = try store.runArtifact(
+            contentSHA256: digest,
+            projectID: projectID,
+            generation: expectedGeneration,
+            runID: runID
+        )
+        guard artifact.unresolvedDocumentCount == 0 else {
+            throw AutonomyError.invalidRequest(
+                "Resolve or replace the \(artifact.unresolvedDocumentCount) unconverted instruction document(s) before starting this task."
+            )
+        }
+        try Self.validatePreparedMission(artifact.mission)
+        return PreparedInstructionInput(
+            mission: artifact.mission,
+            source: ManagerPreparedRunSource(
+                kind: .instructionArtifact,
+                reference: "instruction-artifact:\(runID.description)",
+                snapshotSHA256: artifact.contentSHA256
+            ),
+            documents: try store.documentReferences(contentSHA256: artifact.contentSHA256)
+        )
+    }
+
     public func prepareAutonomousRun(
+        runID: RunID? = nil,
         projectID: ProjectID,
         expectedGeneration: ProjectGeneration,
         assignmentID: String? = nil,
         mission: String,
+        instructionArtifactSHA256: String? = nil,
         providerID: String? = nil,
         adapterID: String? = nil,
         modelKey: String? = nil,
@@ -2310,25 +2404,19 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) throws -> ManagerPreparedRunDescriptor {
-        try Self.validatePreparedMission(mission)
-        let missionData = Data(mission.utf8)
-        let sourceSHA256 = JSONSupport.sha256Hex(missionData)
-        let source = ManagerPreparedRunSource(
-            kind: .inlineMission,
-            reference: "inline-mission:\(sourceSHA256)",
-            snapshotSHA256: sourceSHA256
+        let instruction = try preparedInstructionInput(
+            runID: runID,
+            projectID: projectID,
+            expectedGeneration: expectedGeneration,
+            mission: mission,
+            instructionArtifactSHA256: instructionArtifactSHA256
         )
-        let documents = [ManagerPreparedRunDocumentReference(
-            reference: "inline:mission",
-            byteCount: missionData.count,
-            sha256: sourceSHA256
-        )]
         return try resolvedRunPreparation(
             projectID: projectID,
             expectedGeneration: expectedGeneration,
             assignmentID: assignmentID,
-            source: source,
-            documents: documents,
+            source: instruction.source,
+            documents: instruction.documents,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -2340,10 +2428,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     public func inspectAutonomousRunPreparation(
+        runID: RunID? = nil,
         projectID: ProjectID,
         expectedGeneration: ProjectGeneration,
         assignmentID: String? = nil,
         mission: String,
+        instructionArtifactSHA256: String? = nil,
         providerID: String? = nil,
         adapterID: String? = nil,
         modelKey: String? = nil,
@@ -2352,16 +2442,18 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) -> ManagerRunPreparationResult {
-        do {
-            try Self.validatePreparedMission(mission)
-        } catch {
-            return ManagerRunPreparationResult(
-                projectID: projectID.description,
-                projectGeneration: expectedGeneration.rawValue,
-                readiness: .failed,
-                detail: error.localizedDescription,
-                recoveryAction: .retryPreparation
-            )
+        if instructionArtifactSHA256 == nil {
+            do {
+                try Self.validatePreparedMission(mission)
+            } catch {
+                return ManagerRunPreparationResult(
+                    projectID: projectID.description,
+                    projectGeneration: expectedGeneration.rawValue,
+                    readiness: .failed,
+                    detail: error.localizedDescription,
+                    recoveryAction: .retryPreparation
+                )
+            }
         }
         let result: (
             ManagerRunReadinessState,
@@ -2372,10 +2464,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         var resultProjectGeneration = expectedGeneration.rawValue
         do {
             let descriptor = try prepareAutonomousRun(
+                runID: runID,
                 projectID: projectID,
                 expectedGeneration: expectedGeneration,
                 assignmentID: assignmentID,
                 mission: mission,
+                instructionArtifactSHA256: instructionArtifactSHA256,
                 providerID: providerID,
                 adapterID: adapterID,
                 modelKey: modelKey,
@@ -2541,6 +2635,13 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             completionGates: completionGates,
             networkAllowed: networkAllowed
         )
+        if source.kind != .inlineMission {
+            let missing = Set(["instruction_catalog", "instruction_read"])
+                .subtracting(resolved.allowedTools)
+            guard missing.isEmpty else {
+                throw AutonomyError.invalidToolConfiguration(missing.sorted())
+            }
+        }
         do {
             _ = try catalog.providerToolDefinitions(allowedToolNames: resolved.allowedTools)
         } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
@@ -2615,6 +2716,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         expectedGeneration: ProjectGeneration,
         assignmentID: String? = nil,
         mission: String,
+        instructionArtifactSHA256: String? = nil,
         providerID: String? = nil,
         adapterID: String? = nil,
         modelKey: String? = nil,
@@ -2630,23 +2732,19 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let autonomy = managedAutonomy
         lock.unlock()
         guard let autonomy else { throw AutonomyError.shutdown }
-        try Self.validatePreparedMission(mission)
-        let missionData = Data(mission.utf8)
-        let sourceSHA256 = JSONSupport.sha256Hex(missionData)
+        let instruction = try preparedInstructionInput(
+            runID: runID,
+            projectID: projectID,
+            expectedGeneration: expectedGeneration,
+            mission: mission,
+            instructionArtifactSHA256: instructionArtifactSHA256
+        )
         let context = try resolvedRunPreparation(
             projectID: projectID,
             expectedGeneration: expectedGeneration,
             assignmentID: assignmentID,
-            source: ManagerPreparedRunSource(
-                kind: .inlineMission,
-                reference: "inline-mission:\(sourceSHA256)",
-                snapshotSHA256: sourceSHA256
-            ),
-            documents: [ManagerPreparedRunDocumentReference(
-                reference: "inline:mission",
-                byteCount: missionData.count,
-                sha256: sourceSHA256
-            )],
+            source: instruction.source,
+            documents: instruction.documents,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -2666,7 +2764,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectID: projectID,
             projectGeneration: expectedGeneration,
             assignmentID: assignmentID,
-            mission: mission,
+            mission: instruction.mission,
             providerID: context.resolved.providerID,
             adapterID: context.resolved.adapterID,
             modelKey: context.resolved.modelKey,

@@ -168,17 +168,27 @@ queue mutation lock; atomic publication precedes the compact queue link, failed
 links remove only unreferenced new snapshots, and restart removes only
 UUID-named abandoned staging directories.
 
-Queue metadata migrates transactionally from schema 1 to schema 2 while new
-optional fields keep legacy package identities, ordering, active run linkage,
-and snapshots intact. The fixed 512-snapshot admission count is removed in
+Queue metadata migrates transactionally from schema 1 or 2 to schema 3 while
+the immutable snapshot/catalog format remains schema 2. New optional records
+keep legacy package identities, ordering, active run linkage, and snapshots
+intact. The fixed 512-snapshot admission count is removed in
 favor of reference-aware removal. The current explicit safety budgets are
 4,096 source files, 128 MiB per file, 512 MiB per import, 4,096 queue rows,
-64 MiB queue metadata, and 64 KiB per delivery window; these are resource
+4,096 direct-run artifacts, 64 MiB queue metadata, and 64 KiB per delivery
+window; these are resource
 backpressure limits rather than instructions-authoring limits.
 
-This slice closes the artifact-backed text/rich-document and bounded ZIP storage
-and scoped-retrieval foundation of M3. Paste/drop parity, durable delivery
-progress and token-aware planning, catalog/history paging
+Autonomy now gives typed/pasted instructions, selected files/folders/ZIPs, and
+dropped sources the same artifact semantics as queue import. Large pasted text
+is staged off the main actor in a fresh owner-only directory and removed after
+the authenticated import response. Each direct artifact is durably bound to its
+exact project, generation, and run UUID without entering or reordering the
+package queue. Preparation and Start carry only the compact bootstrap and
+snapshot digest; the scoped readers reject every other run identity.
+
+This slice closes the artifact-backed text/rich-document and bounded ZIP storage,
+direct input-surface parity, and scoped-retrieval foundation of M3. Durable
+delivery progress and token-aware planning, catalog/history paging
 beyond the transitional queue metadata budget, and decisive non-text asset
 representation remain open before M3 can be declared complete.
 
@@ -230,7 +240,7 @@ and the source-bound candidate remain M6 and M7.
   provider/catalog/budget revisions, continuity mode, and immutable package
   snapshot hash. The storage regression independently hashes the accepted
   owner-only document after the original source changes.
-- Eighteen instruction-queue tests cover the 1/32,767/32,768/32,769-byte
+- Nineteen instruction-store/queue tests cover the 1/32,767/32,768/32,769-byte
   boundaries and a 1.1 MiB file, a 66-document folder above 8 MiB including a
   hidden file, UTF-16 and multi-scalar seven-byte delivery windows, exact
   reassembly, native RTF/HTML/DOCX conversion, malformed PDF and opaque-binary
@@ -238,10 +248,12 @@ and the source-bound candidate remain M6 and M7.
   traversal/encryption/link/expansion rejection, nested-ZIP retention,
   project/generation/run isolation, schema-1 queue migration, immutable
   originals, ordering, restart, and completion advance behavior.
-- Seven catalog, nine provider/preparation, eight operator-contract, and 122
+- Seven catalog, ten provider/preparation, nine operator-contract, and 122
   Manager tests passed after the scoped readers entered the production catalog;
   Manager retained two explicit environment/helper skips. Both SwiftPM products
-  and the canonical Apple Development-signed Debug Xcode build passed.
+  and the canonical Apple Development-signed Debug Xcode build passed. The
+  matching Xcode app-hosted test passed with multi-megabyte pasted instructions
+  and selected/drop-source artifact semantics.
 - The authenticated project-registration regression first failed because the
   new authorization field was rejected. It now proves that one request retains
   an existing root, adds only the selected canonical directory, persists the

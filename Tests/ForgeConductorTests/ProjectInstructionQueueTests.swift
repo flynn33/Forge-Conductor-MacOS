@@ -122,6 +122,72 @@ final class ProjectInstructionQueueTests: XCTestCase {
         }
     }
 
+    func testDirectRunArtifactIsDurableRunBoundAndDoesNotEnterQueue() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.external.appendingPathComponent("pasted-task.txt")
+        let instructions = String(repeating: "Preserve every requirement.\n", count: 80_000)
+        try instructions.write(to: source, atomically: true, encoding: .utf8)
+        let runID = RunID()
+
+        let imported = try fixture.store.importRunArtifact(
+            sourceURL: source,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: runID
+        )
+        XCTAssertGreaterThan(imported.instructionByteCount, 1_048_576)
+        XCTAssertLessThanOrEqual(
+            imported.mission.utf8.count,
+            ProjectInstructionQueueStore.maximumMissionBytes
+        )
+        XCTAssertEqual(imported.unresolvedDocumentCount, 0)
+        XCTAssertTrue(try fixture.store.snapshot(
+            projectID: fixture.projectID,
+            generation: .initial
+        ).packages.isEmpty)
+
+        let reopened = try ProjectInstructionQueueStore(paths: fixture.paths, clock: fixture.clock)
+        XCTAssertEqual(try reopened.runArtifact(
+            contentSHA256: imported.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: runID
+        ), imported)
+        XCTAssertThrowsError(try reopened.runArtifact(
+            contentSHA256: imported.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: RunID()
+        ))
+        XCTAssertThrowsError(try reopened.catalogPage(
+            contentSHA256: imported.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: RunID(),
+            cursor: 0,
+            limit: 10
+        ))
+        let catalog = try reopened.catalogPage(
+            contentSHA256: imported.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: runID,
+            cursor: 0,
+            limit: 10
+        )
+        XCTAssertEqual(catalog.totalDocuments, 1)
+        XCTAssertEqual(
+            try reopened.importRunArtifact(
+                sourceURL: source,
+                projectID: fixture.projectID,
+                generation: .initial,
+                runID: runID
+            ),
+            imported
+        )
+    }
+
     func testHiddenAndLargeDirectoryInventoryExceedsOldLimits() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }

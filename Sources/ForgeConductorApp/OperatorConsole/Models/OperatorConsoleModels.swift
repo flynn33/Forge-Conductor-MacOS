@@ -790,6 +790,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let projectGeneration: UInt64
     let assignmentID: String?
     let mission: String
+    let instructionArtifactSHA256: String?
+    let localInstructionSourcePath: String?
     let providerID: String?
     let adapterID: String?
     let modelKey: String?
@@ -807,6 +809,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         projectGeneration: UInt64,
         assignmentID: String?,
         mission: String,
+        instructionArtifactSHA256: String? = nil,
+        localInstructionSourcePath: String? = nil,
         providerID: String?,
         adapterID: String?,
         modelKey: String?,
@@ -823,6 +827,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         self.projectGeneration = projectGeneration
         self.assignmentID = assignmentID
         self.mission = mission
+        self.instructionArtifactSHA256 = instructionArtifactSHA256
+        self.localInstructionSourcePath = localInstructionSourcePath
         self.providerID = providerID
         self.adapterID = adapterID
         self.modelKey = modelKey
@@ -841,6 +847,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         case projectGeneration = "project_generation"
         case assignmentID = "assignment_id"
         case mission
+        case instructionArtifactSHA256 = "instruction_artifact_sha256"
         case providerID = "provider_id"
         case adapterID = "adapter_id"
         case modelKey = "model_key"
@@ -860,6 +867,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             projectGeneration: projectGeneration,
             assignmentID: assignmentID,
             mission: mission,
+            instructionArtifactSHA256: instructionArtifactSHA256,
+            localInstructionSourcePath: localInstructionSourcePath,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -880,6 +889,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             projectGeneration: projectGeneration,
             assignmentID: assignmentID,
             mission: mission,
+            instructionArtifactSHA256: instructionArtifactSHA256,
+            localInstructionSourcePath: localInstructionSourcePath,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -900,6 +911,30 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             projectGeneration: generation,
             assignmentID: assignmentID,
             mission: mission,
+            instructionArtifactSHA256: instructionArtifactSHA256,
+            localInstructionSourcePath: localInstructionSourcePath,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed,
+            expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
+            expectedToolCatalogRevision: expectedToolCatalogRevision,
+            expectedPreparedRunRevision: expectedPreparedRunRevision,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+    }
+
+    func usingInstructionArtifact(_ artifact: ProjectRunInstructionArtifact) -> Self {
+        Self(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            assignmentID: assignmentID,
+            mission: artifact.mission,
+            instructionArtifactSHA256: artifact.contentSHA256,
+            localInstructionSourcePath: localInstructionSourcePath,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,

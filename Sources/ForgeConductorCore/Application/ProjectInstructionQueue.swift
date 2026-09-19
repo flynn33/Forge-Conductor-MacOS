@@ -118,6 +118,114 @@ public struct ProjectInstructionQueueSnapshot: Codable, Sendable, Equatable {
     }
 }
 
+public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
+    public let runID: RunID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let mission: String
+    public let sourcePath: String
+    public let contentSHA256: String
+    public let documentCount: Int
+    public let instructionByteCount: Int
+    public let unresolvedDocumentCount: Int
+    public let createdAt: String
+
+    public init(
+        runID: RunID,
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        mission: String,
+        sourcePath: String,
+        contentSHA256: String,
+        documentCount: Int,
+        instructionByteCount: Int,
+        unresolvedDocumentCount: Int,
+        createdAt: String
+    ) {
+        self.runID = runID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.mission = mission
+        self.sourcePath = sourcePath
+        self.contentSHA256 = contentSHA256
+        self.documentCount = documentCount
+        self.instructionByteCount = instructionByteCount
+        self.unresolvedDocumentCount = unresolvedDocumentCount
+        self.createdAt = createdAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case mission
+        case sourcePath = "source_path"
+        case contentSHA256 = "content_sha256"
+        case documentCount = "document_count"
+        case instructionByteCount = "instruction_byte_count"
+        case unresolvedDocumentCount = "unresolved_document_count"
+        case createdAt = "created_at"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let runValue = try values.decode(String.self, forKey: .runID)
+        let projectValue = try values.decode(String.self, forKey: .projectID)
+        guard let runUUID = UUID(uuidString: runValue),
+              let projectUUID = UUID(uuidString: projectValue) else {
+            throw DecodingError.dataCorrupted(
+                .init(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Run instruction artifact identities must be UUID strings."
+                )
+            )
+        }
+        runID = RunID(runUUID)
+        projectID = ProjectID(projectUUID)
+        projectGeneration = ProjectGeneration(
+            try values.decode(UInt64.self, forKey: .projectGeneration)
+        )
+        mission = try values.decode(String.self, forKey: .mission)
+        sourcePath = try values.decode(String.self, forKey: .sourcePath)
+        contentSHA256 = try values.decode(String.self, forKey: .contentSHA256)
+        documentCount = try values.decode(Int.self, forKey: .documentCount)
+        instructionByteCount = try values.decode(Int.self, forKey: .instructionByteCount)
+        unresolvedDocumentCount = try values.decode(Int.self, forKey: .unresolvedDocumentCount)
+        createdAt = try values.decode(String.self, forKey: .createdAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(runID.description, forKey: .runID)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(projectGeneration.rawValue, forKey: .projectGeneration)
+        try values.encode(mission, forKey: .mission)
+        try values.encode(sourcePath, forKey: .sourcePath)
+        try values.encode(contentSHA256, forKey: .contentSHA256)
+        try values.encode(documentCount, forKey: .documentCount)
+        try values.encode(instructionByteCount, forKey: .instructionByteCount)
+        try values.encode(unresolvedDocumentCount, forKey: .unresolvedDocumentCount)
+        try values.encode(createdAt, forKey: .createdAt)
+    }
+
+    public func asDictionary() -> [String: Any] {
+        [
+            "ok": true,
+            "run_id": runID.description,
+            "project_id": projectID.description,
+            "project_generation": projectGeneration.rawValue,
+            "mission": mission,
+            "source_path": sourcePath,
+            "content_sha256": contentSHA256,
+            "document_count": documentCount,
+            "instruction_byte_count": instructionByteCount,
+            "unresolved_document_count": unresolvedDocumentCount,
+            "import_ready": unresolvedDocumentCount == 0,
+            "created_at": createdAt,
+        ]
+    }
+}
+
 public enum ProjectInstructionQueueError: Error, LocalizedError, Sendable, Equatable {
     case invalidRequest(String)
     case sourceUnavailable
@@ -158,9 +266,11 @@ public enum ProjectInstructionQueueError: Error, LocalizedError, Sendable, Equat
 /// The lock bounds all mutations, and every accepted source becomes a content-addressed,
 /// owner-only snapshot before the queue record is published atomically.
 public final class ProjectInstructionQueueStore: @unchecked Sendable {
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
+    private static let catalogSchemaVersion = 2
     public static let builtInCompletionGate = "forge.package.tool-success"
     public static let maximumPackages = 4_096
+    public static let maximumRunArtifacts = 4_096
     public static let maximumSourceFiles = 4_096
     public static let maximumSourceFileBytes = 128 * 1_048_576
     public static let maximumAggregateBytes = 512 * 1_048_576
@@ -173,19 +283,48 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         var revision: UInt64
         var runningProjects: [String]
         var packages: [ProjectInstructionPackage]
+        var runArtifacts: [ProjectRunInstructionArtifact]
 
         enum CodingKeys: String, CodingKey {
             case schemaVersion = "schema_version"
             case revision
             case runningProjects = "running_projects"
             case packages
+            case runArtifacts = "run_artifacts"
+        }
+
+        init(
+            schemaVersion: Int,
+            revision: UInt64,
+            runningProjects: [String],
+            packages: [ProjectInstructionPackage],
+            runArtifacts: [ProjectRunInstructionArtifact]
+        ) {
+            self.schemaVersion = schemaVersion
+            self.revision = revision
+            self.runningProjects = runningProjects
+            self.packages = packages
+            self.runArtifacts = runArtifacts
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            schemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
+            revision = try values.decode(UInt64.self, forKey: .revision)
+            runningProjects = try values.decode([String].self, forKey: .runningProjects)
+            packages = try values.decode([ProjectInstructionPackage].self, forKey: .packages)
+            runArtifacts = try values.decodeIfPresent(
+                [ProjectRunInstructionArtifact].self,
+                forKey: .runArtifacts
+            ) ?? []
         }
 
         static let empty = PersistedState(
             schemaVersion: ProjectInstructionQueueStore.schemaVersion,
             revision: 0,
             runningProjects: [],
-            packages: []
+            packages: [],
+            runArtifacts: []
         )
     }
 
@@ -342,7 +481,10 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             )
             var decoded = try JSONDecoder().decode(PersistedState.self, from: data)
             guard (1...Self.schemaVersion).contains(decoded.schemaVersion),
-                  decoded.packages.count <= Self.maximumPackages else {
+                  decoded.packages.count <= Self.maximumPackages,
+                  decoded.runArtifacts.count <= Self.maximumRunArtifacts,
+                  Set(decoded.runArtifacts.map(\.runID)).count == decoded.runArtifacts.count,
+                  decoded.runArtifacts.allSatisfy(Self.validRunArtifact) else {
                 throw ProjectInstructionQueueError.storageFailure("unsupported or oversized queue state")
             }
             if decoded.schemaVersion < Self.schemaVersion {
@@ -355,6 +497,86 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         } else {
             state = .empty
         }
+    }
+
+    @discardableResult
+    public func importRunArtifact(
+        sourceURL: URL,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID
+    ) throws -> ProjectRunInstructionArtifact {
+        let ingested = try Self.ingest(sourceURL: sourceURL, projectID: projectID)
+        let snapshotURL = paths.instructionPackageStoreDir.appendingPathComponent(
+            ingested.digest, isDirectory: true
+        )
+        let published = try Self.publish(ingested, storeRoot: paths.instructionPackageStoreDir)
+        lock.lock(); defer { lock.unlock() }
+        if let existing = state.runArtifacts.first(where: { $0.runID == runID }) {
+            guard existing.projectID == projectID,
+                  existing.projectGeneration == generation,
+                  existing.contentSHA256 == ingested.digest else {
+                if published, !isDigestReferencedUnlocked(ingested.digest) {
+                    try? FileManager.default.removeItem(at: snapshotURL)
+                }
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "The run identifier is already bound to a different instruction artifact."
+                )
+            }
+            return existing
+        }
+        guard state.runArtifacts.count < Self.maximumRunArtifacts else {
+            if published, !isDigestReferencedUnlocked(ingested.digest) {
+                try? FileManager.default.removeItem(at: snapshotURL)
+            }
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Direct run instruction storage is limited to \(Self.maximumRunArtifacts) artifacts."
+            )
+        }
+        let record = ProjectRunInstructionArtifact(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: generation,
+            mission: ingested.mission,
+            sourcePath: ingested.sourcePath,
+            contentSHA256: ingested.digest,
+            documentCount: ingested.documents.count,
+            instructionByteCount: ingested.instructionByteCount,
+            unresolvedDocumentCount: ingested.unresolvedDocumentCount,
+            createdAt: ISO8601.string(from: clock.now())
+        )
+        let prior = state
+        state.runArtifacts.append(record)
+        do {
+            try commitUnlocked(restoring: prior)
+        } catch {
+            if published, !isDigestReferencedUnlocked(ingested.digest) {
+                try? FileManager.default.removeItem(at: snapshotURL)
+            }
+            throw error
+        }
+        return record
+    }
+
+    public func runArtifact(
+        contentSHA256: String,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID
+    ) throws -> ProjectRunInstructionArtifact {
+        lock.lock(); defer { lock.unlock() }
+        try validateDigestReferenceUnlocked(contentSHA256)
+        guard let artifact = state.runArtifacts.first(where: {
+            $0.contentSHA256 == contentSHA256
+                && $0.projectID == projectID
+                && $0.projectGeneration == generation
+                && $0.runID == runID
+        }) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction artifact access is not authorized for this project, generation, or run."
+            )
+        }
+        return artifact
     }
 
     public func snapshot(
@@ -380,7 +602,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let published = try Self.publish(ingested, storeRoot: paths.instructionPackageStoreDir)
         lock.lock(); defer { lock.unlock() }
         guard state.packages.count < Self.maximumPackages else {
-            if published, !state.packages.contains(where: { $0.contentSHA256 == ingested.digest }) {
+            if published, !isDigestReferencedUnlocked(ingested.digest) {
                 try? FileManager.default.removeItem(at: snapshotURL)
             }
             throw ProjectInstructionQueueError.invalidRequest("The instruction queue is limited to \(Self.maximumPackages) packages.")
@@ -406,7 +628,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         do {
             try commitUnlocked(restoring: prior)
         } catch {
-            if published, !state.packages.contains(where: { $0.contentSHA256 == ingested.digest }) {
+            if published, !isDigestReferencedUnlocked(ingested.digest) {
                 try? FileManager.default.removeItem(at: snapshotURL)
             }
             throw error
@@ -852,16 +1074,21 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let prior = state
         let removedDigests = Set(
             state.packages.filter { $0.projectID == projectID }.map(\.contentSHA256)
+                + state.runArtifacts.filter { $0.projectID == projectID }.map(\.contentSHA256)
         )
         let originalCount = state.packages.count
+        let originalArtifactCount = state.runArtifacts.count
         state.packages.removeAll { $0.projectID == projectID }
+        state.runArtifacts.removeAll { $0.projectID == projectID }
         state.runningProjects.removeAll { $0 == projectID.description }
         let removed = originalCount - state.packages.count
-        if removed > 0 || prior.runningProjects.contains(projectID.description) {
+        let removedArtifacts = originalArtifactCount - state.runArtifacts.count
+        if removed > 0 || removedArtifacts > 0
+            || prior.runningProjects.contains(projectID.description) {
             try commitUnlocked(restoring: prior)
             for digest in removedDigests { removeSnapshotIfUnreferencedUnlocked(digest) }
         }
-        return removed
+        return removed + removedArtifacts
     }
 
     private func snapshotUnlocked(
@@ -900,7 +1127,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
               contentSHA256.utf8.allSatisfy({
                   (48...57).contains($0) || (97...102).contains($0)
               }),
-              state.packages.contains(where: { $0.contentSHA256 == contentSHA256 }) else {
+              isDigestReferencedUnlocked(contentSHA256) else {
             throw ProjectInstructionQueueError.storageFailure(
                 "instruction snapshot identity is invalid or unreferenced"
             )
@@ -914,20 +1141,54 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         runID: RunID?
     ) throws {
         try validateDigestReferenceUnlocked(contentSHA256)
-        guard state.packages.contains(where: {
+        let packageAccess = state.packages.contains(where: {
             $0.contentSHA256 == contentSHA256
                 && $0.projectID == projectID
                 && $0.projectGeneration == generation
                 && (runID == nil || $0.runID == runID)
-        }) else {
+        })
+        let runArtifactAccess = runID.map { requestedRunID in
+            state.runArtifacts.contains(where: {
+                $0.contentSHA256 == contentSHA256
+                    && $0.projectID == projectID
+                    && $0.projectGeneration == generation
+                    && $0.runID == requestedRunID
+            })
+        } ?? false
+        guard packageAccess || runArtifactAccess else {
             throw ProjectInstructionQueueError.invalidRequest(
                 "Instruction snapshot access is not authorized for this project, generation, or run."
             )
         }
     }
 
+    private func isDigestReferencedUnlocked(_ digest: String) -> Bool {
+        state.packages.contains(where: { $0.contentSHA256 == digest })
+            || state.runArtifacts.contains(where: { $0.contentSHA256 == digest })
+    }
+
+    private static func validRunArtifact(_ artifact: ProjectRunInstructionArtifact) -> Bool {
+        artifact.contentSHA256.utf8.count == 64
+            && artifact.contentSHA256.utf8.allSatisfy({
+                (48...57).contains($0) || (97...102).contains($0)
+            })
+            && !artifact.mission.isEmpty
+            && artifact.mission == artifact.mission.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            && artifact.mission.utf8.count <= maximumMissionBytes
+            && !artifact.sourcePath.isEmpty
+            && artifact.sourcePath.utf8.count <= 4_096
+            && (artifact.sourcePath as NSString).isAbsolutePath
+            && (1...maximumSourceFiles).contains(artifact.documentCount)
+            && artifact.instructionByteCount >= 0
+            && artifact.instructionByteCount <= maximumAggregateBytes
+            && (0...artifact.documentCount).contains(artifact.unresolvedDocumentCount)
+            && artifact.createdAt.utf8.count <= 64
+    }
+
     private func removeSnapshotIfUnreferencedUnlocked(_ digest: String) {
-        guard !state.packages.contains(where: { $0.contentSHA256 == digest }) else { return }
+        guard !isDigestReferencedUnlocked(digest) else { return }
         try? FileManager.default.removeItem(
             at: paths.instructionPackageStoreDir.appendingPathComponent(digest, isDirectory: true)
         )
@@ -1272,7 +1533,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 ))
             }
             let catalog = StoredCatalog(
-                schemaVersion: Self.schemaVersion,
+                schemaVersion: Self.catalogSchemaVersion,
                 contentSHA256: package.digest,
                 documents: storedDocuments
             )
@@ -1289,7 +1550,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 [.posixPermissions: 0o400], ofItemAtPath: catalogURL.path
             )
             let receipt: [String: Any] = [
-                "schema_version": Self.schemaVersion, "content_sha256": package.digest,
+                "schema_version": Self.catalogSchemaVersion, "content_sha256": package.digest,
                 "package_id": package.packageID, "version": package.version,
                 "document_count": package.documents.count,
                 "instruction_byte_count": package.instructionByteCount,
@@ -1334,7 +1595,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: 32 * 1_048_576)
         let catalog = try JSONDecoder().decode(StoredCatalog.self, from: data)
-        guard catalog.schemaVersion == Self.schemaVersion,
+        guard catalog.schemaVersion == Self.catalogSchemaVersion,
               catalog.documents.count <= Self.maximumSourceFiles else {
             throw ProjectInstructionQueueError.storageFailure(
                 "instruction document catalog is unsupported or oversized"

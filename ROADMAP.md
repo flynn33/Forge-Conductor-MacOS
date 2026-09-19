@@ -68,22 +68,28 @@ with an unresolved state that prevents queue execution. Compact bootstrap
 missions now require the run-bound, read-only `instruction_catalog` and
 `instruction_read` tools instead of embedding all instructions. Import work is
 staged outside the queue mutation lock, atomic publication is reference-aware,
-abandoned UUID stages are recovered, and schema-1 queue metadata migrates without
-changing package identity or order. ZIP containers are inspected before native
+abandoned UUID stages are recovered, and schema-1/2 queue metadata migrates to
+schema 3 without changing package identity or order. ZIP containers are inspected before native
 extraction and rejected for traversal, links, encryption, unsupported
 compression, resource expansion, or an extracted inventory mismatch. Nested
-ZIPs are retained unresolved rather than recursively expanded. Eighteen focused
+ZIPs are retained unresolved rather than recursively expanded. Large pasted
+instructions and file/folder/ZIP selection or drop now import through bounded,
+owner-only staging into an exact project/generation/run-bound artifact; prepare
+and Start carry its compact bootstrap and digest instead of the source body.
+Direct artifacts do not enter or reorder the package queue. Nineteen focused
 queue tests pass, including
 the 32 KiB boundary, a 1.1 MiB document, a 66-document aggregate above 8 MiB,
 hidden input, exact Unicode/UTF-16 reassembly, rich-document and ZIP conversion,
 archive rejection, unresolved content, isolation, migration, restart, and
 execution ordering.
-Seven production-catalog, nine provider/preparation, eight operator-contract,
+Seven production-catalog, ten provider/preparation, nine operator-contract,
 and 122 Manager tests also passed; Manager retained its two explicit helper/live
 provider skips. Both SwiftPM products and the canonical Apple Development-signed
-Debug Xcode build passed with the new source compiled into the Core framework.
-Paste/drop parity, durable token-aware delivery progress, and final
-large-catalog/history paging remain open. This checkpoint changes the canonical
+Debug Xcode build passed with the new source compiled into the Core framework;
+the matching Xcode app-hosted multi-megabyte paste/selection/drop contract test
+also passed.
+Durable token-aware delivery progress and final large-catalog/history paging
+remain open. This checkpoint changes the canonical
 Xcode graph by adding `InstructionArtifactToolPack.swift` and
 `SafeZIPArchive.swift`; it does not qualify shipment or distribution.
 

@@ -255,6 +255,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumProviderProbeBodyBytes = 512
     static let maximumRunControlBodyBytes = 256
     static let maximumToolPermissionBodyBytes = 128 * 1_024
+    static let maximumRunAdmissionBodyBytes = 128 * 1_024
     /// Provider I/O is intentionally isolated from `DashboardServer`'s serial
     /// listener queue. The active-connection cap bounds submitted work, while
     /// `ManagerNode` rejects overlapping probes and owns the operation deadline.
@@ -878,11 +879,103 @@ public final class ManagerRoutes: @unchecked Sendable {
                     "message": error.localizedDescription,
                 ])
             }
+        case ("POST", "/api/manager/runs/instruction-artifacts/import"):
+            guard body.count <= Self.maximumInstructionQueueBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "run_instruction_import_body_too_large",
+                    "message": "Run instruction import accepts bounded identities and a source path",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_run_instruction_import",
+                    "message": "Run instruction import requires one bounded JSON object",
+                ])
+                return
+            }
+            guard Set(object.keys) == [
+                "run_id", "project_id", "project_generation", "source_path",
+            ],
+                  let runIDValue = object["run_id"] as? String,
+                  let runUUID = UUID(uuidString: runIDValue),
+                  let sourcePath = object["source_path"] as? String else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_run_instruction_import",
+                    "message": "Run instruction import requires exact run, project, generation, and source path fields",
+                ])
+                return
+            }
+            do {
+                let artifact = try manager.importRunInstructionArtifact(
+                    sourcePath: sourcePath,
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object),
+                    runID: RunID(runUUID)
+                )
+                http.respondJSON(connection, status: 201, object: artifact)
+            } catch let error as ProjectInstructionQueueError {
+                let status: Int
+                switch error {
+                case .sourceUnavailable, .packageNotFound:
+                    status = 404
+                case .invalidRequest, .sourceTypeUnsupported, .sourceContainsLink,
+                     .manifestInvalid:
+                    status = 422
+                case .storageFailure:
+                    status = 500
+                case .activePackage, .staleRevision, .staleProjectGeneration,
+                     .queueAlreadyRunning, .queueNotRunning, .queueBlocked:
+                    status = 409
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": "run_instruction_import_failed",
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectContextError {
+                let busy = error == .databaseBusy
+                http.respondJSON(connection, status: busy ? 503 : 409, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                    "retryable": busy,
+                ])
+            }
         case ("POST", "/api/manager/runs/prepare"):
+            guard body.count <= Self.maximumRunAdmissionBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "run_preparation_body_too_large",
+                    "message": "Run preparation requires a bounded mission or instruction artifact reference",
+                ])
+                return
+            }
             let object = try JSONSupport.object(from: body)
             guard let mission = object["mission"] as? String, !mission.isEmpty else {
                 throw AutonomyError.invalidRequest("mission is required")
             }
+            let preparationRunID: RunID?
+            if let value = object["run_id"] {
+                guard let string = value as? String,
+                      string.utf8.count <= 36,
+                      let identifier = UUID(uuidString: string) else {
+                    throw AutonomyError.invalidRequest(
+                        "run_id must be a UUID when supplied"
+                    )
+                }
+                preparationRunID = RunID(identifier)
+            } else { preparationRunID = nil }
+            let instructionArtifactSHA256 = try optionalSHA256(
+                object,
+                key: "instruction_artifact_sha256"
+            )
             let providerID = try optionalString(object, key: "provider_id", maximumBytes: 256)
             let adapterID = try optionalString(
                 object,
@@ -894,6 +987,7 @@ public final class ManagerRoutes: @unchecked Sendable {
             let completionGates = try optionalStringArray(object, key: "completion_gates")
             let networkAllowed = try optionalBoolean(object, key: "network_allowed") ?? false
             let result = manager.inspectAutonomousRunPreparation(
+                runID: preparationRunID,
                 projectID: try projectID(object),
                 expectedGeneration: try projectGeneration(object),
                 assignmentID: try optionalString(
@@ -902,6 +996,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                     maximumBytes: 1_024
                 ),
                 mission: mission,
+                instructionArtifactSHA256: instructionArtifactSHA256,
                 providerID: providerID,
                 adapterID: adapterID,
                 modelKey: modelKey,
@@ -913,6 +1008,14 @@ public final class ManagerRoutes: @unchecked Sendable {
             )
             http.respondJSON(connection, status: 200, object: try result.asDictionary())
         case ("POST", "/api/manager/runs/start"):
+            guard body.count <= Self.maximumRunAdmissionBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "run_start_body_too_large",
+                    "message": "Run Start requires a bounded mission or instruction artifact reference",
+                ])
+                return
+            }
             let object = try JSONSupport.object(from: body)
             guard let runIDValue = object["run_id"] as? String,
                   let runUUID = UUID(uuidString: runIDValue),
@@ -999,6 +1102,10 @@ public final class ManagerRoutes: @unchecked Sendable {
                 }
                 expectedPreparedRunRevision = typed
             } else { expectedPreparedRunRevision = nil }
+            let instructionArtifactSHA256 = try optionalSHA256(
+                object,
+                key: "instruction_artifact_sha256"
+            )
             do {
                 let result = try manager.startAutonomousRun(
                     runID: RunID(runUUID),
@@ -1006,6 +1113,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                     expectedGeneration: try projectGeneration(object),
                     assignmentID: object["assignment_id"] as? String,
                     mission: mission,
+                    instructionArtifactSHA256: instructionArtifactSHA256,
                     providerID: providerID,
                     adapterID: adapterID,
                     modelKey: modelKey,
@@ -1537,6 +1645,23 @@ public final class ManagerRoutes: @unchecked Sendable {
         guard let value = object[key] else { return nil }
         guard let typed = value as? [String] else {
             throw AutonomyError.invalidRequest("\(key) must be a string array when supplied")
+        }
+        return typed
+    }
+
+    private func optionalSHA256(
+        _ object: [String: Any],
+        key: String
+    ) throws -> String? {
+        guard let value = object[key] else { return nil }
+        guard let typed = value as? String,
+              typed.utf8.count == 64,
+              typed.utf8.allSatisfy({
+                  (48...57).contains($0) || (97...102).contains($0)
+              }) else {
+            throw AutonomyError.invalidRequest(
+                "\(key) must be a lowercase SHA-256 string when supplied"
+            )
         }
         return typed
     }

@@ -1104,7 +1104,7 @@ final class ManagerTests: XCTestCase {
         XCTAssertNotNil(replay["reset_receipt"] as? [String: Any])
     }
 
-    func testInstructionPackageAndProjectRemovalRoutesPersistExactProjectOrder() async throws {
+    func testInstructionPackageArtifactAndProjectRemovalRoutesPersistExactProjectOrder() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = Int.random(in: 39_001...49_000)
         try app.config.update([
@@ -1149,6 +1149,22 @@ final class ManagerTests: XCTestCase {
             "project_id": projectID,
             "project_generation": UInt64(1),
         ]
+
+        let malformedArtifactImport = try post(
+            "/api/manager/runs/instruction-artifacts/import",
+            projectRequest,
+            expectedStatus: 400
+        )
+        XCTAssertEqual(malformedArtifactImport["code"] as? String, "invalid_run_instruction_import")
+        let unavailableArtifactImport = try post(
+            "/api/manager/runs/instruction-artifacts/import",
+            projectRequest.merging([
+                "run_id": UUID().uuidString.lowercased(),
+                "source_path": projectRoot.appendingPathComponent("missing.md").path,
+            ]) { _, value in value },
+            expectedStatus: 404
+        )
+        XCTAssertEqual(unavailableArtifactImport["code"] as? String, "run_instruction_import_failed")
 
         let firstImport = try post(
             "/api/manager/projects/instruction-packages/import",

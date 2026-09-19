@@ -397,7 +397,7 @@ struct ProjectsOperatorView: View {
     private func instructionPackages(_ project: OperatorProject) -> some View {
         GroupBox("Instruction packages") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Add a file or folder in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows to set the order used by autonomous runs.")
+                Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows to set the order used by autonomous runs.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -520,7 +520,7 @@ struct ProjectsOperatorView: View {
         panel.canCreateDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Add Instructions"
-        panel.message = "Choose an instruction file or folder. Forge preserves the originals and reports unsupported content without executing imported files."
+        panel.message = "Choose an instruction file, folder, or ZIP. Forge preserves the originals and reports unsupported content without executing imported files."
         guard panel.runModal() == .OK, let url = panel.urls.first,
               url.isFileURL, (url.path as NSString).isAbsolutePath else { return }
         viewModel.importInstructionPackage(path: url.path)

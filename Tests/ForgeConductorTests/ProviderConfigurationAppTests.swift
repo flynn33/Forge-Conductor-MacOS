@@ -599,6 +599,105 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertNil(denied.descriptor)
     }
 
+    func testDirectRunArtifactPreparesAndStartsWithoutInlineSourceBody() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        defer { Self.makeInstructionSnapshotsRemovable(app.paths.instructionPackageStoreDir) }
+        let port = Int.random(in: 29_000...39_000)
+        let projectRoot = directory.appendingPathComponent("artifact-run-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        try app.config.update([
+            "allowed_roots": [projectRoot.path],
+            "dashboard": ["port": port],
+        ], save: true)
+        let source = directory.appendingPathComponent("pasted-large-task.txt")
+        let instructions = String(repeating: "Apply every late constraint.\n", count: 80_000)
+        try instructions.write(to: source, atomically: true, encoding: .utf8)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = try? manager.stopService()
+            _ = manager.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        let current = try manager.readProviderConfiguration()
+        _ = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: current.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/artifact-model"
+        ))
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+        _ = try manager.recoverManagedAutonomy()
+        _ = try manager.startService()
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: port,
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
+        let runID = RunID()
+        let imported = try await client.importRunInstructionArtifact(
+            projectID: projectID.description,
+            generation: generation.rawValue,
+            runID: runID.description,
+            sourcePath: source.path,
+        )
+        let digest = imported.contentSHA256
+        let bootstrap = imported.mission
+        XCTAssertGreaterThan(instructions.utf8.count, 1_048_576)
+        XCTAssertLessThanOrEqual(
+            bootstrap.utf8.count,
+            ProjectInstructionQueueStore.maximumMissionBytes
+        )
+
+        let request = OperatorRunStartRequest(
+            runID: runID.description,
+            projectID: projectID.description,
+            projectGeneration: generation.rawValue,
+            assignmentID: nil,
+            mission: bootstrap,
+            instructionArtifactSHA256: digest,
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: nil,
+            completionGates: nil,
+            networkAllowed: nil,
+            expectedProviderConfigurationRevision: nil,
+            expectedToolCatalogRevision: nil,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        let preparation = try await client.prepareRun(request)
+        let prepared = try XCTUnwrap(preparation.descriptor)
+        XCTAssertEqual(prepared.source.kind, .instructionArtifact)
+        XCTAssertEqual(prepared.source.snapshotSHA256, digest)
+        XCTAssertEqual(prepared.documents.count, 1)
+        XCTAssertTrue(prepared.allowedTools.contains("instruction_catalog"))
+        XCTAssertTrue(prepared.allowedTools.contains("instruction_read"))
+        _ = try await client.startRun(request.expectingPreparedRevision(prepared.revision))
+        let stored = try await app.projectContexts.repository.autonomousRun(runID)
+        let durable = try XCTUnwrap(stored)
+        XCTAssertEqual(durable.mission, bootstrap)
+        XCTAssertEqual(
+            durable.specification.work.metadata["source_snapshot_sha256"],
+            digest
+        )
+        let catalog = try ProjectInstructionQueueStore(paths: app.paths).catalogPage(
+            contentSHA256: digest,
+            projectID: projectID,
+            generation: generation,
+            runID: runID,
+            cursor: 0,
+            limit: 10
+        )
+        XCTAssertEqual(catalog.totalDocuments, 1)
+    }
+
     func testInstructionQueuePersistsSharedPreparedDescriptorIdentity() async throws {
         let app = try ForgeApp.bootstrap(home: directory)
         defer { Self.makeInstructionSnapshotsRemovable(app.paths.instructionPackageStoreDir) }

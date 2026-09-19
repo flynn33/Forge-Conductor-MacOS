@@ -227,7 +227,7 @@ struct AutonomyOperatorView: View {
     private var startSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Start Task").font(.title2.bold())
-            Text("Choose the project, enter the instructions, and start. Forge supplies the saved model, task capabilities, completion checks, and continuity defaults.")
+            Text("Choose the project, then type, paste, drop, or select the instructions and start. Forge supplies the saved model, task capabilities, completion checks, and continuity defaults.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -242,9 +242,36 @@ struct AutonomyOperatorView: View {
             .onChange(of: viewModel.selectedProjectID) { _, _ in
                 viewModel.refreshToolPermissionsForSelection()
             }
-            TextField("Instructions", text: $viewModel.mission, axis: .vertical)
-                .lineLimit(2...5)
-                .accessibilityIdentifier("run-start-mission")
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("Instructions", text: $viewModel.mission, axis: .vertical)
+                    .lineLimit(2...5)
+                    .disabled(viewModel.instructionSourcePath != nil)
+                    .accessibilityIdentifier("run-start-mission")
+                HStack {
+                    Button("Choose File or Folder…") {
+                        viewModel.chooseInstructionSource()
+                    }
+                    .accessibilityIdentifier("run-start-choose-instructions")
+                    if let sourceName = viewModel.instructionSourceName {
+                        Label(sourceName, systemImage: "doc.badge.checkmark")
+                            .lineLimit(1)
+                        Button("Remove") {
+                            viewModel.clearInstructionSource()
+                        }
+                        .accessibilityIdentifier("run-start-remove-instructions")
+                    } else {
+                        Text("Drop a file, folder, or ZIP here")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
+            }
+            .contentShape(Rectangle())
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let source = urls.first else { return false }
+                return viewModel.setInstructionSource(source)
+            }
+            .accessibilityIdentifier("run-start-instruction-drop-target")
 
             GroupBox("Forge preparation") {
                 VStack(alignment: .leading, spacing: 7) {
