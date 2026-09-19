@@ -17,6 +17,9 @@ Product versions do not by themselves claim shipment.
   defaults; technical overrides remain available under Advanced.
 - Preserved selected run defaults across refresh and completed-run reset instead
   of requiring repeated raw tool and completion-gate entry.
+- Unified direct and queued technical preparation in the Manager. Configured
+  starts now omit unchanged provider/model/tool/gate/network fields, while
+  explicit Advanced overrides remain exact and fail closed when invalid.
 
 ### Pending qualification
 

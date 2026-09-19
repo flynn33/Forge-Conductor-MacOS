@@ -775,12 +775,12 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let projectGeneration: UInt64
     let assignmentID: String?
     let mission: String
-    let providerID: String
-    let adapterID: String
-    let modelKey: String
-    let allowedTools: [String]
-    let completionGates: [String]
-    let networkAllowed: Bool
+    let providerID: String?
+    let adapterID: String?
+    let modelKey: String?
+    let allowedTools: [String]?
+    let completionGates: [String]?
+    let networkAllowed: Bool?
     let maximumInlineOutputBytes: Int
 
     enum CodingKeys: String, CodingKey {

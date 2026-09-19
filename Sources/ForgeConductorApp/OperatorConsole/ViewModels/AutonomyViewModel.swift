@@ -116,27 +116,40 @@ final class AutonomyViewModel: ObservableObject {
     }
 
     func startRun() {
-        guard canStart, let project = selectedProject else { return }
+        guard let request = makeStartRequest() else { return }
         isStarting = true
         startRequiresReconciliation = true
         errorMessage = nil
         notice = nil
-        let request = OperatorRunStartRequest(
+        pendingStartRequest = request
+        submitStart(request)
+    }
+
+    func makeStartRequest() -> OperatorRunStartRequest? {
+        guard canStart, let project = selectedProject else { return nil }
+        let providerID = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let adapterID = adapterID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelKey = modelKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let allowedTools = parsedList(allowedTools)
+        let completionGates = parsedList(completionGates)
+        let preparation = runPreparation
+        return OperatorRunStartRequest(
             runID: UUID().uuidString.lowercased(),
             projectID: project.projectID,
             projectGeneration: project.projectGeneration,
             assignmentID: assignmentID.nilIfBlank,
             mission: mission.trimmingCharacters(in: .whitespacesAndNewlines),
-            providerID: providerID.trimmingCharacters(in: .whitespacesAndNewlines),
-            adapterID: adapterID.trimmingCharacters(in: .whitespacesAndNewlines),
-            modelKey: modelKey.trimmingCharacters(in: .whitespacesAndNewlines),
-            allowedTools: parsedList(allowedTools),
-            completionGates: parsedList(completionGates),
-            networkAllowed: networkAllowed,
+            providerID: providerID == preparation?.providerID ? nil : providerID,
+            adapterID: adapterID == preparation?.adapterID ? nil : adapterID,
+            modelKey: modelKey == preparation?.modelKey ? nil : modelKey,
+            allowedTools: Set(allowedTools) == Set(preparation?.allowedTools ?? [])
+                ? nil : allowedTools,
+            completionGates: completionGates == preparation?.completionGates
+                ? nil : completionGates,
+            networkAllowed: networkAllowed == preparation?.networkAllowed
+                ? nil : networkAllowed,
             maximumInlineOutputBytes: 64 * 1_024
         )
-        pendingStartRequest = request
-        submitStart(request)
     }
 
     func reconcileStart() {

@@ -35,6 +35,85 @@ private struct ManagerOperatorProjectPersistenceSnapshot: Sendable {
     let continuity: ManagerOperatorContinuityReadModel?
 }
 
+struct ManagerResolvedRunPreparation: Sendable, Equatable {
+    let providerID: String
+    let adapterID: String
+    let modelKey: String
+    let allowedTools: Set<String>
+    let completionGates: [String]
+    let networkAllowed: Bool
+}
+
+enum ManagerRunPreparationResolver {
+    static func resolve(
+        configuration: ProviderConfigurationSnapshot?,
+        registeredToolNames: [String],
+        providerID requestedProviderID: String? = nil,
+        adapterID requestedAdapterID: String? = nil,
+        modelKey requestedModelKey: String? = nil,
+        allowedTools requestedAllowedTools: Set<String>? = nil,
+        completionGates requestedCompletionGates: [String]? = nil,
+        networkAllowed: Bool = false
+    ) throws -> ManagerResolvedRunPreparation {
+        let providerID = requestedProviderID ?? "lmstudio"
+        let adapterID = requestedAdapterID ?? ManagerNode.nativeSessionHostAdapterID
+        let modelKey: String
+        if let requestedModelKey {
+            modelKey = requestedModelKey
+        } else if configuration?.saved == true, let configured = configuration?.modelKey {
+            modelKey = configured
+        } else {
+            throw AutonomyError.invalidRequest(
+                "A saved provider model is required when model_key is omitted"
+            )
+        }
+
+        let registeredTools = Set(registeredToolNames)
+        let allowedTools = requestedAllowedTools ?? Set(
+            ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter {
+                registeredTools.contains($0)
+            }
+        )
+        let completionGates = requestedCompletionGates
+            ?? [ProjectInstructionQueueStore.builtInCompletionGate]
+
+        guard providerID == providerID.trimmingCharacters(in: .whitespacesAndNewlines),
+              !providerID.isEmpty, providerID.utf8.count <= 256 else {
+            throw AutonomyError.invalidRequest("provider_id is empty, padded, or oversized")
+        }
+        guard adapterID == adapterID.trimmingCharacters(in: .whitespacesAndNewlines),
+              !adapterID.isEmpty,
+              adapterID.utf8.count <= ManagerNode.maximumProviderAdapterIDBytes else {
+            throw AutonomyError.invalidRequest("adapter_id is empty, padded, or oversized")
+        }
+        guard modelKey == modelKey.trimmingCharacters(in: .whitespacesAndNewlines),
+              !modelKey.isEmpty, modelKey.utf8.count <= 1_024 else {
+            throw AutonomyError.invalidRequest("model_key is empty, padded, or oversized")
+        }
+        guard (1...256).contains(allowedTools.count),
+              allowedTools.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw AutonomyError.invalidRequest(
+                "allowed_tools must contain 1 through 256 bounded identifiers"
+            )
+        }
+        guard (1...256).contains(completionGates.count),
+              completionGates.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 512 }) else {
+            throw AutonomyError.invalidRequest(
+                "completion_gates must contain 1 through 256 bounded identifiers"
+            )
+        }
+
+        return ManagerResolvedRunPreparation(
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed
+        )
+    }
+}
+
 private enum ManagerLifecycleTransitionError: Error, LocalizedError, Sendable {
     case busy(String)
 
@@ -2100,11 +2179,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         expectedGeneration: ProjectGeneration,
         assignmentID: String? = nil,
         mission: String,
-        providerID: String,
-        adapterID: String,
-        modelKey: String,
-        allowedTools: Set<String>,
-        completionGates: [String],
+        providerID: String? = nil,
+        adapterID: String? = nil,
+        modelKey: String? = nil,
+        allowedTools: Set<String>? = nil,
+        completionGates: [String]? = nil,
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) throws -> [String: Any] {
@@ -2122,9 +2201,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
         }
         let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
+        let providerConfiguration = modelKey == nil ? try readProviderConfiguration() : nil
+        let preparation = try ManagerRunPreparationResolver.resolve(
+            configuration: providerConfiguration,
+            registeredToolNames: app.tools.toolNames,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed
+        )
         do {
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
-            _ = try catalog.providerToolDefinitions(allowedToolNames: allowedTools)
+            _ = try catalog.providerToolDefinitions(allowedToolNames: preparation.allowedTools)
         } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
             throw AutonomyError.invalidToolConfiguration(tools)
         } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
@@ -2136,17 +2226,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectGeneration: expectedGeneration,
             assignmentID: assignmentID,
             mission: mission,
-            providerID: providerID,
-            adapterID: adapterID,
-            modelKey: modelKey,
+            providerID: preparation.providerID,
+            adapterID: preparation.adapterID,
+            modelKey: preparation.modelKey,
             specification: AutonomousRunSpecification(
-                allowedTools: allowedTools.sorted(),
-                completionGates: completionGates
+                allowedTools: preparation.allowedTools.sorted(),
+                completionGates: preparation.completionGates
             ),
             authorizationScope: ToolAuthorizationScope(
                 canonicalRoots: [authorizedRoot],
-                allowedTools: allowedTools,
-                networkAllowed: networkAllowed,
+                allowedTools: preparation.allowedTools,
+                networkAllowed: preparation.networkAllowed,
                 maximumInlineOutputBytes: maximumInlineOutputBytes
             )
         )
@@ -2394,15 +2484,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             throw ProjectContextError.projectNotFound(package.projectID)
         }
         let provider = try readProviderConfiguration()
-        guard provider.saved, let modelKey = provider.modelKey, !modelKey.isEmpty else {
+        guard provider.saved, provider.modelKey?.isEmpty == false else {
             throw ProjectInstructionQueueError.queueBlocked(
                 "Save an LM Studio endpoint and model in Provider before starting the instruction queue."
             )
         }
-        let allowedTools = Set(package.allowedTools)
+        let preparation = try ManagerRunPreparationResolver.resolve(
+            configuration: provider,
+            registeredToolNames: app.tools.toolNames,
+            allowedTools: Set(package.allowedTools),
+            completionGates: package.completionGates
+        )
         do {
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
-            _ = try catalog.providerToolDefinitions(allowedToolNames: allowedTools)
+            _ = try catalog.providerToolDefinitions(allowedToolNames: preparation.allowedTools)
         } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
             throw AutonomyError.invalidToolConfiguration(tools)
         } catch ToolDefinitionCatalogError.controlPlaneOnlyTools(let tools) {
@@ -2415,12 +2510,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectGeneration: package.projectGeneration,
             assignmentID: "instruction-package:\(package.id.uuidString.lowercased())",
             mission: package.mission,
-            providerID: "lmstudio",
-            adapterID: Self.nativeSessionHostAdapterID,
-            modelKey: modelKey,
+            providerID: preparation.providerID,
+            adapterID: preparation.adapterID,
+            modelKey: preparation.modelKey,
             specification: AutonomousRunSpecification(
-                allowedTools: package.allowedTools,
-                completionGates: package.completionGates,
+                allowedTools: preparation.allowedTools.sorted(),
+                completionGates: preparation.completionGates,
                 work: AutonomousRunWork(metadata: [
                     "instruction_package_id": package.id.uuidString.lowercased(),
                     "instruction_package_name": package.packageID,
@@ -2430,8 +2525,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             ),
             authorizationScope: ToolAuthorizationScope(
                 canonicalRoots: [authorizedRoot],
-                allowedTools: allowedTools,
-                networkAllowed: false,
+                allowedTools: preparation.allowedTools,
+                networkAllowed: preparation.networkAllowed,
                 maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
             )
         )

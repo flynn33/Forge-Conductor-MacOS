@@ -40,6 +40,134 @@ final class ProviderConfigurationAppTests: XCTestCase {
             modelKey: "fixture/tool-model", credentialAction: .keep)
     }
 
+    func testRunPreparationResolverUsesDefaultsAndPreservesExplicitOverrides() throws {
+        let configuration = ProviderConfigurationSnapshot(
+            revision: "0",
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/tool-model",
+            credentialConfigured: false,
+            saved: true
+        )
+        let registered = ["fs_read", "fs_edit", "shell_exec"]
+        let defaults = try ManagerRunPreparationResolver.resolve(
+            configuration: configuration,
+            registeredToolNames: registered
+        )
+        XCTAssertEqual(defaults.providerID, "lmstudio")
+        XCTAssertEqual(defaults.adapterID, ManagerNode.nativeSessionHostAdapterID)
+        XCTAssertEqual(defaults.modelKey, "fixture/tool-model")
+        XCTAssertEqual(defaults.allowedTools, Set(registered))
+        XCTAssertEqual(
+            defaults.completionGates,
+            [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        XCTAssertFalse(defaults.networkAllowed)
+
+        let explicit = try ManagerRunPreparationResolver.resolve(
+            configuration: configuration,
+            registeredToolNames: registered,
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture/override",
+            allowedTools: ["fs_read"],
+            completionGates: ["fixture-gate"],
+            networkAllowed: true
+        )
+        XCTAssertEqual(explicit.providerID, "fixture-provider")
+        XCTAssertEqual(explicit.adapterID, "fixture-adapter")
+        XCTAssertEqual(explicit.modelKey, "fixture/override")
+        XCTAssertEqual(explicit.allowedTools, ["fs_read"])
+        XCTAssertEqual(explicit.completionGates, ["fixture-gate"])
+        XCTAssertTrue(explicit.networkAllowed)
+
+        XCTAssertThrowsError(try ManagerRunPreparationResolver.resolve(
+            configuration: configuration,
+            registeredToolNames: registered,
+            allowedTools: []
+        ))
+        XCTAssertThrowsError(try ManagerRunPreparationResolver.resolve(
+            configuration: configuration,
+            registeredToolNames: registered,
+            completionGates: []
+        ))
+        XCTAssertThrowsError(try ManagerRunPreparationResolver.resolve(
+            configuration: configuration,
+            registeredToolNames: registered,
+            modelKey: ""
+        ))
+    }
+
+    func testHTTPStartUsesSavedManagerDefaultsWhenTechnicalFieldsAreOmitted() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        let port = Int.random(in: 29_000...39_000)
+        let projectRoot = directory.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        try app.config.update([
+            "allowed_roots": [projectRoot.path],
+            "dashboard": ["port": port],
+        ], save: true)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = try? manager.stopService()
+            _ = manager.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        let current = try manager.readProviderConfiguration()
+        _ = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: current.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/tool-model"
+        ))
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+        _ = try manager.recoverManagedAutonomy()
+        _ = try manager.startService()
+
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: port,
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
+        let started = try await client.startRun(OperatorRunStartRequest(
+            runID: UUID().uuidString.lowercased(),
+            projectID: projectID.description,
+            projectGeneration: generation.rawValue,
+            assignmentID: nil,
+            mission: "Use the manager-owned preparation defaults.",
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: nil,
+            completionGates: nil,
+            networkAllowed: nil,
+            maximumInlineOutputBytes: 64 * 1_024
+        ))
+        XCTAssertEqual(started.providerID, "lmstudio")
+        XCTAssertEqual(started.modelKey, "fixture/tool-model")
+        let runID = try RunID(XCTUnwrap(UUID(uuidString: started.runID)))
+        let durable = try await app.projectContexts.repository.autonomousRun(runID)
+        XCTAssertEqual(
+            durable?.specification.allowedTools,
+            ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter {
+                Set(app.tools.toolNames).contains($0)
+            }.sorted()
+        )
+        XCTAssertEqual(
+            durable?.specification.completionGates,
+            [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+    }
+
     func testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations() async throws {
         let app = try ForgeApp.bootstrap(home: directory)
         defer { app.shutdown() }

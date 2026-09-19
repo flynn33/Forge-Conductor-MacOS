@@ -33,7 +33,7 @@ failed with three assertions: manager defaults left the allowed-tool list empty,
 left the completion check empty, and kept Start disabled after the user selected
 the project and entered instructions. This is E0 for the first M1 correction.
 
-## Implemented configured-start slice
+## Implemented M1 slices
 
 The manager operator snapshot now publishes one bounded `run_preparation`
 projection. It derives the ordinary tool grant from the intersection of the
@@ -49,12 +49,23 @@ Instructions first, with preparation state summarized and technical overrides
 collapsed under Advanced. The protected custom validation importer remains
 available as an advanced action.
 
+Direct HTTP admission and instruction-queue admission now call the same typed
+manager resolver for provider, adapter, model, registered tools, built-in
+completion, and network defaults. A configured Autonomy request omits those
+technical keys entirely when the displayed values still match the manager
+projection. Explicit Advanced changes remain exact request values and are
+validated rather than silently replaced. The authenticated manager route now
+accepts the minimal request, rereads the saved provider configuration at
+admission, resolves only omitted fields, validates the effective production
+tool catalog, and persists the resolved run contract.
+
 This is a narrow M1 slice, not completion of M1 or the overall remediation.
-Direct and queued admission still need one shared preparation service; native
-catalog checkboxes and saved project preferences remain M2; document-backed
-format-neutral import remains M3; automatic task-aware completion remains M4;
-provider lifecycle, continuity presentation, and contextual Guided Mode remain
-M5; whole-journey acceptance and the source-bound candidate remain M6 and M7.
+Durable prepared descriptors, stale-preparation receipts, and combined folder
+grant/registration remain open in M1. Native catalog checkboxes and saved
+project preferences remain M2; document-backed format-neutral import remains
+M3; automatic task-aware completion remains M4; provider lifecycle, continuity
+presentation, and contextual Guided Mode remain M5; whole-journey acceptance
+and the source-bound candidate remain M6 and M7.
 
 ## Verification
 
@@ -63,9 +74,18 @@ M5; whole-journey acceptance and the source-bound candidate remain M6 and M7.
 - The real manager/provider configuration test passes and verifies that the
   published defaults contain only registered tools, the saved model, the native
   host adapter, the built-in completion check, and no network grant.
-- Five operator-project/app-contract tests, two provider-configuration tests,
-  six queue tests, and 121 Manager tests passed. The Manager class retained two
-  explicit environment/helper skips and had zero failures.
+- The configured app request encodes no provider, adapter, model, tool, gate, or
+  network key when manager defaults are unchanged; changed Advanced values are
+  retained exactly.
+- An authenticated HTTP integration starts and persists a run with every
+  technical field omitted, then reads back the saved model, registered ordinary
+  tools, and built-in completion gate from the durable run.
+- Direct and queue construction both use `ManagerRunPreparationResolver`; its
+  focused test covers defaults, exact overrides, and explicit-empty rejection.
+- Five operator-project/app-contract tests, four provider-configuration tests,
+  the focused HTTP runtime-control test, six queue tests, and 121 Manager tests
+  passed. The Manager class retained two explicit environment/helper skips and
+  had zero failures.
 - Both SwiftPM products and the canonical `ForgeConductor` Debug Xcode scheme
   built successfully. Repository hygiene and `git diff --check` passed.
 - Unexecuted revision-2 acceptance tests remain `not_run`; this record does not

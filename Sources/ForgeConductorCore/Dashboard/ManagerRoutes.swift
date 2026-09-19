@@ -818,16 +818,53 @@ public final class ManagerRoutes: @unchecked Sendable {
             let object = try JSONSupport.object(from: body)
             guard let runIDValue = object["run_id"] as? String,
                   let runUUID = UUID(uuidString: runIDValue),
-                  let mission = object["mission"] as? String, !mission.isEmpty,
-                  let modelKey = object["model_key"] as? String, !modelKey.isEmpty,
-                  let allowedToolValues = object["allowed_tools"] as? [String],
-                  !allowedToolValues.isEmpty,
-                  let completionGates = object["completion_gates"] as? [String],
-                  !completionGates.isEmpty else {
+                  let mission = object["mission"] as? String, !mission.isEmpty else {
                 throw AutonomyError.invalidRequest(
-                    "run_id, mission, model_key, allowed_tools, and completion_gates are required"
+                    "run_id and mission are required"
                 )
             }
+            let providerID: String?
+            if let value = object["provider_id"] {
+                guard let typed = value as? String else {
+                    throw AutonomyError.invalidRequest("provider_id must be a string when supplied")
+                }
+                providerID = typed
+            } else { providerID = nil }
+            let adapterID: String?
+            if let value = object["adapter_id"] {
+                guard let typed = value as? String else {
+                    throw AutonomyError.invalidRequest("adapter_id must be a string when supplied")
+                }
+                adapterID = typed
+            } else { adapterID = nil }
+            let modelKey: String?
+            if let value = object["model_key"] {
+                guard let typed = value as? String else {
+                    throw AutonomyError.invalidRequest("model_key must be a string when supplied")
+                }
+                modelKey = typed
+            } else { modelKey = nil }
+            let allowedTools: Set<String>?
+            if let value = object["allowed_tools"] {
+                guard let typed = value as? [String] else {
+                    throw AutonomyError.invalidRequest("allowed_tools must be a string array when supplied")
+                }
+                allowedTools = Set(typed)
+            } else { allowedTools = nil }
+            let completionGates: [String]?
+            if let value = object["completion_gates"] {
+                guard let typed = value as? [String] else {
+                    throw AutonomyError.invalidRequest("completion_gates must be a string array when supplied")
+                }
+                completionGates = typed
+            } else { completionGates = nil }
+            let networkAllowed: Bool
+            if let value = object["network_allowed"] {
+                guard let typed = value as? Bool else {
+                    throw AutonomyError.invalidRequest("network_allowed must be a boolean when supplied")
+                }
+                networkAllowed = typed
+            } else { networkAllowed = false }
             do {
                 let result = try manager.startAutonomousRun(
                     runID: RunID(runUUID),
@@ -835,12 +872,12 @@ public final class ManagerRoutes: @unchecked Sendable {
                     expectedGeneration: try projectGeneration(object),
                     assignmentID: object["assignment_id"] as? String,
                     mission: mission,
-                    providerID: object["provider_id"] as? String ?? "lmstudio",
-                    adapterID: object["adapter_id"] as? String ?? "forge.native-session-host",
+                    providerID: providerID,
+                    adapterID: adapterID,
                     modelKey: modelKey,
-                    allowedTools: Set(allowedToolValues),
+                    allowedTools: allowedTools,
                     completionGates: completionGates,
-                    networkAllowed: (object["network_allowed"] as? Bool) ?? false,
+                    networkAllowed: networkAllowed,
                     maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
                         ?? ProjectContextService.defaultInlineOutputLimit
                 )

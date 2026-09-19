@@ -209,6 +209,24 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertFalse(viewModel.allowedTools.isEmpty)
         XCTAssertEqual(viewModel.completionGates, ProjectInstructionQueueStore.builtInCompletionGate)
         XCTAssertTrue(viewModel.canStart)
+        let defaultRequest = try XCTUnwrap(viewModel.makeStartRequest())
+        XCTAssertNil(defaultRequest.providerID)
+        XCTAssertNil(defaultRequest.adapterID)
+        XCTAssertNil(defaultRequest.modelKey)
+        XCTAssertNil(defaultRequest.allowedTools)
+        XCTAssertNil(defaultRequest.completionGates)
+        XCTAssertNil(defaultRequest.networkAllowed)
+        let defaultBody = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(defaultRequest))
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            Set(defaultBody.keys),
+            [
+                "run_id", "project_id", "project_generation", "mission",
+                "maximum_inline_output_bytes",
+            ]
+        )
 
         viewModel.modelKey = "fixture/pinned-model"
         viewModel.allowedTools = "fs_read"
@@ -221,6 +239,13 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.allowedTools, "fs_read")
         XCTAssertEqual(viewModel.completionGates, "fixture-check")
         XCTAssertTrue(viewModel.networkAllowed)
+        let overrideRequest = try XCTUnwrap(viewModel.makeStartRequest())
+        XCTAssertNil(overrideRequest.providerID)
+        XCTAssertNil(overrideRequest.adapterID)
+        XCTAssertEqual(overrideRequest.modelKey, "fixture/pinned-model")
+        XCTAssertEqual(overrideRequest.allowedTools, ["fs_read"])
+        XCTAssertEqual(overrideRequest.completionGates, ["fixture-check"])
+        XCTAssertEqual(overrideRequest.networkAllowed, true)
     }
 
     func testProjectRemovalAndInstructionQueueUseTypedManagerContracts() async throws {

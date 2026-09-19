@@ -95,7 +95,8 @@ authorize your project folder, register it in **Projects**, and save/probe the
 loaded model in **Provider**. For managed work, choose the registered project,
 enter the instructions, and select **Start Task** in **Autonomy**. Forge fills
 the saved model, registered capability profile, and completion check; technical
-overrides remain available under **Advanced**. For an LM Studio desktop chat, deploy the
+defaults are resolved by the Manager at admission and overrides remain available
+under **Advanced**. For an LM Studio desktop chat, deploy the
 MCP roles as described below. A SwiftPM CLI build by itself is not the complete
 signed app; its Core resource bundle must be adjacent before MCP initialization.
 
