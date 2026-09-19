@@ -10,12 +10,14 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
     let continuityOperations: [OperatorContinuity]
     let runtimeJobs: [OperatorRuntimeJob]
     let provider: OperatorProvider?
+    let runPreparation: OperatorRunPreparation?
     let runtime: OperatorRuntimePolicy?
     let events: [OperatorEvent]
     let nextCursor: String?
 
     enum CodingKeys: String, CodingKey {
         case projects, runs, provider, runtime, events
+        case runPreparation = "run_preparation"
         case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
         case runtimeJobs = "runtime_jobs"
@@ -36,9 +38,31 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
         ) ?? []
         runtimeJobs = try container.decodeIfPresent([OperatorRuntimeJob].self, forKey: .runtimeJobs) ?? []
         provider = try container.decodeIfPresent(OperatorProvider.self, forKey: .provider)
+        runPreparation = try container.decodeIfPresent(OperatorRunPreparation.self, forKey: .runPreparation)
         runtime = try container.decodeIfPresent(OperatorRuntimePolicy.self, forKey: .runtime)
         events = try container.decodeIfPresent([OperatorEvent].self, forKey: .events) ?? []
         nextCursor = try container.decodeIfPresent(String.self, forKey: .nextCursor)
+    }
+}
+
+struct OperatorRunPreparation: Decodable, Sendable, Equatable {
+    let state: String
+    let providerID: String?
+    let adapterID: String
+    let modelKey: String?
+    let allowedTools: [String]
+    let completionGates: [String]
+    let networkAllowed: Bool
+    let detail: String?
+
+    enum CodingKeys: String, CodingKey {
+        case state, detail
+        case providerID = "provider_id"
+        case adapterID = "adapter_id"
+        case modelKey = "model_key"
+        case allowedTools = "allowed_tools"
+        case completionGates = "completion_gates"
+        case networkAllowed = "network_allowed"
     }
 }
 

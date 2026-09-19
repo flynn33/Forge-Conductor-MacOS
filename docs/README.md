@@ -12,6 +12,7 @@ is retained for auditability, but it is not current operating guidance.
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Deploy and diagnose the LM Studio MCP connection |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Queue ordered project work |
 | [Native completion](NATIVE-COMPLETION.md) | Configure protected completion gates |
+| [Automation and usability remediation](AUTOMATION-USABILITY-REMEDIATION.md) | Track the revision-2 minimal-input remediation and its evidence |
 
 ## Architecture and contracts
 

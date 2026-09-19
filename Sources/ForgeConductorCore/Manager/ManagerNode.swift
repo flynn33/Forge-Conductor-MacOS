@@ -491,6 +491,34 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         lock.lock()
         let providerProbe = runtime.providerProbeState
         lock.unlock()
+        let providerConfiguration = try? readProviderConfiguration()
+        let provider = Self.operatorProvider(
+            from: persisted.runs,
+            probe: providerProbe,
+            configuration: providerConfiguration
+        )
+        let registeredTools = Set(app.tools.toolNames)
+        let ordinaryTools = ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter {
+            registeredTools.contains($0)
+        }
+        let configuredModel = providerConfiguration?.modelKey?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let providerConfigured = providerConfiguration?.saved == true
+            && configuredModel?.isEmpty == false
+        let preparationState: String
+        let preparationDetail: String
+        if providerConfigured,
+           provider.health == "reachable" || provider.health == "contract_valid" {
+            preparationState = "ready"
+            preparationDetail = "Saved provider, registered capabilities, completion checks, and continuity defaults are ready."
+        } else if providerConfigured {
+            preparationState = "automatically_preparing"
+            preparationDetail = "Forge will validate the saved provider when the task starts."
+        } else {
+            preparationState = "waiting_dependency"
+            preparationDetail = "A saved local model is not available yet."
+        }
         return ManagerOperatorSnapshot(
             generatedAt: ISO8601.string(from: app.clock.now()),
             limit: limit,
@@ -499,7 +527,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runs: runRows,
             continuityOperations: continuityRows,
             runtimeJobs: jobRows,
-            provider: Self.operatorProvider(from: persisted.runs, probe: providerProbe),
+            provider: provider,
+            runPreparation: ManagerOperatorRunPreparation(
+                state: preparationState,
+                providerID: providerConfigured ? "lmstudio" : nil,
+                adapterID: Self.nativeSessionHostAdapterID,
+                modelKey: providerConfigured ? configuredModel : nil,
+                allowedTools: ordinaryTools,
+                completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
+                networkAllowed: false,
+                detail: preparationDetail
+            ),
             runtime: Self.operatorRuntime(
                 persisted.runtimeCapabilities,
                 defaultTimeoutSeconds: app.config.model.shell.defaultTimeoutSec,
@@ -2003,7 +2041,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 ],
                 category: .manager
             )
-            return Self.operatorProvider(from: [], probe: state)
+            return Self.operatorProvider(
+                from: [],
+                probe: state,
+                configuration: try? readProviderConfiguration()
+            )
         } catch {
             let probeError: ManagerProviderProbeError
             if let typed = error as? ManagerProviderProbeError {
@@ -2921,7 +2963,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private static func operatorProvider(
         from runs: [ManagerOperatorRunReadModel],
-        probe: ManagerProviderProbeState?
+        probe: ManagerProviderProbeState?,
+        configuration: ProviderConfigurationSnapshot?
     ) -> ManagerOperatorProvider {
         let probeCapabilities = probe?.capabilities
         guard let detail = runs.first(where: {
@@ -2930,20 +2973,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             return ManagerOperatorProvider(
                 adapterID: probe.map {
                     operatorIdentifier($0.adapterID, maximumCharacters: 128)
-                },
+                } ?? (configuration?.saved == true ? nativeSessionHostAdapterID : nil),
                 providerID: probeCapabilities.map {
                     operatorIdentifier($0.providerID, maximumCharacters: 512)
-                },
+                } ?? (configuration?.saved == true ? "lmstudio" : nil),
                 health: probe?.health ?? "unavailable",
-                endpoint: nil,
+                endpoint: configuration?.endpoint,
                 loopback: nil,
                 tls: nil,
                 authenticationEnabled: nil,
-                credentialConfigured: nil,
+                credentialConfigured: configuration?.credentialConfigured,
                 apiMode: probe == nil ? nil : "managed_provider",
                 modelKey: probeCapabilities.map {
                     operatorIdentifier($0.modelKey, maximumCharacters: 1_024)
-                },
+                } ?? configuration?.modelKey,
                 instanceID: probeCapabilities.map {
                     operatorIdentifier($0.providerInstanceID, maximumCharacters: 1_024)
                 },
@@ -2977,24 +3020,24 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 operatorIdentifier($0.adapterID, maximumCharacters: 128)
             } ?? detail.run.adapterID.map {
                 operatorIdentifier($0, maximumCharacters: 128)
-            },
+            } ?? (configuration?.saved == true ? nativeSessionHostAdapterID : nil),
             providerID: probeCapabilities.map {
                 operatorIdentifier($0.providerID, maximumCharacters: 512)
             } ?? (detail.run.providerID ?? session?.providerID).map {
                 operatorIdentifier($0, maximumCharacters: 512)
-            },
+            } ?? (configuration?.saved == true ? "lmstudio" : nil),
             health: probe?.health ?? "unavailable",
-            endpoint: nil,
+            endpoint: configuration?.endpoint,
             loopback: nil,
             tls: nil,
             authenticationEnabled: nil,
-            credentialConfigured: nil,
+            credentialConfigured: configuration?.credentialConfigured,
             apiMode: probe == nil ? nil : "managed_provider",
             modelKey: probeCapabilities.map {
                 operatorIdentifier($0.modelKey, maximumCharacters: 1_024)
             } ?? (detail.run.modelKey ?? session?.modelKey).map {
                 operatorIdentifier($0, maximumCharacters: 1_024)
-            },
+            } ?? configuration?.modelKey,
             instanceID: probeCapabilities.map {
                 operatorIdentifier($0.providerInstanceID, maximumCharacters: 1_024)
             } ?? instanceID,

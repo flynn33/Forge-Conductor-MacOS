@@ -10,6 +10,14 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Changed
+
+- Simplified configured Autonomy start to Project and Instructions by applying
+  manager-owned saved-model, registered-tool, completion-check, and continuity
+  defaults; technical overrides remain available under Advanced.
+- Preserved selected run defaults across refresh and completed-run reset instead
+  of requiring repeated raw tool and completion-gate entry.
+
 ### Pending qualification
 
 - Rebuild and qualify the `0.10.0 (2)` native product set.

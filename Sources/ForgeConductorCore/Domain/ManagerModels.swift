@@ -592,6 +592,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     public let continuityOperations: [ManagerOperatorContinuity]
     public let runtimeJobs: [ManagerOperatorRuntimeJob]
     public let provider: ManagerOperatorProvider
+    public let runPreparation: ManagerOperatorRunPreparation
     public let runtime: ManagerOperatorRuntime
     public let events: [ManagerOperatorEvent]
     public let nextCursor: String?
@@ -603,6 +604,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
         case continuityOperations = "continuity_operations"
         case runtimeJobs = "runtime_jobs"
         case provider, runtime, events
+        case runPreparation = "run_preparation"
         case nextCursor = "next_cursor"
     }
 
@@ -614,6 +616,31 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
             throw ManagerModelError.invalidOperatorSnapshot
         }
         return object
+    }
+}
+
+/// Manager-owned ordinary-run defaults. These values are a bounded projection
+/// of registered capabilities and the saved provider configuration; the GUI
+/// may expose overrides, but it does not require the operator to reconstruct
+/// internal identifiers for every task.
+public struct ManagerOperatorRunPreparation: Codable, Sendable, Equatable {
+    public let state: String
+    public let providerID: String?
+    public let adapterID: String
+    public let modelKey: String?
+    public let allowedTools: [String]
+    public let completionGates: [String]
+    public let networkAllowed: Bool
+    public let detail: String
+
+    enum CodingKeys: String, CodingKey {
+        case state, detail
+        case providerID = "provider_id"
+        case adapterID = "adapter_id"
+        case modelKey = "model_key"
+        case allowedTools = "allowed_tools"
+        case completionGates = "completion_gates"
+        case networkAllowed = "network_allowed"
     }
 }
 

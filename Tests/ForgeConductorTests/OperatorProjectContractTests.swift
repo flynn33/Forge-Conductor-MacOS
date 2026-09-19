@@ -147,6 +147,82 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
 }
 
 final class OperatorProjectContractTests: XCTestCase {
+    @MainActor
+    func testConfiguredAutonomyStartNeedsOnlyProjectAndInstructions() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let project = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: Self.projectData(
+                    projectID: projectID,
+                    generation: 1,
+                    root: "/tmp/operator-project",
+                    resetPriorGeneration: 0
+                )
+            ) as? [String: Any]
+        )
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                "projects": [project],
+                "runs": [],
+                "provider": [
+                    "adapter_id": "forge.native-session-host",
+                    "provider_id": "lmstudio",
+                    "health": "contract_valid",
+                    "model_key": "fixture/tool-model",
+                ],
+                "run_preparation": [
+                    "state": "ready",
+                    "provider_id": "lmstudio",
+                    "adapter_id": "forge.native-session-host",
+                    "model_key": "fixture/tool-model",
+                    "allowed_tools": ["fs_read", "fs_edit", "shell_exec"],
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "network_allowed": false,
+                ],
+            ]),
+            "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                "started": true,
+                "active_run_ids": [],
+                "deferred_run_ids": [],
+            ]),
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let viewModel = AutonomyViewModel(
+            client: OperatorManagerHTTPClient(
+                host: "127.0.0.1",
+                port: 8_899,
+                session: session,
+                credentials: OperatorProjectContractCredential()
+            )
+        )
+
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+        viewModel.mission = "Repair the selected project."
+
+        XCTAssertEqual(viewModel.selectedProjectID, projectID)
+        XCTAssertEqual(viewModel.providerID, "lmstudio")
+        XCTAssertEqual(viewModel.modelKey, "fixture/tool-model")
+        XCTAssertFalse(viewModel.allowedTools.isEmpty)
+        XCTAssertEqual(viewModel.completionGates, ProjectInstructionQueueStore.builtInCompletionGate)
+        XCTAssertTrue(viewModel.canStart)
+
+        viewModel.modelKey = "fixture/pinned-model"
+        viewModel.allowedTools = "fs_read"
+        viewModel.completionGates = "fixture-check"
+        viewModel.networkAllowed = true
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+
+        XCTAssertEqual(viewModel.modelKey, "fixture/pinned-model")
+        XCTAssertEqual(viewModel.allowedTools, "fs_read")
+        XCTAssertEqual(viewModel.completionGates, "fixture-check")
+        XCTAssertTrue(viewModel.networkAllowed)
+    }
+
     func testProjectRemovalAndInstructionQueueUseTypedManagerContracts() async throws {
         let projectID = UUID().uuidString.lowercased()
         let packageID = UUID().uuidString.lowercased()
@@ -436,6 +512,16 @@ final class OperatorProjectContractTests: XCTestCase {
 
     @MainActor
     private static func waitUntilIdle(_ viewModel: ProjectsViewModel) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while viewModel.isLoading, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    @MainActor
+    private static func waitUntilIdle(_ viewModel: AutonomyViewModel) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
         while viewModel.isLoading, ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))

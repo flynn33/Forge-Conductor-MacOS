@@ -34,7 +34,7 @@ struct AutonomyOperatorView: View {
             }
             .listStyle(.sidebar)
             .safeAreaInset(edge: .bottom) {
-                Button("Start Managed Run…", systemImage: "plus") {
+                Button("Start Task…", systemImage: "plus") {
                     showingStartSheet = true
                 }
                 .disabled(!viewModel.autonomyStarted || viewModel.projects.isEmpty)
@@ -147,7 +147,7 @@ struct AutonomyOperatorView: View {
                 }
             }
 
-            GroupBox("Deterministic completion") {
+            GroupBox("Completion checks") {
                 VStack(alignment: .leading, spacing: 10) {
                     if run.completionGates.isEmpty {
                         Text("No completion-gate projection was published.")
@@ -161,7 +161,7 @@ struct AutonomyOperatorView: View {
                             .foregroundStyle(run.passedGates.contains(gate) ? .green : .secondary)
                         }
                     }
-                    Button("Import Native Validation Policy…", action: viewModel.chooseNativePolicy)
+                    Button("Advanced: Import Custom Validation…", action: viewModel.chooseNativePolicy)
                         .disabled(viewModel.policyImportInFlight || run.completionGates.isEmpty)
                         .accessibilityIdentifier("run-import-native-policy")
                     if viewModel.policyImportInFlight {
@@ -215,8 +215,8 @@ struct AutonomyOperatorView: View {
 
     private var startSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Start Managed Run").font(.title2.bold())
-            Text("The manager persists the run before any provider side effect. Required fields have no hidden UI defaults.")
+            Text("Start Task").font(.title2.bold())
+            Text("Choose the project, enter the instructions, and start. Forge supplies the saved model, task capabilities, completion checks, and continuity defaults.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -228,23 +228,41 @@ struct AutonomyOperatorView: View {
                 }
             }
             .accessibilityIdentifier("run-start-project")
-            TextField("Mission", text: $viewModel.mission, axis: .vertical)
+            TextField("Instructions", text: $viewModel.mission, axis: .vertical)
                 .lineLimit(2...5)
                 .accessibilityIdentifier("run-start-mission")
-            TextField("Assignment ID (optional)", text: $viewModel.assignmentID)
-            HStack {
-                TextField("Provider", text: $viewModel.providerID)
-                TextField("Adapter", text: $viewModel.adapterID)
+
+            GroupBox("Forge preparation") {
+                VStack(alignment: .leading, spacing: 7) {
+                    LabeledContent("Status", value: viewModel.runPreparation?.state.replacingOccurrences(of: "_", with: " ") ?? "checking")
+                    LabeledContent("Model", value: viewModel.modelKey.isEmpty ? "Waiting for saved model" : viewModel.modelKey)
+                    LabeledContent("Capabilities", value: "\(viewModel.allowedTools.split(whereSeparator: { $0 == "," || $0.isNewline }).count) selected")
+                    LabeledContent("Completion", value: viewModel.completionGates.isEmpty ? "Waiting for checks" : "Automatic")
+                    Text(viewModel.runPreparation?.detail ?? "Forge is loading manager-owned defaults.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-            TextField("Model", text: $viewModel.modelKey)
-                .accessibilityIdentifier("run-start-model")
-            TextField("Allowed tools (comma or newline separated)", text: $viewModel.allowedTools, axis: .vertical)
-                .lineLimit(2...4)
-                .accessibilityIdentifier("run-start-tool-policy")
-            TextField("Completion gates (comma or newline separated)", text: $viewModel.completionGates, axis: .vertical)
-                .lineLimit(2...4)
-                .accessibilityIdentifier("run-start-completion-gates")
-            Toggle("Allow network tools for this run", isOn: $viewModel.networkAllowed)
+
+            DisclosureGroup("Advanced overrides") {
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField("Assignment ID (optional)", text: $viewModel.assignmentID)
+                    HStack {
+                        TextField("Provider", text: $viewModel.providerID)
+                        TextField("Adapter", text: $viewModel.adapterID)
+                    }
+                    TextField("Model", text: $viewModel.modelKey)
+                        .accessibilityIdentifier("run-start-model")
+                    TextField("Allowed tools (comma or newline separated)", text: $viewModel.allowedTools, axis: .vertical)
+                        .lineLimit(2...4)
+                        .accessibilityIdentifier("run-start-tool-policy")
+                    TextField("Completion gates (comma or newline separated)", text: $viewModel.completionGates, axis: .vertical)
+                        .lineLimit(2...4)
+                        .accessibilityIdentifier("run-start-completion-gates")
+                    Toggle("Allow network tools for this run", isOn: $viewModel.networkAllowed)
+                }
+                .padding(.top, 8)
+            }
 
             if let error = viewModel.errorMessage {
                 Text(error)
@@ -265,7 +283,7 @@ struct AutonomyOperatorView: View {
                     .accessibilityIdentifier("run-start-cancel")
                 Spacer()
                 if viewModel.isStarting { ProgressView().controlSize(.small) }
-                Button("Start Run") {
+                Button("Start Task") {
                     viewModel.startRun()
                 }
                 .buttonStyle(.borderedProminent)

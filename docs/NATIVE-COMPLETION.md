@@ -69,8 +69,8 @@ manager adjudication.
 
 ## Native operator policy import
 
-Select a persisted run in **Autonomy** and use **Import Native Validation
-Policy…** in Deterministic completion. Choose a separately approved schema-1
+Select a persisted run in **Autonomy** and use **Advanced: Import Custom
+Validation…** in Completion checks. Choose a separately approved schema-1
 JSON policy. Its signed XCTest package must already be under the exact protected
 `native-validation/packages/<package UUID>/` path. Forge's native importer does
 not compile arbitrary tests, take executable or shell selectors, or grant gate

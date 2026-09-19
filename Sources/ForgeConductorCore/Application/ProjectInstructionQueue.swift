@@ -227,7 +227,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     }
 
     private static let plainDocumentExtensions: Set<String> = ["md", "markdown", "txt"]
-    private static let defaultAllowedTools = [
+    public static let ordinaryDefaultAllowedTools = [
         "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_move",
         "search_text", "shell_exec", "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "project_memory.remember", "project_memory.search", "project_memory.get",
@@ -656,7 +656,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 package = try makePackage(
                     packageID: slug(name), version: "1", displayName: name,
                     mission: mission, sourcePath: source.path,
-                    allowedTools: defaultAllowedTools,
+                    allowedTools: ordinaryDefaultAllowedTools,
                     completionGates: [builtInCompletionGate],
                     documents: [(source.lastPathComponent, data)]
                 )
@@ -710,7 +710,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         return try makePackage(
             packageID: slug(root.lastPathComponent), version: "1",
             displayName: root.lastPathComponent, mission: mission, sourcePath: root.path,
-            allowedTools: defaultAllowedTools, completionGates: [builtInCompletionGate],
+            allowedTools: ordinaryDefaultAllowedTools, completionGates: [builtInCompletionGate],
             documents: documents
         )
     }

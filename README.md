@@ -74,11 +74,13 @@ product set.
 4. In **Projects**, register the repository by picker or absolute path.
 5. In **Provider**, save and test the LM Studio endpoint and selected model.
 6. Add instruction packages to the registered project.
-7. In **Autonomy**, select the project, model, limits, and completion gates.
-8. Start the run and review its events and evidence.
+7. In **Autonomy**, select the project, enter the instructions, and choose
+   **Start Task**. Forge uses the saved model plus manager-owned capability and
+   completion defaults; optional technical overrides remain under **Advanced**.
+8. Review the run's events and evidence.
 
-The built-in setup guide covers the same workflow and can be reopened from the
-question-mark toolbar button.
+The current setup guide can be reopened from the question-mark toolbar button.
+Comprehensive current-view help is tracked as an open remediation milestone.
 
 ## Project lifecycle
 

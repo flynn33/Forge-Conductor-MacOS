@@ -112,6 +112,22 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertFalse(clean.saved)
         let saved = try await client.updateProviderConfiguration(request(clean.revision))
         XCTAssertTrue(saved.saved)
+        let operatorSnapshot = try manager.operatorSnapshot(limit: 10)
+        XCTAssertEqual(operatorSnapshot.runPreparation.state, "automatically_preparing")
+        XCTAssertEqual(operatorSnapshot.runPreparation.providerID, "lmstudio")
+        XCTAssertEqual(operatorSnapshot.runPreparation.adapterID, ManagerNode.nativeSessionHostAdapterID)
+        XCTAssertEqual(operatorSnapshot.runPreparation.modelKey, "fixture/tool-model")
+        XCTAssertFalse(operatorSnapshot.runPreparation.allowedTools.isEmpty)
+        XCTAssertTrue(
+            Set(operatorSnapshot.runPreparation.allowedTools).isSubset(of: Set(app.tools.toolNames))
+        )
+        XCTAssertEqual(
+            operatorSnapshot.runPreparation.completionGates,
+            [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        XCTAssertFalse(operatorSnapshot.runPreparation.networkAllowed)
+        XCTAssertEqual(operatorSnapshot.provider.endpoint, saved.endpoint)
+        XCTAssertEqual(operatorSnapshot.provider.modelKey, saved.modelKey)
         let reread = try await client.providerConfiguration()
         XCTAssertEqual(reread, saved)
         do { _ = try await client.updateProviderConfiguration(request(clean.revision)); XCTFail("Stale manager update accepted") }

@@ -11,6 +11,7 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var runs: [OperatorRun] = []
     @Published private(set) var projects: [OperatorProject] = []
     @Published private(set) var provider: OperatorProvider?
+    @Published private(set) var runPreparation: OperatorRunPreparation?
     @Published private(set) var autonomyStarted = false
     @Published var selectedRunID: String?
     @Published var selectedProjectID: String?
@@ -35,6 +36,7 @@ final class AutonomyViewModel: ObservableObject {
     private let policyInstaller = NativeValidationPolicyInstaller()
     private var loadTask: Task<Void, Never>?
     private var pendingStartRequest: OperatorRunStartRequest?
+    private var didApplyPreparationDefaults = false
 
     init(client: any OperatorManagerClientProtocol) {
         self.client = client
@@ -71,6 +73,7 @@ final class AutonomyViewModel: ObservableObject {
                 projects = loadedProjects
                 runs = loadedRuns
                 provider = snapshot.provider
+                runPreparation = snapshot.runPreparation
                 autonomyStarted = status.started
                 let priorProjectSelection = selectedProjectID
                 if priorProjectSelection == nil
@@ -81,8 +84,24 @@ final class AutonomyViewModel: ObservableObject {
                 if priorRunSelection == nil || !loadedRuns.contains(where: { $0.runID == priorRunSelection }) {
                     selectedRunID = loadedRuns.first?.runID
                 }
-                if providerID.isEmpty { providerID = snapshot.provider?.providerID ?? "" }
-                if modelKey.isEmpty { modelKey = snapshot.provider?.modelKey ?? "" }
+                if let preparation = snapshot.runPreparation {
+                    if !didApplyPreparationDefaults {
+                        if providerID.isEmpty { providerID = preparation.providerID ?? "" }
+                        if adapterID.isEmpty { adapterID = preparation.adapterID }
+                        if modelKey.isEmpty { modelKey = preparation.modelKey ?? "" }
+                        if allowedTools.isEmpty {
+                            allowedTools = preparation.allowedTools.joined(separator: "\n")
+                        }
+                        if completionGates.isEmpty {
+                            completionGates = preparation.completionGates.joined(separator: "\n")
+                        }
+                        networkAllowed = preparation.networkAllowed
+                        didApplyPreparationDefaults = true
+                    }
+                } else {
+                    if providerID.isEmpty { providerID = snapshot.provider?.providerID ?? "" }
+                    if modelKey.isEmpty { modelKey = snapshot.provider?.modelKey ?? "" }
+                }
                 if let pending = pendingStartRequest,
                    let accepted = loadedRuns.first(where: { $0.runID == pending.runID }) {
                     acceptStartedRun(accepted)
@@ -166,8 +185,6 @@ final class AutonomyViewModel: ObservableObject {
         pendingStartRequest = nil
         mission = ""
         assignmentID = ""
-        allowedTools = ""
-        completionGates = ""
         startRequiresReconciliation = false
     }
 
