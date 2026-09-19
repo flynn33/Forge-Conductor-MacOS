@@ -132,7 +132,27 @@ project preference, intersects it with current availability, and records that
 exact effective grant plus the availability-aware catalog revision in the
 prepared descriptor. Existing prepared and running descriptors are immutable,
 so a later install, removal, or policy change cannot silently widen them.
-Advanced raw identifiers remain available as an exact compatibility override.
+Raw identifiers remain accepted at the versioned compatibility API boundary,
+but are no longer exposed as ordinary Start Task fields.
+
+## Revision-3 Autonomy and tool-selection refinement
+
+The ordinary Start Task sheet now leads with project and instructions, then a
+compact summary of the saved model, checkbox-selected tools, automatic
+completion checks, and automatic continuity. **Customize** contains only an
+optional human task label, a typed picker for the saved compatible model, and a
+separate network-authority toggle. Provider ID, adapter ID, raw model strings,
+capability-ID lists, and completion-gate-ID lists are not editable in this
+workflow.
+
+The registered-catalog checkbox UI is now the reusable
+`ToolPermissionEditor`, presented from **Tools → Customize** and used as the
+sole ordinary permission authority. A permission recovery opens that editor
+directly. The completion summary is inspectable but manager-derived. The run
+detail now presents mission, state, current work, recent model/tool activity,
+automatic continuity, completion, and recovery before placing run, project,
+provider, session, operation, and lease identifiers under **Technical
+details**.
 
 ## Implemented M3 artifact-storage slice
 
@@ -201,13 +221,20 @@ and the source-bound candidate remain M6 and M7.
 
 ## Verification
 
+- Four focused signed native UI cases verify that ordinary Start has no raw
+  technical editors, Customize exposes only typed task/model/network controls,
+  the reusable permission editor retains mouse/keyboard/mixed-state and relaunch
+  behavior, uncertain Start replays one byte-identical prepared request, and
+  nested Guided Mode help preserves the instruction draft. The focused
+  `OperatorProjectContractTests` passed 9/9; both SwiftPM products and the
+  canonical Apple Development-signed Debug app build also passed.
 - The configured-start reproducer now passes with only its project and
   instructions supplied by the user fixture.
 - The real manager/provider configuration test passes and verifies that the
   published defaults contain only registered tools, the saved model, the native
   host adapter, the built-in completion check, and no network grant.
 - The configured app request encodes no provider, adapter, model, tool, gate, or
-  network key when manager defaults are unchanged; changed Advanced values are
+  network key when manager defaults are unchanged; changed typed values are
   retained exactly.
 - An authenticated HTTP integration starts and persists a run with every
   technical field omitted, then reads back the saved model, registered ordinary

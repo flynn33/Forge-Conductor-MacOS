@@ -954,6 +954,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(start, timeout: 5))
         start.click()
+        let customize = app.buttons["run-tools-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 5))
+        customize.click()
 
         let read = app.checkBoxes["run-tool-fs_read"]
         let fileCategory = app.checkBoxes["run-tools-category-files"]
@@ -1004,6 +1007,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             fixture.toolSelectionMode == "recommended"
                 && fixture.toolPermissionUpdateCount == 5
         })
+        app.buttons["run-tools-done"].click()
         app.buttons["run-start-cancel"].click()
         app.terminate()
         app.launch()
@@ -1011,6 +1015,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let reopenedStart = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(reopenedStart, timeout: 5))
         reopenedStart.click()
+        app.buttons["run-tools-customize"].click()
         XCTAssertTrue(app.checkBoxes["run-tool-fs_read"].waitForExistence(timeout: 5))
         XCTAssertTrue(waitForCheckboxState(.on, on: app.checkBoxes["run-tool-fs_read"]))
         XCTAssertEqual(fixture.toolSelectionMode, "recommended")
@@ -1029,15 +1034,18 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         start.click()
 
         let mission = app.descendants(matching: .any)["run-start-mission"]
-        let tools = app.descendants(matching: .any)["run-start-tool-policy"]
-        let gates = app.descendants(matching: .any)["run-start-completion-gates"]
         XCTAssertTrue(mission.waitForExistence(timeout: 5))
         mission.click()
         mission.typeText("Continue the fixture mission")
-        tools.click()
-        tools.typeText("project_memory.search")
-        gates.click()
-        gates.typeText("tests")
+
+        app.buttons["run-tools-customize"].click()
+        let projectMemory = app.checkBoxes["run-tool-project_memory.search"]
+        XCTAssertTrue(projectMemory.waitForExistence(timeout: 5))
+        projectMemory.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.selectedToolIDs == ["project_memory.search"]
+        })
+        app.buttons["run-tools-done"].click()
 
         let confirm = app.buttons["run-start-confirm"]
         XCTAssertTrue(waitForEnabled(confirm, timeout: 3))
@@ -1065,10 +1073,14 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             1,
             "Reconciliation must replay the exact retained request body"
         )
-        XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
+        XCTAssertEqual(
+            fixture.mutationAuthorizationCount,
+            3,
+            "The typed permission update and both identical start submissions must be authorized"
+        )
     }
 
-    func testInvalidAllowedToolIsRejectedWithoutReconciliation() throws {
+    func testOrdinaryStartHasNoRawTechnicalEditors() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
@@ -1081,28 +1093,33 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         start.click()
 
         let mission = app.descendants(matching: .any)["run-start-mission"]
-        let tools = app.descendants(matching: .any)["run-start-tool-policy"]
-        let gates = app.descendants(matching: .any)["run-start-completion-gates"]
         XCTAssertTrue(mission.waitForExistence(timeout: 5))
-        mission.click()
-        mission.typeText("Reject an invalid tool policy")
-        tools.click()
-        tools.typeText("project.memory.search")
-        gates.click()
-        gates.typeText("tests")
+        XCTAssertFalse(app.descendants(matching: .any)["run-start-tool-policy"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["run-start-completion-gates"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["run-start-provider"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["run-start-adapter"].exists)
 
-        let confirm = app.buttons["run-start-confirm"]
-        XCTAssertTrue(waitForEnabled(confirm, timeout: 3))
-        confirm.click()
+        let customize = app.buttons["run-start-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 5))
+        customize.click()
+        XCTAssertTrue(app.descendants(matching: .any)["run-start-model-picker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["run-start-task-label"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["run-start-network"].exists)
 
-        let error = app.descendants(matching: .any)["run-start-error"]
-        XCTAssertTrue(error.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(error, contains: "autonomy_tool_configuration_invalid"))
-        XCTAssertFalse(app.buttons["run-start-reconcile"].exists)
-        XCTAssertTrue(waitForEnabled(confirm, timeout: 3))
-        XCTAssertEqual(fixture.startRequestCount, 1)
-        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
-        XCTAssertTrue(fixture.acceptedStartRunID.isEmpty)
+        app.buttons["run-tools-customize"].click()
+        XCTAssertTrue(app.checkBoxes["run-tools-allow-all"].waitForExistence(timeout: 5))
+        app.buttons["run-tools-done"].click()
+
+        app.buttons["run-completion-view"].click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["run-completion-automatic"].waitForExistence(timeout: 5)
+                || app.buttons["run-completion-done"].waitForExistence(timeout: 5)
+        )
+        app.buttons["run-completion-done"].click()
+        app.buttons["run-start-cancel"].click()
+
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
     }
 
     func testCollapsedNavigationCanBeRestored() throws {
@@ -1783,6 +1800,22 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             } else {
                 respond(status: 200, object: run(state: nextState), to: connection)
             }
+        case "/api/manager/runs/prepare":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  let generation = (object["project_generation"] as? NSNumber)?.uint64Value,
+                  generation == locked({ mutableProjectGeneration }),
+                  let mission = object["mission"] as? String,
+                  !mission.isEmpty else {
+                respond(status: 401, object: ["message": "missing preparation authority or task inputs"], to: connection)
+                return
+            }
+            respond(
+                status: 200,
+                object: preparedRunResult(object: object, generation: generation, mission: mission),
+                to: connection
+            )
         case "/api/manager/runs/start":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
@@ -1792,7 +1825,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 return
             }
             locked { mutableMutationAuthorizationCount += 1 }
-            let allowedTools = Set(object["allowed_tools"] as? [String] ?? [])
+            let allowedTools = resolvedToolIDs(from: object)
             let knownTools: Set<String> = ["project_memory.search"]
             let invalidTools = allowedTools.subtracting(knownTools).sorted()
             guard !allowedTools.isEmpty, invalidTools.isEmpty else {
@@ -1846,6 +1879,99 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         default:
             respond(status: 404, object: ["message": "fixture route unavailable"], to: connection)
         }
+    }
+
+    private func resolvedToolIDs(from object: [String: Any]) -> Set<String> {
+        if let requestedTools = object["allowed_tools"] as? [String] {
+            return Set(requestedTools)
+        }
+        return locked {
+            switch mutableToolSelectionMode {
+            case "all_eligible", "recommended":
+                return Set(["project_memory.search"])
+            default:
+                return Set(mutableSelectedToolIDs)
+            }
+        }
+    }
+
+    private func preparedRunResult(
+        object: [String: Any],
+        generation: UInt64,
+        mission: String
+    ) -> [String: Any] {
+        let sourceSHA = String(repeating: "c", count: 64)
+        let descriptor: [String: Any] = [
+            "schema_version": 1,
+            "revision": String(repeating: "d", count: 64),
+            "readiness": "ready",
+            "detail": "The exact fixture task inputs are ready.",
+            "recovery_action": "none",
+            "project_id": projectID,
+            "project_generation": generation,
+            "source": [
+                "kind": "inline_mission",
+                "reference": "inline-mission:\(sourceSHA)",
+                "snapshot_sha256": sourceSHA,
+            ],
+            "documents": [[
+                "reference": "inline:mission",
+                "byte_count": mission.utf8.count,
+                "sha256": sourceSHA,
+            ]],
+            "provider_id": object["provider_id"] as? String ?? "fixture-provider",
+            "adapter_id": object["adapter_id"] as? String ?? "forge.native-session-host",
+            "model_key": object["model_key"] as? String ?? "fixture-model",
+            "provider_configuration_revision": locked { mutableProviderConfigurationRevision },
+            "tool_catalog_revision": String(repeating: "b", count: 64),
+            "allowed_tools": resolvedToolIDs(from: object).sorted(),
+            "network_allowed": object["network_allowed"] as? Bool ?? false,
+            "validation_plan": [
+                "mode": "manager_completion_gates",
+                "completion_gates": object["completion_gates"] as? [String] ?? ["tests"],
+            ],
+            "continuity_mode": "managedAutonomous",
+            "budget_policy": [
+                "scope": [
+                    "kind": "project_override",
+                    "project_id": projectID,
+                    "project_generation": generation,
+                ],
+                "revision": 0,
+                "global_revision": 1,
+                "inherited": true,
+                "policy": [
+                    "schema_version": 1,
+                    "context": [
+                        "mode": "auto",
+                        "max_context_tokens": 32_768,
+                        "checkpoint_ratio": 0.75,
+                        "rollover_ratio": 0.85,
+                        "emergency_ratio": 0.95,
+                    ],
+                    "tools": [
+                        "calls_per_turn": 8,
+                        "calls_per_session": 64,
+                        "calls_per_run": 512,
+                        "max_in_flight": 2,
+                        "max_result_bytes": 65_536,
+                        "max_retained_result_tokens": 4_096,
+                        "recovery_calls_per_rollover": 4,
+                    ],
+                    "automatic_handoff_enabled": false,
+                ],
+            ],
+            "maximum_inline_output_bytes": 65_536,
+        ]
+        return [
+            "schema_version": 1,
+            "project_id": projectID,
+            "project_generation": generation,
+            "readiness": "ready",
+            "detail": "The exact fixture task inputs are ready.",
+            "recovery_action": "none",
+            "descriptor": descriptor,
+        ]
     }
 
     private func snapshot() -> [String: Any] {

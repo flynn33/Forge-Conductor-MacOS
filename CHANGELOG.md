@@ -26,18 +26,29 @@ Product versions do not by themselves claim shipment.
   first-use setup guide as onboarding.
 - Restored the Start Task mission field's stable accessibility identity by
   separating it from the file/folder/ZIP drop-target annotation.
+- Refined Start Task into a compact project-and-instructions flow with plain
+  summaries for the saved model, checkbox-selected tools, automatic completion
+  checks, and automatic continuity. Raw provider, adapter, model-string,
+  capability-ID, and completion-gate editors are no longer ordinary controls;
+  an optional task label, typed saved-model picker, and network toggle live
+  under **Customize**.
+- Extracted the registered tool checkbox catalog into one reusable native
+  permission editor and moved run/provider/session identifiers behind
+  **Technical details** so active work, progress, continuity, completion, and
+  recovery lead the run view.
 
 - Simplified configured Autonomy start to Project and Instructions by applying
   manager-owned saved-model, registered-tool, completion-check, and continuity
-  defaults; technical overrides remain available under Advanced.
+  defaults; typed task-label, saved-model, and network choices remain available
+  under **Customize**.
 - Preserved selected run defaults across refresh and completed-run reset instead
   of requiring repeated raw tool and completion-gate entry.
 - Unified direct and queued technical preparation in the Manager. Configured
   starts now omit unchanged provider/model/tool/gate/network fields, while
-  explicit Advanced overrides remain exact and fail closed when invalid.
+  explicit typed choices remain exact and fail closed when invalid.
 - Added provider-configuration and canonical tool-catalog revision fencing to
   run preparation. Stale previews create no durable run and refresh automatic
-  values without erasing explicit Advanced choices.
+  values without erasing explicit typed choices.
 - Added a versioned project-bound prepared-run descriptor for direct and queued
   starts. Its revision covers the source snapshot and document references,
   provider/model configuration, exact grants, completion checks, automatic
@@ -55,7 +66,7 @@ Product versions do not by themselves claim shipment.
   editor containing native individual/category checkboxes, mixed-state **Allow
   all tools**, Select none, Restore recommended, counts, technical identifiers,
   higher-impact labels, and explicit unavailable reasons. Network authority
-  remains a separate Advanced control.
+  remains a separate **Customize** control.
 - Added owner-only saved project capability defaults with revision-checked
   updates. Explicit denials survive catalog expansion, removed or disabled tools
   are explained without being granted, Allow all follows the eligible catalog

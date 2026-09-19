@@ -371,9 +371,10 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         try click(start)
         let mission = "Read work-product.txt once, report its exact content, and request completion. Do not edit files."
         try replace(element("run-start-mission"), with: mission)
-        try replace(element("run-start-tool-policy"), with: "fs_read")
-        try replace(element("run-start-completion-gates"), with: "tests")
-        XCTAssertEqual(element("run-start-model").value as? String, model)
+        try click(app.buttons["run-start-customize"])
+        XCTAssertTrue(element("run-start-model-picker").exists)
+        XCTAssertFalse(element("run-start-tool-policy").exists)
+        XCTAssertFalse(element("run-start-completion-gates").exists)
         try click(app.buttons["run-start-confirm"])
         XCTAssertTrue(waitUntil(timeout: 20) { !self.app.buttons["run-start-confirm"].exists })
 

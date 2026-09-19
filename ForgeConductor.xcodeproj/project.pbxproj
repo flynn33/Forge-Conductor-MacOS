@@ -186,6 +186,7 @@
 		R3B000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift */; };
 		R3B000000000000000000008 /* Resources/GuidedHelpCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */; };
 		R3B000000000000000000009 /* GuidedModeAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F000000000000000000009 /* GuidedModeAppTests.swift */; };
+		R3B00000000000000000000A /* OperatorConsole/Views/ToolPermissionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = R3F00000000000000000000A /* OperatorConsole/Views/ToolPermissionEditor.swift */; };
 		A38C1D60A02CC1E25BD6C7B1 /* ManagerNativeTaskAttachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F7766412EFCDCB1AEB044D /* ManagerNativeTaskAttachmentTests.swift */; };
 		A462A9FF129C4AACAD2912CC /* ForgeConductorMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC7D134862743548715243E /* ForgeConductorMain.swift */; };
 		A965A476C3D44982C5B43365 /* ContinuityControlRoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7BA1F3E45BC2FB4CF4C30A4 /* ContinuityControlRoleTests.swift */; };
@@ -749,6 +750,7 @@
 		R3F000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedMode/GuidedHelpSheet.swift; sourceTree = "<group>"; };
 		R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Resources/GuidedHelpCatalog.json; sourceTree = "<group>"; };
 		R3F000000000000000000009 /* GuidedModeAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedModeAppTests.swift; sourceTree = "<group>"; };
+		R3F00000000000000000000A /* OperatorConsole/Views/ToolPermissionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/ToolPermissionEditor.swift; sourceTree = "<group>"; };
 		A315ED797874434C8A261B11 /* Application/AgentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/AgentCatalog.swift; sourceTree = "<group>"; };
 		A3A912701042491E96B07D2B /* Views/Rig/RigDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Rig/RigDashboardView.swift; sourceTree = "<group>"; };
 		A42DFDE9DBABDC4C5BB05379 /* Domain/NativeContinuitySourceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/NativeContinuitySourceModels.swift; sourceTree = "<group>"; };
@@ -1252,6 +1254,7 @@
 				A26F00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift */,
 				A26F00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift */,
 				A26F00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift */,
+				R3F00000000000000000000A /* OperatorConsole/Views/ToolPermissionEditor.swift */,
 				P10F00000000000000000007 /* Metal/MetalGaugeResources.swift */,
 				DC5D36D534784BBAA579243E /* AppModel.swift */,
 				A1T2E3L4E5M600000001 /* AppTelemetryBinding.swift */,
@@ -2031,6 +2034,7 @@
 				A26B00000000000000000048 /* OperatorConsole/Views/ProjectsOperatorView.swift in Sources */,
 				A26B00000000000000000049 /* OperatorConsole/Views/ProviderOperatorView.swift in Sources */,
 				A26B00000000000000000050 /* OperatorConsole/Views/RuntimesOperatorView.swift in Sources */,
+				R3B00000000000000000000A /* OperatorConsole/Views/ToolPermissionEditor.swift in Sources */,
 				P10B00000000000000000007 /* Metal/MetalGaugeResources.swift in Sources */,
 				36E0A9288A004103A772C778 /* Metal/MetalGaugeKit.swift in Sources */,
 				0D50172020A24DFFA4B22EBC /* Views/Rig/RigDashboardView.swift in Sources */,

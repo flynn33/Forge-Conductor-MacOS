@@ -30,6 +30,7 @@ final class AutonomyViewModel: ObservableObject {
     @Published var providerID = ""
     @Published var adapterID = "forge.native-session-host"
     @Published var modelKey = ""
+    @Published var modelOverrideKey = ""
     @Published var allowedTools = ""
     @Published var completionGates = ""
     @Published var networkAllowed = false
@@ -333,6 +334,7 @@ final class AutonomyViewModel: ObservableObject {
         let providerID = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
         let adapterID = adapterID.trimmingCharacters(in: .whitespacesAndNewlines)
         let modelKey = modelKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelOverrideKey = modelOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let allowedTools = parsedList(allowedTools)
         let completionGates = parsedList(completionGates)
         let preparation = runPreparation
@@ -353,8 +355,9 @@ final class AutonomyViewModel: ObservableObject {
                 ? nil : providerID,
             adapterID: adapterID.isEmpty || adapterID == preparation?.adapterID
                 ? nil : adapterID,
-            modelKey: modelKey.isEmpty || modelKey == preparation?.modelKey
-                ? nil : modelKey,
+            modelKey: modelOverrideKey.isEmpty
+                ? (modelKey.isEmpty || modelKey == preparation?.modelKey ? nil : modelKey)
+                : modelOverrideKey,
             allowedTools: allowedTools.isEmpty
                 || Set(allowedTools) == Set(projectPermissions?.effectiveToolIDs
                     ?? preparation?.allowedTools ?? [])
@@ -538,6 +541,7 @@ final class AutonomyViewModel: ObservableObject {
         mission = ""
         instructionSourcePath = nil
         assignmentID = ""
+        modelOverrideKey = ""
         startRequiresReconciliation = false
     }
 
@@ -567,7 +571,7 @@ final class AutonomyViewModel: ObservableObject {
         case .retryPreparation:
             startRun()
         case .reviewPermissions:
-            notice = "Review the Advanced overrides, then try Start again."
+            notice = "Review the task capability checkboxes, then try Start again."
         case .authorizeProject, .configureProvider:
             break
         case .none:

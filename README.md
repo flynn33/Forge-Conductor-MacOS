@@ -91,21 +91,27 @@ product set.
    artifact digest rather than the full instruction body. Forge uses the saved
    model plus manager-owned capability and
    completion defaults; unchanged technical defaults are omitted from the start
-   request and resolved again by the Manager. Optional overrides remain under
-   **Advanced**. Before admission, Forge prepares an inspectable project-bound
+   request and resolved again by the Manager. Optional task label, saved-model
+   choice, and network authority remain under **Customize**; provider/adapter,
+   raw capability IDs, and raw completion-gate IDs are not routine inputs.
+   Before admission, Forge prepares an inspectable project-bound
    descriptor covering the source snapshot, model/configuration, exact grants,
    completion checks, automatic continuity, and resource budget. Start verifies
    that descriptor again; changed inputs refresh preparation before any run is
    persisted. If a prerequisite is missing, the sheet reports an exact
    readiness state and offers the focused Projects, Model connection,
    permissions, or refresh action without submitting a run.
-   The optional **Task capabilities** editor is populated from the registered
+   The optional **Tools → Customize** editor is populated from the registered
    tool catalog. It supports searchable individual and category checkboxes,
    mixed-state **Allow all tools**, Select none, Restore recommended, explicit
    unavailable reasons, and saved per-project defaults. Each admitted run keeps
    the exact resolved grant and catalog revision it prepared with; later catalog
    changes apply only to future preparations.
 7. Review the run's events and evidence.
+
+The run view leads with the task, current state/work, recent model and tool
+activity, automatic continuity, completion, and recovery. Provider, session,
+lease, project, and run identifiers remain available under **Technical details**.
 
 Use the **Guided Mode** toolbar toggle to show or hide concise, state-aware
 guidance in the current view. The setting persists across relaunch. The

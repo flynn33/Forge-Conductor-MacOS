@@ -2,7 +2,6 @@
 // Native managed-run source list, detail inspector, and duplicate-safe start sheet.
 
 import SwiftUI
-import AppKit
 import ForgeConductorCore
 
 struct AutonomyOperatorView: View {
@@ -10,6 +9,8 @@ struct AutonomyOperatorView: View {
     @State private var showingStartSheet = false
     @State private var showingCancelConfirmation = false
     @State private var showingAdvancedOverrides = false
+    @State private var showingToolSelection = false
+    @State private var showingCompletionChecks = false
     private let onOpenProjects: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -126,36 +127,31 @@ struct AutonomyOperatorView: View {
 
     private func runDetail(_ run: OperatorRun) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            GroupBox("Run") {
+            GroupBox("Task") {
                 VStack(alignment: .leading, spacing: 9) {
+                    Text(run.mission)
+                        .font(.title3.weight(.semibold))
+                        .accessibilityIdentifier("autonomy-task-title")
                     LabeledContent("State") {
                         OperatorStateBadge(state: run.state)
                             .accessibilityIdentifier("autonomy-state")
                     }
-                    LabeledContent("Mode", value: modeLabel(run.continuityMode))
-                    LabeledContent("Run ID") { OperatorIdentifier(run.runID) }
-                    LabeledContent("Project ID") { OperatorIdentifier(run.projectID) }
-                    LabeledContent("Project generation", value: "\(run.projectGeneration)")
-                    LabeledContent("Mission", value: run.mission)
-                    LabeledContent("Lease owner") { OperatorIdentifier(run.leaseOwner) }
-                    LabeledContent("Current work item", value: run.workItem ?? "Unavailable")
-                    LabeledContent("Last model turn", value: run.lastModelTurnAt ?? "Unavailable")
-                    LabeledContent("Last tool activity", value: run.lastToolActivityAt ?? "Unavailable")
+                    LabeledContent("Current work item", value: run.workItem ?? "Preparing the next work item")
+                    LabeledContent("Last model turn", value: run.lastModelTurnAt ?? "No model activity yet")
+                    LabeledContent("Last tool activity", value: run.lastToolActivityAt ?? "No tool activity yet")
                 }
             }
 
-            GroupBox("Provider session") {
+            GroupBox("Automatic continuity") {
                 VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Provider", value: run.providerID ?? "Unavailable")
-                    LabeledContent("Provider health") {
-                        OperatorStateBadge(state: viewModel.provider?.health ?? "unavailable")
-                    }
-                    LabeledContent("Adapter", value: run.adapterID ?? "Unavailable")
-                    LabeledContent("Model", value: run.modelKey ?? "Unavailable")
-                    LabeledContent("Instance", value: run.providerInstanceID ?? "Unavailable")
-                    LabeledContent("Current session") { OperatorIdentifier(run.activeSessionID) }
-                    LabeledContent("Predecessor session") { OperatorIdentifier(run.predecessorSessionID) }
-                    LabeledContent("Continuity operation") { OperatorIdentifier(run.activeOperationID) }
+                    LabeledContent("Protection", value: modeLabel(run.continuityMode))
+                    LabeledContent(
+                        "Successor work",
+                        value: run.continuationPending ? "Preparing automatically" : "No rollover pending"
+                    )
+                    Text("Forge checkpoints and rolls this task into a successor session when supported; no handoff identifiers are required.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -228,6 +224,28 @@ struct AutonomyOperatorView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("run-controls-authority")
+
+            DisclosureGroup("Technical details") {
+                VStack(alignment: .leading, spacing: 9) {
+                    LabeledContent("Run ID") { OperatorIdentifier(run.runID) }
+                    LabeledContent("Project ID") { OperatorIdentifier(run.projectID) }
+                    LabeledContent("Project generation", value: "\(run.projectGeneration)")
+                    LabeledContent("Assignment ID") { OperatorIdentifier(run.assignmentID) }
+                    LabeledContent("Provider", value: run.providerID ?? "Unavailable")
+                    LabeledContent("Provider health") {
+                        OperatorStateBadge(state: viewModel.provider?.health ?? "unavailable")
+                    }
+                    LabeledContent("Adapter", value: run.adapterID ?? "Unavailable")
+                    LabeledContent("Model", value: run.modelKey ?? "Unavailable")
+                    LabeledContent("Provider instance", value: run.providerInstanceID ?? "Unavailable")
+                    LabeledContent("Current session") { OperatorIdentifier(run.activeSessionID) }
+                    LabeledContent("Predecessor session") { OperatorIdentifier(run.predecessorSessionID) }
+                    LabeledContent("Continuity operation") { OperatorIdentifier(run.activeOperationID) }
+                    LabeledContent("Lease owner") { OperatorIdentifier(run.leaseOwner) }
+                }
+                .padding(.top, 8)
+            }
+            .accessibilityIdentifier("autonomy-technical-details")
         }
     }
 
@@ -292,14 +310,6 @@ struct AutonomyOperatorView: View {
                             ?? viewModel.runPreparation?.state
                             ?? "checking").replacingOccurrences(of: "_", with: " ")
                     )
-                    LabeledContent("Model", value: viewModel.modelKey.isEmpty ? "Waiting for saved model" : viewModel.modelKey)
-                    LabeledContent(
-                        "Capabilities",
-                        value: viewModel.toolPermissions.map {
-                            "\($0.effectiveCount) of \($0.availableCount) granted"
-                        } ?? "\(viewModel.allowedTools.split(whereSeparator: { $0 == "," || $0.isNewline }).count) selected"
-                    )
-                    LabeledContent("Completion", value: viewModel.completionGates.isEmpty ? "Waiting for checks" : "Automatic")
                     Text(viewModel.projectRunPreparation?.detail
                         ?? viewModel.runPreparation?.detail
                         ?? "Forge is loading manager-owned defaults.")
@@ -314,28 +324,52 @@ struct AutonomyOperatorView: View {
                 }
             }
 
-            toolPermissionEditor
-
-            DisclosureGroup("Advanced overrides", isExpanded: $showingAdvancedOverrides) {
+            GroupBox("Task setup") {
                 VStack(alignment: .leading, spacing: 10) {
-                    TextField("Assignment ID (optional)", text: $viewModel.assignmentID)
-                    HStack {
-                        TextField("Provider", text: $viewModel.providerID)
-                        TextField("Adapter", text: $viewModel.adapterID)
+                    LabeledContent("Model", value: viewModel.modelKey.isEmpty ? "Automatic" : viewModel.modelKey)
+                    LabeledContent("Tools") {
+                        HStack(spacing: 8) {
+                            Text(toolSelectionSummary)
+                            Button("Customize…") { showingToolSelection = true }
+                                .accessibilityIdentifier("run-tools-customize")
+                        }
                     }
-                    TextField("Model", text: $viewModel.modelKey)
-                        .accessibilityIdentifier("run-start-model")
-                    TextField(
-                        "Capability IDs (advanced override; comma or newline separated)",
-                        text: $viewModel.allowedTools,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...4)
-                    .accessibilityIdentifier("run-start-tool-policy")
-                    TextField("Completion gates (comma or newline separated)", text: $viewModel.completionGates, axis: .vertical)
-                        .lineLimit(2...4)
-                        .accessibilityIdentifier("run-start-completion-gates")
+                    LabeledContent("Completion checks") {
+                        HStack(spacing: 8) {
+                            Text("Automatic")
+                            Button("View…") { showingCompletionChecks = true }
+                                .accessibilityIdentifier("run-completion-view")
+                        }
+                    }
+                    LabeledContent("Continuity", value: "Automatic")
+                }
+            }
+
+            Button {
+                showingAdvancedOverrides.toggle()
+            } label: {
+                Label(
+                    "Customize",
+                    systemImage: showingAdvancedOverrides ? "chevron.down" : "chevron.right"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("run-start-customize")
+
+            if showingAdvancedOverrides {
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField("Task label (optional)", text: $viewModel.assignmentID)
+                        .accessibilityIdentifier("run-start-task-label")
+                    Picker("Model", selection: $viewModel.modelOverrideKey) {
+                        Text("Automatic — use the saved compatible model").tag("")
+                        if let savedModel = viewModel.runPreparation?.modelKey,
+                           !savedModel.isEmpty {
+                            Text(savedModel).tag(savedModel)
+                        }
+                    }
+                    .accessibilityIdentifier("run-start-model-picker")
                     Toggle("Allow network tools for this run", isOn: $viewModel.networkAllowed)
+                        .accessibilityIdentifier("run-start-network")
                 }
                 .padding(.top, 8)
             }
@@ -370,121 +404,68 @@ struct AutonomyOperatorView: View {
         .padding(22)
         .frame(width: 620)
         .guidedHelpContext(.autonomyStartTask)
+        .sheet(isPresented: $showingToolSelection) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Customize Task Capabilities").font(.title2.bold())
+                    Spacer()
+                    GuidedHelpButton(context: .autonomyToolSelection)
+                }
+                Text("These project defaults are the sole source of tool permission truth for new tasks. Unavailable or forbidden tools cannot be granted.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ToolPermissionEditor(viewModel: viewModel)
+                HStack {
+                    Spacer()
+                    Button("Done") { showingToolSelection = false }
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("run-tools-done")
+                }
+            }
+            .padding(22)
+            .frame(width: 680, height: 620)
+            .guidedHelpContext(.autonomyToolSelection)
+        }
+        .sheet(isPresented: $showingCompletionChecks) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Automatic Completion Checks").font(.title2.bold())
+                    Spacer()
+                    GuidedHelpButton(context: .autonomyCompletionChecks)
+                }
+                Text("Forge derives checks from the selected instructions and project structure. Custom signed policies remain available for specialized tasks after a run is prepared.")
+                    .foregroundStyle(.secondary)
+                if viewModel.completionGates.isEmpty {
+                    Text("Checks will be derived during task preparation.")
+                        .accessibilityIdentifier("run-completion-automatic")
+                } else {
+                    ForEach(viewModel.completionGates.split(separator: "\n"), id: \.self) { gate in
+                        Label(String(gate), systemImage: "checkmark.seal")
+                    }
+                }
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button("Done") { showingCompletionChecks = false }
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("run-completion-done")
+                }
+            }
+            .padding(22)
+            .frame(width: 560, height: 380)
+            .guidedHelpContext(.autonomyCompletionChecks)
+        }
     }
 
-    private var toolPermissionEditor: some View {
-        GroupBox {
-            if let permissions = viewModel.toolPermissions {
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack(spacing: 12) {
-                        NativeTriStateCheckbox(
-                            title: "Allow all tools",
-                            identifier: "run-tools-allow-all",
-                            state: viewModel.allToolSelectionState,
-                            enabled: !viewModel.toolPermissionUpdateInFlight
-                        ) {
-                            viewModel.setAllTools(
-                                selected: viewModel.allToolSelectionState != .checked
-                            )
-                        }
-                        .frame(minWidth: 180, alignment: .leading)
-                        Spacer()
-                        Button("Select none") { viewModel.setAllTools(selected: false) }
-                            .disabled(viewModel.toolPermissionUpdateInFlight)
-                            .accessibilityIdentifier("run-tools-select-none")
-                        Button("Restore recommended") {
-                            viewModel.restoreRecommendedTools()
-                        }
-                        .disabled(viewModel.toolPermissionUpdateInFlight)
-                        .accessibilityIdentifier("run-tools-restore-recommended")
-                    }
-                    TextField("Search capabilities", text: $viewModel.toolSearch)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("run-tools-search")
-                    Text("\(permissions.effectiveCount) granted · \(permissions.availableCount) available · saved for this project")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("run-tools-selection-count")
-
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(viewModel.visibleToolCategories, id: \.self) { category in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    NativeTriStateCheckbox(
-                                        title: category.displayName,
-                                        identifier: "run-tools-category-\(category.rawValue)",
-                                        state: viewModel.categorySelectionState(category),
-                                        enabled: !viewModel.toolPermissionUpdateInFlight
-                                    ) {
-                                        viewModel.setCategory(
-                                            category,
-                                            selected: viewModel.categorySelectionState(category) != .checked
-                                        )
-                                    }
-                                    .frame(minWidth: 240, alignment: .leading)
-
-                                    ForEach(viewModel.filteredToolEntries.filter {
-                                        $0.category == category
-                                    }) { tool in
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            HStack(spacing: 6) {
-                                                NativeTriStateCheckbox(
-                                                    title: tool.displayName,
-                                                    identifier: "run-tool-\(tool.id)",
-                                                    state: viewModel.isToolSelected(tool.id)
-                                                        ? .checked
-                                                        : .unchecked,
-                                                    enabled: !viewModel.toolPermissionUpdateInFlight
-                                                        && (tool.available
-                                                            || permissions.selectedToolIDs.contains(tool.id))
-                                                ) {
-                                                    viewModel.setTool(
-                                                        tool.id,
-                                                        selected: !viewModel.isToolSelected(tool.id)
-                                                    )
-                                                }
-                                                .frame(minWidth: 180, alignment: .leading)
-                                                if tool.highImpact {
-                                                    Text("Higher impact")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(.orange)
-                                                }
-                                            }
-                                            Text(tool.description)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                            Text(tool.id)
-                                                .font(.caption2.monospaced())
-                                                .foregroundStyle(.tertiary)
-                                            if let reason = tool.unavailableReason {
-                                                Text(reason)
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.orange)
-                                            }
-                                        }
-                                        .padding(.leading, 20)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 260)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Loading the registered capability catalog for this project…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityIdentifier("run-tools-loading")
-            }
-        } label: {
-            HStack {
-                Text("Task capabilities")
-                Spacer()
-                GuidedHelpButton(context: .autonomyToolSelection)
-            }
+    private var toolSelectionSummary: String {
+        guard let permissions = viewModel.toolPermissions else { return "Preparing…" }
+        switch permissions.selectionMode {
+        case .recommended:
+            return "Recommended · \(permissions.effectiveCount) tools"
+        case .allEligible:
+            return "All eligible · \(permissions.effectiveCount) tools"
+        case .explicit:
+            return "Custom · \(permissions.effectiveCount) tools"
         }
     }
 
@@ -521,79 +502,8 @@ struct AutonomyOperatorView: View {
         case .configureProvider:
             onOpenProvider()
         case .reviewPermissions:
-            showingAdvancedOverrides = true
+            showingToolSelection = true
             viewModel.refreshPreparationRecovery()
         }
-    }
-}
-
-private struct NativeTriStateCheckbox: NSViewRepresentable {
-    let title: String
-    let identifier: String
-    let state: ToolCheckboxState
-    let enabled: Bool
-    let action: () -> Void
-
-    func makeNSView(context: Context) -> NativeCheckboxButton {
-        NativeCheckboxButton(
-            title: title,
-            identifier: identifier,
-            activation: action
-        )
-    }
-
-    func updateNSView(_ button: NativeCheckboxButton, context: Context) {
-        button.activation = action
-        button.title = title
-        button.setAccessibilityIdentifier(identifier)
-        if !enabled, button.window?.firstResponder === button {
-            button.restoreKeyboardFocusWhenEnabled = true
-        }
-        button.isEnabled = enabled
-        if enabled, button.restoreKeyboardFocusWhenEnabled {
-            button.restoreKeyboardFocusWhenEnabled = false
-            DispatchQueue.main.async { [weak button] in
-                guard let button, button.isEnabled else { return }
-                button.window?.makeFirstResponder(button)
-            }
-        }
-        switch state {
-        case .unchecked: button.state = .off
-        case .mixed: button.state = .mixed
-        case .checked: button.state = .on
-        }
-    }
-}
-
-private final class NativeCheckboxButton: NSButton {
-    var activation: () -> Void
-    var restoreKeyboardFocusWhenEnabled = false
-
-    init(title: String, identifier: String, activation: @escaping () -> Void) {
-        self.activation = activation
-        super.init(frame: .zero)
-        self.title = title
-        setButtonType(.switch)
-        allowsMixedState = true
-        setAccessibilityIdentifier(identifier)
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self)
-        super.mouseDown(with: event)
-        activation()
-    }
-
-    override func keyDown(with event: NSEvent) {
-        guard event.keyCode == 49 else {
-            super.keyDown(with: event)
-            return
-        }
-        state = state == .on ? .off : .on
-        activation()
     }
 }
