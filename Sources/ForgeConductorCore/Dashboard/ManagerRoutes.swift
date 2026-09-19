@@ -865,6 +865,29 @@ public final class ManagerRoutes: @unchecked Sendable {
                 }
                 networkAllowed = typed
             } else { networkAllowed = false }
+            let expectedProviderConfigurationRevision: String?
+            if let value = object["expected_provider_configuration_revision"] {
+                guard let typed = value as? String,
+                      !typed.isEmpty, typed.utf8.count <= 256 else {
+                    throw AutonomyError.invalidRequest(
+                        "expected_provider_configuration_revision must be a bounded string when supplied"
+                    )
+                }
+                expectedProviderConfigurationRevision = typed
+            } else { expectedProviderConfigurationRevision = nil }
+            let expectedToolCatalogRevision: String?
+            if let value = object["expected_tool_catalog_revision"] {
+                guard let typed = value as? String,
+                      typed.utf8.count == 64,
+                      typed.utf8.allSatisfy({
+                          (48...57).contains($0) || (97...102).contains($0)
+                      }) else {
+                    throw AutonomyError.invalidRequest(
+                        "expected_tool_catalog_revision must be a SHA-256 string when supplied"
+                    )
+                }
+                expectedToolCatalogRevision = typed
+            } else { expectedToolCatalogRevision = nil }
             do {
                 let result = try manager.startAutonomousRun(
                     runID: RunID(runUUID),
@@ -877,6 +900,9 @@ public final class ManagerRoutes: @unchecked Sendable {
                     modelKey: modelKey,
                     allowedTools: allowedTools,
                     completionGates: completionGates,
+                    expectedProviderConfigurationRevision:
+                        expectedProviderConfigurationRevision,
+                    expectedToolCatalogRevision: expectedToolCatalogRevision,
                     networkAllowed: networkAllowed,
                     maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
                         ?? ProjectContextService.defaultInlineOutputLimit
@@ -889,6 +915,13 @@ public final class ManagerRoutes: @unchecked Sendable {
                     "code": error.code,
                     "message": error.localizedDescription,
                     "retryable": false,
+                ])
+            } catch let error as ManagerRunPreparationError {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false,
+                    "code": "run_preparation_stale",
+                    "message": error.localizedDescription,
+                    "retryable": true,
                 ])
             } catch let error as ProjectContextError {
                 guard case .projectRootNotAuthorized = error else { throw error }

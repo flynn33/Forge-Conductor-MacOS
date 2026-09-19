@@ -46,10 +46,13 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
 }
 
 struct OperatorRunPreparation: Decodable, Sendable, Equatable {
+    let schemaVersion: Int?
     let state: String
     let providerID: String?
     let adapterID: String
     let modelKey: String?
+    let providerConfigurationRevision: String?
+    let toolCatalogRevision: String?
     let allowedTools: [String]
     let completionGates: [String]
     let networkAllowed: Bool
@@ -57,9 +60,12 @@ struct OperatorRunPreparation: Decodable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case state, detail
+        case schemaVersion = "schema_version"
         case providerID = "provider_id"
         case adapterID = "adapter_id"
         case modelKey = "model_key"
+        case providerConfigurationRevision = "provider_configuration_revision"
+        case toolCatalogRevision = "tool_catalog_revision"
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
         case networkAllowed = "network_allowed"
@@ -781,6 +787,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let allowedTools: [String]?
     let completionGates: [String]?
     let networkAllowed: Bool?
+    let expectedProviderConfigurationRevision: String?
+    let expectedToolCatalogRevision: String?
     let maximumInlineOutputBytes: Int
 
     enum CodingKeys: String, CodingKey {
@@ -795,6 +803,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
         case networkAllowed = "network_allowed"
+        case expectedProviderConfigurationRevision = "expected_provider_configuration_revision"
+        case expectedToolCatalogRevision = "expected_tool_catalog_revision"
         case maximumInlineOutputBytes = "maximum_inline_output_bytes"
     }
 }

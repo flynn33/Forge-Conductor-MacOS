@@ -9,11 +9,13 @@ import XCTest
 private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked Sendable {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var responses: [String: Data] = [:]
+    nonisolated(unsafe) private static var statuses: [String: Int] = [:]
     nonisolated(unsafe) private static var paths: [String] = []
 
-    static func configure(responses: [String: Data]) {
+    static func configure(responses: [String: Data], statuses: [String: Int] = [:]) {
         lock.lock()
         self.responses = responses
+        self.statuses = statuses
         paths = []
         lock.unlock()
     }
@@ -32,12 +34,13 @@ private final class OperatorProjectContractURLProtocol: URLProtocol, @unchecked 
         Self.lock.lock()
         Self.paths.append(path)
         let data = Self.responses[path]
+        let status = Self.statuses[path] ?? 200
         Self.lock.unlock()
         guard let data,
               let url = request.url,
               let response = HTTPURLResponse(
                 url: url,
-                statusCode: 200,
+                statusCode: status,
                 httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": "application/json"]
               ) else {
@@ -175,6 +178,9 @@ final class OperatorProjectContractTests: XCTestCase {
                     "provider_id": "lmstudio",
                     "adapter_id": "forge.native-session-host",
                     "model_key": "fixture/tool-model",
+                    "schema_version": 1,
+                    "provider_configuration_revision": "fixture-provider-revision",
+                    "tool_catalog_revision": String(repeating: "a", count: 64),
                     "allowed_tools": ["fs_read", "fs_edit", "shell_exec"],
                     "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
                     "network_allowed": false,
@@ -224,8 +230,18 @@ final class OperatorProjectContractTests: XCTestCase {
             Set(defaultBody.keys),
             [
                 "run_id", "project_id", "project_generation", "mission",
+                "expected_provider_configuration_revision",
+                "expected_tool_catalog_revision",
                 "maximum_inline_output_bytes",
             ]
+        )
+        XCTAssertEqual(
+            defaultBody["expected_provider_configuration_revision"] as? String,
+            "fixture-provider-revision"
+        )
+        XCTAssertEqual(
+            defaultBody["expected_tool_catalog_revision"] as? String,
+            String(repeating: "a", count: 64)
         )
 
         viewModel.modelKey = "fixture/pinned-model"
@@ -246,6 +262,65 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(overrideRequest.allowedTools, ["fs_read"])
         XCTAssertEqual(overrideRequest.completionGates, ["fixture-check"])
         XCTAssertEqual(overrideRequest.networkAllowed, true)
+
+        OperatorProjectContractURLProtocol.configure(
+            responses: [
+                "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                    "projects": [project],
+                    "runs": [],
+                    "provider": [
+                        "adapter_id": "forge.native-session-host",
+                        "provider_id": "lmstudio",
+                        "health": "contract_valid",
+                        "model_key": "fixture/new-default-model",
+                    ],
+                    "run_preparation": [
+                        "state": "ready",
+                        "provider_id": "lmstudio",
+                        "adapter_id": "forge.native-session-host",
+                        "model_key": "fixture/new-default-model",
+                        "schema_version": 1,
+                        "provider_configuration_revision": "fixture-provider-revision-2",
+                        "tool_catalog_revision": String(repeating: "a", count: 64),
+                        "allowed_tools": ["fs_read", "fs_edit", "shell_exec"],
+                        "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                        "network_allowed": false,
+                    ],
+                ]),
+                "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                    "started": true,
+                    "active_run_ids": [],
+                    "deferred_run_ids": [],
+                ]),
+                "/api/manager/runs/start": try JSONSupport.data(from: [
+                    "ok": false,
+                    "code": "run_preparation_stale",
+                    "message": "The saved provider configuration changed.",
+                    "retryable": true,
+                ]),
+            ],
+            statuses: ["/api/manager/runs/start": 409]
+        )
+        viewModel.startRun()
+        let staleDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while (viewModel.isStarting || viewModel.isLoading),
+              ContinuousClock.now < staleDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(viewModel.isStarting)
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertFalse(viewModel.startRequiresReconciliation)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.notice?.contains("refreshing changed run preparation") == true)
+        XCTAssertEqual(
+            viewModel.runPreparation?.providerConfigurationRevision,
+            "fixture-provider-revision-2"
+        )
+        XCTAssertEqual(viewModel.providerID, "lmstudio")
+        XCTAssertEqual(viewModel.modelKey, "fixture/pinned-model")
+        XCTAssertEqual(viewModel.allowedTools, "fs_read")
+        XCTAssertEqual(viewModel.completionGates, "fixture-check")
+        XCTAssertTrue(viewModel.networkAllowed)
     }
 
     func testProjectRemovalAndInstructionQueueUseTypedManagerContracts() async throws {

@@ -20,6 +20,9 @@ Product versions do not by themselves claim shipment.
 - Unified direct and queued technical preparation in the Manager. Configured
   starts now omit unchanged provider/model/tool/gate/network fields, while
   explicit Advanced overrides remain exact and fail closed when invalid.
+- Added provider-configuration and canonical tool-catalog revision fencing to
+  run preparation. Stale previews create no durable run and refresh automatic
+  values without erasing explicit Advanced choices.
 
 ### Pending qualification
 

@@ -764,6 +764,15 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                     message: (object["message"] as? String) ?? "Allowed tools are invalid"
                 )
             }
+            if http.statusCode == 409,
+               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               object["code"] as? String == "run_preparation_stale" {
+                throw OperatorManagerClientError.configurationRejected(
+                    code: "run_preparation_stale",
+                    message: (object["message"] as? String)
+                        ?? "Run preparation changed"
+                )
+            }
             throw OperatorManagerClientError.rejected(
                 status: http.statusCode,
                 message: Self.errorMessage(from: data)

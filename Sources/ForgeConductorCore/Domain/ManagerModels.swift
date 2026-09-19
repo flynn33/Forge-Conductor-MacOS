@@ -624,10 +624,13 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
 /// may expose overrides, but it does not require the operator to reconstruct
 /// internal identifiers for every task.
 public struct ManagerOperatorRunPreparation: Codable, Sendable, Equatable {
+    public let schemaVersion: Int?
     public let state: String
     public let providerID: String?
     public let adapterID: String
     public let modelKey: String?
+    public let providerConfigurationRevision: String?
+    public let toolCatalogRevision: String?
     public let allowedTools: [String]
     public let completionGates: [String]
     public let networkAllowed: Bool
@@ -635,9 +638,12 @@ public struct ManagerOperatorRunPreparation: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case state, detail
+        case schemaVersion = "schema_version"
         case providerID = "provider_id"
         case adapterID = "adapter_id"
         case modelKey = "model_key"
+        case providerConfigurationRevision = "provider_configuration_revision"
+        case toolCatalogRevision = "tool_catalog_revision"
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
         case networkAllowed = "network_allowed"

@@ -59,13 +59,23 @@ accepts the minimal request, rereads the saved provider configuration at
 admission, resolves only omitted fields, validates the effective production
 tool catalog, and persists the resolved run contract.
 
+The versioned preparation projection now includes the opaque saved-provider
+configuration revision and the canonical production tool-catalog SHA-256. The
+app echoes those revisions without exposing them as routine inputs. Start
+compares both values before persisting a run; a changed provider or catalog
+returns typed `run_preparation_stale`, leaves the requested run identity
+unpersisted, and causes Autonomy to refresh manager defaults while retaining
+explicit Advanced overrides. Project generation remains independently fenced by
+the existing exact-generation admission contract.
+
 This is a narrow M1 slice, not completion of M1 or the overall remediation.
-Durable prepared descriptors, stale-preparation receipts, and combined folder
-grant/registration remain open in M1. Native catalog checkboxes and saved
-project preferences remain M2; document-backed format-neutral import remains
-M3; automatic task-aware completion remains M4; provider lifecycle, continuity
-presentation, and contextual Guided Mode remain M5; whole-journey acceptance
-and the source-bound candidate remain M6 and M7.
+The full project/package/document, validation-plan, continuity, and budget
+prepared descriptor plus combined folder grant/registration remain open in M1.
+Native catalog checkboxes and saved project preferences remain M2;
+document-backed format-neutral import remains M3; automatic task-aware
+completion remains M4; provider lifecycle, continuity presentation, and
+contextual Guided Mode remain M5; whole-journey acceptance and the source-bound
+candidate remain M6 and M7.
 
 ## Verification
 
@@ -80,9 +90,16 @@ and the source-bound candidate remain M6 and M7.
 - An authenticated HTTP integration starts and persists a run with every
   technical field omitted, then reads back the saved model, registered ordinary
   tools, and built-in completion gate from the durable run.
+- A second authenticated HTTP integration changes the provider configuration
+  after preview and supplies a stale catalog hash. Both starts return the typed
+  stale-preparation result before durable creation; the same run identity is
+  then accepted with refreshed revisions and the new saved model.
+- The app regression verifies that stale rejection triggers preparation refresh,
+  clears duplicate-start reconciliation, and preserves explicit model, tool,
+  gate, and network overrides.
 - Direct and queue construction both use `ManagerRunPreparationResolver`; its
   focused test covers defaults, exact overrides, and explicit-empty rejection.
-- Five operator-project/app-contract tests, four provider-configuration tests,
+- Five operator-project/app-contract tests, five provider-configuration tests,
   the focused HTTP runtime-control test, six queue tests, and 121 Manager tests
   passed. The Manager class retained two explicit environment/helper skips and
   had zero failures.

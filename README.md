@@ -78,7 +78,8 @@ product set.
    **Start Task**. Forge uses the saved model plus manager-owned capability and
    completion defaults; unchanged technical defaults are omitted from the start
    request and resolved again by the Manager. Optional overrides remain under
-   **Advanced**.
+   **Advanced**. If the saved provider or registered tool catalog changes after
+   preview, Forge refreshes preparation before any run is persisted.
 8. Review the run's events and evidence.
 
 The current setup guide can be reopened from the question-mark toolbar button.

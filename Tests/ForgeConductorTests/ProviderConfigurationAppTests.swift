@@ -132,6 +132,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         ))
         _ = try manager.recoverManagedAutonomy()
         _ = try manager.startService()
+        let preparation = try manager.operatorSnapshot(limit: 10).runPreparation
 
         let client = OperatorManagerHTTPClient(
             host: "127.0.0.1",
@@ -150,6 +151,9 @@ final class ProviderConfigurationAppTests: XCTestCase {
             allowedTools: nil,
             completionGates: nil,
             networkAllowed: nil,
+            expectedProviderConfigurationRevision:
+                preparation.providerConfigurationRevision,
+            expectedToolCatalogRevision: preparation.toolCatalogRevision,
             maximumInlineOutputBytes: 64 * 1_024
         ))
         XCTAssertEqual(started.providerID, "lmstudio")
@@ -166,6 +170,138 @@ final class ProviderConfigurationAppTests: XCTestCase {
             durable?.specification.completionGates,
             [ProjectInstructionQueueStore.builtInCompletionGate]
         )
+    }
+
+    func testHTTPStartRejectsStalePreparationBeforePersistingRun() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        let port = Int.random(in: 29_000...39_000)
+        let projectRoot = directory.appendingPathComponent("stale-project", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        try app.config.update([
+            "allowed_roots": [projectRoot.path],
+            "dashboard": ["port": port],
+        ], save: true)
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        defer {
+            _ = try? manager.stopService()
+            _ = manager.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+        let empty = try manager.readProviderConfiguration()
+        let first = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: empty.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/first-model"
+        ))
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+        let stale = try manager.operatorSnapshot(limit: 10).runPreparation
+        XCTAssertEqual(stale.providerConfigurationRevision, first.revision)
+        let second = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+            expectedRevision: first.revision,
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/second-model"
+        ))
+        XCTAssertNotEqual(second.revision, first.revision)
+        _ = try manager.recoverManagedAutonomy()
+        _ = try manager.startService()
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: port,
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
+        let runID = UUID().uuidString.lowercased()
+        let staleRequest = OperatorRunStartRequest(
+            runID: runID,
+            projectID: projectID.description,
+            projectGeneration: generation.rawValue,
+            assignmentID: nil,
+            mission: "Reject stale manager preparation.",
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: nil,
+            completionGates: nil,
+            networkAllowed: nil,
+            expectedProviderConfigurationRevision:
+                stale.providerConfigurationRevision,
+            expectedToolCatalogRevision: stale.toolCatalogRevision,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        do {
+            _ = try await client.startRun(staleRequest)
+            XCTFail("A stale prepared request was accepted")
+        } catch let error as OperatorManagerClientError {
+            guard case .configurationRejected(let code, _) = error else {
+                return XCTFail("Wrong stale-preparation error: \(error)")
+            }
+            XCTAssertEqual(code, "run_preparation_stale")
+        }
+        let rejectedRunID = try RunID(XCTUnwrap(UUID(uuidString: runID)))
+        let rejectedRun = try await app.projectContexts.repository.autonomousRun(rejectedRunID)
+        XCTAssertNil(rejectedRun)
+
+        let refreshed = try manager.operatorSnapshot(limit: 10).runPreparation
+        let staleCatalogRequest = OperatorRunStartRequest(
+            runID: runID,
+            projectID: projectID.description,
+            projectGeneration: generation.rawValue,
+            assignmentID: nil,
+            mission: "Reject stale manager preparation.",
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: nil,
+            completionGates: nil,
+            networkAllowed: nil,
+            expectedProviderConfigurationRevision:
+                refreshed.providerConfigurationRevision,
+            expectedToolCatalogRevision: String(repeating: "b", count: 64),
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        do {
+            _ = try await client.startRun(staleCatalogRequest)
+            XCTFail("A stale tool-catalog preparation was accepted")
+        } catch let error as OperatorManagerClientError {
+            guard case .configurationRejected(let code, _) = error else {
+                return XCTFail("Wrong stale-catalog error: \(error)")
+            }
+            XCTAssertEqual(code, "run_preparation_stale")
+        }
+        let catalogRejectedRun = try await app.projectContexts.repository.autonomousRun(
+            rejectedRunID
+        )
+        XCTAssertNil(catalogRejectedRun)
+
+        let accepted = try await client.startRun(OperatorRunStartRequest(
+            runID: runID,
+            projectID: projectID.description,
+            projectGeneration: generation.rawValue,
+            assignmentID: nil,
+            mission: "Reject stale manager preparation.",
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: nil,
+            completionGates: nil,
+            networkAllowed: nil,
+            expectedProviderConfigurationRevision:
+                refreshed.providerConfigurationRevision,
+            expectedToolCatalogRevision: refreshed.toolCatalogRevision,
+            maximumInlineOutputBytes: 64 * 1_024
+        ))
+        XCTAssertEqual(accepted.runID, runID)
+        XCTAssertEqual(accepted.modelKey, "fixture/second-model")
     }
 
     func testBusyProviderRouteRejectsCredentialBodiesWithoutDispatchingMutations() async throws {

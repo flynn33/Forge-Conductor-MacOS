@@ -114,6 +114,20 @@ enum ManagerRunPreparationResolver {
     }
 }
 
+enum ManagerRunPreparationError: Error, LocalizedError, Sendable, Equatable {
+    case staleProviderConfiguration
+    case staleToolCatalog
+
+    var errorDescription: String? {
+        switch self {
+        case .staleProviderConfiguration:
+            "The saved provider configuration changed after this run was prepared. Refresh preparation and retry."
+        case .staleToolCatalog:
+            "The registered tool catalog changed after this run was prepared. Refresh preparation and retry."
+        }
+    }
+}
+
 private enum ManagerLifecycleTransitionError: Error, LocalizedError, Sendable {
     case busy(String)
 
@@ -576,10 +590,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             probe: providerProbe,
             configuration: providerConfiguration
         )
-        let registeredTools = Set(app.tools.toolNames)
+        let registeredToolNames = app.tools.toolNames
+        let registeredTools = Set(registeredToolNames)
         let ordinaryTools = ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter {
             registeredTools.contains($0)
         }
+        let toolCatalogRevision = try? ToolDefinitionCatalog.production(
+            toolNames: registeredToolNames
+        ).canonicalSHA256
         let configuredModel = providerConfiguration?.modelKey?.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
@@ -608,10 +626,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runtimeJobs: jobRows,
             provider: provider,
             runPreparation: ManagerOperatorRunPreparation(
+                schemaVersion: 1,
                 state: preparationState,
                 providerID: providerConfigured ? "lmstudio" : nil,
                 adapterID: Self.nativeSessionHostAdapterID,
                 modelKey: providerConfigured ? configuredModel : nil,
+                providerConfigurationRevision: providerConfigured
+                    ? providerConfiguration?.revision : nil,
+                toolCatalogRevision: toolCatalogRevision,
                 allowedTools: ordinaryTools,
                 completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
                 networkAllowed: false,
@@ -2184,6 +2206,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         modelKey: String? = nil,
         allowedTools: Set<String>? = nil,
         completionGates: [String]? = nil,
+        expectedProviderConfigurationRevision: String? = nil,
+        expectedToolCatalogRevision: String? = nil,
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) throws -> [String: Any] {
@@ -2201,7 +2225,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
         }
         let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
-        let providerConfiguration = modelKey == nil ? try readProviderConfiguration() : nil
+        let providerConfiguration = modelKey == nil || expectedProviderConfigurationRevision != nil
+            ? try readProviderConfiguration() : nil
+        if let expectedProviderConfigurationRevision,
+           providerConfiguration?.revision != expectedProviderConfigurationRevision {
+            throw ManagerRunPreparationError.staleProviderConfiguration
+        }
+        let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        if let expectedToolCatalogRevision,
+           catalog.canonicalSHA256 != expectedToolCatalogRevision {
+            throw ManagerRunPreparationError.staleToolCatalog
+        }
         let preparation = try ManagerRunPreparationResolver.resolve(
             configuration: providerConfiguration,
             registeredToolNames: app.tools.toolNames,
@@ -2213,7 +2247,6 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             networkAllowed: networkAllowed
         )
         do {
-            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
             _ = try catalog.providerToolDefinitions(allowedToolNames: preparation.allowedTools)
         } catch ToolDefinitionCatalogError.unregisteredAllowedTools(let tools) {
             throw AutonomyError.invalidToolConfiguration(tools)

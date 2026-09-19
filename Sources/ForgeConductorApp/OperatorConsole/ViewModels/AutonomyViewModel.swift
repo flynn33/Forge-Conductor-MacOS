@@ -37,6 +37,7 @@ final class AutonomyViewModel: ObservableObject {
     private var loadTask: Task<Void, Never>?
     private var pendingStartRequest: OperatorRunStartRequest?
     private var didApplyPreparationDefaults = false
+    private var networkOverrideForNextPreparation: Bool?
 
     init(client: any OperatorManagerClientProtocol) {
         self.client = client
@@ -95,7 +96,12 @@ final class AutonomyViewModel: ObservableObject {
                         if completionGates.isEmpty {
                             completionGates = preparation.completionGates.joined(separator: "\n")
                         }
-                        networkAllowed = preparation.networkAllowed
+                        if let networkOverrideForNextPreparation {
+                            networkAllowed = networkOverrideForNextPreparation
+                            self.networkOverrideForNextPreparation = nil
+                        } else {
+                            networkAllowed = preparation.networkAllowed
+                        }
                         didApplyPreparationDefaults = true
                     }
                 } else {
@@ -148,6 +154,9 @@ final class AutonomyViewModel: ObservableObject {
                 ? nil : completionGates,
             networkAllowed: networkAllowed == preparation?.networkAllowed
                 ? nil : networkAllowed,
+            expectedProviderConfigurationRevision:
+                preparation?.providerConfigurationRevision,
+            expectedToolCatalogRevision: preparation?.toolCatalogRevision,
             maximumInlineOutputBytes: 64 * 1_024
         )
     }
@@ -172,11 +181,18 @@ final class AutonomyViewModel: ObservableObject {
                 }
                 acceptStartedRun(run)
             } catch let clientError as OperatorManagerClientError {
-                if case .configurationRejected = clientError {
+                if case .configurationRejected(let code, _) = clientError {
                     pendingStartRequest = nil
                     startRequiresReconciliation = false
                     errorMessage = clientError.localizedDescription
-                    notice = "Correct the run configuration and submit it again. No run was persisted."
+                    if code == "run_preparation_stale" {
+                        clearAutomaticallyAppliedPreparationValues()
+                        didApplyPreparationDefaults = false
+                        notice = "Forge is refreshing changed run preparation. No run was persisted."
+                        load()
+                    } else {
+                        notice = "Correct the run configuration and submit it again. No run was persisted."
+                    }
                 } else {
                     errorMessage = "Run \(request.runID) must be reconciled before another start: \(clientError.localizedDescription)"
                     notice = nil
@@ -199,6 +215,24 @@ final class AutonomyViewModel: ObservableObject {
         mission = ""
         assignmentID = ""
         startRequiresReconciliation = false
+    }
+
+    private func clearAutomaticallyAppliedPreparationValues() {
+        guard let preparation = runPreparation else { return }
+        if providerID == preparation.providerID { providerID = "" }
+        if adapterID == preparation.adapterID { adapterID = "" }
+        if modelKey == preparation.modelKey { modelKey = "" }
+        if Set(parsedList(allowedTools)) == Set(preparation.allowedTools) {
+            allowedTools = ""
+        }
+        if parsedList(completionGates) == preparation.completionGates {
+            completionGates = ""
+        }
+        if networkAllowed == preparation.networkAllowed {
+            networkAllowed = false
+        } else {
+            networkOverrideForNextPreparation = networkAllowed
+        }
     }
 
     func refreshSelectedRun() {
