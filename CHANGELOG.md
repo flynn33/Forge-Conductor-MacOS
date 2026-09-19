@@ -12,6 +12,9 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added direct Start Task selection of existing project instruction packages,
+  including ordered multi-package composition that remains usable after the
+  original import paths are removed.
 - Added persistent contextual Guided Mode with complete offline help for all 13
   application tabs and typed guides for Start Task, task capabilities,
   completion checks, project registration/import/queue/relink/reset/clear,
@@ -21,6 +24,9 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Changed every quick-text task input, including short paste, to publish through
+  the same immutable run-artifact pipeline as files, folders, ZIPs, and selected
+  project packages before preparation or Start.
 - Changed the persistent question-mark toolbar action from the generic setup
   slideshow to the current tab or active sheet guide while retaining the
   first-use setup guide as onboarding.

@@ -20,6 +20,8 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var runPreparation: OperatorRunPreparation?
     @Published private(set) var projectRunPreparation: ManagerRunPreparationResult?
     @Published private(set) var toolPermissions: ManagerToolPermissionSnapshot?
+    @Published private(set) var instructionQueue: OperatorInstructionQueue?
+    @Published private(set) var selectedInstructionPackageIDs: [String] = []
     @Published var toolSearch = ""
     @Published private(set) var autonomyStarted = false
     @Published var selectedRunID: String?
@@ -58,12 +60,34 @@ final class AutonomyViewModel: ObservableObject {
     var selectedRun: OperatorRun? { runs.first { $0.runID == selectedRunID } }
     var selectedProject: OperatorProject? { projects.first { $0.projectID == selectedProjectID } }
 
+    var taskDraft: AutonomyTaskDraft {
+        AutonomyTaskDraft(
+            projectID: selectedProjectID,
+            packageIDs: selectedInstructionPackageIDs,
+            quickInstructions: mission,
+            localImportPath: instructionSourcePath,
+            optionalAssignmentLabel: assignmentID.nilIfBlank,
+            networkAllowed: networkAllowed,
+            modelOverride: modelOverrideKey.nilIfBlank
+        )
+    }
+
     var canStart: Bool {
         !isStarting
             && !startRequiresReconciliation
             && selectedProject != nil
-            && (instructionSourcePath != nil
-                || !mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            && taskDraft.hasInstructionInput
+    }
+
+    var availableInstructionPackages: [OperatorInstructionPackage] {
+        (instructionQueue?.packages ?? []).sorted {
+            $0.position == $1.position ? $0.id < $1.id : $0.position < $1.position
+        }
+    }
+
+    var selectedInstructionPackages: [OperatorInstructionPackage] {
+        let selected = Set(selectedInstructionPackageIDs)
+        return availableInstructionPackages.filter { selected.contains($0.id) }
     }
 
     var instructionSourceName: String? {
@@ -97,6 +121,56 @@ final class AutonomyViewModel: ObservableObject {
 
     func clearInstructionSource() {
         instructionSourcePath = nil
+    }
+
+    func refreshInstructionArtifactsForSelection() {
+        selectedInstructionPackageIDs = []
+        instructionQueue = nil
+        guard let project = selectedProject else { return }
+        Task { [weak self] in
+            await self?.refreshInstructionQueue(for: project, reportErrors: true)
+        }
+    }
+
+    func toggleInstructionPackage(_ packageID: String) {
+        setInstructionPackage(
+            packageID,
+            selected: !selectedInstructionPackageIDs.contains(packageID)
+        )
+    }
+
+    func setInstructionPackage(_ packageID: String, selected shouldSelect: Bool) {
+        guard let package = availableInstructionPackages.first(where: { $0.id == packageID }),
+              package.importReady != false else { return }
+        var selected = Set(selectedInstructionPackageIDs)
+        if shouldSelect {
+            selected.insert(packageID)
+        } else {
+            selected.remove(packageID)
+        }
+        selectedInstructionPackageIDs = availableInstructionPackages.compactMap {
+            selected.contains($0.id) ? $0.id : nil
+        }
+    }
+
+    private func refreshInstructionQueue(
+        for project: OperatorProject,
+        reportErrors: Bool
+    ) async {
+        do {
+            let queue = try await client.instructionQueue(
+                projectID: project.projectID,
+                generation: project.projectGeneration
+            )
+            guard selectedProjectID == project.projectID else { return }
+            instructionQueue = queue
+            let available = Set(queue.packages.map(\.id))
+            selectedInstructionPackageIDs.removeAll { !available.contains($0) }
+        } catch OperatorManagerClientError.capabilityUnavailable(_) {
+            if selectedProjectID == project.projectID { instructionQueue = nil }
+        } catch {
+            if reportErrors { errorMessage = error.localizedDescription }
+        }
     }
 
     var preparationRecoveryAction: ManagerRunRecoveryAction? {
@@ -302,8 +376,10 @@ final class AutonomyViewModel: ObservableObject {
                 }
                 if let project = selectedProject {
                     await refreshToolPermissions(for: project, reportErrors: false)
+                    await refreshInstructionQueue(for: project, reportErrors: false)
                 } else {
                     toolPermissions = nil
+                    instructionQueue = nil
                 }
                 if let pending = pendingStartRequest,
                    let accepted = loadedRuns.first(where: { $0.runID == pending.runID }) {
@@ -349,8 +425,11 @@ final class AutonomyViewModel: ObservableObject {
             assignmentID: assignmentID.nilIfBlank,
             mission: instructionSourceName.map {
                 "Follow the imported instructions in \($0)."
-            } ?? mission.trimmingCharacters(in: .whitespacesAndNewlines),
+            } ?? mission.nilIfBlank
+                ?? "Follow the selected instruction artifacts in their displayed order.",
             localInstructionSourcePath: instructionSourcePath,
+            localInstructionPackageIDs: selectedInstructionPackageIDs,
+            localQuickInstructions: mission.nilIfBlank,
             providerID: providerID.isEmpty || providerID == preparation?.providerID
                 ? nil : providerID,
             adapterID: adapterID.isEmpty || adapterID == preparation?.adapterID
@@ -388,54 +467,17 @@ final class AutonomyViewModel: ObservableObject {
             guard let self else { return }
             var startWasSubmitted = false
             do {
-                var admittedRequest = request
-                if request.instructionArtifactSHA256 == nil,
-                   (request.localInstructionSourcePath != nil
-                    || request.mission.utf8.count > ProjectInstructionQueueStore.maximumMissionBytes) {
-                    let staged: URL?
-                    let sourcePath: String
-                    if let selectedPath = request.localInstructionSourcePath {
-                        staged = nil
-                        sourcePath = selectedPath
-                    } else {
-                        let url = try await Self.stagePastedInstructions(
-                            request.mission,
-                            runID: request.runID
-                        )
-                        staged = url
-                        sourcePath = url.path
-                    }
-                    defer {
-                        if let staged {
-                            Task.detached(priority: .utility) {
-                                try? FileManager.default.removeItem(
-                                    at: staged.deletingLastPathComponent()
-                                )
-                            }
-                        }
-                    }
-                    let artifact = try await client.importRunInstructionArtifact(
-                        projectID: request.projectID,
-                        generation: request.projectGeneration,
-                        runID: request.runID,
-                        sourcePath: sourcePath
-                    )
-                    guard artifact.unresolvedDocumentCount == 0 else {
-                        throw OperatorManagerClientError.invalidPayload(
-                            "The instructions contain \(artifact.unresolvedDocumentCount) unresolved document(s)."
-                        )
-                    }
-                    admittedRequest = request.usingInstructionArtifact(artifact)
-                    pendingStartRequest = admittedRequest
-                }
+                var admittedRequest = try await admitInstructionArtifact(request)
                 if admittedRequest.expectedPreparedRunRevision == nil {
                     do {
                         var preparationResult = try await client.prepareRun(admittedRequest)
                         if preparationResult.readiness == .automaticallyPreparing,
                            preparationResult.projectID == request.projectID,
                            preparationResult.projectGeneration != request.projectGeneration {
-                            admittedRequest = admittedRequest.replacingProjectGeneration(
-                                preparationResult.projectGeneration
+                            admittedRequest = try await admitInstructionArtifact(
+                                admittedRequest.replacingProjectGenerationForInstructionReassembly(
+                                    preparationResult.projectGeneration
+                                )
                             )
                             preparationResult = try await client.prepareRun(admittedRequest)
                         }
@@ -501,6 +543,52 @@ final class AutonomyViewModel: ObservableObject {
         }
     }
 
+    private func admitInstructionArtifact(
+        _ request: OperatorRunStartRequest
+    ) async throws -> OperatorRunStartRequest {
+        guard request.instructionArtifactSHA256 == nil else { return request }
+        let staged: URL?
+        let sourcePath: String?
+        if let selectedPath = request.localInstructionSourcePath {
+            staged = nil
+            sourcePath = selectedPath
+        } else if let quickInstructions = request.localQuickInstructions {
+            let url = try await Self.stagePastedInstructions(
+                quickInstructions,
+                runID: request.runID
+            )
+            staged = url
+            sourcePath = url.path
+        } else {
+            staged = nil
+            sourcePath = nil
+        }
+        defer {
+            if let staged {
+                Task.detached(priority: .utility) {
+                    try? FileManager.default.removeItem(
+                        at: staged.deletingLastPathComponent()
+                    )
+                }
+            }
+        }
+        let artifact = try await client.assembleRunInstructionArtifact(
+            projectID: request.projectID,
+            generation: request.projectGeneration,
+            runID: request.runID,
+            packageIDs: request.localInstructionPackageIDs,
+            sourcePath: sourcePath
+        )
+        guard artifact.unresolvedDocumentCount == 0 else {
+            throw OperatorManagerClientError.invalidPayload(
+                "The instructions contain \(artifact.unresolvedDocumentCount) unresolved document(s)."
+            )
+        }
+        let admitted = request.usingInstructionArtifact(artifact)
+        pendingStartRequest = admitted
+        return admitted
+    }
+
     private nonisolated static func stagePastedInstructions(
         _ instructions: String,
         runID: String
@@ -540,6 +628,7 @@ final class AutonomyViewModel: ObservableObject {
         projectRunPreparation = nil
         mission = ""
         instructionSourcePath = nil
+        selectedInstructionPackageIDs = []
         assignmentID = ""
         modelOverrideKey = ""
         startRequiresReconciliation = false

@@ -1075,8 +1075,8 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         XCTAssertEqual(
             fixture.mutationAuthorizationCount,
-            3,
-            "The typed permission update and both identical start submissions must be authorized"
+            4,
+            "Artifact publication, the typed permission update, and both identical start submissions must be authorized"
         )
     }
 
@@ -1116,6 +1116,31 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                 || app.buttons["run-completion-done"].waitForExistence(timeout: 5)
         )
         app.buttons["run-completion-done"].click()
+        app.buttons["run-start-cancel"].click()
+
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testExistingInstructionPackageEnablesStartWithoutQuickText() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let autonomy = app.buttons["tab-autonomy"]
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+        let start = app.buttons["autonomy-start"]
+        XCTAssertTrue(waitForEnabled(start, timeout: 5))
+        start.click()
+
+        let package = app.checkBoxes["run-start-package-\(fixture.instructionPackageID)"]
+        XCTAssertTrue(package.waitForExistence(timeout: 5))
+        let mission = app.descendants(matching: .any)["run-start-mission"]
+        XCTAssertTrue(mission.exists)
+        package.click()
+        let selectedCount = app.descendants(matching: .any)["run-start-package-selection-count"]
+        XCTAssertTrue(selectedCount.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForEnabled(app.buttons["run-start-confirm"], timeout: 3))
         app.buttons["run-start-cancel"].click()
 
         XCTAssertEqual(fixture.startRequestCount, 0)
@@ -1281,6 +1306,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     let projectID = "11111111-1111-4111-8111-111111111111"
     let runID = "22222222-2222-4222-8222-222222222222"
     let runtimeJobID = "33333333-3333-4333-8333-333333333333"
+    let instructionPackageID = "44444444-4444-4444-8444-444444444444"
 
     private let listener: NWListener
     private let queue = DispatchQueue(label: "forge.operator-ui-fixture")
@@ -1532,6 +1558,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             )
         case "/api/manager/projects/status":
             respond(status: 200, object: project(), to: connection)
+        case "/api/manager/projects/instruction-packages":
+            respond(status: 200, object: instructionQueue(), to: connection)
         case "/api/manager/projects/tool-permissions/status":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true else {
                 respond(status: 401, object: ["message": "missing tool permission authorization"], to: connection)
@@ -1800,6 +1828,42 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             } else {
                 respond(status: 200, object: run(state: nextState), to: connection)
             }
+        case "/api/manager/runs/instruction-artifacts/import":
+            guard let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any] else {
+                respond(status: 401, object: ["message": "invalid instruction artifact body"], to: connection)
+                return
+            }
+            let packageIDs = (object["package_ids"] as? [String]) ?? []
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let requestedRunID = object["run_id"] as? String,
+                  UUID(uuidString: requestedRunID) != nil,
+                  object["project_id"] as? String == projectID,
+                  let generation = (object["project_generation"] as? NSNumber)?.uint64Value,
+                  generation == locked({ mutableProjectGeneration }),
+                  packageIDs.allSatisfy({ $0 == instructionPackageID }),
+                  object["source_path"] is String || !packageIDs.isEmpty else {
+                respond(status: 401, object: ["message": "missing instruction artifact authority or inputs"], to: connection)
+                return
+            }
+            locked { mutableMutationAuthorizationCount += 1 }
+            let digest = String(repeating: "c", count: 64)
+            respond(
+                status: 201,
+                object: [
+                    "ok": true,
+                    "run_id": requestedRunID,
+                    "project_id": projectID,
+                    "project_generation": generation,
+                    "mission": "Follow the fixture instruction artifact. Snapshot: \(digest)",
+                    "source_path": "/tmp/forge-operator-fixture-instructions",
+                    "content_sha256": digest,
+                    "document_count": max(packageIDs.count, 1),
+                    "instruction_byte_count": 128,
+                    "unresolved_document_count": 0,
+                    "created_at": "2026-08-31T12:00:00Z",
+                ],
+                to: connection
+            )
         case "/api/manager/runs/prepare":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
@@ -1900,7 +1964,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         generation: UInt64,
         mission: String
     ) -> [String: Any] {
-        let sourceSHA = String(repeating: "c", count: 64)
+        let sourceSHA = object["instruction_artifact_sha256"] as? String
+            ?? String(repeating: "c", count: 64)
+        let artifactBacked = object["instruction_artifact_sha256"] != nil
         let descriptor: [String: Any] = [
             "schema_version": 1,
             "revision": String(repeating: "d", count: 64),
@@ -1910,12 +1976,15 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "project_id": projectID,
             "project_generation": generation,
             "source": [
-                "kind": "inline_mission",
-                "reference": "inline-mission:\(sourceSHA)",
+                "kind": artifactBacked ? "instruction_artifact" : "inline_mission",
+                "reference": artifactBacked
+                    ? "instruction-artifact:fixture" : "inline-mission:\(sourceSHA)",
                 "snapshot_sha256": sourceSHA,
             ],
             "documents": [[
-                "reference": "inline:mission",
+                "reference": artifactBacked
+                    ? "instruction-snapshot:\(sourceSHA)/.forge/canonical/document-000001.txt"
+                    : "inline:mission",
                 "byte_count": mission.utf8.count,
                 "sha256": sourceSHA,
             ]],
@@ -2058,6 +2127,38 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "memory": ["state": "healthy", "database_bytes": 4_096, "record_count": 2],
             "continuity": ["state": "ready", "migration_state": "not_required"],
             "migration_warnings": [],
+        ]
+    }
+
+    private func instructionQueue() -> [String: Any] {
+        let generation = locked { mutableProjectGeneration }
+        return [
+            "ok": true,
+            "project_id": projectID,
+            "project_generation": generation,
+            "revision": 1,
+            "running": false,
+            "packages": [[
+                "id": instructionPackageID,
+                "project_id": projectID,
+                "project_generation": generation,
+                "package_id": "fixture-package",
+                "version": "1",
+                "display_name": "Fixture Instructions",
+                "mission": "Follow the fixture instructions.",
+                "source_path": "/tmp/removed-fixture-source.md",
+                "content_sha256": String(repeating: "c", count: 64),
+                "allowed_tools": ["project_memory.search"],
+                "completion_gates": ["tests"],
+                "document_count": 1,
+                "instruction_byte_count": 128,
+                "unresolved_document_count": 0,
+                "import_ready": true,
+                "position": 0,
+                "state": "queued",
+                "created_at": "2026-08-31T12:00:00Z",
+                "updated_at": "2026-08-31T12:00:00Z",
+            ]],
         ]
     }
 

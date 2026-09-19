@@ -319,6 +319,8 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(overrideRequest.completionGates, ["fixture-check"])
         XCTAssertEqual(overrideRequest.networkAllowed, true)
 
+        let overrideDigest = String(repeating: "b", count: 64)
+        let overrideBootstrap = "Follow the run instruction artifact. Snapshot: \(overrideDigest)"
         OperatorProjectContractURLProtocol.configure(
             responses: [
                 "/api/manager/operator/snapshot": try JSONSupport.data(from: [
@@ -348,10 +350,23 @@ final class OperatorProjectContractTests: XCTestCase {
                     "active_run_ids": [],
                     "deferred_run_ids": [],
                 ]),
-                "/api/manager/runs/prepare": try Self.preparedRunData(
+                "/api/manager/runs/instruction-artifacts/import": try JSONSupport.data(from: [
+                    "ok": true,
+                    "run_id": "__REQUEST_RUN_ID__",
+                    "project_id": projectID,
+                    "project_generation": UInt64(1),
+                    "mission": overrideBootstrap,
+                    "source_path": "/private/tmp/override-instructions.txt",
+                    "content_sha256": overrideDigest,
+                    "document_count": 1,
+                    "instruction_byte_count": 28,
+                    "unresolved_document_count": 0,
+                    "created_at": "2026-09-19T00:00:00Z",
+                ]),
+                "/api/manager/runs/prepare": try Self.preparedArtifactRunData(
                     projectID: projectID,
                     generation: 1,
-                    mission: "Repair the selected project.",
+                    snapshotSHA256: overrideDigest,
                     providerConfigurationRevision: "fixture-provider-revision-2",
                     modelKey: "fixture/pinned-model",
                     allowedTools: ["fs_read"],
@@ -407,7 +422,7 @@ final class OperatorProjectContractTests: XCTestCase {
     }
 
     @MainActor
-    func testLargePasteAndSelectedOrDroppedSourceUseArtifactReferenceBeforePrepareAndStart() async throws {
+    func testQuickPasteAndSelectedOrDroppedSourceUseArtifactReferenceBeforePrepareAndStart() async throws {
         let projectID = UUID().uuidString.lowercased()
         let project = try XCTUnwrap(
             JSONSerialization.jsonObject(with: Self.projectData(
@@ -417,8 +432,7 @@ final class OperatorProjectContractTests: XCTestCase {
                 resetPriorGeneration: 0
             )) as? [String: Any]
         )
-        let largeMission = String(repeating: "Preserve this requirement.\n", count: 80_000)
-        XCTAssertGreaterThan(largeMission.utf8.count, 1_048_576)
+        let quickInstructions = "Preserve this concise requirement."
         let digest = String(repeating: "c", count: 64)
         let bootstrap = "Read the complete run-bound instruction artifact. Snapshot: \(digest)"
         OperatorProjectContractURLProtocol.configure(responses: [
@@ -458,7 +472,7 @@ final class OperatorProjectContractTests: XCTestCase {
                 "source_path": "/private/tmp/staged.txt",
                 "content_sha256": digest,
                 "document_count": 1,
-                "instruction_byte_count": largeMission.utf8.count,
+                "instruction_byte_count": quickInstructions.utf8.count,
                 "unresolved_document_count": 0,
                 "created_at": "2026-09-19T00:00:00Z",
             ]),
@@ -493,7 +507,7 @@ final class OperatorProjectContractTests: XCTestCase {
         ))
         viewModel.load()
         try await Self.waitUntilIdle(viewModel)
-        viewModel.mission = largeMission
+        viewModel.mission = quickInstructions
         viewModel.startRun()
         try await Self.waitUntilStartIdle(viewModel)
 
@@ -509,6 +523,7 @@ final class OperatorProjectContractTests: XCTestCase {
         ).first)
         let importBody = try JSONSupport.object(from: importData)
         let stagedPath = try XCTUnwrap(importBody["source_path"] as? String)
+        XCTAssertNil(importBody["package_ids"])
         XCTAssertNil(importBody["mission"])
         let prepareData = try XCTUnwrap(OperatorProjectContractURLProtocol.requestedBodies(
             path: "/api/manager/runs/prepare"
@@ -517,7 +532,7 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(prepareBody["mission"] as? String, bootstrap)
         XCTAssertEqual(prepareBody["instruction_artifact_sha256"] as? String, digest)
         XCTAssertNil(prepareBody["local_instruction_source_path"])
-        XCTAssertLessThan(prepareData.count, largeMission.utf8.count)
+        XCTAssertNotEqual(prepareBody["mission"] as? String, quickInstructions)
         let startData = try XCTUnwrap(OperatorProjectContractURLProtocol.requestedBodies(
             path: "/api/manager/runs/start"
         ).first)
@@ -535,7 +550,7 @@ final class OperatorProjectContractTests: XCTestCase {
             "forge-selected-\(UUID().uuidString.lowercased()).txt"
         )
         defer { try? FileManager.default.removeItem(at: selectedSource) }
-        try largeMission.write(to: selectedSource, atomically: true, encoding: .utf8)
+        try quickInstructions.write(to: selectedSource, atomically: true, encoding: .utf8)
         XCTAssertTrue(viewModel.setInstructionSource(selectedSource))
         XCTAssertTrue(viewModel.canStart)
         viewModel.startRun()
@@ -547,7 +562,143 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(importBodies.count, 2)
         let selectedImport = try JSONSupport.object(from: importBodies[1])
         XCTAssertEqual(selectedImport["source_path"] as? String, selectedSource.path)
+        XCTAssertNil(selectedImport["package_ids"])
         XCTAssertNil(selectedImport["mission"])
+    }
+
+    @MainActor
+    func testExistingInstructionPackageSelectionUsesStoredIdentityBeforePrepare() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let packageID = UUID().uuidString.lowercased()
+        let digest = String(repeating: "e", count: 64)
+        let bootstrap = "Follow the selected stored package. Snapshot: \(digest)"
+        let project = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.projectData(
+            projectID: projectID,
+            generation: 1,
+            root: "/tmp/operator-selected-package",
+            resetPriorGeneration: 0
+        )) as? [String: Any])
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                "projects": [project],
+                "runs": [],
+                "provider": [
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "provider_id": "lmstudio",
+                    "health": "contract_valid",
+                    "model_key": "fixture/package-model",
+                ],
+                "run_preparation": [
+                    "state": "ready",
+                    "provider_id": "lmstudio",
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "model_key": "fixture/package-model",
+                    "schema_version": 1,
+                    "provider_configuration_revision": "fixture-package-provider",
+                    "tool_catalog_revision": String(repeating: "a", count: 64),
+                    "allowed_tools": ["instruction_catalog", "instruction_read"],
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "network_allowed": false,
+                ],
+            ]),
+            "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                "started": true,
+                "active_run_ids": [],
+                "deferred_run_ids": [],
+            ]),
+            "/api/manager/projects/instruction-packages": try JSONSupport.data(from: [
+                "project_id": projectID,
+                "project_generation": UInt64(1),
+                "revision": UInt64(4),
+                "running": false,
+                "packages": [[
+                    "id": packageID,
+                    "project_id": projectID,
+                    "project_generation": UInt64(1),
+                    "package_id": "stored-package",
+                    "version": "1",
+                    "display_name": "Stored Package",
+                    "mission": bootstrap,
+                    "source_path": "/source/no-longer-required.md",
+                    "content_sha256": digest,
+                    "allowed_tools": ["instruction_catalog", "instruction_read"],
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "document_count": 1,
+                    "instruction_byte_count": 42,
+                    "unresolved_document_count": 0,
+                    "import_ready": true,
+                    "position": 0,
+                    "state": "queued",
+                    "created_at": "2026-09-19T00:00:00Z",
+                    "updated_at": "2026-09-19T00:00:00Z",
+                ]],
+            ]),
+            "/api/manager/runs/instruction-artifacts/import": try JSONSupport.data(from: [
+                "ok": true,
+                "run_id": "__REQUEST_RUN_ID__",
+                "project_id": projectID,
+                "project_generation": UInt64(1),
+                "mission": bootstrap,
+                "source_path": "/source/no-longer-required.md",
+                "content_sha256": digest,
+                "document_count": 1,
+                "instruction_byte_count": 42,
+                "unresolved_document_count": 0,
+                "created_at": "2026-09-19T00:00:00Z",
+            ]),
+            "/api/manager/runs/prepare": try Self.preparedArtifactRunData(
+                projectID: projectID,
+                generation: 1,
+                snapshotSHA256: digest
+            ),
+            "/api/manager/runs/start": try JSONSupport.data(from: [
+                "run_id": "__REQUEST_RUN_ID__",
+                "project_id": projectID,
+                "project_generation": UInt64(1),
+                "mission": bootstrap,
+                "state": "created",
+                "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
+                "provider_id": "lmstudio",
+                "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                "model_key": "fixture/package-model",
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                "passed_gates": [],
+            ]),
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let viewModel = AutonomyViewModel(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        ))
+
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+        XCTAssertEqual(viewModel.availableInstructionPackages.map(\.id), [packageID])
+        viewModel.toggleInstructionPackage(packageID)
+        XCTAssertTrue(viewModel.canStart)
+        XCTAssertEqual(viewModel.taskDraft.packageIDs, [packageID])
+        XCTAssertTrue(viewModel.taskDraft.quickInstructions.isEmpty)
+        viewModel.startRun()
+        try await Self.waitUntilStartIdle(viewModel)
+
+        XCTAssertNil(viewModel.errorMessage)
+        let body = try JSONSupport.object(from: try XCTUnwrap(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/instruction-artifacts/import"
+            ).first
+        ))
+        XCTAssertEqual(body["package_ids"] as? [String], [packageID])
+        XCTAssertNil(body["source_path"])
+        let paths = OperatorProjectContractURLProtocol.requestedPaths()
+        XCTAssertLessThan(
+            try XCTUnwrap(paths.firstIndex(of: "/api/manager/runs/instruction-artifacts/import")),
+            try XCTUnwrap(paths.firstIndex(of: "/api/manager/runs/prepare"))
+        )
     }
 
     @MainActor
@@ -571,6 +722,7 @@ final class OperatorProjectContractTests: XCTestCase {
             detail: detail,
             recoveryAction: .configureProvider
         )
+        let waitingDigest = String(repeating: "f", count: 64)
         OperatorProjectContractURLProtocol.configure(responses: [
             "/api/manager/operator/snapshot": try JSONSupport.data(from: [
                 "projects": [project],
@@ -593,6 +745,19 @@ final class OperatorProjectContractTests: XCTestCase {
                 "started": true,
                 "active_run_ids": [],
                 "deferred_run_ids": [],
+            ]),
+            "/api/manager/runs/instruction-artifacts/import": try JSONSupport.data(from: [
+                "ok": true,
+                "run_id": "__REQUEST_RUN_ID__",
+                "project_id": projectID,
+                "project_generation": UInt64(1),
+                "mission": "Follow the run instruction artifact. Snapshot: \(waitingDigest)",
+                "source_path": "/private/tmp/waiting-instructions.txt",
+                "content_sha256": waitingDigest,
+                "document_count": 1,
+                "instruction_byte_count": 37,
+                "unresolved_document_count": 0,
+                "created_at": "2026-09-19T00:00:00Z",
             ]),
             "/api/manager/runs/prepare": try JSONSupport.data(from: readiness.asDictionary()),
         ])
@@ -642,6 +807,8 @@ final class OperatorProjectContractTests: XCTestCase {
             ) as? [String: Any]
         )
         let mission = "Continue from the current project generation."
+        let generationDigest = String(repeating: "7", count: 64)
+        let generationBootstrap = "Follow the run instruction artifact. Snapshot: \(generationDigest)"
         let stale = ManagerRunPreparationResult(
             projectID: projectID,
             projectGeneration: 2,
@@ -682,7 +849,7 @@ final class OperatorProjectContractTests: XCTestCase {
                     "run_id": "__REQUEST_RUN_ID__",
                     "project_id": projectID,
                     "project_generation": UInt64(2),
-                    "mission": mission,
+                    "mission": generationBootstrap,
                     "state": "created",
                     "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
                     "provider_id": "lmstudio",
@@ -693,12 +860,40 @@ final class OperatorProjectContractTests: XCTestCase {
                 ]),
             ],
             responseSequences: [
+                "/api/manager/runs/instruction-artifacts/import": [
+                    try JSONSupport.data(from: [
+                        "ok": true,
+                        "run_id": "__REQUEST_RUN_ID__",
+                        "project_id": projectID,
+                        "project_generation": UInt64(1),
+                        "mission": generationBootstrap,
+                        "source_path": "/private/tmp/generation-instructions.txt",
+                        "content_sha256": generationDigest,
+                        "document_count": 1,
+                        "instruction_byte_count": mission.utf8.count,
+                        "unresolved_document_count": 0,
+                        "created_at": "2026-09-19T00:00:00Z",
+                    ]),
+                    try JSONSupport.data(from: [
+                        "ok": true,
+                        "run_id": "__REQUEST_RUN_ID__",
+                        "project_id": projectID,
+                        "project_generation": UInt64(2),
+                        "mission": generationBootstrap,
+                        "source_path": "/private/tmp/generation-instructions.txt",
+                        "content_sha256": generationDigest,
+                        "document_count": 1,
+                        "instruction_byte_count": mission.utf8.count,
+                        "unresolved_document_count": 0,
+                        "created_at": "2026-09-19T00:00:00Z",
+                    ]),
+                ],
                 "/api/manager/runs/prepare": [
                     try JSONSupport.data(from: stale.asDictionary()),
-                    try Self.preparedRunData(
+                    try Self.preparedArtifactRunData(
                         projectID: projectID,
                         generation: 2,
-                        mission: mission,
+                        snapshotSHA256: generationDigest,
                         providerConfigurationRevision: "fixture-generation-provider",
                         modelKey: "fixture/generation-model",
                         allowedTools: ["fs_read"],
@@ -755,6 +950,8 @@ final class OperatorProjectContractTests: XCTestCase {
             ) as? [String: Any]
         )
         let mission = "Replay this exact prepared start."
+        let replayDigest = String(repeating: "9", count: 64)
+        let replayBootstrap = "Follow the run instruction artifact. Snapshot: \(replayDigest)"
         OperatorProjectContractURLProtocol.configure(
             responses: [
                 "/api/manager/operator/snapshot": try JSONSupport.data(from: [
@@ -784,10 +981,23 @@ final class OperatorProjectContractTests: XCTestCase {
                     "active_run_ids": [],
                     "deferred_run_ids": [],
                 ]),
-                "/api/manager/runs/prepare": try Self.preparedRunData(
+                "/api/manager/runs/instruction-artifacts/import": try JSONSupport.data(from: [
+                    "ok": true,
+                    "run_id": "__REQUEST_RUN_ID__",
+                    "project_id": projectID,
+                    "project_generation": UInt64(1),
+                    "mission": replayBootstrap,
+                    "source_path": "/private/tmp/replay-instructions.txt",
+                    "content_sha256": replayDigest,
+                    "document_count": 1,
+                    "instruction_byte_count": mission.utf8.count,
+                    "unresolved_document_count": 0,
+                    "created_at": "2026-09-19T00:00:00Z",
+                ]),
+                "/api/manager/runs/prepare": try Self.preparedArtifactRunData(
                     projectID: projectID,
                     generation: 1,
-                    mission: mission,
+                    snapshotSHA256: replayDigest,
                     providerConfigurationRevision: "fixture-replay-provider",
                     modelKey: "fixture/replay-model",
                     allowedTools: ["fs_read"],
@@ -798,7 +1008,7 @@ final class OperatorProjectContractTests: XCTestCase {
                     "run_id": "__REQUEST_RUN_ID__",
                     "project_id": projectID,
                     "project_generation": UInt64(1),
-                    "mission": mission,
+                    "mission": replayBootstrap,
                     "state": "created",
                     "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
                     "provider_id": "lmstudio",
@@ -1243,7 +1453,12 @@ final class OperatorProjectContractTests: XCTestCase {
     private static func preparedArtifactRunData(
         projectID: String,
         generation: UInt64,
-        snapshotSHA256: String
+        snapshotSHA256: String,
+        providerConfigurationRevision: String = "fixture-artifact-provider",
+        modelKey: String = "fixture/artifact-model",
+        allowedTools: [String] = ["instruction_catalog", "instruction_read"],
+        completionGates: [String] = [ProjectInstructionQueueStore.builtInCompletionGate],
+        networkAllowed: Bool = false
     ) throws -> Data {
         let descriptor = try ManagerPreparedRunDescriptor.make(
             detail: "The exact artifact-backed run inputs are ready.",
@@ -1261,13 +1476,13 @@ final class OperatorProjectContractTests: XCTestCase {
             )],
             providerID: "lmstudio",
             adapterID: ManagerNode.nativeSessionHostAdapterID,
-            modelKey: "fixture/artifact-model",
-            providerConfigurationRevision: "fixture-artifact-provider",
+            modelKey: modelKey,
+            providerConfigurationRevision: providerConfigurationRevision,
             toolCatalogRevision: String(repeating: "a", count: 64),
-            allowedTools: ["instruction_catalog", "instruction_read"],
-            networkAllowed: false,
+            allowedTools: allowedTools,
+            networkAllowed: networkAllowed,
             validationPlan: ManagerPreparedRunValidationPlan(
-                completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+                completionGates: completionGates
             ),
             continuityMode: .managedAutonomous,
             budgetPolicy: BudgetPolicySelection(

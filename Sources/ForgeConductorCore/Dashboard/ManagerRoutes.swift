@@ -899,22 +899,45 @@ public final class ManagerRoutes: @unchecked Sendable {
                 ])
                 return
             }
-            guard Set(object.keys) == [
-                "run_id", "project_id", "project_generation", "source_path",
-            ],
+            let allowedKeys: Set<String> = [
+                "run_id", "project_id", "project_generation", "source_path", "package_ids",
+            ]
+            guard Set(object.keys).isSubset(of: allowedKeys),
+                  Set(object.keys).isSuperset(of: [
+                    "run_id", "project_id", "project_generation",
+                  ]),
                   let runIDValue = object["run_id"] as? String,
-                  let runUUID = UUID(uuidString: runIDValue),
-                  let sourcePath = object["source_path"] as? String else {
+                  let runUUID = UUID(uuidString: runIDValue) else {
                 http.respondJSON(connection, status: 400, object: [
                     "ok": false,
                     "code": "invalid_run_instruction_import",
-                    "message": "Run instruction import requires exact run, project, generation, and source path fields",
+                    "message": "Run instruction import requires exact run, project, and generation fields plus a source or packages",
                 ])
                 return
             }
+            let sourcePath = try optionalString(
+                object,
+                key: "source_path",
+                maximumBytes: 4_096
+            )
+            let rawPackageIDs: [String]
+            if let value = object["package_ids"] {
+                guard let values = value as? [String],
+                      values.count <= ProjectInstructionQueueStore.maximumRunArtifactInputs,
+                      Set(values.map { $0.lowercased() }).count == values.count,
+                      values.allSatisfy({ UUID(uuidString: $0) != nil }) else {
+                    throw AutonomyError.invalidRequest(
+                        "package_ids must contain unique bounded UUID strings"
+                    )
+                }
+                rawPackageIDs = values
+            } else {
+                rawPackageIDs = []
+            }
             do {
-                let artifact = try manager.importRunInstructionArtifact(
+                let artifact = try manager.assembleRunInstructionArtifact(
                     sourcePath: sourcePath,
+                    packageIDs: rawPackageIDs.compactMap(UUID.init(uuidString:)),
                     projectID: try projectID(object),
                     expectedGeneration: try projectGeneration(object),
                     runID: RunID(runUUID)

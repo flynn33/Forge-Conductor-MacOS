@@ -84,14 +84,17 @@ product set.
    nested ZIPs are retained for separate review rather than expanded recursively.
    Large instruction bodies remain in the artifact rather than the run mission;
    managed runs page them through project/run-bound read-only tools.
-6. In **Autonomy**, select the project, then type, paste, drop, or choose a file,
-   folder, or ZIP and select **Start Task**. Inputs above the compact bootstrap
-   boundary and all selected/dropped sources are imported through the same
-   immutable project/run-bound artifact pipeline; prepare and Start carry the
-   artifact digest rather than the full instruction body. Forge uses the saved
-   model plus manager-owned capability and
-   completion defaults; unchanged technical defaults are omitted from the start
-   request and resolved again by the Manager. Optional task label, saved-model
+6. In **Autonomy**, select the project and one or more existing instruction
+   packages in their displayed order, or type, paste, drop, or add a file,
+   folder, or ZIP, then select **Start Task**. A single existing package keeps
+   its exact stored content hash even if the original import path is gone;
+   multiple packages and an optional new source become one deterministic,
+   ordered run artifact. Every quick-text input, regardless of size, is also
+   published through this immutable project/run-bound pipeline. Prepare and
+   Start carry the artifact digest rather than the full instruction body. Forge
+   uses the saved model plus manager-owned capability and completion defaults;
+   unchanged technical defaults are omitted from the start request and resolved
+   again by the Manager. Optional task label, saved-model
    choice, and network authority remain under **Customize**; provider/adapter,
    raw capability IDs, and raw completion-gate IDs are not routine inputs.
    Before admission, Forge prepares an inspectable project-bound

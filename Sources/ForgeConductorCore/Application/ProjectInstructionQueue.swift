@@ -66,6 +66,14 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
         case updatedAt = "updated_at"
     }
 
+    fileprivate var importReadyMetadataAvailable: Bool {
+        guard let documentCount, let instructionByteCount,
+              let unresolvedDocumentCount else { return false }
+        return (1...ProjectInstructionQueueStore.maximumSourceFiles).contains(documentCount)
+            && (0...ProjectInstructionQueueStore.maximumAggregateBytes).contains(instructionByteCount)
+            && (0...documentCount).contains(unresolvedDocumentCount)
+    }
+
     public func asDictionary() -> [String: Any] {
         [
             "id": id.uuidString.lowercased(),
@@ -271,6 +279,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     public static let builtInCompletionGate = "forge.package.tool-success"
     public static let maximumPackages = 4_096
     public static let maximumRunArtifacts = 4_096
+    public static let maximumRunArtifactInputs = 64
     public static let maximumSourceFiles = 4_096
     public static let maximumSourceFileBytes = 128 * 1_048_576
     public static let maximumAggregateBytes = 512 * 1_048_576
@@ -506,27 +515,136 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         generation: ProjectGeneration,
         runID: RunID
     ) throws -> ProjectRunInstructionArtifact {
-        let ingested = try Self.ingest(sourceURL: sourceURL, projectID: projectID)
-        let snapshotURL = paths.instructionPackageStoreDir.appendingPathComponent(
-            ingested.digest, isDirectory: true
+        try assembleRunArtifact(
+            sourceURL: sourceURL,
+            packageIDs: [],
+            projectID: projectID,
+            generation: generation,
+            runID: runID
         )
-        let published = try Self.publish(ingested, storeRoot: paths.instructionPackageStoreDir)
+    }
+
+    /// Binds an ordered selection of already-published project packages and an
+    /// optional newly imported source to one immutable, run-scoped artifact.
+    /// A single existing package retains its exact content hash. Multiple
+    /// inputs produce a deterministic composite snapshot whose document order
+    /// follows `packageIDs`, with the new source (when present) appended last.
+    @discardableResult
+    public func assembleRunArtifact(
+        sourceURL: URL?,
+        packageIDs: [UUID],
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        runID: RunID
+    ) throws -> ProjectRunInstructionArtifact {
+        guard (!packageIDs.isEmpty || sourceURL != nil),
+              packageIDs.count <= Self.maximumRunArtifactInputs,
+              Set(packageIDs).count == packageIDs.count else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Choose one through \(Self.maximumRunArtifactInputs) unique instruction inputs."
+            )
+        }
+        let imported = try sourceURL.map {
+            try Self.ingest(sourceURL: $0, projectID: projectID)
+        }
         lock.lock(); defer { lock.unlock() }
-        if let existing = state.runArtifacts.first(where: { $0.runID == runID }) {
+        let packageByID: [UUID: ProjectInstructionPackage] = Dictionary(
+            uniqueKeysWithValues: state.packages.compactMap { package in
+            guard package.projectID == projectID,
+                  package.projectGeneration == generation else { return nil }
+            return (package.id, package)
+        })
+        let packages = try packageIDs.map { packageID in
+            guard let package = packageByID[packageID] else {
+                throw ProjectInstructionQueueError.packageNotFound(packageID)
+            }
+            guard package.unresolvedDocumentCount == 0,
+                  package.importReadyMetadataAvailable else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "Re-import \(package.displayName) after resolving its unsupported documents before using it in a task."
+                )
+            }
+            return package
+        }
+
+        let ingested: IngestedPackage?
+        let mission: String
+        let sourcePath: String
+        let contentSHA256: String
+        let documentCount: Int
+        let instructionByteCount: Int
+        let unresolvedDocumentCount: Int
+        if packages.count == 1, imported == nil, let package = packages.first {
+            ingested = nil
+            mission = package.mission
+            sourcePath = package.sourcePath
+            contentSHA256 = package.contentSHA256
+            documentCount = package.documentCount ?? 0
+            instructionByteCount = package.instructionByteCount ?? 0
+            unresolvedDocumentCount = package.unresolvedDocumentCount ?? 0
+        } else if packages.isEmpty, let imported {
+            ingested = imported
+            mission = imported.mission
+            sourcePath = imported.sourcePath
+            contentSHA256 = imported.digest
+            documentCount = imported.documents.count
+            instructionByteCount = imported.instructionByteCount
+            unresolvedDocumentCount = imported.unresolvedDocumentCount
+        } else {
+            let composite = try compositeRunPackage(
+                packages: packages,
+                imported: imported,
+                projectID: projectID
+            )
+            ingested = composite
+            mission = composite.mission
+            sourcePath = paths.instructionPackageStoreDir
+                .appendingPathComponent(composite.digest, isDirectory: true).path
+            contentSHA256 = composite.digest
+            documentCount = composite.documents.count
+            instructionByteCount = composite.instructionByteCount
+            unresolvedDocumentCount = composite.unresolvedDocumentCount
+        }
+
+        let snapshotURL = paths.instructionPackageStoreDir.appendingPathComponent(
+            contentSHA256, isDirectory: true
+        )
+        let published = try ingested.map {
+            try Self.publish($0, storeRoot: paths.instructionPackageStoreDir)
+        } ?? false
+        if let existingIndex = state.runArtifacts.firstIndex(where: { $0.runID == runID }) {
+            let existing = state.runArtifacts[existingIndex]
             guard existing.projectID == projectID,
-                  existing.projectGeneration == generation,
-                  existing.contentSHA256 == ingested.digest else {
-                if published, !isDigestReferencedUnlocked(ingested.digest) {
+                  existing.contentSHA256 == contentSHA256 else {
+                if published, !isDigestReferencedUnlocked(contentSHA256) {
                     try? FileManager.default.removeItem(at: snapshotURL)
                 }
                 throw ProjectInstructionQueueError.invalidRequest(
                     "The run identifier is already bound to a different instruction artifact."
                 )
             }
+            if existing.projectGeneration != generation {
+                let rebound = ProjectRunInstructionArtifact(
+                    runID: runID,
+                    projectID: projectID,
+                    projectGeneration: generation,
+                    mission: mission,
+                    sourcePath: sourcePath,
+                    contentSHA256: contentSHA256,
+                    documentCount: documentCount,
+                    instructionByteCount: instructionByteCount,
+                    unresolvedDocumentCount: unresolvedDocumentCount,
+                    createdAt: existing.createdAt
+                )
+                let prior = state
+                state.runArtifacts[existingIndex] = rebound
+                try commitUnlocked(restoring: prior)
+                return rebound
+            }
             return existing
         }
         guard state.runArtifacts.count < Self.maximumRunArtifacts else {
-            if published, !isDigestReferencedUnlocked(ingested.digest) {
+            if published, !isDigestReferencedUnlocked(contentSHA256) {
                 try? FileManager.default.removeItem(at: snapshotURL)
             }
             throw ProjectInstructionQueueError.invalidRequest(
@@ -537,12 +655,12 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             runID: runID,
             projectID: projectID,
             projectGeneration: generation,
-            mission: ingested.mission,
-            sourcePath: ingested.sourcePath,
-            contentSHA256: ingested.digest,
-            documentCount: ingested.documents.count,
-            instructionByteCount: ingested.instructionByteCount,
-            unresolvedDocumentCount: ingested.unresolvedDocumentCount,
+            mission: mission,
+            sourcePath: sourcePath,
+            contentSHA256: contentSHA256,
+            documentCount: documentCount,
+            instructionByteCount: instructionByteCount,
+            unresolvedDocumentCount: unresolvedDocumentCount,
             createdAt: ISO8601.string(from: clock.now())
         )
         let prior = state
@@ -550,7 +668,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         do {
             try commitUnlocked(restoring: prior)
         } catch {
-            if published, !isDigestReferencedUnlocked(ingested.digest) {
+            if published, !isDigestReferencedUnlocked(contentSHA256) {
                 try? FileManager.default.removeItem(at: snapshotURL)
             }
             throw error
@@ -1185,6 +1303,137 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             && artifact.instructionByteCount <= maximumAggregateBytes
             && (0...artifact.documentCount).contains(artifact.unresolvedDocumentCount)
             && artifact.createdAt.utf8.count <= 64
+    }
+
+    private func compositeRunPackage(
+        packages: [ProjectInstructionPackage],
+        imported: IngestedPackage?,
+        projectID: ProjectID
+    ) throws -> IngestedPackage {
+        var documents: [IngestedDocument] = []
+        var labels: [String] = []
+        for (index, package) in packages.enumerated() {
+            labels.append(package.displayName)
+            let prefix = String(format: "%03d-%@", index + 1, Self.slug(package.displayName))
+            let stored = try storedDocuments(
+                contentSHA256: package.contentSHA256,
+                pathPrefix: prefix
+            )
+            guard documents.count <= Self.maximumSourceFiles - stored.count else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "The selected packages contain more than \(Self.maximumSourceFiles) documents."
+                )
+            }
+            documents.append(contentsOf: stored)
+        }
+        if let imported {
+            labels.append(imported.displayName)
+            let prefix = String(
+                format: "%03d-%@",
+                packages.count + 1,
+                Self.slug(imported.displayName)
+            )
+            guard documents.count <= Self.maximumSourceFiles - imported.documents.count else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "The selected instructions contain more than \(Self.maximumSourceFiles) documents."
+                )
+            }
+            documents.append(contentsOf: imported.documents.map { document in
+                IngestedDocument(
+                    path: "\(prefix)/\(document.path)",
+                    original: document.original,
+                    canonicalText: document.canonicalText,
+                    encoding: document.encoding,
+                    converter: document.converter,
+                    status: document.status,
+                    detail: document.detail
+                )
+            })
+        }
+        let orderedSummary = labels.enumerated().map { index, label in
+            "\(index + 1). \(label)"
+        }.joined(separator: "\n")
+        let goal = try Self.boundedBootstrapGoal(
+            "Follow these selected instruction artifacts in order:\n\(orderedSummary)"
+        )
+        return try Self.makePackage(
+            packageID: "run-instructions",
+            version: "1",
+            displayName: "Task Instructions",
+            sourcePath: paths.instructionPackageStoreDir.path,
+            bootstrapGoal: goal,
+            allowedTools: Self.ordinaryDefaultAllowedTools,
+            completionGates: [Self.builtInCompletionGate],
+            documents: documents
+        )
+    }
+
+    private func storedDocuments(
+        contentSHA256: String,
+        pathPrefix: String
+    ) throws -> [IngestedDocument] {
+        let root = paths.instructionPackageStoreDir
+            .appendingPathComponent(contentSHA256, isDirectory: true)
+            .standardizedFileURL
+        guard let catalog = try Self.storedCatalog(root: root),
+              catalog.contentSHA256 == contentSHA256 else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "This legacy instruction snapshot must be re-imported before it can be selected for a task."
+            )
+        }
+        return try catalog.documents.map { document in
+            let originalURL = root.appendingPathComponent(document.originalReference)
+                .standardizedFileURL
+            guard try Self.relativePath(originalURL, root: root) == document.originalReference else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction snapshot source escaped its content-addressed root"
+                )
+            }
+            let original = try OwnerOnlyAtomicFile.read(
+                from: originalURL,
+                maximumBytes: Self.maximumSourceFileBytes
+            )
+            guard original.count == document.originalByteCount,
+                  JSONSupport.sha256Hex(original) == document.originalSHA256 else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction snapshot source integrity verification failed"
+                )
+            }
+            let canonicalText: String?
+            if let reference = document.canonicalReference,
+               let byteCount = document.canonicalByteCount,
+               let sha256 = document.canonicalSHA256 {
+                let canonicalURL = root.appendingPathComponent(reference).standardizedFileURL
+                guard try Self.relativePath(canonicalURL, root: root) == reference else {
+                    throw ProjectInstructionQueueError.storageFailure(
+                        "canonical instruction escaped its content-addressed root"
+                    )
+                }
+                let data = try OwnerOnlyAtomicFile.read(
+                    from: canonicalURL,
+                    maximumBytes: Self.maximumSourceFileBytes
+                )
+                guard data.count == byteCount,
+                      JSONSupport.sha256Hex(data) == sha256,
+                      let text = String(data: data, encoding: .utf8) else {
+                    throw ProjectInstructionQueueError.storageFailure(
+                        "canonical instruction integrity verification failed"
+                    )
+                }
+                canonicalText = text
+            } else {
+                canonicalText = nil
+            }
+            return IngestedDocument(
+                path: "\(pathPrefix)/\(document.sourcePath)",
+                original: original,
+                canonicalText: canonicalText,
+                encoding: document.encoding,
+                converter: document.converter,
+                status: document.status,
+                detail: document.detail
+            )
+        }
     }
 
     private func removeSnapshotIfUnreferencedUnlocked(_ digest: String) {

@@ -1142,7 +1142,11 @@ final class ManagerTests: XCTestCase {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
             let (data, response) = try HTTPTestHelpers.fetch(request)
-            XCTAssertEqual(response.statusCode, expectedStatus)
+            XCTAssertEqual(
+                response.statusCode,
+                expectedStatus,
+                String(data: data, encoding: .utf8) ?? "non-UTF-8 response"
+            )
             return try JSONSupport.object(from: data)
         }
         let projectRequest: [String: Any] = [
@@ -1178,7 +1182,33 @@ final class ManagerTests: XCTestCase {
         let importedPackages = try XCTUnwrap(secondImport["packages"] as? [[String: Any]])
         XCTAssertEqual(importedPackages.map { $0["display_name"] as? String }, ["first", "second"])
         let importedIDs = try importedPackages.map { try XCTUnwrap($0["id"] as? String) }
-        let revision = try XCTUnwrap((secondImport["revision"] as? NSNumber)?.uint64Value)
+        try FileManager.default.removeItem(at: firstDocument)
+        try FileManager.default.removeItem(at: secondDocument)
+
+        let artifactRunID = UUID().uuidString.lowercased()
+        let selectedArtifact = try post(
+            "/api/manager/runs/instruction-artifacts/import",
+            projectRequest.merging([
+                "run_id": artifactRunID,
+                "package_ids": Array(importedIDs.reversed()),
+            ]) { _, value in value },
+            expectedStatus: 201
+        )
+        XCTAssertEqual(selectedArtifact["run_id"] as? String, artifactRunID)
+        XCTAssertEqual(selectedArtifact["document_count"] as? Int, 2)
+        XCTAssertEqual((selectedArtifact["content_sha256"] as? String)?.count, 64)
+        XCTAssertTrue(
+            (selectedArtifact["mission"] as? String)?.contains(
+                "selected instruction artifacts in order"
+            ) == true
+        )
+        let queueAfterArtifact = try post(
+            "/api/manager/projects/instruction-packages",
+            projectRequest
+        )
+        let revision = try XCTUnwrap(
+            (queueAfterArtifact["revision"] as? NSNumber)?.uint64Value
+        )
 
         let reordered = try post(
             "/api/manager/projects/instruction-packages/reorder",

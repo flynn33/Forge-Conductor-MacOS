@@ -784,6 +784,22 @@ enum OperatorRunControlAction: String, Encodable, Sendable, Equatable, CaseItera
     case checkpoint, rollover
 }
 
+struct AutonomyTaskDraft: Sendable, Equatable {
+    var projectID: String?
+    var packageIDs: [String]
+    var quickInstructions: String
+    var localImportPath: String?
+    var optionalAssignmentLabel: String?
+    var networkAllowed: Bool
+    var modelOverride: String?
+
+    var hasInstructionInput: Bool {
+        !packageIDs.isEmpty
+            || localImportPath != nil
+            || !quickInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let runID: String
     let projectID: String
@@ -792,6 +808,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let mission: String
     let instructionArtifactSHA256: String?
     let localInstructionSourcePath: String?
+    let localInstructionPackageIDs: [String]
+    let localQuickInstructions: String?
     let providerID: String?
     let adapterID: String?
     let modelKey: String?
@@ -811,6 +829,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         mission: String,
         instructionArtifactSHA256: String? = nil,
         localInstructionSourcePath: String? = nil,
+        localInstructionPackageIDs: [String] = [],
+        localQuickInstructions: String? = nil,
         providerID: String?,
         adapterID: String?,
         modelKey: String?,
@@ -829,6 +849,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         self.mission = mission
         self.instructionArtifactSHA256 = instructionArtifactSHA256
         self.localInstructionSourcePath = localInstructionSourcePath
+        self.localInstructionPackageIDs = localInstructionPackageIDs
+        self.localQuickInstructions = localQuickInstructions
         self.providerID = providerID
         self.adapterID = adapterID
         self.modelKey = modelKey
@@ -869,6 +891,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             mission: mission,
             instructionArtifactSHA256: instructionArtifactSHA256,
             localInstructionSourcePath: localInstructionSourcePath,
+            localInstructionPackageIDs: localInstructionPackageIDs,
+            localQuickInstructions: localQuickInstructions,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -891,6 +915,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             mission: mission,
             instructionArtifactSHA256: instructionArtifactSHA256,
             localInstructionSourcePath: localInstructionSourcePath,
+            localInstructionPackageIDs: localInstructionPackageIDs,
+            localQuickInstructions: localQuickInstructions,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -913,6 +939,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             mission: mission,
             instructionArtifactSHA256: instructionArtifactSHA256,
             localInstructionSourcePath: localInstructionSourcePath,
+            localInstructionPackageIDs: localInstructionPackageIDs,
+            localQuickInstructions: localQuickInstructions,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
@@ -926,6 +954,30 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         )
     }
 
+    func replacingProjectGenerationForInstructionReassembly(_ generation: UInt64) -> Self {
+        Self(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: generation,
+            assignmentID: assignmentID,
+            mission: localQuickInstructions ?? mission,
+            instructionArtifactSHA256: nil,
+            localInstructionSourcePath: localInstructionSourcePath,
+            localInstructionPackageIDs: localInstructionPackageIDs,
+            localQuickInstructions: localQuickInstructions,
+            providerID: providerID,
+            adapterID: adapterID,
+            modelKey: modelKey,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
+            networkAllowed: networkAllowed,
+            expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
+            expectedToolCatalogRevision: expectedToolCatalogRevision,
+            expectedPreparedRunRevision: nil,
+            maximumInlineOutputBytes: maximumInlineOutputBytes
+        )
+    }
+
     func usingInstructionArtifact(_ artifact: ProjectRunInstructionArtifact) -> Self {
         Self(
             runID: runID,
@@ -935,6 +987,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             mission: artifact.mission,
             instructionArtifactSHA256: artifact.contentSHA256,
             localInstructionSourcePath: localInstructionSourcePath,
+            localInstructionPackageIDs: localInstructionPackageIDs,
+            localQuickInstructions: localQuickInstructions,
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,

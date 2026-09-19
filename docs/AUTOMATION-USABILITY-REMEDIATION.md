@@ -154,6 +154,26 @@ automatic continuity, completion, and recovery before placing run, project,
 provider, session, operation, and lease identifiers under **Technical
 details**.
 
+## Revision-3 instruction-artifact task source
+
+Start Task now loads the selected project's imported instruction packages and
+lets the operator choose one or more in their visible queue order. A single
+selection binds the direct run to the package's existing immutable SHA-256; it
+does not reopen the original source path. Multiple selections, plus an optional
+new file/folder/ZIP or quick-text source, are integrity-checked and published as
+one deterministic ordered composite snapshot. Package and aggregate bounds,
+unresolved-document rejection, project/generation/run scoping, and catalog/read
+tool contracts remain unchanged.
+
+`AutonomyTaskDraft` is the typed presentation model for project identity,
+ordered package identities, quick text or local import, optional task label,
+network authority, and model choice. Only the selected project and at least one
+instruction input are required. Quick text of every size is staged off the main
+actor in an owner-only temporary directory and removed after import. A changed
+project generation reassembles a still-valid local or quick-text artifact under
+the same client run UUID before preparation is retried; a selected package from
+an obsolete generation remains fenced rather than silently rebound.
+
 ## Implemented M3 artifact-storage slice
 
 Instruction import no longer concatenates source bodies into the 32 KiB run
@@ -198,8 +218,9 @@ favor of reference-aware removal. The current explicit safety budgets are
 window; these are resource
 backpressure limits rather than instructions-authoring limits.
 
-Autonomy now gives typed/pasted instructions, selected files/folders/ZIPs, and
-dropped sources the same artifact semantics as queue import. Large pasted text
+Autonomy now gives typed/pasted instructions, selected project packages,
+selected files/folders/ZIPs, and dropped sources the same artifact semantics as
+queue import. Pasted text of every size
 is staged off the main actor in a fresh owner-only directory and removed after
 the authenticated import response. Each direct artifact is durably bound to its
 exact project, generation, and run UUID without entering or reordering the
@@ -221,6 +242,18 @@ and the source-bound candidate remain M6 and M7.
 
 ## Verification
 
+- AU-01 focused verification covers exact-hash selection after deleting the
+  original source, ordered multi-package composition, idempotent run binding,
+  authenticated package-ID transport, concise quick-text artifact publication,
+  selected-file import, preparation-before-start ordering, stale-generation
+  reassembly, and exact lost-response replay. The full 20-test instruction
+  queue suite and 10-test operator contract suite pass; the authenticated
+  manager route case also passes. Three focused signed native UI cases pass:
+  an existing package alone enables Start through a native checkbox, ordinary
+  Start retains its compact typed surface, and uncertain Start reuses its exact
+  client run identity. Both SwiftPM products and the canonical Apple
+  Development-signed Debug Xcode build pass. Exact receipts and the retained
+  non-passing UI attempts are recorded in the roadmap.
 - Four focused signed native UI cases verify that ordinary Start has no raw
   technical editors, Customize exposes only typed task/model/network controls,
   the reusable permission editor retains mouse/keyboard/mixed-state and relaunch

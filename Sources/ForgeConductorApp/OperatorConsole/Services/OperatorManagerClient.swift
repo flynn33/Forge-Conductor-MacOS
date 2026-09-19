@@ -27,6 +27,13 @@ protocol OperatorManagerClientProtocol: Sendable {
         runID: String,
         sourcePath: String
     ) async throws -> ProjectRunInstructionArtifact
+    func assembleRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        packageIDs: [String],
+        sourcePath: String?
+    ) async throws -> ProjectRunInstructionArtifact
     func reorderInstructionPackages(
         projectID: String,
         generation: UInt64,
@@ -122,6 +129,26 @@ extension OperatorManagerClientProtocol {
     ) async throws -> ProjectRunInstructionArtifact {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Run instruction artifact import is unavailable from this manager client."
+        )
+    }
+
+    func assembleRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        packageIDs: [String],
+        sourcePath: String?
+    ) async throws -> ProjectRunInstructionArtifact {
+        guard packageIDs.isEmpty, let sourcePath else {
+            throw OperatorManagerClientError.capabilityUnavailable(
+                "Selecting existing instruction packages is unavailable from this manager client."
+            )
+        }
+        return try await importRunInstructionArtifact(
+            projectID: projectID,
+            generation: generation,
+            runID: runID,
+            sourcePath: sourcePath
         )
     }
 
@@ -446,7 +473,8 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                 runID: runID,
                 projectID: projectID,
                 projectGeneration: generation,
-                sourcePath: sourcePath
+                sourcePath: sourcePath,
+                packageIDs: nil
             ),
             timeoutInterval: 20
         )
@@ -455,6 +483,56 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
               artifact.projectGeneration.rawValue == generation else {
             throw OperatorManagerClientError.invalidPayload(
                 "manager returned an instruction artifact for a different run or project generation"
+            )
+        }
+        return artifact
+    }
+
+    func assembleRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        packageIDs: [String],
+        sourcePath: String?
+    ) async throws -> ProjectRunInstructionArtifact {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        guard UUID(uuidString: runID) != nil,
+              packageIDs.count <= ProjectInstructionQueueStore.maximumRunArtifactInputs,
+              Set(packageIDs.map { $0.lowercased() }).count == packageIDs.count,
+              packageIDs.allSatisfy({ UUID(uuidString: $0) != nil }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "run instruction assembly requires a run UUID and unique package UUIDs"
+            )
+        }
+        if let sourcePath {
+            guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
+                  (sourcePath as NSString).isAbsolutePath else {
+                throw OperatorManagerClientError.invalidPayload(
+                    "run instruction artifact path must be a bounded absolute path"
+                )
+            }
+        } else if packageIDs.isEmpty {
+            throw OperatorManagerClientError.invalidPayload(
+                "run instruction assembly requires a package or imported source"
+            )
+        }
+        let artifact: ProjectRunInstructionArtifact = try await request(
+            method: "POST",
+            path: "/api/manager/runs/instruction-artifacts/import",
+            body: RunInstructionArtifactImportBody(
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: generation,
+                sourcePath: sourcePath,
+                packageIDs: packageIDs.isEmpty ? nil : packageIDs
+            ),
+            timeoutInterval: 20
+        )
+        guard artifact.runID.description == runID.lowercased(),
+              artifact.projectID.description == projectID.lowercased(),
+              artifact.projectGeneration.rawValue == generation else {
+            throw OperatorManagerClientError.invalidPayload(
+                "run instruction artifact identity did not match the request"
             )
         }
         return artifact
@@ -1042,6 +1120,22 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         )
     }
 
+    func assembleRunInstructionArtifact(
+        projectID: String,
+        generation: UInt64,
+        runID: String,
+        packageIDs: [String],
+        sourcePath: String?
+    ) async throws -> ProjectRunInstructionArtifact {
+        try await current.assembleRunInstructionArtifact(
+            projectID: projectID,
+            generation: generation,
+            runID: runID,
+            packageIDs: packageIDs,
+            sourcePath: sourcePath
+        )
+    }
+
     func reorderInstructionPackages(projectID: String, generation: UInt64, packageIDs: [String], expectedRevision: UInt64) async throws -> OperatorInstructionQueue {
         try await current.reorderInstructionPackages(
             projectID: projectID,
@@ -1185,12 +1279,14 @@ private struct RunInstructionArtifactImportBody: Encodable {
     let runID: String
     let projectID: String
     let projectGeneration: UInt64
-    let sourcePath: String
+    let sourcePath: String?
+    let packageIDs: [String]?
     enum CodingKeys: String, CodingKey {
         case runID = "run_id"
         case projectID = "project_id"
         case projectGeneration = "project_generation"
         case sourcePath = "source_path"
+        case packageIDs = "package_ids"
     }
 }
 

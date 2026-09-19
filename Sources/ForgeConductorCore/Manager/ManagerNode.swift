@@ -1691,15 +1691,45 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         expectedGeneration: ProjectGeneration,
         runID: RunID
     ) throws -> [String: Any] {
-        guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
-              (sourcePath as NSString).isAbsolutePath else {
+        try assembleRunInstructionArtifact(
+            sourcePath: sourcePath,
+            packageIDs: [],
+            projectID: projectID,
+            expectedGeneration: expectedGeneration,
+            runID: runID
+        )
+    }
+
+    @discardableResult
+    public func assembleRunInstructionArtifact(
+        sourcePath: String?,
+        packageIDs: [UUID],
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        runID: RunID
+    ) throws -> [String: Any] {
+        guard packageIDs.count <= ProjectInstructionQueueStore.maximumRunArtifactInputs,
+              Set(packageIDs).count == packageIDs.count else {
             throw ProjectInstructionQueueError.invalidRequest(
-                "Run instruction import requires one bounded absolute path."
+                "Run instruction assembly requires unique bounded package identities."
+            )
+        }
+        if let sourcePath {
+            guard !sourcePath.isEmpty, sourcePath.utf8.count <= 4_096,
+                  (sourcePath as NSString).isAbsolutePath else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "Run instruction import requires one bounded absolute path."
+                )
+            }
+        } else if packageIDs.isEmpty {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Run instruction assembly requires a selected package or imported source."
             )
         }
         try requireActiveProject(projectID, generation: expectedGeneration)
-        let artifact = try instructionQueueStore().importRunArtifact(
-            sourceURL: URL(fileURLWithPath: sourcePath),
+        let artifact = try instructionQueueStore().assembleRunArtifact(
+            sourceURL: sourcePath.map { URL(fileURLWithPath: $0) },
+            packageIDs: packageIDs,
             projectID: projectID,
             generation: expectedGeneration,
             runID: runID
@@ -1710,6 +1740,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 "project_id": projectID.description,
                 "run_id": runID.description,
                 "snapshot_sha256": artifact.contentSHA256,
+                "selected_package_count": String(packageIDs.count),
             ],
             category: .manager
         )

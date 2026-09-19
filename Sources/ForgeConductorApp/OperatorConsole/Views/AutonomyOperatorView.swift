@@ -270,31 +270,73 @@ struct AutonomyOperatorView: View {
             .accessibilityIdentifier("run-start-project")
             .onChange(of: viewModel.selectedProjectID) { _, _ in
                 viewModel.refreshToolPermissionsForSelection()
+                viewModel.refreshInstructionArtifactsForSelection()
             }
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("Instructions", text: $viewModel.mission, axis: .vertical)
+            GroupBox("Instructions") {
+                VStack(alignment: .leading, spacing: 9) {
+                    if viewModel.availableInstructionPackages.isEmpty {
+                        Text("No imported project packages are available. Add a file, folder, ZIP, or quick instructions below.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("run-start-no-project-packages")
+                    } else {
+                        Text("Selected project packages")
+                            .font(.caption.weight(.semibold))
+                        ForEach(viewModel.availableInstructionPackages) { package in
+                            Toggle(
+                                isOn: Binding(
+                                    get: { viewModel.selectedInstructionPackageIDs.contains(package.id) },
+                                    set: { viewModel.setInstructionPackage(package.id, selected: $0) }
+                                )
+                            ) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(package.displayName)
+                                        Text("\(package.documentCount ?? 0) documents · \(package.state)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                            .disabled(package.importReady == false)
+                            .accessibilityIdentifier("run-start-package-\(package.id)")
+                        }
+                        Text("\(viewModel.selectedInstructionPackageIDs.count) selected")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("run-start-package-selection-count")
+                    }
+
+                    Divider()
+                    TextField("Optional quick instructions", text: $viewModel.mission, axis: .vertical)
                     .lineLimit(2...5)
                     .disabled(viewModel.instructionSourcePath != nil)
                     .accessibilityIdentifier("run-start-mission")
-                HStack {
-                    Button("Choose File or Folder…") {
-                        viewModel.chooseInstructionSource()
-                    }
-                    .accessibilityIdentifier("run-start-choose-instructions")
-                    if let sourceName = viewModel.instructionSourceName {
-                        Label(sourceName, systemImage: "doc.badge.checkmark")
-                            .lineLimit(1)
-                        Button("Remove") {
-                            viewModel.clearInstructionSource()
+                    HStack {
+                        Button("Add Instructions…") {
+                            viewModel.chooseInstructionSource()
                         }
-                        .accessibilityIdentifier("run-start-remove-instructions")
-                    } else {
-                        Text("Drop a file, folder, or ZIP here")
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("run-start-instruction-drop-target")
+                        .accessibilityIdentifier("run-start-choose-instructions")
+                        if let sourceName = viewModel.instructionSourceName {
+                            Label(sourceName, systemImage: "doc.badge.checkmark")
+                                .lineLimit(1)
+                            Button("Remove") {
+                                viewModel.clearInstructionSource()
+                            }
+                            .accessibilityIdentifier("run-start-remove-instructions")
+                        } else {
+                            Text("or drop a file, folder, or ZIP here")
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-start-instruction-drop-target")
+                        }
                     }
+                    .font(.caption)
+                    Text("Forge publishes quick text and added sources as immutable artifacts. Selected packages retain their stored content identity and displayed order.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .font(.caption)
             }
             .contentShape(Rectangle())
             .dropDestination(for: URL.self) { urls, _ in

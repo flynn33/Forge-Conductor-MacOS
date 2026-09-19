@@ -188,6 +188,84 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
     }
 
+    func testSelectedPackagesBindByImmutableHashAndComposeInVisibleOrder() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let firstSource = fixture.external.appendingPathComponent("First.md")
+        let secondSource = fixture.external.appendingPathComponent("Second.md")
+        try "First selected requirement.".write(
+            to: firstSource, atomically: true, encoding: .utf8
+        )
+        try "Second selected requirement.".write(
+            to: secondSource, atomically: true, encoding: .utf8
+        )
+        var queue = try fixture.store.importPackage(
+            sourceURL: firstSource,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        queue = try fixture.store.importPackage(
+            sourceURL: secondSource,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let first = try XCTUnwrap(queue.packages.first)
+        let second = try XCTUnwrap(queue.packages.last)
+        try FileManager.default.removeItem(at: firstSource)
+        try FileManager.default.removeItem(at: secondSource)
+
+        let singleRunID = RunID()
+        let single = try fixture.store.assembleRunArtifact(
+            sourceURL: nil,
+            packageIDs: [first.id],
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: singleRunID
+        )
+        XCTAssertEqual(single.contentSHA256, first.contentSHA256)
+        XCTAssertEqual(single.documentCount, first.documentCount)
+
+        let orderedRunID = RunID()
+        let ordered = try fixture.store.assembleRunArtifact(
+            sourceURL: nil,
+            packageIDs: [second.id, first.id],
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: orderedRunID
+        )
+        XCTAssertNotEqual(ordered.contentSHA256, first.contentSHA256)
+        XCTAssertNotEqual(ordered.contentSHA256, second.contentSHA256)
+        XCTAssertEqual(ordered.documentCount, 2)
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: ordered.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: orderedRunID,
+            cursor: 0,
+            limit: 10
+        )
+        XCTAssertEqual(catalog.totalDocuments, 2)
+        XCTAssertTrue(catalog.documents[0]["source_path"]?.contains("Second") == true)
+        XCTAssertTrue(catalog.documents[1]["source_path"]?.contains("First") == true)
+        XCTAssertEqual(
+            try fixture.store.assembleRunArtifact(
+                sourceURL: nil,
+                packageIDs: [second.id, first.id],
+                projectID: fixture.projectID,
+                generation: .initial,
+                runID: orderedRunID
+            ),
+            ordered
+        )
+        XCTAssertThrowsError(try fixture.store.assembleRunArtifact(
+            sourceURL: nil,
+            packageIDs: [first.id, second.id],
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: orderedRunID
+        ))
+    }
+
     func testHiddenAndLargeDirectoryInventoryExceedsOldLimits() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
