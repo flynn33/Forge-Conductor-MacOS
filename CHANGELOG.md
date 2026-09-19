@@ -55,6 +55,10 @@ Product versions do not by themselves claim shipment.
   or encrypted content remains preserved with an actionable unresolved state
   that prevents execution; legacy queue metadata migrates without losing
   package identity, ordering, or snapshots.
+- Added bounded ZIP instruction import. Forge inventories the central directory,
+  rejects traversal, links, encryption, unsupported compression, excessive
+  expansion, and mismatched extraction results before accepting content, and
+  retains nested archives without recursively expanding them.
 
 ### Pending qualification
 

@@ -77,8 +77,11 @@ product set.
 5. Add instruction packages to the registered project. Files are admitted by
    inspected content rather than a filename whitelist. Forge preserves the
    originals, normalizes UTF-8/UTF-16 and supported native PDF, DOCX, RTF, and
-   HTML text into an immutable catalog, includes hidden files in folder
+   HTML text into an immutable catalog, includes hidden files in folder and ZIP
    inventories, and reports opaque or malformed content instead of dropping it.
+   ZIPs are preflighted for traversal, links, encryption, unsupported
+   compression, excessive expansion, and bounded size before native extraction;
+   nested ZIPs are retained for separate review rather than expanded recursively.
    Large instruction bodies remain in the artifact rather than the run mission;
    managed runs page them through project/run-bound read-only tools.
 6. In **Autonomy**, select the project, enter the instructions, and choose
@@ -109,7 +112,8 @@ The **Projects** tab exposes the complete registration lifecycle:
 
 - **Register Project…** selects a folder with the native picker.
 - **Enter Project Path…** accepts a validated absolute path.
-- **Add Instructions…** accepts a file or folder in its current format, shows
+- **Add Instructions…** accepts a file, folder, or bounded ZIP in its current
+  format, shows
   converted document/byte counts, and prevents queue start when required source
   content remains unresolved.
 - Both registration actions authorize only the selected canonical folder and

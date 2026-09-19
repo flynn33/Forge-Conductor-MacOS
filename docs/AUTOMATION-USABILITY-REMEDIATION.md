@@ -151,6 +151,14 @@ no-instructions error. Opaque, malformed, encrypted, or image-only content is
 retained byte-for-byte and reported unresolved rather than silently omitted or
 misrepresented as understood; an unresolved next package cannot start.
 
+ZIP containers are inspected before extraction. Import rejects unsafe or
+duplicate paths, links and unsupported filesystem entries, encryption,
+unsupported compression, excessive entry/expanded size or expansion ratios,
+and local/central header disagreement. The native macOS `ditto` facility runs
+only after preflight under a bounded deadline, and Forge compares the extracted
+file inventory and sizes with the inspected container. Nested ZIPs are retained
+unresolved for separate bounded import rather than recursively expanded.
+
 The registered read-only `instruction_catalog` and `instruction_read` tools
 require the active project, generation, and run identity. Catalog results page;
 document reads use bounded byte windows, validate hashes and UTF-8 cursor
@@ -168,9 +176,9 @@ favor of reference-aware removal. The current explicit safety budgets are
 64 MiB queue metadata, and 64 KiB per delivery window; these are resource
 backpressure limits rather than instructions-authoring limits.
 
-This slice closes the artifact-backed text/rich-document storage and scoped
-retrieval foundation of M3. Safe ZIP-container extraction, paste/drop parity,
-durable delivery progress and token-aware planning, catalog/history paging
+This slice closes the artifact-backed text/rich-document and bounded ZIP storage
+and scoped-retrieval foundation of M3. Paste/drop parity, durable delivery
+progress and token-aware planning, catalog/history paging
 beyond the transitional queue metadata budget, and decisive non-text asset
 representation remain open before M3 can be declared complete.
 
@@ -222,12 +230,14 @@ and the source-bound candidate remain M6 and M7.
   provider/catalog/budget revisions, continuity mode, and immutable package
   snapshot hash. The storage regression independently hashes the accepted
   owner-only document after the original source changes.
-- Fifteen instruction-queue tests cover the 1/32,767/32,768/32,769-byte
+- Eighteen instruction-queue tests cover the 1/32,767/32,768/32,769-byte
   boundaries and a 1.1 MiB file, a 66-document folder above 8 MiB including a
   hidden file, UTF-16 and multi-scalar seven-byte delivery windows, exact
   reassembly, native RTF/HTML/DOCX conversion, malformed PDF and opaque-binary
-  unresolved states, project/generation/run isolation, schema-1 queue migration,
-  immutable originals, ordering, restart, and completion advance behavior.
+  unresolved states, bounded ZIP import including hidden/native documents,
+  traversal/encryption/link/expansion rejection, nested-ZIP retention,
+  project/generation/run isolation, schema-1 queue migration, immutable
+  originals, ordering, restart, and completion advance behavior.
 - Seven catalog, nine provider/preparation, eight operator-contract, and 122
   Manager tests passed after the scoped readers entered the production catalog;
   Manager retained two explicit environment/helper skips. Both SwiftPM products

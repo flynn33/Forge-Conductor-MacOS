@@ -69,18 +69,23 @@ missions now require the run-bound, read-only `instruction_catalog` and
 `instruction_read` tools instead of embedding all instructions. Import work is
 staged outside the queue mutation lock, atomic publication is reference-aware,
 abandoned UUID stages are recovered, and schema-1 queue metadata migrates without
-changing package identity or order. Fifteen focused queue tests pass, including
+changing package identity or order. ZIP containers are inspected before native
+extraction and rejected for traversal, links, encryption, unsupported
+compression, resource expansion, or an extracted inventory mismatch. Nested
+ZIPs are retained unresolved rather than recursively expanded. Eighteen focused
+queue tests pass, including
 the 32 KiB boundary, a 1.1 MiB document, a 66-document aggregate above 8 MiB,
-hidden input, exact Unicode/UTF-16 reassembly, rich-document conversion,
-unresolved content, isolation, migration, restart, and execution ordering.
+hidden input, exact Unicode/UTF-16 reassembly, rich-document and ZIP conversion,
+archive rejection, unresolved content, isolation, migration, restart, and
+execution ordering.
 Seven production-catalog, nine provider/preparation, eight operator-contract,
 and 122 Manager tests also passed; Manager retained its two explicit helper/live
 provider skips. Both SwiftPM products and the canonical Apple Development-signed
 Debug Xcode build passed with the new source compiled into the Core framework.
-Safe ZIP extraction, paste/drop parity, durable token-aware delivery progress,
-and final large-catalog/history paging remain open. This checkpoint changes the
-canonical Xcode graph by adding `InstructionArtifactToolPack.swift`; it does not
-qualify shipment or distribution.
+Paste/drop parity, durable token-aware delivery progress, and final
+large-catalog/history paging remain open. This checkpoint changes the canonical
+Xcode graph by adding `InstructionArtifactToolPack.swift` and
+`SafeZIPArchive.swift`; it does not qualify shipment or distribution.
 
 ## Phase closeout state
 

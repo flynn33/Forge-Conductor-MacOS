@@ -295,6 +295,130 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertTrue(catalog.documents.first?["detail"]?.contains("encrypted or malformed") == true)
     }
 
+    func testZIPImportInventoriesHiddenAndNativeDocumentsWithoutExecutingAssets() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let sourceRoot = fixture.external.appendingPathComponent("zip-source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        try "Late global rule".write(
+            to: sourceRoot.appendingPathComponent("guide.md"), atomically: true, encoding: .utf8
+        )
+        try "hidden: required".write(
+            to: sourceRoot.appendingPathComponent(".policy.yaml"), atomically: true, encoding: .utf8
+        )
+        let rtf = NSAttributedString(string: "RTF archive instruction")
+        try rtf.data(
+            from: NSRange(location: 0, length: rtf.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ).write(to: sourceRoot.appendingPathComponent("policy.rtf"))
+        let archive = fixture.external.appendingPathComponent("instructions.zip")
+        try makeZIP(sourceRoot: sourceRoot, destination: archive)
+
+        let imported = try fixture.store.importPackage(
+            sourceURL: archive,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.unresolvedDocumentCount, 0)
+        XCTAssertGreaterThanOrEqual(package.documentCount ?? 0, 4)
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: package.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: nil,
+            cursor: 0,
+            limit: 128
+        )
+        XCTAssertTrue(catalog.documents.contains { $0["source_path"]?.hasSuffix("/.policy.yaml") == true })
+        XCTAssertTrue(catalog.documents.contains { $0["source_path"] == "instructions.zip" })
+        XCTAssertEqual(catalog.documents.first { $0["source_path"] == "instructions.zip" }?["status"], "retained_attachment")
+    }
+
+    func testZIPInspectionRejectsTraversalEncryptionLinksAndExpansionBombs() throws {
+        var commented = minimalZIP(path: "commented.txt")
+        let commentLengthOffset = commented.count - 2
+        commented[commentLengthOffset] = 30
+        commented[commentLengthOffset + 1] = 0
+        var comment = Data(repeating: 0, count: 30)
+        comment[0] = 0x50
+        comment[1] = 0x4B
+        comment[2] = 0x05
+        comment[3] = 0x06
+        commented.append(comment)
+        XCTAssertEqual(try SafeZIPArchive.inspect(commented).map(\.path), ["commented.txt"])
+
+        XCTAssertThrowsError(try SafeZIPArchive.inspect(minimalZIP(path: "../escape.txt"))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("unsafe path"))
+        }
+        XCTAssertThrowsError(try SafeZIPArchive.inspect(minimalZIP(path: "secret.txt", flags: 1))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("encrypted"))
+        }
+        XCTAssertThrowsError(try SafeZIPArchive.inspect(minimalZIP(
+            path: "bomb.txt", compressedBytes: 1, uncompressedBytes: 100 * 1_048_576
+        ))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("expansion ratio"))
+        }
+
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let sourceRoot = fixture.external.appendingPathComponent("link-source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        let outside = fixture.external.appendingPathComponent("outside.txt")
+        try "outside".write(to: outside, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            at: sourceRoot.appendingPathComponent("linked.txt"),
+            withDestinationURL: outside
+        )
+        let archive = fixture.external.appendingPathComponent("linked.zip")
+        try makeZIP(sourceRoot: sourceRoot, destination: archive)
+        XCTAssertThrowsError(try fixture.store.importPackage(
+            sourceURL: archive,
+            projectID: fixture.projectID,
+            generation: .initial
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("link or unsupported"))
+        }
+    }
+
+    func testNestedZIPIsRetainedAndReportedWithoutRecursiveExpansion() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let innerRoot = fixture.external.appendingPathComponent("inner", isDirectory: true)
+        try FileManager.default.createDirectory(at: innerRoot, withIntermediateDirectories: true)
+        try "nested instruction".write(
+            to: innerRoot.appendingPathComponent("nested.txt"), atomically: true, encoding: .utf8
+        )
+        let innerZIP = fixture.external.appendingPathComponent("inner.zip")
+        try makeZIP(sourceRoot: innerRoot, destination: innerZIP)
+        let outerRoot = fixture.external.appendingPathComponent("outer", isDirectory: true)
+        try FileManager.default.createDirectory(at: outerRoot, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: innerZIP, to: outerRoot.appendingPathComponent("inner.zip"))
+        try "outer instruction".write(
+            to: outerRoot.appendingPathComponent("outer.txt"), atomically: true, encoding: .utf8
+        )
+        let outerZIP = fixture.external.appendingPathComponent("outer.zip")
+        try makeZIP(sourceRoot: outerRoot, destination: outerZIP)
+        let imported = try fixture.store.importPackage(
+            sourceURL: outerZIP,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.unresolvedDocumentCount, 1)
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: package.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: nil,
+            cursor: 0,
+            limit: 128
+        )
+        XCTAssertTrue(catalog.documents.contains {
+            $0["detail"]?.contains("not recursively expanded") == true
+        })
+    }
+
     func testEmptyAndWhitespaceSourcesReportNoInstructions() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -583,6 +707,85 @@ final class ProjectInstructionQueueTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
             .write(to: root.appendingPathComponent("forge-package.json"))
         return root
+    }
+
+    private func makeZIP(sourceRoot: URL, destination: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = ["-c", "-k", "--norsrc", sourceRoot.path, destination.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+    }
+
+    private func minimalZIP(
+        path: String,
+        flags: UInt16 = 0,
+        compressedBytes: Int = 1,
+        uncompressedBytes: Int = 1
+    ) -> Data {
+        let name = Data(path.utf8)
+        var local = Data()
+        append(0x0403_4B50 as UInt32, to: &local)
+        append(20 as UInt16, to: &local)
+        append(flags, to: &local)
+        append(0 as UInt16, to: &local)
+        append(0 as UInt16, to: &local)
+        append(0 as UInt16, to: &local)
+        append(0 as UInt32, to: &local)
+        append(UInt32(compressedBytes), to: &local)
+        append(UInt32(uncompressedBytes), to: &local)
+        append(UInt16(name.count), to: &local)
+        append(0 as UInt16, to: &local)
+        local.append(name)
+        local.append(Data(repeating: 0x61, count: compressedBytes))
+
+        var central = Data()
+        append(0x0201_4B50 as UInt32, to: &central)
+        append(0x0314 as UInt16, to: &central)
+        append(20 as UInt16, to: &central)
+        append(flags, to: &central)
+        append(0 as UInt16, to: &central)
+        append(0 as UInt16, to: &central)
+        append(0 as UInt16, to: &central)
+        append(0 as UInt32, to: &central)
+        append(UInt32(compressedBytes), to: &central)
+        append(UInt32(uncompressedBytes), to: &central)
+        append(UInt16(name.count), to: &central)
+        append(0 as UInt16, to: &central)
+        append(0 as UInt16, to: &central)
+        append(0 as UInt16, to: &central)
+        append(0 as UInt16, to: &central)
+        append(UInt32(0o100600) << 16, to: &central)
+        append(0 as UInt32, to: &central)
+        central.append(name)
+
+        var result = local
+        let centralOffset = result.count
+        result.append(central)
+        append(0x0605_4B50 as UInt32, to: &result)
+        append(0 as UInt16, to: &result)
+        append(0 as UInt16, to: &result)
+        append(1 as UInt16, to: &result)
+        append(1 as UInt16, to: &result)
+        append(UInt32(central.count), to: &result)
+        append(UInt32(centralOffset), to: &result)
+        append(0 as UInt16, to: &result)
+        return result
+    }
+
+    private func append(_ value: UInt16, to data: inout Data) {
+        data.append(UInt8(value & 0xFF))
+        data.append(UInt8((value >> 8) & 0xFF))
+    }
+
+    private func append(_ value: UInt32, to data: inout Data) {
+        data.append(UInt8(value & 0xFF))
+        data.append(UInt8((value >> 8) & 0xFF))
+        data.append(UInt8((value >> 16) & 0xFF))
+        data.append(UInt8((value >> 24) & 0xFF))
     }
 
     private func toolInvocation(

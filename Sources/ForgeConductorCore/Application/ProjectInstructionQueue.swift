@@ -977,7 +977,11 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         guard values.isSymbolicLink != true else { throw ProjectInstructionQueueError.sourceContainsLink }
         let package: IngestedPackage
         if values.isRegularFile == true {
-            if source.pathExtension.lowercased() == "forgepackage"
+            let sourceData = try readRegularFile(source)
+            if source.pathExtension.lowercased() != "docx",
+               SafeZIPArchive.isZIP(sourceData, path: source.path) {
+                package = try archivePackage(source, data: sourceData)
+            } else if source.pathExtension.lowercased() == "forgepackage"
                 || (source.lastPathComponent == "forge-package.json"
                     && (try? compatibleManifest(at: source)) == true) {
                 package = try manifestPackage(manifestURL: source, root: source.deletingLastPathComponent(), projectID: projectID)
@@ -989,7 +993,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                     bootstrapGoal: "Follow the imported instructions in \(source.lastPathComponent).",
                     allowedTools: ordinaryDefaultAllowedTools,
                     completionGates: [builtInCompletionGate],
-                    documents: [try ingestDocument(path: source.lastPathComponent, url: source)]
+                    documents: [try ingestDocument(path: source.lastPathComponent, data: sourceData)]
                 )
             }
         } else if values.isDirectory == true {
@@ -1037,6 +1041,47 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             displayName: root.lastPathComponent, sourcePath: root.path,
             bootstrapGoal: "Follow the imported instructions in \(root.lastPathComponent).",
             allowedTools: ordinaryDefaultAllowedTools, completionGates: [builtInCompletionGate],
+            documents: documents
+        )
+    }
+
+    private static func archivePackage(_ archive: URL, data: Data) throws -> IngestedPackage {
+        let entries: [SafeZIPArchive.Entry]
+        do { entries = try SafeZIPArchive.inspect(data) }
+        catch { throw ProjectInstructionQueueError.invalidRequest(error.localizedDescription) }
+        let extraction = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-instruction-archive-\(UUID().uuidString.lowercased())",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: extraction) }
+        do { try SafeZIPArchive.extract(data, to: extraction, expected: entries) }
+        catch { throw ProjectInstructionQueueError.invalidRequest(error.localizedDescription) }
+        var documents: [IngestedDocument] = [IngestedDocument(
+            path: archive.lastPathComponent,
+            original: data,
+            canonicalText: nil,
+            encoding: nil,
+            converter: "native-zip-inventory-v1",
+            status: .retainedAttachment,
+            detail: "Original ZIP container retained; inventoried entries are stored separately and are never executed during import."
+        )]
+        for entry in entries where !entry.isDirectory {
+            let url = extraction.appendingPathComponent(entry.path).standardizedFileURL
+            guard try relativePath(url, root: extraction) == entry.path else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "The extracted ZIP inventory escaped its staging directory."
+                )
+            }
+            documents.append(try ingestDocument(path: "archive/\(entry.path)", url: url))
+        }
+        return try makePackage(
+            packageID: slug(archive.deletingPathExtension().lastPathComponent),
+            version: "1",
+            displayName: archive.deletingPathExtension().lastPathComponent,
+            sourcePath: archive.path,
+            bootstrapGoal: "Follow the imported instructions in \(archive.lastPathComponent).",
+            allowedTools: ordinaryDefaultAllowedTools,
+            completionGates: [builtInCompletionGate],
             documents: documents
         )
     }
@@ -1341,6 +1386,13 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     }
 
     private static func ingestDocument(path: String, data: Data) throws -> IngestedDocument {
+        if path.lowercased().hasSuffix(".zip"), SafeZIPArchive.isZIP(data, path: path) {
+            return IngestedDocument(
+                path: path, original: data, canonicalText: nil, encoding: nil,
+                converter: "nested-zip-retention-v1", status: .unresolvedConversion,
+                detail: "Nested ZIP archives are retained but not recursively expanded. Import this archive separately for bounded inspection."
+            )
+        }
         if let rich = try decodedRichDocument(path: path, data: data) {
             let normalized = normalizeText(rich.text)
             guard !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
