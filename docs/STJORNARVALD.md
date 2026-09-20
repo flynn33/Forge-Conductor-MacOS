@@ -361,7 +361,7 @@ initial native-panel queries used the wrong accessibility roles; the observed
 
 RF-SJ-08 subsequently replaced the provisional export action with a native
 four-format save workflow. Integrated fault/privacy/performance proof, product
-observation-hook completion, and final delivery acceptance remain open.
+observation-hook completion and final delivery acceptance were subsequently delivered.
 
 ## RF-SJ-08 policy-log export evidence
 
@@ -424,7 +424,7 @@ a non-pass; explicit canonical membership produced the passing 10-test run.
 
 RF-SJ-09 subsequently completed product observation integration and its focused
 fault, bounds, privacy, restart, shutdown, and performance qualification.
-RF-SJ-10 final acceptance remains open.
+RF-SJ-10 subsequently closed final implementation acceptance.
 
 ## RF-SJ-09 integrated non-interference qualification evidence
 
@@ -472,12 +472,43 @@ in tool authorization, completion validation, or automatic completion-plan
 resolution. Owner-only policy-path tests, explicit project membership,
 whitespace and attribution scans, the ordinary Apple Development-signed Debug
 workspace build, and strict deep signature verification passed. RF-SJ-10 final
-integrated delivery acceptance remains open.
+integrated delivery acceptance subsequently closed as described below.
+
+## RF-SJ-10 integrated delivery acceptance
+
+Every row in the issued 40-row acceptance matrix now has current evidence or an
+explicit limitation. Thirty-nine rows are accepted. AC-032 is limited because
+stable accessibility identifiers and labels, non-color textual state, native
+controls, keyboard dismissal, and automated accessibility queries passed, but
+a human physical VoiceOver listening session was not performed.
+
+The terminal full-suite rerun executed 1,687 tests with 12 explicit skips and
+zero failures. Its precursor run exposed two stale expectations in a
+protected-path precedence test: whole-home deletion and movement correctly
+returned the more specific `manager_policy_path_protected` result rather than
+`manager_validation_path_protected`. The exact corrected test passed 1/1, its
+class passed 94/94, and the full suite then passed. Canonical app-hosted Rune
+Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
+destinations, all guide routes, immediate opaque-source acceptance during
+Manager outage, the native source picker, and four-format native export.
+
+The current authority remains version `0.10.0`, build `2`. No release archive,
+installer, notarized artifact, installation replacement, or shipment candidate
+was created; those remain separate owner-directed release work. See the
+[acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) and
+[implementation handoff](RUNE-FORGE-STJORNARVALD-HANDOFF.md).
+
+Rune Forge Development Policy and Stjornarvald are implemented. Every selected
+policy source is accepted; Raven Forge Development is continuously applied;
+detected violations are reported to the coding agent and retained in the
+exportable policy log; and fault-injection evidence shows Stjornarvald does not
+interfere with development.
 
 ## Delivery sequence
 
-Implementation proceeds in small tested vertical slices: typed contracts and
+Implementation proceeded in small tested vertical slices: typed contracts and
 durable policy history; universal source catalog; pinned Raven rule adapter;
 observation and violation lifecycle; managed and MCP notices; manager API and
 recovery; Rune Forge UI and Guided Mode; four export formats; fault, bounds,
-privacy, and performance proof; then integrated delivery acceptance.
+privacy, and performance proof; then integrated delivery acceptance. RF-SJ-00
+through RF-SJ-10 are complete under the cited implementation evidence.

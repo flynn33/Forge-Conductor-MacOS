@@ -1390,21 +1390,29 @@ final class SecureFilesystemMutationTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: protected)
         let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
         let context = makeContext(allowedTools: ["*"])
-        let cases: [(String, [String: Any])] = [
-            ("fs_read", ["path": policy.path]),
-            ("fs_write", ["path": policy.path]),
-            ("fs_write", ["path": alias.appendingPathComponent("policy.json").path]),
-            ("fs_delete", ["path": app.paths.home.path]),
-            ("fs_move", ["path": app.paths.home.path, "dest": root.appendingPathComponent("moved").path]),
+        let cases: [(String, [String: Any], String)] = [
+            ("fs_read", ["path": policy.path], "manager_validation_path_protected"),
+            ("fs_write", ["path": policy.path], "manager_validation_path_protected"),
+            (
+                "fs_write",
+                ["path": alias.appendingPathComponent("policy.json").path],
+                "manager_validation_path_protected"
+            ),
+            ("fs_delete", ["path": app.paths.home.path], "manager_policy_path_protected"),
+            (
+                "fs_move",
+                ["path": app.paths.home.path, "dest": root.appendingPathComponent("moved").path],
+                "manager_policy_path_protected"
+            ),
         ]
-        for (tool, arguments) in cases {
+        for (tool, arguments, expectedCode) in cases {
             let decision = authorization.authorize(tool: tool, arguments: arguments,
                                                    context: context, clientID: context.clientID, binding: nil)
             guard case let .denied(code, _) = decision else {
                 XCTFail("protected validation path was authorized for \(tool)")
                 continue
             }
-            XCTAssertEqual(code, "manager_validation_path_protected")
+            XCTAssertEqual(code, expectedCode)
         }
         let ordinary = root.appendingPathComponent("ordinary.txt")
         try Data("ordinary searchable work".utf8).write(to: ordinary)

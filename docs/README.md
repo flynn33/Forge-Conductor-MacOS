@@ -20,7 +20,9 @@ is retained for auditability, but it is not current operating guidance.
 | Document | Purpose |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | Product boundaries, ownership, persistence, and trust |
-| [Rune Forge and Stjornarvald](STJORNARVALD.md) | Pinned policy binding, durable log, all-format catalog, Raven rules, manager lifecycle/API, managed/MCP notice delivery, non-interference boundary, realization map, and current delivery state |
+| [Rune Forge and Stjornarvald](STJORNARVALD.md) | Pinned policy binding, durable log, all-format catalog, Raven rules, manager lifecycle/API, managed/MCP notice delivery, non-interference boundary, realization map, and delivered state |
+| [Rune Forge acceptance](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) | Every issued acceptance row, integrated evidence, and the remaining physical VoiceOver limit |
+| [Rune Forge handoff](RUNE-FORGE-STJORNARVALD-HANDOFF.md) | Repository, policy, behavior, verification, version, candidate, and open-matter handoff |
 | [Project memory](PROJECT-MEMORY.md) | Project-scoped durable memory contract |
 | [Project reset](PROJECT-RESET.md) | Generation reset and isolation behavior |
 | [Continuity ingress](CONTINUITY-INGRESS.md) | Authorized source attachment and rollover |

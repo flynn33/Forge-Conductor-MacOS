@@ -244,8 +244,12 @@ honest metadata-only or pending state. **Refresh Source** rechecks one source,
 If the Manager disconnects, the last confirmed policy data and any newly
 accepted pending source remain visible with a degraded-state message. This does
 not pause tools, runs, queues, completion, or ordinary development. The
-**Export Policy Log** control currently reports that export is unavailable;
-JSONL, JSON, Markdown, and CSV file delivery is scheduled for RF-SJ-08.
+**Export Policy Log** menu offers JSON Lines, JSON snapshot, Markdown report,
+and CSV table formats through a native save panel. Exports use the current
+bounded filters, include chronology, policy-source revisions, integrity and
+limitation metadata, and are atomically published with owner-only permissions.
+Cancelling or failing an export leaves policy history and any existing
+destination unchanged.
 
 The question-mark toolbar action opens the complete offline Rune Forge guide.
 Guided Mode uses the same terminology as the screen and performs no source,

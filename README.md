@@ -248,8 +248,9 @@ ownership and trust model.
 
 The reconciled native design and current implementation boundary for Rune Forge
 Development Policy and Stjornarvald are recorded in
-[the Stjornarvald product record](docs/STJORNARVALD.md). That feature remains in
-implementation. Its typed contracts, fail-forward durable policy log, bounded
+[the Stjornarvald product record](docs/STJORNARVALD.md). The implementation is
+complete under the package acceptance record. Its typed contracts,
+fail-forward durable policy log, bounded
 all-format source catalog, and pinned source-linked Raven rule projection are
 now implemented. Bounded durable observation intake and single-lease native
 evaluation also group repeats and append correction/reopen history. Managed
@@ -266,8 +267,11 @@ integrity metadata, limitations, and retry-stable receipts. Product observation
 hooks now emit bounded redacted post-commit observations for ordinary tools,
 managed tools, completion claims, and Manager availability through a separate
 durable client outbox. Delivery is nonblocking, bounded, restart-safe, and
-outside authorization, completion, and canonical result paths. Final delivery
-acceptance remains open, so this is not a release claim.
+outside authorization, completion, and canonical result paths. All 40
+acceptance rows are [recorded individually](docs/RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md):
+39 are accepted and the accessibility row retains one explicit physical
+VoiceOver validation limit. This is implementation acceptance, not a release or
+shipment claim.
 
 ## Versioning
 

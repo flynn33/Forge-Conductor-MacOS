@@ -11,7 +11,7 @@ Forge Conductor is a native macOS orchestration server for local models hosted b
 5. Primary and fallback LM Studio connectors are independent processes with typed identities and aggregate health.
 6. Persistent sessions, active bindings, memory notes, and context handoffs survive process restarts.
 
-The in-progress Rune Forge Development Policy feature adds a manager-owned,
+The implemented Rune Forge Development Policy feature adds a manager-owned,
 non-interfering observer and policy-log boundary without entering tool
 authorization, run admission, queue state, project generations, or completion.
 Its implemented persistence foundation uses schema-versioned SQLite as query
@@ -74,6 +74,8 @@ response reports the event count, byte count, digest, destination, and retry
 identity.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
+Its 40-row implementation result and explicit physical accessibility limit are
+recorded in [the acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md).
 
 ## Package products
 

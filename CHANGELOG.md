@@ -12,6 +12,13 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Completed RF-SJ-10 integrated delivery acceptance and handoff for Rune Forge
+  Development Policy and Stjornarvald. All 40 issued acceptance rows now have
+  current evidence or an explicit limit; 39 are accepted, while a human
+  physical VoiceOver listening session remains unperformed. Full SwiftPM,
+  app-hosted, native UI, canonical Xcode build, signing, membership,
+  documentation, privacy, non-interference, and repository checks are retained
+  without claiming release or shipment.
 - Added bounded product-event integration and RF-SJ-09 non-interference
   qualification for Stjornarvald. Ordinary tool completions, managed tool
   completions, deterministic completion claims, and Manager availability now
