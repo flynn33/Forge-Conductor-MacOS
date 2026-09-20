@@ -605,13 +605,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     public func stjornarvaldExportReceipt(
         requestID: UUID,
         format: StjornarvaldExportFormat,
-        destination: String?
+        destination: String?,
+        filters: StjornarvaldExportFilters = StjornarvaldExportFilters()
     ) throws -> [String: Any] {
         try JSONSupport.object(from: JSONEncoder().encode(
-            stjornarvald.unavailableExportReceipt(
+            stjornarvald.exportReceipt(
                 requestID: requestID,
                 format: format,
-                destination: destination
+                destination: destination,
+                filters: filters
             )
         ))
     }

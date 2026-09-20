@@ -394,7 +394,7 @@ public enum PolicyViolationProjectionState: String, Codable, Sendable {
     case unresolvedAtHandoff = "unresolved_at_handoff"
 }
 
-public enum PolicyViolationEventType: String, Codable, Sendable {
+public enum PolicyViolationEventType: String, Codable, Sendable, CaseIterable {
     case opened = "violation_opened"
     case repeated = "violation_repeated"
     case evidenceUpdated = "violation_evidence_updated"

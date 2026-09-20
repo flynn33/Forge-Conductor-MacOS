@@ -183,6 +183,30 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
         return try eventsUnlocked(after: sequence - 1, limit: 1).first
     }
 
+    public func latestEventSequence() throws -> Int64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return Int64(try scalarIntUnlocked(
+            "SELECT COALESCE(MAX(sequence),0) FROM stj_violation_events;"
+        ))
+    }
+
+    public func violation(id: PolicyViolationID) throws -> PolicyViolation? {
+        lock.lock()
+        defer { lock.unlock() }
+        let statement = try prepareUnlocked("""
+        SELECT violation_id,fingerprint,rule_id,policy_revision,state,first_observed_at,
+          last_observed_at,occurrence_count,latest_summary,latest_suggested_correction
+        FROM stj_violations WHERE violation_id=? LIMIT 1;
+        """)
+        defer { sqlite3_finalize(statement) }
+        try bind([.text(id.description)], to: statement)
+        let step = sqlite3_step(statement)
+        if step == SQLITE_DONE { return nil }
+        guard step == SQLITE_ROW else { throw sqliteErrorUnlocked() }
+        return try projectionUnlocked(from: statement)
+    }
+
     /// Returns stable, cursor-ordered violation projections without exposing
     /// source bodies or loading the complete history into memory.
     public func violations(

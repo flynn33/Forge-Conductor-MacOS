@@ -67,7 +67,7 @@ stale patch location while preserving those newer contracts.
 | Coding-agent notice delivery | `Application/StjornarvaldPolicyNotices.swift`, `Infrastructure/StjornarvaldPolicyNoticeRepository.swift`, `ManagedProjectRunStepExecutor`, and `MCPServer`/`MCPToolResponse` (implemented in RF-SJ-05) |
 | Process composition | `ForgeApp` and `Application/StjornarvaldObservationClient.swift` (bounded owner-only FIFO outbox implemented in RF-SJ-06; product event hooks remain open) |
 | Manager lifecycle and single evaluator | `ManagerNode` and `Application/StjornarvaldManagerCoordinator.swift` (implemented in RF-SJ-06) |
-| Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `ManagerDashboardClient` (implemented in RF-SJ-06; export responds with a typed RF-SJ-08 limitation) |
+| Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `ManagerDashboardClient` (implemented in RF-SJ-06; four-format export implemented in RF-SJ-08) |
 | Managed coding-agent context and observations | `ManagedProjectRunStepExecutor` and post-commit `ToolInvocationBroker` seams |
 | Ordinary MCP observations and notices | Post-result `ToolRouter` observation plus `MCPToolResponse` presentation decoration; canonical `ToolResult` stays unchanged |
 | Operator navigation and workflow | `AppModel.AppTab`, `ContentView`, `AppSidebarView`, a dedicated view model/view, and Guided Mode |
@@ -320,10 +320,10 @@ the corrected Core scheme selected and passed all nine. Xcode reported the
 existing non-failing `ProjectContextService.close` priority-inversion warning,
 so this phase makes no clean performance claim.
 
-The export operation deliberately returns a typed `unavailable` receipt until
-RF-SJ-08 implements JSONL, JSON, Markdown, and CSV writers. Complete product
-observation hooks, actual export, integrated fault/performance qualification,
-and release acceptance remain open.
+RF-SJ-08 subsequently replaced the provisional unavailable receipt with the
+bounded four-format exporter described below. Complete product observation
+hooks, integrated fault/performance qualification, and release acceptance
+remain open.
 
 ## RF-SJ-07 Rune Forge UI and Guided Mode evidence
 
@@ -359,10 +359,71 @@ visible title and subtitle elements, and the final route test passed. Two
 initial native-panel queries used the wrong accessibility roles; the observed
 `open-panel` dialog and `CancelButton` identifiers supplied the passing test.
 
-The **Export Policy Log** button deliberately surfaces the typed RF-SJ-08
-unavailable receipt. It does not open a save panel or claim a file exists.
-Actual four-format export, integrated fault/privacy/performance proof, product
+RF-SJ-08 subsequently replaced the provisional export action with a native
+four-format save workflow. Integrated fault/privacy/performance proof, product
 observation-hook completion, and final delivery acceptance remain open.
+
+## RF-SJ-08 policy-log export evidence
+
+The Manager now owns one serialized, bounded export service rather than asking
+the SwiftUI process to read policy storage. It takes a stable upper event
+sequence and streams chronological matching events in pages of 256. Callers may
+filter by project, project generation, run, session, client, inclusive date
+range, rule, current violation state, policy source, event type, notice state,
+and minimum confidence, with a default 10,000-event and absolute 100,000-event
+bound. A truncated snapshot records the exact applied limit as a limitation.
+
+All four formats retain the same export identity and evidence boundary:
+
+- JSON is a structured snapshot with sources, current matching projections,
+  events, filters, integrity, event range, and limitations;
+- JSONL separates export, source, violation, and event records for incremental
+  processing;
+- Markdown supplies a human-readable source/revision, violation, occurrence,
+  integrity, and limitation report; and
+- CSV supplies explicit metadata and chronological event rows with JSON cells
+  for structured evidence, assumptions, alternatives, filters, and limitations.
+
+The service writes an owner-only manager staging file, synchronizes it, copies
+through a bounded 64 KiB buffer into destination-local staging, synchronizes
+again, and atomically renames the completed file over the selected destination.
+Cancellation before publication or a staging/destination write failure removes
+staging and leaves any prior destination intact; no export failure mutates the
+append-only policy log. Completed receipts include event count,
+byte count, SHA-256, destination, creation time, and request identity. A
+manager-owned owner-only receipt record makes an identical request replay return
+the original receipt after restart and rejects reuse with changed parameters.
+The header records the last included event digest, event range, pending-outbox
+state, policy source revisions, and limitations; these hashes detect accidental
+truncation or reordering but are not external authorship proof.
+
+Rune Forge presents an `NSSavePanel` from a four-item format menu and passes the
+chosen absolute path through the authenticated Manager client. The menu and
+each format have stable accessibility identifiers; Guided Mode describes the
+portable-history workflow without implying that export controls development.
+
+`StjornarvaldPolicyLogExporterTests` passed four focused cases through SwiftPM
+and the canonical app-hosted Xcode graph. They cover every encoding, schema and
+JSON/JSONL round trips, chronological sequences, the complete filter surface,
+default and invalid bounds, a 1,025-event stress fixture with explicit
+1,000-event truncation, digest readback, mode `0600`, cancellation, missing
+destination failure, atomic replacement, log immutability, persistent replay,
+and conflicting request rejection. `RuneForgeAppTests` passed six cases,
+including exact save-panel format configuration. Native UI automation exposed
+all four format choices, presented the real save panel, and canceled without
+issuing an export. The ordinary Apple Development-signed Debug workspace build
+and strict deep signature verification also passed.
+
+The first focused compile attempt retained the removed provisional export API
+in two RF-SJ-06 assertions and was a non-pass. The first exporter test run then
+exposed a missing CSV `record_type` value and a fixture expectation that did not
+account for corrected events using `not_required`; the corrected implementation
+and test passed. The first app-hosted exporter invocation selected zero tests
+because the new test was not yet a member of that app-hosted target and remains
+a non-pass; explicit canonical membership produced the passing 10-test run.
+
+RF-SJ-09 integrated fault, bounds, privacy, and performance qualification,
+complete product observation hooks, and RF-SJ-10 final acceptance remain open.
 
 ## Delivery sequence
 

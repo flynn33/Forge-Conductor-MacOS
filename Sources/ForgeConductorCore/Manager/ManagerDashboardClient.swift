@@ -549,6 +549,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     public func requestStjornarvaldExport(
         format: StjornarvaldExportFormat,
         destination: String? = nil,
+        filters: StjornarvaldExportFilters = StjornarvaldExportFilters(),
         requestID: UUID = UUID()
     ) async throws -> StjornarvaldExportReceipt {
         guard destination.map({
@@ -561,13 +562,14 @@ public final class ManagerDashboardClient: @unchecked Sendable {
             "format": format.rawValue,
         ]
         if let destination { body["destination"] = destination }
+        body["filters"] = try JSONSupport.object(from: JSONEncoder().encode(filters))
         return try decodeResponse(
             StjornarvaldExportReceipt.self,
             from: try await request(
                 method: "POST",
                 path: "/api/manager/stjornarvald/export",
                 body: body,
-                timeoutInterval: 5
+                timeoutInterval: 60
             )
         )
     }

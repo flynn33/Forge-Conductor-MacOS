@@ -308,10 +308,11 @@ private struct StjornarvaldExportRequest: Decodable {
     let requestID: UUID
     let format: StjornarvaldExportFormat
     let destination: String?
+    let filters: StjornarvaldExportFilters?
 
     enum CodingKeys: String, CodingKey {
         case requestID = "request_id"
-        case format, destination
+        case format, destination, filters
     }
 }
 
@@ -608,7 +609,8 @@ public final class ManagerRoutes: @unchecked Sendable {
                     object: try manager.stjornarvaldExportReceipt(
                         requestID: request.requestID,
                         format: request.format,
-                        destination: request.destination
+                        destination: request.destination,
+                        filters: request.filters ?? StjornarvaldExportFilters()
                     )
                 )
             } catch {

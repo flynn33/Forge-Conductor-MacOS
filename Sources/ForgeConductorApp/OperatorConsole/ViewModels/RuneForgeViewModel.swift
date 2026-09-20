@@ -23,6 +23,8 @@ protocol RuneForgeManagerClientProtocol: Sendable {
     func scheduleRuneForgeScan(requestID: UUID, reason: String) async throws -> StjornarvaldScanReceipt
     func requestRuneForgeExport(
         format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt
 }
@@ -144,6 +146,7 @@ final class RuneForgeViewModel: ObservableObject {
     @Published private(set) var health: StjornarvaldManagerHealth?
     @Published private(set) var limitations: [String] = []
     @Published private(set) var isLoading = false
+    @Published private(set) var isExporting = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var noticeMessage: String?
 
@@ -337,15 +340,24 @@ final class RuneForgeViewModel: ObservableObject {
         }
     }
 
-    func requestExport(format: StjornarvaldExportFormat = .jsonl) {
+    func requestExport(
+        format: StjornarvaldExportFormat,
+        destination: URL,
+        filters: StjornarvaldExportFilters = StjornarvaldExportFilters()
+    ) {
+        guard destination.isFileURL, !isExporting else { return }
+        isExporting = true
         runCommand { [weak self] in
             guard let self else { return }
+            defer { isExporting = false }
             do {
                 let receipt = try await client.requestRuneForgeExport(
                     format: format,
+                    destination: destination.path,
+                    filters: filters,
                     requestID: UUID()
                 )
-                noticeMessage = receipt.message
+                noticeMessage = "\(receipt.message) \(receipt.destination ?? destination.path)"
             } catch is CancellationError {
                 return
             } catch {

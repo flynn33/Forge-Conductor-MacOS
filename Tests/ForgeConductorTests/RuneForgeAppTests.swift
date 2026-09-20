@@ -37,6 +37,26 @@ final class RuneForgeAppTests: XCTestCase {
         )
     }
 
+    func testNativeExportPickerUsesExactFormatAndUITestHook() {
+        let jsonl = RuneForgePolicyPicker.makeExportPanel(format: .jsonl)
+        XCTAssertTrue(jsonl.canCreateDirectories)
+        XCTAssertFalse(jsonl.isExtensionHidden)
+        XCTAssertFalse(jsonl.allowsOtherFileTypes)
+        XCTAssertEqual(jsonl.prompt, "Export Policy Log")
+        XCTAssertEqual(jsonl.nameFieldStringValue, "stjornarvald-policy-log.jsonl")
+        XCTAssertEqual(jsonl.allowedContentTypes.first?.preferredFilenameExtension, "jsonl")
+
+        let path = "/tmp/stjornarvald-export.csv"
+        XCTAssertEqual(
+            RuneForgePolicyPicker.selectExportDestination(
+                format: .csv,
+                arguments: ["Forge Conductor", "--uitesting"],
+                environment: [RuneForgePolicyPicker.testExportEnvironmentKey: path]
+            )?.path,
+            path
+        )
+    }
+
     func testSelectedSourceAppearsImmediatelyAndSurvivesDeferredManager() async throws {
         let client = DeferredRuneForgeClient()
         let viewModel = RuneForgeViewModel(client: client)
@@ -143,6 +163,8 @@ private struct DeferredRuneForgeClient: RuneForgeManagerClientProtocol {
 
     func requestRuneForgeExport(
         format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt { throw URLError(.cannotConnectToHost) }
 }
@@ -182,6 +204,8 @@ private struct ConfirmingRuneForgeClient: RuneForgeManagerClientProtocol {
 
     func requestRuneForgeExport(
         format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt { throw URLError(.cannotConnectToHost) }
 }

@@ -94,7 +94,95 @@ public enum StjornarvaldExportFormat: String, Codable, Sendable, CaseIterable {
 }
 
 public enum StjornarvaldExportReceiptState: String, Codable, Sendable {
-    case unavailable
+    case completed, unavailable
+}
+
+public struct StjornarvaldExportFilters: Codable, Sendable, Equatable {
+    public static let defaultMaximumEvents = 10_000
+    public static let absoluteMaximumEvents = 100_000
+
+    public let projectID: String?
+    public let projectGeneration: Int?
+    public let runID: String?
+    public let sessionID: String?
+    public let clientID: String?
+    public let startDate: Date?
+    public let endDate: Date?
+    public let ruleID: String?
+    public let state: PolicyViolationProjectionState?
+    public let sourceID: PolicySourceID?
+    public let eventTypes: [PolicyViolationEventType]?
+    public let noticeState: String?
+    public let minimumConfidence: Double?
+    public let maximumEvents: Int
+
+    public init(
+        projectID: String? = nil,
+        projectGeneration: Int? = nil,
+        runID: String? = nil,
+        sessionID: String? = nil,
+        clientID: String? = nil,
+        startDate: Date? = nil,
+        endDate: Date? = nil,
+        ruleID: String? = nil,
+        state: PolicyViolationProjectionState? = nil,
+        sourceID: PolicySourceID? = nil,
+        eventTypes: [PolicyViolationEventType]? = nil,
+        noticeState: String? = nil,
+        minimumConfidence: Double? = nil,
+        maximumEvents: Int = Self.defaultMaximumEvents
+    ) {
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.runID = runID
+        self.sessionID = sessionID
+        self.clientID = clientID
+        self.startDate = startDate
+        self.endDate = endDate
+        self.ruleID = ruleID
+        self.state = state
+        self.sourceID = sourceID
+        self.eventTypes = eventTypes
+        self.noticeState = noticeState
+        self.minimumConfidence = minimumConfidence
+        self.maximumEvents = maximumEvents
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        projectID = try container.decodeIfPresent(String.self, forKey: .projectID)
+        projectGeneration = try container.decodeIfPresent(Int.self, forKey: .projectGeneration)
+        runID = try container.decodeIfPresent(String.self, forKey: .runID)
+        sessionID = try container.decodeIfPresent(String.self, forKey: .sessionID)
+        clientID = try container.decodeIfPresent(String.self, forKey: .clientID)
+        startDate = try container.decodeIfPresent(Date.self, forKey: .startDate)
+        endDate = try container.decodeIfPresent(Date.self, forKey: .endDate)
+        ruleID = try container.decodeIfPresent(String.self, forKey: .ruleID)
+        state = try container.decodeIfPresent(PolicyViolationProjectionState.self, forKey: .state)
+        sourceID = try container.decodeIfPresent(PolicySourceID.self, forKey: .sourceID)
+        eventTypes = try container.decodeIfPresent([PolicyViolationEventType].self, forKey: .eventTypes)
+        noticeState = try container.decodeIfPresent(String.self, forKey: .noticeState)
+        minimumConfidence = try container.decodeIfPresent(Double.self, forKey: .minimumConfidence)
+        maximumEvents = try container.decodeIfPresent(Int.self, forKey: .maximumEvents)
+            ?? Self.defaultMaximumEvents
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case runID = "run_id"
+        case sessionID = "session_id"
+        case clientID = "client_id"
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case ruleID = "rule_id"
+        case state
+        case sourceID = "source_id"
+        case eventTypes = "event_types"
+        case noticeState = "notice_state"
+        case minimumConfidence = "minimum_confidence"
+        case maximumEvents = "maximum_events"
+    }
 }
 
 public struct StjornarvaldExportReceipt: Codable, Sendable, Equatable {
@@ -103,7 +191,35 @@ public struct StjornarvaldExportReceipt: Codable, Sendable, Equatable {
     public let state: StjornarvaldExportReceiptState
     public let destination: String?
     public let message: String
+    public let createdAt: Date?
+    public let eventCount: Int?
+    public let byteCount: Int64?
+    public let sha256: String?
     public let controlsExecution: Bool
+
+    public init(
+        requestID: UUID,
+        format: StjornarvaldExportFormat,
+        state: StjornarvaldExportReceiptState,
+        destination: String?,
+        message: String,
+        createdAt: Date? = nil,
+        eventCount: Int? = nil,
+        byteCount: Int64? = nil,
+        sha256: String? = nil,
+        controlsExecution: Bool = false
+    ) {
+        self.requestID = requestID
+        self.format = format
+        self.state = state
+        self.destination = destination
+        self.message = message
+        self.createdAt = createdAt
+        self.eventCount = eventCount
+        self.byteCount = byteCount
+        self.sha256 = sha256
+        self.controlsExecution = controlsExecution
+    }
 }
 
 public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
@@ -116,6 +232,7 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
     private var sourceCatalog: StjornarvaldPolicySourceCatalog?
     private var observationRepository: StjornarvaldObservationRepository?
     private var logStore: StjornarvaldPolicyLogStore?
+    private var exporter: StjornarvaldPolicyLogExporter?
     private var observationService: StjornarvaldObservationService?
     private var policyReporter: StjornarvaldCodingAgentPolicyReporter?
     private var evaluator: StjornarvaldPolicyEvaluator?
@@ -166,7 +283,13 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
             logStore = log
             let reporter = StjornarvaldCodingAgentPolicyReporter(paths: paths, diagnostics: diagnostics)
             policyReporter = reporter
-            sourceCatalog = try StjornarvaldPolicySourceCatalog(paths: paths, diagnostics: diagnostics)
+            let catalog = try StjornarvaldPolicySourceCatalog(paths: paths, diagnostics: diagnostics)
+            sourceCatalog = catalog
+            exporter = StjornarvaldPolicyLogExporter(
+                logStore: log,
+                sourceCatalog: catalog,
+                paths: paths
+            )
             evaluator = StjornarvaldPolicyEvaluator(
                 observationRepository: observations,
                 ruleRepository: rules,
@@ -182,6 +305,7 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
             sourceCatalog = nil
             observationRepository = nil
             logStore = nil
+            exporter = nil
             policyReporter = nil
             evaluator = nil
             state = .degraded
@@ -234,6 +358,7 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
         policyReporter = nil
         observationService = nil
         logStore = nil
+        exporter = nil
         observationRepository = nil
         sourceCatalog = nil
         state = .stopped
@@ -433,10 +558,11 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
         )
     }
 
-    public func unavailableExportReceipt(
+    public func exportReceipt(
         requestID: UUID,
         format: StjornarvaldExportFormat,
-        destination: String?
+        destination: String?,
+        filters: StjornarvaldExportFilters = StjornarvaldExportFilters()
     ) throws -> StjornarvaldExportReceipt {
         guard destination.map({
             !$0.isEmpty && $0.utf8.count <= 4_096 && ($0 as NSString).isAbsolutePath
@@ -445,13 +571,21 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
                 "export destination must be a bounded absolute path"
             )
         }
-        return StjornarvaldExportReceipt(
+        guard let exporter else {
+            return StjornarvaldExportReceipt(
+                requestID: requestID,
+                format: format,
+                state: .unavailable,
+                destination: destination,
+                message: "Policy export is unavailable while Stjornarvald is degraded.",
+                controlsExecution: false
+            )
+        }
+        return try exporter.export(
             requestID: requestID,
             format: format,
-            state: .unavailable,
-            destination: destination,
-            message: "Policy export implementation is scheduled for RF-SJ-08.",
-            controlsExecution: false
+            destination: destination.map { URL(fileURLWithPath: $0) },
+            filters: filters
         )
     }
 

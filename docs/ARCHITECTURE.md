@@ -44,8 +44,11 @@ and notice reservations from credential-protected source, observation, scan,
 presentation, and export requests. Process clients retain observations in a
 bounded owner-only FIFO outbox across manager outages. Initialization or loop
 faults publish degraded health and bounded retry state without failing ordinary
-manager bootstrap; the export route intentionally reports unavailable until
-RF-SJ-08 supplies the file writers.
+manager bootstrap. The export boundary takes a stable upper event sequence,
+streams bounded filtered history through manager-owned staging, synchronizes
+the file, and atomically replaces the user-selected destination. Durable
+request receipts preserve retry identity across Manager restarts; export faults
+do not mutate the authoritative policy log.
 The SwiftUI app exposes that boundary through a dedicated Rune Forge tab. Its
 main-actor view model owns one cancellable five-second polling loop, caps the
 visible source and violation collections at 100 entries each, preserves
@@ -55,7 +58,10 @@ open panel accepts one file or folder without a content-type allowlist. A
 `NavigationSplitView` keeps source and violation selection separate from detail
 presentation, while occurrence and delivery details remain bounded by the
 Manager snapshot. Guided Mode content is bundled and requires no provider or
-Manager connection.
+Manager connection. An `NSSavePanel`-backed format menu exports JSONL, JSON,
+Markdown, or CSV without database or file work on the main actor. The Manager
+response reports the event count, byte count, digest, destination, and retry
+identity.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

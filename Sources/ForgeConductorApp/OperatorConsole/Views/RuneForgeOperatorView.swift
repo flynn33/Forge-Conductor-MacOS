@@ -14,15 +14,20 @@ struct RuneForgeOperatorView: View {
     @StateObject private var viewModel: RuneForgeViewModel
     @State private var selection: RuneForgeSelection? = .overview
     private let selectPolicySource: @MainActor () -> URL?
+    private let selectExportDestination: @MainActor (StjornarvaldExportFormat) -> URL?
 
     init(
         client: any RuneForgeManagerClientProtocol,
         selectPolicySource: @escaping @MainActor () -> URL? = {
             RuneForgePolicyPicker.select()
+        },
+        selectExportDestination: @escaping @MainActor (StjornarvaldExportFormat) -> URL? = {
+            RuneForgePolicyPicker.selectExportDestination(format: $0)
         }
     ) {
         _viewModel = StateObject(wrappedValue: RuneForgeViewModel(client: client))
         self.selectPolicySource = selectPolicySource
+        self.selectExportDestination = selectExportDestination
     }
 
     var body: some View {
@@ -70,10 +75,17 @@ struct RuneForgeOperatorView: View {
                 viewModel.scan()
             }
             .accessibilityIdentifier("rune-policy-refresh")
-            Button("Export Policy Log", systemImage: "square.and.arrow.up") {
-                viewModel.requestExport()
+            Menu("Export Policy Log", systemImage: "square.and.arrow.up") {
+                ForEach(StjornarvaldExportFormat.allCases, id: \.self) { format in
+                    Button(exportTitle(format)) {
+                        guard let destination = selectExportDestination(format) else { return }
+                        viewModel.requestExport(format: format, destination: destination)
+                    }
+                    .accessibilityIdentifier("rune-policy-export-\(format.rawValue)")
+                }
             }
             .accessibilityIdentifier("rune-policy-export")
+            .disabled(viewModel.isExporting)
         }
     }
 
@@ -349,6 +361,15 @@ struct RuneForgeOperatorView: View {
         case .running: return "Observing"
         case .degraded: return "Degraded — development continuing"
         case .stopping: return "Stopping"
+        }
+    }
+
+    private func exportTitle(_ format: StjornarvaldExportFormat) -> String {
+        switch format {
+        case .jsonl: "JSON Lines (.jsonl)"
+        case .json: "JSON snapshot (.json)"
+        case .markdown: "Markdown report (.md)"
+        case .csv: "CSV table (.csv)"
         }
     }
 

@@ -1157,6 +1157,8 @@ extension UnavailableOperatorManagerClient: RuneForgeManagerClientProtocol {
 
     func requestRuneForgeExport(
         format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt { throw error }
 }
@@ -1427,10 +1429,14 @@ extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
 
     func requestRuneForgeExport(
         format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt {
         try await managerClient.requestStjornarvaldExport(
             format: format,
+            destination: destination,
+            filters: filters,
             requestID: requestID
         )
     }
@@ -1492,10 +1498,14 @@ extension OperatorManagerClientRouter: RuneForgeManagerClientProtocol {
 
     func requestRuneForgeExport(
         format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt {
         try await runeForgeClient.requestRuneForgeExport(
             format: format,
+            destination: destination,
+            filters: filters,
             requestID: requestID
         )
     }

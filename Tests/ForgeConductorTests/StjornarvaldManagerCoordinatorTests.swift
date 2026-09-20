@@ -214,12 +214,15 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
             }
         }
 
-        let export = try coordinator.unavailableExportReceipt(
+        let exportDestination = fixture.root.appendingPathComponent("policy.json")
+        let export = try coordinator.exportReceipt(
             requestID: UUID(),
             format: .json,
-            destination: fixture.root.appendingPathComponent("policy.json").path
+            destination: exportDestination.path
         )
-        XCTAssertEqual(export.state, .unavailable)
+        XCTAssertEqual(export.state, .completed)
+        XCTAssertEqual(export.destination, exportDestination.path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: exportDestination.path))
         XCTAssertFalse(export.controlsExecution)
         await coordinator.shutdown()
     }
@@ -324,11 +327,14 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
         XCTAssertEqual(scan.requestID, scanID)
         XCTAssertEqual(scan.state, .scheduled)
 
+        let exportDestination = fixture.root.appendingPathComponent("route-policy.json")
         let export = try await client.requestStjornarvaldExport(
             format: .json,
-            destination: fixture.root.appendingPathComponent("route-policy.json").path
+            destination: exportDestination.path
         )
-        XCTAssertEqual(export.state, .unavailable)
+        XCTAssertEqual(export.state, .completed)
+        XCTAssertEqual(export.destination, exportDestination.path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: exportDestination.path))
         XCTAssertFalse(export.controlsExecution)
 
         let observation = fixture.observation(key: "route-observation")

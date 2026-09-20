@@ -178,6 +178,34 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
     }
 
+    func testRuneForgePresentsFourFormatNativeExportPicker() throws {
+        let tab = app.buttons["tab-rune-forge"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 8))
+        tab.click()
+
+        let export = app.menuButtons["rune-policy-export"]
+        XCTAssertTrue(export.waitForExistence(timeout: 5))
+        export.click()
+
+        let jsonl = app.menuItems["JSON Lines (.jsonl)"]
+        XCTAssertTrue(jsonl.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.menuItems["JSON snapshot (.json)"].exists)
+        XCTAssertTrue(app.menuItems["Markdown report (.md)"].exists)
+        XCTAssertTrue(app.menuItems["CSV table (.csv)"].exists)
+        jsonl.click()
+
+        let panel = app.dialogs["save-panel"]
+        let confirm = panel.buttons["Export Policy Log"]
+        XCTAssertTrue(
+            confirm.waitForExistence(timeout: 5),
+            "Export Policy Log must present the native save panel"
+        )
+        let cancel = panel.buttons["CancelButton"]
+        XCTAssertTrue(cancel.exists)
+        cancel.click()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
+    }
+
     func testRefreshToolbarExists() throws {
         let refresh = app.buttons["toolbar-refresh"]
         XCTAssertTrue(

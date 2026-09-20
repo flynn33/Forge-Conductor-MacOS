@@ -12,13 +12,20 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added four-format Stjornarvald policy-log export. Rune Forge now presents a
+  native save panel for JSON Lines, JSON snapshots, Markdown reports, and CSV;
+  exports support bounded project, generation, run, session, client, date,
+  rule, state, source, event, notice, and confidence filters. Files are staged,
+  synchronized, atomically installed with owner-only permissions, and paired
+  with durable retry-stable receipts and explicit integrity and limitation
+  metadata. Cancellation and export failure do not mutate policy history.
 - Added the native Rune Forge operator workflow and Guided Mode coverage.
   Operators can select any local file or folder without a content-type
   allowlist, see the source immediately while Manager confirmation is pending,
   inspect bounded source, violation, occurrence, and notice-delivery details,
   refresh or remove sources, schedule a scan, and retain cached information
-  during Manager outages. The export entry point reports the current RF-SJ-08
-  limitation rather than implying that a file was written.
+  during Manager outages. The export menu now opens the RF-SJ-08 native
+  four-format save workflow.
 - Added the manager-owned Stjornarvald lifecycle and typed bounded API. One
   restart-safe coordinator indexes policy sources and evaluates observations,
   while authenticated mutations, read-only snapshots and violation paging,
