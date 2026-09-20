@@ -1126,6 +1126,41 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
     private var error: OperatorManagerClientError { .disabled(reason) }
 }
 
+extension UnavailableOperatorManagerClient: RuneForgeManagerClientProtocol {
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot { throw error }
+
+    func addRuneForgeSource(
+        path: String,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource { throw error }
+
+    func refreshRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource { throw error }
+
+    func removeRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource { throw error }
+
+    func runeForgeViolations(
+        cursor: Int64,
+        limit: Int,
+        state: PolicyViolationProjectionState?
+    ) async throws -> StjornarvaldViolationPage { throw error }
+
+    func scheduleRuneForgeScan(
+        requestID: UUID,
+        reason: String
+    ) async throws -> StjornarvaldScanReceipt { throw error }
+
+    func requestRuneForgeExport(
+        format: StjornarvaldExportFormat,
+        requestID: UUID
+    ) async throws -> StjornarvaldExportReceipt { throw error }
+}
+
 /// Keeps feature view models attached to one stable client seam when manager
 /// settings change the loopback endpoint. The lock is released before every
 /// asynchronous operation.
@@ -1330,6 +1365,150 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         let value = client
         lock.unlock()
         return value
+    }
+}
+
+extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
+        try await managerClient.stjornarvaldSnapshot()
+    }
+
+    func addRuneForgeSource(
+        path: String,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource {
+        try await managerClient.addStjornarvaldSource(
+            selectedPath: path,
+            requestID: requestID
+        )
+    }
+
+    func refreshRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource {
+        try await managerClient.refreshStjornarvaldSource(
+            sourceID: sourceID,
+            requestID: requestID
+        )
+    }
+
+    func removeRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource {
+        try await managerClient.removeStjornarvaldSource(
+            sourceID: sourceID,
+            requestID: requestID
+        )
+    }
+
+    func runeForgeViolations(
+        cursor: Int64,
+        limit: Int,
+        state: PolicyViolationProjectionState?
+    ) async throws -> StjornarvaldViolationPage {
+        try await managerClient.stjornarvaldViolations(
+            cursor: cursor,
+            limit: limit,
+            state: state
+        )
+    }
+
+    func scheduleRuneForgeScan(
+        requestID: UUID,
+        reason: String
+    ) async throws -> StjornarvaldScanReceipt {
+        try await managerClient.scheduleStjornarvaldScan(
+            requestID: requestID,
+            reason: reason
+        )
+    }
+
+    func requestRuneForgeExport(
+        format: StjornarvaldExportFormat,
+        requestID: UUID
+    ) async throws -> StjornarvaldExportReceipt {
+        try await managerClient.requestStjornarvaldExport(
+            format: format,
+            requestID: requestID
+        )
+    }
+}
+
+extension OperatorManagerClientRouter: RuneForgeManagerClientProtocol {
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
+        try await runeForgeClient.runeForgeSnapshot()
+    }
+
+    func addRuneForgeSource(
+        path: String,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource {
+        try await runeForgeClient.addRuneForgeSource(path: path, requestID: requestID)
+    }
+
+    func refreshRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource {
+        try await runeForgeClient.refreshRuneForgeSource(
+            sourceID: sourceID,
+            requestID: requestID
+        )
+    }
+
+    func removeRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource {
+        try await runeForgeClient.removeRuneForgeSource(
+            sourceID: sourceID,
+            requestID: requestID
+        )
+    }
+
+    func runeForgeViolations(
+        cursor: Int64,
+        limit: Int,
+        state: PolicyViolationProjectionState?
+    ) async throws -> StjornarvaldViolationPage {
+        try await runeForgeClient.runeForgeViolations(
+            cursor: cursor,
+            limit: limit,
+            state: state
+        )
+    }
+
+    func scheduleRuneForgeScan(
+        requestID: UUID,
+        reason: String
+    ) async throws -> StjornarvaldScanReceipt {
+        try await runeForgeClient.scheduleRuneForgeScan(
+            requestID: requestID,
+            reason: reason
+        )
+    }
+
+    func requestRuneForgeExport(
+        format: StjornarvaldExportFormat,
+        requestID: UUID
+    ) async throws -> StjornarvaldExportReceipt {
+        try await runeForgeClient.requestRuneForgeExport(
+            format: format,
+            requestID: requestID
+        )
+    }
+
+    private var runeForgeClient: any RuneForgeManagerClientProtocol {
+        get throws {
+            guard let value = current as? any RuneForgeManagerClientProtocol else {
+                throw OperatorManagerClientError.capabilityUnavailable(
+                    "Rune Forge is unavailable from this manager client."
+                )
+            }
+            return value
+        }
     }
 }
 

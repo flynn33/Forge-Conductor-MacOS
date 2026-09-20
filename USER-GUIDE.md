@@ -225,6 +225,32 @@ repository again reconnects its durable identity. Package formats, manifest
 fields, limits, and storage behavior are documented in
 [Project instruction packages](docs/INSTRUCTION-PACKAGES.md).
 
+### Review Development Policy in Rune Forge
+
+Open **Rune Forge** to inspect the additive Stjornarvald policy observer. The
+left column lists Development Policy sources and current violations; selecting
+an item shows its identity, interpretation state, evidence, suggested
+correction, delivery state, and bounded occurrence history.
+
+Use **Add Development Policy…** to choose any one local file or folder. Forge
+does not restrict the picker by file extension or content type. The selection
+appears immediately as accepted, even if the Manager is temporarily
+unavailable; supported content is indexed incrementally, while opaque,
+encrypted, partial, and otherwise unsupported content remains visible with an
+honest metadata-only or pending state. **Refresh Source** rechecks one source,
+**Remove Source** deactivates a selected external source, and the toolbar
+**Refresh** action schedules a bounded policy scan.
+
+If the Manager disconnects, the last confirmed policy data and any newly
+accepted pending source remain visible with a degraded-state message. This does
+not pause tools, runs, queues, completion, or ordinary development. The
+**Export Policy Log** control currently reports that export is unavailable;
+JSONL, JSON, Markdown, and CSV file delivery is scheduled for RF-SJ-08.
+
+The question-mark toolbar action opens the complete offline Rune Forge guide.
+Guided Mode uses the same terminology as the screen and performs no source,
+scan, removal, export, or recovery operation itself.
+
 ---
 
 ## 6. Continuity (packet automation and current boundary)

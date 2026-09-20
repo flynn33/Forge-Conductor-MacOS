@@ -76,6 +76,8 @@ struct ProjectsOperatorView: View {
                         title: "Projects",
                         subtitle: "Durable identity, generation, bindings, memory, and continuity",
                         isLoading: viewModel.isLoading,
+                        titleAccessibilityIdentifier: "detail-projects",
+                        subtitleAccessibilityIdentifier: "projects-operator-view",
                         onRefresh: viewModel.load
                     )
                     if let error = viewModel.errorMessage {
@@ -203,7 +205,6 @@ struct ProjectsOperatorView: View {
         }
         .task { viewModel.load() }
         .task(id: viewModel.selectedProjectID) { viewModel.loadInstructionQueue() }
-        .accessibilityIdentifier("projects-operator-view")
     }
 
     private func projectDetail(_ project: OperatorProject) -> some View {

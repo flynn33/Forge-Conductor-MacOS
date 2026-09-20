@@ -12,6 +12,13 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added the native Rune Forge operator workflow and Guided Mode coverage.
+  Operators can select any local file or folder without a content-type
+  allowlist, see the source immediately while Manager confirmation is pending,
+  inspect bounded source, violation, occurrence, and notice-delivery details,
+  refresh or remove sources, schedule a scan, and retain cached information
+  during Manager outages. The export entry point reports the current RF-SJ-08
+  limitation rather than implying that a file was written.
 - Added the manager-owned Stjornarvald lifecycle and typed bounded API. One
   restart-safe coordinator indexes policy sources and evaluates observations,
   while authenticated mutations, read-only snapshots and violation paging,

@@ -52,6 +52,12 @@ the selected operation. Provider guidance distinguishes unsaved settings,
 verified readiness, and connection/setup work. Runtimes guidance reports the
 selected job state or that no runtime job needs attention.
 
+Rune Forge guidance explains Development Policy source selection, immediate
+acceptance, bounded interpretation states, violation and occurrence history,
+delivery status, cached degraded behavior, scanning, removal, and the current
+export limitation. It also states the non-interference boundary: Stjornarvald
+reports guidance but does not authorize tools, admit runs, or decide completion.
+
 Unavailable or disconnected provider state does not prevent the bundled guide
 catalog from opening.
 
@@ -63,7 +69,7 @@ validated against the app-owned identifier list and fails tests if a primary
 tab or typed guide context is omitted. Guided Mode does not intercept ordinary
 screen interaction when its inline banner is visible.
 
-Native UI acceptance covers all primary-tab routes, Start Task's more-specific
+Native UI acceptance covers all 14 primary-tab routes, Start Task's more-specific
 guide, preservation of the entered task draft while help opens and closes,
 persisted Guided Mode preference, keyboard dismissal, and the reusable native
 tool-permission checkboxes. These behaviors are also backed by app-hosted

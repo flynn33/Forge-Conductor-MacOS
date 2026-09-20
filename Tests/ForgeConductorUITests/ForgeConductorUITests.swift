@@ -75,6 +75,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             ("tab-tools", "Tools", "detail-tools"),
             ("tab-feed", "Live Feed", "detail-feed"),
             ("tab-projects", "Projects", "detail-projects"),
+            ("tab-rune-forge", "Rune Forge", "detail-rune-forge"),
             ("tab-autonomy", "Autonomy", "detail-autonomy"),
             ("tab-continuity", "Continuity", "detail-continuity"),
             ("tab-runtimes", "Runtimes", "detail-runtimes"),
@@ -114,6 +115,69 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testRuneForgeAcceptsOpaqueSourceImmediatelyWhileManagerIsUnavailable() throws {
+        let sourceDirectory = testHome.appendingPathComponent("policy-fixture", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: sourceDirectory,
+            withIntermediateDirectories: true
+        )
+        let source = sourceDirectory.appendingPathComponent("governance.opaque-format")
+        try Data([0x00, 0x7f, 0xff]).write(to: source)
+
+        app.terminate()
+        app.launchEnvironment["FORGE_RUNE_POLICY_UI_TEST_SELECTION"] = source.path
+        app.launch()
+
+        let tab = app.buttons["tab-rune-forge"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 8))
+        tab.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["rune-forge-view"].waitForExistence(timeout: 5)
+        )
+
+        let add = app.buttons["rune-policy-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.click()
+
+        let sourceRow = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "rune-policy-source-row-")
+        ).firstMatch
+        XCTAssertTrue(
+            sourceRow.waitForExistence(timeout: 3),
+            "Every selected format must appear before manager interpretation completes"
+        )
+        XCTAssertTrue(sourceRow.label.contains("governance.opaque-format"))
+        XCTAssertTrue(
+            sourceRow.label.contains("Refresh pending")
+                || sourceRow.label.contains("Accepted")
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["operator-unavailable"].waitForExistence(timeout: 3),
+            "Cached policy UI must remain usable while the manager is unavailable"
+        )
+    }
+
+    func testRuneForgePresentsAndCancelsNativePolicyPicker() throws {
+        let tab = app.buttons["tab-rune-forge"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 8))
+        tab.click()
+
+        let add = app.buttons["rune-policy-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.click()
+
+        let panel = app.dialogs["open-panel"]
+        let confirm = panel.buttons["Add Development Policy"]
+        XCTAssertTrue(
+            confirm.waitForExistence(timeout: 5),
+            "Add Development Policy must present the native open panel"
+        )
+        let cancel = panel.buttons["CancelButton"]
+        XCTAssertTrue(cancel.exists)
+        cancel.click()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
+    }
+
     func testRefreshToolbarExists() throws {
         let refresh = app.buttons["toolbar-refresh"]
         XCTAssertTrue(
@@ -136,6 +200,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             ("tab-tools", "Tools guide"),
             ("tab-feed", "Live Feed guide"),
             ("tab-projects", "Projects guide"),
+            ("tab-rune-forge", "Rune Forge guide"),
             ("tab-autonomy", "Autonomy guide"),
             ("tab-continuity", "Continuity guide"),
             ("tab-runtimes", "Runtimes guide"),

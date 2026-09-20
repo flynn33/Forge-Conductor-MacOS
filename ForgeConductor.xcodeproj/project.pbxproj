@@ -26,6 +26,10 @@
 		A10600000000000000000001 /* Application/StjornarvaldManagerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10600000000000000000001 /* Application/StjornarvaldManagerCoordinator.swift */; };
 		A10600000000000000000002 /* StjornarvaldManagerCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10600000000000000000002 /* StjornarvaldManagerCoordinatorTests.swift */; };
 		A10600000000000000000003 /* Application/StjornarvaldObservationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10600000000000000000003 /* Application/StjornarvaldObservationClient.swift */; };
+		A10700000000000000000001 /* OperatorConsole/Services/RuneForgePolicyPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10700000000000000000001 /* OperatorConsole/Services/RuneForgePolicyPicker.swift */; };
+		A10700000000000000000002 /* OperatorConsole/ViewModels/RuneForgeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10700000000000000000002 /* OperatorConsole/ViewModels/RuneForgeViewModel.swift */; };
+		A10700000000000000000003 /* OperatorConsole/Views/RuneForgeOperatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10700000000000000000003 /* OperatorConsole/Views/RuneForgeOperatorView.swift */; };
+		A10700000000000000000004 /* RuneForgeAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10700000000000000000004 /* RuneForgeAppTests.swift */; };
 		00969EC47C1147019BE707F7 /* Application/Tools/GitToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */; };
 		0136D5BD66A452D75D2DE7CA /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4B61D4415545424119C86B /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift */; };
 		013A73A4EF99C1EF80BCB1AA /* ContinuitySourceDispatchIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A19BC93808829B74EBDE045 /* ContinuitySourceDispatchIdentityTests.swift */; };
@@ -939,6 +943,10 @@
 		F10600000000000000000001 /* Application/StjornarvaldManagerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/StjornarvaldManagerCoordinator.swift; sourceTree = "<group>"; };
 		F10600000000000000000002 /* StjornarvaldManagerCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StjornarvaldManagerCoordinatorTests.swift; sourceTree = "<group>"; };
 		F10600000000000000000003 /* Application/StjornarvaldObservationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/StjornarvaldObservationClient.swift; sourceTree = "<group>"; };
+		F10700000000000000000001 /* OperatorConsole/Services/RuneForgePolicyPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Services/RuneForgePolicyPicker.swift; sourceTree = "<group>"; };
+		F10700000000000000000002 /* OperatorConsole/ViewModels/RuneForgeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/RuneForgeViewModel.swift; sourceTree = "<group>"; };
+		F10700000000000000000003 /* OperatorConsole/Views/RuneForgeOperatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/Views/RuneForgeOperatorView.swift; sourceTree = "<group>"; };
+		F10700000000000000000004 /* RuneForgeAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuneForgeAppTests.swift; sourceTree = "<group>"; };
 		F3E4B8F9C30E0B9F91893320 /* MCP/MCPToolAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPToolAccessPolicy.swift; sourceTree = "<group>"; };
 		F51EE9CA88424463AF1B25D2 /* Domain/DoctorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/DoctorModels.swift; sourceTree = "<group>"; };
 		F541EDBDE03E4D6E97FA4775 /* Manager/ManagerSettingsNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/ManagerSettingsNormalizer.swift; sourceTree = "<group>"; };
@@ -1108,6 +1116,7 @@
 				F10400000000000000000003 /* StjornarvaldObservationEvaluatorTests.swift */,
 				F10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift */,
 				F10600000000000000000002 /* StjornarvaldManagerCoordinatorTests.swift */,
+				F10700000000000000000004 /* RuneForgeAppTests.swift */,
 				R3F000000000000000000009 /* GuidedModeAppTests.swift */,
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
@@ -1288,6 +1297,9 @@
 				R3F000000000000000000005 /* GuidedMode/GuidedHelpState.swift */,
 				R3F000000000000000000006 /* GuidedMode/GuidedInlineHelp.swift */,
 				R3F000000000000000000007 /* GuidedMode/GuidedHelpSheet.swift */,
+				F10700000000000000000001 /* OperatorConsole/Services/RuneForgePolicyPicker.swift */,
+				F10700000000000000000002 /* OperatorConsole/ViewModels/RuneForgeViewModel.swift */,
+				F10700000000000000000003 /* OperatorConsole/Views/RuneForgeOperatorView.swift */,
 				A26F00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift */,
 				A26F00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift */,
 				A26F00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift */,
@@ -2069,6 +2081,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10700000000000000000004 /* RuneForgeAppTests.swift in Sources */,
 				R3B000000000000000000009 /* GuidedModeAppTests.swift in Sources */,
 				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
 				B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */,
@@ -2082,6 +2095,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10700000000000000000001 /* OperatorConsole/Services/RuneForgePolicyPicker.swift in Sources */,
+				A10700000000000000000002 /* OperatorConsole/ViewModels/RuneForgeViewModel.swift in Sources */,
+				A10700000000000000000003 /* OperatorConsole/Views/RuneForgeOperatorView.swift in Sources */,
 				R3B000000000000000000001 /* GuidedMode/GuidedHelpContext.swift in Sources */,
 				R3B000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift in Sources */,
 				R3B000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift in Sources */,

@@ -7,15 +7,46 @@ struct OperatorHeader: View {
     let title: String
     let subtitle: String
     let isLoading: Bool
+    let titleAccessibilityIdentifier: String?
+    let subtitleAccessibilityIdentifier: String?
     let onRefresh: () -> Void
+
+    init(
+        title: String,
+        subtitle: String,
+        isLoading: Bool,
+        titleAccessibilityIdentifier: String? = nil,
+        subtitleAccessibilityIdentifier: String? = nil,
+        onRefresh: @escaping () -> Void
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.isLoading = isLoading
+        self.titleAccessibilityIdentifier = titleAccessibilityIdentifier
+        self.subtitleAccessibilityIdentifier = subtitleAccessibilityIdentifier
+        self.onRefresh = onRefresh
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.title2.bold())
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let titleAccessibilityIdentifier {
+                    Text(title)
+                        .font(.title2.bold())
+                        .accessibilityIdentifier(titleAccessibilityIdentifier)
+                } else {
+                    Text(title).font(.title2.bold())
+                }
+                if let subtitleAccessibilityIdentifier {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier(subtitleAccessibilityIdentifier)
+                } else {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if isLoading {

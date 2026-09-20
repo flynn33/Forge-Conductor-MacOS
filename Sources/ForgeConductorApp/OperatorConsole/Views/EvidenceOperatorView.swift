@@ -17,6 +17,8 @@ struct EvidenceOperatorView: View {
                 title: "Events & Evidence",
                 subtitle: "Up to 100 redacted manager events per page with durable resource references",
                 isLoading: viewModel.isLoading,
+                titleAccessibilityIdentifier: "detail-evidence",
+                subtitleAccessibilityIdentifier: "evidence-operator-view",
                 onRefresh: viewModel.load
             )
             if let error = viewModel.errorMessage {
@@ -74,7 +76,6 @@ struct EvidenceOperatorView: View {
         }
         .padding(20)
         .task { viewModel.load() }
-        .accessibilityIdentifier("evidence-operator-view")
     }
 
     @ViewBuilder

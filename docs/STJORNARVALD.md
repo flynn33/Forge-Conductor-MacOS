@@ -322,8 +322,47 @@ so this phase makes no clean performance claim.
 
 The export operation deliberately returns a typed `unavailable` receipt until
 RF-SJ-08 implements JSONL, JSON, Markdown, and CSV writers. Complete product
-observation hooks, the Rune Forge UI and Guided Mode, actual export, integrated
-fault/performance qualification, and release acceptance remain open.
+observation hooks, actual export, integrated fault/performance qualification,
+and release acceptance remain open.
+
+## RF-SJ-07 Rune Forge UI and Guided Mode evidence
+
+The native app now exposes a fourteenth primary tab named **Rune Forge**:
+
+- one unrestricted `NSOpenPanel` accepts a single file or folder without a
+  content-type allowlist, and a test-only selection hook is enabled only by the
+  explicit UI-test launch argument;
+- a selected source is inserted into bounded presentation state immediately,
+  before the authenticated Manager request completes, and remains visible as
+  confirmation-pending if the request fails;
+- the sidebar presents at most 100 sources and 100 current violations, while
+  the detail column exposes source identity and interpretation, violation
+  evidence and suggested correction, notice-delivery state, assumptions,
+  alternatives, and the bounded occurrence history supplied by the Manager;
+- one cancellable five-second polling owner retains the last confirmed data
+  during outage, avoids overlapping refreshes, and stops with the view;
+- source refresh, source removal, scan scheduling, and the export request use
+  the typed RF-SJ-06 client; and
+- the bundled Guided Mode catalog explains the workflow, state vocabulary,
+  degraded behavior, and non-interference contract without requiring a live
+  Manager or provider.
+
+`RuneForgeAppTests` passed five focused cases through SwiftPM and, together
+with `GuidedModeAppTests`, eight app-hosted cases through the canonical Xcode
+graph. Native UI automation accepted an opaque source immediately while the
+Manager was unavailable, routed the complete Guided Mode catalog across all 14
+tabs, presented and canceled the real native open panel, and navigated every
+primary sidebar destination using stable accessibility identifiers. Earlier
+navigation attempts exposed identifiers
+attached above nested split views; identifiers now belong directly to the
+visible title and subtitle elements, and the final route test passed. Two
+initial native-panel queries used the wrong accessibility roles; the observed
+`open-panel` dialog and `CancelButton` identifiers supplied the passing test.
+
+The **Export Policy Log** button deliberately surfaces the typed RF-SJ-08
+unavailable receipt. It does not open a save panel or claim a file exists.
+Actual four-format export, integrated fault/privacy/performance proof, product
+observation-hook completion, and final delivery acceptance remain open.
 
 ## Delivery sequence
 

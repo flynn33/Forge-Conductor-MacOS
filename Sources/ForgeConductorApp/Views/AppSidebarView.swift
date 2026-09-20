@@ -93,6 +93,7 @@ private extension AppModel.AppTab {
         case .tools: "wrench.and.screwdriver"
         case .feed: "waveform.path.ecg"
         case .projects: "folder"
+        case .runeForge: "shield.lefthalf.filled"
         case .autonomy: "bolt.horizontal.circle"
         case .continuity: "arrow.trianglehead.2.clockwise.rotate.90"
         case .runtimes: "terminal"

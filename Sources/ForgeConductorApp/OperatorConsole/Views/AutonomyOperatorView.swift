@@ -61,6 +61,8 @@ struct AutonomyOperatorView: View {
                         title: "Autonomy",
                         subtitle: "Manager-owned provider sessions, leases, work, and completion gates",
                         isLoading: viewModel.isLoading,
+                        titleAccessibilityIdentifier: "detail-autonomy",
+                        subtitleAccessibilityIdentifier: "autonomy-operator-view",
                         onRefresh: viewModel.load
                     )
                     HStack {
@@ -123,7 +125,6 @@ struct AutonomyOperatorView: View {
         }
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .autonomy)
-        .accessibilityIdentifier("autonomy-operator-view")
     }
 
     private func runDetail(_ run: OperatorRun) -> some View {

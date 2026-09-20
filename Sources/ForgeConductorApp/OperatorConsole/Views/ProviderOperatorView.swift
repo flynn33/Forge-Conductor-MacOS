@@ -19,6 +19,8 @@ struct ProviderOperatorView: View {
                     title: "Provider",
                     subtitle: "Automatic model readiness for managed tasks",
                     isLoading: viewModel.isBusy,
+                    titleAccessibilityIdentifier: "detail-provider",
+                    subtitleAccessibilityIdentifier: "provider-operator-view",
                     onRefresh: viewModel.load
                 )
                 if let error = viewModel.errorMessage {
@@ -56,7 +58,6 @@ struct ProviderOperatorView: View {
         .task { viewModel.load() }
         .onDisappear { viewModel.clearCredentialEntry() }
         .guidedHelpState(viewModel.guidedHelpState, for: .provider)
-        .accessibilityIdentifier("provider-operator-view")
     }
 
     private var readiness: some View {

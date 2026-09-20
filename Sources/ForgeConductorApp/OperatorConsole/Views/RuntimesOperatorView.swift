@@ -42,6 +42,8 @@ struct RuntimesOperatorView: View {
                         title: "Runtimes",
                         subtitle: "Programs needed by the selected task and the results of its durable jobs",
                         isLoading: viewModel.isLoading,
+                        titleAccessibilityIdentifier: "detail-runtimes",
+                        subtitleAccessibilityIdentifier: "runtimes-operator-view",
                         onRefresh: viewModel.load
                     )
                     if let error = viewModel.errorMessage {
@@ -88,7 +90,6 @@ struct RuntimesOperatorView: View {
         .navigationSplitViewStyle(.balanced)
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .runtimes)
-        .accessibilityIdentifier("runtimes-operator-view")
     }
 
     private var shellPolicy: some View {

@@ -225,7 +225,7 @@ Detailed deployment and recovery behavior is documented in
 | **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
-| **Rune Forge** *(manager foundation implemented)* | Development Policy sources, Stjornarvald violations, delivery state, and policy-log export; typed history, all-format source cataloging, the pinned Raven rule index, restart-safe evaluation, non-interfering managed/MCP notices, and the bounded manager lifecycle/API are complete while product observation hooks and UI remain in implementation |
+| **Rune Forge** | Native Development Policy source selection, bounded Stjornarvald violation/history inspection, delivery state, cached degraded operation, and policy-log export entry point; actual four-format export remains scheduled for RF-SJ-08 |
 | **Autonomy** | Manager-owned runs, budgets, gates, retries, and completion |
 | **Provider** | Local endpoint, model inventory, credentials, and contract probes |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
@@ -257,9 +257,12 @@ provider turns and ordinary MCP tool responses can now receive bounded additive
 notices without changing canonical outcomes. The Manager now owns the single
 restart-safe coordinator, typed health, bounded authenticated operations,
 read-only snapshots and violation paging, retry-stable notice reservations, and
-process-local observation outboxes; product observation hooks, UI, actual
-exports, integrated qualification, and delivery acceptance remain open, so this
-is not a runtime or release claim.
+process-local observation outboxes. The native Rune Forge tab now accepts any
+file or folder immediately, shows bounded sources, violations, occurrence
+history, delivery state, and cached degraded information, and supplies complete
+offline Guided Mode help. Product observation hooks, actual exports, integrated
+qualification, and delivery acceptance remain open, so this is not a release
+claim.
 
 ## Versioning
 

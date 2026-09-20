@@ -203,6 +203,8 @@ struct ContentView: View {
             LiveFeedView()
         case .projects:
             operatorContent { ProjectsOperatorView(client: model.operatorManagerClient) }
+        case .runeForge:
+            operatorContent { RuneForgeOperatorView(client: model.operatorManagerClient) }
         case .autonomy:
             operatorContent {
                 AutonomyOperatorView(

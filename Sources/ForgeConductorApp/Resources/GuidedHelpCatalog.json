@@ -1066,6 +1066,56 @@
       "control_anchors": []
     },
     {
+      "id": "runeForge",
+      "title": "Rune Forge guide",
+      "purpose": "Add Development Policy sources and inspect Stjornarvald observations without stopping development.",
+      "forge_handles_automatically": [
+        "Accept every selected file or folder format before interpretation",
+        "Apply the pinned Raven Forge Development baseline",
+        "Keep bounded source, violation, correction, repetition, reopening, and delivery history",
+        "Continue ordinary tools, runs, queues, and completion when policy processing is degraded"
+      ],
+      "controls": [
+        "Add Development Policy",
+        "Refresh policy sources and scan",
+        "Inspect source identity and interpretation state",
+        "Inspect policy violations and delivery state",
+        "Export Policy Log"
+      ],
+      "status_meanings": [
+        "Accepted means the source is active even before interpretation finishes",
+        "Cataloging and Partially indexed describe best-effort interpretation",
+        "Delivery pending means the durable violation has not reached a future agent boundary",
+        "Corrected, Repeated, and Reopened append history rather than replacing it",
+        "Development continuing means no tool, run, queue, or completion was restricted"
+      ],
+      "normal_workflow": [
+        "Choose Add Development Policy and select any one file or folder",
+        "Confirm that it appears immediately in Policy sources",
+        "Open a source to inspect its path, revision, and interpretation observation",
+        "Open a violation to inspect its exact rule, evidence, confidence, correction, and delivery state",
+        "Use Export Policy Log when a portable history is needed"
+      ],
+      "troubleshooting": [
+        "Manager unavailable: cached sources and violations remain visible; retry refresh later",
+        "Source unavailable: keep the source active and restore or refresh its selected path",
+        "Partially indexed: inspect the interpretation observation for unsupported or opaque content",
+        "Delivery pending: development continues and the notice waits for a safe future agent boundary"
+      ],
+      "advanced_details": [
+        "Source and revision identifiers",
+        "Policy binding revision and rule locator",
+        "Observation evidence, assumptions, alternatives, and confidence",
+        "Append-only violation sequence and delivery receipt state"
+      ],
+      "related_contexts": [
+        "projects",
+        "evidence",
+        "manager"
+      ],
+      "control_anchors": []
+    },
+    {
       "id": "diagnostics",
       "title": "Diagnostics guide",
       "purpose": "Collect redacted operational information for troubleshooting without changing work.",

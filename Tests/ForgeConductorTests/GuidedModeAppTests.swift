@@ -10,7 +10,7 @@ final class GuidedModeAppTests: XCTestCase {
     func testEveryApplicationTabMapsToOneDistinctPrimaryGuide() {
         let contexts = AppModel.AppTab.allCases.map(\.guidedHelpContext)
 
-        XCTAssertEqual(contexts.count, 13)
+        XCTAssertEqual(contexts.count, 14)
         XCTAssertEqual(Set(contexts).count, contexts.count)
         XCTAssertTrue(Set(contexts).isSubset(of: Set(GuidedHelpContext.allCases)))
     }

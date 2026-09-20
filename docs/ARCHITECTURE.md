@@ -46,6 +46,16 @@ bounded owner-only FIFO outbox across manager outages. Initialization or loop
 faults publish degraded health and bounded retry state without failing ordinary
 manager bootstrap; the export route intentionally reports unavailable until
 RF-SJ-08 supplies the file writers.
+The SwiftUI app exposes that boundary through a dedicated Rune Forge tab. Its
+main-actor view model owns one cancellable five-second polling loop, caps the
+visible source and violation collections at 100 entries each, preserves
+optimistically accepted sources and the last confirmed snapshot through
+Manager outages, and cancels work at the view lifetime boundary. The native
+open panel accepts one file or folder without a content-type allowlist. A
+`NavigationSplitView` keeps source and violation selection separate from detail
+presentation, while occurrence and delivery details remain bounded by the
+Manager snapshot. Guided Mode content is bundled and requires no provider or
+Manager connection.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

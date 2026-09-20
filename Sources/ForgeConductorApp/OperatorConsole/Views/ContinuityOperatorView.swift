@@ -42,6 +42,8 @@ struct ContinuityOperatorView: View {
                         title: "Continuity",
                         subtitle: "Automatic progress protection and fresh-session continuation",
                         isLoading: viewModel.isLoading,
+                        titleAccessibilityIdentifier: "detail-continuity",
+                        subtitleAccessibilityIdentifier: "continuity-operator-view",
                         onRefresh: viewModel.load
                     )
                     continuityStatus
@@ -84,7 +86,6 @@ struct ContinuityOperatorView: View {
         }
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .continuity)
-        .accessibilityIdentifier("continuity-operator-view")
     }
 
     private var continuityStatus: some View {
