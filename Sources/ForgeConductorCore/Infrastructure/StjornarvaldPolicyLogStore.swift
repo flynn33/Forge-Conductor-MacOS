@@ -168,6 +168,13 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
         return try eventsUnlocked(after: max(sequence, 0), limit: min(max(limit, 1), 1_000))
     }
 
+    public func violation(matching candidate: PolicyViolationCandidate) throws -> PolicyViolation? {
+        lock.lock()
+        defer { lock.unlock() }
+        try Self.validateCandidate(candidate)
+        return try violationUnlocked(fingerprint: Self.fingerprint(for: candidate))
+    }
+
     /// Reconciles the complete bounded mirror with SQLite authority. Rebuilding
     /// atomically also handles a crash between append and cursor persistence.
     public func repairJSONLMirror() throws {
@@ -737,13 +744,17 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
     }
 
     private static func fingerprint(for candidate: PolicyViolationCandidate) throws -> String {
-        try JSONSupport.sha256Hex(JSONSupport.canonicalJSON([
+        var identity: [String: Any] = [
             "rule_id": candidate.rule.id.rawValue,
             "policy_revision": candidate.rule.source.revision,
             "project_id": candidate.scope.projectID ?? "",
             "project_generation": candidate.scope.projectGeneration ?? -1,
             "subject_identity": candidate.subjectIdentity,
-        ]))
+        ]
+        if let conditionIdentity = candidate.conditionIdentity {
+            identity["condition_identity"] = conditionIdentity
+        }
+        return try JSONSupport.sha256Hex(JSONSupport.canonicalJSON(identity))
     }
 
     fileprivate static func validateCandidate(_ candidate: PolicyViolationCandidate) throws {
@@ -753,6 +764,7 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
             candidate.rule.statement, candidate.rule.policyArea,
             candidate.rule.applicability, candidate.subjectIdentity,
             candidate.summary, candidate.explanation, candidate.suggestedCorrection,
+            candidate.conditionIdentity ?? "",
         ]
         guard boundedStrings.allSatisfy({ $0.utf8.count <= 16_384 }),
               candidate.evidenceReferences.count <= 64,

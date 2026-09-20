@@ -334,6 +334,24 @@ public struct DevelopmentObservationScope: Codable, Sendable, Equatable {
     }
 }
 
+public struct NativeTargetObservationEvidence: Codable, Sendable, Equatable {
+    public let shippingRuntimePaths: [String]
+    public let targetMembershipComplete: Bool
+
+    public init(shippingRuntimePaths: [String], targetMembershipComplete: Bool) {
+        self.shippingRuntimePaths = Array(shippingRuntimePaths.prefix(10_000))
+        self.targetMembershipComplete = targetMembershipComplete
+    }
+}
+
+public struct DevelopmentObservationDetails: Codable, Sendable, Equatable {
+    public let nativeTarget: NativeTargetObservationEvidence?
+
+    public init(nativeTarget: NativeTargetObservationEvidence? = nil) {
+        self.nativeTarget = nativeTarget
+    }
+}
+
 public struct DevelopmentObservation: Codable, Sendable, Equatable, Identifiable {
     public let id: UUID
     public let idempotencyKey: String
@@ -344,6 +362,7 @@ public struct DevelopmentObservation: Codable, Sendable, Equatable, Identifiable
     public let summary: String
     public let evidenceReferences: [String]
     public let payloadSHA256: String
+    public let details: DevelopmentObservationDetails?
 
     public init(
         id: UUID = UUID(),
@@ -354,7 +373,8 @@ public struct DevelopmentObservation: Codable, Sendable, Equatable, Identifiable
         subjectIdentity: String,
         summary: String,
         evidenceReferences: [String] = [],
-        payloadSHA256: String
+        payloadSHA256: String,
+        details: DevelopmentObservationDetails? = nil
     ) {
         self.id = id
         self.idempotencyKey = idempotencyKey
@@ -365,6 +385,7 @@ public struct DevelopmentObservation: Codable, Sendable, Equatable, Identifiable
         self.summary = summary
         self.evidenceReferences = evidenceReferences
         self.payloadSHA256 = payloadSHA256
+        self.details = details
     }
 }
 
@@ -394,6 +415,9 @@ public struct PolicyViolationCandidate: Codable, Sendable, Equatable {
     public let assumptions: [String]
     public let alternatives: [String]
     public let suggestedCorrection: String
+    /// Optional to preserve the stable fingerprint of RF-SJ-01 records while
+    /// allowing one rule/subject to report distinct current conditions.
+    public let conditionIdentity: String?
 
     public init(
         rule: PolicyRule,
@@ -406,7 +430,8 @@ public struct PolicyViolationCandidate: Codable, Sendable, Equatable {
         confidence: Double,
         assumptions: [String] = [],
         alternatives: [String] = [],
-        suggestedCorrection: String
+        suggestedCorrection: String,
+        conditionIdentity: String? = nil
     ) {
         self.rule = rule
         self.observationID = observationID
@@ -419,6 +444,30 @@ public struct PolicyViolationCandidate: Codable, Sendable, Equatable {
         self.assumptions = assumptions
         self.alternatives = alternatives
         self.suggestedCorrection = suggestedCorrection
+        self.conditionIdentity = conditionIdentity
+    }
+}
+
+public enum PolicyDetectorFindingDisposition: String, Codable, Sendable {
+    case violation
+    case correction
+}
+
+public struct PolicyDetectorFinding: Codable, Sendable, Equatable {
+    public let detectorID: String
+    public let disposition: PolicyDetectorFindingDisposition
+    public let candidate: PolicyViolationCandidate
+    public let controlsExecution: Bool
+
+    public init(
+        detectorID: String,
+        disposition: PolicyDetectorFindingDisposition,
+        candidate: PolicyViolationCandidate
+    ) {
+        self.detectorID = detectorID
+        self.disposition = disposition
+        self.candidate = candidate
+        self.controlsExecution = false
     }
 }
 
@@ -516,6 +565,14 @@ public protocol PolicyViolationDetecting: Sendable {
         observation: DevelopmentObservation,
         rules: [PolicyRule]
     ) async throws -> [PolicyViolationCandidate]
+}
+
+public protocol PolicyObservationDetecting: Sendable {
+    var detectorID: String { get }
+    func evaluate(
+        observation: DevelopmentObservation,
+        rules: [PolicyRule]
+    ) async throws -> [PolicyDetectorFinding]
 }
 
 public protocol PolicyViolationLogging: Sendable {

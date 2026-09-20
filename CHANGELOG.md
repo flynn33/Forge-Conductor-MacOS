@@ -12,6 +12,11 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added the manager-owned Stjornarvald observation and evaluation core:
+  bounded idempotent observations, durable fail-forward intake, an expiring
+  process/boot evaluator lease and cursor, isolated detector faults,
+  condition-stable violation grouping, and automatic repeat, correction, and
+  reopen history that never controls development execution.
 - Added the pinned Raven Forge Development rule projection: 15 native,
   source-linked rules retain exact repository revision, policy path, and heading
   provenance; deterministic precedence records material ties as explicit

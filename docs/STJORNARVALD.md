@@ -3,8 +3,9 @@
 This document is the current product record for the native **Development
 Policy** feature, its **Rune Forge** operator surface, and the manager-owned
 **Stjornarvald** policy engine. Typed contracts, durable policy history, the
-all-format source catalog, and the pinned source-linked Raven rule index are
-implemented; unfinished work remains open in the [roadmap](../ROADMAP.md).
+all-format source catalog, the pinned source-linked Raven rule index, and the
+restart-safe manager evaluation core are implemented; unfinished work remains
+open in the [roadmap](../ROADMAP.md).
 
 ## Governing source
 
@@ -59,6 +60,7 @@ stale patch location while preserving those newer contracts.
 | Dedicated policy database, JSONL mirror, outbox, source store, exports, and staging | `AppPaths`, `Infrastructure/StjornarvaldPolicyLogStore.swift`, and `Infrastructure/StjornarvaldPolicySourceCatalog.swift` (durable log and source catalog implemented in RF-SJ-01/RF-SJ-02; later stores remain open) |
 | Native source interpretation | `Infrastructure/StjornarvaldNativePolicyExtractor.swift` (bounded native extraction and metadata-only fallback implemented in RF-SJ-02) |
 | Pinned Raven policy projection | `Application/RavenForgeDevelopmentPolicyAdapter.swift` and `Infrastructure/StjornarvaldPolicyRuleRepository.swift` (implemented in RF-SJ-03) |
+| Durable observation intake and single evaluator | `Infrastructure/StjornarvaldObservationRepository.swift` and `Application/StjornarvaldPolicyEvaluator.swift` (implemented in RF-SJ-04; product event integration remains open) |
 | Process composition | `ForgeApp`; process clients may be composed here, but the manager remains the only evaluator owner |
 | Manager lifecycle and single evaluator | `ManagerNode` plus a dedicated coordinator |
 | Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `OperatorManagerClient` |
@@ -200,6 +202,51 @@ Apple Development-signed the products, and reported `** TEST SUCCEEDED **`.
 This phase does not claim automatic manager scheduling, general live
 observation/evaluation, coding-agent notices, manager routes, Rune Forge UI,
 export, integrated stress/fault proof, or release acceptance.
+
+## RF-SJ-04 observation and violation-lifecycle evidence
+
+The manager-owned core now provides:
+
+- immutable, size- and count-bounded development observations with exact
+  project/run/session/client scope, strict payload digest validation,
+  idempotency-key and observation-ID conflict checks, and restart-safe ordering;
+- an owner-only observation outbox plus bounded emergency memory when the
+  shared policy database is unavailable, with idempotent reconciliation after
+  recovery;
+- one expiring evaluator lease bound to evaluator, process, and boot identity,
+  plus a durable cursor that advances exactly one observation only after all
+  idempotent violation writes and the append-only evaluation receipt commit;
+- a bounded detector registry that isolates and records individual detector
+  faults, rejects cross-detector identities, and deduplicates findings without
+  returning a development control decision;
+- the first observation adapter for the source-linked native-stack rule,
+  retaining ambiguity assumptions, alternatives, confidence, and exact pinned
+  rule provenance; and
+- condition-specific stable fingerprints and deterministic event identities so
+  moved evidence groups as a repeat, aligned evidence appends correction,
+  reappearance appends reopen, and replay after a log-before-cursor crash does
+  not duplicate an event.
+
+`swift test --filter StjornarvaldObservationEvaluatorTests` and the canonical
+workspace `ForgeConductor` scheme each executed eleven cases with zero failures.
+The fixtures cover submission conflicts and bounds, restart durability, full
+process/boot lease contention and expiry, cursor recovery, missing-rule
+fail-forward behavior, detector fault isolation, exactly-once evaluation,
+repeat/correction/reopen, distinct condition identities, log-before-cursor
+replay, outbox recovery, malformed/conflicting submission rejection without
+outboxing, owner-only permissions, append-only observation/evaluation history,
+and coexistence with every earlier Stjornarvald store.
+The RF-SJ-01 policy-log suite passed 8/8 and the RF-SJ-03 Raven-rule suite
+passed 8/8 after the shared contract extension. The Xcode run compiled the
+explicitly registered production and test members, Apple Development-signed
+the products, and reported `** TEST SUCCEEDED **`.
+
+The first focused attempt did not execute tests because an async fixture call
+was placed inside a synchronous XCTest autoclosure; awaiting before unwrapping
+repaired the fixture. This phase does not yet claim automatic manager lifecycle
+scheduling, observation hooks in existing product operations, coding-agent
+notice delivery, manager routes, Rune Forge UI, export, integrated stress and
+performance proof, or release acceptance.
 
 ## Delivery sequence
 
