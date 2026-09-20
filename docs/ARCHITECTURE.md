@@ -23,6 +23,10 @@ then processes regular files and directory trees through bounded durable work
 rows. Native extractors retain source revisions, artifacts, segments, cursors,
 and repository identity; links and special entries are described without being
 followed or opened, and incomplete interpretation remains an active source.
+The built-in Raven Forge Development adapter projects immutable native rules
+with exact pinned revision, path, and heading provenance into the same
+schema-versioned policy database. Optional parity-utility results are recorded
+as observations and cannot activate, suspend, or otherwise control policy.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

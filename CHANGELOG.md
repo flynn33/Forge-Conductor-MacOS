@@ -12,6 +12,12 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added the pinned Raven Forge Development rule projection: 15 native,
+  source-linked rules retain exact repository revision, policy path, and heading
+  provenance; deterministic precedence records material ties as explicit
+  ambiguity; the initial native-stack detector reports aligned, violation,
+  ambiguous, and corrected states; and optional parity-utility failure is
+  durably observed without suspending the built-in policy.
 - Added the native all-format Development Policy source catalog. Every selected
   file, folder, bundle, package, archive, executable, link, zero-byte file, or
   special filesystem entry receives a durable active identity before bounded,

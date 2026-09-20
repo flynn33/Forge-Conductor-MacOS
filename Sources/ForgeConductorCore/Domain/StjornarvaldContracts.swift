@@ -190,6 +190,71 @@ public struct PolicySourceReference: Codable, Sendable, Equatable {
     }
 }
 
+public struct GoverningPolicyIdentity: Codable, Sendable, Equatable {
+    public let bindingID: String
+    public let authority: String
+    public let repositoryURL: String
+    public let version: String
+    public let revision: String
+    public let sourceID: PolicySourceID
+
+    public init(
+        bindingID: String,
+        authority: String,
+        repositoryURL: String,
+        version: String,
+        revision: String,
+        sourceID: PolicySourceID
+    ) {
+        self.bindingID = bindingID
+        self.authority = authority
+        self.repositoryURL = repositoryURL
+        self.version = version
+        self.revision = revision
+        self.sourceID = sourceID
+    }
+}
+
+public enum PolicyRuleInterpretationKind: String, Codable, Sendable {
+    case explicitRule = "explicit_rule"
+    case inferredRule = "inferred_rule"
+    case workflow
+    case preference
+    case example
+    case historicalContext = "historical_context"
+    case projectDecision = "project_decision"
+    case ambiguityRecord = "ambiguity_record"
+    case metadataOnlyContext = "metadata_only_context"
+}
+
+public struct PolicyRuleDetails: Codable, Sendable, Equatable {
+    public let title: String
+    public let interpretationKind: PolicyRuleInterpretationKind
+    public let interpretationNotes: [String]
+    public let evidencePatterns: [String]
+    public let suggestedCorrection: String
+    public let detectorIDs: [String]
+    public let limitations: [String]
+
+    public init(
+        title: String,
+        interpretationKind: PolicyRuleInterpretationKind,
+        interpretationNotes: [String] = [],
+        evidencePatterns: [String] = [],
+        suggestedCorrection: String,
+        detectorIDs: [String] = [],
+        limitations: [String] = []
+    ) {
+        self.title = title
+        self.interpretationKind = interpretationKind
+        self.interpretationNotes = interpretationNotes
+        self.evidencePatterns = evidencePatterns
+        self.suggestedCorrection = suggestedCorrection
+        self.detectorIDs = detectorIDs
+        self.limitations = limitations
+    }
+}
+
 public struct PolicyRule: Codable, Sendable, Equatable, Identifiable {
     public let id: PolicyRuleID
     public let source: PolicySourceReference
@@ -199,6 +264,8 @@ public struct PolicyRule: Codable, Sendable, Equatable, Identifiable {
     public let confidence: Double
     public let assumptions: [String]
     public let alternatives: [String]
+    /// Optional for decoding RF-SJ-01 history written before the richer rule index existed.
+    public let details: PolicyRuleDetails?
     public let controlsExecution: Bool
 
     public init(
@@ -210,6 +277,7 @@ public struct PolicyRule: Codable, Sendable, Equatable, Identifiable {
         confidence: Double,
         assumptions: [String] = [],
         alternatives: [String] = [],
+        details: PolicyRuleDetails? = nil,
         controlsExecution: Bool = false
     ) {
         self.id = id
@@ -220,6 +288,7 @@ public struct PolicyRule: Codable, Sendable, Equatable, Identifiable {
         self.confidence = min(max(confidence, 0), 1)
         self.assumptions = assumptions
         self.alternatives = alternatives
+        self.details = details
         // This field is deliberately clamped. Stjornarvald has no execution authority.
         self.controlsExecution = false
     }

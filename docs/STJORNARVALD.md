@@ -2,9 +2,9 @@
 
 This document is the current product record for the native **Development
 Policy** feature, its **Rune Forge** operator surface, and the manager-owned
-**Stjornarvald** policy engine. Typed contracts, durable policy history, and the
-all-format source catalog are implemented; unfinished work remains open in the
-[roadmap](../ROADMAP.md).
+**Stjornarvald** policy engine. Typed contracts, durable policy history, the
+all-format source catalog, and the pinned source-linked Raven rule index are
+implemented; unfinished work remains open in the [roadmap](../ROADMAP.md).
 
 ## Governing source
 
@@ -58,6 +58,7 @@ stale patch location while preserving those newer contracts.
 | Typed policy, observation, violation, and event contracts | `Domain/StjornarvaldContracts.swift` (implemented in RF-SJ-01) |
 | Dedicated policy database, JSONL mirror, outbox, source store, exports, and staging | `AppPaths`, `Infrastructure/StjornarvaldPolicyLogStore.swift`, and `Infrastructure/StjornarvaldPolicySourceCatalog.swift` (durable log and source catalog implemented in RF-SJ-01/RF-SJ-02; later stores remain open) |
 | Native source interpretation | `Infrastructure/StjornarvaldNativePolicyExtractor.swift` (bounded native extraction and metadata-only fallback implemented in RF-SJ-02) |
+| Pinned Raven policy projection | `Application/RavenForgeDevelopmentPolicyAdapter.swift` and `Infrastructure/StjornarvaldPolicyRuleRepository.swift` (implemented in RF-SJ-03) |
 | Process composition | `ForgeApp`; process clients may be composed here, but the manager remains the only evaluator owner |
 | Manager lifecycle and single evaluator | `ManagerNode` plus a dedicated coordinator |
 | Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `OperatorManagerClient` |
@@ -161,6 +162,44 @@ eight cases, and reported `** TEST SUCCEEDED **`.
 This phase does not yet claim automatic manager scheduling, Raven rule
 projection, live observation/evaluation, coding-agent notices, manager routes,
 Rune Forge UI, export, integrated stress/fault proof, or release acceptance.
+
+## RF-SJ-03 pinned Raven rule evidence
+
+The native adapter and durable rule index now provide:
+
+- one exact built-in governing identity for Raven Forge Development 0.6.2 at
+  revision `ed0028a46bac9c5b92876a6ad6589ca421fd9499`;
+- 15 product-local rules across 13 initial policy areas, each retaining the
+  stable source identity, exact revision, policy-relative path, Markdown
+  heading locator, native interpretation details, and the non-interference
+  boundary;
+- deterministic precedence across current owner direction, current
+  project-specific decisions, source specificity, normative status, revision,
+  purpose alignment, and preservation of working behavior, with equal-rank
+  material ties retained as bounded alternatives plus assumptions and
+  confidence rather than silently resolved;
+- an initial native-stack detector that reports aligned, violation, ambiguous,
+  and corrected assessments without controlling tools or development flow;
+- immutable, digest-checked rule projections and append-only projection and
+  optional-utility observations in the shared schema-versioned Stjornarvald
+  database; and
+- fail-forward operation when no optional parity utility is present or when
+  one fails. The pinned native rules remain active and the utility condition is
+  recorded separately.
+
+`swift test --filter StjornarvaldRavenPolicyTests` and the canonical workspace
+`ForgeConductor` scheme each executed eight cases with zero failures. The tests
+cover exact source identity and locator parity, durable projection and
+append-only history, successful and failing utility observations,
+policy-log/source-catalog database coexistence in either open order, every
+published precedence level and ambiguity retention, all four initial detector
+states, and decoding of pre-RF-SJ-03 rule payloads. The Xcode
+run compiled the explicitly registered adapter, repository, and test members,
+Apple Development-signed the products, and reported `** TEST SUCCEEDED **`.
+
+This phase does not claim automatic manager scheduling, general live
+observation/evaluation, coding-agent notices, manager routes, Rune Forge UI,
+export, integrated stress/fault proof, or release acceptance.
 
 ## Delivery sequence
 

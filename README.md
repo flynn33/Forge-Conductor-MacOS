@@ -225,7 +225,7 @@ Detailed deployment and recovery behavior is documented in
 | **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
-| **Rune Forge** *(catalog foundation implemented)* | Development Policy sources, Stjornarvald violations, delivery state, and policy-log export; typed append-only history and bounded all-format source cataloging are complete while evaluation and UI remain in implementation |
+| **Rune Forge** *(rule foundation implemented)* | Development Policy sources, Stjornarvald violations, delivery state, and policy-log export; typed append-only history, bounded all-format source cataloging, and the pinned source-linked Raven rule index are complete while live evaluation and UI remain in implementation |
 | **Autonomy** | Manager-owned runs, budgets, gates, retries, and completion |
 | **Provider** | Local endpoint, model inventory, credentials, and contract probes |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
@@ -249,9 +249,10 @@ ownership and trust model.
 The reconciled native design and current implementation boundary for Rune Forge
 Development Policy and Stjornarvald are recorded in
 [the Stjornarvald product record](docs/STJORNARVALD.md). That feature remains in
-implementation. Its typed contracts, fail-forward durable policy log, and
-bounded all-format source catalog are now implemented; rule evaluation,
-notices, UI, exports, integration, and delivery acceptance remain open, so this
+implementation. Its typed contracts, fail-forward durable policy log, bounded
+all-format source catalog, and pinned source-linked Raven rule projection are
+now implemented; live observation/evaluation, notices, UI, exports,
+integration, and delivery acceptance remain open, so this
 is not a runtime or release claim.
 
 ## Versioning
