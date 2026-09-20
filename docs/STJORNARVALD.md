@@ -2,8 +2,9 @@
 
 This document is the current product record for the native **Development
 Policy** feature, its **Rune Forge** operator surface, and the manager-owned
-**Stjornarvald** policy engine. Typed contracts and durable policy history are
-implemented; unfinished work remains open in the [roadmap](../ROADMAP.md).
+**Stjornarvald** policy engine. Typed contracts, durable policy history, and the
+all-format source catalog are implemented; unfinished work remains open in the
+[roadmap](../ROADMAP.md).
 
 ## Governing source
 
@@ -55,7 +56,8 @@ stale patch location while preserving those newer contracts.
 | Responsibility | Current owner / intended product-local change |
 | --- | --- |
 | Typed policy, observation, violation, and event contracts | `Domain/StjornarvaldContracts.swift` (implemented in RF-SJ-01) |
-| Dedicated policy database, JSONL mirror, outbox, source store, exports, and staging | `AppPaths` and `Infrastructure/StjornarvaldPolicyLogStore.swift` (durable log implemented in RF-SJ-01; later stores remain open) |
+| Dedicated policy database, JSONL mirror, outbox, source store, exports, and staging | `AppPaths`, `Infrastructure/StjornarvaldPolicyLogStore.swift`, and `Infrastructure/StjornarvaldPolicySourceCatalog.swift` (durable log and source catalog implemented in RF-SJ-01/RF-SJ-02; later stores remain open) |
+| Native source interpretation | `Infrastructure/StjornarvaldNativePolicyExtractor.swift` (bounded native extraction and metadata-only fallback implemented in RF-SJ-02) |
 | Process composition | `ForgeApp`; process clients may be composed here, but the manager remains the only evaluator owner |
 | Manager lifecycle and single evaluator | `ManagerNode` plus a dedicated coordinator |
 | Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `OperatorManagerClient` |
@@ -120,6 +122,44 @@ testing and is retained as a non-pass.
 
 This phase does not claim source cataloging or interpretation, live observation
 coordination, violation detection, coding-agent notice delivery, manager routes,
+Rune Forge UI, export, integrated stress/fault proof, or release acceptance.
+
+## RF-SJ-02 all-format source-catalog evidence
+
+The native catalog now provides:
+
+- immediate, durable acceptance of every selected filesystem entry before any
+  parsing, hashing, or traversal begins;
+- restart-safe revisions, artifact records, extracted segments, and bounded
+  SQLite work queues with resumable 256 KiB regular-file hashing;
+- bounded native text, JSON, property-list, rich-text, PDF, image, ZIP inventory,
+  Mach-O, binary-string, and metadata-only strategies without executing input;
+- directory discovery that resumes from durable queued identities, does not
+  follow links, does not open special streams, and does not recursively ingest
+  manager-owned state or Git internals;
+- source-change detection that preserves the prior revision and schedules an
+  explicit successor rather than overwriting provenance;
+- native Git origin, branch, and commit capture with URL credentials removed;
+  worktree cleanliness remains explicitly unassessed; and
+- active partial, deferred, unavailable, and metadata-only states rather than
+  type-, size-, encryption-, or parser-based rejection.
+
+`swift test --filter StjornarvaldPolicySourceCatalogTests` executed eight cases
+covering all-format acceptance, a sparse 2 GiB file, bounded/restart-safe
+hashing, a 150-file tree, a symbolic-link cycle, source replacement, durable
+mutation replay, database open-order compatibility, native extraction, and Git
+metadata redaction/non-traversal with zero failures. The initial implementation
+also produced three retained non-passes: a FIFO-triggered bookmark stall, a
+signed-device conversion trap, and a directory-resume stall caused by treating
+a `telldir` cookie as portable across reopened streams. The delivered design
+uses exact-path metadata for special entries, bit-pattern-safe device identity,
+and the durable SQLite discovery queue instead. The canonical workspace
+`ForgeConductor` scheme compiled the explicitly registered catalog, extractor,
+and test members, Apple Development-signed the products, executed the same
+eight cases, and reported `** TEST SUCCEEDED **`.
+
+This phase does not yet claim automatic manager scheduling, Raven rule
+projection, live observation/evaluation, coding-agent notices, manager routes,
 Rune Forge UI, export, integrated stress/fault proof, or release acceptance.
 
 ## Delivery sequence

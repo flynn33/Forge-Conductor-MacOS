@@ -18,6 +18,11 @@ Its implemented persistence foundation uses schema-versioned SQLite as query
 authority, immutable digest-chained violation events, a repairable JSONL mirror,
 and bounded owner-only fallback storage. A non-throwing service boundary keeps
 all policy-log faults additive to ordinary Forge execution.
+The same manager-owned database now catalogs every selected source immediately,
+then processes regular files and directory trees through bounded durable work
+rows. Native extractors retain source revisions, artifacts, segments, cursors,
+and repository identity; links and special entries are described without being
+followed or opened, and incomplete interpretation remains an active source.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

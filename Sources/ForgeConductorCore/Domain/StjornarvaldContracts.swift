@@ -23,6 +23,36 @@ public struct PolicyViolationID: Hashable, Codable, Sendable, CustomStringConver
     public var description: String { rawValue.uuidString.lowercased() }
 }
 
+public struct PolicySourceRevisionID: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let rawValue: UUID
+    public init(_ rawValue: UUID = UUID()) { self.rawValue = rawValue }
+    public var description: String { rawValue.uuidString.lowercased() }
+}
+
+public struct PolicyArtifactID: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let rawValue: UUID
+    public init(_ rawValue: UUID = UUID()) { self.rawValue = rawValue }
+    public var description: String { rawValue.uuidString.lowercased() }
+}
+
+public struct PolicySegmentID: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let rawValue: UUID
+    public init(_ rawValue: UUID = UUID()) { self.rawValue = rawValue }
+    public var description: String { rawValue.uuidString.lowercased() }
+}
+
+public enum PolicySourceOrigin: String, Codable, Sendable {
+    case builtInRavenForge = "built_in_raven_forge"
+    case userSelected = "user_selected"
+}
+
+public enum PolicySourceRootKind: String, Codable, Sendable {
+    case regularFile = "regular_file"
+    case directory, symbolicLink = "symbolic_link", socket, fifo, characterDevice = "character_device"
+    case blockDevice = "block_device"
+    case unavailable, unknown
+}
+
 public enum PolicySourceInterpretationState: String, Codable, Sendable {
     case accepted, cataloging, indexed
     case partiallyIndexed = "partially_indexed"
@@ -33,27 +63,117 @@ public enum PolicySourceInterpretationState: String, Codable, Sendable {
 
 public struct DevelopmentPolicySource: Codable, Sendable, Equatable, Identifiable {
     public let id: PolicySourceID
+    public let origin: PolicySourceOrigin
     public let displayName: String
     public let selectedPath: String
+    public let standardizedPath: String
+    public let rootKind: PolicySourceRootKind
+    public let bookmarkSHA256: String?
     public let active: Bool
     public let interpretationState: PolicySourceInterpretationState
     public let addedAt: Date
+    public let latestRevisionID: PolicySourceRevisionID?
+    public let lastIndexCursor: String?
+    public let latestObservation: String?
 
     public init(
         id: PolicySourceID = PolicySourceID(),
+        origin: PolicySourceOrigin = .userSelected,
         displayName: String,
         selectedPath: String,
+        standardizedPath: String? = nil,
+        rootKind: PolicySourceRootKind = .unknown,
+        bookmarkSHA256: String? = nil,
         active: Bool = true,
         interpretationState: PolicySourceInterpretationState = .accepted,
-        addedAt: Date = Date()
+        addedAt: Date = Date(),
+        latestRevisionID: PolicySourceRevisionID? = nil,
+        lastIndexCursor: String? = nil,
+        latestObservation: String? = nil
     ) {
         self.id = id
+        self.origin = origin
         self.displayName = displayName
         self.selectedPath = selectedPath
+        self.standardizedPath = standardizedPath ?? selectedPath
+        self.rootKind = rootKind
+        self.bookmarkSHA256 = bookmarkSHA256
         self.active = active
         self.interpretationState = interpretationState
         self.addedAt = addedAt
+        self.latestRevisionID = latestRevisionID
+        self.lastIndexCursor = lastIndexCursor
+        self.latestObservation = latestObservation
     }
+}
+
+public enum PolicyArtifactKind: String, Codable, Sendable {
+    case regularFile = "regular_file"
+    case directory, package, bundle, archive, text, structuredText = "structured_text"
+    case richDocument = "rich_document"
+    case pdf, image, media, executable, script, unknownBinary = "unknown_binary"
+    case symbolicLink = "symbolic_link"
+    case socket, fifo, characterDevice = "character_device", blockDevice = "block_device"
+    case unavailable, unknown
+}
+
+public enum PolicyArtifactInterpretationState: String, Codable, Sendable {
+    case cataloging, indexed, partiallyIndexed = "partially_indexed"
+    case metadataOnly = "metadata_only"
+    case encryptedContent = "encrypted_content"
+    case extractionDeferred = "extraction_deferred"
+    case sourceUnavailable = "source_unavailable"
+    case sourceChanged = "source_changed"
+    case strategyError = "strategy_error"
+}
+
+public struct PolicySourceRevision: Codable, Sendable, Equatable, Identifiable {
+    public let id: PolicySourceRevisionID
+    public let sourceID: PolicySourceID
+    public let observedAt: Date
+    public let priorRevisionID: PolicySourceRevisionID?
+    public let repositoryURL: String?
+    public let gitCommit: String?
+    public let gitBranch: String?
+    public let gitDirty: Bool?
+    public let manifestSHA256: String?
+    public let metadata: [String: String]
+}
+
+public struct PolicyArtifact: Codable, Sendable, Equatable, Identifiable {
+    public let id: PolicyArtifactID
+    public let revisionID: PolicySourceRevisionID
+    public let relativePath: String
+    public let kind: PolicyArtifactKind
+    public let byteCount: Int64?
+    public let contentSHA256: String?
+    public let metadata: [String: String]
+    public let interpretationState: PolicyArtifactInterpretationState
+    public let lastCursor: String?
+}
+
+public struct PolicySegment: Codable, Sendable, Equatable, Identifiable {
+    public let id: PolicySegmentID
+    public let artifactID: PolicyArtifactID
+    public let ordinal: Int
+    public let locator: String
+    public let extractionMethod: String
+    public let extractionVersion: String
+    public let content: String
+    public let contentSHA256: String
+    public let confidence: Double
+}
+
+public struct PolicySourceIndexProgress: Codable, Sendable, Equatable {
+    public let sourceID: PolicySourceID
+    public let revisionID: PolicySourceRevisionID?
+    public let interpretationState: PolicySourceInterpretationState
+    public let pendingWorkCount: Int
+    public let completedWorkCount: Int
+    public let artifactCount: Int
+    public let segmentCount: Int
+    public let cursor: String?
+    public let observation: String?
 }
 
 public struct PolicySourceReference: Codable, Sendable, Equatable {

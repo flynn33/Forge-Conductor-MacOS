@@ -12,6 +12,11 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added the native all-format Development Policy source catalog. Every selected
+  file, folder, bundle, package, archive, executable, link, zero-byte file, or
+  special filesystem entry receives a durable active identity before bounded,
+  restart-safe interpretation; unsupported, encrypted, partial, and
+  metadata-only inputs remain cataloged instead of being rejected.
 - Added the native Stjornarvald contract and persistence foundation: typed
   policy/observation/violation identities, deterministic violation grouping,
   immutable SQLite events, a digest-chained recoverable JSONL mirror,
