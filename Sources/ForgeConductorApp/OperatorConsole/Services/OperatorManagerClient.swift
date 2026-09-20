@@ -432,12 +432,64 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         generation: UInt64
     ) async throws -> OperatorInstructionQueue {
         try validateProjectGeneration(projectID: projectID, generation: generation)
-        let queue: OperatorInstructionQueue = try await request(
+        var queue: OperatorInstructionQueue = try await request(
             method: "POST",
             path: "/api/manager/projects/instruction-packages",
             body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation)
         )
-        return try validated(queue, projectID: projectID, generation: generation)
+        queue = try validated(
+            queue,
+            projectID: projectID,
+            generation: generation,
+            expectedCursor: 0
+        )
+        var packages = queue.packages
+        let revision = queue.revision
+        let running = queue.running
+        let total = queue.totalPackages ?? packages.count
+        var cursor = queue.nextCursor
+        while let pageCursor = cursor {
+            let page: OperatorInstructionQueue = try await request(
+                method: "POST",
+                path: "/api/manager/projects/instruction-packages",
+                body: InstructionQueuePageBody(
+                    projectID: projectID,
+                    projectGeneration: generation,
+                    cursor: pageCursor,
+                    limit: 128
+                )
+            )
+            let validatedPage = try validated(
+                page,
+                projectID: projectID,
+                generation: generation,
+                expectedCursor: pageCursor
+            )
+            guard validatedPage.revision == revision,
+                  validatedPage.running == running,
+                  (validatedPage.totalPackages ?? total) == total else {
+                throw OperatorManagerClientError.invalidPayload(
+                    "instruction queue changed while its pages were loading"
+                )
+            }
+            packages.append(contentsOf: validatedPage.packages)
+            cursor = validatedPage.nextCursor
+        }
+        guard packages.count == total else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction queue paging did not return its declared package count"
+            )
+        }
+        return OperatorInstructionQueue(
+            projectID: queue.projectID,
+            projectGeneration: queue.projectGeneration,
+            revision: revision,
+            running: running,
+            totalPackages: total,
+            cursor: 0,
+            nextCursor: nil,
+            packages: packages
+        )
     }
 
     func importInstructionPackage(
@@ -649,16 +701,26 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
     private func validated(
         _ queue: OperatorInstructionQueue,
         projectID: String,
-        generation: UInt64
+        generation: UInt64,
+        expectedCursor: Int = 0
     ) throws -> OperatorInstructionQueue {
+        let cursor = queue.cursor ?? expectedCursor
+        let total = queue.totalPackages ?? queue.packages.count
+        let expectedNext = cursor + queue.packages.count < total
+            ? cursor + queue.packages.count
+            : nil
         guard queue.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
               queue.projectGeneration == generation,
+              cursor == expectedCursor,
+              (0...ProjectInstructionQueueStore.maximumPackages).contains(total),
+              total >= cursor + queue.packages.count,
+              queue.nextCursor == expectedNext,
               queue.packages.count <= ProjectInstructionQueueStore.maximumPackages,
               queue.packages.enumerated().allSatisfy({ index, package in
                   package.projectID.caseInsensitiveCompare(projectID) == .orderedSame
                       && package.projectGeneration == generation
                       && UUID(uuidString: package.id) != nil
-                      && package.position == index
+                      && package.position == cursor + index
               }) else {
             throw OperatorManagerClientError.invalidPayload(
                 "instruction queue response did not match the selected project and order"
@@ -1284,6 +1346,18 @@ private struct ProjectGenerationBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
+    }
+}
+
+private struct InstructionQueuePageBody: Encodable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let cursor: Int
+    let limit: Int
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case cursor, limit
     }
 }
 

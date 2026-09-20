@@ -302,12 +302,19 @@ struct OperatorInstructionQueue: Decodable, Sendable, Equatable {
     let projectGeneration: UInt64
     let revision: UInt64
     let running: Bool
+    let totalPackages: Int?
+    let cursor: Int?
+    let nextCursor: Int?
     let packages: [OperatorInstructionPackage]
 
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
-        case revision, running, packages
+        case revision, running
+        case totalPackages = "total_packages"
+        case cursor
+        case nextCursor = "next_cursor"
+        case packages
     }
 }
 

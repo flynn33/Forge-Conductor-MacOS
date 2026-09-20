@@ -662,7 +662,7 @@ private enum ProductionToolDefinitionSource {
         "context_get": "Load latest (or id) handoff packet — call first in every new chat bootstrap.",
         "context_list": "List recent context handoff packets.",
         "instruction_catalog": "Page the complete project/run-bound inventory for an immutable imported instruction snapshot before beginning work.",
-        "instruction_read": "Read a byte-bounded UTF-8 window from one converted project/run-bound instruction document with a durable continuation cursor.",
+        "instruction_read": "Read a byte-bounded UTF-8 window from one converted project/run-bound instruction document with a durable continuation cursor. Forge may reduce maximum_bytes to fit the current provider context and inline-result budgets; continue from next_byte_offset.",
         "fs_read": "Read a UTF-8 text file. Optional 1-based line window: offset (start line) + length/limit (line count). Response includes total_lines, start_line, end_line, has_more, next_offset. Do not re-call with the same offset when content was returned.",
         "fs_write": "Write a UTF-8 text file.",
         "fs_edit": "Replace occurrences of old with new in a file.",

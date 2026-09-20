@@ -1306,12 +1306,24 @@ public final class ManagerRoutes: @unchecked Sendable {
             let result: [String: Any]
             switch path {
             case "/api/manager/projects/instruction-packages":
-                guard Set(object.keys) == ["project_id", "project_generation"] else {
-                    throw ProjectInstructionQueueError.invalidRequest("Queue refresh accepts only project_id and project_generation.")
+                let acceptedKeys: Set<String> = [
+                    "project_id", "project_generation", "cursor", "limit",
+                ]
+                guard Set(object.keys).isSubset(of: acceptedKeys),
+                      Set(object.keys).isSuperset(of: ["project_id", "project_generation"]),
+                      object["cursor"] == nil || integer(object["cursor"]) != nil,
+                      object["limit"] == nil || integer(object["limit"]) != nil else {
+                    throw ProjectInstructionQueueError.invalidRequest(
+                        "Queue refresh accepts a project identity and optional cursor and limit."
+                    )
                 }
+                let cursor = integer(object["cursor"]) ?? 0
+                let limit = integer(object["limit"]) ?? 128
                 result = try manager.instructionQueue(
                     projectID: selectedProject,
-                    expectedGeneration: generation
+                    expectedGeneration: generation,
+                    cursor: cursor,
+                    limit: limit
                 )
             case "/api/manager/projects/instruction-packages/import":
                 guard Set(object.keys) == ["project_id", "project_generation", "source_path"],

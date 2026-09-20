@@ -21,9 +21,13 @@ The question-mark toolbar button opens the same setup sequence inside the app.
 Select a document in its existing format. Admission is content-aware rather than
 based on a filename whitelist. Forge normalizes UTF-8 and BOM-marked UTF-16 text
 and uses native PDFKit/AppKit adapters for PDF, DOCX, RTF, and HTML. Every
-original is retained. Opaque, malformed, encrypted, image-only, or otherwise
-unconverted content is reported unresolved and prevents execution rather than
-being dropped or falsely marked understood.
+original is retained. Textless supported images and PDFs receive a bounded
+native Vision OCR attempt. The catalog classifies every source as converted
+instruction content, retained attachment, unrepresented visual/structural
+content, or unresolved conversion. Unrepresented, malformed, encrypted, or
+otherwise unresolved content prevents execution rather than being dropped or
+falsely marked understood; malformed and encrypted failures are named
+separately.
 
 ### A folder of documents
 
@@ -39,8 +43,11 @@ Select or drop a ZIP in its existing form. Forge preflights the container before
 native extraction and rejects traversal, duplicate paths, links, encryption,
 unsupported compression, excessive entry or aggregate size, excessive expansion
 ratios, and local/central-header disagreement. It compares the extracted file
-inventory and sizes with the inspected container. Nested ZIPs are retained
-unresolved for separate bounded import rather than recursively expanded.
+inventory and sizes with the inspected container, observes cancellation during
+the bounded native extraction deadline, and removes its private staging tree.
+The original archive and accepted inventory remain in the immutable snapshot.
+Nested ZIPs are retained unresolved for separate bounded import rather than
+recursively expanded.
 
 ### A manifest package
 
@@ -110,6 +117,19 @@ to its exact project generation and run UUID without entering or reordering the
 package queue. Prepare and Start carry only its compact bootstrap and snapshot
 digest, never the full large instruction body.
 
+Queue refreshes are delivered in revision-bound pages of at most 128 package
+records. The app accepts a page only when its project, generation, revision,
+total count, cursor, and package positions agree, then reconstructs the visible
+order. Large instruction bodies never enter queue metadata.
+
+`instruction_read` accepts a requested byte ceiling but may lower it to fit the
+current provider-reported remaining context and the run's durable inline-result
+envelope. Its response reports the requested and effective limits plus
+`next_byte_offset`; callers continue until that cursor is absent. The durable
+invocation journal records accepted catalog and byte ranges, and managed
+handoffs carry the compact coverage bitmap and partial cursors across restart or
+rollover without preventing a document from being revisited by ID.
+
 Resetting a project generation fences unfinished packages from the old generation. Removing a project deletes its active package queue, advances the control-plane generation, invalidates bindings, and hides the registration while preserving project memory and historical run evidence. Registering the same repository again reconnects its durable project identity.
 
 ## Resource budgets
@@ -119,8 +139,9 @@ Resetting a project generation fences unfinished packages from the old generatio
 - 4,096 source files per import
 - 128 MiB per source file
 - 512 MiB aggregate source bytes per import
-- 32 KiB compact bootstrap mission
-- 64 KiB per scoped delivery window
+- 32 KiB compact bootstrap summary metadata
+- 64 KiB upper transport bound per scoped delivery window; the effective page
+  may be smaller for the current provider context or inline-result envelope
 - 64 MiB queue metadata
 
 These are explicit resource backpressure budgets, not a 32 KiB limit on the

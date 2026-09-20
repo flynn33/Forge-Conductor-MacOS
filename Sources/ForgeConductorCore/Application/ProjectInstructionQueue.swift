@@ -8,6 +8,12 @@ import AppKit
 #if canImport(PDFKit)
 import PDFKit
 #endif
+#if canImport(ImageIO)
+import ImageIO
+#endif
+#if canImport(Vision)
+import Vision
+#endif
 
 public enum ProjectInstructionPackageState: String, Codable, Sendable, CaseIterable {
     case queued
@@ -106,12 +112,19 @@ public struct ProjectInstructionQueueSnapshot: Codable, Sendable, Equatable {
     public let projectGeneration: ProjectGeneration
     public let revision: UInt64
     public let running: Bool
+    public let totalPackages: Int
+    public let cursor: Int
+    public let nextCursor: Int?
     public let packages: [ProjectInstructionPackage]
 
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
-        case revision, running, packages
+        case revision, running
+        case totalPackages = "total_packages"
+        case cursor
+        case nextCursor = "next_cursor"
+        case packages
     }
 
     public func asDictionary() -> [String: Any] {
@@ -121,8 +134,11 @@ public struct ProjectInstructionQueueSnapshot: Codable, Sendable, Equatable {
             "project_generation": projectGeneration.rawValue,
             "revision": revision,
             "running": running,
+            "total_packages": totalPackages,
+            "cursor": cursor,
+            "next_cursor": nextCursor as Any,
             "packages": packages.map { $0.asDictionary() },
-        ]
+        ].compactNSNull()
     }
 }
 
@@ -879,7 +895,10 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     public static let maximumSourceFiles = 4_096
     public static let maximumSourceFileBytes = 128 * 1_048_576
     public static let maximumAggregateBytes = 512 * 1_048_576
-    public static let maximumMissionBytes = 32_768
+    /// Bounds only the compact run bootstrap carried in queue/run metadata.
+    /// Authoritative instruction content is artifact-backed and is governed by
+    /// the source-file and aggregate import budgets instead.
+    public static let maximumBootstrapSummaryBytes = 32_768
     public static let maximumQueueStateBytes = 64 * 1_048_576
     public static let maximumDeliveryBytes = 64 * 1_024
 
@@ -1002,6 +1021,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     public enum InstructionDocumentStatus: String, Codable, Sendable {
         case convertedInstruction = "converted_instruction"
         case retainedAttachment = "retained_attachment"
+        case unrepresentedVisualStructural = "unrepresented_visual_structural"
         case unresolvedConversion = "unresolved_conversion"
     }
 
@@ -1299,6 +1319,41 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     ) throws -> ProjectInstructionQueueSnapshot {
         lock.lock(); defer { lock.unlock() }
         return try snapshotUnlocked(projectID: projectID, generation: generation)
+    }
+
+    public func snapshotPage(
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        cursor: Int,
+        limit: Int
+    ) throws -> ProjectInstructionQueueSnapshot {
+        lock.lock(); defer { lock.unlock() }
+        guard cursor >= 0, (1...128).contains(limit) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction queue cursor or page size is outside its supported range."
+            )
+        }
+        let ordered = state.packages
+            .filter {
+                $0.projectID == projectID && $0.projectGeneration == generation
+            }
+            .sorted(by: Self.packageOrder)
+        guard cursor <= ordered.count else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction queue cursor is past the end."
+            )
+        }
+        let end = min(ordered.count, cursor + limit)
+        return ProjectInstructionQueueSnapshot(
+            projectID: projectID,
+            projectGeneration: generation,
+            revision: state.revision,
+            running: state.runningProjects.contains(projectID.description),
+            totalPackages: ordered.count,
+            cursor: cursor,
+            nextCursor: end < ordered.count ? end : nil,
+            packages: Array(ordered[cursor..<end])
+        )
     }
 
     @discardableResult
@@ -1819,6 +1874,9 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             projectGeneration: generation,
             revision: state.revision,
             running: state.runningProjects.contains(projectID.description),
+            totalPackages: packages.count,
+            cursor: 0,
+            nextCursor: nil,
             packages: packages
         )
     }
@@ -1890,7 +1948,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             && artifact.mission == artifact.mission.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
-            && artifact.mission.utf8.count <= maximumMissionBytes
+            && artifact.mission.utf8.count <= maximumBootstrapSummaryBytes
             && !artifact.sourcePath.isEmpty
             && artifact.sourcePath.utf8.count <= 4_096
             && (artifact.sourcePath as NSString).isAbsolutePath
@@ -2279,7 +2337,10 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let instructionBytes = documents.reduce(0) {
             $0 + ($1.canonicalText.map { Data($0.utf8).count } ?? 0)
         }
-        let unresolved = documents.filter { $0.status == .unresolvedConversion }.count
+        let unresolved = documents.filter {
+            $0.status == .unresolvedConversion
+                || $0.status == .unrepresentedVisualStructural
+        }.count
         if instructionBytes == 0, unresolved == 0 {
             throw ProjectInstructionQueueError.invalidRequest(
                 "No non-whitespace instructions were found in the selected source."
@@ -2302,7 +2363,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let digest = JSONSupport.sha256Hex(
             try JSONSerialization.data(withJSONObject: identity, options: [.sortedKeys, .withoutEscapingSlashes])
         )
-        let mission = try boundedMission(
+        let mission = try boundedBootstrapSummary(
             """
             \(bootstrapGoal)
 
@@ -2465,10 +2526,13 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         }
     }
 
-    private static func boundedMission(_ value: String) throws -> String {
+    private static func boundedBootstrapSummary(_ value: String) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed.utf8.count <= maximumMissionBytes else {
-            throw ProjectInstructionQueueError.invalidRequest("Package instructions must contain 1 through \(maximumMissionBytes) UTF-8 bytes.")
+        guard !trimmed.isEmpty,
+              trimmed.utf8.count <= maximumBootstrapSummaryBytes else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "The generated task bootstrap summary exceeds its \(maximumBootstrapSummaryBytes)-byte metadata budget. The authoritative instruction artifact was not truncated."
+            )
         }
         return trimmed
     }
@@ -2504,7 +2568,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             guard !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return IngestedDocument(
                     path: path, original: data, canonicalText: nil, encoding: nil,
-                    converter: rich.converter, status: .unresolvedConversion,
+                    converter: rich.converter, status: rich.emptyStatus,
                     detail: rich.emptyDetail
                 )
             }
@@ -2531,6 +2595,26 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 detail: "Decoded as \(decoded.encoding) and normalized to UTF-8."
             )
         }
+        if isVisualDocument(path: path, data: data) {
+            if let recognized = recognizedImageText(data),
+               !recognized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return IngestedDocument(
+                    path: path,
+                    original: data,
+                    canonicalText: normalizeText(recognized),
+                    encoding: nil,
+                    converter: "vision-ocr-v1",
+                    status: .convertedInstruction,
+                    detail: "Recovered instruction text with the native Vision OCR adapter; the original visual source remains source-linked."
+                )
+            }
+            return IngestedDocument(
+                path: path, original: data, canonicalText: nil, encoding: nil,
+                converter: "forge-visual-inventory-v1",
+                status: .unrepresentedVisualStructural,
+                detail: "The visual source was retained, but no instruction text could be represented. OCR or visual review is required before this package is ready."
+            )
+        }
         return IngestedDocument(
             path: path, original: data, canonicalText: nil, encoding: nil,
             converter: "forge-native-text-v1",
@@ -2547,18 +2631,44 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     private static func decodedRichDocument(
         path: String,
         data: Data
-    ) throws -> (text: String, converter: String, detail: String, emptyDetail: String)? {
+    ) throws -> (
+        text: String,
+        converter: String,
+        detail: String,
+        emptyStatus: InstructionDocumentStatus,
+        emptyDetail: String
+    )? {
         #if canImport(PDFKit)
         if data.starts(with: Data("%PDF-".utf8)) {
-            guard let document = PDFDocument(data: data), !document.isEncrypted else {
+            guard let document = PDFDocument(data: data) else {
                 return (
-                    "", "pdfkit-text-v1", "", "The PDF is encrypted or malformed; original bytes were retained."
+                    "", "pdfkit-text-v1", "", .unresolvedConversion,
+                    "The PDF is malformed and PDFKit could not open it; original bytes were retained."
                 )
             }
-            let text = (0..<document.pageCount).compactMap { document.page(at: $0)?.string }
+            guard !document.isEncrypted else {
+                return (
+                    "", "pdfkit-text-v1", "", .unresolvedConversion,
+                    "The PDF is encrypted and cannot be converted without its password; original bytes were retained."
+                )
+            }
+            let text = (0..<document.pageCount).compactMap { index in
+                document.page(at: index)?.string.map { "[PDF page \(index + 1)]\n\($0)" }
+            }
                 .joined(separator: "\n\n")
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let recognized = recognizedPDFText(document) {
+                return (
+                    recognized,
+                    "vision-pdf-ocr-v1",
+                    "Recovered page-mapped text with the native Vision OCR adapter; the original PDF remains source-linked.",
+                    .unrepresentedVisualStructural,
+                    "PDF OCR produced no usable instruction text. The original PDF was retained for visual review."
+                )
+            }
             return (
-                text, "pdfkit-text-v1", "Extracted page text with PDFKit; the original PDF remains source-linked.",
+                text, "pdfkit-text-v1", "Extracted page-mapped text with PDFKit; the original PDF remains source-linked.",
+                .unrepresentedVisualStructural,
                 "PDFKit found no extractable text. The original PDF was retained for OCR or visual review."
             )
         }
@@ -2591,11 +2701,13 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             return (
                 attributed.string, converter,
                 "Converted with the native AppKit \(type?.rawValue ?? "document") adapter; original bytes remain source-linked.",
+                .unrepresentedVisualStructural,
                 "The native document adapter produced no usable text; original bytes were retained."
             )
         } catch {
             return (
                 "", converter, "",
+                .unresolvedConversion,
                 "The native document adapter could not convert this file: \(String(error.localizedDescription.prefix(512))). Original bytes were retained."
             )
         }
@@ -2622,6 +2734,77 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         }
         return (value, "utf-8")
     }
+
+    private static func isVisualDocument(path: String, data: Data) -> Bool {
+        let lower = path.lowercased()
+        if [".png", ".jpg", ".jpeg", ".gif", ".heic", ".heif", ".tif", ".tiff", ".bmp"]
+            .contains(where: lower.hasSuffix) {
+            return true
+        }
+        return data.starts(with: [0x89, 0x50, 0x4E, 0x47])
+            || data.starts(with: [0xFF, 0xD8, 0xFF])
+            || data.starts(with: Data("GIF8".utf8))
+            || data.starts(with: [0x49, 0x49, 0x2A, 0x00])
+            || data.starts(with: [0x4D, 0x4D, 0x00, 0x2A])
+    }
+
+    private static func recognizedImageText(_ data: Data) -> String? {
+        #if canImport(ImageIO) && canImport(Vision)
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(
+                source,
+                0,
+                [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 2_048,
+                ] as CFDictionary
+              ) else { return nil }
+        return recognizedText(in: image)
+        #else
+        return nil
+        #endif
+    }
+
+    #if canImport(PDFKit) && canImport(AppKit) && canImport(Vision)
+    private static func recognizedPDFText(_ document: PDFDocument) -> String? {
+        guard document.pageCount > 0, document.pageCount <= 128 else { return nil }
+        var pages: [String] = []
+        for index in 0..<document.pageCount {
+            guard let page = document.page(at: index) else { return nil }
+            let image = page.thumbnail(
+                of: NSSize(width: 2_048, height: 2_048),
+                for: .mediaBox
+            )
+            var rect = NSRect(origin: .zero, size: image.size)
+            guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil),
+                  let text = recognizedText(in: cgImage),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            pages.append("[PDF page \(index + 1) OCR]\n\(text)")
+        }
+        return pages.joined(separator: "\n\n")
+    }
+
+    private static func recognizedText(in image: CGImage) -> String? {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        do {
+            try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        } catch {
+            return nil
+        }
+        let lines = (request.results ?? []).compactMap {
+            $0.topCandidates(1).first?.string
+        }
+        guard !lines.isEmpty else { return nil }
+        return lines.joined(separator: "\n")
+    }
+    #elseif canImport(Vision)
+    private static func recognizedText(in image: CGImage) -> String? { nil }
+    #endif
 
     private static func relativePath(_ url: URL, root: URL) throws -> String {
         let base = root.standardizedFileURL.path

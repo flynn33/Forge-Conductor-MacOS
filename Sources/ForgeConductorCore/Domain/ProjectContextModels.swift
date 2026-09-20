@@ -136,6 +136,9 @@ public struct ToolInvocationContext: Codable, Sendable, Equatable {
     public let runID: RunID?
     public let providerSessionID: String?
     public let runtimeJobID: UUID?
+    /// Provider-reported capacity remaining at the current tool boundary. A
+    /// nil value means the host did not expose reliable usage for this turn.
+    public let remainingContextTokens: Int?
     public let authorizationScope: ToolAuthorizationScope
 
     public init(
@@ -145,6 +148,7 @@ public struct ToolInvocationContext: Codable, Sendable, Equatable {
         runID: RunID? = nil,
         providerSessionID: String? = nil,
         runtimeJobID: UUID? = nil,
+        remainingContextTokens: Int? = nil,
         authorizationScope: ToolAuthorizationScope
     ) {
         self.projectID = projectID
@@ -153,7 +157,21 @@ public struct ToolInvocationContext: Codable, Sendable, Equatable {
         self.runID = runID
         self.providerSessionID = providerSessionID
         self.runtimeJobID = runtimeJobID
+        self.remainingContextTokens = remainingContextTokens
         self.authorizationScope = authorizationScope
+    }
+
+    public func withRemainingContextTokens(_ value: Int?) -> ToolInvocationContext {
+        ToolInvocationContext(
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            clientID: clientID,
+            runID: runID,
+            providerSessionID: providerSessionID,
+            runtimeJobID: runtimeJobID,
+            remainingContextTokens: value,
+            authorizationScope: authorizationScope
+        )
     }
 }
 

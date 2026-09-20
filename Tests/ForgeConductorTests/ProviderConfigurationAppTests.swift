@@ -697,7 +697,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertGreaterThan(instructions.utf8.count, 1_048_576)
         XCTAssertLessThanOrEqual(
             bootstrap.utf8.count,
-            ProjectInstructionQueueStore.maximumMissionBytes
+            ProjectInstructionQueueStore.maximumBootstrapSummaryBytes
         )
 
         let request = OperatorRunStartRequest(

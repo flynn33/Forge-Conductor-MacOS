@@ -597,7 +597,9 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                         idempotencyKey: "\(sessionID):\(call.callID)"
                     ),
                     turnID: record.intent.turnID,
-                    context: providerContext,
+                    context: providerContext.withRemainingContextTokens(
+                        Self.remainingContextTokens(turn.usage)
+                    ),
                     lease: lease
                 )
                 let output = try JSONSupport.canonicalJSON(result.payload)
@@ -653,6 +655,11 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             code: "managed_provider_tool_round_limit",
             summary: "The provider exceeded the bounded tool-round limit"
         )
+    }
+
+    private static func remainingContextTokens(_ usage: ProviderUsage?) -> Int? {
+        guard let usage else { return nil }
+        return max(0, usage.capacity - min(usage.capacity, usage.totalTokens))
     }
 
     private static var sourceBudgetDeferral: ProjectRunStepOutcome {

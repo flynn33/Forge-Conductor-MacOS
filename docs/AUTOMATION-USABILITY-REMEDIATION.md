@@ -300,25 +300,32 @@ requiring a package-level catalog pass before mutation.
 
 Single files are inspected without an extension admission whitelist. Plain and
 structured text decode as UTF-8 or BOM-marked UTF-16; native PDFKit and AppKit
-adapters extract PDF, DOCX, RTF, and HTML text. Folder enumeration includes
-hidden configuration/instruction files. Empty selections report a specific
-no-instructions error. Opaque, malformed, encrypted, or image-only content is
-retained byte-for-byte and reported unresolved rather than silently omitted or
-misrepresented as understood; an unresolved next package cannot start.
+adapters extract page-mapped PDF, DOCX, RTF, and HTML text, with bounded native
+Vision OCR fallback for supported images and textless PDFs. Folder enumeration
+includes hidden configuration/instruction files. Empty selections report a
+specific no-instructions error. Every source is classified as converted
+instruction content, retained attachment, unrepresented visual/structural
+content, or unresolved conversion. Malformed and encrypted sources are named
+separately; unrepresented or unresolved content cannot produce false ready
+state.
 
 ZIP containers are inspected before extraction. Import rejects unsafe or
 duplicate paths, links and unsupported filesystem entries, encryption,
 unsupported compression, excessive entry/expanded size or expansion ratios,
 and local/central header disagreement. The native macOS `ditto` facility runs
-only after preflight under a bounded deadline, and Forge compares the extracted
-file inventory and sizes with the inspected container. Nested ZIPs are retained
-unresolved for separate bounded import rather than recursively expanded.
+only after preflight under a bounded deadline, observes task cancellation, and
+Forge compares the extracted file inventory and sizes with the inspected
+container before removing private staging. Nested ZIPs are retained unresolved
+for separate bounded import rather than recursively expanded.
 
 The registered read-only `instruction_catalog` and `instruction_read` tools
 require the active project, generation, and run identity. Catalog results page;
 document reads use bounded byte windows, validate hashes and UTF-8 cursor
 boundaries, and reassemble canonical content exactly after the original source
-is moved or deleted. Import conversion and immutable staging occur outside the
+is moved or deleted. Requested reads are reduced when necessary to fit the
+provider-reported remaining context and durable inline-result envelope; 64 KiB
+is an upper transport bound rather than a guaranteed page. Import conversion
+and immutable staging occur outside the
 queue mutation lock; atomic publication precedes the compact queue link, failed
 links remove only unreferenced new snapshots, and restart removes only
 UUID-named abandoned staging directories.
@@ -327,7 +334,9 @@ Queue metadata migrates transactionally from schema 1 or 2 to schema 3 while
 the immutable snapshot/catalog format remains schema 2. New optional records
 keep legacy package identities, ordering, active run linkage, and snapshots
 intact. The fixed 512-snapshot admission count is removed in
-favor of reference-aware removal. The current explicit safety budgets are
+favor of reference-aware removal. Queue refresh now pages 128 records at a time
+under one stable revision, while the existing document catalog and completion
+evidence remain paged. The current explicit safety budgets are
 4,096 source files, 128 MiB per file, 512 MiB per import, 4,096 queue rows,
 4,096 direct-run artifacts, 64 MiB queue metadata, and 64 KiB per delivery
 window; these are resource
@@ -342,11 +351,11 @@ exact project, generation, and run UUID without entering or reordering the
 package queue. Preparation and Start carry only the compact bootstrap and
 snapshot digest; the scoped readers reject every other run identity.
 
-This slice closes the artifact-backed text/rich-document and bounded ZIP storage,
-direct input-surface parity, and scoped-retrieval foundation of M3. Durable
-delivery progress and token-aware planning, catalog/history paging
-beyond the transitional queue metadata budget, and decisive non-text asset
-representation remain open before M3 can be declared complete.
+Revision 3 closes the remaining artifact-input workstream: direct input-surface
+parity, bounded cancellable ZIP extraction, durable restart/rollover delivery
+coverage, provider-context-aware page sizing, document/catalog/queue/evidence
+paging, and decisive non-text asset accounting are implemented. Distribution
+qualification and the broader integrated acceptance phase remain separate.
 
 The original revision-2 focused contracts completed M1 shared preparation and
 M2 native tool selection and began M3. Revision 3 has since supplied contextual

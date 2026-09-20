@@ -5,6 +5,9 @@ import Foundation
 
 public struct InstructionArtifactToolPack: ToolPackHandling {
     public static let names = ["instruction_catalog", "instruction_read"]
+    static let responseEnvelopeReserveBytes = 4 * 1_024
+    static let contextContinuationReserveTokens = 2 * 1_024
+    static let conservativeUTF8BytesPerToken = 2
 
     public var toolNames: [String] { Self.names }
 
@@ -55,6 +58,11 @@ public struct InstructionArtifactToolPack: ToolPackHandling {
                 guard let documentID = arguments["document_id"] as? String else {
                     throw ProjectInstructionQueueError.invalidRequest("document_id is required")
                 }
+                let requestedMaximum = arguments["maximum_bytes"] as? Int ?? 32 * 1_024
+                let effectiveMaximum = try Self.effectiveMaximumBytes(
+                    requested: requestedMaximum,
+                    context: context
+                )
                 let page = try store.readDocument(
                     contentSHA256: digest,
                     documentID: documentID,
@@ -62,7 +70,7 @@ public struct InstructionArtifactToolPack: ToolPackHandling {
                     generation: context.projectGeneration,
                     runID: context.runID,
                     byteOffset: arguments["byte_offset"] as? Int ?? 0,
-                    maximumBytes: arguments["maximum_bytes"] as? Int ?? 32 * 1_024
+                    maximumBytes: effectiveMaximum
                 )
                 return .success([
                     "snapshot_sha256": digest,
@@ -73,6 +81,9 @@ public struct InstructionArtifactToolPack: ToolPackHandling {
                     "next_byte_offset": page.nextByteOffset as Any,
                     "total_bytes": page.totalBytes,
                     "sha256": page.sha256,
+                    "requested_maximum_bytes": requestedMaximum,
+                    "effective_maximum_bytes": effectiveMaximum,
+                    "remaining_context_tokens": context.remainingContextTokens as Any,
                 ].compactNSNull())
             default:
                 return nil
@@ -86,5 +97,46 @@ public struct InstructionArtifactToolPack: ToolPackHandling {
                 retryable: false
             )
         }
+    }
+
+    static func effectiveMaximumBytes(
+        requested: Int,
+        context: ToolInvocationContext
+    ) throws -> Int {
+        guard (1...ProjectInstructionQueueStore.maximumDeliveryBytes).contains(requested) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction delivery byte budget is outside its supported range."
+            )
+        }
+        let inlineBudget = context.authorizationScope.maximumInlineOutputBytes
+            - responseEnvelopeReserveBytes
+        guard inlineBudget > 0 else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "The current inline result budget is too small for instruction delivery."
+            )
+        }
+        var effective = min(
+            requested,
+            ProjectInstructionQueueStore.maximumDeliveryBytes,
+            inlineBudget
+        )
+        if let remaining = context.remainingContextTokens {
+            let usableTokens = remaining - contextContinuationReserveTokens
+            guard usableTokens > 0 else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "The current provider context budget cannot safely accept another instruction page. Continue after the managed rollover."
+                )
+            }
+            let contextBytes = usableTokens.multipliedReportingOverflow(
+                by: conservativeUTF8BytesPerToken
+            )
+            effective = min(effective, contextBytes.overflow ? Int.max : contextBytes.partialValue)
+        }
+        guard effective > 0 else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "The current provider context budget cannot safely accept another instruction page."
+            )
+        }
+        return effective
     }
 }

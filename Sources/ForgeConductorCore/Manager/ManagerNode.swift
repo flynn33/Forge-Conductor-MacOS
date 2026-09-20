@@ -1674,12 +1674,16 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     public func instructionQueue(
         projectID: ProjectID,
-        expectedGeneration: ProjectGeneration
+        expectedGeneration: ProjectGeneration,
+        cursor: Int = 0,
+        limit: Int = 128
     ) throws -> [String: Any] {
         try requireActiveProject(projectID, generation: expectedGeneration)
-        return try instructionQueueStore().snapshot(
+        return try instructionQueueStore().snapshotPage(
             projectID: projectID,
-            generation: expectedGeneration
+            generation: expectedGeneration,
+            cursor: cursor,
+            limit: limit
         ).asDictionary()
     }
 

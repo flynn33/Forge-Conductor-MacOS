@@ -85,13 +85,18 @@ product set.
 5. Add instruction packages to the registered project. Files are admitted by
    inspected content rather than a filename whitelist. Forge preserves the
    originals, normalizes UTF-8/UTF-16 and supported native PDF, DOCX, RTF, and
-   HTML text into an immutable catalog, includes hidden files in folder and ZIP
-   inventories, and reports opaque or malformed content instead of dropping it.
+   HTML text into an immutable catalog, uses bounded native Vision OCR when a
+   visual source has no ordinary text representation, includes hidden files in
+   folder and ZIP inventories, and reports each retained attachment,
+   unrepresented visual/structural source, or unresolved conversion instead of
+   dropping it.
    ZIPs are preflighted for traversal, links, encryption, unsupported
    compression, excessive expansion, and bounded size before native extraction;
    nested ZIPs are retained for separate review rather than expanded recursively.
-   Large instruction bodies remain in the artifact rather than the run mission;
-   managed runs page them through project/run-bound read-only tools.
+   Large instruction bodies remain in the artifact rather than the compact run
+   bootstrap summary; managed runs page them through project/run-bound read-only
+   tools sized against both the transport ceiling and current provider context.
+   Large queue refreshes are also loaded in stable revision-bound pages.
 6. In **Autonomy**, select the project and one or more existing instruction
    packages in their displayed order, or type, paste, drop, or add a file,
    folder, or ZIP, then select **Start Task**. A single existing package keeps

@@ -325,7 +325,10 @@ final class ProjectInstructionQueueTests: XCTestCase {
                 generation: .initial
             )
             let package = try XCTUnwrap(snapshot.packages.last)
-            XCTAssertLessThanOrEqual(package.mission.utf8.count, ProjectInstructionQueueStore.maximumMissionBytes)
+            XCTAssertLessThanOrEqual(
+                package.mission.utf8.count,
+                ProjectInstructionQueueStore.maximumBootstrapSummaryBytes
+            )
             XCTAssertEqual(package.instructionByteCount, count)
             XCTAssertEqual(package.unresolvedDocumentCount, 0)
             XCTAssertTrue(package.allowedTools.contains("instruction_read"))
@@ -349,7 +352,7 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertGreaterThan(imported.instructionByteCount, 1_048_576)
         XCTAssertLessThanOrEqual(
             imported.mission.utf8.count,
-            ProjectInstructionQueueStore.maximumMissionBytes
+            ProjectInstructionQueueStore.maximumBootstrapSummaryBytes
         )
         XCTAssertEqual(imported.unresolvedDocumentCount, 0)
         XCTAssertTrue(try fixture.store.snapshot(
@@ -478,6 +481,43 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertLessThan(encoded.count, 8 * 1_024)
     }
 
+    func testInstructionReadBudgetUsesCurrentProviderContextAndInlineEnvelope() throws {
+        let authorization = ToolAuthorizationScope(
+            canonicalRoots: [URL(fileURLWithPath: "/tmp")],
+            allowedTools: ["instruction_read"],
+            networkAllowed: false,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        let base = ToolInvocationContext(
+            projectID: ProjectID(),
+            projectGeneration: .initial,
+            clientID: ClientID("instruction-budget-test"),
+            runID: RunID(),
+            authorizationScope: authorization
+        )
+
+        XCTAssertEqual(
+            try InstructionArtifactToolPack.effectiveMaximumBytes(
+                requested: ProjectInstructionQueueStore.maximumDeliveryBytes,
+                context: base
+            ),
+            60 * 1_024
+        )
+        XCTAssertEqual(
+            try InstructionArtifactToolPack.effectiveMaximumBytes(
+                requested: 32 * 1_024,
+                context: base.withRemainingContextTokens(3_000)
+            ),
+            1_904
+        )
+        XCTAssertThrowsError(try InstructionArtifactToolPack.effectiveMaximumBytes(
+            requested: 1,
+            context: base.withRemainingContextTokens(2_048)
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("managed rollover"))
+        }
+    }
+
     func testSelectedPackagesBindByImmutableHashAndComposeInVisibleOrder() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -585,6 +625,41 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
         XCTAssertEqual(page.totalDocuments, 66)
         XCTAssertTrue(page.documents.contains { $0["source_path"] == ".hidden-policy.yaml" })
+    }
+
+    func testInstructionQueuePagesMoreThanOneHundredTwentyEightPackages() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.external.appendingPathComponent("shared.txt")
+        try "Shared instruction.".write(to: source, atomically: true, encoding: .utf8)
+        for _ in 0..<130 {
+            _ = try fixture.store.importPackage(
+                sourceURL: source,
+                projectID: fixture.projectID,
+                generation: .initial
+            )
+        }
+
+        let first = try fixture.store.snapshotPage(
+            projectID: fixture.projectID,
+            generation: .initial,
+            cursor: 0,
+            limit: 128
+        )
+        XCTAssertEqual(first.totalPackages, 130)
+        XCTAssertEqual(first.packages.count, 128)
+        XCTAssertEqual(first.nextCursor, 128)
+        let second = try fixture.store.snapshotPage(
+            projectID: fixture.projectID,
+            generation: .initial,
+            cursor: try XCTUnwrap(first.nextCursor),
+            limit: 128
+        )
+        XCTAssertEqual(second.revision, first.revision)
+        XCTAssertEqual(second.cursor, 128)
+        XCTAssertEqual(second.packages.count, 2)
+        XCTAssertNil(second.nextCursor)
+        XCTAssertEqual(second.packages.map(\.position), [128, 129])
     }
 
     func testUTF16CanonicalDeliveryReassemblesExactlyAtScalarBoundaries() throws {
@@ -705,6 +780,74 @@ final class ProjectInstructionQueueTests: XCTestCase {
         }
     }
 
+    func testMixedFormatPackageAccountsForUTF16PDFDOCXRTFHTMLAndJSON() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let directory = fixture.external.appendingPathComponent("mixed", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        var utf16 = Data([0xFF, 0xFE])
+        utf16.append("UTF16 instruction".data(using: .utf16LittleEndian)!)
+        try utf16.write(to: directory.appendingPathComponent("policy.txt"))
+        try Data(#"{"instruction":"JSON instruction"}"#.utf8)
+            .write(to: directory.appendingPathComponent("policy.json"))
+        try Data("<html><body>HTML instruction</body></html>".utf8)
+            .write(to: directory.appendingPathComponent("policy.html"))
+
+        let rtf = NSAttributedString(string: "RTF instruction")
+        try rtf.data(
+            from: NSRange(location: 0, length: rtf.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ).write(to: directory.appendingPathComponent("policy.rtf"))
+        let docx = NSAttributedString(string: "DOCX instruction")
+        try docx.data(
+            from: NSRange(location: 0, length: docx.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML]
+        ).write(to: directory.appendingPathComponent("policy.docx"))
+        let pdfView = NSTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 200))
+        pdfView.string = "PDF instruction"
+        try pdfView.dataWithPDF(inside: pdfView.bounds)
+            .write(to: directory.appendingPathComponent("policy.pdf"))
+
+        let imported = try fixture.store.importPackage(
+            sourceURL: directory,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.documentCount, 6)
+        XCTAssertEqual(package.unresolvedDocumentCount, 0)
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: package.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: nil,
+            cursor: 0,
+            limit: 10
+        )
+        XCTAssertEqual(Set(catalog.documents.compactMap { $0["source_path"] }), [
+            "policy.docx", "policy.html", "policy.json", "policy.pdf", "policy.rtf", "policy.txt",
+        ])
+        XCTAssertEqual(
+            Set(catalog.documents.compactMap { $0["status"] }),
+            ["converted_instruction"]
+        )
+        let pdfDocument = try XCTUnwrap(catalog.documents.first {
+            $0["source_path"] == "policy.pdf"
+        })
+        let pdfPage = try fixture.store.readDocument(
+            contentSHA256: package.contentSHA256,
+            documentID: try XCTUnwrap(pdfDocument["id"]),
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: nil,
+            byteOffset: 0,
+            maximumBytes: 4_096
+        )
+        XCTAssertTrue(pdfPage.content.contains("[PDF page 1]"))
+        XCTAssertTrue(pdfPage.content.contains("PDF instruction"))
+    }
+
     func testMalformedPDFIsRetainedWithActionableUnresolvedStatus() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -726,7 +869,36 @@ final class ProjectInstructionQueueTests: XCTestCase {
             limit: 10
         )
         XCTAssertEqual(catalog.documents.first?["status"], "unresolved_conversion")
-        XCTAssertTrue(catalog.documents.first?["detail"]?.contains("encrypted or malformed") == true)
+        XCTAssertTrue(catalog.documents.first?["detail"]?.contains("malformed") == true)
+        XCTAssertFalse(catalog.documents.first?["detail"]?.contains("encrypted") == true)
+    }
+
+    func testVisualSourceIsRetainedAndNamedAsUnrepresented() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.external.appendingPathComponent("scanned-policy.png")
+        try Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]).write(to: source)
+
+        let imported = try fixture.store.importPackage(
+            sourceURL: source,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.unresolvedDocumentCount, 1)
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: package.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: nil,
+            cursor: 0,
+            limit: 10
+        )
+        XCTAssertEqual(
+            catalog.documents.first?["status"],
+            "unrepresented_visual_structural"
+        )
+        XCTAssertTrue(catalog.documents.first?["detail"]?.contains("visual review") == true)
     }
 
     func testZIPImportInventoriesHiddenAndNativeDocumentsWithoutExecutingAssets() throws {

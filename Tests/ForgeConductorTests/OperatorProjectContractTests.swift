@@ -1135,6 +1135,75 @@ final class OperatorProjectContractTests: XCTestCase {
         )
     }
 
+    func testInstructionQueueClientLoadsStableBoundedPages() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        func package(_ position: Int) -> [String: Any] {
+            [
+                "id": UUID().uuidString.lowercased(),
+                "project_id": projectID,
+                "project_generation": UInt64(3),
+                "package_id": "package-\(position)",
+                "version": "1",
+                "display_name": "Package \(position)",
+                "mission": "Follow package \(position).",
+                "source_path": "/tmp/package-\(position).md",
+                "content_sha256": String(repeating: position == 0 ? "a" : "b", count: 64),
+                "allowed_tools": ["instruction_catalog", "instruction_read"],
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                "position": position,
+                "state": "queued",
+                "created_at": "2026-09-18T00:00:00Z",
+                "updated_at": "2026-09-18T00:00:00Z",
+            ]
+        }
+        let first = try JSONSupport.data(from: [
+            "project_id": projectID,
+            "project_generation": UInt64(3),
+            "revision": UInt64(9),
+            "running": false,
+            "total_packages": 2,
+            "cursor": 0,
+            "next_cursor": 1,
+            "packages": [package(0)],
+        ])
+        let second = try JSONSupport.data(from: [
+            "project_id": projectID,
+            "project_generation": UInt64(3),
+            "revision": UInt64(9),
+            "running": false,
+            "total_packages": 2,
+            "cursor": 1,
+            "packages": [package(1)],
+        ])
+        OperatorProjectContractURLProtocol.configure(
+            responses: [:],
+            responseSequences: [
+                "/api/manager/projects/instruction-packages": [first, second],
+            ]
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        )
+
+        let loaded = try await client.instructionQueue(projectID: projectID, generation: 3)
+        XCTAssertEqual(loaded.packages.map(\.position), [0, 1])
+        XCTAssertEqual(loaded.totalPackages, 2)
+        let bodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/projects/instruction-packages"
+        )
+        XCTAssertEqual(bodies.count, 2)
+        let continuation = try JSONSupport.object(from: bodies[1])
+        XCTAssertEqual(continuation["cursor"] as? Int, 1)
+        XCTAssertEqual(continuation["limit"] as? Int, 128)
+    }
+
     func testCommittedRegistrationFetchesFullProjectWithoutLosingReconciledFlag() async throws {
         let projectID = UUID().uuidString.lowercased()
         let project = try Self.project(

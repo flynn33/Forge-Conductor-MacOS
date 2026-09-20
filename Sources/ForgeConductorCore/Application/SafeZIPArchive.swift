@@ -154,6 +154,7 @@ struct SafeZIPArchive {
     }
 
     static func extract(_ inspectedData: Data, to destination: URL, expected: [Entry]) throws {
+        if Task.isCancelled { throw CancellationError() }
         let inspectedArchive = destination.deletingLastPathComponent().appendingPathComponent(
             "forge-inspected-\(UUID().uuidString.lowercased()).zip"
         )
@@ -183,7 +184,20 @@ struct SafeZIPArchive {
         process.terminationHandler = { _ in finished.signal() }
         do { try process.run() }
         catch { throw SafeZIPArchiveError.extractionFailed(error.localizedDescription) }
-        guard finished.wait(timeout: .now() + extractionDeadline) == .success else {
+        let deadline = Date().addingTimeInterval(extractionDeadline)
+        var completed = false
+        while Date() < deadline {
+            if finished.wait(timeout: .now() + .milliseconds(100)) == .success {
+                completed = true
+                break
+            }
+            if Task.isCancelled {
+                process.terminate()
+                _ = finished.wait(timeout: .now() + 5)
+                throw CancellationError()
+            }
+        }
+        guard completed else {
             process.terminate()
             _ = finished.wait(timeout: .now() + 5)
             throw SafeZIPArchiveError.extractionFailed("the native extractor exceeded its 60-second deadline")

@@ -29,6 +29,23 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Renamed the former mission-size limit as a compact bootstrap-summary budget;
+  32,767-, 32,768-, 32,769-byte, multi-megabyte, and multi-document instruction
+  sources remain artifact-backed rather than rejected or truncated.
+- Made `instruction_read` page size responsive to the provider-reported
+  remaining context and durable inline-result envelope while retaining 64 KiB
+  only as an upper transport bound. Accepted catalog/read coverage continues
+  through restart and managed rollover.
+- Added stable-revision paging for large instruction queues and client-side page
+  reconciliation, complementing the existing paged document catalog and
+  completion-evidence history.
+- Added explicit `unrepresented_visual_structural` accounting, page-mapped PDF
+  text, native Vision OCR fallback for supported images and scanned PDFs, and
+  distinct malformed-versus-encrypted conversion reports. Unsupported content
+  remains preserved and prevents false ready state.
+- Made bounded ZIP extraction observe task cancellation while retaining path,
+  link/device, duplicate, compression, expansion-ratio, total-byte, deadline,
+  staging-cleanup, and extracted-inventory protections.
 - Replaced the Provider setup sequence with one cancellable, manager-owned
   **Connect and check** workflow shared by ordinary task preparation and the
   Provider view. It preserves explicit model pins, selects only a sole loaded
