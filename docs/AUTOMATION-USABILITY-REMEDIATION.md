@@ -351,12 +351,57 @@ representation remain open before M3 can be declared complete.
 The original revision-2 focused contracts completed M1 shared preparation and
 M2 native tool selection and began M3. Revision 3 has since supplied contextual
 Guided Mode and the AC-01 through AC-04 automatic-completion implementation
-described above. This still does not claim live provider lifecycle automation,
-whole-journey acceptance, source-bound candidate qualification, distribution,
-or shipment; their current state remains in `ROADMAP.md`.
+described above. Revision 3 now also supplies the manager-owned Provider and
+runtime preparation described below. This still does not claim automatic
+external model loading, whole-journey acceptance, source-bound candidate
+qualification, distribution, or shipment; their current state remains in
+`ROADMAP.md`.
+
+## Revision-3 provider and runtime completion — PR-01 through PR-03 and RT-01 through RT-03
+
+Ordinary **Start Task** and the Provider tab now invoke the same authenticated,
+manager-owned **Connect and check** operation. It starts from the saved
+configuration or a supported loopback default, inventories the provider,
+preserves an explicit model pin, auto-selects only a sole compatible loaded
+model, verifies the request/tool contract, and persists a mode-`0600` readiness
+receipt bound to the exact configuration revision. An exact receipt may be
+reused for at most five minutes. Credential values never enter the response or
+receipt.
+
+Readiness failures return one typed recovery action: start the service, select
+a model, load the selected model, install a compatible model, supply a
+credential, or retry. Start submits no run while action is required. Forge does
+not claim to load an external provider model when the provider exposes no
+supported authenticated loading API.
+
+The runtime resolver derives `required`, `optional`, or `not_needed` only from
+explicit selected tools, the frozen completion plan, structured instruction
+requirements, and saved runtime preferences; it does not infer requirements
+from task prose. Executable probes retain the distinct states `available`,
+`not_installed`, `disabled_by_policy`, `not_authorized`, `probe_failed`, and
+`unknown`, so a missing path alone cannot be mislabeled as an installation
+failure. The Runtimes tab leads with requirements, reasons, availability, and
+one recovery action for the selected task. Paths, quotas, migration details,
+and identifiers are Technical details, while shell authorization is explicitly
+labeled as an application-wide policy rather than a per-task setting.
 
 ## Verification
 
+- PR-01 through PR-03 and RT-01 through RT-03 verification covers sole-compatible
+  model selection, pin preservation, idempotent revision-bound readiness,
+  credential redaction, task-start reuse, exact external actions, irrelevant
+  missing runtimes, required missing runtimes, legacy nil-path decoding, and
+  truthful application-wide shell scope. Seven deterministic Phase 5 cases
+  pass with one explicit live-only skip; the separately enabled live LM Studio
+  case passed 1/1. Provider configuration passed 14/14 with one explicit
+  disposable-Keychain skip, app provider contracts passed 11/11, operator
+  contracts passed 10/10, dashboard security passed 7/7, and the focused
+  runtime discovery case passed 1/1. Both SwiftPM products, the canonical Apple
+  Development-signed Debug app, and the universal Xcode Core test target built;
+  the new source and test compiled in their canonical targets. One mismatched
+  app-test filter selected zero tests and a later focused native UI run timed out
+  while enabling macOS automation before executing the test; neither is counted
+  as a pass.
 - AC-01 through AC-04 verification covers deterministic replay, read-only versus repair
   classification, SwiftPM build/test detection, explicit custom-policy
   obligations, direct and queued persistence, exact source/project/generation

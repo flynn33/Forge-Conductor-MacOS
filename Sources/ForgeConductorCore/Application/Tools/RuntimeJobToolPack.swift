@@ -428,6 +428,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             "available": capability.available,
             "executable_path": capability.executablePath as Any,
             "required": capability.required,
+            "status": capability.probeState.rawValue,
         ]
     }
 

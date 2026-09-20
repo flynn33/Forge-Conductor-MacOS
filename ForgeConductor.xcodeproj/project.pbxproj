@@ -137,6 +137,7 @@
 		A26B00000000000000000008 /* Application/ProjectContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000008 /* Application/ProjectContextService.swift */; };
 		A26B00000000000000000009 /* Application/ProjectRunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */; };
 		A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */; };
+		D51B00000000000000000001 /* Application/RuntimeRequirementResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51F00000000000000000001 /* Application/RuntimeRequirementResolver.swift */; };
 		A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */; };
 		A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */; };
 		A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */; };
@@ -225,6 +226,7 @@
 		B09B00000000000000000051 /* Domain/ProviderConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */; };
 		B09B00000000000000000052 /* Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000052 /* Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift */; };
 		B09B00000000000000000053 /* ProviderConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000053 /* ProviderConfigurationTests.swift */; };
+		D52B00000000000000000001 /* ProviderRuntimePreparationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D52F00000000000000000001 /* ProviderRuntimePreparationTests.swift */; };
 		B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */; };
 		B09B00000000000000000055 /* ProductionOnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000055 /* ProductionOnboardingUITests.swift */; };
 		B09B00000000000000000056 /* NativeGaugeLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */; };
@@ -702,6 +704,7 @@
 		A26F00000000000000000008 /* Application/ProjectContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectContextService.swift; sourceTree = "<group>"; };
 		A26F00000000000000000009 /* Application/ProjectRunCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProjectRunCoordinator.swift; sourceTree = "<group>"; };
 		A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/RuntimeJobSubsystem.swift; sourceTree = "<group>"; };
+		D51F00000000000000000001 /* Application/RuntimeRequirementResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/RuntimeRequirementResolver.swift; sourceTree = "<group>"; };
 		A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolDefinitionCatalog.swift; sourceTree = "<group>"; };
 		A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ToolInvocationBroker.swift; sourceTree = "<group>"; };
 		A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/Tools/RuntimeJobToolPack.swift; sourceTree = "<group>"; };
@@ -768,6 +771,7 @@
 		B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProviderConfigurationService.swift; sourceTree = "<group>"; };
 		B09F00000000000000000052 /* Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift; sourceTree = SOURCE_ROOT; };
 		B09F00000000000000000053 /* ProviderConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationTests.swift; sourceTree = "<group>"; };
+		D52F00000000000000000001 /* ProviderRuntimePreparationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRuntimePreparationTests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationAppTests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000055 /* ProductionOnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOnboardingUITests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGaugeLifecycleTests.swift; sourceTree = "<group>"; };
@@ -1096,6 +1100,7 @@
 				P10F00000000000000000016 /* LifecycleOwnershipTests.swift */,
 				P10F00000000000000000017 /* NativeSessionHostPluginTests.swift */,
 				B09F00000000000000000053 /* ProviderConfigurationTests.swift */,
+				D52F00000000000000000001 /* ProviderRuntimePreparationTests.swift */,
 				P10F00000000000000000018 /* ProjectMemoryTests.swift */,
 				P10F00000000000000000019 /* ResourcePolicyTests.swift */,
 				P10F00000000000000000020 /* RuntimeObservabilityTests.swift */,
@@ -1361,6 +1366,7 @@
 				C92F00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift */,
 				C93F00000000000000000001 /* Application/SafeZIPArchive.swift */,
 				A26F00000000000000000010 /* Application/RuntimeJobSubsystem.swift */,
+				D51F00000000000000000001 /* Application/RuntimeRequirementResolver.swift */,
 				A26F00000000000000000011 /* Application/ToolDefinitionCatalog.swift */,
 				A26F00000000000000000012 /* Application/ToolInvocationBroker.swift */,
 				A26F00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift */,
@@ -1920,6 +1926,7 @@
 				P10B00000000000000000016 /* LifecycleOwnershipTests.swift in Sources */,
 				P10B00000000000000000017 /* NativeSessionHostPluginTests.swift in Sources */,
 				B09B00000000000000000053 /* ProviderConfigurationTests.swift in Sources */,
+				D52B00000000000000000001 /* ProviderRuntimePreparationTests.swift in Sources */,
 				B09B00000000000000000059 /* ProjectContentClearTests.swift in Sources */,
 				P10B00000000000000000018 /* ProjectMemoryTests.swift in Sources */,
 				P10B00000000000000000019 /* ResourcePolicyTests.swift in Sources */,
@@ -2164,6 +2171,7 @@
 				C92B00000000000000000001 /* Application/Tools/InstructionArtifactToolPack.swift in Sources */,
 				C93B00000000000000000001 /* Application/SafeZIPArchive.swift in Sources */,
 				A26B00000000000000000010 /* Application/RuntimeJobSubsystem.swift in Sources */,
+				D51B00000000000000000001 /* Application/RuntimeRequirementResolver.swift in Sources */,
 				A26B00000000000000000011 /* Application/ToolDefinitionCatalog.swift in Sources */,
 				A26B00000000000000000012 /* Application/ToolInvocationBroker.swift in Sources */,
 				A26B00000000000000000013 /* Application/Tools/RuntimeJobToolPack.swift in Sources */,

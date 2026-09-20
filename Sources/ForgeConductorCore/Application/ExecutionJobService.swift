@@ -164,7 +164,8 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
             directProcess: RuntimeExecutableCapability(
                 available: isolationAvailable,
                 executablePath: isolationAvailable ? RuntimeProcessSandbox.executable.path : nil,
-                required: true
+                required: true,
+                probeState: isolationAvailable ? .available : .unknown
             ),
             zsh: zsh,
             bash: bash,
@@ -193,7 +194,9 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
                 return RuntimeExecutableCapability(
                     available: false,
                     executablePath: nil,
-                    required: false
+                    required: false,
+                    probeState: FileManager.default.fileExists(atPath: configured.path)
+                        ? .notAuthorized : .notInstalled
                 )
             }
             return verifiedPythonCapability(
@@ -213,11 +216,13 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         }
         guard let discovered = ProcessRunner.which("python3"),
               discovered != "/usr/bin/python3" else {
-            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false)
+            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
+                                               probeState: .notInstalled)
         }
         let discoveredURL = URL(fileURLWithPath: discovered)
         guard RuntimeProcessSandbox.isImmutableSystemRuntime(discoveredURL) else {
-            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false)
+            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
+                                               probeState: .notAuthorized)
         }
         return verifiedPythonCapability(
             discoveredURL,
@@ -239,7 +244,8 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         }
         guard let candidate,
               RuntimeProcessSandbox.isImmutableSystemRuntime(candidate) else {
-            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false)
+            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
+                                               probeState: candidate == nil ? .notInstalled : .notAuthorized)
         }
         return verifiedPowerShellCapability(
             candidate,
@@ -274,17 +280,25 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         isolationAvailable: Bool,
         probe: (URL) -> Bool
     ) -> RuntimeExecutableCapability {
-        guard isolationAvailable else { return unavailableOptionalCapability() }
+        guard isolationAvailable else { return unavailableOptionalCapability(state: .unknown) }
         let canonical = RuntimeProcessSandbox.canonicalExistingURL(candidate)
+        guard FileManager.default.fileExists(atPath: canonical.path) else {
+            return unavailableOptionalCapability(state: .notInstalled)
+        }
         guard RuntimeProcessSandbox.isImmutableSystemRuntime(canonical),
-              FileManager.default.isExecutableFile(atPath: canonical.path),
-              probe(canonical) else {
-            return unavailableOptionalCapability()
+              FileManager.default.isExecutableFile(atPath: canonical.path) else {
+            return RuntimeExecutableCapability(available: false, executablePath: canonical.path,
+                                               required: false, probeState: .notAuthorized)
+        }
+        guard probe(canonical) else {
+            return RuntimeExecutableCapability(available: false, executablePath: canonical.path,
+                                               required: false, probeState: .probeFailed)
         }
         return RuntimeExecutableCapability(
             available: true,
             executablePath: canonical.path,
-            required: false
+            required: false,
+            probeState: .available
         )
     }
 
@@ -363,8 +377,11 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         return true
     }
 
-    private static func unavailableOptionalCapability() -> RuntimeExecutableCapability {
-        RuntimeExecutableCapability(available: false, executablePath: nil, required: false)
+    private static func unavailableOptionalCapability(
+        state: RuntimeExecutableProbeState
+    ) -> RuntimeExecutableCapability {
+        RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
+                                    probeState: state)
     }
 
     private static func capability(
@@ -378,7 +395,10 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         return RuntimeExecutableCapability(
             available: available,
             executablePath: available ? canonical.path : nil,
-            required: required
+            required: required,
+            probeState: available
+                ? .available
+                : (isolationAvailable ? .notInstalled : .unknown)
         )
     }
 }

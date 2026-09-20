@@ -29,6 +29,21 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Replaced the Provider setup sequence with one cancellable, manager-owned
+  **Connect and check** workflow shared by ordinary task preparation and the
+  Provider view. It preserves explicit model pins, selects only a sole loaded
+  compatible model automatically, performs the contract probe, persists a
+  bounded revision-matched readiness receipt, and returns one typed recovery
+  action when external work is required.
+- Redesigned Provider to lead with model-connection readiness and moved endpoint,
+  exact model, credential, inventory, and probe internals under **Advanced
+  connection settings**.
+- Added task-oriented runtime requirements with explicit required, optional, and
+  not-needed reasons. Runtime availability now distinguishes available, not
+  installed, disabled by the application-wide policy, unauthorized, failed
+  probe, and unknown; job purpose and result precede technical identifiers.
+- Corrected the runtime shell-policy label from project-scoped to
+  application-wide, matching the persisted Manager setting it actually changes.
 - Redesigned Continuity around automatic task protection. The primary view now
   shows the task, plain-language protection state, relative last-save time,
   working-context availability, and next automatic action; technical operation,

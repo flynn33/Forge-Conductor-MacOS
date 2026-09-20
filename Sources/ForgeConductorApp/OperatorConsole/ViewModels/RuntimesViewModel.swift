@@ -73,7 +73,7 @@ final class RuntimesViewModel: ObservableObject {
                 settings = try await client.updateSettings(
                     ManagerSettingsPatch(shellEnabled: enabled)
                 )
-                notice = enabled ? "Project shell tools enabled." : "Project shell tools disabled by operator policy."
+                notice = enabled ? "Application-wide shell tools enabled." : "Application-wide shell tools disabled by operator policy."
             } catch {
                 errorMessage = error.localizedDescription
             }

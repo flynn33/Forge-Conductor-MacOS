@@ -1371,6 +1371,53 @@ public enum ManagerProviderProbeError: Error, LocalizedError, Sendable, Equatabl
     }
 }
 
+public enum ManagerProviderPreparationState: String, Codable, Sendable, CaseIterable {
+    case ready
+    case actionRequired = "action_required"
+}
+
+public struct ManagerProviderPreparationResult: Codable, Sendable, Equatable {
+    public static let schemaVersion = 1
+
+    public let schemaVersion: Int
+    public let state: ManagerProviderPreparationState
+    public let recoveryAction: ProviderPreparationRecoveryAction
+    public let detail: String
+    public let configuration: ProviderConfigurationSnapshot
+    public let provider: ManagerOperatorProvider?
+
+    public init(
+        state: ManagerProviderPreparationState,
+        recoveryAction: ProviderPreparationRecoveryAction,
+        detail: String,
+        configuration: ProviderConfigurationSnapshot,
+        provider: ManagerOperatorProvider? = nil
+    ) {
+        schemaVersion = Self.schemaVersion
+        self.state = state
+        self.recoveryAction = recoveryAction
+        self.detail = detail
+        self.configuration = configuration
+        self.provider = provider
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(self)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ManagerModelError.invalidOperatorSnapshot
+        }
+        return object
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case state, detail, configuration, provider
+        case schemaVersion = "schema_version"
+        case recoveryAction = "recovery_action"
+    }
+}
+
 public struct ManagerOperatorProvider: Codable, Sendable, Equatable {
     public let adapterID: String?
     public let providerID: String?
@@ -1426,13 +1473,14 @@ public struct ManagerOperatorProvider: Codable, Sendable, Equatable {
     }
 }
 
-public struct ManagerOperatorRuntimeExecutable: Encodable, Sendable, Equatable {
+public struct ManagerOperatorRuntimeExecutable: Codable, Sendable, Equatable {
     public let available: Bool
     public let path: String?
     public let version: String?
+    public let status: RuntimeExecutableProbeState
 }
 
-public struct ManagerOperatorRuntime: Encodable, Sendable, Equatable {
+public struct ManagerOperatorRuntime: Codable, Sendable, Equatable {
     public let direct: ManagerOperatorRuntimeExecutable
     public let zsh: ManagerOperatorRuntimeExecutable
     public let bash: ManagerOperatorRuntimeExecutable
@@ -1444,6 +1492,8 @@ public struct ManagerOperatorRuntime: Encodable, Sendable, Equatable {
     public let maximumArtifactBytesPerJob: Int
     public let networkPolicy: String
     public let shellPolicyMigrationState: String
+    public let selectedTaskID: String?
+    public let requirements: [RuntimeRequirementResolution]
 
     enum CodingKeys: String, CodingKey {
         case direct, zsh, bash, python, powershell
@@ -1453,6 +1503,8 @@ public struct ManagerOperatorRuntime: Encodable, Sendable, Equatable {
         case maximumArtifactBytesPerJob = "maximum_artifact_bytes_per_job"
         case networkPolicy = "network_policy"
         case shellPolicyMigrationState = "shell_policy_migration_state"
+        case selectedTaskID = "selected_task_id"
+        case requirements
     }
 }
 

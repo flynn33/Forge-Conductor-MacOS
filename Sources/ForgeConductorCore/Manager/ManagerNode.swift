@@ -50,6 +50,21 @@ private struct ManagerPreparedRunContext: Sendable {
     let resolved: ManagerResolvedRunPreparation
 }
 
+private struct ManagerProviderReadinessReceipt: Codable, Sendable {
+    static let schemaVersion = 1
+    let schemaVersion: Int
+    let configurationRevision: String
+    let checkedAt: String
+    let provider: ManagerOperatorProvider
+
+    init(configurationRevision: String, checkedAt: String, provider: ManagerOperatorProvider) {
+        schemaVersion = Self.schemaVersion
+        self.configurationRevision = configurationRevision
+        self.checkedAt = checkedAt
+        self.provider = provider
+    }
+}
+
 enum ManagerRunPreparationResolver {
     static func resolve(
         configuration: ProviderConfigurationSnapshot?,
@@ -670,7 +685,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runtime: Self.operatorRuntime(
                 persisted.runtimeCapabilities,
                 defaultTimeoutSeconds: app.config.model.shell.defaultTimeoutSec,
-                shellPolicyMigrationState: shell.migration.state
+                shellPolicyMigrationState: shell.migration.state,
+                shellPolicyEnabled: shell.enabled,
+                selectedRun: persisted.runs.first(where: { !$0.run.state.isTerminal })
+                    ?? persisted.runs.first
             ),
             events: visibleEvents.map(Self.operatorEvent),
             nextCursor: nextCursor
@@ -2059,6 +2077,179 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         try performProviderConfiguration { service in try await service.models() }
     }
 
+    /// Reconciles the ordinary local-provider path as one idempotent operation.
+    /// It never replaces an explicit model pin and returns exactly one typed
+    /// external action when local state cannot be resolved automatically.
+    public func connectAndCheckProvider() throws -> ManagerProviderPreparationResult {
+        var configuration = try readProviderConfiguration()
+        lock.lock()
+        let cachedProbe = runtime.providerProbeState
+        lock.unlock()
+        if configuration.saved,
+           let cachedProbe,
+           cachedProbe.configurationRevision == configuration.revision,
+           cachedProbe.health == "contract_valid",
+           let completedAt = cachedProbe.completedAt,
+           let checkedAt = ISO8601.date(from: completedAt),
+           (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
+            return ManagerProviderPreparationResult(
+                state: .ready,
+                recoveryAction: .none,
+                detail: "The saved provider readiness result is current.",
+                configuration: configuration,
+                provider: Self.operatorProvider(
+                    from: [], probe: cachedProbe, configuration: configuration
+                )
+            )
+        }
+        if configuration.saved,
+           let receipt = try? providerReadinessReceipt(),
+           receipt.configurationRevision == configuration.revision,
+           receipt.provider.health == "contract_valid",
+           let checkedAt = ISO8601.date(from: receipt.checkedAt),
+           (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
+            return ManagerProviderPreparationResult(
+                state: .ready,
+                recoveryAction: .none,
+                detail: "The durable provider readiness result is current.",
+                configuration: configuration,
+                provider: receipt.provider
+            )
+        }
+
+        do {
+            if !configuration.saved {
+                configuration = try updateProviderConfiguration(
+                    ProviderConfigurationUpdate(
+                        expectedRevision: configuration.revision,
+                        endpoint: configuration.endpoint,
+                        modelKey: nil
+                    )
+                )
+            }
+            let inventory = try providerModels()
+            guard inventory.revision == configuration.revision else {
+                throw ProviderConfigurationError.revisionConflict
+            }
+            let selection = ProviderModelSelectionResolver.resolve(
+                configuration: configuration,
+                inventory: inventory
+            )
+            guard selection.isReady, let selectedModel = selection.modelKey else {
+                return ManagerProviderPreparationResult(
+                    state: .actionRequired,
+                    recoveryAction: selection.recoveryAction,
+                    detail: selection.detail,
+                    configuration: configuration
+                )
+            }
+            if configuration.modelKey != selectedModel {
+                configuration = try updateProviderConfiguration(
+                    ProviderConfigurationUpdate(
+                        expectedRevision: configuration.revision,
+                        endpoint: configuration.endpoint,
+                        modelKey: selectedModel
+                    )
+                )
+            }
+            let provider = try probeProvider(
+                adapterID: Self.nativeSessionHostAdapterID,
+                mode: .contract
+            )
+            let current = try readProviderConfiguration()
+            guard current.revision == configuration.revision else {
+                return ManagerProviderPreparationResult(
+                    state: .actionRequired,
+                    recoveryAction: .retry,
+                    detail: "Provider settings changed during preparation. Run Connect and check again.",
+                    configuration: current
+                )
+            }
+            do {
+                try persistProviderReadinessReceipt(
+                    ManagerProviderReadinessReceipt(
+                        configurationRevision: current.revision,
+                        checkedAt: provider.lastProbeAt ?? ISO8601.string(from: app.clock.now()),
+                        provider: provider
+                    )
+                )
+            } catch {
+                return ManagerProviderPreparationResult(
+                    state: .actionRequired,
+                    recoveryAction: .retry,
+                    detail: "Provider readiness was verified but its durable receipt could not be saved. Retry Connect and check.",
+                    configuration: current,
+                    provider: provider
+                )
+            }
+            return ManagerProviderPreparationResult(
+                state: .ready,
+                recoveryAction: .none,
+                detail: "LM Studio and the selected tool-capable model are ready for managed tasks.",
+                configuration: current,
+                provider: provider
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ProviderConfigurationError {
+            return ManagerProviderPreparationResult(
+                state: .actionRequired,
+                recoveryAction: Self.providerRecoveryAction(error),
+                detail: error.localizedDescription,
+                configuration: (try? readProviderConfiguration()) ?? configuration
+            )
+        } catch let error as ManagerProviderProbeError {
+            return ManagerProviderPreparationResult(
+                state: .actionRequired,
+                recoveryAction: .retry,
+                detail: error.localizedDescription,
+                configuration: (try? readProviderConfiguration()) ?? configuration
+            )
+        }
+    }
+
+    private func providerReadinessReceipt() throws -> ManagerProviderReadinessReceipt {
+        let url = try providerStorageDirectory(
+            adapterID: Self.nativeSessionHostAdapterID
+        ).appendingPathComponent("provider-readiness.json")
+        let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: 64 * 1_024)
+        let receipt = try JSONDecoder().decode(ManagerProviderReadinessReceipt.self, from: data)
+        guard receipt.schemaVersion == ManagerProviderReadinessReceipt.schemaVersion else {
+            throw ProviderConfigurationError.persistenceFailed
+        }
+        return receipt
+    }
+
+    private func persistProviderReadinessReceipt(
+        _ receipt: ManagerProviderReadinessReceipt
+    ) throws {
+        let directory = try providerStorageDirectory(
+            adapterID: Self.nativeSessionHostAdapterID
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(receipt)
+        guard data.count <= 64 * 1_024 else {
+            throw ProviderConfigurationError.persistenceFailed
+        }
+        try OwnerOnlyAtomicFile.write(
+            data,
+            to: directory.appendingPathComponent("provider-readiness.json")
+        )
+    }
+
+    private static func providerRecoveryAction(
+        _ error: ProviderConfigurationError
+    ) -> ProviderPreparationRecoveryAction {
+        switch error {
+        case .authenticationFailed, .credentialUnavailable: .supplyCredential
+        case .offline, .timeout: .startService
+        case .modelEndpointUnavailable: .installCompatibleModel
+        case .busy, .revisionConflict, .connectionFailed, .unavailable,
+             .invalidRequest, .persistenceFailed: .retry
+        }
+    }
+
     private func performProviderConfiguration<Value: Sendable>(
         _ operation: @escaping @Sendable (any ProviderConfigurationServicing) async throws -> Value
     ) throws -> Value {
@@ -2132,6 +2323,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
 
         let startedAt = ISO8601.string(from: app.clock.now())
+        let configurationRevision = (try? readProviderConfiguration())?.revision
         let probeID = UUID()
         lock.lock()
         guard !managedAutonomyClosing, !runtime.providerProbeInProgress, !providerConfigurationInProgress,
@@ -2143,6 +2335,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         activeProviderProbeID = probeID
         runtime.providerProbeState = ManagerProviderProbeState(
             adapterID: adapterID,
+            configurationRevision: configurationRevision,
             mode: mode,
             health: "probing",
             completedAt: nil,
@@ -2227,6 +2420,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             let completed = ISO8601.string(from: app.clock.now())
             let state = ManagerProviderProbeState(
                 adapterID: adapterID,
+                configurationRevision: configurationRevision,
                 mode: mode,
                 health: mode == .contract ? "contract_valid" : "reachable",
                 completedAt: completed,
@@ -2262,6 +2456,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             let completed = ISO8601.string(from: app.clock.now())
             let state = ManagerProviderProbeState(
                 adapterID: adapterID,
+                configurationRevision: configurationRevision,
                 mode: mode,
                 health: mode == .contract ? "contract_invalid" : "unreachable",
                 completedAt: completed,
@@ -4051,15 +4246,35 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private static func operatorRuntime(
         _ capabilities: RuntimeCapabilities,
         defaultTimeoutSeconds: Int,
-        shellPolicyMigrationState: String
+        shellPolicyMigrationState: String,
+        shellPolicyEnabled: Bool,
+        selectedRun: ManagerOperatorRunReadModel?
     ) -> ManagerOperatorRuntime {
         func executable(_ capability: RuntimeExecutableCapability) -> ManagerOperatorRuntimeExecutable {
             ManagerOperatorRuntimeExecutable(
                 available: capability.available,
                 path: capability.executablePath,
-                version: nil
+                version: nil,
+                status: capability.probeState
             )
         }
+        let run = selectedRun?.run
+        let requirements = RuntimeRequirementResolver.resolve(
+            input: RuntimeRequirementInput(
+                selectedTools: Set(run?.specification.allowedTools ?? []),
+                completionPlan: run?.specification.completionPlan,
+                projectMetadata: run?.specification.work.metadata ?? [:],
+                instructionRequirements: runtimeIdentifiers(
+                    run?.specification.work.metadata["runtime_instruction_requirements"]
+                ),
+                runtimePreferences: runtimeIdentifiers(
+                    run?.specification.work.metadata["runtime_preferences"]
+                ),
+                shellPolicyEnabled: shellPolicyEnabled,
+                projectAuthorized: true
+            ),
+            capabilities: capabilities
+        )
         return ManagerOperatorRuntime(
             direct: executable(capabilities.directProcess),
             zsh: executable(capabilities.zsh),
@@ -4071,8 +4286,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             maximumInlineOutputBytes: capabilities.maximumInlineOutputBytes,
             maximumArtifactBytesPerJob: capabilities.maximumArtifactBytesPerJob,
             networkPolicy: "per_project_authorization_scope",
-            shellPolicyMigrationState: shellPolicyMigrationState
+            shellPolicyMigrationState: shellPolicyMigrationState,
+            selectedTaskID: run?.runID.description,
+            requirements: requirements
         )
+    }
+
+    private static func runtimeIdentifiers(
+        _ commaSeparated: String?
+    ) -> Set<RuntimeRequirementIdentifier> {
+        Set((commaSeparated ?? "").split(separator: ",").compactMap { value in
+            RuntimeRequirementIdentifier(
+                rawValue: value.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        })
     }
 
     private static func operatorEvent(_ event: AutonomyEvent) -> ManagerOperatorEvent {

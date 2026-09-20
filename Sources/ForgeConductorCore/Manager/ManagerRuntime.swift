@@ -8,6 +8,7 @@ import Foundation
 
 struct ManagerProviderProbeState: Sendable, Equatable {
     let adapterID: String
+    let configurationRevision: String?
     let mode: ManagerProviderProbeMode
     let health: String
     let completedAt: String?

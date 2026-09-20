@@ -55,6 +55,100 @@ public struct ProviderModelInventory: Codable, Sendable, Equatable {
     }
 }
 
+public enum ProviderPreparationRecoveryAction: String, Codable, Sendable, CaseIterable {
+    case none
+    case startService = "start_service"
+    case selectModel = "select_model"
+    case loadModel = "load_model"
+    case installCompatibleModel = "install_compatible_model"
+    case supplyCredential = "supply_credential"
+    case retry
+}
+
+public struct ProviderModelSelection: Sendable, Equatable {
+    public let modelKey: String?
+    public let recoveryAction: ProviderPreparationRecoveryAction
+    public let detail: String
+
+    public init(
+        modelKey: String?,
+        recoveryAction: ProviderPreparationRecoveryAction,
+        detail: String
+    ) {
+        self.modelKey = modelKey
+        self.recoveryAction = recoveryAction
+        self.detail = detail
+    }
+
+    public var isReady: Bool { recoveryAction == .none && modelKey != nil }
+}
+
+/// Deterministic selection policy shared by automatic run preparation and the
+/// explicit Provider action. A pin is never replaced implicitly.
+public enum ProviderModelSelectionResolver {
+    public static func resolve(
+        configuration: ProviderConfigurationSnapshot,
+        inventory: ProviderModelInventory
+    ) -> ProviderModelSelection {
+        if let pin = configuration.modelKey, !pin.isEmpty {
+            guard let model = inventory.models.first(where: { $0.key == pin }) else {
+                return ProviderModelSelection(
+                    modelKey: nil,
+                    recoveryAction: .selectModel,
+                    detail: "The pinned model is unavailable. Choose an installed compatible model."
+                )
+            }
+            guard model.toolUseCapable else {
+                return ProviderModelSelection(
+                    modelKey: nil,
+                    recoveryAction: .selectModel,
+                    detail: "The pinned model does not support tool use. Choose a compatible model."
+                )
+            }
+            guard model.loaded else {
+                return ProviderModelSelection(
+                    modelKey: nil,
+                    recoveryAction: .loadModel,
+                    detail: "Load the pinned model in LM Studio, then run Connect and check again."
+                )
+            }
+            return ProviderModelSelection(
+                modelKey: pin,
+                recoveryAction: .none,
+                detail: "The compatible pinned model is loaded."
+            )
+        }
+
+        let compatibleLoaded = inventory.models.filter { $0.loaded && $0.toolUseCapable }
+        if compatibleLoaded.count == 1, let model = compatibleLoaded.first {
+            return ProviderModelSelection(
+                modelKey: model.key,
+                recoveryAction: .none,
+                detail: "Forge selected the only loaded tool-capable model."
+            )
+        }
+        if compatibleLoaded.count > 1 {
+            return ProviderModelSelection(
+                modelKey: nil,
+                recoveryAction: .selectModel,
+                detail: "Choose one of the loaded tool-capable models."
+            )
+        }
+        if inventory.models.contains(where: { $0.toolUseCapable }) {
+            return ProviderModelSelection(
+                modelKey: nil,
+                recoveryAction: .loadModel,
+                detail: "Load one installed tool-capable model in LM Studio."
+            )
+        }
+        return ProviderModelSelection(
+            modelKey: nil,
+            recoveryAction: .installCompatibleModel,
+            detail: "Install a tool-capable model in LM Studio, then run Connect and check again."
+        )
+    }
+}
+
 public enum ProviderConfigurationError: String, Error, LocalizedError, Sendable {
     case unavailable, invalidRequest, revisionConflict, busy, credentialUnavailable, persistenceFailed
     case authenticationFailed, offline, timeout, modelEndpointUnavailable, connectionFailed

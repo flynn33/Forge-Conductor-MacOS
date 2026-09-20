@@ -641,6 +641,18 @@ struct OperatorRuntimeExecutable: Decodable, Sendable, Equatable {
     let available: Bool
     let path: String?
     let version: String?
+    let status: RuntimeExecutableProbeState
+
+    private enum CodingKeys: String, CodingKey { case available, path, version, status }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        available = try container.decode(Bool.self, forKey: .available)
+        path = try container.decodeIfPresent(String.self, forKey: .path)
+        version = try container.decodeIfPresent(String.self, forKey: .version)
+        status = try container.decodeIfPresent(RuntimeExecutableProbeState.self, forKey: .status)
+            ?? (available ? .available : .unknown)
+    }
 }
 
 struct OperatorRuntimePolicy: Decodable, Sendable, Equatable {
@@ -655,6 +667,8 @@ struct OperatorRuntimePolicy: Decodable, Sendable, Equatable {
     let maximumArtifactBytesPerJob: Int
     let networkPolicy: String
     let shellPolicyMigrationState: String
+    let selectedTaskID: String?
+    let requirements: [RuntimeRequirementResolution]
 
     enum CodingKeys: String, CodingKey {
         case direct, zsh, bash, python, powershell
@@ -664,6 +678,28 @@ struct OperatorRuntimePolicy: Decodable, Sendable, Equatable {
         case maximumArtifactBytesPerJob = "maximum_artifact_bytes_per_job"
         case networkPolicy = "network_policy"
         case shellPolicyMigrationState = "shell_policy_migration_state"
+        case selectedTaskID = "selected_task_id"
+        case requirements
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        direct = try container.decode(OperatorRuntimeExecutable.self, forKey: .direct)
+        zsh = try container.decode(OperatorRuntimeExecutable.self, forKey: .zsh)
+        bash = try container.decode(OperatorRuntimeExecutable.self, forKey: .bash)
+        python = try container.decode(OperatorRuntimeExecutable.self, forKey: .python)
+        powershell = try container.decode(OperatorRuntimeExecutable.self, forKey: .powershell)
+        maximumConcurrentJobs = try container.decode(Int.self, forKey: .maximumConcurrentJobs)
+        defaultTimeoutSeconds = try container.decode(Int.self, forKey: .defaultTimeoutSeconds)
+        maximumInlineOutputBytes = try container.decode(Int.self, forKey: .maximumInlineOutputBytes)
+        maximumArtifactBytesPerJob = try container.decode(Int.self, forKey: .maximumArtifactBytesPerJob)
+        networkPolicy = try container.decode(String.self, forKey: .networkPolicy)
+        shellPolicyMigrationState = try container.decode(String.self, forKey: .shellPolicyMigrationState)
+        selectedTaskID = try container.decodeIfPresent(String.self, forKey: .selectedTaskID)
+        requirements = try container.decodeIfPresent(
+            [RuntimeRequirementResolution].self,
+            forKey: .requirements
+        ) ?? []
     }
 }
 
@@ -714,6 +750,30 @@ struct OperatorProvider: Decodable, Sendable, Equatable {
         case probeResultStorage = "probe_result_storage"
         case lastProbeAt = "last_probe_at"
         case lastProbeError = "last_probe_error"
+    }
+
+    init(_ provider: ManagerOperatorProvider) {
+        adapterID = provider.adapterID
+        providerID = provider.providerID
+        health = provider.health
+        endpoint = provider.endpoint
+        loopback = provider.loopback
+        tls = provider.tls
+        authenticationEnabled = provider.authenticationEnabled
+        credentialConfigured = provider.credentialConfigured
+        apiMode = provider.apiMode
+        modelKey = provider.modelKey
+        instanceID = provider.instanceID
+        activeContextLength = provider.activeContextLength
+        maximumContextLength = provider.maximumContextLength
+        toolUseCapable = provider.toolUseCapable
+        lifecycleManagementEnabled = provider.lifecycleManagementEnabled
+        idleTTLSeconds = provider.idleTTLSeconds
+        contractFingerprint = provider.contractFingerprint
+        lastProbeMode = provider.lastProbeMode
+        probeResultStorage = provider.probeResultStorage
+        lastProbeAt = provider.lastProbeAt
+        lastProbeError = provider.lastProbeError
     }
 
     init(from decoder: Decoder) throws {

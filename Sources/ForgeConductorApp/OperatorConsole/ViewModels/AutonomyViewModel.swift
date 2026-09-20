@@ -473,6 +473,32 @@ final class AutonomyViewModel: ObservableObject {
                 var admittedRequest = try await admitInstructionArtifact(request)
                 if admittedRequest.expectedPreparedRunRevision == nil {
                     do {
+                        if admittedRequest.providerID == nil,
+                           admittedRequest.adapterID == nil,
+                           admittedRequest.modelKey == nil {
+                            do {
+                                let providerPreparation = try await client.prepareProvider()
+                                guard providerPreparation.state == .ready else {
+                                    projectRunPreparation = ManagerRunPreparationResult(
+                                        projectID: admittedRequest.projectID,
+                                        projectGeneration: admittedRequest.projectGeneration,
+                                        readiness: .waitingDependency,
+                                        detail: providerPreparation.detail,
+                                        recoveryAction: .configureProvider
+                                    )
+                                    pendingStartRequest = nil
+                                    startRequiresReconciliation = false
+                                    notice = providerPreparation.detail
+                                    isStarting = false
+                                    return
+                                }
+                            } catch OperatorManagerClientError.capabilityUnavailable {
+                                // Compatibility clients retain manager-side validation.
+                            } catch let error as URLError where error.code == .badServerResponse {
+                                // In-process compatibility fixtures without the new
+                                // route retain the prior preparation contract.
+                            }
+                        }
                         var preparationResult = try await client.prepareRun(admittedRequest)
                         if preparationResult.readiness == .automaticallyPreparing,
                            preparationResult.projectID == request.projectID,

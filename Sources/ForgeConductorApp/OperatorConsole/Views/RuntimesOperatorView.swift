@@ -2,9 +2,11 @@
 // Native shell policy, independent runtime capability, and bounded job history surface.
 
 import SwiftUI
+import ForgeConductorCore
 
 struct RuntimesOperatorView: View {
     @StateObject private var viewModel: RuntimesViewModel
+    @State private var showingAdvancedSettings = false
 
     init(client: any OperatorManagerClientProtocol) {
         _viewModel = StateObject(wrappedValue: RuntimesViewModel(client: client))
@@ -38,7 +40,7 @@ struct RuntimesOperatorView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     OperatorHeader(
                         title: "Runtimes",
-                        subtitle: "Effective shell policy, independent executable capabilities, and durable jobs",
+                        subtitle: "Programs needed by the selected task and the results of its durable jobs",
                         isLoading: viewModel.isLoading,
                         onRefresh: viewModel.load
                     )
@@ -48,9 +50,25 @@ struct RuntimesOperatorView: View {
                     if let notice = viewModel.notice {
                         OperatorNoticeBanner(message: notice)
                     }
-                    shellPolicy
-                    capabilityList
-                    runtimePolicy
+                    taskRequirements
+                    Button {
+                        showingAdvancedSettings.toggle()
+                    } label: {
+                        Label(
+                            "Advanced runtime settings",
+                            systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("runtime-advanced-toggle")
+                    if showingAdvancedSettings {
+                        VStack(alignment: .leading, spacing: 16) {
+                            shellPolicy
+                            capabilityList
+                            runtimePolicy
+                        }
+                        .padding(.top, 8)
+                    }
                     if let job = viewModel.selectedJob {
                         jobDetail(job)
                     } else if !viewModel.jobs.isEmpty {
@@ -74,7 +92,7 @@ struct RuntimesOperatorView: View {
     }
 
     private var shellPolicy: some View {
-        GroupBox("Project shell policy") {
+        GroupBox("Application-wide shell policy") {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(
                     "Shell enabled",
@@ -92,6 +110,39 @@ struct RuntimesOperatorView: View {
                 LabeledContent("Default timeout", value: timeoutLabel)
                 LabeledContent("Migration", value: migrationLabel)
                     .accessibilityIdentifier("runtime-shell-migration")
+            }
+        }
+    }
+
+    private var taskRequirements: some View {
+        GroupBox("Runtimes for the selected task") {
+            VStack(alignment: .leading, spacing: 10) {
+                if let taskID = viewModel.runtimePolicy?.selectedTaskID {
+                    LabeledContent("Task") { OperatorIdentifier(taskID) }
+                } else {
+                    Text("No managed task is selected. Missing optional runtimes do not block a task.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(viewModel.runtimePolicy?.requirements ?? [], id: \.runtime) { item in
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(runtimeName(item.runtime))
+                            Text(item.reason)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let action = item.recoveryAction {
+                                Text(action)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        Spacer()
+                        Text(requirementName(item.requirement))
+                            .font(.caption)
+                        OperatorStateBadge(state: item.availability.rawValue)
+                    }
+                    .accessibilityIdentifier("runtime-requirement-\(item.runtime.rawValue)")
+                }
             }
         }
     }
@@ -125,17 +176,22 @@ struct RuntimesOperatorView: View {
             VStack(alignment: .leading, spacing: 9) {
                 LabeledContent("State") { OperatorStateBadge(state: job.state) }
                     .accessibilityIdentifier("runtime-job-state")
-                LabeledContent("Job ID") { OperatorIdentifier(job.jobID) }
+                LabeledContent("Purpose", value: job.commandSummary)
+                LabeledContent("Result", value: jobResult(job))
                 LabeledContent("Runtime", value: job.runtimeKind)
-                LabeledContent("Project") { OperatorIdentifier(job.projectID) }
-                LabeledContent("Generation", value: "\(job.projectGeneration)")
-                LabeledContent("Run") { OperatorIdentifier(job.runID) }
-                LabeledContent("Working directory") { OperatorIdentifier(job.canonicalWorkingDirectory) }
-                LabeledContent("Command summary", value: job.commandSummary)
-                LabeledContent("Timeout", value: "\(job.timeoutSeconds)s")
-                LabeledContent("Exit", value: job.exitCode.map(String.init) ?? "Unavailable")
-                LabeledContent("Output bytes", value: OperatorFormat.bytes(job.outputBytes))
-                LabeledContent("Output artifact") { OperatorIdentifier(job.outputArtifactID) }
+                DisclosureGroup("Technical details") {
+                    VStack(alignment: .leading, spacing: 9) {
+                        LabeledContent("Job ID") { OperatorIdentifier(job.jobID) }
+                        LabeledContent("Project") { OperatorIdentifier(job.projectID) }
+                        LabeledContent("Generation", value: "\(job.projectGeneration)")
+                        LabeledContent("Run") { OperatorIdentifier(job.runID) }
+                        LabeledContent("Working directory") { OperatorIdentifier(job.canonicalWorkingDirectory) }
+                        LabeledContent("Timeout", value: "\(job.timeoutSeconds)s")
+                        LabeledContent("Output bytes", value: OperatorFormat.bytes(job.outputBytes))
+                        LabeledContent("Output artifact") { OperatorIdentifier(job.outputArtifactID) }
+                    }
+                    .padding(.top, 6)
+                }
                 if let error = job.errorSummary {
                     Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
                 }
@@ -167,7 +223,7 @@ struct RuntimesOperatorView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                Text(capability?.path ?? "Not installed")
+                Text(capability?.path ?? "Executable path unavailable")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -177,7 +233,7 @@ struct RuntimesOperatorView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            OperatorStateBadge(state: capability?.available == true ? "available" : "unavailable")
+            OperatorStateBadge(state: capability?.status.rawValue ?? "unknown")
         }
         .accessibilityIdentifier("runtime-capability-\(id)")
     }
@@ -195,5 +251,30 @@ struct RuntimesOperatorView: View {
         guard let settings = viewModel.settings else { return "Unavailable" }
         let receipt = settings.shellMigrationReceiptValid ? "receipt verified" : "receipt unavailable"
         return "\(settings.shellMigrationState) · \(receipt)"
+    }
+
+    private func runtimeName(_ runtime: RuntimeRequirementIdentifier) -> String {
+        switch runtime {
+        case .directProcess: "Direct process"
+        case .zsh: "zsh"
+        case .bash: "Bash"
+        case .python: "Python"
+        case .powershell: "PowerShell"
+        }
+    }
+
+    private func requirementName(_ requirement: RuntimeRequirement) -> String {
+        switch requirement {
+        case .required: "Required"
+        case .optional: "Optional"
+        case .notNeeded: "Not needed"
+        }
+    }
+
+    private func jobResult(_ job: OperatorRuntimeJob) -> String {
+        if let exitCode = job.exitCode {
+            return "\(job.state) · exit \(exitCode)"
+        }
+        return job.errorSummary ?? job.state
     }
 }

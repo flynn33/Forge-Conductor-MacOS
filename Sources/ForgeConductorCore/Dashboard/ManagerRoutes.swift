@@ -338,7 +338,8 @@ public final class ManagerRoutes: @unchecked Sendable {
                 body: body, connection: connection)
         case ("GET", "/api/manager/provider/configuration"),
              ("PUT", "/api/manager/provider/configuration"),
-             ("GET", "/api/manager/provider/models"):
+             ("GET", "/api/manager/provider/models"),
+             ("POST", "/api/manager/provider/prepare"):
             dispatchProviderConfiguration(method: method, path: target.path, body: body, connection: connection)
         case ("GET", "/api/manager/status"):
             http.respondJSON(connection, status: 200, object: manager.status())
@@ -1525,7 +1526,12 @@ public final class ManagerRoutes: @unchecked Sendable {
             defer { Self.providerOperationAdmission.signal() }
             do {
                 let data: Data
-                if method == "PUT" {
+                if path.hasSuffix("/prepare") {
+                    guard body.isEmpty || body == Data("{}".utf8) else {
+                        throw ProviderConfigurationError.invalidRequest
+                    }
+                    data = try JSONEncoder().encode(manager.connectAndCheckProvider())
+                } else if method == "PUT" {
                     guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
                           Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction", "token"]),
                           let update = try? JSONDecoder().decode(ProviderConfigurationUpdate.self, from: body) else {

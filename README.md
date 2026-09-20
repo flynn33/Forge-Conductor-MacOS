@@ -73,7 +73,15 @@ product set.
 3. In **Projects**, register the repository by picker or absolute path. Forge
    authorizes that exact selected folder and preserves existing authorized
    roots; the same path does not need to be entered in Manager first.
-4. In **Provider**, save and test the LM Studio endpoint and selected model.
+4. Usually no Provider visit is required. **Start Task** runs the same
+   manager-owned **Connect and check** workflow exposed in **Provider**: it
+   resolves the saved or local-default endpoint, discovers models, preserves a
+   compatible pin or selects the only compatible loaded model, performs the
+   managed contract probe, and saves a revision-bound readiness receipt. When
+   Forge cannot decide safely, it gives one exact action such as starting LM
+   Studio, loading or selecting a model, or supplying a credential. Endpoint,
+   exact model identifiers, credentials, inventory refresh, and probe details
+   remain under **Advanced connection settings**.
 5. Add instruction packages to the registered project. Files are admitted by
    inspected content rather than a filename whitelist. Forge preserves the
    originals, normalizes UTF-8/UTF-16 and supported native PDF, DOCX, RTF, and
@@ -113,6 +121,13 @@ product set.
    unavailable reasons, and saved per-project defaults. Each admitted run keeps
    the exact resolved grant and catalog revision it prepared with; later catalog
    changes apply only to future preparations.
+   The **Runtimes** tab derives required, optional, and not-needed programs from
+   the selected task's tools, automatic completion plan, structured project and
+   instruction requirements, and runtime preferences. A missing optional Python
+   or PowerShell executable does not block an unrelated Swift task. Availability
+   distinguishes not installed, application-wide policy disablement, missing
+   project authorization, failed probes, and unknown state; an absent path alone
+   is never labeled as proof of non-installation.
    During completion, Forge evaluates the latest relevant durable result for
    each automatic obligation. A corrected build or test can supersede an earlier
    failure, while an unrelated successful read cannot complete repair work and

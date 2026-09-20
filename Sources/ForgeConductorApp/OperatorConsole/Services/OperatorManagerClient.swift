@@ -73,6 +73,7 @@ protocol OperatorManagerClientProtocol: Sendable {
     func providerConfiguration() async throws -> ProviderConfigurationSnapshot
     func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
     func providerModels() async throws -> ProviderModelInventory
+    func prepareProvider() async throws -> ManagerProviderPreparationResult
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -80,6 +81,12 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func prepareProvider() async throws -> ManagerProviderPreparationResult {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Automatic provider preparation is unavailable from this manager client."
+        )
+    }
+
     func projectToolPermissions(
         projectID: String,
         generation: UInt64
@@ -272,6 +279,16 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
 
     func providerModels() async throws -> ProviderModelInventory {
         try await request(method: "GET", path: "/api/manager/provider/models", timeoutInterval: 25)
+    }
+
+    func prepareProvider() async throws -> ManagerProviderPreparationResult {
+        try await request(
+            method: "POST",
+            path: "/api/manager/provider/prepare",
+            body: EmptyProviderPreparationBody(),
+            unavailableMessage: "Automatic provider preparation is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 45
+        )
     }
 
     func snapshot(limit: Int = 100, cursor: String? = nil) async throws -> OperatorSnapshot {
@@ -776,7 +793,7 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
     }
 
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun {
-        try await self.request(
+        return try await self.request(
             method: "POST",
             path: "/api/manager/runs/start",
             body: request,
@@ -806,7 +823,7 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
     }
 
     func prepareRun(_ request: OperatorRunStartRequest) async throws -> ManagerRunPreparationResult {
-        try await self.request(
+        return try await self.request(
             method: "POST",
             path: "/api/manager/runs/prepare",
             body: request,
@@ -1235,6 +1252,10 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.providerModels()
     }
 
+    func prepareProvider() async throws -> ManagerProviderPreparationResult {
+        try await current.prepareProvider()
+    }
+
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -1254,6 +1275,8 @@ private struct ProjectIdentityBody: Encodable {
     let projectID: String
     enum CodingKeys: String, CodingKey { case projectID = "project_id" }
 }
+
+private struct EmptyProviderPreparationBody: Encodable {}
 
 private struct ProjectGenerationBody: Encodable {
     let projectID: String

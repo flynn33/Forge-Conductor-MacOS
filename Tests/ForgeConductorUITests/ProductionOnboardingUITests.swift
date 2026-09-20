@@ -253,15 +253,13 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(saved.credentialConfigured)
         XCTAssertFalse(saved.credentialCleanupPending)
         XCTAssertNotEqual(saved.revision, initial.revision)
-        XCTAssertTrue(contains(element("provider-probe-notice"), "Test Connection"))
+        XCTAssertTrue(contains(element("provider-probe-notice"), "Connect and check"))
 
         try click(app.buttons["provider-test-connection"])
         XCTAssertTrue(element("operator-unavailable").waitForExistence(timeout: 40))
         XCTAssertFalse(contains(element("provider-probe-notice"), "are reachable"))
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            self.element("provider-last-probe-error").exists
-                && (self.element("provider-health").value as? String) == "unreachable"
-        })
+        XCTAssertTrue(app.staticTexts["Start LM Studio, then connect and check again"]
+            .waitForExistence(timeout: 5))
         let afterOfflineProbe: OnboardingProviderConfiguration = try await read("/api/manager/provider/configuration")
         XCTAssertEqual(afterOfflineProbe, saved)
         attachScreenshot("native-provider-offline-error")
@@ -517,6 +515,11 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
 
     private func openProvider() throws {
         try click(app.buttons["tab-provider"])
+        let advanced = app.buttons["provider-advanced-toggle"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 10))
+        if !app.textFields["provider-endpoint"].exists {
+            try click(advanced)
+        }
         XCTAssertTrue(app.textFields["provider-endpoint"].waitForExistence(timeout: 10))
         XCTAssertTrue(waitUntil { self.app.buttons["provider-save"].isEnabled })
     }
@@ -714,7 +717,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private func assertRealConnection(model: String) async throws {
         try click(app.buttons["provider-test-connection"])
         let reachable = waitUntil(timeout: 40) {
-            self.contains(self.element("provider-probe-notice"), "The configured provider and model are reachable.")
+            self.contains(self.element("provider-probe-notice"), "ready for managed tasks")
         }
         if !reachable {
             let notice = element("provider-probe-notice")
@@ -737,9 +740,9 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(element("operator-unavailable").exists)
         let snapshot: OnboardingOperatorSnapshot = try await read("/api/manager/operator/snapshot?limit=1")
         let provider = try XCTUnwrap(snapshot.provider)
-        XCTAssertEqual(provider.health, "reachable")
+        XCTAssertEqual(provider.health, "contract_valid")
         XCTAssertEqual(provider.modelKey, model)
-        XCTAssertEqual(provider.lastProbeMode, "connection")
+        XCTAssertEqual(provider.lastProbeMode, "contract")
         XCTAssertNotNil(provider.lastProbeAt)
         XCTAssertNil(provider.lastProbeError)
         attach("real-provider-manager-probe-readback", provider)

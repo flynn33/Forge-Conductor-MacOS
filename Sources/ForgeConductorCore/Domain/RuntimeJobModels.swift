@@ -214,10 +214,51 @@ public struct RuntimeOutputSlice: Sendable, Equatable {
     public let sha256: String
 }
 
+public enum RuntimeExecutableProbeState: String, Codable, Sendable, CaseIterable {
+    case available
+    case notInstalled = "not_installed"
+    case disabledByPolicy = "disabled_by_policy"
+    case notAuthorized = "not_authorized"
+    case probeFailed = "probe_failed"
+    case unknown
+}
+
 public struct RuntimeExecutableCapability: Codable, Sendable, Equatable {
     public let available: Bool
     public let executablePath: String?
     public let required: Bool
+    public let probeState: RuntimeExecutableProbeState
+
+    public init(
+        available: Bool,
+        executablePath: String?,
+        required: Bool,
+        probeState: RuntimeExecutableProbeState? = nil
+    ) {
+        self.available = available
+        self.executablePath = executablePath
+        self.required = required
+        self.probeState = probeState ?? (available ? .available : .unknown)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case available
+        case executablePath
+        case required
+        case probeState
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let available = try container.decode(Bool.self, forKey: .available)
+        self.available = available
+        executablePath = try container.decodeIfPresent(String.self, forKey: .executablePath)
+        required = try container.decode(Bool.self, forKey: .required)
+        probeState = try container.decodeIfPresent(
+            RuntimeExecutableProbeState.self,
+            forKey: .probeState
+        ) ?? (available ? .available : .unknown)
+    }
 }
 
 public struct RuntimeCapabilities: Codable, Sendable, Equatable {

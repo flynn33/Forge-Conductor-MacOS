@@ -20,6 +20,7 @@ final class ProviderViewModel: ObservableObject {
     @Published private(set) var availableModels: [ProviderAvailableModel] = []
     @Published private(set) var isSaving = false
     @Published private(set) var isFetchingModels = false
+    @Published private(set) var preparation: ManagerProviderPreparationResult?
     private var configurationTask: Task<Void, Never>?
 
     var isBusy: Bool { isLoading || isProbing || isSaving || isFetchingModels }
@@ -54,7 +55,7 @@ final class ProviderViewModel: ObservableObject {
                 apply(saved)
                 if loadedProvider == nil {
                     noticeMessage = saved.saved
-                        ? "Settings are saved. Test Connection to check the loaded model."
+                        ? "Settings are saved. Use Connect and check to verify the loaded model."
                         : "No provider settings are saved. Enter the LM Studio endpoint and model, then Save."
                 }
             } catch is CancellationError {
@@ -92,8 +93,8 @@ final class ProviderViewModel: ObservableObject {
                 availableModels = []
                 provider = nil
                 noticeMessage = saved.credentialCleanupPending
-                    ? "Settings saved. Previous credential cleanup is pending; unlock Keychain and refresh. Test Connection to verify usability."
-                    : "Settings saved. Test Connection to verify the server and loaded model."
+                    ? "Settings saved. Previous credential cleanup is pending; unlock Keychain and refresh. Use Connect and check to verify usability."
+                    : "Settings saved. Use Connect and check to verify the server and loaded model."
             } catch is CancellationError {
                 errorMessage = "Save was cancelled. Refresh to reconcile the saved revision before retrying."
             } catch {
@@ -134,7 +135,41 @@ final class ProviderViewModel: ObservableObject {
     }
 
     func testConnection() {
-        probe(.connection)
+        connectAndCheck()
+    }
+
+    func connectAndCheck() {
+        guard !isBusy, !hasUnsavedChanges else { return }
+        loadTask?.cancel()
+        probeTask?.cancel()
+        isLoading = false
+        isProbing = true
+        errorMessage = nil
+        noticeMessage = nil
+        probeTask = Task { [weak self] in
+            guard let self else { return }
+            defer { isProbing = false }
+            do {
+                let result = try await client.prepareProvider()
+                try Task.checkCancellation()
+                preparation = result
+                apply(result.configuration)
+                provider = result.provider.map(OperatorProvider.init)
+                if result.state == .ready {
+                    noticeMessage = result.detail
+                } else {
+                    errorMessage = result.detail
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func cancelConnectAndCheck() {
+        probeTask?.cancel()
     }
 
     func runContractProbe() {

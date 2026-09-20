@@ -55,6 +55,7 @@ final class DashboardSecurityTests: XCTestCase {
             "/api/manager/runs/control",
             "/api/manager/runtime-jobs/cancel",
             "/api/manager/provider/probe",
+            "/api/manager/provider/prepare",
             "/api/manager/future-mutation",
         ] {
             XCTAssertTrue(

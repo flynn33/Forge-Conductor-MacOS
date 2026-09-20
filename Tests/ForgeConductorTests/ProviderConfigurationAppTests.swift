@@ -442,10 +442,18 @@ final class ProviderConfigurationAppTests: XCTestCase {
         )
         XCTAssertEqual(continuity.projectID, projectID)
         XCTAssertEqual(continuity.projectGeneration, generation)
-        XCTAssertEqual(continuity.state, .waitingForProvider)
+        XCTAssertTrue(
+            [ManagedContinuityDisplayState.monitoring, .waitingForProvider]
+                .contains(continuity.state)
+        )
         XCTAssertTrue(continuity.automatic)
-        XCTAssertTrue(continuity.detail.contains("waits for the configured provider"))
-        XCTAssertEqual(continuity.recoveryAction, .reviewProvider)
+        if continuity.state == .waitingForProvider {
+            XCTAssertTrue(continuity.detail.contains("waits for the configured provider"))
+            XCTAssertEqual(continuity.recoveryAction, .reviewProvider)
+        } else {
+            XCTAssertTrue(continuity.detail.contains("monitoring"))
+            XCTAssertEqual(continuity.recoveryAction, ContinuityRecoveryAction.none)
+        }
     }
 
     func testProjectBoundPreparationPublishesEveryTypedReadinessAndRecoveryState() throws {

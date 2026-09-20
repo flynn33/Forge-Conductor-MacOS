@@ -6,6 +6,7 @@ import ForgeConductorCore
 
 struct ProviderOperatorView: View {
     @StateObject private var viewModel: ProviderViewModel
+    @State private var showingAdvancedSettings = false
 
     init(client: any OperatorManagerClientProtocol) {
         _viewModel = StateObject(wrappedValue: ProviderViewModel(client: client))
@@ -16,7 +17,7 @@ struct ProviderOperatorView: View {
             VStack(alignment: .leading, spacing: 16) {
                 OperatorHeader(
                     title: "Provider",
-                    subtitle: "Redacted endpoint, model instance, context, tools, credentials, and contract health",
+                    subtitle: "Automatic model readiness for managed tasks",
                     isLoading: viewModel.isBusy,
                     onRefresh: viewModel.load
                 )
@@ -29,9 +30,25 @@ struct ProviderOperatorView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("provider-probe-notice")
                 }
-                configurationEditor
-                if let provider = viewModel.provider {
-                    providerDetail(provider)
+                readiness
+                Button {
+                    showingAdvancedSettings.toggle()
+                } label: {
+                    Label(
+                        "Advanced connection settings",
+                        systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("provider-advanced-toggle")
+                if showingAdvancedSettings {
+                    VStack(alignment: .leading, spacing: 16) {
+                        configurationEditor
+                        if let provider = viewModel.provider {
+                            providerDetail(provider)
+                        }
+                    }
+                    .padding(.top, 8)
                 }
             }
             .padding(20)
@@ -40,6 +57,50 @@ struct ProviderOperatorView: View {
         .onDisappear { viewModel.clearCredentialEntry() }
         .guidedHelpState(viewModel.guidedHelpState, for: .provider)
         .accessibilityIdentifier("provider-operator-view")
+    }
+
+    private var readiness: some View {
+        GroupBox("Model connection") {
+            VStack(alignment: .leading, spacing: 10) {
+                LabeledContent("Status") {
+                    OperatorStateBadge(
+                        state: providerReadinessState
+                    )
+                }
+                LabeledContent("Endpoint", value: "Local LM Studio")
+                LabeledContent(
+                    "Model",
+                    value: viewModel.provider?.modelKey
+                        ?? viewModel.configuration?.modelKey
+                        ?? "Not selected"
+                )
+                LabeledContent(
+                    "Tool use",
+                    value: viewModel.provider?.toolUseCapable == true ? "Available" : "Not checked"
+                )
+                LabeledContent(
+                    "Context",
+                    value: context(viewModel.provider?.activeContextLength)
+                )
+                LabeledContent(
+                    "Last checked",
+                    value: viewModel.provider?.lastProbeAt ?? "Not checked"
+                )
+                if let action = viewModel.preparation?.recoveryAction, action != .none {
+                    LabeledContent("Next action", value: recoveryActionLabel(action))
+                }
+                HStack {
+                    Button("Connect and check", action: viewModel.connectAndCheck)
+                        .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
+                        .accessibilityIdentifier("provider-test-connection")
+                    if viewModel.isProbing {
+                        Button("Cancel", action: viewModel.cancelConnectAndCheck)
+                            .accessibilityIdentifier("provider-cancel-connect-and-check")
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            }
+        }
     }
 
     private var configurationEditor: some View {
@@ -87,8 +148,6 @@ struct ProviderOperatorView: View {
                 Text("Save applies to future managed runs. Finish or cancel existing runs before changing settings. Saving does not test the connection; model loading remains in LM Studio.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("Test Connection", action: viewModel.testConnection)
-                        .accessibilityIdentifier("provider-test-connection")
                     Button("Run Contract Probe", action: viewModel.runContractProbe)
                         .accessibilityIdentifier("provider-run-contract-probe")
                     if viewModel.isProbing {
@@ -176,7 +235,7 @@ struct ProviderOperatorView: View {
                 }
             }
 
-            Text("Connection testing performs a real provider probe. Contract probing also verifies the stateful response, tool, usage, identity, and idempotency capabilities required by Forge.")
+            Text("Connect and check performs model discovery and the full managed-provider contract probe. The separate probe remains available here for advanced diagnosis.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -191,6 +250,27 @@ struct ProviderOperatorView: View {
         case "memory_only": "In memory only (cleared on manager restart)"
         case let value?: value
         case nil: "Unavailable"
+        }
+    }
+
+    private var providerReadinessState: String {
+        if viewModel.isProbing { return "checking" }
+        if viewModel.preparation?.state == .ready
+            || viewModel.provider?.health == "contract_valid" {
+            return "ready"
+        }
+        return viewModel.provider?.health ?? "not_checked"
+    }
+
+    private func recoveryActionLabel(_ action: ProviderPreparationRecoveryAction) -> String {
+        switch action {
+        case .none: "No action required"
+        case .startService: "Start LM Studio, then connect and check again"
+        case .selectModel: "Select one compatible loaded model"
+        case .loadModel: "Load the selected model in LM Studio"
+        case .installCompatibleModel: "Install a tool-capable model in LM Studio"
+        case .supplyCredential: "Supply the required provider credential"
+        case .retry: "Retry Connect and check"
         }
     }
 }
