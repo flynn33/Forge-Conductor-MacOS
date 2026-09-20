@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		001774C6E9F20520035EF582 /* ContinuityOperationControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D47CF181E6BFB758EEA5F3 /* ContinuityOperationControlTests.swift */; };
+		A10100000000000000000001 /* Domain/StjornarvaldContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100000000000000000001 /* Domain/StjornarvaldContracts.swift */; };
+		A10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift */; };
+		A10100000000000000000003 /* StjornarvaldPolicyLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100000000000000000003 /* StjornarvaldPolicyLogTests.swift */; };
 		00969EC47C1147019BE707F7 /* Application/Tools/GitToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */; };
 		0136D5BD66A452D75D2DE7CA /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4B61D4415545424119C86B /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift */; };
 		013A73A4EF99C1EF80BCB1AA /* ContinuitySourceDispatchIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A19BC93808829B74EBDE045 /* ContinuitySourceDispatchIdentityTests.swift */; };
@@ -903,6 +906,9 @@
 		F0A70000000000000000000B /* forge-runtime-launcher */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "forge-runtime-launcher"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F14FF988E33B43889826D634 /* Metal/MetalLoadChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/MetalLoadChart.swift; sourceTree = "<group>"; };
 		F2F9953FEBF5B9DC93BB80E6 /* Tests/ForgeConductorTests/NativeSourcePressureDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/NativeSourcePressureDecisionTests.swift; sourceTree = SOURCE_ROOT; };
+		F10100000000000000000001 /* Domain/StjornarvaldContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/StjornarvaldContracts.swift; sourceTree = "<group>"; };
+		F10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/StjornarvaldPolicyLogStore.swift; sourceTree = "<group>"; };
+		F10100000000000000000003 /* StjornarvaldPolicyLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StjornarvaldPolicyLogTests.swift; sourceTree = "<group>"; };
 		F3E4B8F9C30E0B9F91893320 /* MCP/MCPToolAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPToolAccessPolicy.swift; sourceTree = "<group>"; };
 		F51EE9CA88424463AF1B25D2 /* Domain/DoctorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/DoctorModels.swift; sourceTree = "<group>"; };
 		F541EDBDE03E4D6E97FA4775 /* Manager/ManagerSettingsNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/ManagerSettingsNormalizer.swift; sourceTree = "<group>"; };
@@ -1066,6 +1072,7 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				F10100000000000000000003 /* StjornarvaldPolicyLogTests.swift */,
 				R3F000000000000000000009 /* GuidedModeAppTests.swift */,
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
@@ -1337,6 +1344,8 @@
 		EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */ = {
 			isa = PBXGroup;
 			children = (
+				F10100000000000000000001 /* Domain/StjornarvaldContracts.swift */,
+				F10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift */,
 				A26F00000000000000000001 /* Application/AutonomySupervisor.swift */,
 				DDDC37BEB19860460723A98C /* Sources/ForgeConductorCore/Domain/ManagedToolResultBudgetModels.swift */,
 				96418EFEA54A0094DBD3A1FC /* Sources/ForgeConductorCore/Application/NativeSourcePressurePacketBuilder.swift */,
@@ -1899,6 +1908,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10100000000000000000003 /* StjornarvaldPolicyLogTests.swift in Sources */,
 				E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */,
 				E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */,
 				E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */,
@@ -2139,6 +2149,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10100000000000000000001 /* Domain/StjornarvaldContracts.swift in Sources */,
+				A10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift in Sources */,
 				E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */,
 				E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */,
 				E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */,

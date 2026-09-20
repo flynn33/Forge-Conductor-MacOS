@@ -12,6 +12,11 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added the native Stjornarvald contract and persistence foundation: typed
+  policy/observation/violation identities, deterministic violation grouping,
+  immutable SQLite events, a digest-chained recoverable JSONL mirror,
+  owner-only storage, and bounded outbox/in-memory fallback that never controls
+  ordinary Forge development.
 - Established the pinned Raven Forge Development 0.6.2 policy binding and
   current-source realization record for the in-progress Rune Forge Development
   Policy and Stjornarvald feature. The record fixes native ownership,

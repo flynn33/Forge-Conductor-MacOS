@@ -303,6 +303,14 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     message: "The workspace root itself cannot be deleted or moved: \(candidate.path)"
                 )
             }
+            let policyRoot = try canonicalURL(paths.stjornarvaldDir, cancellation: cancellation)
+            if reservedContains(candidate, root: policyRoot)
+                || (access.protectRoot && reservedContains(policyRoot, root: candidate)) {
+                return .denied(
+                    code: "manager_policy_path_protected",
+                    message: "Development Policy state and evidence are owned by the manager"
+                )
+            }
             let validationRoot = try canonicalURL(paths.nativeValidationDir, cancellation: cancellation)
             if reservedContains(candidate, root: validationRoot)
                 || (access.protectRoot && reservedContains(validationRoot, root: candidate)) {

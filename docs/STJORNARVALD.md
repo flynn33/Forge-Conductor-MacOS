@@ -2,8 +2,8 @@
 
 This document is the current product record for the native **Development
 Policy** feature, its **Rune Forge** operator surface, and the manager-owned
-**Stjornarvald** policy engine. It records the reconciled implementation
-boundary; unfinished work remains open in the [roadmap](../ROADMAP.md).
+**Stjornarvald** policy engine. Typed contracts and durable policy history are
+implemented; unfinished work remains open in the [roadmap](../ROADMAP.md).
 
 ## Governing source
 
@@ -54,8 +54,8 @@ stale patch location while preserving those newer contracts.
 
 | Responsibility | Current owner / intended product-local change |
 | --- | --- |
-| Typed policy, observation, violation, notice, and export contracts | New focused files under `Sources/ForgeConductorCore/Domain/` |
-| Dedicated policy database, JSONL mirror, source store, outboxes, exports, and staging | `AppPaths` plus new focused infrastructure owners |
+| Typed policy, observation, violation, and event contracts | `Domain/StjornarvaldContracts.swift` (implemented in RF-SJ-01) |
+| Dedicated policy database, JSONL mirror, outbox, source store, exports, and staging | `AppPaths` and `Infrastructure/StjornarvaldPolicyLogStore.swift` (durable log implemented in RF-SJ-01; later stores remain open) |
 | Process composition | `ForgeApp`; process clients may be composed here, but the manager remains the only evaluator owner |
 | Manager lifecycle and single evaluator | `ManagerNode` plus a dedicated coordinator |
 | Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `OperatorManagerClient` |
@@ -87,9 +87,40 @@ at `8c529924fb770b695b923f11eb5c29b26012db65`, Xcode 27.0, and Apple Swift 6.4.
   'platform=macOS' build` completed with `** BUILD SUCCEEDED **` using the
   ordinary Apple Development signing identity.
 
-This reconciliation changes documentation only. The canonical Xcode and
-SwiftPM graphs are unchanged. It establishes no Stjornarvald implementation,
-runtime, notice-delivery, export, or release claim by itself.
+That RF-SJ-00 reconciliation changed documentation only. RF-SJ-01 subsequently
+added the native contracts and durable policy-log foundation described below.
+
+## RF-SJ-01 durable policy-history evidence
+
+The implementation now provides:
+
+- deterministic violation fingerprints and UUID identities scoped by policy
+  revision, rule, project/generation, and subject;
+- stable caller event IDs, idempotent replay, immutable SQLite event rows, and
+  separate mutable projections;
+- correction, dispute, repeat, and reopen transitions that append history;
+- a SHA-256-linked canonical JSONL mirror rebuilt atomically from SQLite after
+  a partial append, missing mirror, or restart;
+- owner-only directories and database, sidecar, mirror, and outbox files;
+- direct-tool and subprocess/runtime-sandbox exclusion for the entire
+  manager-owned policy namespace, including ancestor move/delete attempts;
+- pre-write schema validation, bounded event queries and candidates, a
+  10,000-item disk outbox, and a 32-item emergency-memory ceiling; and
+- a non-throwing service facade that reports a persisted or deferred result and
+  cannot authorize tools, admit runs, control queues/completion, or mutate
+  project source.
+
+`swift test --filter StjornarvaldPolicyLogTests` and the canonical workspace
+`ForgeConductor` scheme each executed the eight focused store, migration,
+reopen, permission/protection, idempotency, outbox, and all-storage-fault cases
+with zero failures. The Xcode run compiled the explicitly registered production
+and test members and Apple Development-signed the test bundle. An earlier
+command using the nonexistent `ForgeConductorTests` scheme exited 65 before
+testing and is retained as a non-pass.
+
+This phase does not claim source cataloging or interpretation, live observation
+coordination, violation detection, coding-agent notice delivery, manager routes,
+Rune Forge UI, export, integrated stress/fault proof, or release acceptance.
 
 ## Delivery sequence
 

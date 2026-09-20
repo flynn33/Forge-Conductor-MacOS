@@ -163,7 +163,7 @@ public final class ForgeApp: @unchecked Sendable {
             controlPlaneRepository: projectContexts.repository,
             databaseURL: paths.controlPlaneSQLite,
             artifactRoot: paths.runtimeArtifactsDir,
-            protectedDirectories: [paths.nativeValidationDir]
+            protectedDirectories: [paths.nativeValidationDir, paths.stjornarvaldDir]
         )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)

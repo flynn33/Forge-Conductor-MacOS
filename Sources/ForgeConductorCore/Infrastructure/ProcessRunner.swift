@@ -89,7 +89,7 @@ public final class ProcessRunner: @unchecked Sendable {
     private final class ToolSandbox: @unchecked Sendable {
         let directory: URL
         let scope: ToolAuthorizationScope
-        let protectedDirectory: URL
+        let protectedDirectories: [URL]
         let workingDirectory: URL
 
         init(context: ToolInvocationContext?, workingDirectory: URL, paths: AppPaths) throws {
@@ -98,7 +98,7 @@ public final class ProcessRunner: @unchecked Sendable {
                 canonicalRoots: [self.workingDirectory], writableRoots: [self.workingDirectory],
                 allowedTools: [], networkAllowed: false, maximumInlineOutputBytes: 1_048_576
             )
-            protectedDirectory = paths.nativeValidationDir
+            protectedDirectories = [paths.nativeValidationDir, paths.stjornarvaldDir]
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("forge-tool-\(UUID().uuidString.lowercased())")
             try FileManager.default.createDirectory(at: directory.appendingPathComponent("readonly"), withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
@@ -118,7 +118,7 @@ public final class ProcessRunner: @unchecked Sendable {
                 environment: toolEnvironment, canonicalReadRoots: scope.canonicalRoots,
                 canonicalWritableRoots: scope.writableRoots,
                 managerReadDirectory: directory.appendingPathComponent("readonly"), scratchDirectory: directory.appendingPathComponent("scratch"),
-                networkAllowed: scope.networkAllowed, protectedDirectories: [protectedDirectory]
+                networkAllowed: scope.networkAllowed, protectedDirectories: protectedDirectories
             )
         }
     }

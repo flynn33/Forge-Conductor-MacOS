@@ -1,0 +1,382 @@
+// StjornarvaldContracts.swift
+// What: Defines Development Policy identities, observations, violations, and ports.
+// How: Small Sendable value types cross the engine, persistence, and reporting boundaries.
+// Why: Policy interpretation must stay typed, additive, and unable to control development.
+
+import Foundation
+
+public struct PolicySourceID: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let rawValue: UUID
+    public init(_ rawValue: UUID = UUID()) { self.rawValue = rawValue }
+    public var description: String { rawValue.uuidString.lowercased() }
+}
+
+public struct PolicyRuleID: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let rawValue: String
+    public init(_ rawValue: String) { self.rawValue = rawValue }
+    public var description: String { rawValue }
+}
+
+public struct PolicyViolationID: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let rawValue: UUID
+    public init(_ rawValue: UUID = UUID()) { self.rawValue = rawValue }
+    public var description: String { rawValue.uuidString.lowercased() }
+}
+
+public enum PolicySourceInterpretationState: String, Codable, Sendable {
+    case accepted, cataloging, indexed
+    case partiallyIndexed = "partially_indexed"
+    case refreshPending = "refresh_pending"
+    case sourceUnavailable = "source_unavailable"
+    case removedByUser = "removed_by_user"
+}
+
+public struct DevelopmentPolicySource: Codable, Sendable, Equatable, Identifiable {
+    public let id: PolicySourceID
+    public let displayName: String
+    public let selectedPath: String
+    public let active: Bool
+    public let interpretationState: PolicySourceInterpretationState
+    public let addedAt: Date
+
+    public init(
+        id: PolicySourceID = PolicySourceID(),
+        displayName: String,
+        selectedPath: String,
+        active: Bool = true,
+        interpretationState: PolicySourceInterpretationState = .accepted,
+        addedAt: Date = Date()
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.selectedPath = selectedPath
+        self.active = active
+        self.interpretationState = interpretationState
+        self.addedAt = addedAt
+    }
+}
+
+public struct PolicySourceReference: Codable, Sendable, Equatable {
+    public let sourceID: PolicySourceID
+    public let revision: String
+    public let path: String
+    public let locator: String
+
+    public init(sourceID: PolicySourceID, revision: String, path: String, locator: String) {
+        self.sourceID = sourceID
+        self.revision = revision
+        self.path = path
+        self.locator = locator
+    }
+}
+
+public struct PolicyRule: Codable, Sendable, Equatable, Identifiable {
+    public let id: PolicyRuleID
+    public let source: PolicySourceReference
+    public let statement: String
+    public let policyArea: String
+    public let applicability: String
+    public let confidence: Double
+    public let assumptions: [String]
+    public let alternatives: [String]
+    public let controlsExecution: Bool
+
+    public init(
+        id: PolicyRuleID,
+        source: PolicySourceReference,
+        statement: String,
+        policyArea: String,
+        applicability: String,
+        confidence: Double,
+        assumptions: [String] = [],
+        alternatives: [String] = [],
+        controlsExecution: Bool = false
+    ) {
+        self.id = id
+        self.source = source
+        self.statement = statement
+        self.policyArea = policyArea
+        self.applicability = applicability
+        self.confidence = min(max(confidence, 0), 1)
+        self.assumptions = assumptions
+        self.alternatives = alternatives
+        // This field is deliberately clamped. Stjornarvald has no execution authority.
+        self.controlsExecution = false
+    }
+}
+
+public enum DevelopmentObservationKind: String, Codable, Sendable {
+    case sessionStarted = "session_started"
+    case policyContextDelivered = "policy_context_delivered"
+    case agentMessageObserved = "agent_message_observed"
+    case toolInvocationCompleted = "tool_invocation_completed"
+    case runtimeJobObserved = "runtime_job_observed"
+    case repositorySnapshotObserved = "repository_snapshot_observed"
+    case dependencyStateObserved = "dependency_state_observed"
+    case projectConfigurationObserved = "project_configuration_observed"
+    case buildResultObserved = "build_result_observed"
+    case testResultObserved = "test_result_observed"
+    case documentationStateObserved = "documentation_state_observed"
+    case completionClaimObserved = "completion_claim_observed"
+    case handoffObserved = "handoff_observed"
+    case sourceInterpretationObserved = "source_interpretation_observed"
+    case engineFaultObserved = "engine_fault_observed"
+}
+
+public struct DevelopmentObservationScope: Codable, Sendable, Equatable {
+    public let projectID: String?
+    public let projectGeneration: Int?
+    public let runID: String?
+    public let sessionID: String?
+    public let clientID: String?
+
+    public init(
+        projectID: String? = nil,
+        projectGeneration: Int? = nil,
+        runID: String? = nil,
+        sessionID: String? = nil,
+        clientID: String? = nil
+    ) {
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.runID = runID
+        self.sessionID = sessionID
+        self.clientID = clientID
+    }
+}
+
+public struct DevelopmentObservation: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let idempotencyKey: String
+    public let kind: DevelopmentObservationKind
+    public let observedAt: Date
+    public let scope: DevelopmentObservationScope
+    public let subjectIdentity: String
+    public let summary: String
+    public let evidenceReferences: [String]
+    public let payloadSHA256: String
+
+    public init(
+        id: UUID = UUID(),
+        idempotencyKey: String,
+        kind: DevelopmentObservationKind,
+        observedAt: Date = Date(),
+        scope: DevelopmentObservationScope = DevelopmentObservationScope(),
+        subjectIdentity: String,
+        summary: String,
+        evidenceReferences: [String] = [],
+        payloadSHA256: String
+    ) {
+        self.id = id
+        self.idempotencyKey = idempotencyKey
+        self.kind = kind
+        self.observedAt = observedAt
+        self.scope = scope
+        self.subjectIdentity = subjectIdentity
+        self.summary = summary
+        self.evidenceReferences = evidenceReferences
+        self.payloadSHA256 = payloadSHA256
+    }
+}
+
+public enum PolicyViolationProjectionState: String, Codable, Sendable {
+    case open, corrected, repeated, reopened, disputed
+    case unresolvedAtHandoff = "unresolved_at_handoff"
+}
+
+public enum PolicyViolationEventType: String, Codable, Sendable {
+    case opened = "violation_opened"
+    case repeated = "violation_repeated"
+    case evidenceUpdated = "violation_evidence_updated"
+    case corrected = "violation_corrected"
+    case reopened = "violation_reopened"
+    case disputed = "violation_disputed"
+}
+
+public struct PolicyViolationCandidate: Codable, Sendable, Equatable {
+    public let rule: PolicyRule
+    public let observationID: UUID
+    public let scope: DevelopmentObservationScope
+    public let subjectIdentity: String
+    public let summary: String
+    public let evidenceReferences: [String]
+    public let explanation: String
+    public let confidence: Double
+    public let assumptions: [String]
+    public let alternatives: [String]
+    public let suggestedCorrection: String
+
+    public init(
+        rule: PolicyRule,
+        observationID: UUID,
+        scope: DevelopmentObservationScope = DevelopmentObservationScope(),
+        subjectIdentity: String,
+        summary: String,
+        evidenceReferences: [String] = [],
+        explanation: String,
+        confidence: Double,
+        assumptions: [String] = [],
+        alternatives: [String] = [],
+        suggestedCorrection: String
+    ) {
+        self.rule = rule
+        self.observationID = observationID
+        self.scope = scope
+        self.subjectIdentity = subjectIdentity
+        self.summary = summary
+        self.evidenceReferences = evidenceReferences
+        self.explanation = explanation
+        self.confidence = min(max(confidence, 0), 1)
+        self.assumptions = assumptions
+        self.alternatives = alternatives
+        self.suggestedCorrection = suggestedCorrection
+    }
+}
+
+public struct PolicyViolation: Codable, Sendable, Equatable, Identifiable {
+    public let id: PolicyViolationID
+    public let fingerprint: String
+    public let ruleID: PolicyRuleID
+    public let policyRevision: String
+    public let state: PolicyViolationProjectionState
+    public let firstObservedAt: Date
+    public let lastObservedAt: Date
+    public let occurrenceCount: Int
+    public let latestSummary: String
+    public let latestSuggestedCorrection: String
+}
+
+public struct PolicyViolationEvent: Codable, Sendable, Equatable, Identifiable {
+    public let schemaVersion: String
+    public let sequence: Int64
+    public let id: UUID
+    public let type: PolicyViolationEventType
+    public let occurredAt: Date
+    public let violationID: PolicyViolationID
+    public let fingerprint: String
+    public let candidate: PolicyViolationCandidate
+    public let noticeState: String
+    public let priorEventSHA256: String?
+    public let eventSHA256: String
+    public let developmentContinues: Bool
+}
+
+public struct CodingAgentPolicyNotice: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let violationID: PolicyViolationID
+    public let ruleReference: PolicySourceReference
+    public let summary: String
+    public let suggestedCorrection: String
+    public let confidence: Double
+    public let developmentContinues: Bool
+
+    public init(
+        id: UUID = UUID(),
+        violationID: PolicyViolationID,
+        ruleReference: PolicySourceReference,
+        summary: String,
+        suggestedCorrection: String,
+        confidence: Double
+    ) {
+        self.id = id
+        self.violationID = violationID
+        self.ruleReference = ruleReference
+        self.summary = summary
+        self.suggestedCorrection = suggestedCorrection
+        self.confidence = min(max(confidence, 0), 1)
+        self.developmentContinues = true
+    }
+}
+
+public struct PolicyContextSnapshot: Codable, Sendable, Equatable {
+    public let policyIdentity: String
+    public let applicableRuleSummaries: [String]
+    public let pendingNotices: [CodingAgentPolicyNotice]
+    public let limitations: [String]
+
+    public init(
+        policyIdentity: String,
+        applicableRuleSummaries: [String],
+        pendingNotices: [CodingAgentPolicyNotice],
+        limitations: [String]
+    ) {
+        self.policyIdentity = policyIdentity
+        self.applicableRuleSummaries = applicableRuleSummaries
+        self.pendingNotices = pendingNotices
+        self.limitations = limitations
+    }
+}
+
+public protocol DevelopmentPolicySourceCataloging: Sendable {
+    func add(selectedURL: URL, requestID: UUID) async throws -> DevelopmentPolicySource
+    func refresh(sourceID: PolicySourceID, requestID: UUID) async throws
+    func remove(sourceID: PolicySourceID, requestID: UUID) async throws
+}
+
+public protocol PolicyContentIndexing: Sendable {
+    func schedule(sourceID: PolicySourceID) async
+}
+
+public protocol PolicyObservationSubmitting: Sendable {
+    func submit(_ observation: DevelopmentObservation) async
+}
+
+public protocol PolicyViolationDetecting: Sendable {
+    var detectorID: String { get }
+    func evaluate(
+        observation: DevelopmentObservation,
+        rules: [PolicyRule]
+    ) async throws -> [PolicyViolationCandidate]
+}
+
+public protocol PolicyViolationLogging: Sendable {
+    func record(_ candidate: PolicyViolationCandidate) async throws -> PolicyViolation
+}
+
+/// Runtime-facing facade used where policy persistence is explicitly
+/// non-interfering and a deferred write is preferable to a thrown failure.
+public protocol FailForwardPolicyViolationLogging: Sendable {
+    func record(_ candidate: PolicyViolationCandidate) async -> PolicyLogWriteDisposition
+}
+
+public enum PolicyLogWriteDisposition: Sendable, Equatable {
+    case persisted(PolicyViolation)
+    case deferred(eventID: UUID)
+}
+
+public protocol CodingAgentPolicyReporting: Sendable {
+    func queue(_ violation: PolicyViolation) async
+    func pendingNotices(
+        projectID: String?,
+        runID: String?,
+        sessionID: String?,
+        clientID: String?,
+        maximumCount: Int,
+        maximumBytes: Int
+    ) async -> [CodingAgentPolicyNotice]
+}
+
+public protocol PolicyContextProviding: Sendable {
+    func context(
+        projectID: String,
+        projectGeneration: Int,
+        runID: String,
+        sessionID: String?
+    ) async -> PolicyContextSnapshot
+}
+
+public enum PolicyLogExportFormat: String, Codable, Sendable {
+    case jsonl, json, markdown, csv
+}
+
+public protocol PolicyLogExporting: Sendable {
+    func export(format: PolicyLogExportFormat, destination: URL, requestID: UUID) async throws -> URL
+}
+
+public enum StjornarvaldNonInterferenceContract {
+    public static let controlsToolAuthorization = false
+    public static let controlsRunAdmission = false
+    public static let controlsQueueState = false
+    public static let controlsCompletion = false
+    public static let mutatesProjectSource = false
+}

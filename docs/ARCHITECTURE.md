@@ -14,6 +14,10 @@ Forge Conductor is a native macOS orchestration server for local models hosted b
 The in-progress Rune Forge Development Policy feature adds a manager-owned,
 non-interfering observer and policy-log boundary without entering tool
 authorization, run admission, queue state, project generations, or completion.
+Its implemented persistence foundation uses schema-versioned SQLite as query
+authority, immutable digest-chained violation events, a repairable JSONL mirror,
+and bounded owner-only fallback storage. A non-throwing service boundary keeps
+all policy-log faults additive to ordinary Forge execution.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

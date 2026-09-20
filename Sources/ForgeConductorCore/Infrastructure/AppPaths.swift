@@ -90,6 +90,32 @@ public final class AppPaths: @unchecked Sendable {
     public var instructionPackageQueue: URL {
         instructionPackagesDir.appendingPathComponent("queue.json")
     }
+    /// Manager-owned Development Policy state. This namespace is separate from
+    /// ordinary diagnostics and is never an authorization or run-control input.
+    public var stjornarvaldDir: URL {
+        home.appendingPathComponent("stjornarvald", isDirectory: true)
+    }
+    public var stjornarvaldPolicyLogSQLite: URL {
+        stjornarvaldDir.appendingPathComponent("policy-log.sqlite3")
+    }
+    public var stjornarvaldPolicyLogJSONL: URL {
+        stjornarvaldDir.appendingPathComponent("policy-violations.jsonl")
+    }
+    public var stjornarvaldOutboxDir: URL {
+        stjornarvaldDir.appendingPathComponent("outbox", isDirectory: true)
+    }
+    public var stjornarvaldSourceStoreDir: URL {
+        stjornarvaldDir.appendingPathComponent("source-store", isDirectory: true)
+    }
+    public var stjornarvaldExtractedDir: URL {
+        stjornarvaldDir.appendingPathComponent("extracted", isDirectory: true)
+    }
+    public var stjornarvaldExportsDir: URL {
+        stjornarvaldDir.appendingPathComponent("exports", isDirectory: true)
+    }
+    public var stjornarvaldStagingDir: URL {
+        stjornarvaldDir.appendingPathComponent("staging", isDirectory: true)
+    }
     /// Project-scoped default tool selections used by ordinary managed runs.
     /// Exact run grants are still frozen in the control-plane run record.
     public var projectToolPermissions: URL {
@@ -103,10 +129,18 @@ public final class AppPaths: @unchecked Sendable {
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
             memoryDir, memoryHandoffsDir, projectsDir, runtimeArtifactsDir,
             managedProvidersDir, instructionPackagesDir, instructionPackageStoreDir,
-            configMigrationsDir,
+            configMigrationsDir, stjornarvaldDir, stjornarvaldOutboxDir,
+            stjornarvaldSourceStoreDir, stjornarvaldExtractedDir,
+            stjornarvaldExportsDir, stjornarvaldStagingDir,
             cacheDir.appendingPathComponent("browser", isDirectory: true),
         ] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        for dir in [
+            stjornarvaldDir, stjornarvaldOutboxDir, stjornarvaldSourceStoreDir,
+            stjornarvaldExtractedDir, stjornarvaldExportsDir, stjornarvaldStagingDir,
+        ] {
+            try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
         }
         if !fm.fileExists(atPath: configJSON.path) {
             let cfg: [String: Any] = [
