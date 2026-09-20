@@ -12,6 +12,12 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Established the pinned Raven Forge Development 0.6.2 policy binding and
+  current-source realization record for the in-progress Rune Forge Development
+  Policy and Stjornarvald feature. The record fixes native ownership,
+  all-format source acceptance, additive violation reporting, dedicated policy
+  history, and strict non-interference boundaries without claiming runtime
+  implementation.
 - Added manager-owned automatic completion plans bound to the exact project
   generation and immutable instruction source. Direct and queued runs now
   persist typed, reasoned obligations for available builds/tests, read-only

@@ -20,6 +20,7 @@ is retained for auditability, but it is not current operating guidance.
 | Document | Purpose |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | Product boundaries, ownership, persistence, and trust |
+| [Rune Forge and Stjornarvald](STJORNARVALD.md) | Pinned policy binding, non-interference contract, realization map, and current delivery state |
 | [Project memory](PROJECT-MEMORY.md) | Project-scoped durable memory contract |
 | [Project reset](PROJECT-RESET.md) | Generation reset and isolation behavior |
 | [Continuity ingress](CONTINUITY-INGRESS.md) | Authorized source attachment and rollover |
