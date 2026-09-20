@@ -30,8 +30,9 @@ unbounded port-owner subprocess path, Release entitlement/testability settings,
 and browser DOM/error handling. Both SwiftPM products, the canonical Debug
 workspace build, and Xcode static analysis passed. The terminal full suite
 executed **1,691 XCTest cases with 12 explicit skips and zero failures**. See
-the [audit record](AUDIT-2026-09-20.md). The audit did not create or qualify a
-release artifact.
+the [audit record](AUDIT-2026-09-20.md). The exact audited implementation is
+signed revision `839e45035c30d12efcebfbe29f31387972eaa95b`. The audit did not
+create or qualify a release artifact.
 
 The tested production source is owner-authored revision
 `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
