@@ -398,6 +398,86 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
     }
 
+    func testInstructionDeliveryProgressCompactsMaximumDocumentCoverage() throws {
+        let runID = RunID()
+        let projectID = ProjectID()
+        let artifactSHA256 = String(repeating: "a", count: 64)
+        let documentSHA256 = JSONSupport.sha256Hex("x")
+        var progress = try InstructionDeliveryProgress(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            artifactSHA256: [artifactSHA256]
+        )
+        let pageSize = 128
+        for cursor in stride(
+            from: 0,
+            to: ProjectInstructionQueueStore.maximumSourceFiles,
+            by: pageSize
+        ) {
+            let documents: [[String: Any]] = (cursor..<cursor + pageSize).map { index in
+                ["id": String(format: "document-%06d", index + 1)]
+            }
+            let result = try JSONSupport.canonicalJSON([
+                "ok": true,
+                "is_error": false,
+                "payload": [
+                    "snapshot_sha256": artifactSHA256,
+                    "total_documents": ProjectInstructionQueueStore.maximumSourceFiles,
+                    "cursor": cursor,
+                    "documents": documents,
+                ],
+            ])
+            try progress.record(toolInvocation(
+                runID: runID,
+                projectID: projectID,
+                toolName: "instruction_catalog",
+                result: result
+            ))
+        }
+        for index in 0..<ProjectInstructionQueueStore.maximumSourceFiles {
+            let result = try JSONSupport.canonicalJSON([
+                "ok": true,
+                "is_error": false,
+                "payload": [
+                    "snapshot_sha256": artifactSHA256,
+                    "document_id": String(format: "document-%06d", index + 1),
+                    "content": "x",
+                    "byte_offset": 0,
+                    "total_bytes": 1,
+                    "sha256": documentSHA256,
+                ],
+            ])
+            try progress.record(toolInvocation(
+                runID: runID,
+                projectID: projectID,
+                toolName: "instruction_read",
+                result: result
+            ))
+        }
+
+        let validated = try progress.validated()
+        let artifact = try XCTUnwrap(validated.artifacts.first)
+        XCTAssertEqual(
+            artifact.totalDocuments,
+            ProjectInstructionQueueStore.maximumSourceFiles
+        )
+        XCTAssertNil(artifact.nextCatalogCursor)
+        XCTAssertEqual(artifact.catalogDeliveredRanges, [
+            InstructionDeliveryByteRange(
+                lowerBound: 0,
+                upperBound: ProjectInstructionQueueStore.maximumSourceFiles
+            ),
+        ])
+        XCTAssertTrue(artifact.documents.isEmpty)
+        XCTAssertEqual(
+            artifact.completedDocumentBitmap,
+            Data(repeating: 0xff, count: ProjectInstructionQueueStore.maximumSourceFiles / 8)
+        )
+        let encoded = try ForgeJSONCanonicalizationV1.data(from: validated.asDictionary())
+        XCTAssertLessThan(encoded.count, 8 * 1_024)
+    }
+
     func testSelectedPackagesBindByImmutableHashAndComposeInVisibleOrder() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }

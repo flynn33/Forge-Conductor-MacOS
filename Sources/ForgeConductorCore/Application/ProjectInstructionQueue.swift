@@ -234,6 +234,602 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
     }
 }
 
+public struct InstructionDeliveryByteRange: Codable, Sendable, Equatable {
+    public let lowerBound: Int
+    public let upperBound: Int
+
+    public init(lowerBound: Int, upperBound: Int) {
+        self.lowerBound = lowerBound
+        self.upperBound = upperBound
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case lowerBound = "lower_bound"
+        case upperBound = "upper_bound"
+    }
+
+    fileprivate func asDictionary() -> [String: Any] {
+        ["lower_bound": lowerBound, "upper_bound": upperBound]
+    }
+}
+
+public struct InstructionDocumentDeliveryProgress: Codable, Sendable, Equatable {
+    public let documentID: String
+    public let canonicalSHA256: String
+    public let totalBytes: Int
+    public let deliveredRanges: [InstructionDeliveryByteRange]
+    public let nextByteOffset: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case documentID = "document_id"
+        case canonicalSHA256 = "canonical_sha256"
+        case totalBytes = "total_bytes"
+        case deliveredRanges = "delivered_ranges"
+        case nextByteOffset = "next_byte_offset"
+    }
+
+    fileprivate func asDictionary() -> [String: Any] {
+        [
+            "document_id": documentID,
+            "canonical_sha256": canonicalSHA256,
+            "total_bytes": totalBytes,
+            "delivered_ranges": deliveredRanges.map { $0.asDictionary() },
+            "next_byte_offset": nextByteOffset as Any,
+        ].compactNSNull()
+    }
+}
+
+public struct InstructionArtifactDeliveryProgress: Codable, Sendable, Equatable {
+    public let artifactSHA256: String
+    public let totalDocuments: Int?
+    public let catalogDeliveredRanges: [InstructionDeliveryByteRange]
+    public let nextCatalogCursor: Int?
+    public let completedDocumentBitmap: Data
+    public let documents: [InstructionDocumentDeliveryProgress]
+
+    enum CodingKeys: String, CodingKey {
+        case artifactSHA256 = "artifact_sha256"
+        case totalDocuments = "total_documents"
+        case catalogDeliveredRanges = "catalog_delivered_ranges"
+        case nextCatalogCursor = "next_catalog_cursor"
+        case completedDocumentBitmap = "completed_document_bitmap"
+        case documents
+    }
+
+    fileprivate func asDictionary() -> [String: Any] {
+        [
+            "artifact_sha256": artifactSHA256,
+            "total_documents": totalDocuments as Any,
+            "catalog_delivered_ranges": catalogDeliveredRanges.map { $0.asDictionary() },
+            "next_catalog_cursor": nextCatalogCursor as Any,
+            "completed_document_bitmap": completedDocumentBitmap.base64EncodedString(),
+            "documents": documents.map { $0.asDictionary() },
+        ].compactNSNull()
+    }
+}
+
+/// A bounded aggregate derived only from accepted, integrity-checked tool
+/// results. It is copied into a managed handoff; the durable invocation journal
+/// remains the sole delivery authority.
+public struct InstructionDeliveryProgress: Codable, Sendable, Equatable {
+    public static let schemaVersion = 1
+    public static let maximumEvidenceRecords = 65_536
+    public static let maximumRangesPerItem = 32
+    public static let maximumPartialDocuments = 64
+
+    public let schemaVersion: Int
+    public let runID: RunID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let artifacts: [InstructionArtifactDeliveryProgress]
+    public let acknowledgedRequirements: [String]
+    public let evidenceRecordCount: Int
+
+    public init(
+        runID: RunID,
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        artifactSHA256: [String]
+    ) throws {
+        guard artifactSHA256.count <= ProjectInstructionQueueStore.maximumRunArtifactInputs,
+              Set(artifactSHA256).count == artifactSHA256.count,
+              artifactSHA256.allSatisfy(Self.isSHA256) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction delivery artifact identities are invalid or oversized."
+            )
+        }
+        schemaVersion = Self.schemaVersion
+        self.runID = runID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        artifacts = artifactSHA256.sorted().map {
+            InstructionArtifactDeliveryProgress(
+                artifactSHA256: $0,
+                totalDocuments: nil,
+                catalogDeliveredRanges: [],
+                nextCatalogCursor: 0,
+                completedDocumentBitmap: Data(),
+                documents: []
+            )
+        }
+        acknowledgedRequirements = []
+        evidenceRecordCount = 0
+    }
+
+    private init(
+        runID: RunID,
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        artifacts: [InstructionArtifactDeliveryProgress],
+        acknowledgedRequirements: [String],
+        evidenceRecordCount: Int
+    ) {
+        schemaVersion = Self.schemaVersion
+        self.runID = runID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.artifacts = artifacts
+        self.acknowledgedRequirements = acknowledgedRequirements
+        self.evidenceRecordCount = evidenceRecordCount
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case runID = "run_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case artifacts
+        case acknowledgedRequirements = "acknowledged_requirements"
+        case evidenceRecordCount = "evidence_record_count"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedSchemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
+        guard decodedSchemaVersion == Self.schemaVersion,
+              let runUUID = UUID(uuidString: try values.decode(String.self, forKey: .runID)),
+              let projectUUID = UUID(uuidString: try values.decode(String.self, forKey: .projectID)) else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: "Instruction delivery identity is invalid.")
+            )
+        }
+        schemaVersion = decodedSchemaVersion
+        runID = RunID(runUUID)
+        projectID = ProjectID(projectUUID)
+        projectGeneration = ProjectGeneration(
+            try values.decode(UInt64.self, forKey: .projectGeneration)
+        )
+        artifacts = try values.decode([InstructionArtifactDeliveryProgress].self, forKey: .artifacts)
+        acknowledgedRequirements = try values.decode(
+            [String].self,
+            forKey: .acknowledgedRequirements
+        )
+        evidenceRecordCount = try values.decode(Int.self, forKey: .evidenceRecordCount)
+        try validate()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(Self.schemaVersion, forKey: .schemaVersion)
+        try values.encode(runID.description, forKey: .runID)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(projectGeneration.rawValue, forKey: .projectGeneration)
+        try values.encode(artifacts, forKey: .artifacts)
+        try values.encode(acknowledgedRequirements, forKey: .acknowledgedRequirements)
+        try values.encode(evidenceRecordCount, forKey: .evidenceRecordCount)
+    }
+
+    public func validated() throws -> InstructionDeliveryProgress {
+        try validate()
+        return self
+    }
+
+    public func asDictionary() -> [String: Any] {
+        [
+            "schema_version": Self.schemaVersion,
+            "run_id": runID.description,
+            "project_id": projectID.description,
+            "project_generation": projectGeneration.rawValue,
+            "artifacts": artifacts.map { $0.asDictionary() },
+            "acknowledged_requirements": acknowledgedRequirements,
+            "evidence_record_count": evidenceRecordCount,
+        ]
+    }
+
+    mutating func record(_ invocation: ToolInvocationRecord) throws {
+        guard invocation.runID == runID,
+              invocation.projectID == projectID,
+              invocation.projectGeneration == projectGeneration else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction delivery evidence belongs to another run."
+            )
+        }
+        guard invocation.state == .completed,
+              invocation.toolName == "instruction_catalog"
+                || invocation.toolName == "instruction_read" else { return }
+        guard evidenceRecordCount < Self.maximumEvidenceRecords else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction delivery evidence exceeds its bounded history"
+            )
+        }
+        guard let summary = invocation.resultSummary,
+              let resultSHA256 = invocation.resultSHA256,
+              JSONSupport.sha256Hex(Data(summary.utf8)) == resultSHA256,
+              let result = try JSONSerialization.jsonObject(
+                with: Data(summary.utf8)
+              ) as? [String: Any],
+              let ok = result["ok"] as? Bool,
+              let isError = result["is_error"] as? Bool,
+              let payload = result["payload"] as? [String: Any] else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "accepted instruction delivery evidence has no valid durable result"
+            )
+        }
+        guard ok, !isError else { return }
+        let artifactSHA256 = payload["snapshot_sha256"] as? String
+            ?? (invocation.toolName == "instruction_read" && artifacts.count == 1
+                ? artifacts[0].artifactSHA256 : nil)
+        guard
+              let artifactSHA256,
+              let artifactIndex = artifacts.firstIndex(where: {
+                $0.artifactSHA256 == artifactSHA256
+              }) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "accepted instruction delivery evidence is invalid or outside the run artifact set"
+            )
+        }
+        var updatedArtifacts = artifacts
+        var artifact = updatedArtifacts[artifactIndex]
+        if invocation.toolName == "instruction_catalog" {
+            artifact = try Self.recordCatalog(payload, in: artifact)
+        } else {
+            artifact = try Self.recordDocument(payload, in: artifact)
+        }
+        updatedArtifacts[artifactIndex] = artifact
+        self = InstructionDeliveryProgress(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            artifacts: updatedArtifacts,
+            acknowledgedRequirements: acknowledgedRequirements,
+            evidenceRecordCount: evidenceRecordCount + 1
+        )
+    }
+
+    private func validate() throws {
+        guard schemaVersion == Self.schemaVersion,
+              projectGeneration.rawValue > 0,
+              artifacts.count <= ProjectInstructionQueueStore.maximumRunArtifactInputs,
+              Set(artifacts.map(\.artifactSHA256)).count == artifacts.count,
+              artifacts.allSatisfy({ Self.isSHA256($0.artifactSHA256) }),
+              acknowledgedRequirements.count <= ContinuityHandoffV2.maximumListItems,
+              acknowledgedRequirements.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 1_024 }),
+              (0...Self.maximumEvidenceRecords).contains(evidenceRecordCount) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction delivery progress is invalid or oversized"
+            )
+        }
+        for artifact in artifacts {
+            guard artifact.totalDocuments.map({
+                (0...ProjectInstructionQueueStore.maximumSourceFiles).contains($0)
+            }) ?? true,
+            artifact.catalogDeliveredRanges.count <= Self.maximumRangesPerItem,
+            artifact.completedDocumentBitmap.count
+                <= (ProjectInstructionQueueStore.maximumSourceFiles + 7) / 8,
+            artifact.documents.count <= Self.maximumPartialDocuments,
+            Set(artifact.documents.map(\.documentID)).count == artifact.documents.count else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction artifact delivery progress is invalid or oversized"
+                )
+            }
+            try Self.validateRanges(
+                artifact.catalogDeliveredRanges,
+                upperLimit: artifact.totalDocuments
+            )
+            try Self.validateCompletedDocumentBitmap(
+                artifact.completedDocumentBitmap,
+                totalDocuments: artifact.totalDocuments
+            )
+            for document in artifact.documents {
+                guard !document.documentID.isEmpty,
+                      document.documentID.utf8.count <= 512,
+                      Self.isSHA256(document.canonicalSHA256),
+                      (0...ProjectInstructionQueueStore.maximumSourceFileBytes)
+                        .contains(document.totalBytes),
+                      document.deliveredRanges.count <= Self.maximumRangesPerItem else {
+                    throw ProjectInstructionQueueError.storageFailure(
+                        "instruction document delivery progress is invalid or oversized"
+                    )
+                }
+                try Self.validateRanges(
+                    document.deliveredRanges,
+                    upperLimit: document.totalBytes
+                )
+            }
+        }
+    }
+
+    private static func recordCatalog(
+        _ payload: [String: Any],
+        in artifact: InstructionArtifactDeliveryProgress
+    ) throws -> InstructionArtifactDeliveryProgress {
+        guard let total = integer(payload["total_documents"]),
+              let cursor = integer(payload["cursor"]),
+              let documents = payload["documents"] as? [[String: Any]],
+              (0...ProjectInstructionQueueStore.maximumSourceFiles).contains(total),
+              cursor >= 0,
+              cursor <= total,
+              documents.count <= 128,
+              cursor <= total - documents.count else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "accepted instruction catalog evidence is invalid"
+            )
+        }
+        if let priorTotal = artifact.totalDocuments, priorTotal != total {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction catalog size changed for an immutable artifact"
+            )
+        }
+        let ranges = if documents.isEmpty {
+            artifact.catalogDeliveredRanges
+        } else {
+            try merged(
+                artifact.catalogDeliveredRanges,
+                adding: InstructionDeliveryByteRange(
+                    lowerBound: cursor,
+                    upperBound: cursor + documents.count
+                ),
+                upperLimit: total
+            )
+        }
+        return InstructionArtifactDeliveryProgress(
+            artifactSHA256: artifact.artifactSHA256,
+            totalDocuments: total,
+            catalogDeliveredRanges: ranges,
+            nextCatalogCursor: firstGap(in: ranges, upperLimit: total),
+            completedDocumentBitmap: artifact.completedDocumentBitmap,
+            documents: artifact.documents
+        )
+    }
+
+    private static func recordDocument(
+        _ payload: [String: Any],
+        in artifact: InstructionArtifactDeliveryProgress
+    ) throws -> InstructionArtifactDeliveryProgress {
+        guard let documentID = payload["document_id"] as? String,
+              let sha256 = payload["sha256"] as? String,
+              let offset = integer(payload["byte_offset"]),
+              let total = integer(payload["total_bytes"]),
+              let content = payload["content"] as? String,
+              !documentID.isEmpty,
+              documentID.utf8.count <= 512,
+              isSHA256(sha256),
+              (0...ProjectInstructionQueueStore.maximumSourceFileBytes).contains(total),
+              offset >= 0,
+              offset <= total,
+              content.utf8.count <= total - offset else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "accepted instruction document evidence is invalid"
+            )
+        }
+        let upperBound = offset + content.utf8.count
+        var documents = artifact.documents
+        var completedDocumentBitmap = artifact.completedDocumentBitmap
+        let ordinal = try documentOrdinal(documentID)
+        if let ordinal, isDocumentComplete(ordinal, bitmap: completedDocumentBitmap) {
+            return artifact
+        }
+        let existing = documents.firstIndex { $0.documentID == documentID }
+        let ranges: [InstructionDeliveryByteRange]
+        if let existing {
+            let prior = documents[existing]
+            guard prior.canonicalSHA256 == sha256, prior.totalBytes == total else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction document identity changed for an immutable artifact"
+                )
+            }
+            ranges = if upperBound == offset {
+                prior.deliveredRanges
+            } else {
+                try merged(
+                    prior.deliveredRanges,
+                    adding: InstructionDeliveryByteRange(
+                        lowerBound: offset,
+                        upperBound: upperBound
+                    ),
+                    upperLimit: total
+                )
+            }
+        } else {
+            guard documents.count < Self.maximumPartialDocuments else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction delivery document coverage is oversized"
+                )
+            }
+            ranges = if upperBound == offset {
+                []
+            } else {
+                try merged(
+                    [],
+                    adding: InstructionDeliveryByteRange(
+                        lowerBound: offset,
+                        upperBound: upperBound
+                    ),
+                    upperLimit: total
+                )
+            }
+        }
+        let nextByteOffset = firstGap(in: ranges, upperLimit: total)
+        if nextByteOffset == nil, let ordinal {
+            completedDocumentBitmap = try settingDocumentComplete(
+                ordinal,
+                bitmap: completedDocumentBitmap
+            )
+            documents.removeAll { $0.documentID == documentID }
+        } else {
+            let progress = InstructionDocumentDeliveryProgress(
+                documentID: documentID,
+                canonicalSHA256: sha256,
+                totalBytes: total,
+                deliveredRanges: ranges,
+                nextByteOffset: nextByteOffset
+            )
+            if let existing {
+                documents[existing] = progress
+            } else {
+                documents.append(progress)
+            }
+        }
+        return InstructionArtifactDeliveryProgress(
+            artifactSHA256: artifact.artifactSHA256,
+            totalDocuments: artifact.totalDocuments,
+            catalogDeliveredRanges: artifact.catalogDeliveredRanges,
+            nextCatalogCursor: artifact.nextCatalogCursor,
+            completedDocumentBitmap: completedDocumentBitmap,
+            documents: documents.sorted { $0.documentID < $1.documentID }
+        )
+    }
+
+    private static func documentOrdinal(_ documentID: String) throws -> Int? {
+        let prefix = "document-"
+        guard documentID.hasPrefix(prefix) else { return nil }
+        let suffix = documentID.dropFirst(prefix.count)
+        guard suffix.count == 6,
+              suffix.allSatisfy({ $0.isNumber }),
+              let oneBased = Int(suffix),
+              (1...ProjectInstructionQueueStore.maximumSourceFiles).contains(oneBased) else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction document identifier is invalid"
+            )
+        }
+        return oneBased - 1
+    }
+
+    private static func isDocumentComplete(_ ordinal: Int, bitmap: Data) -> Bool {
+        let byteIndex = ordinal / 8
+        guard byteIndex < bitmap.count else { return false }
+        return bitmap[byteIndex] & UInt8(1 << (ordinal % 8)) != 0
+    }
+
+    private static func settingDocumentComplete(
+        _ ordinal: Int,
+        bitmap: Data
+    ) throws -> Data {
+        let maximumBytes = (ProjectInstructionQueueStore.maximumSourceFiles + 7) / 8
+        let byteIndex = ordinal / 8
+        guard byteIndex < maximumBytes else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction document coverage is oversized"
+            )
+        }
+        var updated = bitmap
+        if updated.count <= byteIndex {
+            updated.append(contentsOf: repeatElement(0, count: byteIndex + 1 - updated.count))
+        }
+        updated[byteIndex] |= UInt8(1 << (ordinal % 8))
+        return updated
+    }
+
+    private static func validateCompletedDocumentBitmap(
+        _ bitmap: Data,
+        totalDocuments: Int?
+    ) throws {
+        let upperLimit = totalDocuments ?? ProjectInstructionQueueStore.maximumSourceFiles
+        guard bitmap.count <= (upperLimit + 7) / 8 else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction completed-document coverage is invalid"
+            )
+        }
+        if upperLimit % 8 != 0, let last = bitmap.last {
+            let validMask = UInt8((1 << (upperLimit % 8)) - 1)
+            guard last & ~validMask == 0 else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction completed-document coverage exceeds the catalog"
+                )
+            }
+        }
+    }
+
+    private static func merged(
+        _ existing: [InstructionDeliveryByteRange],
+        adding added: InstructionDeliveryByteRange,
+        upperLimit: Int
+    ) throws -> [InstructionDeliveryByteRange] {
+        guard added.lowerBound >= 0,
+              added.lowerBound <= added.upperBound,
+              added.upperBound <= upperLimit else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction delivery range is invalid"
+            )
+        }
+        var result: [InstructionDeliveryByteRange] = []
+        for range in (existing + [added]).sorted(by: {
+            $0.lowerBound == $1.lowerBound
+                ? $0.upperBound < $1.upperBound : $0.lowerBound < $1.lowerBound
+        }) {
+            guard let last = result.last else {
+                result.append(range)
+                continue
+            }
+            if range.lowerBound <= last.upperBound {
+                result[result.count - 1] = InstructionDeliveryByteRange(
+                    lowerBound: last.lowerBound,
+                    upperBound: max(last.upperBound, range.upperBound)
+                )
+            } else {
+                result.append(range)
+            }
+        }
+        guard result.count <= Self.maximumRangesPerItem else {
+            throw ProjectInstructionQueueError.storageFailure(
+                "instruction delivery range coverage is oversized"
+            )
+        }
+        return result
+    }
+
+    private static func validateRanges(
+        _ ranges: [InstructionDeliveryByteRange],
+        upperLimit: Int?
+    ) throws {
+        var priorUpper = -1
+        for range in ranges {
+            guard range.lowerBound >= 0,
+                  range.lowerBound < range.upperBound,
+                  range.lowerBound > priorUpper,
+                  upperLimit.map({ range.upperBound <= $0 }) ?? true else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction delivery range coverage is invalid"
+                )
+            }
+            priorUpper = range.upperBound
+        }
+    }
+
+    private static func firstGap(
+        in ranges: [InstructionDeliveryByteRange],
+        upperLimit: Int
+    ) -> Int? {
+        var cursor = 0
+        for range in ranges {
+            guard range.lowerBound <= cursor else { break }
+            cursor = max(cursor, range.upperBound)
+        }
+        return cursor < upperLimit ? cursor : nil
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        return (value as? NSNumber)?.intValue
+    }
+
+    private static func isSHA256(_ value: String) -> Bool {
+        value.utf8.count == 64 && value.utf8.allSatisfy {
+            (48...57).contains($0) || (97...102).contains($0)
+        }
+    }
+}
+
 public enum ProjectInstructionQueueError: Error, LocalizedError, Sendable, Equatable {
     case invalidRequest(String)
     case sourceUnavailable

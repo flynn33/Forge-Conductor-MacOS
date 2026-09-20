@@ -254,9 +254,40 @@ The assertion now verifies that actual state and recovery action. One UI command
 used the non-owning `ForgeConductorAppTests` scheme and executed no tests; the
 canonical `ForgeConductor` scheme executed the exact UI case successfully.
 
-CT-04 full instruction delivery in the durable handoff and CT-05 real successor
-lifecycle/recovery qualification remain open. This checkpoint does not claim
-that either later requirement is complete.
+## Revision-3 continuity completion — CT-04 and CT-05
+
+Managed handoffs now retain a versioned `managed_context` bound to the exact
+run, project generation, and instruction snapshot. It carries immutable
+artifact hashes, catalog ranges, partial byte ranges and continuation cursors,
+a compact completed-document bitmap, the frozen tool grant, automatic
+completion plan, evidence references, bounded open work, and exact provider,
+adapter, and model revisions. Delivery progress is reconstructed only from
+completed, integrity-checked `instruction_catalog` and `instruction_read`
+results for that run. Coverage is bounded to 4,096 documents, 32 ranges per
+item, 64 partial documents, and 65,536 evidence records. Legacy handoffs without
+the optional managed context remain decodable.
+
+The managed successor path now treats provider-exact rollover pressure as an
+execution fence before any newly requested tool intent can reach the broker.
+Fresh-root bootstrap wraps the handoff as inert data beside the exact expected
+acknowledgement, reconciles streamed and completed JSON arguments canonically,
+coalesces only identical acknowledgement calls, and rejects divergent values.
+An accepted successor retains the exact handoff identity and automatically
+continues the predecessor's work; deterministic injection at every continuity
+crash boundary converges on one successor and one continuation.
+
+**E0:** an opt-in live test used LM Studio `openai/gpt-oss-20b` with an observed
+65,536-token loaded context. Exact provider usage triggered rollover after the
+first predecessor response, before any predecessor tool intent. The test
+injected a post-bootstrap-response crash, shut down the first manager/app
+instance, restarted from the same durable home with no GUI process, validated
+the retained acknowledgement, accepted one successor, sealed and denied the
+predecessor, completed the reserved automatic continuation, and read the
+successor-only marker through `fs_read`. A second manager restart preserved the
+same receipt, session, provider turn, and tool-invocation set and scheduled no
+active work. This is one real provider crash boundary; all other enumerated
+transition boundaries are deterministic in-process crash-injection coverage,
+not SIGKILL claims.
 
 ## Implemented M3 artifact-storage slice
 

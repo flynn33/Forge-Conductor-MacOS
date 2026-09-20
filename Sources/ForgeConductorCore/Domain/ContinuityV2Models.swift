@@ -272,6 +272,103 @@ public struct ContinuityHandoffV2: @unchecked Sendable {
         try Self.requireBytes(currentWork["work_item_id"] as? String, maximum: 512, field: "current_work.work_item_id")
         try Self.requireBytes(currentWork["summary"] as? String, maximum: 16_384, field: "current_work.summary")
         try Self.requireStrings(activeFiles, maximumBytes: 4_096, field: "current_work.active_files")
+        if let managedValue = currentWork["managed_context"] {
+            guard let managed = managedValue as? [String: Any],
+                  Self.hasExactKeys(managed, [
+                    "version", "instruction_artifact_sha256", "instruction_delivery",
+                    "frozen_tool_grant", "completion_plan", "evidence_references",
+                    "provider_configuration",
+                  ]),
+                  Self.integer(managed["version"]) == 1,
+                  let artifactSHA256 = managed["instruction_artifact_sha256"] as? [String],
+                  artifactSHA256.count <= ProjectInstructionQueueStore.maximumRunArtifactInputs,
+                  Set(artifactSHA256).count == artifactSHA256.count,
+                  artifactSHA256.allSatisfy(Self.isLowercaseSHA256),
+                  let frozenToolGrant = managed["frozen_tool_grant"] as? [String],
+                  frozenToolGrant == frozenToolGrant.sorted(),
+                  frozenToolGrant == Array(Set(frozenToolGrant)).sorted(),
+                  let evidence = managed["evidence_references"] as? [String],
+                  evidence.count <= Self.maximumListItems,
+                  let provider = managed["provider_configuration"] as? [String: Any],
+                  Self.hasExactKeys(provider, [
+                    "provider_id", "adapter_id", "model_key",
+                    "provider_configuration_revision", "tool_catalog_revision",
+                  ]),
+                  provider["provider_id"] as? String
+                    == predecessorSession["provider_id"] as? String,
+                  provider["adapter_id"] as? String
+                    == predecessorSession["adapter_id"] as? String,
+                  provider["model_key"] as? String
+                    == predecessorSession["model"] as? String else {
+                throw ProjectMemoryError.invalidRequest(
+                    "V2 managed handoff context is incomplete"
+                )
+            }
+            try Self.requireStrings(
+                artifactSHA256,
+                maximumBytes: 64,
+                field: "managed instruction artifacts"
+            )
+            try Self.requireStrings(
+                frozenToolGrant,
+                maximumBytes: 256,
+                field: "managed frozen tool grant"
+            )
+            try Self.requireStrings(
+                evidence,
+                maximumBytes: 1_024,
+                field: "managed evidence references"
+            )
+            for key in ["provider_configuration_revision", "tool_catalog_revision"] {
+                if !(provider[key] is NSNull) {
+                    try Self.requireBytes(
+                        provider[key] as? String,
+                        maximum: 256,
+                        field: "managed provider configuration"
+                    )
+                }
+            }
+            guard let deliveryObject = managed["instruction_delivery"] as? [String: Any] else {
+                throw ProjectMemoryError.invalidRequest(
+                    "V2 managed handoff instruction delivery is missing"
+                )
+            }
+            let deliveryData = try ForgeJSONCanonicalizationV1.data(from: deliveryObject)
+            let delivery = try JSONDecoder().decode(
+                InstructionDeliveryProgress.self,
+                from: deliveryData
+            ).validated()
+            guard delivery.projectID.description == projectID,
+                  delivery.projectGeneration.rawValue == projectGeneration,
+                  delivery.runID.description == runID,
+                  delivery.artifacts.map(\.artifactSHA256) == artifactSHA256.sorted() else {
+                throw ProjectMemoryError.conflict(
+                    "V2 managed handoff instruction delivery identity does not match"
+                )
+            }
+            if !(managed["completion_plan"] is NSNull) {
+                guard let completionObject = managed["completion_plan"] as? [String: Any] else {
+                    throw ProjectMemoryError.invalidRequest(
+                        "V2 managed handoff completion plan is invalid"
+                    )
+                }
+                let completionData = try ForgeJSONCanonicalizationV1.data(
+                    from: completionObject
+                )
+                let completion = try JSONDecoder().decode(
+                    AutomaticCompletionPlan.self,
+                    from: completionData
+                )
+                guard completion.projectID.description == projectID,
+                      completion.projectGeneration.rawValue == projectGeneration,
+                      completion.instructionArtifactSHA256.count == artifactSHA256.count,
+                      Set(completion.instructionArtifactSHA256) == Set(artifactSHA256) else {
+                    throw ProjectMemoryError.conflict(
+                        "V2 managed handoff completion plan identity does not match"
+                    )
+                }
+            }
+        }
         try Self.validateLists([constraints, activeFiles, passedGates, openGates])
         try Self.requireStrings(passedGates, maximumBytes: 512, field: "validation.passed_gates")
         try Self.requireStrings(openGates, maximumBytes: 512, field: "validation.open_gates")

@@ -196,6 +196,47 @@ final class LMStudioContractFixtureTests: XCTestCase {
         XCTAssertEqual(turn.responseID, "resp_lms_fixture_root")
     }
 
+    func testManagedTransportSendsExactOneToolCallBounds() async throws {
+        let transport = try makeTransport()
+        let turn = try await transport.createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-require-exact-one-tool",
+            userInput: "bounded",
+            tools: [],
+            toolChoice: "required",
+            parallelToolCalls: false,
+            maximumToolCalls: 1,
+            temperature: 0,
+            idempotencyKey: "fixture-exact-one-tool"
+        ))
+        XCTAssertEqual(turn.responseID, "resp_lms_fixture_root")
+    }
+
+    func testManagedTransportReconcilesSemanticJSONArgumentsButRejectsChangedValues() async throws {
+        let transport = try makeTransport()
+        let accepted = try await transport.createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-argument-reconciliation-equivalent",
+            userInput: "bounded", tools: [], idempotencyKey: "fixture-arguments-equivalent"
+        ))
+        XCTAssertEqual(accepted.functionCalls.count, 1)
+        XCTAssertEqual(
+            accepted.functionCalls.first?.arguments,
+            #"{"contract_version":1,"accepted":true}"#
+        )
+
+        do {
+            _ = try await transport.createRoot(LMStudioRootRequest(
+                systemPrompt: "fixture-argument-reconciliation-mismatch",
+                userInput: "bounded", tools: [], idempotencyKey: "fixture-arguments-mismatch"
+            ))
+            XCTFail("Semantically changed function arguments must be rejected")
+        } catch {
+            XCTAssertEqual(
+                error as? LMStudioProviderError,
+                .malformedResponse("function argument deltas do not match completion")
+            )
+        }
+    }
+
     func testIncrementalDecoderBoundsIdentifiersAndRedaction() throws {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

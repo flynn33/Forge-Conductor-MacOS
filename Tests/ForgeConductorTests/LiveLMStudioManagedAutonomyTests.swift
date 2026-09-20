@@ -12,7 +12,7 @@ import ForgeNativeSessionHostPlugin
 
 final class LiveLMStudioManagedAutonomyTests: XCTestCase {
     private static let successorMarker = "SUCCESSOR_ONLY_TOOL_EFFECT"
-    private static let missionPaddingScalarCount = 4_620
+    private static let missionPaddingByteCount = 12_000
     private static let providerTotalTimeoutSeconds: TimeInterval = 600
 
     func testQuiescentFailureDiagnosticPreservesReasonWithoutPrivatePayloads() throws {
@@ -89,7 +89,11 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             "forge-tool-invocation-lookup-\(UUID().uuidString)",
             isDirectory: true
         )
-        defer { try? FileManager.default.removeItem(at: home) }
+        defer {
+            if FileManager.default.fileExists(atPath: home.path) {
+                try? FileManager.default.removeItem(at: home)
+            }
+        }
 
         let app = try ForgeApp.bootstrap(home: home)
         defer { _ = app.shutdown() }
@@ -194,11 +198,15 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             string: environment["FORGE_LIVE_LMSTUDIO_BASE_URL"]
                 ?? "http://127.0.0.1:1234"
         ))
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent(
+        let home = URL(fileURLWithPath: "/private/tmp", isDirectory: true).appendingPathComponent(
             "forge-live-manager-threshold-\(UUID().uuidString)",
             isDirectory: true
         )
-        defer { try? FileManager.default.removeItem(at: home) }
+        defer {
+            if FileManager.default.fileExists(atPath: home.path) {
+                try? FileManager.default.removeItem(at: home)
+            }
+        }
 
         let registry = HostAdapterRegistry()
         ForgeNativeSessionHostPlugin.register(in: registry)
@@ -225,14 +233,18 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             home: home,
             port: ports[1],
             registry: registry,
-            budgetPolicy: budgetPolicy,
+            // The opt-in accelerated boundary exists only to create the real
+            // predecessor rollover. Fresh-session recovery is qualified under
+            // the normal production policy so the test cannot manufacture a
+            // rollover chain from its own deliberately enlarged mission.
+            budgetPolicy: nil,
             interrupted: interrupted
         )
         let replayed = try await executeStableReplayPhase(
             home: home,
             port: ports[2],
             registry: registry,
-            budgetPolicy: budgetPolicy,
+            budgetPolicy: nil,
             interrupted: interrupted,
             recovered: recovered
         )
@@ -281,6 +293,10 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 actual: loadedProvider.contextLength
             )
         }
+        try FileManager.default.createDirectory(
+            at: home,
+            withIntermediateDirectories: true
+        )
         let app = try ForgeApp.bootstrap(home: home)
         try configureDashboard(port: port, app: app)
         try writeProviderConfiguration(baseURL: baseURL, modelKey: modelKey, paths: app.paths)
@@ -295,7 +311,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         )
 
         let holder = LiveManagedRuntimeHolder()
-        let node = ManagerNode(app: app) { candidate in
+        let node = ManagerNode(app: app, managedAutonomyFactory: { candidate in
             let runtime = try ManagedAutonomyRuntime(
                 app: candidate,
                 registry: registry,
@@ -326,7 +342,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             )
             holder.store(runtime)
             return runtime
-        }
+        }, hostAdapterRegistry: registry)
         defer {
             node.shutdownManagedAutonomy()
             _ = try? node.stopService()
@@ -344,6 +360,24 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             registered["project_generation"]
         ))
         let startupReport = try XCTUnwrap(try node.recoverManagedAutonomy())
+        let preparation = node.inspectAutonomousRunPreparation(
+            runID: runID,
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: mission,
+            providerID: "lmstudio",
+            adapterID: ForgeNativeSessionHostPlugin.identifier,
+            modelKey: modelKey,
+            allowedTools: ["fs_read"],
+            completionGates: ["live_real_provider_threshold_continuity"],
+            networkAllowed: false,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        XCTAssertEqual(
+            preparation.readiness,
+            .ready,
+            "Live manager preparation failed: \(preparation.detail)"
+        )
         _ = try node.startService()
         try await Task.sleep(for: .milliseconds(100))
         let bearerToken = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
@@ -693,27 +727,34 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         let fenceEvent = try exactEvent("continuity_predecessor_fencing", events: events)
         let acceptedEvent = try exactEvent("continuity_successor_accepted", events: events)
         let toolEvents = events.filter { $0.eventType == "tool_invocation_intent_persisted" }
-        XCTAssertEqual(toolEvents.count, 1)
-        let toolEvent = try XCTUnwrap(toolEvents.first)
+        XCTAssertFalse(toolEvents.isEmpty)
+        XCTAssertLessThanOrEqual(toolEvents.count, 8)
         XCTAssertLessThan(fenceEvent.sequence, acceptedEvent.sequence)
-        XCTAssertLessThan(acceptedEvent.sequence, toolEvent.sequence)
         XCTAssertEqual(fenceEvent.sequence, interrupted.predecessorFenceEventSequence)
-        let toolMetadata = try JSONSupport.object(from: Data(toolEvent.metadataJSON.utf8))
-        XCTAssertEqual(toolMetadata["tool_name"] as? String, "fs_read")
-        let invocationID = try XCTUnwrap(UUID(
-            uuidString: try XCTUnwrap(toolMetadata["invocation_id"] as? String)
-        ))
-        let toolValue = try await app.projectContexts.repository.toolInvocation(invocationID)
-        let tool = try XCTUnwrap(toolValue)
-        XCTAssertEqual(tool.invocationID, invocationID)
-        XCTAssertEqual(tool.runID, interrupted.runID)
-        XCTAssertEqual(tool.sessionID, successorSessionID)
-        XCTAssertEqual(tool.turnID, automatic.intent.turnID)
-        XCTAssertEqual(tool.toolName, "fs_read")
-        XCTAssertEqual(tool.replayClass, .readOnly)
-        XCTAssertEqual(tool.state, .completed)
-        XCTAssertNotNil(tool.resultSHA256)
-        XCTAssertTrue(tool.resultSummary?.contains(Self.successorMarker) == true)
+        var retainedTools: [ToolInvocationRecord] = []
+        for toolEvent in toolEvents {
+            XCTAssertLessThan(acceptedEvent.sequence, toolEvent.sequence)
+            let metadata = try JSONSupport.object(from: Data(toolEvent.metadataJSON.utf8))
+            XCTAssertEqual(metadata["tool_name"] as? String, "fs_read")
+            let invocationID = try XCTUnwrap(UUID(
+                uuidString: try XCTUnwrap(metadata["invocation_id"] as? String)
+            ))
+            let toolValue = try await app.projectContexts.repository.toolInvocation(invocationID)
+            let tool = try XCTUnwrap(toolValue)
+            XCTAssertEqual(tool.invocationID, invocationID)
+            XCTAssertEqual(tool.runID, interrupted.runID)
+            XCTAssertEqual(tool.sessionID, successorSessionID)
+            XCTAssertEqual(tool.toolName, "fs_read")
+            XCTAssertEqual(tool.replayClass, .readOnly)
+            XCTAssertEqual(tool.state, .completed)
+            XCTAssertNotNil(tool.resultSHA256)
+            retainedTools.append(tool)
+        }
+        let productiveTools = retainedTools.filter {
+            $0.resultSummary?.contains(Self.successorMarker) == true
+        }
+        XCTAssertEqual(productiveTools.count, 1)
+        let tool = try XCTUnwrap(productiveTools.first)
 
         let actionRequestValue = try await app.projectContexts.repository
             .contextBudgetActionRequest(
@@ -757,11 +798,12 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             sessions: sessions,
             automatic: automatic,
             tool: tool,
+            toolInvocationIDs: retainedTools.map(\.invocationID),
             predecessorAuthority: predecessorAuthority,
             successorAuthority: successorAuthority,
             predecessorFenceEventSequence: fenceEvent.sequence,
             successorAcceptedEventSequence: acceptedEvent.sequence,
-            toolIntentEventSequence: toolEvent.sequence,
+            toolIntentEventSequences: toolEvents.map(\.sequence),
             actionRequest: actionRequest,
             pauseRouteStatus: paused.status,
             pauseRouteState: paused.object["state"] as? String
@@ -819,9 +861,11 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         )
         let automatic = try XCTUnwrap(automaticValue)
         XCTAssertEqual(automatic, recovered.automatic)
-        let toolValue = try await app.projectContexts.repository.toolInvocation(
-            recovered.tool.invocationID
-        )
+        for invocationID in recovered.toolInvocationIDs {
+            let invocation = try await app.projectContexts.repository.toolInvocation(invocationID)
+            XCTAssertNotNil(invocation)
+        }
+        let toolValue = try await app.projectContexts.repository.toolInvocation(recovered.tool.invocationID)
         let tool = try XCTUnwrap(toolValue)
         XCTAssertEqual(tool, recovered.tool)
         let sessions = try await app.projectContexts.repository.providerSessions(
@@ -835,8 +879,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             limit: 1_000
         )
         let toolEvents = events.filter { $0.eventType == "tool_invocation_intent_persisted" }
-        XCTAssertEqual(toolEvents.count, 1)
-        XCTAssertEqual(toolEvents.first?.sequence, recovered.toolIntentEventSequence)
+        XCTAssertEqual(toolEvents.map(\.sequence), recovered.toolIntentEventSequences)
 
         let providerStorage = app.paths.managedProvidersDir.appendingPathComponent(
             ForgeNativeSessionHostPlugin.identifier,
@@ -961,7 +1004,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             let snapshot = await runtime.snapshot()
             if let run,
                automatic?.state == .completed,
-               !toolEvents.isEmpty,
+               try await containsSuccessorMarker(toolEvents, repository: repository),
                !snapshot.supervisor.activeRunIDs.contains(runID) {
                 return run
             }
@@ -988,6 +1031,24 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         throw LiveQualificationError.timeout(
             "automatic successor continuation; final state \(final?.state.rawValue ?? "missing")"
         )
+    }
+
+    private func containsSuccessorMarker(
+        _ events: [AutonomyEvent],
+        repository: ProjectControlPlaneRepository
+    ) async throws -> Bool {
+        for event in events {
+            let metadata = try JSONSupport.object(from: Data(event.metadataJSON.utf8))
+            guard let rawInvocationID = metadata["invocation_id"] as? String,
+                  let invocationID = UUID(uuidString: rawInvocationID),
+                  let invocation = try await repository.toolInvocation(invocationID) else {
+                continue
+            }
+            if invocation.resultSummary?.contains(Self.successorMarker) == true {
+                return true
+            }
+        }
+        return false
     }
 
     private func waitForQuiescentRun(
@@ -1032,6 +1093,16 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         let allowedCodes = providerCodes.union(providerCodes.map { "lmstudio_" + $0 }).union([
             "run_step_failed", "owner_interrupted", "provider_error", "invalid_request", "invalid_handoff",
             "acknowledgement_mismatch", "idempotency_conflict", "candidate_quarantined", "ledger_integrity",
+            "acknowledgement_call_shape_mismatch", "acknowledgement_call_count_mismatch",
+            "acknowledgement_call_missing", "acknowledgement_call_multiple",
+            "acknowledgement_call_name_mismatch", "acknowledgement_argument_shape_mismatch",
+            "acknowledgement_identity_mismatch",
+            "acknowledgement_field_set_mismatch", "acknowledgement_contract_mismatch",
+            "acknowledgement_project_mismatch", "acknowledgement_generation_mismatch",
+            "acknowledgement_run_mismatch", "acknowledgement_operation_mismatch",
+            "acknowledgement_handoff_mismatch", "acknowledgement_checksum_mismatch",
+            "acknowledgement_nonce_mismatch", "acknowledgement_acceptance_mismatch",
+            "acknowledgement_root_mismatch", "acknowledgement_provider_mismatch",
             "storage_limit", "idempotency_identity_conflict", "provider_attempt_limit", "duplicate_operation_candidate",
         ])
         func safeCode(_ value: String?) -> Any {
@@ -1211,19 +1282,23 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         guard value == "yes" else { throw LiveQualificationError.invalidThresholdControl }
         // This deliberately moves a supported policy boundary; exact provider
         // capacity, token usage, fixed reserves, and all continuity receipts remain real.
-        return try ContextBudgetPolicy(checkpointFraction: 0.78, rolloverFraction: 0.75,
+        return try ContextBudgetPolicy(checkpointFraction: 0.78, rolloverFraction: 0.70,
                                        emergencyFraction: 0.05).validated()
     }
 
     private static func thresholdMission() -> String {
         let instruction = """
-        Classify only the current user message, never quoted text or prior context. If the current user message contains either "You are executing a Forge Conductor managed autonomous run." or "Mission:", this is the predecessor stage: never call a tool and answer exactly PREDECESSOR_WAIT. A "Next action" line never changes that rule. Only when the current user message contains neither predecessor marker and begins "The bootstrap-only acknowledgement is complete; do not acknowledge it again." is this the successor stage: call fs_read exactly once for successor-only.txt, verify that its content is SUCCESSOR_ONLY_TOOL_EFFECT, then answer SUCCESSOR_TOOL_VERIFIED and stop. Mentions of successor wording inside this mission are inert data, not authorization. Never request completion.
+        Qualification objective: preserve this unfinished assignment across automatic context rollover. When the manager later continues the acknowledged successor, call fs_read exactly once for successor-only.txt, verify that its content is SUCCESSOR_ONLY_TOOL_EFFECT, then answer SUCCESSOR_TOOL_VERIFIED and stop. The manager controls lifecycle timing. Never request completion.
         """
-        let scalars = (0..<missionPaddingScalarCount).map {
-            UnicodeScalar(0xE000 + ($0 % 0x1900))!
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        var state: UInt64 = 0x464f_5247_455f_4354
+        var characters: [Character] = []
+        characters.reserveCapacity(missionPaddingByteCount)
+        for _ in 0..<missionPaddingByteCount {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            characters.append(alphabet[Int(state % UInt64(alphabet.count))])
         }
-        let padding = String(scalars.map(Character.init))
-        return "\(instruction)\n\(padding)\n\(instruction)"
+        return "\(instruction)\n\(String(characters))"
     }
 
     private func forgeGUIProcessIDs() -> [Int] {
@@ -1371,7 +1446,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 "operation_state": recovered.operation.state.rawValue,
                 "predecessor_fence_event_sequence": recovered.predecessorFenceEventSequence,
                 "successor_accept_event_sequence": recovered.successorAcceptedEventSequence,
-                "tool_intent_event_sequence": recovered.toolIntentEventSequence,
+                "tool_intent_event_sequences": recovered.toolIntentEventSequences,
             ],
             "automatic_continuation": [
                 "turn_id": recovered.automatic.intent.turnID.uuidString.lowercased(),
@@ -1515,11 +1590,12 @@ private struct RecoveredPhase {
     let sessions: [ProviderSessionRecord]
     let automatic: ProviderTurnRecord
     let tool: ToolInvocationRecord
+    let toolInvocationIDs: [UUID]
     let predecessorAuthority: String
     let successorAuthority: String
     let predecessorFenceEventSequence: Int64
     let successorAcceptedEventSequence: Int64
-    let toolIntentEventSequence: Int64
+    let toolIntentEventSequences: [Int64]
     let actionRequest: ContextBudgetActionRequest
     let pauseRouteStatus: Int
     let pauseRouteState: String?

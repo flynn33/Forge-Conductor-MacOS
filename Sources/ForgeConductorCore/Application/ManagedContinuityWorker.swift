@@ -40,7 +40,8 @@ public protocol ManagedContinuityHandoffBuilding: Sendable {
         project: ProjectControlRecord,
         predecessor: ProviderSessionRecord,
         actionRequest: ContextBudgetActionRequest,
-        observation: ContextBudgetObservation
+        observation: ContextBudgetObservation,
+        instructionDelivery: InstructionDeliveryProgress
     ) throws -> ContinuityHandoffV2
 }
 
@@ -55,7 +56,8 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
         project: ProjectControlRecord,
         predecessor: ProviderSessionRecord,
         actionRequest: ContextBudgetActionRequest,
-        observation: ContextBudgetObservation
+        observation: ContextBudgetObservation,
+        instructionDelivery: InstructionDeliveryProgress
     ) throws -> ContinuityHandoffV2 {
         guard actionRequest.continuityOperationID == operationID,
               actionRequest.identity.runID == run.runID,
@@ -64,6 +66,9 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
               actionRequest.identity.sessionID == predecessor.sessionID,
               observation.observationID == actionRequest.observationID,
               observation.identity == actionRequest.identity,
+              instructionDelivery.runID == run.runID,
+              instructionDelivery.projectID == run.projectID,
+              instructionDelivery.projectGeneration == run.projectGeneration,
               predecessor.runID == run.runID,
               predecessor.projectID == run.projectID,
               predecessor.projectGeneration == run.projectGeneration,
@@ -83,6 +88,7 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
             ?? run.runID.description
         let currentSummary = run.specification.work.nextAction ?? run.mission
         let nextAction = run.specification.work.nextAction ?? "Continue the managed mission"
+        let openWorkSummary = Self.boundedUTF8(nextAction, maximumBytes: 8_192)
         let constraints = run.specification.allowedTools.map { "Allowed tool: \($0)" }
         let dirtySummary = Self.stringArray(
             run.specification.work.metadata["git_dirty_summary"]
@@ -91,6 +97,37 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
         let commit = run.specification.work.metadata["git_commit"] ?? ""
         let providerResponse: Any = predecessor.providerResponseID ?? NSNull()
         let assignment: Any = run.assignmentID ?? NSNull()
+        let artifactSHA256 = instructionDelivery.artifacts.map(\.artifactSHA256)
+        let expectedArtifacts = run.specification.completionPlan?
+            .instructionArtifactSHA256
+            ?? run.specification.work.metadata["source_snapshot_sha256"].map { [$0] }
+            ?? []
+        guard Set(artifactSHA256) == Set(expectedArtifacts),
+              artifactSHA256.count == expectedArtifacts.count else {
+            throw ProjectMemoryError.conflict(
+                "managed handoff instruction artifacts do not match the frozen run"
+            )
+        }
+        let completionPlan = try run.specification.completionPlan.map(Self.jsonObject)
+        let managedContext: [String: Any] = [
+            "version": 1,
+            "instruction_artifact_sha256": artifactSHA256,
+            "instruction_delivery": instructionDelivery.asDictionary(),
+            "frozen_tool_grant": run.specification.allowedTools.sorted(),
+            "completion_plan": completionPlan as Any? ?? NSNull(),
+            "evidence_references": run.specification.work.evidenceReferences,
+            "provider_configuration": [
+                "provider_id": predecessor.providerID,
+                "adapter_id": predecessor.adapterID,
+                "model_key": predecessor.modelKey,
+                "provider_configuration_revision": run.specification.work.metadata[
+                    "provider_configuration_revision"
+                ] as Any? ?? NSNull(),
+                "tool_catalog_revision": run.specification.work.metadata[
+                    "tool_catalog_revision"
+                ] as Any? ?? NSNull(),
+            ] as [String: Any],
+        ]
         return try ContinuityHandoffV2(
             handoffID: handoffID.uuidString.lowercased(),
             operationID: operationID.uuidString.lowercased(),
@@ -124,7 +161,13 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
                 "active_files": Self.stringArray(
                     run.specification.work.metadata["active_files"]
                 ),
+                "managed_context": managedContext,
             ],
+            openWork: [[
+                "id": workItem,
+                "summary": openWorkSummary,
+                "status": "open",
+            ]],
             validation: [
                 "passed_gates": [] as [String],
                 "open_gates": run.specification.completionGates,
@@ -157,6 +200,31 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
     private static func stringArray(_ value: String?) -> [String] {
         guard let value, !value.isEmpty else { return [] }
         return value.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+    }
+
+    private static func jsonObject<T: Encodable>(_ value: T) throws -> [String: Any] {
+        let encoded = try JSONEncoder().encode(value)
+        guard let object = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
+            throw ProjectMemoryError.integrityFailure(
+                "managed handoff completion plan is not a JSON object"
+            )
+        }
+        return object
+    }
+
+    private static func boundedUTF8(_ value: String, maximumBytes: Int) -> String {
+        guard value.utf8.count > maximumBytes else { return value }
+        var result = ""
+        var byteCount = 0
+        result.reserveCapacity(maximumBytes)
+        for character in value {
+            let piece = String(character)
+            let pieceBytes = piece.utf8.count
+            guard byteCount <= maximumBytes - pieceBytes else { break }
+            result.append(character)
+            byteCount += pieceBytes
+        }
+        return result
     }
 }
 
@@ -689,6 +757,8 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
                 let predecessor = try await requiredProviderSession(
                     existing.predecessorSessionID
                 )
+                let instructionDelivery = try await repository
+                    .instructionDeliveryProgress(run: run)
                 handoff = try handoffBuilder.buildHandoff(
                     operationID: request.continuityOperationID,
                     handoffID: handoffID,
@@ -697,7 +767,8 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
                     project: project,
                     predecessor: predecessor,
                     actionRequest: request,
-                    observation: observation
+                    observation: observation,
+                    instructionDelivery: instructionDelivery
                 )
             }
             guard handoff.operationID.caseInsensitiveCompare(existing.operationID) == .orderedSame,
@@ -726,6 +797,9 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
         let predecessor = try await requiredProviderSession(request.identity.sessionID)
         let handoffID = Self.stableUUID("handoff:\(operationID)")
         let nonce = Self.bootstrapNonce()
+        let instructionDelivery = try await repository.instructionDeliveryProgress(
+            run: run
+        )
         let handoff = try handoffBuilder.buildHandoff(
             operationID: request.continuityOperationID,
             handoffID: handoffID,
@@ -734,7 +808,8 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
             project: project,
             predecessor: predecessor,
             actionRequest: request,
-            observation: observation
+            observation: observation,
+            instructionDelivery: instructionDelivery
         )
         return try engine.prepareV2(
             handoff: handoff,

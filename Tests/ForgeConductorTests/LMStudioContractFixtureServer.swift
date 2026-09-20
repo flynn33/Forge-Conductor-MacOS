@@ -168,6 +168,19 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
                object["max_output_tokens"] as? Int != 321 {
                 return errorRoute(status: 400, code: "missing_output_token_bound")
             }
+            if requestText.contains("fixture-require-exact-one-tool"),
+               (object["tool_choice"] as? String != "required"
+                || object["parallel_tool_calls"] as? Bool != false
+                || object["max_tool_calls"] as? Int != 1
+                || object["temperature"] as? Double != 0) {
+                return errorRoute(status: 400, code: "missing_exact_tool_call_bounds")
+            }
+            if requestText.contains("fixture-argument-reconciliation-equivalent") {
+                return try argumentReconciliationRoute(semanticMismatch: false)
+            }
+            if requestText.contains("fixture-argument-reconciliation-mismatch") {
+                return try argumentReconciliationRoute(semanticMismatch: true)
+            }
             if requestText.contains("fixture-require-auth"),
                request.value(forHTTPHeaderField: "Authorization") != "Bearer fixture-token" {
                 return errorRoute(status: 401, code: "invalid_api_token")
@@ -282,6 +295,39 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
     private static func fixture(_ name: String, extension value: String, contentType: String) throws -> Route {
         let data = try Data(contentsOf: fixtureDirectory.appendingPathComponent("\(name).\(value)"))
         return Route(status: 200, contentType: contentType, body: data)
+    }
+
+    private static func argumentReconciliationRoute(semanticMismatch: Bool) throws -> Route {
+        let streamed = #"{"accepted":true,"contract_version":1}"#
+        let completed = semanticMismatch
+            ? #"{"contract_version":2,"accepted":true}"#
+            : #"{"contract_version":1,"accepted":true}"#
+        let callID = "call_argument_reconciliation"
+        let itemID = "fc_argument_reconciliation"
+        let events: [[String: Any]] = [
+            ["type": "response.created", "sequence_number": 0,
+             "response": ["id": "resp_argument_reconciliation", "model": "fixture/tool-model"]],
+            ["type": "response.output_item.added", "sequence_number": 1,
+             "item": ["id": itemID, "call_id": callID, "name": "fixture.read",
+                      "type": "function_call"]],
+            ["type": "response.function_call_arguments.delta", "sequence_number": 2,
+             "item_id": itemID, "delta": streamed],
+            ["type": "response.function_call_arguments.done", "sequence_number": 3,
+             "item_id": itemID, "arguments": completed],
+            ["type": "response.completed", "sequence_number": 4,
+             "response": ["id": "resp_argument_reconciliation", "model": "fixture/tool-model",
+                          "status": "completed", "output": [["id": itemID, "call_id": callID,
+                            "name": "fixture.read", "type": "function_call", "arguments": completed]]]],
+        ]
+        var body = Data()
+        for event in events {
+            let data = try JSONSerialization.data(withJSONObject: event, options: [.sortedKeys])
+            body.append(Data("data: ".utf8))
+            body.append(data)
+            body.append(Data("\n\n".utf8))
+        }
+        body.append(Data("data: [DONE]\n\n".utf8))
+        return Route(status: 200, contentType: "text/event-stream", body: body)
     }
 
     private static func requestObject(_ request: URLRequest) throws -> [String: Any] {
@@ -414,7 +460,8 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
               let content = user["content"] as? [[String: Any]],
               let handoffText = content.first?["text"] as? String,
               let handoffData = handoffText.data(using: .utf8),
-              let handoff = try JSONSerialization.jsonObject(with: handoffData) as? [String: Any],
+              let root = try JSONSerialization.jsonObject(with: handoffData) as? [String: Any],
+              let handoff = (root["handoff"] as? [String: Any]) ?? root as [String: Any]?,
               let project = handoff["project"] as? [String: Any],
               let run = handoff["run"] as? [String: Any],
               let bootstrap = handoff["bootstrap"] as? [String: Any],

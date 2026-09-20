@@ -145,6 +145,8 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
         case normal
         case ambiguousFirstResponse
         case unauthorized
+        case duplicateExactAcknowledgement
+        case duplicateMismatchedAcknowledgement
     }
 
     private let mode: Mode
@@ -187,7 +189,30 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
             sawPersistedIntent = true
         }
         if case .unauthorized = mode { throw LMStudioProviderError.unauthorized }
-        let turn = try Self.turn(for: request, responseModel: responseModel)
+        var turn = try Self.turn(for: request, responseModel: responseModel)
+        switch mode {
+        case .duplicateExactAcknowledgement:
+            guard let first = turn.functionCalls.first else { break }
+            turn.functionCalls.append(LMStudioFunctionCall(
+                itemID: first.itemID + "-duplicate",
+                callID: first.callID + "-duplicate",
+                name: first.name,
+                arguments: first.arguments
+            ))
+        case .duplicateMismatchedAcknowledgement:
+            guard let first = turn.functionCalls.first,
+                  var object = try JSONSerialization.jsonObject(with: Data(first.arguments.utf8))
+                    as? [String: Any] else { break }
+            object["accepted"] = false
+            turn.functionCalls.append(LMStudioFunctionCall(
+                itemID: first.itemID + "-mismatch",
+                callID: first.callID + "-mismatch",
+                name: first.name,
+                arguments: try JSONSupport.canonicalJSON(object)
+            ))
+        default:
+            break
+        }
         receipts[request.idempotencyKey] = turn
         if case .ambiguousFirstResponse = mode, attempts == 1 {
             throw LMStudioProviderError.deadlineExceeded(phase: "total")
@@ -218,7 +243,8 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
         responseModel: String?
     ) throws -> LMStudioResponseTurn {
         guard let data = request.userInput.data(using: .utf8),
-              let handoff = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let handoff = (root["handoff"] as? [String: Any]) ?? root as [String: Any]?,
               let project = handoff["project"] as? [String: Any],
               let run = handoff["run"] as? [String: Any],
               let bootstrap = handoff["bootstrap"] as? [String: Any],
@@ -962,6 +988,58 @@ final class NativeSessionHostPluginTests: XCTestCase {
         )
         XCTAssertEqual(replay, receipt)
         XCTAssertEqual(replay?.modelKey, fixture.request.modelKey)
+    }
+
+    func testV2CoalescesIdenticalAcknowledgementCallsAndRejectsDivergence() async throws {
+        let acceptedRoot = temporaryRoot("v2-duplicate-exact-ack")
+        defer { try? FileManager.default.removeItem(at: acceptedRoot) }
+        let acceptedFixture = try makeV2Fixture(
+            mission: "Coalesce identical acknowledgement declarations.",
+            idempotencyKey: "v2-duplicate-exact-ack"
+        )
+        let acceptedAdapter = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: acceptedRoot,
+            transport: ScriptedManagedTransport(
+                mode: .duplicateExactAcknowledgement,
+                ledgerURL: acceptedRoot.appendingPathComponent("native-session-ledger.json")
+            )
+        )
+        let receipt = try await acceptedAdapter.createAndBootstrap(
+            request: acceptedFixture.request,
+            handoffJSON: acceptedFixture.handoffJSON,
+            challenge: acceptedFixture.challenge
+        )
+        XCTAssertEqual(receipt.acknowledgement.operationID, acceptedFixture.request.operationID)
+        let acceptedStatus = await acceptedAdapter.candidateStatus(
+            forIdempotencyKey: acceptedFixture.request.idempotencyKey
+        )
+        XCTAssertEqual(acceptedStatus, "accepted")
+
+        let rejectedRoot = temporaryRoot("v2-duplicate-divergent-ack")
+        defer { try? FileManager.default.removeItem(at: rejectedRoot) }
+        let rejectedFixture = try makeV2Fixture(
+            mission: "Reject divergent acknowledgement declarations.",
+            idempotencyKey: "v2-duplicate-divergent-ack"
+        )
+        let rejectedAdapter = try LMStudioManagedSessionHostAdapterV2(
+            storageDirectory: rejectedRoot,
+            transport: ScriptedManagedTransport(
+                mode: .duplicateMismatchedAcknowledgement,
+                ledgerURL: rejectedRoot.appendingPathComponent("native-session-ledger.json")
+            )
+        )
+        do {
+            _ = try await rejectedAdapter.createAndBootstrap(
+                request: rejectedFixture.request,
+                handoffJSON: rejectedFixture.handoffJSON,
+                challenge: rejectedFixture.challenge
+            )
+            XCTFail("Divergent acknowledgement calls must be rejected")
+        } catch SessionHostAdapterV2Error.acknowledgementMismatch { }
+        let rejectedStatus = await rejectedAdapter.candidateStatus(
+            forIdempotencyKey: rejectedFixture.request.idempotencyKey
+        )
+        XCTAssertEqual(rejectedStatus, "quarantined")
     }
 
     func testV2QuarantinesAcknowledgementMismatchDuplicateAndSyntheticCandidate() async throws {

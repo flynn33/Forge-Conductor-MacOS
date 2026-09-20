@@ -39,6 +39,14 @@ Product versions do not by themselves claim shipment.
 - Added a bounded project/run-scoped manager readiness projection covering
   monitoring, progress save, rollover, restore, continuation, provider wait,
   recovery, external-host limitation, and blocked states.
+- Added bounded instruction-delivery state to managed continuity handoffs,
+  including immutable artifact hashes, catalog coverage, byte cursors, compact
+  completed-document coverage, the exact grant and completion plan, evidence,
+  open work, and provider configuration revisions.
+- Completed the managed successor lifecycle with strict fresh-root
+  acknowledgement reconciliation, one accepted successor, predecessor fencing,
+  automatic continuation, provider-exact tool fencing at rollover, and durable
+  restart replay without duplicate successor effects.
 - Replaced the built-in instruction-run perfect-history completion rule with
   outcome-aware obligation evidence. Corrected build/test passes supersede older
   failures, later regressions invalidate earlier passes, unrelated reads cannot

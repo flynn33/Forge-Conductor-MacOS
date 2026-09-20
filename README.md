@@ -134,6 +134,14 @@ manual continuity action. **Optional manual actions** contains **Save progress
 now** and **Start a fresh session and continue** for administrative recovery or
 an intentionally early rollover.
 
+Managed rollover handoffs retain the exact project generation, immutable
+instruction-artifact hashes, bounded document catalog/read coverage, frozen
+tool grant, automatic completion plan, evidence references, current open work,
+and provider/adapter/model revisions. After a fresh provider root returns the
+matching structured acknowledgement, Forge accepts one successor, fences the
+predecessor, and automatically continues the retained assignment. Restart
+recovery reuses those durable identities and does not grant a second successor.
+
 Use the **Guided Mode** toolbar toggle to show or hide concise, state-aware
 guidance in the current view. The setting persists across relaunch. The
 question-mark toolbar button opens the complete offline guide for the selected

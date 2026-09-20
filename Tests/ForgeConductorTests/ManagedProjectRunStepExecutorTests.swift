@@ -177,6 +177,84 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         XCTAssertEqual(stored.specification.work.metadata["provider_response_id"], "resp-final")
     }
 
+    func testProviderExactRolloverFencesNewToolIntentBeforeBrokerExecution() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-managed-after-turn-rollover-\(UUID().uuidString)", isDirectory: true)
+        let repository = try ProjectControlPlaneRepository(
+            databaseURL: root.appendingPathComponent("control-plane.sqlite3")
+        )
+        defer {
+            Task { await repository.close() }
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let projectID = ProjectID()
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try await repository.registerProjectUnchecked(
+            projectID: projectID,
+            displayName: "Post-provider rollover fixture",
+            canonicalRoot: projectRoot
+        )
+        let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Fence a provider-requested tool when exact usage requires rollover",
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture-model",
+            specification: AutonomousRunSpecification(
+                allowedTools: ["fixture.read"],
+                completionGates: ["tests"]
+            ),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [projectRoot],
+                allowedTools: ["fixture.read"],
+                networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+        ))
+        let provider = ManagedStepFixtureProvider()
+        let budget = AfterProviderRolloverBudgetEvaluator()
+        let toolExecutor = ManagedStepToolExecutor()
+        let broker = ToolInvocationBroker(
+            repository: repository,
+            executor: toolExecutor,
+            classifier: try StaticToolReplayClassifier(
+                productionToolNames: toolExecutor.toolNames,
+                classifications: ["fixture.read": .readOnly]
+            )
+        )
+        let stepper = try ManagedProjectRunStepExecutor(
+            repository: repository,
+            providerResolver: { _ in provider },
+            toolDefinitionResolver: { _ in [] },
+            broker: broker,
+            budget: budget
+        )
+        let coordinator = try ProjectRunCoordinator(
+            runID: run.runID,
+            repository: repository,
+            managerID: "after-turn-rollover-manager",
+            stepExecutor: stepper,
+            completionValidator: EvidenceBoundCompletionValidator(),
+            maximumSteps: 8
+        )
+
+        let result = try await coordinator.runActivation()
+        XCTAssertEqual(result.finalState, .rollingOver)
+        XCTAssertEqual(toolExecutor.callCount, 0)
+        let budgetSnapshot = await budget.snapshot()
+        XCTAssertEqual(budgetSnapshot.providerTurns, 1)
+        XCTAssertEqual(budgetSnapshot.toolResults, 0)
+        let events = try await repository.autonomyEvents(runID: run.runID, limit: 100)
+        XCTAssertFalse(events.contains { $0.eventType == "tool_invocation_intent_persisted" })
+        let storedValue = try await repository.autonomousRun(run.runID)
+        let stored = try XCTUnwrap(storedValue)
+        XCTAssertEqual(stored.state, .rollingOver)
+        XCTAssertEqual(stored.specification.work.metadata["provider_response_id"], "resp-root")
+    }
+
     func testCompletionRequestAtEndOfLMStudioProseEntersNativeValidation() {
         let request = """
         {"forge_run_status":"completion_requested","summary":"README.md read verified; no files edited."}
@@ -433,6 +511,58 @@ private struct ManagedStepFailureResult {
     let run: AutonomousRunRecord
     let turn: ProviderTurnRecord
     let observation: ContextBudgetObservation?
+}
+
+private actor AfterProviderRolloverBudgetEvaluator: ManagedRunBudgetEvaluating {
+    struct Snapshot: Sendable, Equatable {
+        let providerTurns: Int
+        let toolResults: Int
+    }
+
+    private var providerTurns = 0
+    private var toolResults = 0
+
+    func evaluateBeforeProviderTurn(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities,
+        serializedInputBytes: Int
+    ) async throws -> ContextBudgetAction {
+        .normal
+    }
+
+    func observeProviderTurn(
+        _ turn: ProviderTurn,
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction {
+        providerTurns += 1
+        return .rollover
+    }
+
+    func observeToolResult(
+        serializedBytes: Int,
+        providerResponseID: String,
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction {
+        toolResults += 1
+        return .normal
+    }
+
+    func observeProviderOverflow(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction {
+        .emergency
+    }
+
+    func snapshot() -> Snapshot {
+        Snapshot(providerTurns: providerTurns, toolResults: toolResults)
+    }
 }
 
 private struct ManagedStepProviderFailure: ManagedProviderFailure, LocalizedError {

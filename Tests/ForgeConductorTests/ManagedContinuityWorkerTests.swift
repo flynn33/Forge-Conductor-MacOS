@@ -50,6 +50,11 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         XCTAssertEqual(operation.state, .successorRequested)
         let handoff = try XCTUnwrap(try memory.continuityHandoffV2(id: operation.handoffID))
         XCTAssertFalse(handoff.contentSHA256.isEmpty)
+        try assertManagedContext(
+            handoff,
+            run: retained,
+            artifactSHA256: fixture.instructionArtifactSHA256
+        )
         let candidates = try await fixture.repository.providerSessions(operationID: operationID)
         XCTAssertTrue(candidates.isEmpty, "Cancellation must not fabricate a successor receipt")
         await fixture.repository.close()
@@ -417,6 +422,12 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             try projectMemory.continuityHandoffV2(id: operation.handoffID)
         )
         _ = try handoff.validated()
+        try assertManagedContext(
+            handoff,
+            run: recovered,
+            artifactSHA256: fixture.instructionArtifactSHA256,
+            point: point.rawValue
+        )
         XCTAssertEqual(operation.state, .predecessorSealed, point.rawValue)
         XCTAssertEqual(operation.projectID, recovered.projectID.description, point.rawValue)
         XCTAssertEqual(operation.projectGeneration, recovered.projectGeneration.rawValue, point.rawValue)
@@ -713,8 +724,29 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             displayName: "Managed Continuity Fixture",
             canonicalRoot: projectRoot
         )
+        let runID = RunID()
+        let instructionText = "Inspect the durable handoff and continue the assignment exactly once."
+        let instructionSource = root.appendingPathComponent("continuity-instructions.txt")
+        try instructionText.write(to: instructionSource, atomically: true, encoding: .utf8)
+        let instructionStore = try ProjectInstructionQueueStore(paths: paths)
+        let instructionArtifact = try instructionStore.importRunArtifact(
+            sourceURL: instructionSource,
+            projectID: projectID,
+            generation: .initial,
+            runID: runID
+        )
+        let completionPlan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: projectID,
+            projectGeneration: .initial,
+            projectRoot: projectRoot,
+            instructionArtifactSHA256: [instructionArtifact.contentSHA256],
+            instructionText: instructionText,
+            documentCount: instructionArtifact.documentCount,
+            completionGates: ["fixture-gate"]
+        ))
         var run = try await repository.createAutonomousRun(
             AutonomousRunRequest(
+                runID: runID,
                 projectID: projectID,
                 projectGeneration: .initial,
                 assignmentID: "FC-ROLL-001",
@@ -723,17 +755,24 @@ final class ManagedContinuityWorkerTests: XCTestCase {
                 adapterID: "fixture-v2-adapter",
                 modelKey: "fixture/model",
                 specification: AutonomousRunSpecification(
-                    allowedTools: ["fixture.read"],
+                    allowedTools: ["fixture.read", "instruction_catalog", "instruction_read"],
                     completionGates: ["fixture-gate"],
+                    completionPlan: completionPlan,
                     work: AutonomousRunWork(
                         currentPhase: "FC-ROLL-001",
                         workItem: "restart-recovery",
-                        nextAction: "Continue after bootstrap"
+                        nextAction: "Continue after bootstrap",
+                        evidenceReferences: ["evidence:managed-continuity-fixture"],
+                        metadata: [
+                            "source_snapshot_sha256": instructionArtifact.contentSHA256,
+                            "provider_configuration_revision": "provider-config-r7",
+                            "tool_catalog_revision": "tool-catalog-r11",
+                        ]
                     )
                 ),
                 authorizationScope: ToolAuthorizationScope(
                     canonicalRoots: [projectRoot],
-                    allowedTools: ["fixture.read"],
+                    allowedTools: ["fixture.read", "instruction_catalog", "instruction_read"],
                     networkAllowed: false,
                     maximumInlineOutputBytes: 64 * 1_024
                 )
@@ -780,6 +819,14 @@ final class ManagedContinuityWorkerTests: XCTestCase {
                 )
             )
         }
+        try await recordInstructionDelivery(
+            repository: repository,
+            store: instructionStore,
+            run: run,
+            sessionID: predecessor,
+            artifactSHA256: instructionArtifact.contentSHA256,
+            lease: lease
+        )
         let identity = ContextBudgetIdentity(
             runID: run.runID,
             projectID: projectID,
@@ -840,8 +887,177 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             memory: memory,
             run: run,
             lease: lease,
-            predecessorSessionID: predecessor
+            predecessorSessionID: predecessor,
+            instructionArtifactSHA256: instructionArtifact.contentSHA256
         )
+    }
+
+    private func recordInstructionDelivery(
+        repository: ProjectControlPlaneRepository,
+        store: ProjectInstructionQueueStore,
+        run: AutonomousRunRecord,
+        sessionID: String,
+        artifactSHA256: String,
+        lease: RunLease
+    ) async throws {
+        let turn = ProviderTurnIntent(
+            runID: run.runID,
+            sessionID: sessionID,
+            projectID: run.projectID,
+            projectGeneration: run.projectGeneration,
+            kind: .normalContinuation,
+            idempotencyKey: "instruction-delivery:\(run.runID.description)",
+            previousResponseID: "response-predecessor",
+            inputSHA256: String(repeating: "1", count: 64)
+        )
+        _ = try await repository.persistProviderTurnIntent(turn, lease: lease)
+        let catalog = try store.catalogPage(
+            contentSHA256: artifactSHA256,
+            projectID: run.projectID,
+            generation: run.projectGeneration,
+            runID: run.runID,
+            cursor: 0,
+            limit: 128
+        )
+        try await recordInstructionResult(
+            repository: repository,
+            turn: turn,
+            run: run,
+            lease: lease,
+            providerCallID: "instruction-catalog",
+            toolName: "instruction_catalog",
+            payload: [
+                "snapshot_sha256": catalog.contentSHA256,
+                "total_documents": catalog.totalDocuments,
+                "cursor": catalog.cursor,
+                "documents": catalog.documents,
+            ]
+        )
+        let documentID = try XCTUnwrap(catalog.documents.first?["id"])
+        let document = try store.readDocument(
+            contentSHA256: artifactSHA256,
+            documentID: documentID,
+            projectID: run.projectID,
+            generation: run.projectGeneration,
+            runID: run.runID,
+            byteOffset: 0,
+            maximumBytes: ProjectInstructionQueueStore.maximumDeliveryBytes
+        )
+        try await recordInstructionResult(
+            repository: repository,
+            turn: turn,
+            run: run,
+            lease: lease,
+            providerCallID: "instruction-read",
+            toolName: "instruction_read",
+            payload: [
+                "snapshot_sha256": artifactSHA256,
+                "document_id": document.documentID,
+                "content": document.content,
+                "byte_offset": document.byteOffset,
+                "total_bytes": document.totalBytes,
+                "sha256": document.sha256,
+            ]
+        )
+    }
+
+    private func recordInstructionResult(
+        repository: ProjectControlPlaneRepository,
+        turn: ProviderTurnIntent,
+        run: AutonomousRunRecord,
+        lease: RunLease,
+        providerCallID: String,
+        toolName: String,
+        payload: [String: Any]
+    ) async throws {
+        let invocation = ToolInvocationIntent(
+            turnID: turn.turnID,
+            runID: run.runID,
+            sessionID: turn.sessionID,
+            projectID: run.projectID,
+            projectGeneration: run.projectGeneration,
+            providerCallID: providerCallID,
+            toolName: toolName,
+            replayClass: .readOnly,
+            idempotencyKey: nil,
+            argumentsSHA256: String(repeating: "2", count: 64)
+        )
+        _ = try await repository.persistToolInvocationIntent(invocation, lease: lease)
+        _ = try await repository.transitionToolInvocation(
+            invocationID: invocation.invocationID,
+            expected: .intent,
+            to: .executing,
+            lease: lease
+        )
+        let result = try JSONSupport.canonicalJSON([
+            "ok": true,
+            "is_error": false,
+            "payload": payload,
+        ])
+        _ = try await repository.transitionToolInvocation(
+            invocationID: invocation.invocationID,
+            expected: .executing,
+            to: .completed,
+            lease: lease,
+            resultSHA256: JSONSupport.sha256Hex(result),
+            resultSummary: result
+        )
+    }
+
+    private func assertManagedContext(
+        _ handoff: ContinuityHandoffV2,
+        run: AutonomousRunRecord,
+        artifactSHA256: String,
+        point: String = "handoff"
+    ) throws {
+        let managed = try XCTUnwrap(
+            handoff.currentWork["managed_context"] as? [String: Any],
+            point
+        )
+        XCTAssertEqual(
+            managed["instruction_artifact_sha256"] as? [String],
+            [artifactSHA256],
+            point
+        )
+        XCTAssertEqual(
+            managed["frozen_tool_grant"] as? [String],
+            run.specification.allowedTools.sorted(),
+            point
+        )
+        XCTAssertEqual(
+            managed["evidence_references"] as? [String],
+            run.specification.work.evidenceReferences,
+            point
+        )
+        let provider = try XCTUnwrap(
+            managed["provider_configuration"] as? [String: Any],
+            point
+        )
+        XCTAssertEqual(provider["provider_configuration_revision"] as? String, "provider-config-r7", point)
+        XCTAssertEqual(provider["tool_catalog_revision"] as? String, "tool-catalog-r11", point)
+        let planObject = try XCTUnwrap(managed["completion_plan"] as? [String: Any], point)
+        let plan = try JSONDecoder().decode(
+            AutomaticCompletionPlan.self,
+            from: ForgeJSONCanonicalizationV1.data(from: planObject)
+        )
+        XCTAssertEqual(plan, run.specification.completionPlan, point)
+        let deliveryObject = try XCTUnwrap(
+            managed["instruction_delivery"] as? [String: Any],
+            point
+        )
+        let delivery = try JSONDecoder().decode(
+            InstructionDeliveryProgress.self,
+            from: ForgeJSONCanonicalizationV1.data(from: deliveryObject)
+        ).validated()
+        XCTAssertEqual(delivery.runID, run.runID, point)
+        XCTAssertEqual(delivery.evidenceRecordCount, 2, point)
+        let artifact = try XCTUnwrap(delivery.artifacts.first, point)
+        XCTAssertEqual(artifact.totalDocuments, 1, point)
+        XCTAssertNil(artifact.nextCatalogCursor, point)
+        XCTAssertTrue(artifact.documents.isEmpty, point)
+        XCTAssertEqual(artifact.completedDocumentBitmap, Data([1]), point)
+        XCTAssertEqual(handoff.openWork.first?["id"] as? String, "restart-recovery", point)
+        XCTAssertEqual(handoff.nextActions.first?["action"] as? String, "Continue after bootstrap", point)
     }
 
     private func continuityIntent(_ run: AutonomousRunRecord) -> RunSideEffectIntent {
@@ -864,6 +1080,7 @@ private struct WorkerFixture {
     let run: AutonomousRunRecord
     let lease: RunLease
     let predecessorSessionID: String
+    let instructionArtifactSHA256: String
 
     func destroy() {
         memory.closeAll()

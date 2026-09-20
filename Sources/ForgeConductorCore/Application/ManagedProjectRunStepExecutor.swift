@@ -542,10 +542,14 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             }
             strongestAction = Self.stronger(strongestAction, afterAction)
 
+            // Provider-exact pressure is authoritative at this boundary. Fence
+            // every newly requested tool effect before the broker can persist an
+            // invocation intent; continuity must quiesce the predecessor first.
+            if strongestAction == .rollover || strongestAction == .emergency {
+                return .rolloverRequired(work)
+            }
+
             guard !turn.toolCalls.isEmpty else {
-                if strongestAction == .rollover || strongestAction == .emergency {
-                    return .rolloverRequired(work)
-                }
                 if strongestAction == .checkpoint { return .checkpointRequired(work) }
                 if let request = Self.completionRequest(from: turn.messages) {
                     // Legacy gate_evidence fields remain wire-compatible but carry

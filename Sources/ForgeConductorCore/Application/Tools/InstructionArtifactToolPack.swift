@@ -65,6 +65,7 @@ public struct InstructionArtifactToolPack: ToolPackHandling {
                     maximumBytes: arguments["maximum_bytes"] as? Int ?? 32 * 1_024
                 )
                 return .success([
+                    "snapshot_sha256": digest,
                     "document_id": page.documentID,
                     "source_path": page.sourcePath,
                     "content": page.content,

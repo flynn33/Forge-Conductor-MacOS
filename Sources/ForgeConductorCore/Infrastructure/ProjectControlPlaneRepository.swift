@@ -9799,6 +9799,108 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Reconstructs exact instruction coverage from the accepted durable tool
+    /// journal. The aggregate is bounded and copied into a managed handoff; the
+    /// invocation rows remain the sole delivery authority.
+    public func instructionDeliveryProgress(
+        run: AutonomousRunRecord
+    ) throws -> InstructionDeliveryProgress {
+        var artifactSHA256 = run.specification.completionPlan?
+            .instructionArtifactSHA256 ?? []
+        if let source = run.specification.work.metadata["source_snapshot_sha256"],
+           !source.isEmpty,
+           !artifactSHA256.contains(source) {
+            artifactSHA256.append(source)
+        }
+        var progress = try InstructionDeliveryProgress(
+            runID: run.runID,
+            projectID: run.projectID,
+            projectGeneration: run.projectGeneration,
+            artifactSHA256: artifactSHA256
+        )
+        let pageSize = 128
+        var cursor: ToolInvocationPageCursor?
+        var scanned = 0
+        while true {
+            let page = try instructionDeliveryInvocations(
+                runID: run.runID,
+                after: cursor,
+                limit: pageSize
+            )
+            guard !page.isEmpty else { break }
+            guard scanned <= InstructionDeliveryProgress.maximumEvidenceRecords - page.count else {
+                throw ProjectInstructionQueueError.storageFailure(
+                    "instruction delivery history exceeds its bounded scan"
+                )
+            }
+            for invocation in page {
+                try progress.record(invocation)
+            }
+            scanned += page.count
+            guard let last = page.last else { break }
+            cursor = ToolInvocationPageCursor(
+                createdAt: last.createdAt,
+                invocationID: last.invocationID
+            )
+            if page.count < pageSize { break }
+            if scanned == InstructionDeliveryProgress.maximumEvidenceRecords {
+                let overflow = try instructionDeliveryInvocations(
+                    runID: run.runID,
+                    after: cursor,
+                    limit: 1
+                )
+                guard overflow.isEmpty else {
+                    throw ProjectInstructionQueueError.storageFailure(
+                        "instruction delivery history exceeds its bounded scan"
+                    )
+                }
+                break
+            }
+        }
+        return try progress.validated()
+    }
+
+    private func instructionDeliveryInvocations(
+        runID: RunID,
+        after cursor: ToolInvocationPageCursor?,
+        limit: Int
+    ) throws -> [ToolInvocationRecord] {
+        guard (1...512).contains(limit) else {
+            throw AutonomyError.invalidRequest(
+                "instruction delivery invocation page limit is invalid"
+            )
+        }
+        let connection = try requiredConnection()
+        let filter = "tool_name IN ('instruction_catalog','instruction_read')"
+        if let cursor {
+            guard !cursor.createdAt.isEmpty, cursor.createdAt.utf8.count <= 128 else {
+                throw AutonomyError.invalidRequest(
+                    "instruction delivery invocation cursor is invalid"
+                )
+            }
+            return try connection.all(
+                Self.toolInvocationSelect
+                    + " WHERE run_id=? AND \(filter)"
+                    + " AND (created_at>? OR (created_at=? AND invocation_id>?))"
+                    + " ORDER BY created_at,invocation_id LIMIT ?",
+                bindings: [
+                    .text(runID.description), .text(cursor.createdAt),
+                    .text(cursor.createdAt),
+                    .text(cursor.invocationID.uuidString.lowercased()),
+                    .int64(Int64(limit)),
+                ],
+                map: Self.decodeToolInvocation
+            )
+        }
+        return try connection.all(
+            Self.toolInvocationSelect
+                + " WHERE run_id=? AND \(filter)"
+                + " ORDER BY created_at,invocation_id LIMIT ?",
+            bindings: [.text(runID.description), .int64(Int64(limit))],
+            map: Self.decodeToolInvocation
+        )
+    }
+
     @discardableResult
     public func quarantineStaleResult(
         context: ToolInvocationContext,
