@@ -12,6 +12,14 @@ Release configuration requests Developer ID Application for James Daley's team
 `9AQ2C2838M`. Notarization, stapling, and public distribution require their
 own completed checks and owner release decision.
 
+The shipped app, Core framework, and runtime launcher Release configurations
+set `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`. Clean Release products therefore
+do not inherit development-only base entitlements. The Core Release
+configuration does not enable testability; Release app-hosted tests must supply
+their documented per-invocation instrumentation override and remain separate
+from candidate products. `ProductPathReliabilityTests` enforces these settings
+for every shipped Release target.
+
 ## Open
 
 ```bash

@@ -965,6 +965,14 @@ final class ProductPathReliabilityTests: XCTestCase {
                 settings.contains("CODE_SIGN_IDENTITY[sdk=macosx*]"),
                 "SDK-specific signing must not override the Release identity"
             )
+            XCTAssertTrue(
+                settings.contains("CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;"),
+                "Release shipped target \(identifier) must not inherit development-only entitlements"
+            )
+            XCTAssertFalse(
+                settings.contains("ENABLE_TESTABILITY = YES;"),
+                "Release shipped target \(identifier) must not export testable internals"
+            )
         }
     }
 

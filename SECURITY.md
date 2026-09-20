@@ -9,6 +9,16 @@ Security updates are provided for the latest release of this project.
 | latest  | :white_check_mark: |
 | older   | :x:                |
 
+## Local control-plane boundary
+
+The dashboard binds only to loopback and rejects non-loopback Host values.
+State-changing requests require same-origin JSON plus route authorization.
+Native Manager clients use the owner-only bearer stored in
+`manager-control.secret`. The browser control page receives a separate random
+per-server capability limited to its visible Manager controls and session
+prune/close; it never receives the durable bearer. Privileged shell and
+filesystem tools are not exposed as dashboard HTTP routes.
+
 ## Reporting a Vulnerability
 
 Please do **not** report security vulnerabilities through public GitHub issues.

@@ -5,6 +5,73 @@
 // Why: Protocol parsing and security policy remain independently testable from sockets.
 
 import Foundation
+import Security
+
+/// Authorizes state changes initiated by the loopback browser console without
+/// exposing the durable manager bearer credential to page content. A token is
+/// generated for each server instance and is invalid after that server stops.
+struct DashboardMutationAuthorizer: Sendable {
+    static let headerName = "x-forge-dashboard-token"
+    static let tokenByteCount = 32
+    static let tokenCharacterCount = tokenByteCount * 2
+
+    let token: String
+
+    init() {
+        var random = [UInt8](repeating: 0, count: Self.tokenByteCount)
+        let status = random.withUnsafeMutableBytes { bytes in
+            SecRandomCopyBytes(kSecRandomDefault, bytes.count, bytes.baseAddress!)
+        }
+        if status == errSecSuccess {
+            let alphabet = Array("0123456789abcdef".utf8)
+            var encoded = [UInt8]()
+            encoded.reserveCapacity(Self.tokenCharacterCount)
+            for byte in random {
+                encoded.append(alphabet[Int(byte >> 4)])
+                encoded.append(alphabet[Int(byte & 0x0f)])
+            }
+            token = String(decoding: encoded, as: UTF8.self)
+        } else {
+            // UUID generation remains process-local and unpredictable if the
+            // Security framework cannot supply bytes during early startup.
+            token = (UUID().uuidString + UUID().uuidString)
+                .replacingOccurrences(of: "-", with: "")
+                .lowercased()
+        }
+    }
+
+    init(token: String) {
+        precondition(token.utf8.count == Self.tokenCharacterCount)
+        self.token = token
+    }
+
+    func authorizes(_ suppliedToken: String?) -> Bool {
+        guard let suppliedToken,
+              suppliedToken.utf8.count <= Self.tokenCharacterCount else {
+            return false
+        }
+        let supplied = Array(suppliedToken.utf8)
+        let expected = Array(token.utf8)
+        var difference = supplied.count ^ expected.count
+        for index in 0..<Self.tokenCharacterCount {
+            let lhs = index < supplied.count ? supplied[index] : 0
+            let rhs = index < expected.count ? expected[index] : 0
+            difference |= Int(lhs ^ rhs)
+        }
+        return difference == 0
+    }
+
+    static func allowsManagerControl(method: String, path: String) -> Bool {
+        guard method.uppercased() == "POST" else { return false }
+        return [
+            "/api/manager/settings",
+            "/api/manager/start",
+            "/api/manager/stop",
+            "/api/manager/restart",
+            "/api/manager/shutdown",
+        ].contains(path)
+    }
+}
 
 /// A deliberately small HTTP/1.1 request model for the local telemetry server.
 /// The parser owns all size and syntax checks before routing sees a request.

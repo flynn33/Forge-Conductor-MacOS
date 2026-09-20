@@ -29,10 +29,8 @@ public enum DashboardPortGuard {
         // Try connect — if nothing accepts, treat as free (may race).
         if !isPortOpen(host: host == "0.0.0.0" ? "127.0.0.1" : host, port: port) {
             // Also check wildcard LISTEN via lsof if available
-            if let holders = lsofHolders(port: port), holders.isEmpty {
-                return .free
-            }
             if let holders = lsofHolders(port: port) {
+                if holders.isEmpty { return .free }
                 return classify(holders: holders, selfPID: selfPID)
             }
             return .free
@@ -100,27 +98,21 @@ public enum DashboardPortGuard {
     }
 
     private static func lsofHolders(port: Int) -> [Holder]? {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        // -nP -iTCP:PORT -sTCP:LISTEN
-        proc.arguments = ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN"]
-        let out = Pipe()
-        let readHandle = out.fileHandleForReading
-        defer { try? readHandle.close() }
-        proc.standardOutput = out
-        proc.standardError = out
-        do {
-            try proc.run()
-            proc.waitUntilExit()
-        } catch {
+        let result = try? ProcessRunner().run(
+            executable: "/usr/sbin/lsof",
+            arguments: ["-nP", "-iTCP:\(port)", "-sTCP:LISTEN"],
+            timeoutSec: 2,
+            maximumOutputBytes: 128 * 1024
+        )
+        guard let result, !result.timedOut,
+              !result.stdoutTruncated, !result.stderrTruncated else {
             return nil
         }
-        let data = readHandle.readDataToEndOfFile()
-        guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+        guard !result.stdout.isEmpty else {
             return []
         }
         var holders: [Holder] = []
-        for line in text.split(separator: "\n").dropFirst() {
+        for line in result.stdout.split(separator: "\n").dropFirst() {
             let parts = line.split(whereSeparator: { $0.isWhitespace }).map(String.init)
             guard parts.count >= 2, let pid = Int32(parts[1]) else { continue }
             let cmd = parts[0]

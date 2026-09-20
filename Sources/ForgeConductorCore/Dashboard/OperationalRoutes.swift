@@ -18,7 +18,21 @@ public final class OperationalRoutes: @unchecked Sendable {
         self.http = http
     }
 
-    public func handle(method: String, path: String, body: Data, connection: NWConnection) throws {
+    public func handle(
+        method: String,
+        path: String,
+        body: Data,
+        mutationAuthorized: Bool = false,
+        connection: NWConnection
+    ) throws {
+        if Self.requiresAuthorization(method: method, path: path), !mutationAuthorized {
+            http.respondJSON(connection, status: 401, object: [
+                "ok": false,
+                "code": "dashboard_mutation_unauthorized",
+                "message": "Dashboard mutation authorization is required",
+            ])
+            return
+        }
         switch (method, path) {
         case ("GET", "/api/doctor"):
             http.respondJSON(connection, status: 200, object: try app.doctor())
@@ -67,6 +81,11 @@ public final class OperationalRoutes: @unchecked Sendable {
         default:
             http.respond(connection, status: 404, body: "Not Found", contentType: "text/plain")
         }
+    }
+
+    static func requiresAuthorization(method: String, path: String) -> Bool {
+        method.uppercased() == "POST"
+            && (path == "/api/sessions/prune" || path == "/api/sessions/close")
     }
 
     public static func sessionJSON(_ s: AgentSession) -> [String: Any] {

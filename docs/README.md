@@ -37,6 +37,7 @@ is retained for auditability, but it is not current operating guidance.
 | --- | --- |
 | [Roadmap](../ROADMAP.md) | Canonical phase and milestone record |
 | [Qualification status](QUALIFICATION-STATUS.md) | Current evidence and remaining release gates |
+| [Adversarial pre-release audit](AUDIT-2026-09-20.md) | September 20 source findings, corrections, verification, and release boundaries |
 | [Delivery workflow](DELIVERY-WORKFLOW.md) | Local-first update and verification process |
 | [Functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) | Detailed candidate and artifact receipts |
 

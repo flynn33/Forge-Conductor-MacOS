@@ -213,7 +213,6 @@ public struct ManagerMutationAuthorizer: Sendable {
              ("GET", "/api/manager/operator/snapshot"),
              ("GET", "/api/manager/stjornarvald/snapshot"),
              ("POST", "/api/manager/stjornarvald/violations"),
-             ("POST", "/api/manager/stjornarvald/notices/pending"),
              ("GET", "/api/manager/autonomy/status"),
              ("POST", "/api/manager/projects/status"),
              ("POST", "/api/manager/runs/status"):
@@ -376,6 +375,7 @@ public final class ManagerRoutes: @unchecked Sendable {
         path: String,
         headers: [String: String],
         body: Data,
+        additionalMutationAuthorization: Bool = false,
         connection: NWConnection
     ) throws {
         let target: ManagerRouteTarget
@@ -390,6 +390,7 @@ public final class ManagerRoutes: @unchecked Sendable {
             return
         }
         if ManagerMutationAuthorizer.requiresAuthorization(method: method, path: target.path),
+           !additionalMutationAuthorization,
            !authorizer.authorizes(headers["authorization"]) {
             http.respondJSON(connection, status: 401, object: [
                 "ok": false,

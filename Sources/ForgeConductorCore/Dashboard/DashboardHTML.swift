@@ -10,6 +10,15 @@ import Foundation
 /// Dashboard behavior and styling live in bundled resources; this document only
 /// establishes the DOM shell and loads those versioned assets.
 enum DashboardHTML {
+    static let mutationTokenPlaceholder = "__FORGE_DASHBOARD_MUTATION_TOKEN__"
+
+    static func rendered(mutationToken: String) -> String {
+        index.replacingOccurrences(
+            of: mutationTokenPlaceholder,
+            with: mutationToken
+        )
+    }
+
     static let index = #"""
 <!DOCTYPE html>
 <html lang="en">
@@ -199,6 +208,7 @@ let refreshTimer = null;
 let refreshSec = 8;
 let hasManager = false;
 let serviceActive = true;
+const mutationToken = '__FORGE_DASHBOARD_MUTATION_TOKEN__';
 
 function showErr(msg) {
   const el = $('err');
@@ -224,22 +234,25 @@ async function jget(path) {
 async function jpost(path, body) {
   const r = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Forge-Dashboard-Token': mutationToken
+    },
     body: JSON.stringify(body || {})
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok && r.status >= 500) {
+  if (!r.ok) {
     throw new Error(j.message || (path + ' → ' + r.status));
   }
   return j;
 }
 function pill(status) {
-  const s = (status || '').toLowerCase();
+  const s = String(status || '').toLowerCase();
   let cls = 'ok';
   if (s === 'warn' || s === 'warning' || s === 'stopped' || s === 'stopping') cls = 'warn';
   else if (s === 'error' || s === 'failed' || s === 'err') cls = 'err';
   else if (s === 'open' || s === 'running' || s === 'active' || s === 'starting' || s === 'restarting') cls = 'open';
-  return `<span class="pill ${cls}">${status || '?'}</span>`;
+  return `<span class="pill ${cls}">${esc(status || '?')}</span>`;
 }
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -408,8 +421,11 @@ async function refreshAll() {
           <td class="mono">${esc(s.agent_id)}<div class="muted">${esc(s.id)}</div></td>
           <td>${pill(s.status)}</td>
           <td class="mono">${esc(s.updated_at)}</td>
-          <td><button onclick="closeSession('${esc(s.id)}')">Close</button></td>
+          <td><button class="close-session" data-session-id="${esc(s.id)}">Close</button></td>
         </tr>`).join('') + `</tbody></table>`;
+      document.querySelectorAll('.close-session').forEach(button => {
+        button.addEventListener('click', () => closeSession(button.dataset.sessionId || ''));
+      });
     }
 
     const list = agents.agents || [];

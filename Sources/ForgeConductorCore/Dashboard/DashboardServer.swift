@@ -62,6 +62,8 @@ public final class DashboardServer: @unchecked Sendable {
     )
     private let lock = NSLock()
     private let http = HTTPResponder()
+    private let browserMutationAuthorizer: DashboardMutationAuthorizer
+    private let persistentMutationAuthorizer: ManagerMutationAuthorizer
     private var acceptingConnections = false
     private var isGracefullyDraining = false
     private var activeConnections: [ObjectIdentifier: ActiveConnection] = [:]
@@ -90,6 +92,10 @@ public final class DashboardServer: @unchecked Sendable {
 
     public init(app: ForgeApp, host: String? = nil, port: UInt16? = nil) {
         self.app = app
+        browserMutationAuthorizer = DashboardMutationAuthorizer()
+        persistentMutationAuthorizer = ManagerMutationAuthorizer(
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
         self.host = host ?? app.config.string("dashboard", "host", default: "127.0.0.1")
         let cfgPort = app.config.int("dashboard", "port", default: 7788)
         self.port = port ?? UInt16(clamping: cfgPort)
@@ -105,6 +111,10 @@ public final class DashboardServer: @unchecked Sendable {
         incompleteRequestTimeout: TimeInterval
     ) {
         self.app = app
+        browserMutationAuthorizer = DashboardMutationAuthorizer()
+        persistentMutationAuthorizer = ManagerMutationAuthorizer(
+            credentials: ManagerControlCredentialStore(paths: app.paths)
+        )
         self.host = host ?? app.config.string("dashboard", "host", default: "127.0.0.1")
         let cfgPort = app.config.int("dashboard", "port", default: 7788)
         self.port = port ?? UInt16(clamping: cfgPort)
@@ -548,6 +558,9 @@ public final class DashboardServer: @unchecked Sendable {
         let path = pathOnly.hasPrefix("/") ? pathOnly : "/" + pathOnly
         let m = request.method
         let body = request.body
+        let browserMutationAuthorized = browserMutationAuthorizer.authorizes(
+            request.headers[DashboardMutationAuthorizer.headerName]
+        )
 
         if path == MCPTaskHTTPService.path {
             guard rawPath == MCPTaskHTTPService.path,
@@ -578,6 +591,11 @@ public final class DashboardServer: @unchecked Sendable {
                         path: rawPath.hasPrefix("/") ? rawPath : "/" + rawPath,
                         headers: request.headers,
                         body: body,
+                        additionalMutationAuthorization: browserMutationAuthorized
+                            && DashboardMutationAuthorizer.allowsManagerControl(
+                                method: m,
+                                path: path
+                            ),
                         connection: connection
                     )
                 return
@@ -599,10 +617,20 @@ public final class DashboardServer: @unchecked Sendable {
                 if let (data, type) = app.telemetry.loadStatic("index.html") {
                     http.respondData(connection, status: 200, data: data, contentType: type)
                 } else {
-                    http.respond(connection, status: 200, body: DashboardHTML.index, contentType: "text/html; charset=utf-8")
+                    http.respond(
+                        connection,
+                        status: 200,
+                        body: DashboardHTML.rendered(mutationToken: browserMutationAuthorizer.token),
+                        contentType: "text/html; charset=utf-8"
+                    )
                 }
             case ("GET", "/control"), ("GET", "/manager"):
-                http.respond(connection, status: 200, body: DashboardHTML.index, contentType: "text/html; charset=utf-8")
+                http.respond(
+                    connection,
+                    status: 200,
+                    body: DashboardHTML.rendered(mutationToken: browserMutationAuthorizer.token),
+                    contentType: "text/html; charset=utf-8"
+                )
             case ("GET", "/api/status"):
                 var snap = try app.statusSnapshot()
                 if let manager {
@@ -626,7 +654,19 @@ public final class DashboardServer: @unchecked Sendable {
                     return
                 }
                 try OperationalRoutes(app: app, http: http)
-                    .handle(method: m, path: path, body: body, connection: connection)
+                    .handle(
+                        method: m,
+                        path: path,
+                        body: body,
+                        mutationAuthorized: browserMutationAuthorized
+                            || (
+                                OperationalRoutes.requiresAuthorization(method: m, path: path)
+                                    && persistentMutationAuthorizer.authorizes(
+                                        request.headers["authorization"]
+                                    )
+                            ),
+                        connection: connection
+                    )
             }
         } catch {
             http.respondJSON(connection, status: 500, object: ["ok": false, "message": "\(error)"])

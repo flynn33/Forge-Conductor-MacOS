@@ -292,6 +292,7 @@ gates.
 
 Current results and remaining gates are recorded in:
 
+- [Adversarial pre-release audit](docs/AUDIT-2026-09-20.md)
 - [Roadmap](ROADMAP.md)
 - [Qualification status](docs/QUALIFICATION-STATUS.md)
 - [Functional development build record](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)

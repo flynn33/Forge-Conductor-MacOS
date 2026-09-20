@@ -231,7 +231,7 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
         XCTAssertFalse(ManagerMutationAuthorizer.requiresAuthorization(
             method: "GET", path: "/api/manager/stjornarvald/snapshot"
         ))
-        XCTAssertFalse(ManagerMutationAuthorizer.requiresAuthorization(
+        XCTAssertTrue(ManagerMutationAuthorizer.requiresAuthorization(
             method: "POST", path: "/api/manager/stjornarvald/notices/pending"
         ))
         XCTAssertFalse(ManagerMutationAuthorizer.requiresAuthorization(

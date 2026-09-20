@@ -235,6 +235,20 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Hardened the loopback control plane after an adversarial pre-release audit.
+  Session prune/close and visible Manager controls now require a per-server
+  256-bit browser capability, while native clients retain the owner-only bearer
+  path and the durable bearer never enters page content.
+- Reclassified pending Stjornarvald notice reservation as an authenticated
+  mutation because it durably changes delivery state.
+- Removed an unbounded `lsof` wait/pipe-drain ordering hazard from dashboard
+  port inspection and replaced it with the shared deadline- and output-bounded
+  process runner.
+- Hardened shipped Release targets against injected base entitlements and
+  removed Release testability from the Core framework, with an Xcode graph
+  regression covering every shipped Release target.
+- Escaped dynamic dashboard status text, removed session identifiers from
+  inline JavaScript, and made all non-2xx control responses visible as errors.
 - Corrected integrated rollover acceptance so the sealed predecessor cannot
   issue a new tool request under rollover pressure; the acknowledged successor
   now reissues the exact pending read, records its result, and completes on the
