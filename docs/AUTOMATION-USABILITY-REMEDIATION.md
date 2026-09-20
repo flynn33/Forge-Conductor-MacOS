@@ -401,7 +401,8 @@ labeled as an application-wide policy rather than a per-task setting.
   the new source and test compiled in their canonical targets. One mismatched
   app-test filter selected zero tests and a later focused native UI run timed out
   while enabling macOS automation before executing the test; neither is counted
-  as a pass.
+  as a pass. The signed implementation is published and synchronized at
+  `01c874e17c9a26c8f3111981748ed1bd3bdc1f81`.
 - AC-01 through AC-04 verification covers deterministic replay, read-only versus repair
   classification, SwiftPM build/test detection, explicit custom-policy
   obligations, direct and queued persistence, exact source/project/generation
