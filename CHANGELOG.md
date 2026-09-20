@@ -12,6 +12,13 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added bounded product-event integration and RF-SJ-09 non-interference
+  qualification for Stjornarvald. Ordinary tool completions, managed tool
+  completions, deterministic completion claims, and Manager availability now
+  emit redacted post-commit observations through one capped asynchronous queue
+  and a distinct owner-only restart-safe client outbox. Manager outages,
+  saturation, shutdown deadlines, and observation faults remain outside
+  authorization, completion, canonical tool results, and managed run outcomes.
 - Added four-format Stjornarvald policy-log export. Rune Forge now presents a
   native save panel for JSON Lines, JSON snapshots, Markdown reports, and CSV;
   exports support bounded project, generation, run, session, client, date,

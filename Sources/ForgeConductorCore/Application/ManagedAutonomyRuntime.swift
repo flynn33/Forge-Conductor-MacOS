@@ -403,7 +403,9 @@ public actor ManagedAutonomyRuntime {
                 let worker = ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
                                                     adapterResolver: adapterResolver)
                 let broker = ToolInvocationBroker(repository: repository, executor: app.tools,
-                    classifier: classifier, reconciler: reconciler, sourcePolicyResolver: sourcePolicyResolver)
+                    classifier: classifier, reconciler: reconciler,
+                    sourcePolicyResolver: sourcePolicyResolver,
+                    observationRecorder: app.stjornarvaldObservations)
                 let engine = ContinuityStateEngine(memory: app.projectMemory)
                 return try ManagedSourceBootstrapCoordinator(reference: reference, repository: repository,
                     managerID: resolvedManagerID, clock: clock, policyResolver: policyResolver,
@@ -446,7 +448,8 @@ public actor ManagedAutonomyRuntime {
                 executor: app.tools,
                 classifier: classifier,
                 reconciler: reconciler,
-                sourcePolicyResolver: sourcePolicyResolver
+                sourcePolicyResolver: sourcePolicyResolver,
+                observationRecorder: app.stjornarvaldObservations
             )
             let budget = PersistedManagedRunBudgetEvaluator(
                 repository: repository,
@@ -499,6 +502,7 @@ public actor ManagedAutonomyRuntime {
                 stepExecutor: stepExecutor,
                 completionValidator: resolvedCompletionValidator,
                 clock: clock,
+                observationRecorder: app.stjornarvaldObservations,
                 maximumSteps: 16
             )
         }

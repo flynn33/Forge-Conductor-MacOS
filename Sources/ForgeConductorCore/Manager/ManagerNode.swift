@@ -894,6 +894,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             lock.unlock()
             persistState()
             app.diagnostics.info("manager_service_started", ["url": dashboardURLString()])
+            app.stjornarvaldObservations.record(
+                StjornarvaldProductObservationFactory.managerStarted(observedAt: app.clock.now())
+            )
             return statusModel()
         } catch {
             lock.lock()
@@ -954,6 +957,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             stjornarvald.start()
             persistState()
             app.diagnostics.info("manager_service_restarted", ["restart_count": "\(count)"])
+            app.stjornarvaldObservations.record(
+                StjornarvaldProductObservationFactory.managerStarted(observedAt: app.clock.now())
+            )
             return statusModel()
         } catch {
             lock.lock()

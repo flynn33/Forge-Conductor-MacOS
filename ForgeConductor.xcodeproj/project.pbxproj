@@ -33,6 +33,9 @@
 		A10800000000000000000001 /* Application/StjornarvaldPolicyLogExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10800000000000000000001 /* Application/StjornarvaldPolicyLogExporter.swift */; };
 		A10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift */; };
 		A10800000000000000000003 /* StjornarvaldPolicyLogExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift */; };
+		A10900000000000000000001 /* Application/StjornarvaldProductObservations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10900000000000000000001 /* Application/StjornarvaldProductObservations.swift */; };
+		A10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift */; };
+		A10900000000000000000003 /* StjornarvaldIntegrationQualificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift */; };
 		00969EC47C1147019BE707F7 /* Application/Tools/GitToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */; };
 		0136D5BD66A452D75D2DE7CA /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4B61D4415545424119C86B /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift */; };
 		013A73A4EF99C1EF80BCB1AA /* ContinuitySourceDispatchIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A19BC93808829B74EBDE045 /* ContinuitySourceDispatchIdentityTests.swift */; };
@@ -952,6 +955,8 @@
 		F10700000000000000000004 /* RuneForgeAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuneForgeAppTests.swift; sourceTree = "<group>"; };
 		F10800000000000000000001 /* Application/StjornarvaldPolicyLogExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/StjornarvaldPolicyLogExporter.swift; sourceTree = "<group>"; };
 		F10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StjornarvaldPolicyLogExporterTests.swift; sourceTree = "<group>"; };
+		F10900000000000000000001 /* Application/StjornarvaldProductObservations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/StjornarvaldProductObservations.swift; sourceTree = "<group>"; };
+		F10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StjornarvaldIntegrationQualificationTests.swift; sourceTree = "<group>"; };
 		F3E4B8F9C30E0B9F91893320 /* MCP/MCPToolAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPToolAccessPolicy.swift; sourceTree = "<group>"; };
 		F51EE9CA88424463AF1B25D2 /* Domain/DoctorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/DoctorModels.swift; sourceTree = "<group>"; };
 		F541EDBDE03E4D6E97FA4775 /* Manager/ManagerSettingsNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/ManagerSettingsNormalizer.swift; sourceTree = "<group>"; };
@@ -1123,6 +1128,7 @@
 				F10600000000000000000002 /* StjornarvaldManagerCoordinatorTests.swift */,
 				F10700000000000000000004 /* RuneForgeAppTests.swift */,
 				F10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift */,
+				F10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift */,
 				R3F000000000000000000009 /* GuidedModeAppTests.swift */,
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
@@ -1410,6 +1416,7 @@
 				F10600000000000000000001 /* Application/StjornarvaldManagerCoordinator.swift */,
 				F10600000000000000000003 /* Application/StjornarvaldObservationClient.swift */,
 				F10800000000000000000001 /* Application/StjornarvaldPolicyLogExporter.swift */,
+				F10900000000000000000001 /* Application/StjornarvaldProductObservations.swift */,
 				A26F00000000000000000001 /* Application/AutonomySupervisor.swift */,
 				DDDC37BEB19860460723A98C /* Sources/ForgeConductorCore/Domain/ManagedToolResultBudgetModels.swift */,
 				96418EFEA54A0094DBD3A1FC /* Sources/ForgeConductorCore/Application/NativeSourcePressurePacketBuilder.swift */,
@@ -1979,6 +1986,7 @@
 				A10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift in Sources */,
 				A10600000000000000000002 /* StjornarvaldManagerCoordinatorTests.swift in Sources */,
 				A10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift in Sources */,
+				A10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift in Sources */,
 				E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */,
 				E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */,
 				E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */,
@@ -2091,6 +2099,7 @@
 			files = (
 				A10700000000000000000004 /* RuneForgeAppTests.swift in Sources */,
 				A10800000000000000000003 /* StjornarvaldPolicyLogExporterTests.swift in Sources */,
+				A10900000000000000000003 /* StjornarvaldIntegrationQualificationTests.swift in Sources */,
 				R3B000000000000000000009 /* GuidedModeAppTests.swift in Sources */,
 				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
 				B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */,
@@ -2237,6 +2246,7 @@
 				A10600000000000000000001 /* Application/StjornarvaldManagerCoordinator.swift in Sources */,
 				A10600000000000000000003 /* Application/StjornarvaldObservationClient.swift in Sources */,
 				A10800000000000000000001 /* Application/StjornarvaldPolicyLogExporter.swift in Sources */,
+				A10900000000000000000001 /* Application/StjornarvaldProductObservations.swift in Sources */,
 				E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */,
 				E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */,
 				E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */,

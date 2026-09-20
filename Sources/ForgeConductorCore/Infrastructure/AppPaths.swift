@@ -104,6 +104,9 @@ public final class AppPaths: @unchecked Sendable {
     public var stjornarvaldOutboxDir: URL {
         stjornarvaldDir.appendingPathComponent("outbox", isDirectory: true)
     }
+    public var stjornarvaldClientOutboxDir: URL {
+        stjornarvaldDir.appendingPathComponent("client-outbox", isDirectory: true)
+    }
     public var stjornarvaldSourceStoreDir: URL {
         stjornarvaldDir.appendingPathComponent("source-store", isDirectory: true)
     }
@@ -130,6 +133,7 @@ public final class AppPaths: @unchecked Sendable {
             memoryDir, memoryHandoffsDir, projectsDir, runtimeArtifactsDir,
             managedProvidersDir, instructionPackagesDir, instructionPackageStoreDir,
             configMigrationsDir, stjornarvaldDir, stjornarvaldOutboxDir,
+            stjornarvaldClientOutboxDir,
             stjornarvaldSourceStoreDir, stjornarvaldExtractedDir,
             stjornarvaldExportsDir, stjornarvaldStagingDir,
             cacheDir.appendingPathComponent("browser", isDirectory: true),
@@ -137,7 +141,8 @@ public final class AppPaths: @unchecked Sendable {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         for dir in [
-            stjornarvaldDir, stjornarvaldOutboxDir, stjornarvaldSourceStoreDir,
+            stjornarvaldDir, stjornarvaldOutboxDir, stjornarvaldClientOutboxDir,
+            stjornarvaldSourceStoreDir,
             stjornarvaldExtractedDir, stjornarvaldExportsDir, stjornarvaldStagingDir,
         ] {
             try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)

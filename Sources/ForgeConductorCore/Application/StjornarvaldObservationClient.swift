@@ -13,7 +13,7 @@ public protocol StjornarvaldObservationTransport: Sendable {
     ) async throws -> StjornarvaldObservationReceiptBatch
 }
 
-public actor StjornarvaldObservationClient {
+public actor StjornarvaldObservationClient: PolicyObservationSubmitting {
     public static let maximumOutboxItems = 10_000
     public static let maximumBatchCount = 64
 

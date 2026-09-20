@@ -307,6 +307,7 @@ public actor ProjectRunCoordinator {
     private let completionValidator: any RunCompletionValidating
     private let clock: any Clock
     private let sleeper: any AutonomySleeping
+    private let observationRecorder: (any StjornarvaldObservationRecording)?
     private let maximumSteps: Int
     private var stopped = false
 
@@ -320,6 +321,7 @@ public actor ProjectRunCoordinator {
         completionValidator: any RunCompletionValidating,
         clock: any Clock = SystemClock(),
         sleeper: any AutonomySleeping = SystemAutonomySleeper(),
+        observationRecorder: (any StjornarvaldObservationRecording)? = nil,
         maximumSteps: Int = ProjectRunCoordinator.maximumStepsPerActivation
     ) throws {
         guard (1...Self.maximumStepsPerActivation).contains(maximumSteps) else {
@@ -334,6 +336,7 @@ public actor ProjectRunCoordinator {
         self.completionValidator = completionValidator
         self.clock = clock
         self.sleeper = sleeper
+        self.observationRecorder = observationRecorder
         self.maximumSteps = maximumSteps
     }
 
@@ -628,22 +631,26 @@ public actor ProjectRunCoordinator {
             )
         case .completionRequested(let request):
             let requestJSON = try JSONSupport.canonicalJSON(["request": request])
-            return try await transition(
+            let transitioned = try await transition(
                 run, to: .validatingCompletion, lease: lease,
                 event: "autonomous_completion_requested",
                 summary: "Completion request entered deterministic validation",
                 completionRequestJSON: requestJSON
             )
+            recordCompletionClaim(run: transitioned, requestJSON: requestJSON)
+            return transitioned
         case .completionRequestedWithWork(let request, var work):
             work.pendingIntent = nil
             let requestJSON = try JSONSupport.canonicalJSON(["request": request])
-            return try await transition(
+            let transitioned = try await transition(
                 run, to: .validatingCompletion, lease: lease,
                 event: "autonomous_completion_requested",
                 summary: "Completion request entered deterministic validation",
                 work: work,
                 completionRequestJSON: requestJSON
             )
+            recordCompletionClaim(run: transitioned, requestJSON: requestJSON)
+            return transitioned
         case .waitingProvider(let code, let summary):
             return try await waiting(run, state: .waitingProvider, code: code, summary: summary, lease: lease)
         case .waitingResource(let code, let summary):
@@ -671,6 +678,19 @@ public actor ProjectRunCoordinator {
                 event: "autonomous_run_cancel_requested", summary: "Run cancellation was requested"
             )
         }
+    }
+
+    private func recordCompletionClaim(
+        run: AutonomousRunRecord,
+        requestJSON: String
+    ) {
+        observationRecorder?.record(
+            StjornarvaldProductObservationFactory.completionClaim(
+                run: run,
+                requestSHA256: JSONSupport.sha256Hex(requestJSON),
+                observedAt: clock.now()
+            )
+        )
     }
 
     private func waiting(

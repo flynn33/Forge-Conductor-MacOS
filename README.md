@@ -263,8 +263,11 @@ history, delivery state, and cached degraded information, and supplies complete
 offline Guided Mode help. Its native save workflow writes filtered, bounded
 JSONL, JSON, Markdown, or CSV snapshots with policy revisions, chronology,
 integrity metadata, limitations, and retry-stable receipts. Product observation
-hooks, integrated qualification, and delivery acceptance remain open, so this
-is not a release claim.
+hooks now emit bounded redacted post-commit observations for ordinary tools,
+managed tools, completion claims, and Manager availability through a separate
+durable client outbox. Delivery is nonblocking, bounded, restart-safe, and
+outside authorization, completion, and canonical result paths. Final delivery
+acceptance remains open, so this is not a release claim.
 
 ## Versioning
 

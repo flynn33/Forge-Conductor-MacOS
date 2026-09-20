@@ -63,9 +63,9 @@ stale patch location while preserving those newer contracts.
 | Dedicated policy database, JSONL mirror, outbox, source store, exports, and staging | `AppPaths`, `Infrastructure/StjornarvaldPolicyLogStore.swift`, and `Infrastructure/StjornarvaldPolicySourceCatalog.swift` (durable log and source catalog implemented in RF-SJ-01/RF-SJ-02; later stores remain open) |
 | Native source interpretation | `Infrastructure/StjornarvaldNativePolicyExtractor.swift` (bounded native extraction and metadata-only fallback implemented in RF-SJ-02) |
 | Pinned Raven policy projection | `Application/RavenForgeDevelopmentPolicyAdapter.swift` and `Infrastructure/StjornarvaldPolicyRuleRepository.swift` (implemented in RF-SJ-03) |
-| Durable observation intake and single evaluator | `Infrastructure/StjornarvaldObservationRepository.swift` and `Application/StjornarvaldPolicyEvaluator.swift` (implemented in RF-SJ-04; product event integration remains open) |
+| Durable observation intake and single evaluator | `Infrastructure/StjornarvaldObservationRepository.swift`, `Application/StjornarvaldPolicyEvaluator.swift`, and `Application/StjornarvaldProductObservations.swift` (implemented in RF-SJ-04/RF-SJ-09) |
 | Coding-agent notice delivery | `Application/StjornarvaldPolicyNotices.swift`, `Infrastructure/StjornarvaldPolicyNoticeRepository.swift`, `ManagedProjectRunStepExecutor`, and `MCPServer`/`MCPToolResponse` (implemented in RF-SJ-05) |
-| Process composition | `ForgeApp` and `Application/StjornarvaldObservationClient.swift` (bounded owner-only FIFO outbox implemented in RF-SJ-06; product event hooks remain open) |
+| Process composition | `ForgeApp`, `Application/StjornarvaldObservationClient.swift`, and `Application/StjornarvaldProductObservations.swift` (bounded owner-only FIFO outbox implemented in RF-SJ-06; bounded product hooks implemented in RF-SJ-09) |
 | Manager lifecycle and single evaluator | `ManagerNode` and `Application/StjornarvaldManagerCoordinator.swift` (implemented in RF-SJ-06) |
 | Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `ManagerDashboardClient` (implemented in RF-SJ-06; four-format export implemented in RF-SJ-08) |
 | Managed coding-agent context and observations | `ManagedProjectRunStepExecutor` and post-commit `ToolInvocationBroker` seams |
@@ -321,9 +321,9 @@ existing non-failing `ProjectContextService.close` priority-inversion warning,
 so this phase makes no clean performance claim.
 
 RF-SJ-08 subsequently replaced the provisional unavailable receipt with the
-bounded four-format exporter described below. Complete product observation
-hooks, integrated fault/performance qualification, and release acceptance
-remain open.
+bounded four-format exporter described below, and RF-SJ-09 completed bounded
+product hooks plus focused fault, privacy, restart, shutdown, and performance
+qualification. Final release acceptance remains open.
 
 ## RF-SJ-07 Rune Forge UI and Guided Mode evidence
 
@@ -422,8 +422,57 @@ and test passed. The first app-hosted exporter invocation selected zero tests
 because the new test was not yet a member of that app-hosted target and remains
 a non-pass; explicit canonical membership produced the passing 10-test run.
 
-RF-SJ-09 integrated fault, bounds, privacy, and performance qualification,
-complete product observation hooks, and RF-SJ-10 final acceptance remain open.
+RF-SJ-09 subsequently completed product observation integration and its focused
+fault, bounds, privacy, restart, shutdown, and performance qualification.
+RF-SJ-10 final acceptance remains open.
+
+## RF-SJ-09 integrated non-interference qualification evidence
+
+Forge now emits observations only after the canonical development boundary:
+
+- ordinary tool calls record after the final result and audit commit, while
+  managed calls record only after durable broker completion and do not repeat
+  when an already-completed invocation is replayed;
+- completion claims record only after the run durably enters deterministic
+  validation, and Manager availability records after successful start or
+  restart;
+- observation content contains bounded identities, status, stable scope, and
+  SHA-256 evidence references rather than arguments or result bodies;
+- one process-owned emitter admits without throwing or waiting on Manager I/O,
+  retains at most 256 observations, reports saturation through a drop counter,
+  owns one drain worker, and becomes quiescent when the queue is empty; and
+- a dedicated owner-only client outbox is separate from the Manager evaluator
+  outbox, survives outage, resolves the current configured endpoint on retry,
+  and drains after Manager availability returns.
+
+Fault injection proved that an unavailable Manager leaves the canonical tool
+result byte-equivalent, returns promptly, persists one redacted observation,
+and delivers it exactly once after a client restart. A 2,000-observation burst
+completed admission in under one second, retained no more than 256 pending
+items, made drops explicit, drained to idle, and bounded both normal and
+non-cooperative shutdown. Stable managed identities and encoded payload scans
+proved that tool arguments and result bodies were absent. The managed provider
+fixture still reached deterministic completion while recording exactly one
+managed-tool observation and one completion claim.
+
+`swift test --filter Stjornarvald` passed 58/58, the complete managed-step suite
+passed 9/9, and MCP protocol/diagnostics passed 20/20. The three integration
+qualification tests also passed under Thread Sanitizer and in the app-hosted
+target; the canonical Core graph executed those three plus the managed
+completion case, 4/4. The first app-hosted combined filter selected only the
+three tests present in that target and therefore was not accepted as the
+intended four-test proof. A priority-inversion warning initially identified the
+new shutdown waiter; raising its task priority removed that stack on rerun.
+Existing `ProjectContextService` priority-inversion warnings and an existing
+managed-test SQLite teardown diagnostic remain visible, so this phase makes no
+clean whole-application performance claim.
+
+Static scans found no Stjornarvald pass/readiness or violation-state dependency
+in tool authorization, completion validation, or automatic completion-plan
+resolution. Owner-only policy-path tests, explicit project membership,
+whitespace and attribution scans, the ordinary Apple Development-signed Debug
+workspace build, and strict deep signature verification passed. RF-SJ-10 final
+integrated delivery acceptance remains open.
 
 ## Delivery sequence
 

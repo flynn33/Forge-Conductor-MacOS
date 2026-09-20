@@ -19,6 +19,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     private unowned let app: ForgeApp
     private let packs: [any ToolPackHandling]
     private let authorization: any ToolAuthorizing
+    private let observationRecorder: any StjornarvaldObservationRecording
     /// Per-client consecutive identical call fingerprint (tool + canonical args).
     private let loopLock = NSLock()
     private var lastCallFingerprint: [String: (fingerprint: String, count: Int)] = [:]
@@ -30,10 +31,12 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     public init(
         app: ForgeApp,
         packs: [any ToolPackHandling]? = nil,
-        authorization: (any ToolAuthorizing)? = nil
+        authorization: (any ToolAuthorizing)? = nil,
+        observationRecorder: (any StjornarvaldObservationRecording)? = nil
     ) {
         self.app = app
         self.authorization = authorization ?? ToolAuthorizationService(paths: app.paths, config: app.config)
+        self.observationRecorder = observationRecorder ?? app.stjornarvaldObservations
         self.packs = packs ?? [
             AgentToolPack(),
             MemoryToolPack(),
@@ -716,7 +719,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         }
 
         let status = finalResult.ok ? "ok" : "error"
-        return recordAndReturn(
+        let recorded = recordAndReturn(
             finalResult,
             tool: name,
             arguments: routedArguments,
@@ -727,6 +730,17 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             mutating: Self.mutatingTools.contains(name),
             cancellation: cancellation
         )
+        if context?.runID == nil {
+            observationRecorder.record(
+                StjornarvaldProductObservationFactory.ordinaryTool(
+                    name: name,
+                    result: recorded,
+                    context: context,
+                    clientID: clientID
+                )
+            )
+        }
+        return recorded
     }
 
     private func softBudgetResult(

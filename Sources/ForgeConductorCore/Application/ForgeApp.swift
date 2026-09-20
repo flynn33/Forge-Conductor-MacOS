@@ -28,6 +28,7 @@ public final class ForgeApp: @unchecked Sendable {
     public let projectContexts: ProjectContextService
     public let continuityControl: ContinuityControlService
     public let runtimeJobs: RuntimeJobSubsystem
+    public let stjornarvaldObservations: StjornarvaldObservationEmitter
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
 
@@ -64,6 +65,7 @@ public final class ForgeApp: @unchecked Sendable {
         projectContexts: ProjectContextService,
         continuityControl: ContinuityControlService,
         runtimeJobs: RuntimeJobSubsystem,
+        stjornarvaldObservations: StjornarvaldObservationEmitter,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
     ) {
@@ -81,6 +83,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.projectContexts = projectContexts
         self.continuityControl = continuityControl
         self.runtimeJobs = runtimeJobs
+        self.stjornarvaldObservations = stjornarvaldObservations
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
     }
@@ -167,6 +170,30 @@ public final class ForgeApp: @unchecked Sendable {
         )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)
+        let observationClient = StjornarvaldObservationClient(
+            transport: StjornarvaldConfiguredObservationTransport(config: config, paths: paths),
+            outboxDirectory: paths.stjornarvaldClientOutboxDir,
+            processID: "\(ProcessInfo.processInfo.processIdentifier)",
+            bootID: UUID().uuidString.lowercased(),
+            diagnostics: { message in
+                diagnostics.warn(
+                    "stjornarvald_observation_client_deferred",
+                    ["detail": message],
+                    category: .tools
+                )
+            }
+        )
+        let stjornarvaldObservations = StjornarvaldObservationEmitter(
+            submitter: observationClient,
+            shutdown: { await observationClient.shutdown() },
+            diagnostics: { message in
+                diagnostics.warn(
+                    "stjornarvald_observation_emitter_degraded",
+                    ["detail": message],
+                    category: .tools
+                )
+            }
+        )
         let app = ForgeApp(
             paths: paths,
             config: config,
@@ -182,6 +209,7 @@ public final class ForgeApp: @unchecked Sendable {
             projectContexts: projectContexts,
             continuityControl: continuityControl,
             runtimeJobs: runtimeJobs,
+            stjornarvaldObservations: stjornarvaldObservations,
             clock: clock,
             lmStudioDeploy: deploy
         )
@@ -212,6 +240,7 @@ public final class ForgeApp: @unchecked Sendable {
     @discardableResult
     public func shutdown() -> RuntimeJobShutdownReport {
         telemetry.stopBackgroundRefresh()
+        _ = stjornarvaldObservations.shutdown(timeoutSeconds: 3)
         let runtimeStopped = DispatchSemaphore(value: 0)
         let reportBox = RuntimeShutdownReportBox()
         Task.detached { [runtimeJobs] in

@@ -1092,19 +1092,22 @@ public actor ToolInvocationBroker {
     private let classifier: any ToolReplayClassifying
     private let reconciler: any ToolInvocationReconciling
     private let sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)?
+    private let observationRecorder: (any StjornarvaldObservationRecording)?
 
     public init(
         repository: ProjectControlPlaneRepository,
         executor: any ToolExecuting,
         classifier: any ToolReplayClassifying,
         reconciler: any ToolInvocationReconciling = NoToolInvocationReconciler(),
-        sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)? = nil
+        sourcePolicyResolver: (@Sendable (ToolInvocationContext) throws -> BudgetPolicySelection)? = nil,
+        observationRecorder: (any StjornarvaldObservationRecording)? = nil
     ) {
         self.repository = repository
         self.executor = executor
         self.classifier = classifier
         self.reconciler = reconciler
         self.sourcePolicyResolver = sourcePolicyResolver
+        self.observationRecorder = observationRecorder
     }
 
     /// Recovery authority is supplied by the manager, never decoded from a model
@@ -1279,6 +1282,7 @@ public actor ToolInvocationBroker {
                 case .completed(let result):
                     return try await complete(
                         result,
+                        call: call,
                         record: record,
                         expectedState: .intent,
                         lease: lease,
@@ -1313,6 +1317,7 @@ public actor ToolInvocationBroker {
                 case .completed(let result):
                     return try await complete(
                         result,
+                        call: call,
                         record: record,
                         expectedState: record.state,
                         lease: lease,
@@ -1349,6 +1354,7 @@ public actor ToolInvocationBroker {
             )
             return try await complete(
                 result,
+                call: call,
                 record: record,
                 expectedState: .executing,
                 lease: lease,
@@ -1370,6 +1376,7 @@ public actor ToolInvocationBroker {
 
     private func complete(
         _ result: ToolResult,
+        call: BrokeredToolCall,
         record: ToolInvocationRecord,
         expectedState: ToolInvocationState,
         lease: RunLease,
@@ -1401,6 +1408,13 @@ public actor ToolInvocationBroker {
                 invocationID: record.invocationID, expected: expectedState, to: .completed,
                 lease: lease, resultSHA256: JSONSupport.sha256Hex(encoded), resultSummary: encoded)
         }
+        observationRecorder?.record(
+            StjornarvaldProductObservationFactory.managedTool(
+                call: call,
+                result: result,
+                context: context
+            )
+        )
         return result
     }
 

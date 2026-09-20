@@ -114,13 +114,15 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         ))
         let provider = ManagedStepFixtureProvider()
         let toolExecutor = ManagedStepToolExecutor()
+        let observationRecorder = ManagedStepObservationRecorder()
         let broker = ToolInvocationBroker(
             repository: repository,
             executor: toolExecutor,
             classifier: try StaticToolReplayClassifier(
                 productionToolNames: toolExecutor.toolNames,
                 classifications: ["fixture.read": .readOnly]
-            )
+            ),
+            observationRecorder: observationRecorder
         )
         let stepper = try ManagedProjectRunStepExecutor(
             repository: repository,
@@ -159,6 +161,7 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
             managerID: "managed-step-manager",
             stepExecutor: stepper,
             completionValidator: validator,
+            observationRecorder: observationRecorder,
             maximumSteps: 8
         )
 
@@ -175,6 +178,16 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         XCTAssertEqual(stored.state, .completed)
         XCTAssertNotNil(stored.activeSessionID)
         XCTAssertEqual(stored.specification.work.metadata["provider_response_id"], "resp-final")
+        let observations = observationRecorder.snapshot()
+        XCTAssertEqual(
+            observations.filter { $0.kind == .toolInvocationCompleted }.count,
+            1
+        )
+        XCTAssertEqual(
+            observations.filter { $0.kind == .completionClaimObserved }.count,
+            1
+        )
+        XCTAssertTrue(observations.allSatisfy { $0.scope.runID == run.runID.description })
     }
 
     func testProviderExactRolloverFencesNewToolIntentBeforeBrokerExecution() async throws {
@@ -504,6 +517,23 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
             observation = nil
         }
         return ManagedStepFailureResult(run: storedRun, turn: turn, observation: observation)
+    }
+}
+
+private final class ManagedStepObservationRecorder: StjornarvaldObservationRecording, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [DevelopmentObservation] = []
+
+    func record(_ observation: DevelopmentObservation) {
+        lock.lock()
+        values.append(observation)
+        lock.unlock()
+    }
+
+    func snapshot() -> [DevelopmentObservation] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
     }
 }
 

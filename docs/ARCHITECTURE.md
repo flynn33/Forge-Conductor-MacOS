@@ -49,6 +49,16 @@ streams bounded filtered history through manager-owned staging, synchronizes
 the file, and atomically replaces the user-selected destination. Durable
 request receipts preserve retry identity across Manager restarts; export faults
 do not mutate the authoritative policy log.
+Product operations submit only redacted status, identity, and digest evidence
+after their canonical durable boundary. One process-owned emitter admits those
+observations synchronously into a 256-item queue, reports drops explicitly,
+drains through one asynchronous worker, and becomes idle when empty. A separate
+owner-only client outbox survives Manager outage and resolves the current
+loopback endpoint on each retry. Ordinary and managed tool arguments and result
+bodies never enter policy storage, and observation delivery cannot authorize a
+tool, admit or complete a run, or alter a canonical result. Shutdown stops
+admission and uses a bounded deadline; an unresponsive transport is reported
+without holding application shutdown indefinitely.
 The SwiftUI app exposes that boundary through a dedicated Rune Forge tab. Its
 main-actor view model owns one cancellable five-second polling loop, caps the
 visible source and violation collections at 100 entries each, preserves
