@@ -433,6 +433,7 @@ public actor ManagedAutonomyRuntime {
         self.sourceContinuity = app.continuity
         self.sourceCancellationManagerID = resolvedManagerID + ":source-cancel"
         self.diagnostics = app.diagnostics
+        let policyReporter = StjornarvaldCodingAgentPolicyReporter(paths: app.paths)
         self.supervisor = try AutonomySupervisor(
             repository: repository,
             maximumConcurrentRuns: concurrentRuns,
@@ -485,6 +486,7 @@ public actor ManagedAutonomyRuntime {
                     delegate: try resolvedContinuityFactory(runID),
                     clock: clock
                 ),
+                policyContext: policyReporter,
                 sourceResumption: { run, lease in
                     try await sourceCompletion.reconcileSourceResumption(run: run, lease: lease,
                         policyResolver: policyResolver)

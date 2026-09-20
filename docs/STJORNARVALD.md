@@ -3,8 +3,9 @@
 This document is the current product record for the native **Development
 Policy** feature, its **Rune Forge** operator surface, and the manager-owned
 **Stjornarvald** policy engine. Typed contracts, durable policy history, the
-all-format source catalog, the pinned source-linked Raven rule index, and the
-restart-safe manager evaluation core are implemented; unfinished work remains
+all-format source catalog, the pinned source-linked Raven rule index, the
+restart-safe evaluation core, and bounded managed/MCP notice delivery are
+implemented; unfinished work remains
 open in the [roadmap](../ROADMAP.md).
 
 ## Governing source
@@ -61,6 +62,7 @@ stale patch location while preserving those newer contracts.
 | Native source interpretation | `Infrastructure/StjornarvaldNativePolicyExtractor.swift` (bounded native extraction and metadata-only fallback implemented in RF-SJ-02) |
 | Pinned Raven policy projection | `Application/RavenForgeDevelopmentPolicyAdapter.swift` and `Infrastructure/StjornarvaldPolicyRuleRepository.swift` (implemented in RF-SJ-03) |
 | Durable observation intake and single evaluator | `Infrastructure/StjornarvaldObservationRepository.swift` and `Application/StjornarvaldPolicyEvaluator.swift` (implemented in RF-SJ-04; product event integration remains open) |
+| Coding-agent notice delivery | `Application/StjornarvaldPolicyNotices.swift`, `Infrastructure/StjornarvaldPolicyNoticeRepository.swift`, `ManagedProjectRunStepExecutor`, and `MCPServer`/`MCPToolResponse` (implemented in RF-SJ-05) |
 | Process composition | `ForgeApp`; process clients may be composed here, but the manager remains the only evaluator owner |
 | Manager lifecycle and single evaluator | `ManagerNode` plus a dedicated coordinator |
 | Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `OperatorManagerClient` |
@@ -247,6 +249,40 @@ repaired the fixture. This phase does not yet claim automatic manager lifecycle
 scheduling, observation hooks in existing product operations, coding-agent
 notice delivery, manager routes, Rune Forge UI, export, integrated stress and
 performance proof, or release acceptance.
+
+## RF-SJ-05 coding-agent notice-delivery evidence
+
+The additive reporting path now provides:
+
+- durable, bounded notices keyed to the strongest available managed-run, MCP
+  client, or project identity, with stable event deduplication, a repeat quiet
+  interval, correction supersession, secret redaction, and restart-safe state;
+- deterministic managed delivery snapshots keyed to the provider side effect,
+  so retries receive the same context and provider failure records deferral;
+- bounded managed context appended only at a safe non-tool-output provider
+  boundary, without changing budgets, completion checks, tools, or run outcome;
+- an asynchronous process-local MCP notice cache and separate second text
+  content item that preserves canonical structured content, first content,
+  error status, payload, replay, audit, and authorization behavior; and
+- delivery receipts recorded only after provider acceptance or successful MCP
+  transport write. Failed writes discard transient presentation state and leave
+  the durable notice eligible for a later boundary.
+
+`swift test --filter StjornarvaldPolicyNoticeTests` executed six cases with zero
+failures. The canonical workspace `ForgeConductor` scheme executed the same six
+cases with zero failures and no skips. Focused regressions passed 11/11 evaluator,
+8/8 policy-log, 9/9 managed-step, 20/20 MCP protocol, and 8/8 Raven-rule cases.
+The first implementation attempts retained useful non-passes: malformed Swift
+test syntax, a NUL-delimited SQLite binding that truncated target identity, and
+invalid fixture transitions. The delivered design hashes composite identities
+before SQLite binding and uses valid lifecycle fixtures. Xcode also reported a
+non-failing priority-inversion runtime warning in the existing
+`ProjectContextService` path; it is not treated as a clean performance proof.
+
+This phase does not yet claim continuous manager evaluator scheduling, complete
+product observation hooks, manager routes, Rune Forge UI, export, integrated
+fault/performance proof, or release acceptance. Presentation proves transport,
+not that a model understood or acted on a notice.
 
 ## Delivery sequence
 

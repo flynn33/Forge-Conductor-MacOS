@@ -139,6 +139,8 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
 
     public static let maximumToolRounds = 32
     public static let maximumAssistantSummaryBytes = 16 * 1_024
+    public static let maximumPolicyNoticeCount = 8
+    public static let maximumPolicyContextBytes = 16 * 1_024
 
     private struct ActiveProviderRequest: Sendable {
         let provider: any ManagedModelProvider
@@ -151,6 +153,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
     private let broker: ToolInvocationBroker
     private let budget: any ManagedRunBudgetEvaluating
     private let continuity: any ManagedRunContinuityExecuting
+    private let policyContext: any PolicyContextProviding
     private let maximumToolRounds: Int
     private let sourceResumption: SourceResumption?
 
@@ -166,11 +169,13 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         broker: ToolInvocationBroker,
         budget: any ManagedRunBudgetEvaluating = NoManagedRunBudgetEvaluator(),
         continuity: any ManagedRunContinuityExecuting = UnavailableManagedRunContinuityExecutor(),
+        policyContext: any PolicyContextProviding = NoPolicyContextProvider(),
         maximumToolRounds: Int = ManagedProjectRunStepExecutor.maximumToolRounds
     ) throws {
         try self.init(repository: repository, providerResolver: providerResolver,
             toolDefinitionResolver: toolDefinitionResolver, broker: broker, budget: budget,
-            continuity: continuity, maximumToolRounds: maximumToolRounds, sourceResumption: nil)
+            continuity: continuity, policyContext: policyContext,
+            maximumToolRounds: maximumToolRounds, sourceResumption: nil)
     }
 
     init(
@@ -180,6 +185,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         broker: ToolInvocationBroker,
         budget: any ManagedRunBudgetEvaluating = NoManagedRunBudgetEvaluator(),
         continuity: any ManagedRunContinuityExecuting = UnavailableManagedRunContinuityExecutor(),
+        policyContext: any PolicyContextProviding = NoPolicyContextProvider(),
         maximumToolRounds: Int = ManagedProjectRunStepExecutor.maximumToolRounds,
         sourceResumption: SourceResumption?
     ) throws {
@@ -192,6 +198,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         self.broker = broker
         self.budget = budget
         self.continuity = continuity
+        self.policyContext = policyContext
         self.maximumToolRounds = maximumToolRounds
         self.sourceResumption = sourceResumption
     }
@@ -396,10 +403,33 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                     work: work
                 )
                 : nil
+            let policyDeliveryID: String?
+            let policyText: String?
+            if automatic == nil, continuationInput == nil,
+               let generation = Int(exactly: run.projectGeneration.rawValue) {
+                let deliveryID = "managed:\(sideEffect.idempotencyKey):\(round)"
+                let snapshot = await policyContext.context(
+                    projectID: run.projectID.description,
+                    projectGeneration: generation,
+                    runID: run.runID.description,
+                    sessionID: sessionID,
+                    deliveryID: deliveryID,
+                    maximumCount: Self.maximumPolicyNoticeCount,
+                    maximumBytes: Self.maximumPolicyContextBytes
+                )
+                policyDeliveryID = deliveryID
+                policyText = StjornarvaldPolicyNoticeFormatter.managedContext(
+                    snapshot, maximumBytes: Self.maximumPolicyContextBytes
+                )
+            } else {
+                policyDeliveryID = nil
+                policyText = nil
+            }
             let input = try automatic?.input ?? requestInput(
                 run: run,
                 previousResponseID: previousResponseID,
-                continuationInput: continuationInput
+                continuationInput: continuationInput,
+                policyContext: policyText
             )
             let sourceDispatch: SourceDerivedDispatch?
             if let observedProvider {
@@ -490,6 +520,9 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 )
             } catch let failure as any ManagedProviderFailure
             where failure.managedProviderFailureDisposition == .contextOverflow {
+                if let policyDeliveryID, policyText != nil {
+                    await policyContext.deferred(deliveryID: policyDeliveryID)
+                }
                 if record.intent.kind == .automaticContinuation {
                     return .failedRecoverable(
                         code: failure.managedProviderFailureCode,
@@ -506,6 +539,14 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 work.metadata["provider_overflow_code"] = failure.managedProviderFailureCode
                 work.metadata["provider_response_id"] = previousResponseID
                 return .rolloverRequired(work)
+            } catch {
+                if let policyDeliveryID, policyText != nil {
+                    await policyContext.deferred(deliveryID: policyDeliveryID)
+                }
+                throw error
+            }
+            if let policyDeliveryID, policyText != nil {
+                await policyContext.presented(deliveryID: policyDeliveryID)
             }
             guard turn.completed,
                   turn.providerID == expectedProviderID,
@@ -1226,10 +1267,14 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
     private func requestInput(
         run: AutonomousRunRecord,
         previousResponseID: String?,
-        continuationInput: Data?
+        continuationInput: Data?,
+        policyContext: String?
     ) throws -> Data {
         if let continuationInput { return continuationInput }
-        let prompt = Self.rootOrContinuationPrompt(for: run)
+        var prompt = Self.rootOrContinuationPrompt(for: run)
+        if let policyContext, !policyContext.isEmpty {
+            prompt += "\n\n" + policyContext
+        }
         guard previousResponseID != nil else { return Data(prompt.utf8) }
         return try Self.canonicalData([[
             "type": "message",

@@ -526,6 +526,47 @@ public struct CodingAgentPolicyNotice: Codable, Sendable, Equatable, Identifiabl
     }
 }
 
+public enum PolicyNoticeDeliveryState: String, Codable, Sendable {
+    case pending
+    case presented
+    case acknowledgedByTransport = "acknowledged_by_transport"
+    case supersededByCorrection = "superseded_by_correction"
+    case deliveryDeferred = "delivery_deferred"
+}
+
+public enum PolicyNoticeTargetKind: String, Codable, Sendable {
+    case managedProvider = "managed_provider"
+    case mcpClient = "mcp_client"
+    case project
+}
+
+public struct PolicyNoticePresentation: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let targetKind: PolicyNoticeTargetKind
+    public let targetIdentity: String
+    public let notices: [CodingAgentPolicyNotice]
+    public let text: String
+    public let digestSHA256: String
+    public let controlsExecution: Bool
+
+    public init(
+        id: String,
+        targetKind: PolicyNoticeTargetKind,
+        targetIdentity: String,
+        notices: [CodingAgentPolicyNotice],
+        text: String,
+        digestSHA256: String
+    ) {
+        self.id = id
+        self.targetKind = targetKind
+        self.targetIdentity = targetIdentity
+        self.notices = notices
+        self.text = text
+        self.digestSHA256 = digestSHA256
+        self.controlsExecution = false
+    }
+}
+
 public struct PolicyContextSnapshot: Codable, Sendable, Equatable {
     public let policyIdentity: String
     public let applicableRuleSummaries: [String]
@@ -591,9 +632,10 @@ public enum PolicyLogWriteDisposition: Sendable, Equatable {
 }
 
 public protocol CodingAgentPolicyReporting: Sendable {
-    func queue(_ violation: PolicyViolation) async
+    func queue(_ event: PolicyViolationEvent) async
     func pendingNotices(
         projectID: String?,
+        projectGeneration: Int?,
         runID: String?,
         sessionID: String?,
         clientID: String?,
@@ -607,8 +649,26 @@ public protocol PolicyContextProviding: Sendable {
         projectID: String,
         projectGeneration: Int,
         runID: String,
-        sessionID: String?
+        sessionID: String?,
+        deliveryID: String,
+        maximumCount: Int,
+        maximumBytes: Int
     ) async -> PolicyContextSnapshot
+    func presented(deliveryID: String) async
+    func deferred(deliveryID: String) async
+}
+
+public protocol InteractivePolicyNoticeProviding: Sendable {
+    func presentation(
+        deliveryID: String,
+        projectID: String?,
+        projectGeneration: Int?,
+        clientID: String,
+        maximumCount: Int,
+        maximumBytes: Int
+    )
+        -> PolicyNoticePresentation?
+    func didPresent(_ presentation: PolicyNoticePresentation)
 }
 
 public enum PolicyLogExportFormat: String, Codable, Sendable {

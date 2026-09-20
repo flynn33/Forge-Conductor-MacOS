@@ -20,6 +20,9 @@
 		A10400000000000000000001 /* Application/StjornarvaldPolicyEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10400000000000000000001 /* Application/StjornarvaldPolicyEvaluator.swift */; };
 		A10400000000000000000002 /* Infrastructure/StjornarvaldObservationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10400000000000000000002 /* Infrastructure/StjornarvaldObservationRepository.swift */; };
 		A10400000000000000000003 /* StjornarvaldObservationEvaluatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10400000000000000000003 /* StjornarvaldObservationEvaluatorTests.swift */; };
+		A10500000000000000000001 /* Application/StjornarvaldPolicyNotices.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10500000000000000000001 /* Application/StjornarvaldPolicyNotices.swift */; };
+		A10500000000000000000002 /* Infrastructure/StjornarvaldPolicyNoticeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10500000000000000000002 /* Infrastructure/StjornarvaldPolicyNoticeRepository.swift */; };
+		A10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift */; };
 		00969EC47C1147019BE707F7 /* Application/Tools/GitToolPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04061BB23AF4A38A9CB5E37 /* Application/Tools/GitToolPack.swift */; };
 		0136D5BD66A452D75D2DE7CA /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4B61D4415545424119C86B /* Tests/ForgeConductorTests/CanonicalToolOutputPreflightTests.swift */; };
 		013A73A4EF99C1EF80BCB1AA /* ContinuitySourceDispatchIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A19BC93808829B74EBDE045 /* ContinuitySourceDispatchIdentityTests.swift */; };
@@ -927,6 +930,9 @@
 		F10400000000000000000001 /* Application/StjornarvaldPolicyEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/StjornarvaldPolicyEvaluator.swift; sourceTree = "<group>"; };
 		F10400000000000000000002 /* Infrastructure/StjornarvaldObservationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/StjornarvaldObservationRepository.swift; sourceTree = "<group>"; };
 		F10400000000000000000003 /* StjornarvaldObservationEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StjornarvaldObservationEvaluatorTests.swift; sourceTree = "<group>"; };
+		F10500000000000000000001 /* Application/StjornarvaldPolicyNotices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/StjornarvaldPolicyNotices.swift; sourceTree = "<group>"; };
+		F10500000000000000000002 /* Infrastructure/StjornarvaldPolicyNoticeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Infrastructure/StjornarvaldPolicyNoticeRepository.swift; sourceTree = "<group>"; };
+		F10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StjornarvaldPolicyNoticeTests.swift; sourceTree = "<group>"; };
 		F3E4B8F9C30E0B9F91893320 /* MCP/MCPToolAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCP/MCPToolAccessPolicy.swift; sourceTree = "<group>"; };
 		F51EE9CA88424463AF1B25D2 /* Domain/DoctorModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/DoctorModels.swift; sourceTree = "<group>"; };
 		F541EDBDE03E4D6E97FA4775 /* Manager/ManagerSettingsNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Manager/ManagerSettingsNormalizer.swift; sourceTree = "<group>"; };
@@ -1094,6 +1100,7 @@
 				F10200000000000000000003 /* StjornarvaldPolicySourceCatalogTests.swift */,
 				F10300000000000000000003 /* StjornarvaldRavenPolicyTests.swift */,
 				F10400000000000000000003 /* StjornarvaldObservationEvaluatorTests.swift */,
+				F10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift */,
 				R3F000000000000000000009 /* GuidedModeAppTests.swift */,
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
@@ -1373,6 +1380,8 @@
 				F10300000000000000000002 /* Infrastructure/StjornarvaldPolicyRuleRepository.swift */,
 				F10400000000000000000001 /* Application/StjornarvaldPolicyEvaluator.swift */,
 				F10400000000000000000002 /* Infrastructure/StjornarvaldObservationRepository.swift */,
+				F10500000000000000000001 /* Application/StjornarvaldPolicyNotices.swift */,
+				F10500000000000000000002 /* Infrastructure/StjornarvaldPolicyNoticeRepository.swift */,
 				A26F00000000000000000001 /* Application/AutonomySupervisor.swift */,
 				DDDC37BEB19860460723A98C /* Sources/ForgeConductorCore/Domain/ManagedToolResultBudgetModels.swift */,
 				96418EFEA54A0094DBD3A1FC /* Sources/ForgeConductorCore/Application/NativeSourcePressurePacketBuilder.swift */,
@@ -1939,6 +1948,7 @@
 				A10200000000000000000003 /* StjornarvaldPolicySourceCatalogTests.swift in Sources */,
 				A10300000000000000000003 /* StjornarvaldRavenPolicyTests.swift in Sources */,
 				A10400000000000000000003 /* StjornarvaldObservationEvaluatorTests.swift in Sources */,
+				A10500000000000000000003 /* StjornarvaldPolicyNoticeTests.swift in Sources */,
 				E2F500000000000000000004 /* ForgeFilesystemProtocolTests.swift in Sources */,
 				E2F500000000000000000042 /* SecureFilesystemMutationTests.swift in Sources */,
 				E2F500000000000000000054 /* SecureFilesystemQualificationHealthSessionTests.swift in Sources */,
@@ -2187,6 +2197,8 @@
 				A10300000000000000000002 /* Infrastructure/StjornarvaldPolicyRuleRepository.swift in Sources */,
 				A10400000000000000000001 /* Application/StjornarvaldPolicyEvaluator.swift in Sources */,
 				A10400000000000000000002 /* Infrastructure/StjornarvaldObservationRepository.swift in Sources */,
+				A10500000000000000000001 /* Application/StjornarvaldPolicyNotices.swift in Sources */,
+				A10500000000000000000002 /* Infrastructure/StjornarvaldPolicyNoticeRepository.swift in Sources */,
 				E2F500000000000000000050 /* Infrastructure/SecureFilesystemRecoveryLedger.swift in Sources */,
 				E2F500000000000000000003 /* Infrastructure/SecureFilesystemService.swift in Sources */,
 				E2F500000000000000000052 /* Infrastructure/SecureFilesystemQualificationHealthSession.swift in Sources */,

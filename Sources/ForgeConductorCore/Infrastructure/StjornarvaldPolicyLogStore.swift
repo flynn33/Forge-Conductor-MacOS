@@ -168,6 +168,21 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
         return try eventsUnlocked(after: max(sequence, 0), limit: min(max(limit, 1), 1_000))
     }
 
+    public func event(id: UUID) throws -> PolicyViolationEvent? {
+        lock.lock()
+        defer { lock.unlock() }
+        let statement = try prepareUnlocked(
+            "SELECT sequence FROM stj_violation_events WHERE event_id=? LIMIT 1;"
+        )
+        defer { sqlite3_finalize(statement) }
+        try bind([.text(id.uuidString.lowercased())], to: statement)
+        let step = sqlite3_step(statement)
+        if step == SQLITE_DONE { return nil }
+        guard step == SQLITE_ROW else { throw sqliteErrorUnlocked() }
+        let sequence = sqlite3_column_int64(statement, 0)
+        return try eventsUnlocked(after: sequence - 1, limit: 1).first
+    }
+
     public func violation(matching candidate: PolicyViolationCandidate) throws -> PolicyViolation? {
         lock.lock()
         defer { lock.unlock() }

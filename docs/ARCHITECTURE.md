@@ -32,6 +32,11 @@ owner-only outbox. One manager evaluator selected by an expiring process/boot
 lease advances a committed cursor only after idempotent lifecycle writes;
 detector faults become append-only evidence and cannot stop peer detectors or
 the observed development operation.
+Coding-agent reporting uses a separate bounded notice store and delivery ledger.
+Managed runs receive a retry-stable context snapshot before a safe provider
+input, while ordinary MCP responses append a second text content item after the
+canonical content. Transport failures retain eligibility for later delivery;
+neither path changes tool payloads, error status, authorization, or run outcomes.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

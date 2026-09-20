@@ -35,7 +35,7 @@ public struct StjornarvaldEvaluationRunReport: Sendable, Equatable {
 }
 
 public enum StjornarvaldLifecycleApplication: Sendable, Equatable {
-    case recorded(PolicyViolation)
+    case recorded(PolicyViolation, PolicyViolationEvent)
     case noPriorViolationToCorrect
     case alreadyCorrected(PolicyViolation)
 }
@@ -175,20 +175,28 @@ public final class StjornarvaldViolationLifecycleService: @unchecked Sendable {
         let eventID = Self.eventID(for: finding)
         switch finding.disposition {
         case .violation:
-            return .recorded(try store.record(
+            let violation = try store.record(
                 finding.candidate, eventID: eventID, occurredAt: occurredAt
-            ))
+            )
+            guard let event = try store.event(id: eventID) else {
+                throw StjornarvaldPolicyLogError.invalidRecord("recorded event is unavailable")
+            }
+            return .recorded(violation, event)
         case .correction:
             guard let current = try store.violation(matching: finding.candidate) else {
                 return .noPriorViolationToCorrect
             }
             if current.state == .corrected { return .alreadyCorrected(current) }
-            return .recorded(try store.recordCorrection(
+            let violation = try store.recordCorrection(
                 violationID: current.id,
                 candidate: finding.candidate,
                 eventID: eventID,
                 occurredAt: occurredAt
-            ))
+            )
+            guard let event = try store.event(id: eventID) else {
+                throw StjornarvaldPolicyLogError.invalidRecord("recorded correction event is unavailable")
+            }
+            return .recorded(violation, event)
         }
     }
 
@@ -219,6 +227,7 @@ public actor StjornarvaldPolicyEvaluator {
     private let ruleRepository: StjornarvaldPolicyRuleRepository
     private let detectorRegistry: StjornarvaldDetectorRegistry
     private let lifecycleService: StjornarvaldViolationLifecycleService
+    private let policyReporter: (any CodingAgentPolicyReporting)?
     private let identity: StjornarvaldEvaluatorIdentity
     private let leaseDuration: TimeInterval
     private let clock: @Sendable () -> Date
@@ -228,6 +237,7 @@ public actor StjornarvaldPolicyEvaluator {
         ruleRepository: StjornarvaldPolicyRuleRepository,
         detectorRegistry: StjornarvaldDetectorRegistry,
         lifecycleService: StjornarvaldViolationLifecycleService,
+        policyReporter: (any CodingAgentPolicyReporting)? = nil,
         identity: StjornarvaldEvaluatorIdentity,
         leaseDuration: TimeInterval = 30,
         clock: @escaping @Sendable () -> Date = { Date() }
@@ -236,6 +246,7 @@ public actor StjornarvaldPolicyEvaluator {
         self.ruleRepository = ruleRepository
         self.detectorRegistry = detectorRegistry
         self.lifecycleService = lifecycleService
+        self.policyReporter = policyReporter
         self.identity = identity
         self.leaseDuration = min(max(leaseDuration, 1), 300)
         self.clock = clock
@@ -284,7 +295,12 @@ public actor StjornarvaldPolicyEvaluator {
                 observation: sequenced.observation, rules: rules
             )
             for finding in evaluation.findings {
-                _ = try lifecycleService.apply(finding, occurredAt: sequenced.observation.observedAt)
+                let application = try lifecycleService.apply(
+                    finding, occurredAt: sequenced.observation.observedAt
+                )
+                if case .recorded(_, let event) = application {
+                    await policyReporter?.queue(event)
+                }
             }
             let receipt = try observationRepository.completeEvaluation(
                 observationSequence: sequenced.sequence,

@@ -12,6 +12,10 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added bounded, source-linked Stjornarvald notices for managed provider turns
+  and ordinary MCP tool responses. Durable delivery snapshots and receipts make
+  retries stable, corrections supersede stale pending guidance, and delivery
+  faults leave canonical tool results, run outcomes, and authorization unchanged.
 - Added the manager-owned Stjornarvald observation and evaluation core:
   bounded idempotent observations, durable fail-forward intake, an expiring
   process/boot evaluator lease and cursor, isolated detector faults,

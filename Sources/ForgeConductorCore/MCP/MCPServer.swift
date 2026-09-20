@@ -40,6 +40,9 @@ public final class MCPServer: @unchecked Sendable {
     private let responseWriteLock = NSLock()
     private let cancellationLock = NSLock()
     private let didCloseResponseDeliveryObserver: (@Sendable () -> Void)?
+    private let policyNoticeProvider: any InteractivePolicyNoticeProviding
+    private let policyNoticeLock = NSLock()
+    private var pendingPolicyNoticePresentations: [RequestKey: PolicyNoticePresentation] = [:]
     private var responseDeliveryOpen = false
     private let admission: MCPRequestAdmission
     private let admissionNamespace = UUID()
@@ -56,7 +59,8 @@ public final class MCPServer: @unchecked Sendable {
         shutdownWaitSeconds: TimeInterval = MCPServer.defaultShutdownWaitSeconds,
         requestTimeoutSeconds: TimeInterval = MCPServer.defaultRequestTimeoutSeconds,
         responseWriteTimeoutSeconds: TimeInterval = MCPServer.defaultResponseWriteTimeoutSeconds,
-        didCloseResponseDeliveryObserver: (@Sendable () -> Void)? = nil
+        didCloseResponseDeliveryObserver: (@Sendable () -> Void)? = nil,
+        policyNoticeProvider: (any InteractivePolicyNoticeProviding)? = nil
     ) {
         self.app = app
         self.clientID = clientID
@@ -71,6 +75,10 @@ public final class MCPServer: @unchecked Sendable {
             ? max(0.01, min(responseWriteTimeoutSeconds, 30))
             : Self.defaultResponseWriteTimeoutSeconds
         self.didCloseResponseDeliveryObserver = didCloseResponseDeliveryObserver
+        self.policyNoticeProvider = policyNoticeProvider ?? StjornarvaldInteractivePolicyNoticeCache(
+            paths: app.paths,
+            clientID: clientID.rawValue
+        )
         self.deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.toolDefinitionCatalog = Result {
@@ -414,6 +422,7 @@ public final class MCPServer: @unchecked Sendable {
             } catch is ToolCallDeadlineExceeded {
                 finishRequest(requestID, cancellation: cancellation)
                 try write(deadlineExceededResponse(id: id, method: "tools/call"), to: output)
+                commitPolicyNoticePresentation(requestID: requestID)
                 return
             } catch {
                 finishRequest(requestID, cancellation: cancellation)
@@ -435,7 +444,9 @@ public final class MCPServer: @unchecked Sendable {
                 guard let response = handle(envelope.message, cancellation: cancellation) else { return }
                 do {
                     try write(response, to: output)
+                    commitPolicyNoticePresentation(requestID: requestID)
                 } catch {
+                    discardPolicyNoticePresentation(requestID: requestID)
                     workerErrors.store(error)
                 }
             }
@@ -519,7 +530,36 @@ public final class MCPServer: @unchecked Sendable {
     }
 
     private func toolCallResponse(id: Any?, result: ToolResult) -> [String: Any] {
-        MCPToolResponse.object(id: id, result: result)
+        let context = try? app.projectContexts.invocationContext(for: clientID)
+        let generation = context.flatMap { Int(exactly: $0.projectGeneration.rawValue) }
+        guard let requestID = Self.requestKey(id),
+              let presentation = policyNoticeProvider.presentation(
+                deliveryID: "mcp:\(clientID.rawValue):\(requestID.sha256)",
+                projectID: context?.projectID.description,
+                projectGeneration: generation,
+                clientID: clientID.rawValue,
+                maximumCount: 8,
+                maximumBytes: StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes
+              ) else {
+            return MCPToolResponse.object(id: id, result: result)
+        }
+        policyNoticeLock.lock()
+        pendingPolicyNoticePresentations[requestID] = presentation
+        policyNoticeLock.unlock()
+        return MCPToolResponse.object(id: id, result: result, additiveNotice: presentation.text)
+    }
+
+    private func commitPolicyNoticePresentation(requestID: RequestKey) {
+        policyNoticeLock.lock()
+        let presentation = pendingPolicyNoticePresentations.removeValue(forKey: requestID)
+        policyNoticeLock.unlock()
+        if let presentation { policyNoticeProvider.didPresent(presentation) }
+    }
+
+    private func discardPolicyNoticePresentation(requestID: RequestKey) {
+        policyNoticeLock.lock()
+        pendingPolicyNoticePresentations.removeValue(forKey: requestID)
+        policyNoticeLock.unlock()
     }
 
     private func ok(id: Any?, result: [String: Any]) -> [String: Any] {
