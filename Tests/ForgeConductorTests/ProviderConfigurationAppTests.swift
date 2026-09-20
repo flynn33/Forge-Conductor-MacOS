@@ -80,6 +80,18 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(explicit.completionGates, ["fixture-gate"])
         XCTAssertTrue(explicit.networkAllowed)
 
+        let explicitWithoutSettings = try ManagerRunPreparationResolver.resolve(
+            configuration: nil,
+            registeredToolNames: registered,
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture/override",
+            allowedTools: ["fs_read"],
+            completionGates: ["fixture-gate"],
+            networkAllowed: true
+        )
+        XCTAssertEqual(explicitWithoutSettings, explicit)
+
         XCTAssertThrowsError(try ManagerRunPreparationResolver.resolve(
             configuration: configuration,
             registeredToolNames: registered,

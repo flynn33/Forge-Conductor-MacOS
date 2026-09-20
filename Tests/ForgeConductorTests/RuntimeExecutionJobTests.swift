@@ -3344,10 +3344,12 @@ final class RuntimeExecutionJobTests: XCTestCase {
         ).discover(limits: Self.testLimits)
 
         XCTAssertFalse(capabilities.python.available)
-        XCTAssertNil(capabilities.python.executablePath)
+        XCTAssertEqual(capabilities.python.executablePath, "/usr/bin/true")
+        XCTAssertEqual(capabilities.python.probeState, .probeFailed)
         XCTAssertFalse(capabilities.python.required)
         XCTAssertFalse(capabilities.powershell.available)
-        XCTAssertNil(capabilities.powershell.executablePath)
+        XCTAssertEqual(capabilities.powershell.executablePath, "/usr/bin/true")
+        XCTAssertEqual(capabilities.powershell.probeState, .probeFailed)
         XCTAssertFalse(capabilities.powershell.required)
         XCTAssertTrue(capabilities.shellAvailable)
     }

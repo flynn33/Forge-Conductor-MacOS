@@ -29,6 +29,10 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Preserved model-explicit starts for statically registered provider adapters
+  that do not expose the saved Provider-settings surface, while ordinary
+  minimal-input starts still require the manager-owned saved configuration and
+  its revision fencing.
 - Renamed the former mission-size limit as a compact bootstrap-summary budget;
   32,767-, 32,768-, 32,769-byte, multi-megabyte, and multi-document instruction
   sources remain artifact-backed rather than rejected or truncated.
@@ -163,6 +167,16 @@ Product versions do not by themselves claim shipment.
   admission on the immutable artifact importer. Direct artifacts are bound to
   the exact project generation and run; prepare and Start receive only a compact
   bootstrap and digest, and protected instruction reads remain run-scoped.
+
+### Fixed
+
+- Corrected integrated rollover acceptance so the sealed predecessor cannot
+  issue a new tool request under rollover pressure; the acknowledged successor
+  now reissues the exact pending read, records its result, and completes on the
+  following provider turn.
+- Updated runtime-discovery acceptance to retain an immutable configured
+  executable candidate when its probe fails, reporting `probe_failed` and
+  unavailable instead of erasing its path.
 
 ### Pending qualification
 

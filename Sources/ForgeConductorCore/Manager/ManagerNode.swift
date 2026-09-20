@@ -66,6 +66,8 @@ private struct ManagerProviderReadinessReceipt: Codable, Sendable {
 }
 
 enum ManagerRunPreparationResolver {
+    static let explicitConfigurationRevision = "explicit-provider-configuration-v1"
+
     static func resolve(
         configuration: ProviderConfigurationSnapshot?,
         registeredToolNames: [String],
@@ -2899,9 +2901,22 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
         }
         let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
-        let providerConfiguration = try readProviderConfiguration()
+        let providerConfiguration: ProviderConfigurationSnapshot?
+        do {
+            providerConfiguration = try readProviderConfiguration()
+        } catch ProviderConfigurationError.unavailable {
+            // Preserve the established model-explicit admission contract for
+            // statically registered adapters that do not expose the native
+            // provider-settings surface. Ordinary minimal-input admission still
+            // requires the saved manager-owned configuration below.
+            guard modelKey != nil,
+                  expectedProviderConfigurationRevision == nil else {
+                throw ProviderConfigurationError.unavailable
+            }
+            providerConfiguration = nil
+        }
         if let expectedProviderConfigurationRevision,
-           providerConfiguration.revision != expectedProviderConfigurationRevision {
+           providerConfiguration?.revision != expectedProviderConfigurationRevision {
             throw ManagerRunPreparationError.staleProviderConfiguration
         }
         let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
@@ -2966,7 +2981,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             providerID: resolved.providerID,
             adapterID: resolved.adapterID,
             modelKey: resolved.modelKey,
-            providerConfigurationRevision: providerConfiguration.revision,
+            providerConfigurationRevision: providerConfiguration?.revision
+                ?? ManagerRunPreparationResolver.explicitConfigurationRevision,
             toolCatalogRevision: permissionSnapshot.catalogRevision,
             allowedTools: resolved.allowedTools.sorted(),
             networkAllowed: resolved.networkAllowed,

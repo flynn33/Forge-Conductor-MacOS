@@ -394,8 +394,77 @@ one recovery action for the selected task. Paths, quotas, migration details,
 and identifiers are Technical details, while shell authorization is explicitly
 labeled as an application-wide policy rather than a per-task setting.
 
+## Revision-3 integrated acceptance — Phase 7
+
+The integrated acceptance pass exercised the six revision-3 scenarios against
+the combined source rather than treating the individual phase receipts as a
+release claim:
+
+- **First productive task:** direct and queued admission accept the registered
+  project plus immutable instruction artifacts, derive provider, tool, runtime,
+  completion, and continuity settings in the Manager, and return typed recovery
+  without persisting a run when preparation is not ready.
+- **Tool customization:** the reusable native permission editor preserves
+  individual, category, mixed-state **Allow all tools**, Select none, Restore
+  recommended, keyboard, and saved-project behavior; admission freezes the
+  exact effective grant and catalog revision.
+- **Contextual Guided Mode:** all 13 primary tabs, Start Task's more-specific
+  guide, persisted activation, keyboard dismissal, and draft-preserving nested
+  help have focused native UI coverage plus app-hosted catalog and route tests.
+- **Automatic continuity:** deterministic acceptance forces provider-exact
+  threshold rollover across two projects, verifies fresh-root acknowledgement,
+  one accepted successor, predecessor sealing, successor-only tool execution,
+  and exact continuation. Separate acceptance interrupts the provider, shuts
+  down and recreates the Manager/application state, and completes the same
+  durable run. The operator UI reconnect test terminates and relaunches the GUI
+  and reloads the Manager's durable run state.
+- **Corrected completion:** outcome-aware validation retains failed build/test
+  history while a later relevant pass repairs the obligation; a later failure
+  invalidates an earlier pass, and unrelated reads cannot satisfy repair work.
+- **Large package:** boundary, multi-megabyte, aggregate-above-8-MiB,
+  66-document catalog, 130-package queue, mixed native-format, restart, and
+  rollover coverage verifies exact hashes, bounded paging, reconstruction, and
+  retained delivery progress.
+
+The combined pass also repaired one compatibility regression found only when
+the integrated acceptance fixture exercised a statically registered provider
+adapter without the saved Provider-settings surface. Model-explicit callers
+retain that established contract; ordinary minimal-input admission still
+requires manager-owned saved configuration and revision checks. The rollover
+acceptance fixture now follows the production execution fence: the predecessor
+does not issue a new tool call, the acknowledged successor reissues the exact
+read, and completion follows the recorded successor result. Runtime discovery
+acceptance now reflects the production contract that an immutable configured
+candidate remains identifiable as unavailable with `probe_failed` after its
+probe fails.
+
+The product identity remains `0.10.0 (2)` because revision 3 did not select a
+new release version or build number. All Phase 7 source and test edits are in
+files already owned by the canonical SwiftPM and Xcode targets, so no Xcode
+project-graph change is required. Distribution, notarization, Gatekeeper, and
+owner shipment remain separate qualification work.
+
 ## Verification
 
+- Phase 7 combined verification passed the full SwiftPM suite with 1,623 tests,
+  12 explicit environment/runtime skips, and zero failures. Focused provider
+  resolution, managed autonomy, budget policy, runtime discovery, forced
+  rollover, and provider interruption/restart cases also passed. A later Xcode
+  aggregate retained 1,552 passes and 12 skips but is a non-pass: nine protocol
+  fixture tests reported the identical `response poll failed: Interrupted
+  system call`, and the action was bounded after the UI runner stalled before
+  its first test. The same protocol class then passed 20/20 in a focused native
+  Swift test, so the aggregate fixture interruption did not reproduce.
+  Restarting the per-user test service did not repair UI
+  automation; the six exact Guided Mode/tool/compact-Start cases rebuilt and
+  signed successfully but the runner again failed before test selection with
+  `Timed out while enabling automation mode`. The result is retained at
+  `Test-ForgeConductor-2026.09.19_21-59-13--0500.xcresult`. Earlier focused
+  native UI passes remain the current behavioral evidence; this host failure is
+  not represented as a fresh Phase 7 UI pass. The app-hosted Guided Mode suite
+  passed 3/3. Both SwiftPM products, the canonical Apple Development-signed
+  Debug app build, strict deep signature verification, repository hygiene, and
+  whitespace validation passed.
 - PR-01 through PR-03 and RT-01 through RT-03 verification covers sole-compatible
   model selection, pin preservation, idempotent revision-bound readiness,
   credential redaction, task-start reuse, exact external actions, irrelevant

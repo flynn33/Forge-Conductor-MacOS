@@ -62,3 +62,10 @@ stable accessibility identifiers for referenced controls. The catalog is
 validated against the app-owned identifier list and fails tests if a primary
 tab or typed guide context is omitted. Guided Mode does not intercept ordinary
 screen interaction when its inline banner is visible.
+
+Native UI acceptance covers all primary-tab routes, Start Task's more-specific
+guide, preservation of the entered task draft while help opens and closes,
+persisted Guided Mode preference, keyboard dismissal, and the reusable native
+tool-permission checkboxes. These behaviors are also backed by app-hosted
+catalog and route tests, so an unavailable UI-automation host is recorded as a
+test-environment limitation rather than silently treated as a pass.

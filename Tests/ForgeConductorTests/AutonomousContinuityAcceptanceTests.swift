@@ -45,8 +45,15 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
                         .continuityOperationV2(id: operationID) else {
                     return CompletionGateResult(gate: "fixture_read", passed: false, summary: "Rollover is not durable")
                 }
+                guard let operationUUID = UUID(uuidString: operation.operationID),
+                      let successor = try await app.projectContexts.repository
+                        .providerSessions(operationID: operationUUID).first(where: { $0.accepted }) else {
+                    return CompletionGateResult(
+                        gate: "fixture_read", passed: false, summary: "Accepted successor is missing"
+                    )
+                }
                 let invocation = try await app.projectContexts.repository.toolInvocation(
-                    sessionID: operation.predecessorSessionID,
+                    sessionID: successor.sessionID,
                     providerCallID: "threshold-read-\(String(run.projectID.description.prefix(12)))"
                 )
                 let snapshot = await provider.snapshot()
@@ -58,7 +65,7 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
                     && snapshot.continuationProjectIDs.contains(run.projectID.description)
                 return CompletionGateResult(
                     gate: "fixture_read", passed: passed,
-                    summary: "Assert durable rollover, predecessor tool execution, and exact successor continuation",
+                    summary: "Assert durable rollover, successor tool execution, and exact automatic continuation",
                     evidenceReferences: invocation?.resultSHA256.map { [$0] } ?? []
                 )
             }])
@@ -380,13 +387,13 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
             operation.predecessorSessionID
         )
         let predecessor = try XCTUnwrap(predecessorValue)
+        let successor = try XCTUnwrap(candidates.first { $0.accepted })
         let invocation = try await repository.toolInvocation(
-            sessionID: predecessor.sessionID,
+            sessionID: successor.sessionID,
             providerCallID: "threshold-read-\(String(run.projectID.description.prefix(12)))"
         )
         let invocationDigest = try XCTUnwrap(invocation?.resultSHA256)
         XCTAssertEqual(completion.results.first?.evidenceReferences, [invocationDigest])
-        let successor = try XCTUnwrap(candidates.first { $0.accepted })
         XCTAssertEqual(predecessor.status, .sealed)
         XCTAssertEqual(successor.status, .active)
         XCTAssertNotEqual(predecessor.sessionID, successor.sessionID)
@@ -450,6 +457,7 @@ private actor AutonomousRolloverAcceptanceProvider: ManagedModelProvider,
     private var providerTurns: [String: ProviderTurn] = [:]
     private var bootstrapReceipts: [String: BootstrapReceipt] = [:]
     private var projectByBootstrapResponse: [String: String] = [:]
+    private var projectByAutomaticResponse: [String: String] = [:]
     private var rootProjectIDs: [String] = []
     private var continuationProjectIDs: [String] = []
     private var bootstrapProjectIDs: [String] = []
@@ -520,22 +528,66 @@ private actor AutonomousRolloverAcceptanceProvider: ManagedModelProvider,
 
     func continueSession(_ request: ProviderContinuationRequest) async throws -> ProviderTurn {
         if let existing = providerTurns[request.idempotencyKey] { return existing }
-        guard let projectID = projectByBootstrapResponse[request.previousResponseID],
-              let fixture = fixtures[projectID] else {
+        if let projectID = projectByBootstrapResponse[request.previousResponseID],
+           let fixture = fixtures[projectID] {
+            let expectedInput = try ManagedContinuityWorker.automaticContinuationInput()
+            guard request.input == expectedInput else { throw AutonomyError.intentConflict }
+            exactAutomaticInputCount += 1
+            let suffix = String(projectID.prefix(12))
+            let arguments = try JSONSerialization.data(
+                withJSONObject: ["path": fixture.path],
+                options: [.sortedKeys]
+            )
+            let responseID = "automatic-response-\(projectID)"
+            let turn = try ProviderTurn(
+                requestID: "automatic-request-\(suffix)",
+                responseID: responseID,
+                previousResponseID: request.previousResponseID,
+                providerID: providerID,
+                providerVersion: "acceptance-1",
+                modelKey: request.modelKey,
+                providerInstanceID: "acceptance-instance",
+                messages: ["The successor resumed the first open read action"],
+                toolCalls: [try ProviderToolCall(
+                    callID: "threshold-read-\(suffix)",
+                    name: "fs_read",
+                    argumentsJSON: arguments
+                )],
+                usage: try ProviderUsage(
+                    capacity: 4_096,
+                    inputTokens: 128,
+                    outputTokens: 32,
+                    source: .providerExact,
+                    confidence: 1
+                ),
+                completed: true,
+                finishReason: .toolCalls
+            )
+            continuationProjectIDs.append(projectID)
+            projectByAutomaticResponse[responseID] = projectID
+            providerTurns[request.idempotencyKey] = turn
+            return turn
+        }
+        guard let projectID = projectByAutomaticResponse[request.previousResponseID],
+              let fixture = fixtures[projectID],
+              let outputs = try JSONSerialization.jsonObject(with: request.input) as? [[String: Any]],
+              outputs.count == 1,
+              outputs[0]["type"] as? String == "function_call_output",
+              outputs[0]["call_id"] as? String
+                == "threshold-read-\(String(projectID.prefix(12)))",
+              let output = outputs[0]["output"] as? String,
+              JSONSupport.sha256Hex(Data(output.utf8)) == fixture.proof else {
             throw AutonomyError.intentConflict
         }
-        let expectedInput = try ManagedContinuityWorker.automaticContinuationInput()
-        guard request.input == expectedInput else { throw AutonomyError.intentConflict }
-        exactAutomaticInputCount += 1
         let message = try JSONSupport.canonicalJSON([
             "forge_run_status": "completion_requested",
-            "summary": "The acknowledged successor continued the exact project",
+            "summary": "The acknowledged successor completed the exact project read",
             "gate_evidence": ["fixture_read": fixture.proof],
         ])
         let suffix = String(projectID.prefix(12))
         let turn = try ProviderTurn(
-            requestID: "automatic-request-\(suffix)",
-            responseID: "automatic-response-\(projectID)",
+            requestID: "completion-request-\(suffix)",
+            responseID: "completion-response-\(projectID)",
             previousResponseID: request.previousResponseID,
             providerID: providerID,
             providerVersion: "acceptance-1",
@@ -553,7 +605,6 @@ private actor AutonomousRolloverAcceptanceProvider: ManagedModelProvider,
             completed: true,
             finishReason: .stop
         )
-        continuationProjectIDs.append(projectID)
         providerTurns[request.idempotencyKey] = turn
         return turn
     }

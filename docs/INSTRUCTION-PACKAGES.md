@@ -5,12 +5,18 @@ Instruction packages turn a registered local repository into an ordered work que
 ## Setup
 
 1. In LM Studio, load a tool-capable model and start the local server from the Developer screen.
-2. In Forge Conductor **Provider**, enter the LM Studio endpoint (commonly `http://127.0.0.1:1234`), load the model list, choose the loaded model, save, and run the connection and contract checks.
-3. In **Manager**, start the manager if it is stopped.
-4. In **Projects**, register the local repository folder and select it. The
+2. In Forge Conductor **Manager**, start the manager if it is stopped.
+3. In **Projects**, register the local repository folder and select it. The
    registration authorizes that exact canonical root without widening access to
    its parent.
-5. Under **Instruction packages**, choose **Add Instructions…**, arrange packages by dragging rows, then choose **Start Ordered Autonomy**.
+4. Under **Instruction packages**, choose **Add Instructions…** and arrange
+   packages by dragging rows.
+5. For an ordinary task, open **Autonomy**, select one or more imported packages,
+   and choose **Start Task**. Forge runs the manager-owned **Connect and check**
+   preparation and returns one exact Provider action if it cannot choose safely.
+6. To run the whole project queue, first save the Provider model, then choose
+   **Start Ordered Autonomy** in Projects. Endpoint, credential, exact-model,
+   inventory, and probe controls remain under **Advanced connection settings**.
 
 The question-mark toolbar button opens the same setup sequence inside the app.
 
@@ -85,7 +91,12 @@ Select a `.forgepackage` JSON file, a `forge-package.json` file, or a folder con
 
 The Projects list order is authoritative. Drag rows before starting the queue. Forge persists every order change with a queue revision so concurrent or stale edits fail instead of silently overwriting a newer order.
 
-**Start Ordered Autonomy** requires a saved Provider model and a running managed autonomy service. Forge creates a managed run scoped to the registered repository root, package project UUID, and current project generation. It advances to the next queued package only after the current package reaches `completed`. A failed, cancelled, paused, or configuration-blocked run stops automatic advancement so the operator can review it in **Autonomy**.
+**Start Ordered Autonomy** requires a saved Provider model and a running managed
+autonomy service. Forge creates a managed run scoped to the registered
+repository root, package project UUID, and current project generation. It
+advances to the next queued package only after the current package reaches
+`completed`. A failed, cancelled, paused, or configuration-blocked run stops
+automatic advancement so the operator can review it in **Autonomy**.
 
 **Stop Queue** prevents the next package from starting. It does not discard or silently cancel an already admitted autonomous run; that run remains visible in **Autonomy**.
 

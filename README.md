@@ -17,6 +17,14 @@ running project-scoped work with local models in
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
+The revision-3 guided-autonomy remediation is implemented across contextual
+help, compact task admission, native tool selection, automatic completion,
+provider/runtime preparation, durable continuity, and large instruction
+packages. Integrated deterministic acceptance covers restart, provider
+interruption, forced rollover, corrected completion evidence, and multi-page
+instruction delivery. Native distribution and shipment qualification remain
+separate.
+
 ## What Forge Conductor does
 
 - Connects LM Studio models to native filesystem, Git, memory, shell, and
