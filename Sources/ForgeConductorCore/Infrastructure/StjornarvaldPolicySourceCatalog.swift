@@ -247,15 +247,20 @@ public final class StjornarvaldPolicySourceCatalog: DevelopmentPolicySourceCatal
         return try progressUnlocked(sourceID: sourceID)
     }
 
-    public func sources(includeRemoved: Bool = true) throws -> [DevelopmentPolicySource] {
+    public func sources(
+        includeRemoved: Bool = true,
+        limit: Int = 10_000
+    ) throws -> [DevelopmentPolicySource] {
         lock.lock()
         defer { lock.unlock() }
+        let boundedLimit = min(max(limit, 1), 10_000)
         let sql = "SELECT source_id,origin,display_name,selected_path,standardized_path,root_kind," +
             "bookmark_sha256,active,interpretation_state,added_at,latest_revision_id," +
             "last_index_cursor,last_observation FROM stj_policy_sources " +
-            (includeRemoved ? "" : "WHERE active=1 ") + "ORDER BY added_at,source_id;"
+            (includeRemoved ? "" : "WHERE active=1 ") + "ORDER BY added_at,source_id LIMIT ?;"
         let statement = try prepareUnlocked(sql)
         defer { sqlite3_finalize(statement) }
+        try bind([.integer(Int64(boundedLimit))], to: statement)
         var result: [DevelopmentPolicySource] = []
         while true {
             let step = sqlite3_step(statement)

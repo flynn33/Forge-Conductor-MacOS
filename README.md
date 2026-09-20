@@ -225,7 +225,7 @@ Detailed deployment and recovery behavior is documented in
 | **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
-| **Rune Forge** *(notice-delivery foundation implemented)* | Development Policy sources, Stjornarvald violations, delivery state, and policy-log export; typed history, all-format source cataloging, the pinned Raven rule index, restart-safe evaluation, and non-interfering managed/MCP notices are complete while manager lifecycle, product observation hooks, and UI remain in implementation |
+| **Rune Forge** *(manager foundation implemented)* | Development Policy sources, Stjornarvald violations, delivery state, and policy-log export; typed history, all-format source cataloging, the pinned Raven rule index, restart-safe evaluation, non-interfering managed/MCP notices, and the bounded manager lifecycle/API are complete while product observation hooks and UI remain in implementation |
 | **Autonomy** | Manager-owned runs, budgets, gates, retries, and completion |
 | **Provider** | Local endpoint, model inventory, credentials, and contract probes |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
@@ -254,9 +254,11 @@ all-format source catalog, and pinned source-linked Raven rule projection are
 now implemented. Bounded durable observation intake and single-lease native
 evaluation also group repeats and append correction/reopen history. Managed
 provider turns and ordinary MCP tool responses can now receive bounded additive
-notices without changing canonical outcomes; continuous manager composition,
-product observation hooks, UI, exports, integrated qualification, and delivery
-acceptance remain open, so this
+notices without changing canonical outcomes. The Manager now owns the single
+restart-safe coordinator, typed health, bounded authenticated operations,
+read-only snapshots and violation paging, retry-stable notice reservations, and
+process-local observation outboxes; product observation hooks, UI, actual
+exports, integrated qualification, and delivery acceptance remain open, so this
 is not a runtime or release claim.
 
 ## Versioning

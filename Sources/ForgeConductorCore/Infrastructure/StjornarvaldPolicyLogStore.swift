@@ -183,6 +183,56 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
         return try eventsUnlocked(after: sequence - 1, limit: 1).first
     }
 
+    /// Returns stable, cursor-ordered violation projections without exposing
+    /// source bodies or loading the complete history into memory.
+    public func violations(
+        afterEventSequence: Int64 = 0,
+        projectID: String? = nil,
+        state: PolicyViolationProjectionState? = nil,
+        limit: Int = 100
+    ) throws -> [(violation: PolicyViolation, latestEventSequence: Int64)] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard afterEventSequence >= 0,
+              (1...1_000).contains(limit),
+              projectID.map({ !$0.isEmpty && $0.utf8.count <= 1_024 }) ?? true else {
+            throw StjornarvaldPolicyLogError.invalidRecord(
+                "violation page cursor, filters, or limit are outside bounds"
+            )
+        }
+        var predicates = ["latest_event_sequence>?"]
+        var bindings: [SQLiteValue] = [.integer(afterEventSequence)]
+        if let projectID {
+            predicates.append("project_id=?")
+            bindings.append(.text(projectID))
+        }
+        if let state {
+            predicates.append("state=?")
+            bindings.append(.text(state.rawValue))
+        }
+        bindings.append(.integer(Int64(limit)))
+        let statement = try prepareUnlocked("""
+        SELECT violation_id,fingerprint,rule_id,policy_revision,state,first_observed_at,
+          last_observed_at,occurrence_count,latest_summary,latest_suggested_correction,
+          latest_event_sequence
+        FROM stj_violations WHERE \(predicates.joined(separator: " AND "))
+        ORDER BY latest_event_sequence ASC LIMIT ?;
+        """)
+        defer { sqlite3_finalize(statement) }
+        try bind(bindings, to: statement)
+        var result: [(violation: PolicyViolation, latestEventSequence: Int64)] = []
+        while true {
+            let step = sqlite3_step(statement)
+            if step == SQLITE_DONE { break }
+            guard step == SQLITE_ROW else { throw sqliteErrorUnlocked() }
+            result.append((
+                violation: try projectionUnlocked(from: statement),
+                latestEventSequence: sqlite3_column_int64(statement, 10)
+            ))
+        }
+        return result
+    }
+
     public func violation(matching candidate: PolicyViolationCandidate) throws -> PolicyViolation? {
         lock.lock()
         defer { lock.unlock() }
@@ -541,6 +591,10 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
             if step == SQLITE_DONE { return nil }
             throw sqliteErrorUnlocked()
         }
+        return try projectionUnlocked(from: statement)
+    }
+
+    private func projectionUnlocked(from statement: OpaquePointer) throws -> PolicyViolation {
         guard let id = UUID(uuidString: text(statement, 0)),
               let state = PolicyViolationProjectionState(rawValue: text(statement, 4)),
               let first = ISO8601.date(from: text(statement, 5)),

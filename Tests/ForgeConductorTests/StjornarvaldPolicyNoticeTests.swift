@@ -287,6 +287,52 @@ final class StjornarvaldPolicyNoticeTests: XCTestCase {
         XCTAssertEqual(state, .presented)
     }
 
+    func testInteractiveManagerReservationIsReplayStableAndBatchReceiptIsValidated() throws {
+        let fixture = try NoticeFixture()
+        defer { fixture.cleanup() }
+        let clientID = "manager-api-client"
+        let event = try fixture.record(
+            .violation,
+            observationID: UUID(),
+            occurredAt: Date(),
+            scope: DevelopmentObservationScope(
+                projectID: fixture.projectID,
+                projectGeneration: fixture.generation,
+                clientID: clientID
+            )
+        )
+        _ = try fixture.notices.queue(event)
+        let first = try XCTUnwrap(try fixture.notices.reserveInteractivePresentation(
+            deliveryID: "manager-api-delivery",
+            projectID: fixture.projectID,
+            projectGeneration: fixture.generation,
+            clientID: clientID,
+            maximumCount: 8,
+            maximumBytes: 16 * 1_024
+        ))
+        let replay = try XCTUnwrap(try fixture.notices.reserveInteractivePresentation(
+            deliveryID: "manager-api-delivery",
+            projectID: fixture.projectID,
+            projectGeneration: fixture.generation,
+            clientID: clientID,
+            maximumCount: 8,
+            maximumBytes: 16 * 1_024
+        ))
+        XCTAssertEqual(first.notices, replay.notices)
+        XCTAssertEqual(first.digestSHA256, replay.digestSHA256)
+        XCTAssertEqual(try fixture.notices.deliveryState(first.id), .pending)
+
+        XCTAssertThrowsError(try fixture.notices.markPresented(
+            deliveryIDs: [first.id, first.id]
+        ))
+        XCTAssertThrowsError(try fixture.notices.markPresented(
+            deliveryIDs: [first.id, "unknown-delivery"]
+        ))
+        XCTAssertEqual(try fixture.notices.deliveryState(first.id), .pending)
+        try fixture.notices.markPresented(deliveryIDs: [first.id])
+        XCTAssertEqual(try fixture.notices.deliveryState(first.id), .presented)
+    }
+
     func testNoticeTextIsBoundedAndRedactsSecrets() throws {
         let fixture = try NoticeFixture(summary: "api_key=super-secret-value")
         defer { fixture.cleanup() }

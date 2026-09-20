@@ -6,6 +6,62 @@
 
 import Foundation
 
+private struct ManagerStjornarvaldObservationRequest: Encodable {
+    let processID: String
+    let bootID: String
+    let observations: [DevelopmentObservation]
+
+    enum CodingKeys: String, CodingKey {
+        case processID = "process_id"
+        case bootID = "boot_id"
+        case observations
+    }
+}
+
+private struct ManagerStjornarvaldPendingNoticeRequest: Encodable {
+    let deliveryID: String
+    let projectID: String?
+    let projectGeneration: Int?
+    let runID: String?
+    let sessionID: String?
+    let clientID: String?
+    let maximumCount: Int
+    let maximumBytes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case deliveryID = "delivery_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case runID = "run_id"
+        case sessionID = "session_id"
+        case clientID = "client_id"
+        case maximumCount = "maximum_count"
+        case maximumBytes = "maximum_bytes"
+    }
+}
+
+private struct ManagerStjornarvaldPresentedNoticeRequest: Encodable {
+    let requestID: UUID
+    let deliveryIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case requestID = "request_id"
+        case deliveryIDs = "delivery_ids"
+    }
+}
+
+private struct ManagerStjornarvaldViolationPageRequest: Encodable {
+    let cursor: Int64
+    let limit: Int
+    let projectID: String?
+    let state: PolicyViolationProjectionState?
+
+    enum CodingKeys: String, CodingKey {
+        case cursor, limit, state
+        case projectID = "project_id"
+    }
+}
+
 /// Native loopback client used by presentation processes that attach to the
 /// one persistent manager instead of attempting to bind a second HTTP server.
 public final class ManagerDashboardClient: @unchecked Sendable {
@@ -257,6 +313,276 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         }
     }
 
+    public func stjornarvaldSnapshot() async throws -> StjornarvaldManagerSnapshot {
+        let object = try await request(
+            method: "GET",
+            path: "/api/manager/stjornarvald/snapshot"
+        )
+        do {
+            return try JSONDecoder().decode(
+                StjornarvaldManagerSnapshot.self,
+                from: JSONSupport.data(from: object)
+            )
+        } catch {
+            throw ClientError.invalidResponse
+        }
+    }
+
+    public func addStjornarvaldSource(
+        selectedPath: String,
+        requestID: UUID = UUID()
+    ) async throws -> DevelopmentPolicySource {
+        guard !selectedPath.isEmpty,
+              selectedPath.utf8.count <= ManagerRoutes.maximumProjectRegistrationPathBytes,
+              (selectedPath as NSString).isAbsolutePath else {
+            throw ClientError.invalidRequest(
+                "Development Policy source requires one bounded absolute path"
+            )
+        }
+        return try await stjornarvaldSourceMutation(
+            action: "add",
+            body: [
+                "request_id": requestID.uuidString.lowercased(),
+                "selected_path": selectedPath,
+            ]
+        )
+    }
+
+    public func refreshStjornarvaldSource(
+        sourceID: PolicySourceID,
+        requestID: UUID = UUID()
+    ) async throws -> DevelopmentPolicySource {
+        try await stjornarvaldSourceMutation(
+            action: "refresh",
+            body: [
+                "request_id": requestID.uuidString.lowercased(),
+                "source_id": sourceID.description,
+            ]
+        )
+    }
+
+    public func removeStjornarvaldSource(
+        sourceID: PolicySourceID,
+        requestID: UUID = UUID()
+    ) async throws -> DevelopmentPolicySource {
+        try await stjornarvaldSourceMutation(
+            action: "remove",
+            body: [
+                "request_id": requestID.uuidString.lowercased(),
+                "source_id": sourceID.description,
+            ]
+        )
+    }
+
+    private func stjornarvaldSourceMutation(
+        action: String,
+        body: [String: Any]
+    ) async throws -> DevelopmentPolicySource {
+        let object = try await request(
+            method: "POST",
+            path: "/api/manager/stjornarvald/sources/\(action)",
+            body: body,
+            timeoutInterval: 12
+        )
+        do {
+            return try JSONDecoder().decode(
+                DevelopmentPolicySource.self,
+                from: JSONSupport.data(from: object)
+            )
+        } catch {
+            throw ClientError.invalidResponse
+        }
+    }
+
+    public func submitStjornarvaldObservations(
+        processID: String,
+        bootID: String,
+        observations: [DevelopmentObservation]
+    ) async throws -> StjornarvaldObservationReceiptBatch {
+        guard !processID.isEmpty, processID.utf8.count <= 256,
+              !bootID.isEmpty, bootID.utf8.count <= 256,
+              !observations.isEmpty,
+              observations.count <= StjornarvaldObservationClient.maximumBatchCount else {
+            throw ClientError.invalidRequest("Observation batch is outside manager bounds")
+        }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        let body = try encoder.encode(ManagerStjornarvaldObservationRequest(
+            processID: processID,
+            bootID: bootID,
+            observations: observations
+        ))
+        let object = try await request(
+            method: "POST",
+            path: "/api/manager/stjornarvald/observations/submit",
+            body: body,
+            timeoutInterval: 5
+        )
+        do {
+            return try JSONDecoder().decode(
+                StjornarvaldObservationReceiptBatch.self,
+                from: JSONSupport.data(from: object)
+            )
+        } catch {
+            throw ClientError.invalidResponse
+        }
+    }
+
+    public func scheduleStjornarvaldScan(
+        requestID: UUID = UUID(),
+        projectID: String? = nil,
+        projectGeneration: Int? = nil,
+        reason: String
+    ) async throws -> StjornarvaldScanReceipt {
+        guard projectID.map({ !$0.isEmpty && $0.utf8.count <= 1_024 }) ?? true,
+              projectGeneration.map({ $0 > 0 }) ?? true,
+              !reason.isEmpty,
+              reason.utf8.count <= 1_024 else {
+            throw ClientError.invalidRequest("Scan target or reason is outside manager bounds")
+        }
+        var body: [String: Any] = [
+            "request_id": requestID.uuidString.lowercased(),
+            "reason": reason,
+        ]
+        if let projectID { body["project_id"] = projectID }
+        if let projectGeneration { body["project_generation"] = projectGeneration }
+        return try decodeResponse(
+            StjornarvaldScanReceipt.self,
+            from: try await request(
+                method: "POST",
+                path: "/api/manager/stjornarvald/scan",
+                body: body,
+                timeoutInterval: 5
+            )
+        )
+    }
+
+    public func stjornarvaldViolations(
+        cursor: Int64 = 0,
+        limit: Int = 50,
+        projectID: String? = nil,
+        state: PolicyViolationProjectionState? = nil
+    ) async throws -> StjornarvaldViolationPage {
+        guard cursor >= 0, (1...100).contains(limit),
+              projectID.map({ !$0.isEmpty && $0.utf8.count <= 1_024 }) ?? true else {
+            throw ClientError.invalidRequest("Violation page cursor, filter, or limit is outside bounds")
+        }
+        let body = try JSONEncoder().encode(ManagerStjornarvaldViolationPageRequest(
+            cursor: cursor,
+            limit: limit,
+            projectID: projectID,
+            state: state
+        ))
+        return try decodeResponse(
+            StjornarvaldViolationPage.self,
+            from: try await request(
+                method: "POST",
+                path: "/api/manager/stjornarvald/violations",
+                body: body,
+                timeoutInterval: 5
+            )
+        )
+    }
+
+    public func pendingStjornarvaldNotices(
+        deliveryID: String = UUID().uuidString.lowercased(),
+        projectID: String? = nil,
+        projectGeneration: Int? = nil,
+        runID: String? = nil,
+        sessionID: String? = nil,
+        clientID: String? = nil,
+        maximumCount: Int = 16,
+        maximumBytes: Int = 16 * 1_024
+    ) async throws -> StjornarvaldNoticeBatch {
+        guard !deliveryID.isEmpty, deliveryID.utf8.count <= 1_024,
+              (1...64).contains(maximumCount),
+              (512...StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes)
+                .contains(maximumBytes) else {
+            throw ClientError.invalidRequest("Pending-notice bounds are invalid")
+        }
+        let body = try JSONEncoder().encode(ManagerStjornarvaldPendingNoticeRequest(
+            deliveryID: deliveryID,
+            projectID: projectID,
+            projectGeneration: projectGeneration,
+            runID: runID,
+            sessionID: sessionID,
+            clientID: clientID,
+            maximumCount: maximumCount,
+            maximumBytes: maximumBytes
+        ))
+        return try decodeResponse(
+            StjornarvaldNoticeBatch.self,
+            from: try await request(
+                method: "POST",
+                path: "/api/manager/stjornarvald/notices/pending",
+                body: body,
+                timeoutInterval: 5
+            )
+        )
+    }
+
+    public func markStjornarvaldNoticesPresented(
+        deliveryIDs: [String],
+        requestID: UUID = UUID()
+    ) async throws -> StjornarvaldNoticePresentationReceipt {
+        guard !deliveryIDs.isEmpty, deliveryIDs.count <= 64,
+              Set(deliveryIDs).count == deliveryIDs.count,
+              deliveryIDs.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 1_024 }) else {
+            throw ClientError.invalidRequest("Notice delivery identities are outside bounds")
+        }
+        let body = try JSONEncoder().encode(ManagerStjornarvaldPresentedNoticeRequest(
+            requestID: requestID,
+            deliveryIDs: deliveryIDs
+        ))
+        return try decodeResponse(
+            StjornarvaldNoticePresentationReceipt.self,
+            from: try await request(
+                method: "POST",
+                path: "/api/manager/stjornarvald/notices/presented",
+                body: body,
+                timeoutInterval: 5
+            )
+        )
+    }
+
+    public func requestStjornarvaldExport(
+        format: StjornarvaldExportFormat,
+        destination: String? = nil,
+        requestID: UUID = UUID()
+    ) async throws -> StjornarvaldExportReceipt {
+        guard destination.map({
+            !$0.isEmpty && $0.utf8.count <= 4_096 && ($0 as NSString).isAbsolutePath
+        }) ?? true else {
+            throw ClientError.invalidRequest("Export destination must be a bounded absolute path")
+        }
+        var body: [String: Any] = [
+            "request_id": requestID.uuidString.lowercased(),
+            "format": format.rawValue,
+        ]
+        if let destination { body["destination"] = destination }
+        return try decodeResponse(
+            StjornarvaldExportReceipt.self,
+            from: try await request(
+                method: "POST",
+                path: "/api/manager/stjornarvald/export",
+                body: body,
+                timeoutInterval: 5
+            )
+        )
+    }
+
+    private func decodeResponse<T: Decodable>(
+        _ type: T.Type,
+        from object: [String: Any]
+    ) throws -> T {
+        do {
+            return try JSONDecoder().decode(type, from: JSONSupport.data(from: object))
+        } catch {
+            throw ClientError.invalidResponse
+        }
+    }
+
     private func request(
         method: String,
         path: String,
@@ -427,6 +753,20 @@ extension ManagerDashboardClient: NativeTaskOperatorTransport {
     }
     public func revokeNativeContinuityTask(_ request: NativeContinuityTaskRevocationRequest) async throws -> NativeTaskCapabilityCommandResult {
         try await submitNativeTaskCommand(action: request.action, body: request.canonicalRequestJSON)
+    }
+}
+
+extension ManagerDashboardClient: StjornarvaldObservationTransport {
+    public func submit(
+        processID: String,
+        bootID: String,
+        observations: [DevelopmentObservation]
+    ) async throws -> StjornarvaldObservationReceiptBatch {
+        try await submitStjornarvaldObservations(
+            processID: processID,
+            bootID: bootID,
+            observations: observations
+        )
     }
 }
 

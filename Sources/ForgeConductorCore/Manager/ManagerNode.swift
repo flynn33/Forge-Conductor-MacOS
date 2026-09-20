@@ -223,6 +223,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private static let operatorRedactor = ProjectMemoryRedactor()
 
     public let app: ForgeApp
+    public let stjornarvald: StjornarvaldManagerCoordinator
     private let lock = NSLock()
     /// Serializes listener/config transitions without holding `lock` across
     /// Network.framework callbacks. Acquisition is always deadline-bounded.
@@ -403,6 +404,16 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ) throws -> Void = { _ in }
     ) {
         self.app = app
+        self.stjornarvald = StjornarvaldManagerCoordinator(
+            paths: app.paths,
+            diagnostics: { message in
+                app.diagnostics.error(
+                    "stjornarvald_manager_degraded",
+                    ["detail": message],
+                    category: .manager
+                )
+            }
+        )
         self.taskHTTPService = MCPTaskHTTPService(app: app)
         self.toolPermissionStoreResult = Result {
             try ProjectToolPermissionStore(paths: app.paths, clock: app.clock)
@@ -420,6 +431,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     deinit {
+        stjornarvald.stop()
         nativeTaskOperatorAdmission.setOpen(false)
         taskHTTPService.closeAdmission()
         nativeSourceConversation?.setOperational(false)
@@ -506,6 +518,144 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     public func settings() -> [String: Any] {
         settingsModel().asDictionary()
+    }
+
+    public func stjornarvaldSnapshotDictionary(
+        eventCursor: Int64 = 0,
+        limit: Int = 50
+    ) throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(
+            stjornarvald.snapshot(eventCursor: eventCursor, limit: limit)
+        ))
+    }
+
+    public func stjornarvaldAddSource(
+        selectedPath: String,
+        requestID: UUID
+    ) throws -> [String: Any] {
+        let source = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.stjornarvald.addSource(
+                selectedURL: URL(fileURLWithPath: selectedPath),
+                requestID: requestID
+            )
+        }
+        return try JSONSupport.object(from: JSONEncoder().encode(source))
+    }
+
+    public func stjornarvaldRefreshSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) throws -> [String: Any] {
+        let source = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.stjornarvald.refreshSource(sourceID: sourceID, requestID: requestID)
+        }
+        return try JSONSupport.object(from: JSONEncoder().encode(source))
+    }
+
+    public func stjornarvaldRemoveSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) throws -> [String: Any] {
+        let source = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.stjornarvald.removeSource(sourceID: sourceID, requestID: requestID)
+        }
+        return try JSONSupport.object(from: JSONEncoder().encode(source))
+    }
+
+    public func stjornarvaldSubmitObservations(
+        _ observations: [DevelopmentObservation]
+    ) throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(
+            stjornarvald.submitObservations(observations)
+        ))
+    }
+
+    public func stjornarvaldScheduleScan(
+        requestID: UUID,
+        projectID: String?,
+        projectGeneration: Int?,
+        reason: String
+    ) throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(
+            stjornarvald.scheduleScan(
+                requestID: requestID,
+                projectID: projectID,
+                projectGeneration: projectGeneration,
+                reason: reason
+            )
+        ))
+    }
+
+    public func stjornarvaldViolationPage(
+        cursor: Int64,
+        limit: Int,
+        projectID: String?,
+        state: PolicyViolationProjectionState?
+    ) throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(
+            stjornarvald.violationPage(
+                cursor: cursor,
+                limit: limit,
+                projectID: projectID,
+                state: state
+            )
+        ))
+    }
+
+    public func stjornarvaldExportReceipt(
+        requestID: UUID,
+        format: StjornarvaldExportFormat,
+        destination: String?
+    ) throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(
+            stjornarvald.unavailableExportReceipt(
+                requestID: requestID,
+                format: format,
+                destination: destination
+            )
+        ))
+    }
+
+    public func stjornarvaldPendingNotices(
+        deliveryID: String,
+        projectID: String?,
+        projectGeneration: Int?,
+        runID: String?,
+        sessionID: String?,
+        clientID: String?,
+        maximumCount: Int,
+        maximumBytes: Int
+    ) throws -> [String: Any] {
+        let batch = try Self.waitForAsync(timeoutSeconds: 5) {
+            try await self.stjornarvald.pendingNotices(
+                deliveryID: deliveryID,
+                projectID: projectID,
+                projectGeneration: projectGeneration,
+                runID: runID,
+                sessionID: sessionID,
+                clientID: clientID,
+                maximumCount: maximumCount,
+                maximumBytes: maximumBytes
+            )
+        }
+        return try JSONSupport.object(from: JSONEncoder().encode(batch))
+    }
+
+    public func stjornarvaldMarkNoticesPresented(
+        requestID: UUID,
+        deliveryIDs: [String]
+    ) throws -> [String: Any] {
+        try Self.waitForAsync(timeoutSeconds: 5) {
+            try await self.stjornarvald.markNoticesPresented(deliveryIDs: deliveryIDs)
+        }
+        return try JSONSupport.object(from: JSONEncoder().encode(
+            StjornarvaldNoticePresentationReceipt(
+                requestID: requestID,
+                deliveryIDs: deliveryIDs,
+                state: .presented,
+                controlsExecution: false
+            )
+        ))
     }
 
     /// Returns a bounded, read-only projection for the native operator console.
@@ -723,6 +873,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     private func startServiceSerialized() throws -> ManagerStatus {
         pruneStalePresenceIfDue(force: true)
+        stjornarvald.start()
 
         lock.lock()
         runtime.desiredRunning = true
@@ -762,6 +913,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func stopServiceSerialized() -> ManagerStatus {
+        stjornarvald.stop()
         lock.lock()
         taskHTTPService.setOperational(false)
         nativeSourceConversation?.setOperational(false)
@@ -783,6 +935,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func restartServiceSerialized(reloadConfiguration: Bool) throws -> ManagerStatus {
+        stjornarvald.stop()
         lock.lock()
         let count = runtime.beginRestart()
         lock.unlock()
@@ -796,6 +949,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runtime.startedAt = Date()
             runtime.lastError = nil
             lock.unlock()
+            stjornarvald.start()
             persistState()
             app.diagnostics.info("manager_service_restarted", ["restart_count": "\(count)"])
             return statusModel()
@@ -4576,6 +4730,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func halt() {
+        stjornarvald.stop()
         stopWatchdog()
         stopSignalHandlers()
         tearDownDashboard()

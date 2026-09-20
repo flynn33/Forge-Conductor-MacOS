@@ -5,7 +5,9 @@ Policy** feature, its **Rune Forge** operator surface, and the manager-owned
 **Stjornarvald** policy engine. Typed contracts, durable policy history, the
 all-format source catalog, the pinned source-linked Raven rule index, the
 restart-safe evaluation core, and bounded managed/MCP notice delivery are
-implemented; unfinished work remains
+implemented. The Manager now composes one restart-safe evaluator with bounded
+typed operations, health, durable notice reservations, and process observation
+outboxes; unfinished work remains
 open in the [roadmap](../ROADMAP.md).
 
 ## Governing source
@@ -63,9 +65,9 @@ stale patch location while preserving those newer contracts.
 | Pinned Raven policy projection | `Application/RavenForgeDevelopmentPolicyAdapter.swift` and `Infrastructure/StjornarvaldPolicyRuleRepository.swift` (implemented in RF-SJ-03) |
 | Durable observation intake and single evaluator | `Infrastructure/StjornarvaldObservationRepository.swift` and `Application/StjornarvaldPolicyEvaluator.swift` (implemented in RF-SJ-04; product event integration remains open) |
 | Coding-agent notice delivery | `Application/StjornarvaldPolicyNotices.swift`, `Infrastructure/StjornarvaldPolicyNoticeRepository.swift`, `ManagedProjectRunStepExecutor`, and `MCPServer`/`MCPToolResponse` (implemented in RF-SJ-05) |
-| Process composition | `ForgeApp`; process clients may be composed here, but the manager remains the only evaluator owner |
-| Manager lifecycle and single evaluator | `ManagerNode` plus a dedicated coordinator |
-| Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `OperatorManagerClient` |
+| Process composition | `ForgeApp` and `Application/StjornarvaldObservationClient.swift` (bounded owner-only FIFO outbox implemented in RF-SJ-06; product event hooks remain open) |
+| Manager lifecycle and single evaluator | `ManagerNode` and `Application/StjornarvaldManagerCoordinator.swift` (implemented in RF-SJ-06) |
+| Authenticated bounded operations | `ManagerRoutes`, typed operator wire models, and `ManagerDashboardClient` (implemented in RF-SJ-06; export responds with a typed RF-SJ-08 limitation) |
 | Managed coding-agent context and observations | `ManagedProjectRunStepExecutor` and post-commit `ToolInvocationBroker` seams |
 | Ordinary MCP observations and notices | Post-result `ToolRouter` observation plus `MCPToolResponse` presentation decoration; canonical `ToolResult` stays unchanged |
 | Operator navigation and workflow | `AppModel.AppTab`, `ContentView`, `AppSidebarView`, a dedicated view model/view, and Guided Mode |
@@ -283,6 +285,45 @@ This phase does not yet claim continuous manager evaluator scheduling, complete
 product observation hooks, manager routes, Rune Forge UI, export, integrated
 fault/performance proof, or release acceptance. Presentation proves transport,
 not that a model understood or acted on a notice.
+
+## RF-SJ-06 manager lifecycle and typed API evidence
+
+The Manager now owns the Stjornarvald composition boundary:
+
+- one cancellable coordinator task installs the pinned baseline, drains bounded
+  source work, acquires the durable evaluator lease, and follows Manager start,
+  stop, restart, halt, and deallocation without retaining its owner;
+- initialization and loop faults publish bounded typed degraded health and
+  retry with capped backoff without failing ordinary Manager bootstrap;
+- bounded source add, refresh, and removal; observation submission; scan
+  scheduling; snapshot and violation paging; notice reservation/presentation;
+  and export-request routes have matching typed client operations;
+- mutations require the existing Manager control credential, while bounded
+  snapshot, violation, and pending-notice reads remain read-only operations;
+- pending notices require a stable delivery identifier and persist the
+  reservation before return, making retries stable across Manager restart;
+- presentation is atomic and rejects unknown or duplicate delivery identifiers;
+  and
+- process clients retain up to 10,000 observations in an owner-only FIFO
+  outbox and resume sequential submission after Manager outage.
+
+`swift test --filter StjornarvaldManagerCoordinatorTests` and the canonical
+workspace `ForgeConductor` scheme each executed nine cases with zero failures.
+They cover lifecycle restart, evaluator exclusion, degraded bootstrap, owner
+release, bounded/idempotent source and snapshot operations, observation/notice
+flow, authorization, HTTP body bounds, typed client routes, atomic notice
+presentation, and outage-persistent client draining. The notice suite passed
+7/7 after adding durable-reservation coverage, and the broader Manager suite
+passed 122 tests with two explicit environment skips and zero failures. The
+first app-test invocation selected zero tests and is retained as a non-pass;
+the corrected Core scheme selected and passed all nine. Xcode reported the
+existing non-failing `ProjectContextService.close` priority-inversion warning,
+so this phase makes no clean performance claim.
+
+The export operation deliberately returns a typed `unavailable` receipt until
+RF-SJ-08 implements JSONL, JSON, Markdown, and CSV writers. Complete product
+observation hooks, the Rune Forge UI and Guided Mode, actual export, integrated
+fault/performance qualification, and release acceptance remain open.
 
 ## Delivery sequence
 

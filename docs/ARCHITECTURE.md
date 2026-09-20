@@ -37,6 +37,15 @@ Managed runs receive a retry-stable context snapshot before a safe provider
 input, while ordinary MCP responses append a second text content item after the
 canonical content. Transport failures retain eligibility for later delivery;
 neither path changes tool payloads, error status, authorization, or run outcomes.
+A dedicated manager coordinator now composes these stores, owns the only
+continuous index/evaluation task, and follows manager start, stop, and restart.
+Its typed HTTP boundary separates read-only bounded snapshots, violation pages,
+and notice reservations from credential-protected source, observation, scan,
+presentation, and export requests. Process clients retain observations in a
+bounded owner-only FIFO outbox across manager outages. Initialization or loop
+faults publish degraded health and bounded retry state without failing ordinary
+manager bootstrap; the export route intentionally reports unavailable until
+RF-SJ-08 supplies the file writers.
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 

@@ -211,6 +211,9 @@ public struct ManagerMutationAuthorizer: Sendable {
         case ("GET", "/api/manager/status"),
              ("GET", "/api/manager/settings"),
              ("GET", "/api/manager/operator/snapshot"),
+             ("GET", "/api/manager/stjornarvald/snapshot"),
+             ("POST", "/api/manager/stjornarvald/violations"),
+             ("POST", "/api/manager/stjornarvald/notices/pending"),
              ("GET", "/api/manager/autonomy/status"),
              ("POST", "/api/manager/projects/status"),
              ("POST", "/api/manager/runs/status"):
@@ -229,6 +232,87 @@ private struct ManagerRouteTarget {
 private struct ManagerOperatorSnapshotQuery {
     let limit: Int
     let cursor: Int64?
+}
+
+private struct StjornarvaldObservationSubmitRequest: Decodable {
+    let processID: String
+    let bootID: String
+    let observations: [DevelopmentObservation]
+
+    enum CodingKeys: String, CodingKey {
+        case processID = "process_id"
+        case bootID = "boot_id"
+        case observations
+    }
+}
+
+private struct StjornarvaldPendingNoticeRequest: Decodable {
+    let deliveryID: String
+    let projectID: String?
+    let projectGeneration: Int?
+    let runID: String?
+    let sessionID: String?
+    let clientID: String?
+    let maximumCount: Int
+    let maximumBytes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case deliveryID = "delivery_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case runID = "run_id"
+        case sessionID = "session_id"
+        case clientID = "client_id"
+        case maximumCount = "maximum_count"
+        case maximumBytes = "maximum_bytes"
+    }
+}
+
+private struct StjornarvaldPresentedNoticeRequest: Decodable {
+    let requestID: UUID
+    let deliveryIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case requestID = "request_id"
+        case deliveryIDs = "delivery_ids"
+    }
+}
+
+private struct StjornarvaldScanRequest: Decodable {
+    let requestID: UUID
+    let projectID: String?
+    let projectGeneration: Int?
+    let reason: String
+
+    enum CodingKeys: String, CodingKey {
+        case requestID = "request_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case reason
+    }
+}
+
+private struct StjornarvaldViolationPageRequest: Decodable {
+    let cursor: Int64
+    let limit: Int
+    let projectID: String?
+    let state: PolicyViolationProjectionState?
+
+    enum CodingKeys: String, CodingKey {
+        case cursor, limit, state
+        case projectID = "project_id"
+    }
+}
+
+private struct StjornarvaldExportRequest: Decodable {
+    let requestID: UUID
+    let format: StjornarvaldExportFormat
+    let destination: String?
+
+    enum CodingKeys: String, CodingKey {
+        case requestID = "request_id"
+        case format, destination
+    }
 }
 
 private enum ManagerOperatorSnapshotQueryError: Error, LocalizedError {
@@ -256,6 +340,8 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumRunControlBodyBytes = 256
     static let maximumToolPermissionBodyBytes = 128 * 1_024
     static let maximumRunAdmissionBodyBytes = 128 * 1_024
+    static let maximumStjornarvaldMutationBodyBytes = 16 * 1_024
+    static let maximumStjornarvaldObservationBodyBytes = 1_048_576
     /// Provider I/O is intentionally isolated from `DashboardServer`'s serial
     /// listener queue. The active-connection cap bounds submitted work, while
     /// `ManagerNode` rejects overlapping probes and owns the operation deadline.
@@ -360,6 +446,282 @@ public final class ManagerRoutes: @unchecked Sendable {
                 http.respondJSON(connection, status: 400, object: [
                     "ok": false,
                     "code": "invalid_snapshot_query",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("GET", "/api/manager/stjornarvald/snapshot"):
+            do {
+                let query = try Self.operatorSnapshotQuery(target.queryItems)
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldSnapshotDictionary(
+                        eventCursor: query.cursor ?? 0,
+                        limit: query.limit
+                    )
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_stjornarvald_snapshot",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/sources/add"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_request_too_large",
+                    "message": "Stjornarvald source request exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let object = try JSONSupport.object(from: body)
+                guard Set(object.keys).isSubset(of: ["request_id", "selected_path"]),
+                      let request = object["request_id"] as? String,
+                      let requestID = UUID(uuidString: request),
+                      let path = object["selected_path"] as? String,
+                      !path.isEmpty,
+                      path.utf8.count <= Self.maximumProjectRegistrationPathBytes,
+                      (path as NSString).isAbsolutePath else {
+                    throw StjornarvaldPolicySourceError.invalidRequest(
+                        "source add requires a request ID and bounded absolute selected path"
+                    )
+                }
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldAddSource(
+                        selectedPath: path,
+                        requestID: requestID
+                    )
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_source_add",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/sources/refresh"),
+             ("POST", "/api/manager/stjornarvald/sources/remove"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_request_too_large",
+                    "message": "Stjornarvald source request exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let object = try JSONSupport.object(from: body)
+                guard Set(object.keys).isSubset(of: ["request_id", "source_id"]),
+                      let request = object["request_id"] as? String,
+                      let requestID = UUID(uuidString: request),
+                      let source = object["source_id"] as? String,
+                      let sourceUUID = UUID(uuidString: source) else {
+                    throw StjornarvaldPolicySourceError.invalidRequest(
+                        "source mutation requires request and source IDs"
+                    )
+                }
+                let sourceID = PolicySourceID(sourceUUID)
+                let response = target.path.hasSuffix("/refresh")
+                    ? try manager.stjornarvaldRefreshSource(
+                        sourceID: sourceID, requestID: requestID
+                    )
+                    : try manager.stjornarvaldRemoveSource(
+                        sourceID: sourceID, requestID: requestID
+                    )
+                http.respondJSON(connection, status: 200, object: response)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_source_mutation",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/scan"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_scan_request_too_large",
+                    "message": "Scan request exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(StjornarvaldScanRequest.self, from: body)
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldScheduleScan(
+                        requestID: request.requestID,
+                        projectID: request.projectID,
+                        projectGeneration: request.projectGeneration,
+                        reason: request.reason
+                    )
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_scan_request",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/violations"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_violation_request_too_large",
+                    "message": "Violation page request exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(
+                    StjornarvaldViolationPageRequest.self,
+                    from: body
+                )
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldViolationPage(
+                        cursor: request.cursor,
+                        limit: request.limit,
+                        projectID: request.projectID,
+                        state: request.state
+                    )
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_violation_request",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/export"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_export_request_too_large",
+                    "message": "Export request exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(StjornarvaldExportRequest.self, from: body)
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldExportReceipt(
+                        requestID: request.requestID,
+                        format: request.format,
+                        destination: request.destination
+                    )
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_export_request",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/observations/submit"):
+            guard body.count <= Self.maximumStjornarvaldObservationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_observation_body_too_large",
+                    "message": "Observation submission exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let request = try decoder.decode(
+                    StjornarvaldObservationSubmitRequest.self,
+                    from: body
+                )
+                guard !request.processID.isEmpty, request.processID.utf8.count <= 256,
+                      !request.bootID.isEmpty, request.bootID.utf8.count <= 256,
+                      !request.observations.isEmpty, request.observations.count <= 64 else {
+                    throw StjornarvaldObservationError.invalidObservation(
+                        "observation batch identity or count is outside bounds"
+                    )
+                }
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldSubmitObservations(request.observations)
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_observation_batch",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/notices/pending"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_notice_request_too_large",
+                    "message": "Pending-notice request exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(
+                    StjornarvaldPendingNoticeRequest.self,
+                    from: body
+                )
+                guard (1...64).contains(request.maximumCount),
+                      (512...StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes)
+                        .contains(request.maximumBytes),
+                      !request.deliveryID.isEmpty,
+                      request.deliveryID.utf8.count <= 1_024 else {
+                    throw StjornarvaldPolicyNoticeError.invalid(
+                        "pending-notice limits are outside bounds"
+                    )
+                }
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldPendingNotices(
+                        deliveryID: request.deliveryID,
+                        projectID: request.projectID,
+                        projectGeneration: request.projectGeneration,
+                        runID: request.runID,
+                        sessionID: request.sessionID,
+                        clientID: request.clientID,
+                        maximumCount: request.maximumCount,
+                        maximumBytes: request.maximumBytes
+                    )
+                )
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_notice_request",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/stjornarvald/notices/presented"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_notice_receipt_too_large",
+                    "message": "Notice receipt exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(
+                    StjornarvaldPresentedNoticeRequest.self,
+                    from: body
+                )
+                guard !request.deliveryIDs.isEmpty, request.deliveryIDs.count <= 64,
+                      Set(request.deliveryIDs).count == request.deliveryIDs.count,
+                      request.deliveryIDs.allSatisfy({
+                        !$0.isEmpty && $0.utf8.count <= 1_024
+                      }) else {
+                    throw StjornarvaldPolicyNoticeError.invalid(
+                        "notice receipt identities are outside bounds"
+                    )
+                }
+                let response = try manager.stjornarvaldMarkNoticesPresented(
+                    requestID: request.requestID,
+                    deliveryIDs: request.deliveryIDs
+                )
+                http.respondJSON(connection, status: 200, object: response)
+            } catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_stjornarvald_notice_receipt",
                     "message": error.localizedDescription,
                 ])
             }

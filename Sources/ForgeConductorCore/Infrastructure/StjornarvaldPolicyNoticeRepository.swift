@@ -209,8 +209,114 @@ public final class StjornarvaldPolicyNoticeRepository: @unchecked Sendable {
         }
     }
 
+    public func reserveInteractivePresentation(
+        deliveryID: String,
+        projectID: String?,
+        projectGeneration: Int?,
+        clientID: String,
+        maximumCount: Int,
+        maximumBytes: Int,
+        now: Date = Date()
+    ) throws -> PolicyNoticePresentation? {
+        try Self.validateDeliveryID(deliveryID)
+        guard !clientID.isEmpty, clientID.utf8.count <= 1_024 else {
+            throw StjornarvaldPolicyNoticeError.invalid("client identity is outside bounds")
+        }
+        let targetIdentity = Self.mcpTargetIdentity(
+            projectID: projectID,
+            generation: projectGeneration,
+            clientID: clientID
+        )
+        lock.lock()
+        defer { lock.unlock() }
+        try execUnlocked("BEGIN IMMEDIATE;")
+        do {
+            let notices: [CodingAgentPolicyNotice]
+            if let existing = try deliverySnapshotUnlocked(id: deliveryID) {
+                guard existing.targetKind == .mcpClient,
+                      existing.targetIdentity == targetIdentity else {
+                    throw StjornarvaldPolicyNoticeError.conflict(
+                        "delivery ID names another target"
+                    )
+                }
+                notices = existing.snapshot.pendingNotices
+            } else {
+                notices = try pendingUnlocked(
+                    targetKind: .mcpClient,
+                    targetIdentity: targetIdentity,
+                    maximumCount: maximumCount,
+                    maximumBytes: maximumBytes
+                )
+                let snapshot = PolicyContextSnapshot(
+                    policyIdentity: Self.policyIdentity,
+                    applicableRuleSummaries: [],
+                    pendingNotices: notices,
+                    limitations: [
+                        "Presented means serialized to the MCP host, not understood or followed."
+                    ]
+                )
+                try insertDeliveryUnlocked(
+                    id: deliveryID,
+                    target: (.mcpClient, targetIdentity),
+                    snapshot: snapshot,
+                    noticeIDs: notices.map(\.id),
+                    now: now
+                )
+            }
+            let text = StjornarvaldPolicyNoticeFormatter.interactivePresentation(
+                notices: notices,
+                maximumBytes: maximumBytes
+            ) ?? ""
+            let presentation = PolicyNoticePresentation(
+                id: deliveryID,
+                targetKind: .mcpClient,
+                targetIdentity: targetIdentity,
+                notices: notices,
+                text: text,
+                digestSHA256: JSONSupport.sha256Hex(text)
+            )
+            try execUnlocked("COMMIT;")
+            return presentation
+        } catch {
+            try? execUnlocked("ROLLBACK;")
+            throw error
+        }
+    }
+
     public func markPresented(deliveryID: String, now: Date = Date()) throws {
         try updateDelivery(deliveryID: deliveryID, state: .presented, now: now)
+    }
+
+    public func markPresented(deliveryIDs: [String], now: Date = Date()) throws {
+        guard !deliveryIDs.isEmpty,
+              deliveryIDs.count <= 64,
+              Set(deliveryIDs).count == deliveryIDs.count else {
+            throw StjornarvaldPolicyNoticeError.invalid(
+                "presentation receipt count is outside bounds"
+            )
+        }
+        try deliveryIDs.forEach(Self.validateDeliveryID)
+        lock.lock()
+        defer { lock.unlock() }
+        try execUnlocked("BEGIN IMMEDIATE;")
+        do {
+            for deliveryID in deliveryIDs {
+                guard try deliverySnapshotUnlocked(id: deliveryID) != nil else {
+                    throw StjornarvaldPolicyNoticeError.invalid("unknown delivery ID")
+                }
+            }
+            for deliveryID in deliveryIDs {
+                try updateDeliveryUnlocked(
+                    deliveryID: deliveryID,
+                    state: .presented,
+                    now: now
+                )
+            }
+            try execUnlocked("COMMIT;")
+        } catch {
+            try? execUnlocked("ROLLBACK;")
+            throw error
+        }
     }
 
     public func markDeferred(deliveryID: String, now: Date = Date()) throws {
@@ -746,6 +852,30 @@ public final class StjornarvaldCodingAgentPolicyReporter: CodingAgentPolicyRepor
         return []
     }
 
+    public func interactivePresentation(
+        deliveryID: String,
+        projectID: String?,
+        projectGeneration: Int?,
+        clientID: String,
+        maximumCount: Int,
+        maximumBytes: Int
+    ) async -> PolicyNoticePresentation? {
+        guard let repository else { return nil }
+        do {
+            return try repository.reserveInteractivePresentation(
+                deliveryID: deliveryID,
+                projectID: projectID,
+                projectGeneration: projectGeneration,
+                clientID: clientID,
+                maximumCount: maximumCount,
+                maximumBytes: maximumBytes
+            )
+        } catch {
+            diagnostics("stjornarvald interactive presentation deferred: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     public func context(
         projectID: String,
         projectGeneration: Int,
@@ -771,6 +901,13 @@ public final class StjornarvaldCodingAgentPolicyReporter: CodingAgentPolicyRepor
     public func presented(deliveryID: String) async {
         do { try repository?.markPresented(deliveryID: deliveryID) }
         catch { diagnostics("stjornarvald notice presentation receipt deferred: \(error.localizedDescription)") }
+    }
+
+    public func confirmPresented(deliveryIDs: [String]) async throws {
+        guard let repository else {
+            throw StjornarvaldPolicyNoticeError.unavailable("notice repository unavailable")
+        }
+        try repository.markPresented(deliveryIDs: deliveryIDs)
     }
 
     public func deferred(deliveryID: String) async {

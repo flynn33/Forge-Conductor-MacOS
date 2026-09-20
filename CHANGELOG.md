@@ -12,6 +12,12 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Added the manager-owned Stjornarvald lifecycle and typed bounded API. One
+  restart-safe coordinator indexes policy sources and evaluates observations,
+  while authenticated mutations, read-only snapshots and violation paging,
+  durable notice reservations, process-local observation outboxes, typed
+  health, and explicit degraded state keep policy faults outside ordinary
+  Forge bootstrap and development control.
 - Added bounded, source-linked Stjornarvald notices for managed provider turns
   and ordinary MCP tool responses. Durable delivery snapshots and receipts make
   retries stable, corrections supersede stale pending guidance, and delivery

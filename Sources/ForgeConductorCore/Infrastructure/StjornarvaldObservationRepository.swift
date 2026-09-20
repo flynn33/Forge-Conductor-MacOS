@@ -273,6 +273,18 @@ public final class StjornarvaldObservationRepository: @unchecked Sendable {
         return current
     }
 
+    public func releaseLease(identity: StjornarvaldEvaluatorIdentity) throws {
+        try Self.validate(identity)
+        lock.lock()
+        defer { lock.unlock() }
+        try executeUnlocked(
+            "UPDATE stj_evaluator_lease SET expires_at=0 WHERE singleton=1 AND evaluator_id=? " +
+                "AND process_id=? AND boot_id=?;",
+            [.text(identity.evaluatorID), .integer(Int64(identity.processID)),
+             .text(identity.bootID)]
+        )
+    }
+
     @discardableResult
     public func completeEvaluation(
         observationSequence: Int64,
