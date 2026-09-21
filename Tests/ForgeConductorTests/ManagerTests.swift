@@ -897,6 +897,39 @@ final class ManagerTests: XCTestCase {
         _ = node
     }
 
+    func testEmbeddedRuntimeStartsWatchdogAndPersistsSubsequentTick() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let port = try Self.availableLoopbackPort()
+        try app.config.update([
+            "dashboard": ["port": port] as [String: Any],
+            "manager": ["watchdog_interval_sec": 1] as [String: Any],
+        ], save: true)
+
+        let node = ManagerNode(app: app)
+        defer { _ = try? node.stopService() }
+        let started = try node.startEmbeddedRuntime()
+        XCTAssertEqual(started.state, .running)
+        XCTAssertEqual(started.serviceActive, true)
+
+        let deadline = Date().addingTimeInterval(3)
+        var persistedUptime = 0
+        repeat {
+            if let data = try? Data(contentsOf: app.paths.managerState),
+               let object = try? JSONSupport.object(from: data) {
+                persistedUptime = object["uptime_sec"] as? Int ?? 0
+            }
+            if persistedUptime >= 1 { break }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+
+        XCTAssertGreaterThanOrEqual(
+            persistedUptime,
+            1,
+            "The embedded manager must retain a firing watchdog after startup"
+        )
+    }
+
     func testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = Int.random(in: 19_000...28_000)

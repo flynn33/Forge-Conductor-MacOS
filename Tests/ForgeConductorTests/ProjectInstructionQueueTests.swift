@@ -232,6 +232,69 @@ final class ProjectInstructionQueueTests: XCTestCase {
         })
     }
 
+    func testSelectableCompletionPresetsCompileIntoTypedNativeObligations() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-completion-presets-\(UUID().uuidString)", isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("// swift-tools-version: 6.2\n".utf8).write(
+            to: root.appendingPathComponent("Package.swift"), options: .atomic
+        )
+        let plan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: ProjectID(), projectGeneration: .initial, projectRoot: root,
+            instructionArtifactSHA256: [String(repeating: "a", count: 64)],
+            instructionText: "Build the project.", documentCount: 1,
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+                + CompletionCheckPreset.allCases.map(\.rawValue)
+        ))
+        let kinds = Set(plan.obligations.map(\.kind))
+        XCTAssertTrue(kinds.contains(.projectBuild))
+        XCTAssertTrue(kinds.contains(.projectBuildNoWarnings))
+        XCTAssertTrue(kinds.contains(.projectTests))
+        XCTAssertTrue(kinds.contains(.instructionDeliveryComplete))
+        XCTAssertTrue(kinds.contains(.noRelevantUnresolvedSideEffect))
+        XCTAssertFalse(kinds.contains(.customNativeGate))
+        XCTAssertEqual(plan.source, .automatic)
+    }
+
+    func testNoWarningsPresetRequiresCompleteWarningFreeBuildOutput() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-no-warning-gate-\(UUID().uuidString)", isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("// swift-tools-version: 6.2\n".utf8).write(
+            to: root.appendingPathComponent("Package.swift"), options: .atomic
+        )
+        let projectID = ProjectID()
+        let runID = RunID()
+        let digest = String(repeating: "8", count: 64)
+        let plan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: projectID, projectGeneration: .initial, projectRoot: root,
+            instructionArtifactSHA256: [digest], instructionText: "Build the project.",
+            documentCount: 1,
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate,
+                              CompletionCheckPreset.noWarnings.rawValue]
+        ))
+        let run = completionRun(runID: runID, projectID: projectID, digest: digest, plan: plan)
+        var passing = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try passing.consume([toolInvocation(
+            runID: runID, projectID: projectID, toolName: "shell_exec",
+            result: try shellResult(command: "swift build", ok: true, stdout: "Build complete")
+        )])
+        XCTAssertTrue(passing.result().passed)
+
+        var warning = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
+        try warning.consume([toolInvocation(
+            runID: runID, projectID: projectID, toolName: "shell_exec",
+            result: try shellResult(command: "swift build", ok: true,
+                                    stderr: "main.swift:1: warning: unused value")
+        )])
+        XCTAssertFalse(warning.result().passed)
+        XCTAssertTrue(warning.result().summary.contains(CompletionCheckPreset.noWarnings.rawValue))
+    }
+
     func testLegacyRunAndValidationPlanDecodeWithoutAutomaticCompletionPlan() throws {
         let specification = AutonomousRunSpecification(
             allowedTools: ["fs_read"],
@@ -241,12 +304,14 @@ final class ProjectInstructionQueueTests: XCTestCase {
             JSONSerialization.jsonObject(with: JSONEncoder().encode(specification)) as? [String: Any]
         )
         specificationObject.removeValue(forKey: "completion_plan")
+        specificationObject.removeValue(forKey: "failure_policy")
         let legacySpecification = try JSONDecoder().decode(
             AutonomousRunSpecification.self,
             from: JSONSerialization.data(withJSONObject: specificationObject, options: [.sortedKeys])
         )
         XCTAssertNil(legacySpecification.completionPlan)
         XCTAssertEqual(legacySpecification.allowedTools, ["fs_read"])
+        XCTAssertEqual(legacySpecification.failurePolicy, .default)
 
         let validation = ManagerPreparedRunValidationPlan(
             completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
@@ -1424,7 +1489,12 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
     }
 
-    private func shellResult(command: String, ok: Bool) throws -> String {
+    private func shellResult(
+        command: String,
+        ok: Bool,
+        stdout: String = "",
+        stderr: String = ""
+    ) throws -> String {
         let object: [String: Any] = [
             "is_error": !ok,
             "ok": ok,
@@ -1434,6 +1504,10 @@ final class ProjectInstructionQueueTests: XCTestCase {
                 "exit_code": ok ? 0 : 1,
                 "ok": ok,
                 "timed_out": false,
+                "stdout": stdout,
+                "stderr": stderr,
+                "stdout_truncated": false,
+                "stderr_truncated": false,
             ],
         ]
         return String(

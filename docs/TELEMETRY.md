@@ -41,6 +41,29 @@ Frame shape still validated by `TelemetryContract` and
 Continuous behavior is proven by `RealtimeStreamTests` (engine samples,
 service listener frames, multi-event SSE).
 
+## Orchestration status
+
+The native Rig places a shortened Load Trace beside four compact status/load
+cards and one full-width project-progress row. They combine the existing bounded
+telemetry frame with a separate
+five-second, view-owned Manager refresh:
+
+- **LM Studio** distinguishes a reachable headless Provider API from process
+  presence alone and labels its desktop Chat as separate.
+- **Autonomy** reports manager service state plus bounded active/deferred load.
+- **Continuity** reports automatic monitoring, active rollover, attention, and
+  the greatest available context-load fraction.
+- **Rune Forge** reports selected/indexed policy-source and observation state.
+  It remains an additive observer and never claims authorization enforcement.
+- **Project** reports exact delivered instruction-document steps and completed
+  instruction packages for the active project. Failed or blocked packages
+  surface an attention state.
+
+The Manager refresh starts only while Rig is visible, owns one cancellable
+task, coalesces each response into one value snapshot, and stops on detach. The
+Metal gauges reuse the Rig's existing bounded renderer and add no independent
+render clock.
+
 ## Qualification boundary
 
 Telemetry contract and stream tests qualify only this subsystem. The retained
@@ -63,6 +86,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.10.0`
+`0.11.0`
 
-Build: `2`
+Build: `3`

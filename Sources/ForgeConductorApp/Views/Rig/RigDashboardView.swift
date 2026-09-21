@@ -22,19 +22,17 @@ struct RigDashboardView: View {
             VStack(alignment: .leading, spacing: 16) {
                 headerPills
                 sysStrip
-                MultiSeriesLoadChart(
-                    cpu: model.historyCPU,
-                    ram: model.historyRAM,
-                    gpu: model.historyGPU
-                )
-                .frame(height: 168)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.35), lineWidth: 1))
-                .overlay(alignment: .topLeading) {
-                    Text("LOAD TRACE  ·  Metal  ·  REAL-TIME  ·  \(model.telemetryModeLabel)")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.cyan.opacity(0.8))
-                        .padding(10)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 14) {
+                        loadTracePanel
+                            .frame(minWidth: 360, maxWidth: .infinity)
+                        operationalIndicatorsPanel
+                            .frame(width: 440)
+                    }
+                    VStack(alignment: .leading, spacing: 14) {
+                        loadTracePanel
+                        operationalIndicatorsPanel
+                    }
                 }
 
                 LazyVGrid(
@@ -67,6 +65,164 @@ struct RigDashboardView: View {
             .padding(18)
         }
         .background(Color(red: 0.008, green: 0.016, blue: 0.04))
+        .onAppear { model.startRigOperationalMonitoring() }
+        .onDisappear { model.stopRigOperationalMonitoring() }
+    }
+
+    private var loadTracePanel: some View {
+        MultiSeriesLoadChart(
+            cpu: model.historyCPU,
+            ram: model.historyRAM,
+            gpu: model.historyGPU
+        )
+        .frame(height: 208)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.35), lineWidth: 1))
+        .overlay(alignment: .topLeading) {
+            Text("LOAD TRACE  ·  Metal  ·  REAL-TIME  ·  \(model.telemetryModeLabel)")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.cyan.opacity(0.8))
+                .padding(10)
+        }
+    }
+
+    private var operationalIndicatorsPanel: some View {
+        panel("ORCHESTRATION STATUS", meta: "5 s bounded refresh") {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(Array(operationalIndicatorCards.enumerated()), id: \.offset) { _, card in
+                    orchestrationCard(card, compact: true)
+                }
+            }
+            orchestrationCard(projectProgressCard, compact: true)
+        }
+        .frame(height: 208)
+        .accessibilityIdentifier("rig-operational-indicators")
+    }
+
+    private var operationalIndicatorCards: [OrchestrationCardState] {
+        let runtime = model.rigOperationalSnapshot
+        let providerReady = ["reachable", "contract_valid"].contains(runtime.providerHealth)
+        let lmStudioAlive = model.orchestration?.lmStudioAlive == true
+        let lmStudioCPU = model.hotProcesses
+            .filter {
+                let name = $0.name.lowercased()
+                return name.contains("lm studio") || name.contains("llama")
+            }
+            .reduce(0) { $0 + $1.cpuPercent }
+        let lmStudioState: String
+        let lmStudioTone: TelemetryStatusTone
+        let lmStudioDetail: String
+        if providerReady {
+            lmStudioState = "HEADLESS"
+            lmStudioTone = .healthy
+            lmStudioDetail = runtime.providerModel.map { "\($0) · Chat separate" }
+                ?? "Provider API · Chat separate"
+        } else if lmStudioAlive {
+            lmStudioState = "RUNNING"
+            lmStudioTone = .caution
+            lmStudioDetail = "Process detected · API unverified"
+        } else {
+            lmStudioState = "OFFLINE"
+            lmStudioTone = .failure
+            lmStudioDetail = "Provider unavailable"
+        }
+
+        let autonomyState: String
+        let autonomyTone: TelemetryStatusTone
+        if runtime.autonomyStarted == true {
+            autonomyState = "RUNNING"
+            autonomyTone = runtime.autonomyDeferredCount > 0 ? .caution : .healthy
+        } else if runtime.autonomyStarted == false {
+            autonomyState = "STOPPED"
+            autonomyTone = .failure
+        } else {
+            autonomyState = "CHECK"
+            autonomyTone = .unavailable
+        }
+
+        let continuityState: String
+        let continuityTone: TelemetryStatusTone
+        if runtime.continuityBlockedCount > 0 {
+            continuityState = "ATTENTION"
+            continuityTone = .caution
+        } else if runtime.continuityAutomaticCount > 0 {
+            continuityState = runtime.continuityActiveCount > 0 ? "ACTIVE" : "MONITORING"
+            continuityTone = .healthy
+        } else if runtime.autonomyStarted == true {
+            continuityState = "READY"
+            continuityTone = .informational
+        } else {
+            continuityState = "CHECK"
+            continuityTone = .unavailable
+        }
+
+        let runeState: String
+        let runeTone: TelemetryStatusTone
+        switch runtime.runeForgeState {
+        case .running:
+            runeState = runtime.runeForgeSelectedSourceCount > 0 ? "OBSERVING" : "READY"
+            runeTone = .healthy
+        case .degraded:
+            runeState = "DEGRADED"
+            runeTone = .caution
+        case .starting:
+            runeState = "STARTING"
+            runeTone = .informational
+        case .stopped, .stopping:
+            runeState = "STOPPED"
+            runeTone = .failure
+        case nil:
+            runeState = "CHECK"
+            runeTone = .unavailable
+        }
+        let runeLoad = runtime.runeForgeActiveSourceCount > 0
+            ? Double(runtime.runeForgeIndexedSourceCount) / Double(runtime.runeForgeActiveSourceCount)
+            : 0
+
+        return [
+            OrchestrationCardState(
+                title: "LM STUDIO", state: lmStudioState,
+                detail: lmStudioDetail,
+                fraction: min(max(lmStudioCPU / 100, 0), 1), tone: lmStudioTone
+            ),
+            OrchestrationCardState(
+                title: "AUTONOMY", state: autonomyState,
+                detail: "\(runtime.autonomyActiveCount) active · \(runtime.autonomyDeferredCount) queued",
+                fraction: min(Double(runtime.autonomyActiveCount) / 4, 1), tone: autonomyTone
+            ),
+            OrchestrationCardState(
+                title: "CONTINUITY", state: continuityState,
+                detail: "\(runtime.continuityAutomaticCount) monitored · \(runtime.continuityActiveCount) rollover",
+                fraction: runtime.continuityContextLoad ?? 0, tone: continuityTone
+            ),
+            OrchestrationCardState(
+                title: "RUNE FORGE", state: runeState,
+                detail: "\(runtime.runeForgeSelectedSourceCount) selected · \(runtime.runeForgeProcessedObservationCount) observed",
+                fraction: min(max(runeLoad, 0), 1), tone: runeTone
+            ),
+        ]
+    }
+
+    private var projectProgressCard: OrchestrationCardState {
+        let runtime = model.rigOperationalSnapshot
+        let completed = runtime.projectCompletedSteps + runtime.projectCompletedPackages
+        let total = runtime.projectTotalSteps + runtime.projectTotalPackages
+        let state = runtime.projectProgressState ?? "CHECK"
+        let tone: TelemetryStatusTone = switch state {
+        case "COMPLETE": .healthy
+        case "RUNNING": .informational
+        case "ATTENTION": .caution
+        case "QUEUED", "NO PACKAGES": .unavailable
+        default: .unavailable
+        }
+        return OrchestrationCardState(
+            title: "PROJECT · \(runtime.projectName ?? "NO SELECTION")",
+            state: state,
+            detail: "\(runtime.projectCompletedSteps)/\(runtime.projectTotalSteps) steps · "
+                + "\(runtime.projectCompletedPackages)/\(runtime.projectTotalPackages) packages",
+            fraction: total > 0 ? min(max(Double(completed) / Double(total), 0), 1) : 0,
+            tone: tone
+        )
     }
 
     // MARK: Header
@@ -363,32 +519,48 @@ struct RigDashboardView: View {
         return panel("ORCHESTRATION", meta: "\(o?.healthLabel ?? "—") · \(mode)") {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 10)], spacing: 10) {
                 ForEach(Array(cards.enumerated()), id: \.offset) { _, c in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
-                            Text(c.title).font(.system(size: 10, weight: .bold, design: .monospaced))
-                            Spacer(minLength: 6)
-                            Text(c.state)
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(c.tone.color)
-                        }
-                        MetalBarGauge(fraction: c.fraction, tint: c.tone.color)
-                            .frame(height: 8)
-                            .clipShape(Capsule())
-                        Text(c.detail)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(c.tone.color.opacity(0.4), lineWidth: 1)
-                    )
-                    .accessibilityElement(children: .combine)
-                    .accessibilityValue(c.tone.rawValue)
+                    orchestrationCard(c)
                 }
             }
         }
+    }
+
+    private func orchestrationCard(
+        _ card: OrchestrationCardState,
+        compact: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 4 : 6) {
+            HStack(spacing: 6) {
+                Text(card.title)
+                    .font(.system(size: compact ? 8 : 10, weight: .bold, design: .monospaced))
+                Spacer(minLength: 4)
+                Circle()
+                    .fill(card.tone.color)
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+                Text(card.state)
+                    .font(.system(size: compact ? 8 : 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(card.tone.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            MetalBarGauge(fraction: card.fraction, tint: card.tone.color)
+                .frame(height: compact ? 6 : 8)
+                .clipShape(Capsule())
+            Text(card.detail)
+                .font(.system(size: compact ? 8 : 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(compact ? 1 : 2)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(compact ? 7 : 10)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(card.tone.color.opacity(0.4), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(card.title), \(card.state), \(card.detail)")
+        .accessibilityValue(card.tone.rawValue)
     }
 
     // MARK: MCP servers — Metal rings

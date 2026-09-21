@@ -88,6 +88,7 @@ final class DashboardSecurityTests: XCTestCase {
             "/api/manager/runs/prepare",
             "/api/manager/runs/start",
             "/api/manager/runs/control",
+            "/api/manager/runs/delete",
             "/api/manager/runtime-jobs/cancel",
             "/api/manager/provider/probe",
             "/api/manager/provider/prepare",

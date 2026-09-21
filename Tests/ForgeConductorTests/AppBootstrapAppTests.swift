@@ -222,6 +222,160 @@ final class AppBootstrapAppTests: XCTestCase {
     }
 }
 
+final class RigOperationalSnapshotAppTests: XCTestCase {
+    func testComposeProjectsProviderAutonomyContinuityAndRuneForgeEvidence() throws {
+        let projectID = UUID()
+        let runID = UUID()
+        let operatorSnapshot = try JSONDecoder().decode(
+            OperatorSnapshot.self,
+            from: Data("""
+            {
+              "provider":{"health":"contract_valid","model_key":"fixture/model"},
+              "continuity_readiness":[{
+                "project_id":"\(projectID.uuidString)",
+                "project_generation":1,
+                "run_id":"\(runID.uuidString)",
+                "state":"saving_progress",
+                "automatic":true,
+                "detail":"Saving a durable checkpoint",
+                "capacity_tokens":100,
+                "used_tokens":70
+              }]
+            }
+            """.utf8)
+        )
+        let autonomy = try JSONDecoder().decode(
+            OperatorAutonomySummary.self,
+            from: Data("""
+            {"started":true,"active_run_ids":["\(runID.uuidString)"],"deferred_run_ids":[]}
+            """.utf8)
+        )
+        let selected = DevelopmentPolicySource(
+            origin: .userSelected,
+            displayName: "Selected policy",
+            selectedPath: "/tmp/policy",
+            interpretationState: .indexed
+        )
+        let runeForge = StjornarvaldManagerSnapshot(
+            schemaVersion: StjornarvaldManagerSnapshot.schemaVersion,
+            health: StjornarvaldManagerHealth(
+                state: .running,
+                policyIdentity: "fixture-policy",
+                evaluatorID: "fixture-evaluator",
+                startedAt: Date(),
+                lastEvaluationAt: Date(),
+                lastCommittedCursor: 4,
+                processedObservationCount: 7,
+                indexedSourceBatchCount: 1,
+                consecutiveFailureCount: 0,
+                lastError: nil
+            ),
+            governingPolicy: GoverningPolicyIdentity(
+                bindingID: "fixture-policy",
+                authority: "fixture",
+                repositoryURL: "https://example.invalid/policy",
+                version: "1",
+                revision: "fixture",
+                sourceID: selected.id
+            ),
+            sources: [selected],
+            violationEvents: [],
+            nextEventCursor: nil,
+            limitations: []
+        )
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: autonomy,
+            runeForge: runeForge
+        )
+        XCTAssertEqual(result.providerHealth, "contract_valid")
+        XCTAssertEqual(result.providerModel, "fixture/model")
+        XCTAssertEqual(result.autonomyStarted, true)
+        XCTAssertEqual(result.autonomyActiveCount, 1)
+        XCTAssertEqual(result.continuityAutomaticCount, 1)
+        XCTAssertEqual(result.continuityActiveCount, 1)
+        XCTAssertEqual(try XCTUnwrap(result.continuityContextLoad), 0.7, accuracy: 0.0001)
+        XCTAssertEqual(result.runeForgeState, .running)
+        XCTAssertEqual(result.runeForgeSelectedSourceCount, 1)
+        XCTAssertEqual(result.runeForgeIndexedSourceCount, 1)
+        XCTAssertEqual(result.runeForgeProcessedObservationCount, 7)
+    }
+
+    func testComposeReportsInstructionStepAndPackageProgress() throws {
+        let projectID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Fixture Project",
+          "canonical_root":"/tmp/fixture","project_generation":1,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let queue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("""
+        {
+          "project_id":"\(projectID)","project_generation":1,"revision":4,
+          "running":true,"total_packages":2,"packages":[
+            {"id":"\(UUID().uuidString)","project_id":"\(projectID)",
+             "project_generation":1,"package_id":"one","version":"1",
+             "display_name":"One","mission":"One","source_path":"/tmp/one",
+             "content_sha256":"\(String(repeating: "a", count: 64))",
+             "allowed_tools":[],"completion_gates":[],"document_count":3,
+             "completed_step_count":3,"total_step_count":3,"position":0,
+             "state":"completed","created_at":"now","updated_at":"now"},
+            {"id":"\(UUID().uuidString)","project_id":"\(projectID)",
+             "project_generation":1,"package_id":"two","version":"1",
+             "display_name":"Two","mission":"Two","source_path":"/tmp/two",
+             "content_sha256":"\(String(repeating: "b", count: 64))",
+             "allowed_tools":[],"completion_gates":[],"document_count":4,
+             "completed_step_count":2,"total_step_count":4,"position":1,
+             "state":"running","created_at":"now","updated_at":"now"}
+          ]
+        }
+        """.utf8))
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: nil, autonomy: nil, runeForge: nil,
+            instructionQueue: queue, progressProject: project
+        )
+        XCTAssertEqual(result.projectName, "Fixture Project")
+        XCTAssertEqual(result.projectCompletedSteps, 5)
+        XCTAssertEqual(result.projectTotalSteps, 7)
+        XCTAssertEqual(result.projectCompletedPackages, 1)
+        XCTAssertEqual(result.projectTotalPackages, 2)
+        XCTAssertEqual(result.projectProgressState, "RUNNING")
+    }
+}
+
+@MainActor
+final class AutonomyTaskDeletionAppTests: XCTestCase {
+    func testDeletionIsAvailableOnlyForTerminalTasks() throws {
+        let client = UnavailableOperatorManagerClient(reason: "fixture")
+        let viewModel = AutonomyViewModel(client: client)
+        XCTAssertTrue(viewModel.canDelete(try run(state: "completed")))
+        XCTAssertTrue(viewModel.canDelete(try run(state: "cancelled")))
+        XCTAssertTrue(viewModel.canDelete(try run(state: "failed_terminal")))
+        XCTAssertFalse(viewModel.canDelete(try run(state: "running")))
+        XCTAssertFalse(viewModel.canDelete(try run(state: "paused")))
+        XCTAssertFalse(viewModel.canDelete(try run(state: "blocked_configuration")))
+    }
+
+    private func run(state: String) throws -> OperatorRun {
+        try JSONDecoder().decode(
+            OperatorRun.self,
+            from: Data("""
+            {
+              "run_id":"\(UUID().uuidString)",
+              "project_id":"\(UUID().uuidString)",
+              "project_generation":1,
+              "mission":"Deletion fixture",
+              "state":"\(state)",
+              "continuity_mode":"managedAutonomous"
+            }
+            """.utf8)
+        )
+    }
+}
+
 @MainActor
 final class AppBackgroundOperationAppTests: XCTestCase {
     private func waitUntil(_ predicate: () -> Bool) async throws {

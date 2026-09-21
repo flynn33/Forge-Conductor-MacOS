@@ -79,8 +79,8 @@ The accepted and limited rows are recorded individually in
 
 README, User Guide, Unreleased changelog, roadmap, architecture, documentation
 index, Guided Mode, qualification status, product record, acceptance, and this
-handoff describe the current behavior. `VERSION` remains `0.10.0` and
-`BUILD_NUMBER` remains `2`, matching the current authority. No release archive,
+handoff describe the current behavior. `VERSION` is now `0.11.0` and
+`BUILD_NUMBER` is `3`, matching the current authority. No release archive,
 installer, notarized artifact, installation replacement, or shipment candidate
 was created because the owner workflow reserves release qualification and
 shipment for separate work.

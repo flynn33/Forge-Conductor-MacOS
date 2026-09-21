@@ -10,8 +10,30 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-09-21 (development)
+
 ### Added
 
+- Added a compact Rig orchestration-status cluster beside a shortened Load
+  Trace. Color and load indicators now distinguish headless LM Studio Provider
+  reachability, Autonomy service activity, automatic Continuity state/context
+  pressure, and selected/indexed Rune Forge policy observation. The bounded
+  Manager refresh runs only while Rig is visible and Rune Forge remains
+  explicitly non-interfering.
+- Added confirmed deletion of one settled Autonomy task. Completed, cancelled,
+  and terminally failed runs can be removed from run history through an exact
+  authenticated run/project/generation request; nonterminal or unsettled work
+  fails closed and project files remain unchanged.
+- Added a selectable native Completion Checks catalog for buildable project,
+  build errors, build warnings, tests, complete instruction delivery, and
+  unresolved operations. Preset identifiers compile into typed native
+  obligations; they are not treated as external executable policies.
+- Added per-task failure handling for pause-for-review, bounded automatic retry,
+  or terminal stop, plus bounded custom failure instructions delivered to the
+  managed model. Retry exhaustion pauses for review instead of looping.
+- Added a Rig project-progress indicator based on durable instruction-document
+  delivery and completed instruction packages, with running, queued, complete,
+  and attention states.
 - Completed RF-SJ-10 integrated delivery acceptance and handoff for Rune Forge
   Development Policy and Stjornarvald. All 40 issued acceptance rows now have
   current evidence or an explicit limit; 39 are accepted, while a human
@@ -94,6 +116,8 @@ Product versions do not by themselves claim shipment.
 
 ### Changed
 
+- Advanced the development product identity from `0.10.0 (2)` to `0.11.0 (3)`
+  for the backward-compatible Rig operability and Autonomy lifecycle features.
 - Preserved model-explicit starts for statically registered provider adapters
   that do not expose the saved Provider-settings surface, while ordinary
   minimal-input starts still require the manager-owned saved configuration and
@@ -235,6 +259,9 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Started the durable Autonomy watchdog when the Manager is hosted by the
+  native GUI. The GUI previously recovered and reported the service started but
+  omitted the watchdog that rediscovers yielded durable work.
 - Hardened the loopback control plane after an adversarial pre-release audit.
   Session prune/close and visible Manager controls now require a per-server
   256-bit browser capability, while native clients retain the owner-only bearer

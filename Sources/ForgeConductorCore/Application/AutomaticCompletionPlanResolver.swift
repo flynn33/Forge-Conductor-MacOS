@@ -99,8 +99,41 @@ public enum AutomaticCompletionPlanResolver {
             }
         }
 
+        let selectedPresets = Set(input.completionGates.compactMap(CompletionCheckPreset.init(rawValue:)))
+        func appendPreset(
+            _ preset: CompletionCheckPreset,
+            kind: CompletionObligationKind,
+            evidence: CompletionEvidenceRequirement,
+            reason: String
+        ) {
+            guard selectedPresets.contains(preset), !obligations.contains(where: { $0.id == preset.rawValue }) else {
+                return
+            }
+            obligations.append(CompletionObligation(
+                id: preset.rawValue,
+                kind: kind,
+                title: preset.title,
+                reason: reason,
+                evidenceRequirements: [evidence],
+                relevantToolNames: kind == .instructionDeliveryComplete
+                    ? ["instruction_catalog", "instruction_read"] : ["shell_exec"]
+            ))
+        }
+        appendPreset(.buildableProject, kind: .projectBuild, evidence: .successfulBuild,
+                     reason: CompletionCheckPreset.buildableProject.detail)
+        appendPreset(.noErrors, kind: .projectBuild, evidence: .successfulBuild,
+                     reason: CompletionCheckPreset.noErrors.detail)
+        appendPreset(.noWarnings, kind: .projectBuildNoWarnings, evidence: .successfulBuild,
+                     reason: CompletionCheckPreset.noWarnings.detail)
+        appendPreset(.testsPass, kind: .projectTests, evidence: .successfulTests,
+                     reason: CompletionCheckPreset.testsPass.detail)
+        appendPreset(.instructionPackagesComplete, kind: .instructionDeliveryComplete,
+                     evidence: .preparedSource,
+                     reason: CompletionCheckPreset.instructionPackagesComplete.detail)
+
         let customGates = input.completionGates.filter {
             $0 != ProjectInstructionQueueStore.builtInCompletionGate
+                && CompletionCheckPreset(rawValue: $0) == nil
         }
         for gate in customGates {
             let suffix = String(JSONSupport.sha256Hex(gate).prefix(16))
@@ -114,13 +147,17 @@ public enum AutomaticCompletionPlanResolver {
             ))
         }
 
-        obligations.append(CompletionObligation(
-            id: "no-unresolved-side-effects",
-            kind: .noRelevantUnresolvedSideEffect,
-            title: "No relevant operation remains unresolved",
-            reason: "Completion must reconcile in-flight, ambiguous, or interrupted task effects.",
-            evidenceRequirements: [.reconciledSideEffects]
-        ))
+        if !obligations.contains(where: { $0.kind == .noRelevantUnresolvedSideEffect }) {
+            obligations.append(CompletionObligation(
+                id: selectedPresets.contains(.noUnresolvedOperations)
+                    ? CompletionCheckPreset.noUnresolvedOperations.rawValue
+                    : "no-unresolved-side-effects",
+                kind: .noRelevantUnresolvedSideEffect,
+                title: "No relevant operation remains unresolved",
+                reason: "Completion must reconcile in-flight, ambiguous, or interrupted task effects.",
+                evidenceRequirements: [.reconciledSideEffects]
+            ))
+        }
 
         guard !obligations.isEmpty, obligations.count <= maximumObligations,
               Set(obligations.map(\.id)).count == obligations.count else {

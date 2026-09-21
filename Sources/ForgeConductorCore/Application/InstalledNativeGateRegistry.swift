@@ -384,7 +384,10 @@ enum ProjectInstructionCompletionGate {
                 invocationID: last.invocationID
             )
         } while true
-        return accumulator.result()
+        let delivery = run.specification.completionPlan?.obligations.contains {
+            $0.kind == .instructionDeliveryComplete
+        } == true ? try await repository.instructionDeliveryProgress(run: run) : nil
+        return accumulator.result(instructionDelivery: delivery)
     }
 
     struct EvidenceAccumulator {
@@ -399,6 +402,7 @@ enum ProjectInstructionCompletionGate {
         private var unresolvedInvocation = false
         private var latestRelevantRead: LatestEvidence?
         private var latestBuild: LatestEvidence?
+        private var latestBuildWarningFree: LatestEvidence?
         private var latestTests: LatestEvidence?
         private var latestLegacyEvidence: LatestEvidence?
 
@@ -432,12 +436,17 @@ enum ProjectInstructionCompletionGate {
                 guard invocation.toolName == "shell_exec",
                       let command = Self.shellCommand(invocation) else { continue }
                 let categories = Self.shellCategories(command)
-                if categories.contains(.build) { latestBuild = evidence }
+                if categories.contains(.build) {
+                    latestBuild = evidence
+                    latestBuildWarningFree = Self.warningFreeEvidence(invocation, base: evidence)
+                }
                 if categories.contains(.tests) { latestTests = evidence }
             }
         }
 
-        func result() -> CompletionGateResult {
+        func result(
+            instructionDelivery: InstructionDeliveryProgress? = nil
+        ) -> CompletionGateResult {
             let gate = ProjectInstructionQueueStore.builtInCompletionGate
             guard !invalidScope else {
                 return CompletionGateResult(
@@ -488,9 +497,15 @@ enum ProjectInstructionCompletionGate {
                 case .projectBuild:
                     evidence = latestBuild
                     satisfied = latestBuild?.successful == true
+                case .projectBuildNoWarnings:
+                    evidence = latestBuildWarningFree
+                    satisfied = latestBuildWarningFree?.successful == true
                 case .projectTests:
                     evidence = latestTests
                     satisfied = latestTests?.successful == true
+                case .instructionDeliveryComplete:
+                    evidence = nil
+                    satisfied = Self.deliveryIsComplete(instructionDelivery)
                 case .readOnlyReportDelivered:
                     evidence = latestRelevantRead
                     satisfied = run.completionRequestJSON != nil
@@ -567,6 +582,42 @@ enum ProjectInstructionCompletionGate {
                   let command = payload["command"] as? String,
                   !command.isEmpty, command.utf8.count <= 16_384 else { return nil }
             return command
+        }
+
+        private static func warningFreeEvidence(
+            _ invocation: ToolInvocationRecord,
+            base: LatestEvidence
+        ) -> LatestEvidence {
+            guard base.successful,
+                  let summary = invocation.resultSummary,
+                  let data = summary.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let payload = object["payload"] as? [String: Any],
+                  payload["stdout_truncated"] as? Bool == false,
+                  payload["stderr_truncated"] as? Bool == false,
+                  let stdout = payload["stdout"] as? String,
+                  let stderr = payload["stderr"] as? String else {
+                return LatestEvidence(successful: false, reference: nil)
+            }
+            let output = (stdout + "\n" + stderr).lowercased()
+            let hasWarning = output.split(separator: "\n").contains { line in
+                line.contains("warning:")
+            }
+            return LatestEvidence(
+                successful: !hasWarning,
+                reference: hasWarning ? nil : base.reference
+            )
+        }
+
+        private static func deliveryIsComplete(_ progress: InstructionDeliveryProgress?) -> Bool {
+            guard let progress, !progress.artifacts.isEmpty else { return false }
+            return progress.artifacts.allSatisfy { artifact in
+                guard let total = artifact.totalDocuments, total > 0 else { return false }
+                let completed = artifact.completedDocumentBitmap.reduce(0) {
+                    $0 + $1.nonzeroBitCount
+                }
+                return completed >= total
+            }
         }
 
         private static func shellCategories(_ command: String) -> Set<ShellCategory> {

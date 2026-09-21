@@ -618,6 +618,37 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(start.isEnabled, "A run cannot start without a recovered manager, project, and provider")
     }
 
+    func testRigShowsBoundedOperationalIndicatorCluster() throws {
+        let rig = app.buttons["tab-rig"]
+        XCTAssertTrue(rig.waitForExistence(timeout: 8))
+        rig.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["rig-operational-indicators"]
+                .waitForExistence(timeout: 5)
+        )
+    }
+
+    func testTerminalTaskRequiresConfirmationAndCanBeDeleted() throws {
+        let fixture = try OperatorManagerUITestFixture(initialRunState: "completed")
+        relaunch(with: fixture)
+
+        let autonomy = app.buttons["tab-autonomy"]
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+        let row = app.descendants(matching: .any)["autonomy-run-row-\(fixture.runID)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        let delete = app.buttons["run-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        XCTAssertTrue(delete.isEnabled)
+        delete.click()
+
+        let confirmation = app.alerts["Delete task?"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        confirmation.buttons["Delete Task"].click()
+        XCTAssertTrue(waitUntil(timeout: 5) { !row.exists })
+        XCTAssertEqual(fixture.deletionRequestCount, 1)
+    }
+
     func testOperatorStateReconnectsAfterGUIRelaunch() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
@@ -1213,6 +1244,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.descendants(matching: .any)["run-start-model-picker"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["run-start-task-label"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["run-start-network"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["run-failure-behavior"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["run-retry-limit"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["run-failure-instructions"].exists)
 
         app.buttons["run-tools-customize"].click()
         XCTAssertTrue(app.checkBoxes["run-tools-allow-all"].waitForExistence(timeout: 5))
@@ -1222,6 +1256,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(
             app.descendants(matching: .any)["run-completion-automatic"].waitForExistence(timeout: 5)
                 || app.buttons["run-completion-done"].waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.checkBoxes["run-completion-check-forge.completion.buildable-project"].exists
         )
         XCTAssertTrue(app.staticTexts["Instruction artifact is registered"].exists)
         app.buttons["run-completion-done"].click()
@@ -1424,7 +1461,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private let failContractProbe: Bool
     private let dropRelinkResponseCount: Int
     private let rejectFirstRelinkResponse: Bool
-    private var mutableRunState = "running"
+    private var mutableRunState: String
+    private var mutableDeletedRun = false
+    private var mutableDeletionRequestCount = 0
     private var mutableStartRequestCount = 0
     private var mutableControlRequestCount = 0
     private var mutableMutationAuthorizationCount = 0
@@ -1464,6 +1503,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
 
     var startRequestCount: Int { locked { mutableStartRequestCount } }
     var controlRequestCount: Int { locked { mutableControlRequestCount } }
+    var deletionRequestCount: Int { locked { mutableDeletionRequestCount } }
     var mutationAuthorizationCount: Int { locked { mutableMutationAuthorizationCount } }
     var startRequestRunIDs: [String] { locked { mutableStartRequestRunIDs } }
     var startRequestBodies: [Data] { locked { mutableStartRequestBodies } }
@@ -1496,7 +1536,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         failContractProbe: Bool = false,
         dropFirstRelinkResponse: Bool = false,
         dropRelinkResponseCount: Int = 0,
-        rejectFirstRelinkResponse: Bool = false
+        rejectFirstRelinkResponse: Bool = false,
+        initialRunState: String = "running"
     ) throws {
         self.failStartResponse = failStartResponse
         self.failContractProbe = failContractProbe
@@ -1505,6 +1546,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             dropFirstRelinkResponse ? 1 : 0
         )
         self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
+        mutableRunState = initialRunState
         listener = try NWListener(using: .tcp, on: .any)
 
         let ready = DispatchSemaphore(value: 0)
@@ -1656,11 +1698,15 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         case "/api/manager/operator/snapshot":
             respond(status: 200, object: snapshot(), to: connection)
         case "/api/manager/autonomy/status":
+            let activeRunIDs = locked {
+                mutableDeletedRun || ["completed", "cancelled", "failed_terminal"]
+                    .contains(mutableRunState) ? [] : [runID]
+            }
             respond(
                 status: 200,
                 object: [
                     "started": true,
-                    "active_run_ids": [runID],
+                    "active_run_ids": activeRunIDs,
                     "deferred_run_ids": [],
                 ],
                 to: connection
@@ -1937,6 +1983,40 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             } else {
                 respond(status: 200, object: run(state: nextState), to: connection)
             }
+        case "/api/manager/runs/delete":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  Set(object.keys) == ["run_id", "project_id", "project_generation"],
+                  object["run_id"] as? String == runID,
+                  object["project_id"] as? String == projectID,
+                  (object["project_generation"] as? NSNumber)?.uint64Value
+                    == locked({ mutableProjectGeneration }) else {
+                respond(status: 401, object: ["message": "missing task deletion authority"], to: connection)
+                return
+            }
+            let priorState = locked { () -> String? in
+                guard ["completed", "cancelled", "failed_terminal"].contains(mutableRunState),
+                      !mutableDeletedRun else { return nil }
+                mutableDeletedRun = true
+                mutableDeletionRequestCount += 1
+                mutableMutationAuthorizationCount += 1
+                return mutableRunState
+            }
+            guard let priorState else {
+                respond(status: 409, object: ["message": "task is not settled"], to: connection)
+                return
+            }
+            respond(
+                status: 200,
+                object: [
+                    "run_id": runID,
+                    "project_id": projectID,
+                    "project_generation": locked({ mutableProjectGeneration }),
+                    "prior_state": priorState,
+                    "deleted_at": "2026-09-21T12:00:00Z",
+                ],
+                to: connection
+            )
         case "/api/manager/runs/instruction-artifacts/import":
             guard let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any] else {
                 respond(status: 401, object: ["message": "invalid instruction artifact body"], to: connection)
@@ -2160,7 +2240,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         let state = locked { mutableRunState }
         let acceptedStart = locked { mutableAcceptedStart }
         let acceptedStartRunID = locked { mutableAcceptedStartRunID }
-        var runs = [run(state: state)]
+        let deletedRun = locked { mutableDeletedRun }
+        var runs = deletedRun ? [] : [run(state: state)]
         if acceptedStart, let acceptedStartRunID {
             runs.insert(
                 run(
@@ -2372,7 +2453,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "refresh_interval_sec": 8,
             ] as [String: Any],
             "home": "/tmp/forge-operator-fixture",
-            "version": "0.10.0",
+            "version": "0.11.0",
         ]
     }
 

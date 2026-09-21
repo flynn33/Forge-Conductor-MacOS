@@ -263,6 +263,7 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
             health: decision.health.rawValue,
             healthLabel: decision.label,
             managerAlive: managerAlive,
+            lmStudioAlive: lmStudioUp,
             managerPID: managerPID > 0 ? Int(managerPID) : nil,
             serveCount: serveCount,
             superviseCount: procs.supervisePIDs.count,

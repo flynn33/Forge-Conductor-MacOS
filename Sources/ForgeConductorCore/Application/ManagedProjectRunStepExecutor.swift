@@ -1294,6 +1294,10 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         if let phase = run.specification.work.currentPhase { lines.append("Current phase: \(phase)") }
         if let item = run.specification.work.workItem { lines.append("Work item: \(item)") }
         if let next = run.specification.work.nextAction { lines.append("Next action: \(next)") }
+        lines.append("Failure behavior: \(run.specification.failurePolicy.behavior.rawValue)")
+        if let instructions = run.specification.failurePolicy.customInstructions {
+            lines.append("Failure and retry instructions: \(instructions)")
+        }
         lines.append("Completion gates: \(run.specification.completionGates.joined(separator: ", "))")
         lines.append(
             "When work is ready for deterministic validation, respond with exactly "

@@ -1843,12 +1843,49 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         limit: Int = 128
     ) throws -> [String: Any] {
         try requireActiveProject(projectID, generation: expectedGeneration)
-        return try instructionQueueStore().snapshotPage(
+        let snapshot = try instructionQueueStore().snapshotPage(
             projectID: projectID,
             generation: expectedGeneration,
             cursor: cursor,
             limit: limit
-        ).asDictionary()
+        )
+        let progress = try Self.waitForAsync(timeoutSeconds: 10) {
+            var values: [RunID: (completed: Int, total: Int)] = [:]
+            for package in snapshot.packages {
+                guard let runID = package.runID,
+                      let run = try await self.app.projectContexts.repository.autonomousRun(runID) else {
+                    continue
+                }
+                let delivery = try await self.app.projectContexts.repository
+                    .instructionDeliveryProgress(run: run)
+                let total = delivery.artifacts.compactMap(\.totalDocuments).reduce(0, +)
+                let completed = delivery.artifacts.reduce(0) { partial, artifact in
+                    partial + artifact.completedDocumentBitmap.reduce(0) {
+                        $0 + $1.nonzeroBitCount
+                    }
+                }
+                values[runID] = (min(completed, total), total)
+            }
+            return values
+        }
+        return [
+            "ok": true,
+            "project_id": snapshot.projectID.description,
+            "project_generation": snapshot.projectGeneration.rawValue,
+            "revision": snapshot.revision,
+            "running": snapshot.running,
+            "total_packages": snapshot.totalPackages,
+            "cursor": snapshot.cursor,
+            "next_cursor": snapshot.nextCursor as Any,
+            "packages": snapshot.packages.map { package in
+                let delivered = package.runID.flatMap { progress[$0] }
+                return package.asDictionary(
+                    completedStepCount: delivered?.completed
+                        ?? (package.state == .completed ? package.documentCount : 0),
+                    totalStepCount: delivered?.total ?? package.documentCount
+                )
+            },
+        ].compactNSNull()
     }
 
     @discardableResult
@@ -2853,6 +2890,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         modelKey: String? = nil,
         allowedTools: Set<String>? = nil,
         completionGates: [String]? = nil,
+        failurePolicy: AutonomousFailurePolicy = .default,
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) throws -> ManagerPreparedRunDescriptor {
@@ -2875,6 +2913,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             maximumInlineOutputBytes: maximumInlineOutputBytes
         ).descriptor
@@ -2892,6 +2931,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         modelKey: String? = nil,
         allowedTools: Set<String>? = nil,
         completionGates: [String]? = nil,
+        failurePolicy: AutonomousFailurePolicy = .default,
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) -> ManagerRunPreparationResult {
@@ -2928,6 +2968,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 modelKey: modelKey,
                 allowedTools: allowedTools,
                 completionGates: completionGates,
+                failurePolicy: failurePolicy,
                 networkAllowed: networkAllowed,
                 maximumInlineOutputBytes: maximumInlineOutputBytes
             )
@@ -3040,6 +3081,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         modelKey: String?,
         allowedTools: Set<String>?,
         completionGates: [String]?,
+        failurePolicy: AutonomousFailurePolicy,
         expectedProviderConfigurationRevision: String? = nil,
         expectedToolCatalogRevision: String? = nil,
         networkAllowed: Bool,
@@ -3124,6 +3166,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             projectID: projectID.description,
             projectGeneration: generation
         ))
+        let failurePolicy = try failurePolicy.validated()
         let automaticCompletionPlan = try AutomaticCompletionPlanResolver.resolve(.init(
             projectID: projectID,
             projectGeneration: expectedGeneration,
@@ -3153,6 +3196,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 completionGates: resolved.completionGates,
                 automaticPlan: automaticCompletionPlan
             ),
+            failurePolicy: failurePolicy,
             continuityMode: .managedAutonomous,
             budgetPolicy: budgetPolicy,
             maximumInlineOutputBytes: maximumInlineOutputBytes
@@ -3205,6 +3249,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         modelKey: String? = nil,
         allowedTools: Set<String>? = nil,
         completionGates: [String]? = nil,
+        failurePolicy: AutonomousFailurePolicy = .default,
         expectedProviderConfigurationRevision: String? = nil,
         expectedToolCatalogRevision: String? = nil,
         expectedPreparedRunRevision: String? = nil,
@@ -3234,6 +3279,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
             expectedToolCatalogRevision: expectedToolCatalogRevision,
             networkAllowed: networkAllowed,
@@ -3256,6 +3302,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 allowedTools: context.resolved.allowedTools.sorted(),
                 completionGates: context.resolved.completionGates,
                 completionPlan: context.descriptor.validationPlan.automaticPlan,
+                failurePolicy: context.descriptor.failurePolicy ?? .default,
                 work: AutonomousRunWork(
                     metadata: Self.preparedRunMetadata(context.descriptor)
                 )
@@ -3540,6 +3587,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             modelKey: nil,
             allowedTools: Set(package.allowedTools),
             completionGates: package.completionGates,
+            failurePolicy: .default,
             networkAllowed: false,
             maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
         )
@@ -3699,6 +3747,20 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             try await autonomy.run(runID)
         }
         return try autonomousRunDictionary(run)
+    }
+
+    public func deleteAutonomousRun(
+        runID: RunID,
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> AutonomousRunDeletionReceipt {
+        try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.app.projectContexts.repository.deleteTerminalAutonomousRun(
+                runID: runID,
+                projectID: projectID,
+                expectedGeneration: expectedGeneration
+            )
+        }
     }
 
     @discardableResult
@@ -4735,6 +4797,24 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         fputs("  stop process: forge-conductor manager stop   or dashboard Shutdown\n", stderr)
 
         runtime.runLock.wait()
+    }
+
+    /// Starts the manager inside a long-lived presentation process such as the
+    /// native app. Unlike `run`, this does not claim the CLI PID file or block a
+    /// thread, but it must retain the same watchdog ownership so yielded durable
+    /// autonomy work is rediscovered and resumed.
+    @discardableResult
+    public func startEmbeddedRuntime() throws -> ManagerStatus {
+        do {
+            _ = try recoverManagedAutonomy()
+            let status = try startService()
+            startWatchdog()
+            return status
+        } catch {
+            stopWatchdog()
+            _ = shutdownManagedAutonomy()
+            throw error
+        }
     }
 
     private func halt() {

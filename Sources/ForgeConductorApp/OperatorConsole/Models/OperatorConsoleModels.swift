@@ -266,6 +266,8 @@ struct OperatorInstructionPackage: Decodable, Sendable, Equatable, Identifiable 
     let instructionByteCount: Int?
     let unresolvedDocumentCount: Int?
     let importReady: Bool?
+    let completedStepCount: Int?
+    let totalStepCount: Int?
     let position: Int
     let state: String
     let runID: String?
@@ -289,6 +291,8 @@ struct OperatorInstructionPackage: Decodable, Sendable, Equatable, Identifiable 
         case instructionByteCount = "instruction_byte_count"
         case unresolvedDocumentCount = "unresolved_document_count"
         case importReady = "import_ready"
+        case completedStepCount = "completed_step_count"
+        case totalStepCount = "total_step_count"
         case position, state
         case runID = "run_id"
         case lastError = "last_error"
@@ -891,6 +895,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     let modelKey: String?
     let allowedTools: [String]?
     let completionGates: [String]?
+    let failurePolicy: AutonomousFailurePolicy
     let networkAllowed: Bool?
     let expectedProviderConfigurationRevision: String?
     let expectedToolCatalogRevision: String?
@@ -912,6 +917,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         modelKey: String?,
         allowedTools: [String]?,
         completionGates: [String]?,
+        failurePolicy: AutonomousFailurePolicy = .default,
         networkAllowed: Bool?,
         expectedProviderConfigurationRevision: String?,
         expectedToolCatalogRevision: String?,
@@ -932,6 +938,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         self.modelKey = modelKey
         self.allowedTools = allowedTools
         self.completionGates = completionGates
+        self.failurePolicy = failurePolicy
         self.networkAllowed = networkAllowed
         self.expectedProviderConfigurationRevision = expectedProviderConfigurationRevision
         self.expectedToolCatalogRevision = expectedToolCatalogRevision
@@ -951,6 +958,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
         case modelKey = "model_key"
         case allowedTools = "allowed_tools"
         case completionGates = "completion_gates"
+        case failurePolicy = "failure_policy"
         case networkAllowed = "network_allowed"
         case expectedProviderConfigurationRevision = "expected_provider_configuration_revision"
         case expectedToolCatalogRevision = "expected_tool_catalog_revision"
@@ -974,6 +982,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
             expectedToolCatalogRevision: expectedToolCatalogRevision,
@@ -998,6 +1007,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             expectedProviderConfigurationRevision: descriptor.providerConfigurationRevision,
             expectedToolCatalogRevision: descriptor.toolCatalogRevision,
@@ -1022,6 +1032,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
             expectedToolCatalogRevision: expectedToolCatalogRevision,
@@ -1046,6 +1057,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
             expectedToolCatalogRevision: expectedToolCatalogRevision,
@@ -1070,6 +1082,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
             expectedToolCatalogRevision: expectedToolCatalogRevision,

@@ -1,6 +1,6 @@
 # Version and qualification status
 
-Product identity: **0.10.0, build 2**, supporting **macOS 26+**. The owner is
+Product identity: **0.11.0, build 3**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -11,7 +11,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.10.0, build 2**. The root [`VERSION`](../VERSION)
+documentation use version **0.11.0, build 3**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are
@@ -34,6 +34,15 @@ the [audit record](AUDIT-2026-09-20.md). The exact audited implementation is
 signed revision `839e45035c30d12efcebfbe29f31387972eaa95b`. The audit did not
 create or qualify a release artifact.
 
+The September 21 `0.11.0 (3)` source change passed both SwiftPM product builds,
+the canonical Apple Development-signed Debug workspace build, repository
+hygiene, and the complete SwiftPM regression: **1,700 XCTest cases with 13
+explicit environment/live skips and zero failures**. The full Xcode test graph
+compiled and signed. A focused native UI execution timed out while macOS enabled
+automation before the selected test began, so the click-through is retained as
+a host-automation non-pass rather than product evidence. The working
+installation was not replaced.
+
 The tested production source is owner-authored revision
 `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
 `6c03f40e2b04ae6dfd689c9347a84014f7ebe496`; its final GitHub workflow passed
@@ -50,7 +59,8 @@ documentation only and leaves the tested native graph unchanged.
 | LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Offline save/error and invalid endpoint handling also passed. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. |
 | Revision-3 Provider preparation | Published source `01c874e17c9a26c8f3111981748ed1bd3bdc1f81` passed seven deterministic preparation cases with one explicit live-only skip plus a separately enabled 1/1 live LM Studio `openai/gpt-oss-20b` case. The live operation preserved the pin, verified the contract, wrote the revision-bound readiness receipt, and reused that exact receipt idempotently. Provider configuration passed 14/14 with one explicit disposable-Keychain skip; app provider contracts passed 11/11, operator contracts 10/10, and dashboard security 7/7. | External service start and model load remain typed operator actions when the provider offers no supported authenticated lifecycle API. A focused native UI run timed out while enabling automation before test execution and is a non-pass. |
 | Revision-3 runtime readiness | Published source `01c874e17c9a26c8f3111981748ed1bd3bdc1f81` passed focused checks proving an unavailable optional Python runtime does not disable the shell, an explicitly required Python runtime produces exactly one recovery action, nil-path legacy state remains `unknown`, and application-wide shell denial is reported at its true policy scope. Both SwiftPM products, the signed canonical Debug app build, and the universal Xcode Core test target build passed with the new resolver and test in their canonical targets. | Runtime necessity is derived only from explicit structured evidence; task prose is intentionally not interpreted as authority. A zero-selected app-test filter was a non-pass and is not test evidence. |
-| Managed Autonomy | The published-tree native UI authorized and registered an isolated project, connected to LM Studio, admitted the exact read-only assignment, and imported its run-bound policy. A separate current-source live run consumed `fs_read`, retried repaired completion validation without provider/tool replay, executed one signed XCTest case, reached `completed`, and retained `tests`. | Completion remains fail closed without an exact owner-installed native-validation policy and approved signed package. |
+| Managed Autonomy | The published-tree native UI authorized and registered an isolated project, connected to LM Studio, admitted the exact read-only assignment, and imported its run-bound policy. A separate current-source live run consumed `fs_read`, retried repaired completion validation without provider/tool replay, executed one signed XCTest case, reached `completed`, and retained `tests`. Current source also starts the embedded watchdog from the GUI; permits exact confirmed deletion of one terminal task; exposes selectable typed completion presets; and persists pause, bounded retry, or terminal-stop behavior plus custom model instructions. | Completion remains fail closed without exact durable evidence. Signed custom policies remain a separate advanced capability. The new source has deterministic focused evidence; it is not an installed-build claim. |
+| Forge Rig operability | The shortened Load Trace shares its row with bounded status/load cards for headless LM Studio, Autonomy, Continuity, and Rune Forge plus a project row derived from durable instruction-step and package completion. The five-second Manager refresh exists only while Rig is visible; Metal gauges retain the existing shared bounded renderer. | Rune Forge is an additive observer. “Observing” reports a selected/indexed policy source, not task authorization or outcome control. |
 | Native policy import | Core and Developer ID Release UI evidence covers run/project/gate/source/package binding, picker cancellation, exact import, mode `0600`, changed-package rejection, and protected readback. | The app does not silently approve model text or a hand-edited result as native evidence. |
 | Continuity | The r3 deterministic crash matrix recovers every managed transition with one accepted successor and one continuation. A current-source live LM Studio `openai/gpt-oss-20b` run at an observed 65,536-token context triggered on exact provider usage, fenced predecessor tools, survived a post-bootstrap-response manager restart, accepted and consumed one fresh-root successor, performed the successor-only read, then preserved the same receipt/session/turn/tool set across another restart. The handoff retained exact instruction-delivery coverage, artifact, grant, completion-plan, evidence, open-work, and provider-revision bindings. | The live run injects one in-process post-commit crash boundary; the other transitions are covered deterministically rather than by real SIGKILL. LM Studio still exposes no supported authenticated API for replacing an existing desktop GUI chat, so Forge-managed native host mode is the supported automatic path. |
 | Resource policy | Focused Debug and final-source, Xcode-compiled signed Release Core stress each passed on this **128 GiB Apple M5 Max** host while also executing the injected **8 GiB constrained policy**. The final Release report refuses to write `passed` after a recorded XCTest failure. | A second physical-memory-capacity execution is not yet recorded. |

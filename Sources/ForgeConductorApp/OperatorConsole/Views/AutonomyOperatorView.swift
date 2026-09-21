@@ -8,6 +8,7 @@ struct AutonomyOperatorView: View {
     @StateObject private var viewModel: AutonomyViewModel
     @State private var showingStartSheet = false
     @State private var showingCancelConfirmation = false
+    @State private var showingDeleteConfirmation = false
     @State private var showingAdvancedOverrides = false
     @State private var showingToolSelection = false
     @State private var showingCompletionChecks = false
@@ -122,6 +123,18 @@ struct AutonomyOperatorView: View {
             }
         } message: { run in
             Text("Run \(run.runID)\n\(run.mission)\nThe manager will persist cancellation, stop active provider work and runtime jobs, and fence late results.")
+        }
+        .alert(
+            "Delete task?",
+            isPresented: $showingDeleteConfirmation,
+            presenting: viewModel.selectedRun
+        ) { _ in
+            Button("Keep Task", role: .cancel) {}
+            Button("Delete Task", role: .destructive) {
+                viewModel.deleteSelectedRun()
+            }
+        } message: { run in
+            Text("\(run.mission)\n\nThis permanently removes the settled task and its manager-owned run, session, tool, event, and runtime-job history. Project files are not changed.")
         }
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .autonomy)
@@ -252,10 +265,20 @@ struct AutonomyOperatorView: View {
                 Button("Retry") { viewModel.control(.retry) }
                     .accessibilityIdentifier("run-retry")
                     .disabled(!viewModel.canControl(.retry, run: run))
+                Button("Delete Task…", role: .destructive) {
+                    showingDeleteConfirmation = true
+                }
+                .accessibilityIdentifier("run-delete")
+                .disabled(!viewModel.canDelete(run))
                 if let action = viewModel.controlInFlight {
                     ProgressView()
                         .controlSize(.small)
                         .accessibilityLabel("Persisting \(action.rawValue) command")
+                }
+                if viewModel.deletionInFlight {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Deleting settled task")
                 }
                 Spacer()
                 Button("Refresh Run", action: viewModel.refreshSelectedRun)
@@ -419,11 +442,32 @@ struct AutonomyOperatorView: View {
                     }
                     LabeledContent("Completion checks") {
                         HStack(spacing: 8) {
-                            Text("Automatic")
-                            Button("View…") { showingCompletionChecks = true }
+                            Text(viewModel.completionSelectionSummary)
+                            Button("Select…") { showingCompletionChecks = true }
                                 .accessibilityIdentifier("run-completion-view")
                         }
                     }
+                    Picker("On failure", selection: $viewModel.failureBehavior) {
+                        Text("Pause for review").tag(AutonomousFailureBehavior.pauseForReview)
+                        Text("Retry automatically").tag(AutonomousFailureBehavior.retryAutomatically)
+                        Text("Stop task").tag(AutonomousFailureBehavior.stopTask)
+                    }
+                    .accessibilityIdentifier("run-failure-behavior")
+                    if viewModel.failureBehavior == .retryAutomatically {
+                        Stepper(
+                            "Retry limit: \(viewModel.maximumRetries)",
+                            value: $viewModel.maximumRetries,
+                            in: 0...AutonomousFailurePolicy.maximumRetryLimit
+                        )
+                        .accessibilityIdentifier("run-retry-limit")
+                    }
+                    TextField(
+                        "Custom failure instructions (optional)",
+                        text: $viewModel.failureInstructions,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                    .accessibilityIdentifier("run-failure-instructions")
                     LabeledContent("Continuity", value: "Automatic")
                 }
             }
@@ -512,13 +556,32 @@ struct AutonomyOperatorView: View {
         .sheet(isPresented: $showingCompletionChecks) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Automatic Completion Checks").font(.title2.bold())
+                    Text("Completion Checks").font(.title2.bold())
                     Spacer()
                     GuidedHelpButton(context: .autonomyCompletionChecks)
                 }
-                Text("Forge derives checks from the selected instructions and project structure. Custom signed policies remain available for specialized tasks after a run is prepared.")
+                Text("Choose the deterministic checks Forge must satisfy before this task can complete. Forge may also derive relevant checks from the project and instructions.")
                     .foregroundStyle(.secondary)
+                ForEach(CompletionCheckPreset.allCases) { check in
+                    Toggle(
+                        isOn: Binding(
+                            get: { viewModel.selectedCompletionChecks.contains(check) },
+                            set: { viewModel.setCompletionCheck(check, selected: $0) }
+                        )
+                    ) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(check.title)
+                            Text(check.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    .accessibilityIdentifier("run-completion-check-\(check.rawValue)")
+                }
+                Divider()
                 if let plan = viewModel.preparedCompletionPlan, !plan.obligations.isEmpty {
+                    Text("Prepared validation plan").font(.caption.weight(.semibold))
                     ForEach(plan.obligations) { obligation in
                         VStack(alignment: .leading, spacing: 3) {
                             Label(obligation.title, systemImage: "checkmark.seal")
@@ -545,7 +608,7 @@ struct AutonomyOperatorView: View {
                 }
             }
             .padding(22)
-            .frame(width: 560, height: 380)
+            .frame(width: 620, height: 640)
             .guidedHelpContext(.autonomyCompletionChecks)
         }
     }

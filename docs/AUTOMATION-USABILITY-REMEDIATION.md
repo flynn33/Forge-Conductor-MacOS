@@ -438,11 +438,40 @@ acceptance now reflects the production contract that an immutable configured
 candidate remains identifiable as unavailable with `probe_failed` after its
 probe fails.
 
-The product identity remains `0.10.0 (2)` because revision 3 did not select a
-new release version or build number. All Phase 7 source and test edits are in
+At the Phase 7 checkpoint, the product identity remained `0.10.0 (2)` because
+that revision did not select a new release version or build number. All Phase 7 source and test edits are in
 files already owned by the canonical SwiftPM and Xcode targets, so no Xcode
 project-graph change is required. Distribution, notarization, Gatekeeper, and
 owner shipment remain separate qualification work.
+
+## Autonomy operability and settled-task lifecycle
+
+The GUI-hosted Manager now starts the same durable autonomy watchdog owned by
+the blocking CLI Manager path. Recovery, service start, and watchdog start form
+one fail-forward embedded-runtime operation; a startup failure stops both the
+watchdog and managed Autonomy. This closes the observed state where the GUI
+reported Autonomy started while yielded work was never rediscovered.
+
+Autonomy also exposes **Delete Task…** only for completed, cancelled, or
+terminally failed runs. The authenticated request carries the exact run,
+project, and generation identities. Repository deletion runs transactionally,
+rejects unsettled runtime jobs, removes run-scoped provider/session/tool/event
+and job history through existing foreign-key ownership, preserves project
+files, and returns a typed receipt. Nonterminal and stale-generation requests
+fail closed.
+
+Routine Completion Checks are now a selectable native checklist. Stable preset
+identifiers compile into typed obligations for build success, warning-free
+complete output, tests, full instruction delivery, and reconciled operations;
+only unknown configured identifiers remain signed custom-native gates. The
+task descriptor also binds a typed failure policy: pause for review, bounded
+automatic retry, or terminal stop, with optional bounded instructions included
+in the managed model context. Retry exhaustion pauses for review.
+
+Rig projects durable progress from the same instruction-delivery journal used
+by continuity. Fully delivered documents are counted as steps, terminally
+completed queue items are counted as packages, and the view-owned five-second
+refresh stops when Rig detaches.
 
 ## Verification
 

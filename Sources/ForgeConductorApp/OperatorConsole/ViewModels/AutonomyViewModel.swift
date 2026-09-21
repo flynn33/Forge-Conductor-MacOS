@@ -35,12 +35,17 @@ final class AutonomyViewModel: ObservableObject {
     @Published var modelOverrideKey = ""
     @Published var allowedTools = ""
     @Published var completionGates = ""
+    @Published var selectedCompletionChecks = CompletionCheckPreset.defaults
+    @Published var failureBehavior = AutonomousFailureBehavior.retryAutomatically
+    @Published var maximumRetries = 3
+    @Published var failureInstructions = ""
     @Published var networkAllowed = false
     @Published private(set) var isLoading = false
     @Published private(set) var isStarting = false
     @Published private(set) var startRequiresReconciliation = false
     @Published private(set) var lastStartedRunID: String?
     @Published private(set) var controlInFlight: OperatorRunControlAction?
+    @Published private(set) var deletionInFlight = false
     @Published private(set) var policyImportInFlight = false
     @Published private(set) var toolPermissionUpdateInFlight = false
     @Published private(set) var errorMessage: String?
@@ -61,6 +66,16 @@ final class AutonomyViewModel: ObservableObject {
     var selectedProject: OperatorProject? { projects.first { $0.projectID == selectedProjectID } }
     var preparedCompletionPlan: AutomaticCompletionPlan? {
         projectRunPreparation?.descriptor?.validationPlan.automaticPlan
+    }
+
+    var completionSelectionSummary: String {
+        "\(selectedCompletionChecks.count) selected"
+    }
+
+    func setCompletionCheck(_ check: CompletionCheckPreset, selected: Bool) {
+        if selected { selectedCompletionChecks.insert(check) }
+        else { selectedCompletionChecks.remove(check) }
+        projectRunPreparation = nil
     }
 
     var taskDraft: AutonomyTaskDraft {
@@ -415,7 +430,13 @@ final class AutonomyViewModel: ObservableObject {
         let modelKey = modelKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let modelOverrideKey = modelOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let allowedTools = parsedList(allowedTools)
-        let completionGates = parsedList(completionGates)
+        let customCompletionGates = parsedList(completionGates).filter {
+            $0 != ProjectInstructionQueueStore.builtInCompletionGate
+                && CompletionCheckPreset(rawValue: $0) == nil
+        }
+        let completionGates = [ProjectInstructionQueueStore.builtInCompletionGate]
+            + selectedCompletionChecks.map(\.rawValue).sorted()
+            + customCompletionGates
         let preparation = runPreparation
         let projectPermissions = toolPermissions.flatMap {
             $0.projectID == project.projectID
@@ -447,6 +468,11 @@ final class AutonomyViewModel: ObservableObject {
             completionGates: completionGates.isEmpty
                 || completionGates == preparation?.completionGates
                 ? nil : completionGates,
+            failurePolicy: AutonomousFailurePolicy(
+                behavior: failureBehavior,
+                maximumRetries: failureBehavior == .retryAutomatically ? maximumRetries : 0,
+                customInstructions: failureInstructions.nilIfBlank
+            ),
             networkAllowed: networkAllowed == preparation?.networkAllowed
                 ? nil : networkAllowed,
             expectedProviderConfigurationRevision:
@@ -660,6 +686,9 @@ final class AutonomyViewModel: ObservableObject {
         selectedInstructionPackageIDs = []
         assignmentID = ""
         modelOverrideKey = ""
+        failureBehavior = .retryAutomatically
+        maximumRetries = 3
+        failureInstructions = ""
         startRequiresReconciliation = false
     }
 
@@ -817,6 +846,35 @@ final class AutonomyViewModel: ObservableObject {
             if shouldReload {
                 load()
             }
+        }
+    }
+
+    func canDelete(_ run: OperatorRun) -> Bool {
+        !deletionInFlight
+            && controlInFlight == nil
+            && ["completed", "cancelled", "failed_terminal"].contains(run.state)
+    }
+
+    func deleteSelectedRun() {
+        guard let run = selectedRun, canDelete(run) else { return }
+        deletionInFlight = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await client.deleteRun(
+                    runID: run.runID,
+                    projectID: run.projectID,
+                    generation: run.projectGeneration
+                )
+                runs.removeAll { $0.runID == run.runID }
+                selectedRunID = runs.first?.runID
+                notice = "Task deleted from Forge run history. Project files were not changed."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            deletionInFlight = false
         }
     }
 

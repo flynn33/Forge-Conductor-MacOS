@@ -7989,6 +7989,86 @@ public actor ProjectControlPlaneRepository {
         try autonomousRunUnlocked(runID, connection: requiredConnection())
     }
 
+    /// Deletes one terminal run and the same run-scoped history removed by the
+    /// existing project-wide completed-history command. Nonterminal work and
+    /// unsettled runtime jobs fail closed.
+    public func deleteTerminalAutonomousRun(
+        runID: RunID,
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration
+    ) throws -> AutonomousRunDeletionReceipt {
+        try Self.validate(expectedGeneration)
+        return try controlledTransaction(cancellation: nil) { connection in
+            guard let run = try autonomousRunUnlocked(runID, connection: connection) else {
+                throw AutonomyError.runNotFound(runID)
+            }
+            guard run.projectID == projectID,
+                  run.projectGeneration == expectedGeneration else {
+                throw AutonomyError.runConflict(runID)
+            }
+            guard run.state.isTerminal else {
+                throw AutonomyError.invalidRequest(
+                    "Only completed, cancelled, or terminally failed tasks can be deleted"
+                )
+            }
+            let unsettledJobs = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM execution_jobs
+                WHERE run_id=? AND state NOT IN
+                    ('completed','failed','timed_out','cancelled','quarantined_stale')
+                """,
+                bindings: [.text(runID.description)]
+            )
+            guard unsettledJobs == 0 else {
+                throw AutonomyError.invalidRequest(
+                    "The task still owns unsettled runtime work and cannot be deleted"
+                )
+            }
+
+            try connection.execute(
+                "DELETE FROM autonomy_events WHERE run_id=?",
+                bindings: [.text(runID.description)]
+            )
+            try connection.execute(
+                "DELETE FROM native_source_provider_run_offsets WHERE run_id=?",
+                bindings: [.text(runID.description)]
+            )
+            try connection.execute(
+                "DELETE FROM native_source_run_offsets WHERE run_id=?",
+                bindings: [.text(runID.description)]
+            )
+            try connection.execute(
+                "DELETE FROM execution_jobs WHERE run_id=?",
+                bindings: [.text(runID.description)]
+            )
+            let removed = try connection.execute(
+                "DELETE FROM autonomous_runs WHERE run_id=? AND state IN ('completed','cancelled','failed_terminal')",
+                bindings: [.text(runID.description)]
+            )
+            guard removed == 1 else { throw AutonomyError.transitionConflict }
+            let deletedAt = ISO8601.string(from: clock.now())
+            try appendEventUnlocked(
+                projectID: projectID,
+                eventType: "autonomous_run_deleted",
+                severity: "info",
+                summary: "A settled task was deleted from run history",
+                metadata: [
+                    "run_id": runID.description,
+                    "project_generation": String(expectedGeneration.rawValue),
+                    "prior_state": run.state.rawValue,
+                ],
+                connection: connection
+            )
+            return AutonomousRunDeletionReceipt(
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: expectedGeneration,
+                priorState: run.state,
+                deletedAt: deletedAt
+            )
+        }
+    }
+
     public func operatorAutonomousRuns(limit: Int) throws -> [AutonomousRunRecord] {
         guard (1...100).contains(limit) else {
             throw AutonomyError.invalidRequest("operator run limit must be between 1 and 100")

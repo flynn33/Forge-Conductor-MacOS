@@ -10,6 +10,125 @@ import AppKit
 import ForgeConductorCore
 import SwiftUI
 
+struct RigOperationalSnapshot: Sendable, Equatable {
+    var providerHealth: String?
+    var providerModel: String?
+    var autonomyStarted: Bool?
+    var autonomyActiveCount: Int
+    var autonomyDeferredCount: Int
+    var continuityAutomaticCount: Int
+    var continuityActiveCount: Int
+    var continuityBlockedCount: Int
+    var continuityContextLoad: Double?
+    var runeForgeState: StjornarvaldManagerState?
+    var runeForgeActiveSourceCount: Int
+    var runeForgeSelectedSourceCount: Int
+    var runeForgeIndexedSourceCount: Int
+    var runeForgeProcessedObservationCount: Int
+    var projectName: String?
+    var projectCompletedSteps: Int
+    var projectTotalSteps: Int
+    var projectCompletedPackages: Int
+    var projectTotalPackages: Int
+    var projectProgressState: String?
+
+    static let unavailable = RigOperationalSnapshot(
+        providerHealth: nil,
+        providerModel: nil,
+        autonomyStarted: nil,
+        autonomyActiveCount: 0,
+        autonomyDeferredCount: 0,
+        continuityAutomaticCount: 0,
+        continuityActiveCount: 0,
+        continuityBlockedCount: 0,
+        continuityContextLoad: nil,
+        runeForgeState: nil,
+        runeForgeActiveSourceCount: 0,
+        runeForgeSelectedSourceCount: 0,
+        runeForgeIndexedSourceCount: 0,
+        runeForgeProcessedObservationCount: 0,
+        projectName: nil,
+        projectCompletedSteps: 0,
+        projectTotalSteps: 0,
+        projectCompletedPackages: 0,
+        projectTotalPackages: 0,
+        projectProgressState: nil
+    )
+
+    static func compose(
+        operatorSnapshot: OperatorSnapshot?,
+        autonomy: OperatorAutonomySummary?,
+        runeForge: StjornarvaldManagerSnapshot?,
+        instructionQueue: OperatorInstructionQueue? = nil,
+        progressProject: OperatorProject? = nil
+    ) -> Self {
+        let automaticContinuity = operatorSnapshot?.continuityReadiness.filter(\.automatic) ?? []
+        let activeContinuityStates: Set<ManagedContinuityDisplayState> = [
+            .savingProgress, .rolloverQueued, .quiescing, .creatingSuccessor,
+            .restoring, .continuing,
+        ]
+        let blockedContinuityStates: Set<ManagedContinuityDisplayState> = [
+            .waitingForProvider, .blocked, .unavailable,
+        ]
+        let contextLoads = automaticContinuity.compactMap { readiness -> Double? in
+            guard let used = readiness.usedTokens,
+                  let capacity = readiness.capacityTokens,
+                  capacity > 0 else { return nil }
+            return min(max(Double(used) / Double(capacity), 0), 1)
+        }
+        let activeSources = runeForge?.sources.filter(\.active) ?? []
+        let selectedSources = activeSources.filter { $0.origin == .userSelected }
+        let indexedSources = activeSources.filter {
+            $0.interpretationState == .indexed || $0.interpretationState == .partiallyIndexed
+        }
+        let packages = instructionQueue?.packages ?? []
+        let completedPackages = packages.filter { $0.state == "completed" }.count
+        let completedSteps = packages.reduce(0) {
+            $0 + ($1.completedStepCount ?? ($1.state == "completed" ? $1.documentCount ?? 0 : 0))
+        }
+        let totalSteps = packages.reduce(0) {
+            $0 + ($1.totalStepCount ?? $1.documentCount ?? 0)
+        }
+        let progressState: String? = if packages.isEmpty {
+            progressProject == nil ? nil : "NO PACKAGES"
+        } else if packages.contains(where: { $0.state == "failed" || $0.state == "blocked" }) {
+            "ATTENTION"
+        } else if completedPackages == packages.count {
+            "COMPLETE"
+        } else if instructionQueue?.running == true {
+            "RUNNING"
+        } else {
+            "QUEUED"
+        }
+        return Self(
+            providerHealth: operatorSnapshot?.provider?.health,
+            providerModel: operatorSnapshot?.provider?.modelKey,
+            autonomyStarted: autonomy?.started,
+            autonomyActiveCount: autonomy?.activeRunIDs.count ?? 0,
+            autonomyDeferredCount: autonomy?.deferredRunIDs.count ?? 0,
+            continuityAutomaticCount: automaticContinuity.count,
+            continuityActiveCount: automaticContinuity.filter {
+                activeContinuityStates.contains($0.state)
+            }.count,
+            continuityBlockedCount: automaticContinuity.filter {
+                blockedContinuityStates.contains($0.state)
+            }.count,
+            continuityContextLoad: contextLoads.max(),
+            runeForgeState: runeForge?.health.state,
+            runeForgeActiveSourceCount: activeSources.count,
+            runeForgeSelectedSourceCount: selectedSources.count,
+            runeForgeIndexedSourceCount: indexedSources.count,
+            runeForgeProcessedObservationCount: runeForge?.health.processedObservationCount ?? 0,
+            projectName: progressProject?.displayName,
+            projectCompletedSteps: completedSteps,
+            projectTotalSteps: totalSteps,
+            projectCompletedPackages: completedPackages,
+            projectTotalPackages: packages.count,
+            projectProgressState: progressState
+        )
+    }
+}
+
 struct AppBootstrapSnapshot: Sendable {
     let app: ForgeApp
     let pluginStatus: LMStudioMCPPluginInstaller.PluginStatus?
@@ -179,6 +298,7 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var lastExportMessage: String?
     @Published public private(set) var measuredTelemetryHz: Double = 0
     @Published public private(set) var runtimeDiagnosticSnapshot: RuntimeDiagnosticSnapshot?
+    @Published private(set) var rigOperationalSnapshot = RigOperationalSnapshot.unavailable
     @Published public var autoRefresh = true {
         didSet { telemetryBinding.autoRefresh = autoRefresh }
     }
@@ -221,6 +341,7 @@ public final class AppModel: ObservableObject {
     private var managerPoll: AnyCancellable?
     private var telemetryBag: AnyCancellable?
     private var managerPollInFlight = false
+    private var rigOperationalTask: Task<Void, Never>?
     private var remoteManagerLastError: String?
     private let bootstrapOperation: AppBootstrapOperation
     private let settingsOperation = AppBackgroundOperation()
@@ -318,6 +439,56 @@ public final class AppModel: ObservableObject {
         pluginStatusOperation.cancel()
         deploymentOperation.cancel()
         diagnosticsExportOperation.cancel()
+        stopRigOperationalMonitoring()
+    }
+
+    func startRigOperationalMonitoring() {
+        guard rigOperationalTask == nil else { return }
+        rigOperationalTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                await refreshRigOperationalSnapshot()
+                do { try await Task.sleep(for: .seconds(5)) }
+                catch { return }
+            }
+        }
+    }
+
+    func stopRigOperationalMonitoring() {
+        rigOperationalTask?.cancel()
+        rigOperationalTask = nil
+    }
+
+    private func refreshRigOperationalSnapshot() async {
+        async let operatorRequest: OperatorSnapshot? = try? operatorManagerClient.snapshot(limit: 100)
+        async let autonomyRequest: OperatorAutonomySummary? = try? operatorManagerClient.autonomyStatus()
+        async let runeForgeRequest: StjornarvaldManagerSnapshot? = try? operatorManagerClient.runeForgeSnapshot()
+        let (operatorSnapshot, autonomy, runeForge) = await (
+            operatorRequest, autonomyRequest, runeForgeRequest
+        )
+        let terminalStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
+        let activeRun = operatorSnapshot?.runs.first { !terminalStates.contains($0.state) }
+        let progressProject = operatorSnapshot?.projects.first {
+            $0.projectID == activeRun?.projectID
+                && $0.projectGeneration == activeRun?.projectGeneration
+        } ?? operatorSnapshot?.projects.first
+        let instructionQueue: OperatorInstructionQueue?
+        if let progressProject {
+            instructionQueue = try? await operatorManagerClient.instructionQueue(
+                projectID: progressProject.projectID,
+                generation: progressProject.projectGeneration
+            )
+        } else {
+            instructionQueue = nil
+        }
+        guard !Task.isCancelled else { return }
+        rigOperationalSnapshot = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: autonomy,
+            runeForge: runeForge,
+            instructionQueue: instructionQueue,
+            progressProject: progressProject
+        )
     }
 
     func stopBootstrap() async {
@@ -421,13 +592,7 @@ public final class AppModel: ObservableObject {
             let node = ManagerNode(app: forgeApp)
             do {
                 let status = try await Task.detached {
-                    do {
-                        _ = try node.recoverManagedAutonomy()
-                        return try node.startService()
-                    } catch {
-                        node.shutdownManagedAutonomy()
-                        throw error
-                    }
+                    try node.startEmbeddedRuntime()
                 }.value
                 manager = node
                 remoteManager = nil

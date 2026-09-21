@@ -53,9 +53,60 @@ public enum AutonomyResourceProfile: String, Codable, Sendable, CaseIterable {
     case automatic
 }
 
+public enum AutonomousFailureBehavior: String, Codable, Sendable, CaseIterable, Identifiable {
+    case pauseForReview = "pause_for_review"
+    case retryAutomatically = "retry_automatically"
+    case stopTask = "stop_task"
+
+    public var id: String { rawValue }
+}
+
+public struct AutonomousFailurePolicy: Codable, Sendable, Equatable {
+    public static let maximumRetryLimit = 10
+    public static let maximumInstructionBytes = 4_096
+
+    public let behavior: AutonomousFailureBehavior
+    public let maximumRetries: Int
+    public let customInstructions: String?
+
+    public init(
+        behavior: AutonomousFailureBehavior = .retryAutomatically,
+        maximumRetries: Int = 3,
+        customInstructions: String? = nil
+    ) {
+        self.behavior = behavior
+        self.maximumRetries = maximumRetries
+        self.customInstructions = customInstructions
+    }
+
+    public static let `default` = AutonomousFailurePolicy()
+
+    public func validated() throws -> Self {
+        guard (0...Self.maximumRetryLimit).contains(maximumRetries) else {
+            throw AutonomyError.invalidRequest("maximum_retries must be between 0 and 10")
+        }
+        if let customInstructions {
+            guard customInstructions == customInstructions.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !customInstructions.isEmpty,
+                  customInstructions.utf8.count <= Self.maximumInstructionBytes else {
+                throw AutonomyError.invalidRequest("failure instructions must be trimmed and at most 4096 bytes")
+            }
+        }
+        return self
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case behavior
+        case maximumRetries = "maximum_retries"
+        case customInstructions = "custom_instructions"
+    }
+}
+
 public enum CompletionObligationKind: String, Codable, Sendable, CaseIterable {
     case projectBuild = "project_build"
+    case projectBuildNoWarnings = "project_build_no_warnings"
     case projectTests = "project_tests"
+    case instructionDeliveryComplete = "instruction_delivery_complete"
     case requestedFileExists = "requested_file_exists"
     case requestedContentAssertion = "requested_content_assertion"
     case structuredDocumentValid = "structured_document_valid"
@@ -64,6 +115,47 @@ public enum CompletionObligationKind: String, Codable, Sendable, CaseIterable {
     case runtimeJobSucceeded = "runtime_job_succeeded"
     case noRelevantUnresolvedSideEffect = "no_relevant_unresolved_side_effect"
     case customNativeGate = "custom_native_gate"
+}
+
+/// Stable manager-recognized completion choices exposed by the native task UI.
+/// The built-in gate remains the compiled validator; these identifiers select
+/// typed obligations and never invoke an arbitrary executable policy.
+public enum CompletionCheckPreset: String, Codable, Sendable, CaseIterable, Identifiable {
+    case buildableProject = "forge.completion.buildable-project"
+    case noErrors = "forge.completion.no-errors"
+    case noWarnings = "forge.completion.no-warnings"
+    case testsPass = "forge.completion.tests-pass"
+    case instructionPackagesComplete = "forge.completion.instruction-packages-complete"
+    case noUnresolvedOperations = "forge.completion.no-unresolved-operations"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .buildableProject: "Buildable project"
+        case .noErrors: "No build errors"
+        case .noWarnings: "No build warnings"
+        case .testsPass: "Available tests pass"
+        case .instructionPackagesComplete: "Instruction packages complete"
+        case .noUnresolvedOperations: "No unresolved operations"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .buildableProject: "Require a successful SwiftPM or Xcode build when the project is buildable."
+        case .noErrors: "Require the latest relevant build command to complete successfully."
+        case .noWarnings: "Require complete build output with no compiler warning diagnostics."
+        case .testsPass: "Require the latest relevant SwiftPM or Xcode test command to pass."
+        case .instructionPackagesComplete: "Require every instruction document to be delivered to the model."
+        case .noUnresolvedOperations: "Require every in-flight or ambiguous side effect to be reconciled."
+        }
+    }
+
+    public static let defaults: Set<Self> = [
+        .buildableProject, .noErrors, .noWarnings, .instructionPackagesComplete,
+        .noUnresolvedOperations,
+    ]
 }
 
 public enum CompletionEvidenceRequirement: String, Codable, Sendable, CaseIterable {
@@ -166,6 +258,7 @@ public struct AutonomousRunSpecification: Codable, Sendable, Equatable {
     public let completionGates: [String]
     public let completionPlan: AutomaticCompletionPlan?
     public let resourceProfile: AutonomyResourceProfile
+    public let failurePolicy: AutonomousFailurePolicy
     public var work: AutonomousRunWork
 
     public init(
@@ -173,12 +266,14 @@ public struct AutonomousRunSpecification: Codable, Sendable, Equatable {
         completionGates: [String],
         completionPlan: AutomaticCompletionPlan? = nil,
         resourceProfile: AutonomyResourceProfile = .automatic,
+        failurePolicy: AutonomousFailurePolicy = .default,
         work: AutonomousRunWork = .init()
     ) {
         self.allowedTools = allowedTools
         self.completionGates = completionGates
         self.completionPlan = completionPlan
         self.resourceProfile = resourceProfile
+        self.failurePolicy = failurePolicy
         self.work = work
     }
 
@@ -187,7 +282,20 @@ public struct AutonomousRunSpecification: Codable, Sendable, Equatable {
         case completionGates = "completion_gates"
         case completionPlan = "completion_plan"
         case resourceProfile = "resource_profile"
+        case failurePolicy = "failure_policy"
         case work
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        allowedTools = try values.decode([String].self, forKey: .allowedTools)
+        completionGates = try values.decode([String].self, forKey: .completionGates)
+        completionPlan = try values.decodeIfPresent(AutomaticCompletionPlan.self, forKey: .completionPlan)
+        resourceProfile = try values.decodeIfPresent(AutonomyResourceProfile.self, forKey: .resourceProfile)
+            ?? .automatic
+        failurePolicy = try values.decodeIfPresent(AutonomousFailurePolicy.self, forKey: .failurePolicy)
+            ?? .default
+        work = try values.decodeIfPresent(AutonomousRunWork.self, forKey: .work) ?? .init()
     }
 }
 
@@ -333,6 +441,81 @@ public struct AutonomousRunRecord: Codable, Sendable, Equatable {
     /// the exact plugin registration used to create and recover sessions.
     public var adapterID: String? {
         specification.work.metadata["adapter_id"]
+    }
+}
+
+/// Exact receipt for removing one settled task from the operator-visible run
+/// history. Project files and separately retained continuity authority
+/// tombstones are outside this deletion boundary.
+public struct AutonomousRunDeletionReceipt: Codable, Sendable, Equatable {
+    public let runID: RunID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let priorState: AutonomousRunState
+    public let deletedAt: String
+
+    public init(
+        runID: RunID,
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        priorState: AutonomousRunState,
+        deletedAt: String
+    ) {
+        self.runID = runID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.priorState = priorState
+        self.deletedAt = deletedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case priorState = "prior_state"
+        case deletedAt = "deleted_at"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let runValue = try container.decode(String.self, forKey: .runID)
+        let projectValue = try container.decode(String.self, forKey: .projectID)
+        guard let runUUID = UUID(uuidString: runValue) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .runID,
+                in: container,
+                debugDescription: "run_id must be a UUID"
+            )
+        }
+        guard let projectUUID = UUID(uuidString: projectValue) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .projectID,
+                in: container,
+                debugDescription: "project_id must be a UUID"
+            )
+        }
+        let generation = try container.decode(UInt64.self, forKey: .projectGeneration)
+        guard generation > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .projectGeneration,
+                in: container,
+                debugDescription: "project_generation must be positive"
+            )
+        }
+        runID = RunID(runUUID)
+        projectID = ProjectID(projectUUID)
+        projectGeneration = ProjectGeneration(generation)
+        priorState = try container.decode(AutonomousRunState.self, forKey: .priorState)
+        deletedAt = try container.decode(String.self, forKey: .deletedAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(runID.description, forKey: .runID)
+        try container.encode(projectID.description, forKey: .projectID)
+        try container.encode(projectGeneration.rawValue, forKey: .projectGeneration)
+        try container.encode(priorState, forKey: .priorState)
+        try container.encode(deletedAt, forKey: .deletedAt)
     }
 }
 

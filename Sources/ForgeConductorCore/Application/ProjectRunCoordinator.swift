@@ -437,7 +437,42 @@ public actor ProjectRunCoordinator {
                 if stopped || error is CancellationError {
                     break
                 }
-                let attempt = max(1, steps + 1)
+                let failurePolicy = try run.specification.failurePolicy.validated()
+                let priorRetryCount = Int(run.specification.work.metadata["failure_retry_count"] ?? "0") ?? 0
+                let nextRetryCount = priorRetryCount + 1
+                if failurePolicy.behavior == .pauseForReview {
+                    run = try await transition(
+                        run, to: .paused, lease: lease,
+                        event: "autonomous_run_paused_after_failure",
+                        summary: failurePolicy.customInstructions ?? "Task paused for review after a failure",
+                        errorCode: "run_step_failed",
+                        errorSummary: String(error.localizedDescription.prefix(2_048))
+                    )
+                    break
+                }
+                if failurePolicy.behavior == .stopTask {
+                    run = try await transition(
+                        run, to: .failedTerminal, lease: lease,
+                        event: "autonomous_run_stopped_after_failure",
+                        summary: failurePolicy.customInstructions ?? "Task stopped after a failure",
+                        errorCode: "run_step_failed",
+                        errorSummary: String(error.localizedDescription.prefix(2_048))
+                    )
+                    break
+                }
+                if nextRetryCount > failurePolicy.maximumRetries {
+                    run = try await transition(
+                        run, to: .paused, lease: lease,
+                        event: "autonomous_run_retry_limit_reached",
+                        summary: "Automatic retry limit reached; review is required",
+                        errorCode: "retry_limit_reached",
+                        errorSummary: String(error.localizedDescription.prefix(2_048))
+                    )
+                    break
+                }
+                var retryWork = run.specification.work
+                retryWork.metadata["failure_retry_count"] = String(nextRetryCount)
+                let attempt = max(1, nextRetryCount)
                 let seed = AutonomyRetryPolicy.deterministicSeed(runID: runID, attempt: attempt)
                 let policyDelay = try retryPolicy.delay(
                     attempt: min(attempt, retryPolicy.maximumAttempts),
@@ -463,6 +498,7 @@ public actor ProjectRunCoordinator {
                             run, to: .waitingProvider, lease: lease,
                             event: "autonomous_run_waiting_provider",
                             summary: "Managed provider is temporarily unavailable",
+                            work: retryWork,
                             errorCode: failure.managedProviderFailureCode,
                             errorSummary: summary,
                             retryAt: ISO8601.string(from: clock.now().addingTimeInterval(delay))
@@ -488,6 +524,7 @@ public actor ProjectRunCoordinator {
                             run, to: .failedRecoverable, lease: lease,
                             event: "autonomous_run_failed_recoverable",
                             summary: "Managed provider execution can be recovered",
+                            work: retryWork,
                             errorCode: failure.managedProviderFailureCode,
                             errorSummary: summary
                         )
@@ -507,6 +544,7 @@ public actor ProjectRunCoordinator {
                         lease: lease,
                         event: "autonomous_run_waiting_provider",
                         summary: "Run yielded after a transient execution failure",
+                        work: retryWork,
                         errorCode: "run_step_failed",
                         errorSummary: summary,
                         retryAt: ISO8601.string(

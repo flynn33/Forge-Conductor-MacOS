@@ -174,6 +174,13 @@ atomic queue-file commit makes it visible. Every record carries the project UUID
 and generation; the autonomous run receives the registered repository root as
 its tool scope rather than authority over the instruction source location.
 
+The queue projection augments each linked run with bounded, journal-derived
+instruction-delivery counts. Rig treats fully delivered instruction documents
+as steps and completed queue records as packages. Completion presets use stable
+identifiers that the manager compiles into typed native obligations; unknown
+identifiers remain advanced signed native gates. Each prepared descriptor also
+binds a validated failure policy and optional bounded model-facing instructions.
+
 `ManagerNode` is the single scheduler. Its existing bounded autonomy watchdog
 reconciles durable package/run links, observes terminal run state, and starts at
 most the next queued package for a project. The run identifier is persisted in
@@ -305,5 +312,5 @@ The staged bundle contains `Contents/Helpers/forge-conductor`,
 `Contents/MacOS/forge-filesystem-daemon`. Nested code is signed before the app
 seal and each artifact is strictly verified.
 
-Version: `0.10.0`
+Version: `0.11.0`
 Build: `2`

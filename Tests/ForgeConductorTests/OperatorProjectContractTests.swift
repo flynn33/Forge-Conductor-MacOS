@@ -276,7 +276,12 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertNil(defaultRequest.adapterID)
         XCTAssertNil(defaultRequest.modelKey)
         XCTAssertNil(defaultRequest.allowedTools)
-        XCTAssertNil(defaultRequest.completionGates)
+        XCTAssertEqual(
+            Set(try XCTUnwrap(defaultRequest.completionGates)),
+            Set([ProjectInstructionQueueStore.builtInCompletionGate]
+                + CompletionCheckPreset.defaults.map(\.rawValue))
+        )
+        XCTAssertEqual(defaultRequest.failurePolicy, .default)
         XCTAssertNil(defaultRequest.networkAllowed)
         let defaultBody = try XCTUnwrap(
             JSONSerialization.jsonObject(with: JSONEncoder().encode(defaultRequest))
@@ -288,6 +293,7 @@ final class OperatorProjectContractTests: XCTestCase {
                 "run_id", "project_id", "project_generation", "mission",
                 "expected_provider_configuration_revision",
                 "expected_tool_catalog_revision",
+                "completion_gates", "failure_policy",
                 "maximum_inline_output_bytes",
             ]
         )
@@ -304,6 +310,8 @@ final class OperatorProjectContractTests: XCTestCase {
         viewModel.allowedTools = "fs_read"
         viewModel.completionGates = "fixture-check"
         viewModel.networkAllowed = true
+        viewModel.failureBehavior = .pauseForReview
+        viewModel.failureInstructions = "Preserve the failing evidence for operator review."
         viewModel.load()
         try await Self.waitUntilIdle(viewModel)
 
@@ -316,8 +324,18 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertNil(overrideRequest.adapterID)
         XCTAssertEqual(overrideRequest.modelKey, "fixture/pinned-model")
         XCTAssertEqual(overrideRequest.allowedTools, ["fs_read"])
-        XCTAssertEqual(overrideRequest.completionGates, ["fixture-check"])
+        XCTAssertEqual(
+            Set(try XCTUnwrap(overrideRequest.completionGates)),
+            Set([ProjectInstructionQueueStore.builtInCompletionGate, "fixture-check"]
+                + CompletionCheckPreset.defaults.map(\.rawValue))
+        )
         XCTAssertEqual(overrideRequest.networkAllowed, true)
+        XCTAssertEqual(overrideRequest.failurePolicy.behavior, .pauseForReview)
+        XCTAssertEqual(overrideRequest.failurePolicy.maximumRetries, 0)
+        XCTAssertEqual(
+            overrideRequest.failurePolicy.customInstructions,
+            "Preserve the failing evidence for operator review."
+        )
 
         let overrideDigest = String(repeating: "b", count: 64)
         let overrideBootstrap = "Follow the run instruction artifact. Snapshot: \(overrideDigest)"
@@ -1133,6 +1151,56 @@ final class OperatorProjectContractTests: XCTestCase {
                 "/api/manager/projects/remove",
             ]
         )
+    }
+
+    func testTaskDeletionUsesExactTypedIdentityAndValidatesReceipt() async throws {
+        let runID = UUID().uuidString.lowercased()
+        let projectID = UUID().uuidString.lowercased()
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/runs/delete": try JSONSupport.data(from: [
+                "run_id": runID,
+                "project_id": projectID,
+                "project_generation": UInt64(3),
+                "prior_state": "completed",
+                "deleted_at": "2026-09-21T12:00:00Z",
+            ]),
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        )
+
+        let receipt = try await client.deleteRun(
+            runID: runID,
+            projectID: projectID,
+            generation: 3
+        )
+
+        XCTAssertEqual(receipt.runID.description, runID)
+        XCTAssertEqual(receipt.projectID.description, projectID)
+        XCTAssertEqual(receipt.projectGeneration.rawValue, 3)
+        XCTAssertEqual(receipt.priorState, .completed)
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedPaths(),
+            ["/api/manager/runs/delete"]
+        )
+        let request = try JSONSupport.object(
+            from: try XCTUnwrap(
+                OperatorProjectContractURLProtocol.requestedBodies(
+                    path: "/api/manager/runs/delete"
+                ).first
+            )
+        )
+        XCTAssertEqual(Set(request.keys), ["run_id", "project_id", "project_generation"])
+        XCTAssertEqual(request["run_id"] as? String, runID)
+        XCTAssertEqual(request["project_id"] as? String, projectID)
+        XCTAssertEqual(request["project_generation"] as? UInt64, 3)
     }
 
     func testInstructionQueueClientLoadsStableBoundedPages() async throws {

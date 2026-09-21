@@ -411,6 +411,65 @@ final class ProjectContentClearTests: XCTestCase {
         }
     }
 
+    func testSingleTaskDeletionRemovesOnlyExactTerminalRunAndRejectsActiveRun() async throws {
+        let app = try configuredApp()
+        defer { app.shutdown() }
+        let manager = ManagerNode(app: app)
+        let projectID = try register(projectA, named: "Task Deletion Project", using: manager)
+        let terminal = try await app.projectContexts.repository.createAutonomousRun(
+            runRequest(projectID: projectID, mission: "Delete this settled task")
+        )
+        let active = try await app.projectContexts.repository.createAutonomousRun(
+            runRequest(projectID: projectID, mission: "Preserve this active task")
+        )
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: terminal.runID,
+            ownerID: "task-deletion-fixture"
+        )
+        _ = try await app.projectContexts.repository.transitionAutonomousRun(
+            runID: terminal.runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: .created,
+                expectedRevision: terminal.revision,
+                nextState: .failedTerminal,
+                eventType: "fixture_run_terminal",
+                eventSummary: "Fixture run is safe to delete",
+                errorCode: "fixture_terminal",
+                errorSummary: "Intentional terminal deletion fixture"
+            )
+        )
+
+        let receipt = try manager.deleteAutonomousRun(
+            runID: terminal.runID,
+            projectID: projectID,
+            expectedGeneration: .initial
+        )
+        XCTAssertEqual(receipt.runID, terminal.runID)
+        XCTAssertEqual(receipt.projectID, projectID)
+        XCTAssertEqual(receipt.projectGeneration, .initial)
+        XCTAssertEqual(receipt.priorState, .failedTerminal)
+        XCTAssertNotNil(ISO8601.date(from: receipt.deletedAt))
+        let removedRun = try await app.projectContexts.repository.autonomousRun(terminal.runID)
+        let preservedActiveRun = try await app.projectContexts.repository.autonomousRun(active.runID)
+        XCTAssertNil(removedRun)
+        XCTAssertNotNil(preservedActiveRun)
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await app.projectContexts.repository.deleteTerminalAutonomousRun(
+                runID: active.runID,
+                projectID: projectID,
+                expectedGeneration: .initial
+            )
+        } verify: { error in
+            guard case .invalidRequest = error as? AutonomyError else {
+                return XCTFail("Expected nonterminal deletion to fail closed, got \(error)")
+            }
+        }
+        let activeRunAfterRejection = try await app.projectContexts.repository.autonomousRun(active.runID)
+        XCTAssertNotNil(activeRunAfterRejection)
+    }
+
     private func configuredApp() throws -> ForgeApp {
         let app = try ForgeApp.bootstrap(home: home)
         _ = try app.config.update(["allowed_roots": [root.path]], save: true)

@@ -215,6 +215,7 @@ public struct OrchestrationStatus: Sendable, Equatable {
     public var health: String
     public var healthLabel: String
     public var managerAlive: Bool
+    public var lmStudioAlive: Bool
     public var managerPID: Int?
     public var serveCount: Int
     public var superviseCount: Int
@@ -233,6 +234,7 @@ public struct OrchestrationStatus: Sendable, Equatable {
         health: String,
         healthLabel: String,
         managerAlive: Bool,
+        lmStudioAlive: Bool,
         managerPID: Int?,
         serveCount: Int,
         superviseCount: Int,
@@ -250,6 +252,7 @@ public struct OrchestrationStatus: Sendable, Equatable {
         self.health = health
         self.healthLabel = healthLabel
         self.managerAlive = managerAlive
+        self.lmStudioAlive = lmStudioAlive
         self.managerPID = managerPID
         self.serveCount = serveCount
         self.superviseCount = superviseCount
@@ -270,6 +273,7 @@ public struct OrchestrationStatus: Sendable, Equatable {
             health: "unknown",
             healthLabel: "—",
             managerAlive: false,
+            lmStudioAlive: false,
             managerPID: nil,
             serveCount: 0,
             superviseCount: 0,
@@ -297,6 +301,7 @@ public struct OrchestrationStatus: Sendable, Equatable {
             "health": health,
             "health_label": healthLabel,
             "manager_alive": managerAlive,
+            "lm_studio_alive": lmStudioAlive,
             "manager_pid": managerPID as Any,
             "manager_state": managerState,
             "primary_alive": primaryAlive,

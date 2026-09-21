@@ -338,6 +338,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumRuntimeJobCancelBodyBytes = 256
     static let maximumProviderProbeBodyBytes = 512
     static let maximumRunControlBodyBytes = 256
+    static let maximumRunDeletionBodyBytes = 256
     static let maximumToolPermissionBodyBytes = 128 * 1_024
     static let maximumRunAdmissionBodyBytes = 128 * 1_024
     static let maximumStjornarvaldMutationBodyBytes = 16 * 1_024
@@ -1374,6 +1375,7 @@ public final class ManagerRoutes: @unchecked Sendable {
             let modelKey = try optionalString(object, key: "model_key", maximumBytes: 1_024)
             let allowedTools = try optionalStringSet(object, key: "allowed_tools")
             let completionGates = try optionalStringArray(object, key: "completion_gates")
+            let failurePolicy = try failurePolicy(object)
             let networkAllowed = try optionalBoolean(object, key: "network_allowed") ?? false
             let result = manager.inspectAutonomousRunPreparation(
                 runID: preparationRunID,
@@ -1391,6 +1393,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                 modelKey: modelKey,
                 allowedTools: allowedTools,
                 completionGates: completionGates,
+                failurePolicy: failurePolicy,
                 networkAllowed: networkAllowed,
                 maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
                     ?? ProjectContextService.defaultInlineOutputLimit
@@ -1448,6 +1451,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                 }
                 completionGates = typed
             } else { completionGates = nil }
+            let failurePolicy = try failurePolicy(object)
             let networkAllowed: Bool
             if let value = object["network_allowed"] {
                 guard let typed = value as? Bool else {
@@ -1508,6 +1512,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                     modelKey: modelKey,
                     allowedTools: allowedTools,
                     completionGates: completionGates,
+                    failurePolicy: failurePolicy,
                     expectedProviderConfigurationRevision:
                         expectedProviderConfigurationRevision,
                     expectedToolCatalogRevision: expectedToolCatalogRevision,
@@ -1548,6 +1553,48 @@ public final class ManagerRoutes: @unchecked Sendable {
                 status: 200,
                 object: try manager.autonomousRunStatus(runID: try runID(object))
             )
+        case ("POST", "/api/manager/runs/delete"):
+            guard body.count <= Self.maximumRunDeletionBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "run_deletion_body_too_large",
+                    "message": "Task deletion accepts one bounded run, project, and generation identity",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do {
+                object = try JSONSupport.object(from: body)
+                guard object.count == 3,
+                      Set(object.keys) == ["run_id", "project_id", "project_generation"] else {
+                    throw AutonomyError.invalidRequest(
+                        "Task deletion requires exactly run_id, project_id, and project_generation"
+                    )
+                }
+                let receipt = try manager.deleteAutonomousRun(
+                    runID: try runID(object),
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object)
+                )
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try JSONSupport.object(from: JSONEncoder().encode(receipt))
+                )
+            } catch let error as AutonomyError {
+                let status = if case .runNotFound = error { 404 } else { 409 }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectContextError {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            }
         case ("POST", "/api/manager/runs/control"):
             guard body.count <= Self.maximumRunControlBodyBytes else {
                 http.respondJSON(connection, status: 413, object: [
@@ -2088,6 +2135,31 @@ public final class ManagerRoutes: @unchecked Sendable {
             throw AutonomyError.invalidRequest("\(key) must be a boolean when supplied")
         }
         return typed
+    }
+
+    private func failurePolicy(_ object: [String: Any]) throws -> AutonomousFailurePolicy {
+        guard let raw = object["failure_policy"] else { return .default }
+        guard let policy = raw as? [String: Any],
+              Set(policy.keys).isSubset(of: ["behavior", "maximum_retries", "custom_instructions"]),
+              let behaviorValue = policy["behavior"] as? String,
+              let behavior = AutonomousFailureBehavior(rawValue: behaviorValue),
+              let maximumRetries = integer(policy["maximum_retries"]) else {
+            throw AutonomyError.invalidRequest("failure_policy is invalid")
+        }
+        let instructions: String?
+        if let value = policy["custom_instructions"] {
+            guard let typed = value as? String else {
+                throw AutonomyError.invalidRequest("failure_policy custom_instructions must be a string")
+            }
+            instructions = typed
+        } else {
+            instructions = nil
+        }
+        return try AutonomousFailurePolicy(
+            behavior: behavior,
+            maximumRetries: maximumRetries,
+            customInstructions: instructions
+        ).validated()
     }
 
     private static func routeTarget(_ rawTarget: String) throws -> ManagerRouteTarget {

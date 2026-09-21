@@ -6,14 +6,14 @@ running project-scoped work with local models in
 
 | | |
 | --- | --- |
-| **Version** | **0.10.0** |
-| **Build** | **2** |
+| **Version** | **0.11.0** |
+| **Build** | **3** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.10.0 (2)` is the current development identity. It is
+> **Release status:** `0.11.0 (3)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
@@ -118,6 +118,11 @@ product set.
    again by the Manager. Optional task label, saved-model
    choice, and network authority remain under **Customize**; provider/adapter,
    raw capability IDs, and raw completion-gate IDs are not routine inputs.
+   **Completion Checks → Select** exposes native checkboxes for a buildable
+   project, no build errors, no build warnings, available tests, complete
+   instruction delivery, and no unresolved operations. **On failure** selects
+   pause-for-review, bounded automatic retry, or terminal stop; an optional
+   custom instruction is included in the model's managed-run context.
    Before admission, Forge prepares an inspectable project-bound
    descriptor covering the source snapshot, model/configuration, exact grants,
    a deterministic typed completion plan, automatic continuity, and resource
@@ -147,6 +152,9 @@ product set.
    unresolved effects remain fail-closed. Long run histories are read in bounded
    pages. The run detail shows the derived checks and keeps the signed custom
    policy importer collapsed under **Advanced controls** for specialized use.
+   A settled task exposes **Delete Task…**. Forge confirms the action and
+   deletes only a completed, cancelled, or terminally failed run whose runtime
+   work is settled; project files are unchanged.
 7. Review the run's events and evidence.
 
 The run view leads with the task, current state/work, recent model and tool
@@ -222,11 +230,11 @@ Detailed deployment and recovery behavior is documented in
 
 | Surface | Responsibility |
 | --- | --- |
-| **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry |
+| **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry plus color/load status for headless LM Studio, Autonomy, Continuity, Rune Forge observation, and durable project instruction/package progress |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
 | **Rune Forge** | Native Development Policy source selection, bounded Stjornarvald violation/history inspection, delivery state, cached degraded operation, and atomic filtered policy-log export as JSONL, JSON, Markdown, or CSV |
-| **Autonomy** | Manager-owned runs, budgets, gates, retries, and completion |
+| **Autonomy** | Manager-owned runs, selectable native completion checks, per-task failure/retry instructions, continuity, and confirmed deletion of settled task history |
 | **Provider** | Local endpoint, model inventory, credentials, and contract probes |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
 | **Events & Evidence** | Bounded audit events, receipts, diagnostics, and exports |

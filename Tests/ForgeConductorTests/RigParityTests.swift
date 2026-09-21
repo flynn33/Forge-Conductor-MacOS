@@ -186,6 +186,7 @@ final class RigParityTests: XCTestCase {
         XCTAssertFalse(forge.orchestration.health.isEmpty)
         XCTAssertFalse(forge.orchestration.healthLabel.isEmpty)
         XCTAssertFalse(forge.orchestration.mode.isEmpty)
+        XCTAssertNotNil(forge.orchestration.asDictionary()["lm_studio_alive"] as? Bool)
 
         XCTAssertFalse(forge.mcpTools.isEmpty, "tool catalog should not be empty")
         XCTAssertFalse(forge.mcpTools[0].name.isEmpty)

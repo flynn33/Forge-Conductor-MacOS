@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.10.0**, build **2**. This guide covers the native Forge Conductor
+Version **0.11.0**, build **3**. This guide covers the native Forge Conductor
 application and its LM Studio integration on macOS.
 
-> `0.10.0 (2)` is the current development identity. It has not inherited the
+> `0.11.0 (3)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release gates.
@@ -112,15 +112,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and both mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.10.0 binary:
+Confirm the registered command is a `serve`-capable 0.11.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.10.0
+forge-conductor version    # should print 0.11.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.10.0` and
-`CFBundleVersion` must be `2`.
+For an app bundle, `CFBundleShortVersionString` must be `0.11.0` and
+`CFBundleVersion` must be `3`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -217,6 +217,22 @@ is the registered repository, even when the imported instruction file lives
 elsewhere. **Stop Queue** prevents the next package from starting while leaving
 an already admitted run visible in **Autonomy**.
 
+For a new task, select **Completion Checks → Select…** to choose the premade
+checks that fit the work: Buildable project, No build errors, No build warnings,
+Available tests pass, Instruction packages complete, and No unresolved
+operations. A warning-free check requires complete build output; truncated
+output cannot prove an absence of warnings. Select **On failure** to pause for
+review, retry automatically up to the chosen bounded limit, or stop the task.
+Optional custom failure instructions are persisted with the task and shown to
+the managed model. Exhausted automatic retries pause for operator review.
+
+In **Autonomy**, select a completed, cancelled, or terminally failed task and
+choose **Delete Task…** to remove that one settled run from Forge history.
+Forge confirms the destructive action, rejects deletion while runtime work is
+unsettled, and fences the request to the exact project generation. Project
+files are never removed. Active, paused, recoverable, or configuration-blocked
+tasks must first reach a terminal state.
+
 Use **Remove Selected Project…** below the project list, the row context menu,
 or **Remove Project…** in the detail pane to remove a registration. Forge asks
 for confirmation, advances the project generation, and invalidates bindings;
@@ -250,6 +266,13 @@ bounded filters, include chronology, policy-source revisions, integrity and
 limitation metadata, and are atomically published with owner-only permissions.
 Cancelling or failing an export leaves policy history and any existing
 destination unchanged.
+
+Each detected violation is appended to Rune Forge's dedicated owner-only,
+digest-chained policy log. At the next safe model boundary, Forge sends a
+separate additive notice that identifies what was observed, the policy and rule
+that were violated, and the suggested correction. Stjornarvald never edits,
+undoes, denies, pauses, or otherwise acts on the model's work; logging and
+notification are its only effects.
 
 The question-mark toolbar action opens the complete offline Rune Forge guide.
 Guided Mode uses the same terminology as the screen and performs no source,
@@ -440,12 +463,23 @@ Default bind: `http://127.0.0.1:7788/` (loopback).
 
 | Surface | What it shows |
 |---------|----------------|
-| Rig | Host CPU / RAM / GPU / disk (sampled continuously) |
+| Rig | Host CPU / RAM / GPU / disk plus headless LM Studio, Autonomy, Continuity, Rune Forge, and project-progress status/load indicators |
 | LM Studio MCP | Live Forge stdio servers, configured roles, LM Studio host processes |
 | Agents / Tools / Feed | Sessions and recent tool audit |
 | Manager / Settings | Start/stop the HTTP control plane; inspect and change the persisted project-shell policy |
 
 `primary_alive` / `fallback_alive` are true only when a **stdio `serve` process** for that role is running. That happens when a chat has MCP enabled, not merely because the GUI is open.
+
+The Rig's **LM Studio — HEADLESS** state means Forge's provider API is reachable
+for managed Autonomy. The managed conversation is owned by Forge's native host
+and does not appear in LM Studio's desktop Chat history. **Rune Forge —
+OBSERVING** means a selected source is indexed and observed; Rune Forge remains
+additive and does not authorize, block, or change task outcomes.
+
+The Rig project row reports delivered instruction documents as **steps** and
+terminally completed queue items as **packages**. Its fraction combines those
+two bounded counts; failed or blocked packages report **ATTENTION** rather than
+inflating progress.
 
 The MCP list shows Forge stdio roles (`mcp-stdio`, `mcp-stdio-fallback`) and configured-but-not-started roles. LM Studio helper and model-backend processes are not listed as MCP servers.
 

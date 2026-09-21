@@ -768,6 +768,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
     public let allowedTools: [String]
     public let networkAllowed: Bool
     public let validationPlan: ManagerPreparedRunValidationPlan
+    public let failurePolicy: AutonomousFailurePolicy?
     public let continuityMode: ContinuityMode
     public let budgetPolicy: BudgetPolicySelection
     public let maximumInlineOutputBytes: Int
@@ -790,6 +791,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
         allowedTools: [String],
         networkAllowed: Bool,
         validationPlan: ManagerPreparedRunValidationPlan,
+        failurePolicy: AutonomousFailurePolicy?,
         continuityMode: ContinuityMode,
         budgetPolicy: BudgetPolicySelection,
         maximumInlineOutputBytes: Int
@@ -812,6 +814,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
         self.allowedTools = allowedTools
         self.networkAllowed = networkAllowed
         self.validationPlan = validationPlan
+        self.failurePolicy = failurePolicy
         self.continuityMode = continuityMode
         self.budgetPolicy = budgetPolicy
         self.maximumInlineOutputBytes = maximumInlineOutputBytes
@@ -834,6 +837,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
         allowedTools: [String],
         networkAllowed: Bool,
         validationPlan: ManagerPreparedRunValidationPlan,
+        failurePolicy: AutonomousFailurePolicy = .default,
         continuityMode: ContinuityMode,
         budgetPolicy: BudgetPolicySelection,
         maximumInlineOutputBytes: Int
@@ -857,6 +861,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
             allowedTools: allowedTools.sorted(),
             networkAllowed: networkAllowed,
             validationPlan: validationPlan,
+            failurePolicy: failurePolicy,
             continuityMode: continuityMode,
             budgetPolicy: budgetPolicy,
             maximumInlineOutputBytes: maximumInlineOutputBytes
@@ -885,6 +890,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
             allowedTools: allowedTools.sorted(),
             networkAllowed: networkAllowed,
             validationPlan: validationPlan,
+            failurePolicy: failurePolicy,
             continuityMode: continuityMode,
             budgetPolicy: budgetPolicy,
             maximumInlineOutputBytes: maximumInlineOutputBytes
@@ -916,6 +922,7 @@ public struct ManagerPreparedRunDescriptor: Codable, Sendable, Equatable {
         case allowedTools = "allowed_tools"
         case networkAllowed = "network_allowed"
         case validationPlan = "validation_plan"
+        case failurePolicy = "failure_policy"
         case continuityMode = "continuity_mode"
         case budgetPolicy = "budget_policy"
         case maximumInlineOutputBytes = "maximum_inline_output_bytes"

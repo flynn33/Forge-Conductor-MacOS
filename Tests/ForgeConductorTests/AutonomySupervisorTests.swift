@@ -2081,6 +2081,46 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testFailurePolicyPausesOrStopsWithoutSchedulingARetry() async throws {
+        for (behavior, expected) in [
+            (AutonomousFailureBehavior.pauseForReview, AutonomousRunState.paused),
+            (.stopTask, .failedTerminal),
+        ] {
+            try await withRepository { repository, root in
+                let fixture = try await makeRun(
+                    repository: repository,
+                    root: root,
+                    failurePolicy: AutonomousFailurePolicy(
+                        behavior: behavior,
+                        maximumRetries: 0,
+                        customInstructions: "Retain the exact failure evidence."
+                    )
+                )
+                let validator = try DeterministicCompletionValidator(validators: [
+                    CompletionGateValidator(gate: "tests") { _ in
+                        CompletionGateResult(gate: "tests", passed: true, summary: "unused")
+                    },
+                ])
+                let coordinator = try ProjectRunCoordinator(
+                    runID: fixture.run.runID,
+                    repository: repository,
+                    managerID: "manager-failure-policy",
+                    leasePolicy: fixture.leasePolicy,
+                    stepExecutor: AlwaysFailingStepper(),
+                    completionValidator: validator,
+                    maximumSteps: 8
+                )
+                let result = try await coordinator.runActivation()
+                XCTAssertEqual(result.finalState, expected)
+                let storedValue = try await repository.autonomousRun(fixture.run.runID)
+                let stored = try XCTUnwrap(storedValue)
+                XCTAssertEqual(stored.state, expected)
+                XCTAssertNil(stored.retryAt)
+                XCTAssertEqual(stored.lastErrorCode, "run_step_failed")
+            }
+        }
+    }
+
     func testManagerStartupReleasesExpiredLeaseAndActivatesWithoutGUIOwner() async throws {
         let clock = MutableAutonomyClock(Date(timeIntervalSince1970: 2_000))
         try await withRepository(clock: clock) { repository, root in
@@ -2315,7 +2355,8 @@ final class AutonomySupervisorTests: XCTestCase {
         repository: ProjectControlPlaneRepository,
         root: URL,
         allowedTools: [String] = ["fixture.read"],
-        completionGates: [String] = ["tests"]
+        completionGates: [String] = ["tests"],
+        failurePolicy: AutonomousFailurePolicy = .default
     ) async throws -> RunFixture {
         let projectID = ProjectID()
         let projectRoot = root.appendingPathComponent("project", isDirectory: true)
@@ -2332,7 +2373,8 @@ final class AutonomySupervisorTests: XCTestCase {
             modelKey: "fixture-model",
             specification: AutonomousRunSpecification(
                 allowedTools: allowedTools,
-                completionGates: completionGates
+                completionGates: completionGates,
+                failurePolicy: failurePolicy
             ),
             authorizationScope: ToolAuthorizationScope(
                 canonicalRoots: [projectRoot],
@@ -2722,6 +2764,30 @@ private actor IdleRunStepper: ProjectRunStepExecuting {
         lease: RunLease
     ) async throws -> ProjectRunStepOutcome {
         .continued(run.specification.work)
+    }
+
+    func cancel(runID: RunID) async {}
+}
+
+private actor AlwaysFailingStepper: ProjectRunStepExecuting {
+    enum Failure: Error { case expected }
+
+    func prepareNextStep(for run: AutonomousRunRecord) async throws -> RunSideEffectIntent? {
+        RunSideEffectIntent(
+            kind: .providerTurn,
+            idempotencyKey: "always-failing-step",
+            payloadSHA256: String(repeating: "f", count: 64),
+            summary: "Exercise configured failure behavior"
+        )
+    }
+
+    func execute(
+        _ intent: RunSideEffectIntent,
+        run: AutonomousRunRecord,
+        context: ToolInvocationContext,
+        lease: RunLease
+    ) async throws -> ProjectRunStepOutcome {
+        throw Failure.expected
     }
 
     func cancel(runID: RunID) async {}

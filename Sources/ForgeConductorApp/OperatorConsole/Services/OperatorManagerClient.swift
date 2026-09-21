@@ -69,6 +69,11 @@ protocol OperatorManagerClientProtocol: Sendable {
     func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun
     func runStatus(runID: String) async throws -> OperatorRun
     func controlRun(runID: String, action: OperatorRunControlAction) async throws -> OperatorRun
+    func deleteRun(
+        runID: String,
+        projectID: String,
+        generation: UInt64
+    ) async throws -> AutonomousRunDeletionReceipt
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob
     func providerConfiguration() async throws -> ProviderConfigurationSnapshot
     func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
@@ -81,6 +86,16 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func deleteRun(
+        runID: String,
+        projectID: String,
+        generation: UInt64
+    ) async throws -> AutonomousRunDeletionReceipt {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Task deletion is unavailable from this manager client."
+        )
+    }
+
     func prepareProvider() async throws -> ManagerProviderPreparationResult {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Automatic provider preparation is unavailable from this manager client."
@@ -916,6 +931,41 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         )
     }
 
+    func deleteRun(
+        runID: String,
+        projectID: String,
+        generation: UInt64
+    ) async throws -> AutonomousRunDeletionReceipt {
+        guard let runUUID = UUID(uuidString: runID),
+              let projectUUID = UUID(uuidString: projectID),
+              generation > 0,
+              generation < UInt64(Int64.max) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "Task deletion requires exact run, project, and generation identities"
+            )
+        }
+        let receipt: AutonomousRunDeletionReceipt = try await request(
+            method: "POST",
+            path: "/api/manager/runs/delete",
+            body: RunDeletionBody(
+                runID: runUUID.uuidString.lowercased(),
+                projectID: projectUUID.uuidString.lowercased(),
+                projectGeneration: generation
+            ),
+            timeoutInterval: 12
+        )
+        guard receipt.runID == RunID(runUUID),
+              receipt.projectID == ProjectID(projectUUID),
+              receipt.projectGeneration.rawValue == generation,
+              receipt.priorState.isTerminal,
+              ISO8601.date(from: receipt.deletedAt) != nil else {
+            throw OperatorManagerClientError.invalidPayload(
+                "Task deletion receipt did not match the selected task"
+            )
+        }
+        return receipt
+    }
+
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
         guard let identifier = UUID(uuidString: jobID), jobID.utf8.count <= 36 else {
             throw OperatorManagerClientError.invalidPayload("runtime job identifier must be a UUID")
@@ -1335,6 +1385,18 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.controlRun(runID: runID, action: action)
     }
 
+    func deleteRun(
+        runID: String,
+        projectID: String,
+        generation: UInt64
+    ) async throws -> AutonomousRunDeletionReceipt {
+        try await current.deleteRun(
+            runID: runID,
+            projectID: projectID,
+            generation: generation
+        )
+    }
+
     func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob {
         try await current.cancelRuntimeJob(jobID: jobID)
     }
@@ -1625,6 +1687,18 @@ private struct RunControlBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case runID = "run_id"
         case action
+    }
+}
+
+private struct RunDeletionBody: Encodable {
+    let runID: String
+    let projectID: String
+    let projectGeneration: UInt64
+
+    enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
     }
 }
 

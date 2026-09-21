@@ -80,7 +80,10 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
             && (0...documentCount).contains(unresolvedDocumentCount)
     }
 
-    public func asDictionary() -> [String: Any] {
+    public func asDictionary(
+        completedStepCount: Int? = nil,
+        totalStepCount: Int? = nil
+    ) -> [String: Any] {
         [
             "id": id.uuidString.lowercased(),
             "project_id": projectID.description,
@@ -97,6 +100,8 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
             "instruction_byte_count": instructionByteCount as Any,
             "unresolved_document_count": unresolvedDocumentCount as Any,
             "import_ready": unresolvedDocumentCount.map { $0 == 0 } as Any,
+            "completed_step_count": completedStepCount as Any,
+            "total_step_count": totalStepCount ?? documentCount as Any,
             "position": position,
             "state": state.rawValue,
             "run_id": runID?.description as Any,
