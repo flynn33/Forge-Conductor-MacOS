@@ -4,7 +4,100 @@
 // AppModel; visible heading anchors make each rendered module automation-accessible.
 // Why: Central composition keeps navigation ownership separate from feature views.
 
+import Foundation
 import SwiftUI
+
+enum GuidedSetupStorage {
+    static let legacyCompletionKey = "forge.setupTutorial.completed.v1"
+    static let currentCompletionKey = "forge.guidedSetup.completed.v2"
+    static let selectedStepKey = "forge.guidedSetup.step.v2"
+    static let reviewedPreparationKey = "forge.guidedSetup.reviewedPreparation.v2"
+
+    static func defaults() -> UserDefaults {
+        guard let suiteName = ProcessInfo.processInfo.environment[
+            "FORGE_GUIDED_SETUP_DEFAULTS_SUITE"
+        ], !suiteName.isEmpty else {
+            return .standard
+        }
+        return UserDefaults(suiteName: suiteName) ?? .standard
+    }
+
+    static func shouldPresent(in defaults: UserDefaults) -> Bool {
+        !defaults.bool(forKey: currentCompletionKey)
+    }
+}
+
+struct GuidedSetupProgress: Equatable {
+    enum Step: Int, Equatable {
+        case manager
+        case provider
+        case project
+        case instructions
+        case configure
+        case start
+        case monitor
+        case recover
+    }
+
+    enum PreparationState: Equatable {
+        case unavailable
+        case needsReview(fingerprint: String)
+        case reviewed(fingerprint: String)
+    }
+
+    let managerReady: Bool
+    let providerReady: Bool
+    let projectIsRegistered: Bool
+    let instructionPackageCount: Int
+    let preparationFingerprint: String?
+    let reviewedPreparationFingerprint: String
+    let activeRunState: String?
+    let needsAttention: Bool
+
+    static func compose(
+        managerReady: Bool,
+        snapshot: RigOperationalSnapshot,
+        reviewedPreparationFingerprint: String
+    ) -> Self {
+        Self(
+            managerReady: managerReady,
+            providerReady: GuidedSetupProviderStatus.compose(snapshot.selectedProvider).isReady,
+            projectIsRegistered: snapshot.projectName != nil,
+            instructionPackageCount: snapshot.projectTotalPackages,
+            preparationFingerprint: snapshot.guidedSetupPreparationFingerprint,
+            reviewedPreparationFingerprint: reviewedPreparationFingerprint,
+            activeRunState: snapshot.activeRunState,
+            needsAttention: snapshot.continuityBlockedCount > 0
+                || snapshot.projectProgressState == "ATTENTION"
+                || ["failed_recoverable", "failed_terminal"]
+                    .contains(snapshot.activeRunState)
+        )
+    }
+
+    var preparationState: PreparationState {
+        guard managerReady,
+              providerReady,
+              projectIsRegistered,
+              instructionPackageCount > 0,
+              let preparationFingerprint else {
+            return .unavailable
+        }
+        return reviewedPreparationFingerprint == preparationFingerprint
+            ? .reviewed(fingerprint: preparationFingerprint)
+            : .needsReview(fingerprint: preparationFingerprint)
+    }
+
+    var recommendedStep: Step {
+        if !managerReady { return .manager }
+        if !providerReady { return .provider }
+        if !projectIsRegistered { return .project }
+        if instructionPackageCount == 0 { return .instructions }
+        if needsAttention { return .recover }
+        if activeRunState != nil { return .monitor }
+        if case .reviewed = preparationState { return .start }
+        return .configure
+    }
+}
 
 /// Provides the app's top-level split layout, toolbar, and feature-module routing.
 ///
@@ -12,8 +105,18 @@ import SwiftUI
 /// presentation while `AppModel.AppTab` supplies the single navigation state.
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
-    @AppStorage("forge.setupTutorial.completed.v1") private var setupTutorialCompleted = false
-    @AppStorage("forge.guidedSetup.step.v2") private var guidedSetupStep = 0
+    @AppStorage(
+        GuidedSetupStorage.currentCompletionKey,
+        store: GuidedSetupStorage.defaults()
+    ) private var guidedSetupCompleted = false
+    @AppStorage(
+        GuidedSetupStorage.selectedStepKey,
+        store: GuidedSetupStorage.defaults()
+    ) private var guidedSetupStep = 0
+    @AppStorage(
+        GuidedSetupStorage.reviewedPreparationKey,
+        store: GuidedSetupStorage.defaults()
+    ) private var reviewedPreparationFingerprint = ""
     @StateObject private var guidedMode = GuidedModeCoordinator()
     @State private var showingGuidedSetup = false
 
@@ -79,8 +182,10 @@ struct ContentView: View {
         .accessibilityIdentifier("root-split")
         .onAppear {
             guidedMode.select(model.selectedTab.guidedHelpContext)
-            if !setupTutorialCompleted,
-               !CommandLine.arguments.contains("--uitesting") {
+            let arguments = CommandLine.arguments
+            let allowAutomaticPresentation = !arguments.contains("--uitesting")
+                || arguments.contains("--uitesting-show-guided-setup")
+            if !guidedSetupCompleted, allowAutomaticPresentation {
                 showingGuidedSetup = true
             }
         }
@@ -91,6 +196,7 @@ struct ContentView: View {
         .sheet(isPresented: $showingGuidedSetup) {
             GuidedSetupWizardView(
                 selectedStep: $guidedSetupStep,
+                reviewedPreparationFingerprint: $reviewedPreparationFingerprint,
                 managerReady: model.serviceActive,
                 snapshot: model.rigOperationalSnapshot,
                 onOpen: { tab in
@@ -98,7 +204,7 @@ struct ContentView: View {
                     showingGuidedSetup = false
                 },
                 onComplete: {
-                    setupTutorialCompleted = true
+                    guidedSetupCompleted = true
                     showingGuidedSetup = false
                 }
             )
@@ -129,6 +235,24 @@ struct ContentView: View {
                 }
                 .help("Show or hide navigation")
                 .accessibilityIdentifier("toolbar-navigation")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Group {
+                    if model.selectedTab == .rig {
+                        Button {
+                            showingGuidedSetup = true
+                        } label: {
+                            Label(
+                                "Guided Setup",
+                                systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                            )
+                            .labelStyle(.titleAndIcon)
+                        }
+                        .controlSize(.regular)
+                        .help("Set up, start, monitor, and recover an automated project run")
+                        .accessibilityIdentifier("toolbar-guided-setup")
+                    }
+                }
             }
             // Separate items (no HStack) so macOS applies native toolbar control scale.
             ToolbarItem(placement: .primaryAction) {
@@ -363,16 +487,16 @@ private struct GuidedSetupWizardView: View {
             kind: .instructions,
             title: "Add and order instructions",
             symbol: "text.badge.plus",
-            purpose: "Instruction packages define the work, allowed capabilities, completion gates, and execution order.",
+            purpose: "Instruction packages define the work, allowed capabilities, completion requirements, and execution order.",
             readyWhen: "The selected project has at least one import-ready package and no unresolved documents.",
             actions: [
                 "In Projects, choose Add Instructions and select a file, folder, ZIP, or .forgepackage.",
-                "Review the package name, document count, capabilities, and package-defined gates.",
+                "Review the package name, document count, capabilities, and package-defined completion requirements.",
                 "Arrange multiple packages in the order they must run.",
             ],
             recovery: [
                 "A package with unresolved or unsupported documents is not start-ready; correct the named source and import it again.",
-                "Package gates belong to the instruction package. Ordinary automatic checks do not require a separate native gate policy.",
+                "Completion requirements come from the instruction package, remain read-only in Forge, and are evaluated automatically.",
             ],
             destinations: [(.projects, "Open Instruction Packages")]
         ),
@@ -383,13 +507,13 @@ private struct GuidedSetupWizardView: View {
             purpose: "Before launch, confirm the model, tools, automatic completion evidence, retry behavior, and continuity defaults.",
             readyWhen: "Provider, project, and instructions are ready and the intended failure behavior is understood.",
             actions: [
-                "For ordered packages, the package supplies its capabilities and gates.",
+                "For ordered packages, the package supplies its capabilities and completion requirements.",
                 "For a direct task, open Autonomy → Start Task, select instructions, and check or clear the inline Completion checks.",
                 "Choose whether failures pause, retry within the displayed limit, or stop the task. Continuity remains automatic.",
             ],
             recovery: [
-                "A blocked preparation card names the missing project, permission, or provider condition and provides the owning-view action.",
-                "Do not install a native policy unless the run explicitly declares a custom native gate.",
+                "Forge repairs provider readiness automatically when possible. A preparation card appears only when a project, permission, or source choice requires your input.",
+                "If a package requirement is incorrect, correct the instruction package; Forge configuration does not create or override package requirements.",
             ],
             destinations: [(.autonomy, "Open Autonomy")]
         ),
@@ -439,11 +563,11 @@ private struct GuidedSetupWizardView: View {
             title: "Resolve issues and continue",
             symbol: "cross.case",
             purpose: "Forge preserves durable state and routes each issue to the view that owns the corrective action.",
-            readyWhen: "No active run or continuity item reports a blocked/failed condition requiring operator action.",
+            readyWhen: "No active run or continuity item reports an issue requiring operator action.",
             actions: [
-                "Provider issue: open Provider, choose Connect and Check, then retry the run.",
-                "Automatic completion issue: correct the named check and choose Retry in Autonomy; no separate gate environment is required.",
-                "Custom native gate: import its matching signed policy only when the run explicitly names that custom gate.",
+                "Provider issue: open Provider and choose Connect and Check. Forge resumes the exact retained run automatically after the contract check passes.",
+                "Automatic completion issue: Forge returns the run to work and re-evaluates it when more evidence is available.",
+                "Package completion issue: correct the named evidence or the instruction package. Forge re-evaluates the retained run automatically.",
                 "Continuity issue: read the exact detail and use its Open Provider or Open Autonomy action.",
                 "Policy violation: inspect Rune Forge and Events & Evidence, correct the named policy condition, then retry when allowed.",
             ],
@@ -459,6 +583,7 @@ private struct GuidedSetupWizardView: View {
     ]
 
     @Binding var selectedStep: Int
+    @Binding var reviewedPreparationFingerprint: String
     let managerReady: Bool
     let snapshot: RigOperationalSnapshot
     let onOpen: (AppModel.AppTab) -> Void
@@ -478,9 +603,9 @@ private struct GuidedSetupWizardView: View {
                 }
                 Spacer()
                 Button("Next required step") {
-                    selectedStep = recommendedStep
+                    selectedStep = progress.recommendedStep.rawValue
                 }
-                .disabled(recommendedStep == index)
+                .disabled(progress.recommendedStep.rawValue == index)
                 .accessibilityIdentifier("guided-setup-next-required")
                 Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -534,7 +659,18 @@ private struct GuidedSetupWizardView: View {
                 Spacer()
                 Button("Back") { selectedStep = max(0, index - 1) }
                     .disabled(index == 0)
-                if index == steps.count - 1 {
+                if step.kind == .configure {
+                    Button(
+                        configurationReviewIsCurrent
+                            ? "Continue to Start"
+                            : "Confirm Review and Continue"
+                    ) {
+                        confirmConfigurationReview()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(progress.preparationFingerprint == nil)
+                    .accessibilityIdentifier("setup-guide-confirm-review")
+                } else if index == steps.count - 1 {
                     Button("Finish Guided Setup", action: onComplete)
                         .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("setup-guide-finish")
@@ -555,25 +691,31 @@ private struct GuidedSetupWizardView: View {
         }
     }
 
-    private var recommendedStep: Int {
-        if !managerReady { return 0 }
-        if !providerReady { return 1 }
-        if snapshot.projectName == nil { return 2 }
-        if snapshot.projectTotalPackages == 0 { return 3 }
-        if snapshot.activeRunState == nil { return 4 }
-        if needsAttention { return 7 }
-        return 6
+    private var progress: GuidedSetupProgress {
+        .compose(
+            managerReady: managerReady,
+            snapshot: snapshot,
+            reviewedPreparationFingerprint: reviewedPreparationFingerprint
+        )
     }
 
     private var providerReady: Bool {
-        GuidedSetupProviderStatus.compose(snapshot.selectedProvider).isReady
+        progress.providerReady
     }
 
     private var needsAttention: Bool {
-        snapshot.continuityBlockedCount > 0
-            || snapshot.projectProgressState == "ATTENTION"
-            || ["blocked_configuration", "failed_recoverable", "failed_terminal"]
-                .contains(snapshot.activeRunState)
+        progress.needsAttention
+    }
+
+    private var configurationReviewIsCurrent: Bool {
+        if case .reviewed = progress.preparationState { return true }
+        return false
+    }
+
+    private func confirmConfigurationReview() {
+        guard let fingerprint = progress.preparationFingerprint else { return }
+        reviewedPreparationFingerprint = fingerprint
+        selectedStep = GuidedSetupProgress.Step.start.rawValue
     }
 
     private func stepButton(_ step: Step, index: Int) -> some View {
@@ -720,12 +862,26 @@ private struct GuidedSetupWizardView: View {
         case .configure:
             let ready = managerReady && providerReady
                 && snapshot.projectName != nil && snapshot.projectTotalPackages > 0
+            if ready, configurationReviewIsCurrent {
+                return (
+                    "Review complete",
+                    "This exact project, provider, and instruction package setup is ready to start.",
+                    "checkmark.circle.fill",
+                    .green
+                )
+            }
             return ready
                 ? ("Ready to review", "The setup prerequisites are present.", "checkmark.circle.fill", .green)
                 : ("Waiting", "Complete the earlier setup steps first.", "clock", .secondary)
         case .start:
             if let state = snapshot.activeRunState {
-                return ("Started", "The current managed task reports \(state.replacingOccurrences(of: "_", with: " ")).", "play.circle.fill", .green)
+                return (
+                    "Started",
+                    "The current managed task reports "
+                        + OperatorRunStatePresentation.displayName(state) + ".",
+                    "play.circle.fill",
+                    .green
+                )
             }
             if snapshot.projectTotalPackages > 0 && providerReady {
                 return ("Ready to start", "Choose ordered or direct launch.", "play.circle", .accentColor)
@@ -734,7 +890,8 @@ private struct GuidedSetupWizardView: View {
         case .monitor:
             if let state = snapshot.activeRunState {
                 return (needsAttention ? "Action required" : "Monitoring",
-                        "The current task reports \(state.replacingOccurrences(of: "_", with: " ")).",
+                        "The current task reports "
+                            + OperatorRunStatePresentation.displayName(state) + ".",
                         needsAttention ? "exclamationmark.triangle.fill" : "waveform.path.ecg",
                         needsAttention ? .orange : .green)
             }

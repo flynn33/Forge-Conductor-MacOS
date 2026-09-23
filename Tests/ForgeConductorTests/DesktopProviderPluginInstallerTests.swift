@@ -17,6 +17,7 @@ private final class DesktopPluginCommandFixture: DesktopProviderPluginCommandRun
     private let deactivateAfterRemovalAttempt: Bool
     private let codexMarketplace: String
     private let initialInventoryEnabled: Bool
+    private let resultForInvocation: @Sendable (Invocation) -> DesktopProviderPluginCommandResult?
     private let onInvocation: @Sendable (Invocation) -> Void
     private var storedInvocations: [Invocation] = []
     private var deactivatedExecutables: Set<String> = []
@@ -28,6 +29,7 @@ private final class DesktopPluginCommandFixture: DesktopProviderPluginCommandRun
         deactivateAfterRemovalAttempt: Bool = false,
         codexMarketplace: String = "personal",
         initialInventoryEnabled: Bool = true,
+        resultForInvocation: @escaping @Sendable (Invocation) -> DesktopProviderPluginCommandResult? = { _ in nil },
         onInvocation: @escaping @Sendable (Invocation) -> Void = { _ in }
     ) {
         self.available = available
@@ -36,6 +38,7 @@ private final class DesktopPluginCommandFixture: DesktopProviderPluginCommandRun
         self.deactivateAfterRemovalAttempt = deactivateAfterRemovalAttempt
         self.codexMarketplace = codexMarketplace
         self.initialInventoryEnabled = initialInventoryEnabled
+        self.resultForInvocation = resultForInvocation
         self.onInvocation = onInvocation
     }
 
@@ -59,6 +62,9 @@ private final class DesktopPluginCommandFixture: DesktopProviderPluginCommandRun
         storedInvocations.append(invocation)
         lock.unlock()
         onInvocation(invocation)
+        if let scripted = resultForInvocation(invocation) {
+            return scripted
+        }
         let isRemoval = Self.isRemovalCommand(arguments, executable: executable.lastPathComponent)
         let effectiveResult = isRemoval ? (removalResult ?? result) : result
         if isRemoval,
@@ -308,6 +314,10 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
         XCTAssertEqual(compatibility["mcpServers"] as? String, "./mcp.json")
         XCTAssertEqual(compatibility["hooks"] as? String, "./hooks/hooks.json")
         let mcp = try json(at: pluginRoot.appendingPathComponent("mcp.json"))
+        XCTAssertEqual(
+            mcp["$schema"] as? String,
+            "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
+        )
         let servers = try XCTUnwrap(mcp["mcpServers"] as? [String: [String: Any]])
         XCTAssertEqual(servers["forge-conductor"]?["type"] as? String, "stdio")
         XCTAssertEqual(
@@ -348,6 +358,27 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
         ])
     }
 
+    func testCodexPortableMCPManifestDeclaresMatchingAgentPluginsSchema() throws {
+        let installer = makeInstaller(
+            runner: DesktopPluginCommandFixture(available: ["codex"])
+        )
+
+        let status = try installer.install(request(.codexDesktop, mcp: true))
+
+        let pluginRoot = URL(fileURLWithPath: status.packagePath, isDirectory: true)
+        let plugin = try json(at: pluginRoot.appendingPathComponent("plugin.json"))
+        let mcp = try json(at: pluginRoot.appendingPathComponent("mcp.json"))
+        XCTAssertEqual(
+            plugin["$schema"] as? String,
+            "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+        )
+        XCTAssertEqual(
+            mcp["$schema"] as? String,
+            "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
+        )
+        XCTAssertEqual(Set(mcp.keys), ["$schema", "mcpServers"])
+    }
+
     func testGrokDirectPluginUsesDocumentedPackageAndEnableCommands() throws {
         let runner = DesktopPluginCommandFixture(available: ["grok"])
         let installer = makeInstaller(runner: runner)
@@ -382,8 +413,10 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
             at: pluginRoot,
             providerID: "grok-build",
             expectedEvents: [
-                "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
-                "PostToolUse", "PostToolUseFailure", "Stop", "SessionEnd",
+                "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+                "PostToolUseFailure", "PermissionDenied", "Stop", "StopFailure",
+                "Notification", "SubagentStart", "SubagentStop", "PreCompact",
+                "PostCompact", "SessionEnd",
             ]
         )
         XCTAssertEqual(runner.invocations.map(\.arguments), [
@@ -433,6 +466,125 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
             ["plugin", "add", "forge-conductor@personal"],
             ["plugin", "list", "--json"],
         ])
+    }
+
+    func testActivationFailsWhenValidateFailsDespiteStaleEnabledInventory() throws {
+        let runner = DesktopPluginCommandFixture(
+            available: ["claude"],
+            resultForInvocation: { invocation in
+                guard invocation.arguments.starts(with: ["plugin", "validate"]) else {
+                    return nil
+                }
+                return .init(exitCode: 1, stderr: "Plugin validation failed")
+            }
+        )
+
+        let status = try makeInstaller(runner: runner).install(
+            request(.claudeCodeDesktop)
+        )
+
+        XCTAssertEqual(status.disposition, .awaitingUserAction)
+        XCTAssertFalse(status.deploymentVerified)
+        XCTAssertFalse(status.isReady)
+        XCTAssertEqual(runner.invocations.map(\.arguments), [
+            ["plugin", "validate", status.packagePath],
+        ])
+        XCTAssertEqual(status.receipt?.commandAttempts.first?.exitCode, 1)
+    }
+
+    func testActivationFailsWhenAddMutationFailsDespiteStaleEnabledInventory() throws {
+        let runner = DesktopPluginCommandFixture(
+            available: ["codex"],
+            resultForInvocation: { invocation in
+                guard invocation.arguments.starts(with: ["plugin", "add"]) else {
+                    return nil
+                }
+                return .init(exitCode: 1, stderr: "Plugin installation failed")
+            }
+        )
+
+        let status = try makeInstaller(runner: runner).install(request(.codexDesktop))
+
+        XCTAssertEqual(status.disposition, .awaitingUserAction)
+        XCTAssertFalse(status.deploymentVerified)
+        XCTAssertFalse(status.isReady)
+        XCTAssertEqual(runner.invocations.map(\.arguments), [
+            ["plugin", "add", "forge-conductor@personal"],
+        ])
+        XCTAssertEqual(status.receipt?.commandAttempts.first?.exitCode, 1)
+    }
+
+    func testActivationRejectsTimedOutOrTruncatedRequiredMutations() throws {
+        let timedOut = DesktopPluginCommandFixture(
+            available: ["grok"],
+            resultForInvocation: { invocation in
+                guard invocation.arguments == ["plugin", "enable", "forge-conductor"] else {
+                    return nil
+                }
+                return .init(
+                    exitCode: 0,
+                    stdout: "already enabled",
+                    timedOut: true
+                )
+            }
+        )
+        let timedOutStatus = try makeInstaller(runner: timedOut).install(
+            request(.grokBuild)
+        )
+        XCTAssertEqual(timedOutStatus.disposition, .awaitingUserAction)
+        XCTAssertFalse(timedOutStatus.deploymentVerified)
+        XCTAssertEqual(timedOut.invocations.map(\.arguments), [
+            ["plugin", "validate", timedOutStatus.packagePath],
+            ["plugin", "enable", "forge-conductor"],
+        ])
+
+        let truncated = DesktopPluginCommandFixture(
+            available: ["codex"],
+            resultForInvocation: { invocation in
+                guard invocation.arguments.starts(with: ["plugin", "add"]) else {
+                    return nil
+                }
+                return .init(
+                    exitCode: 0,
+                    stdout: "plugin output",
+                    stdoutTruncated: true
+                )
+            }
+        )
+        let truncatedStatus = try makeInstaller(runner: truncated).install(
+            request(.codexDesktop)
+        )
+        XCTAssertEqual(truncatedStatus.disposition, .awaitingUserAction)
+        XCTAssertFalse(truncatedStatus.deploymentVerified)
+        XCTAssertEqual(truncated.invocations.map(\.arguments), [
+            ["plugin", "add", "forge-conductor@personal"],
+        ])
+    }
+
+    func testActivationAcceptsOnlyRecognizedIdempotentOutcomeBeforeInventory() throws {
+        let runner = DesktopPluginCommandFixture(
+            available: ["codex"],
+            resultForInvocation: { invocation in
+                guard invocation.arguments.starts(with: ["plugin", "add"]) else {
+                    return nil
+                }
+                return .init(
+                    exitCode: 1,
+                    stderr: "Plugin forge-conductor@personal is already added."
+                )
+            }
+        )
+
+        let status = try makeInstaller(runner: runner).install(request(.codexDesktop))
+
+        XCTAssertEqual(status.disposition, .installed)
+        XCTAssertTrue(status.deploymentVerified)
+        XCTAssertTrue(status.isReady)
+        XCTAssertEqual(runner.invocations.map(\.arguments), [
+            ["plugin", "add", "forge-conductor@personal"],
+            ["plugin", "list", "--json"],
+        ])
+        XCTAssertEqual(status.receipt?.commandAttempts.first?.exitCode, 1)
     }
 
     func testStatusAndAdapterRejectStalePackageDespiteVerifiedReceipt() async throws {

@@ -304,18 +304,50 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         XCTAssertEqual(result.turn.lastErrorCode, "fixture_provider_unavailable")
     }
 
-    func testProviderConfigurationFailureBlocksRunAndRetainsExactTurn() async throws {
+    func testProviderConfigurationFailureWaitsForAutomaticRepairAndRetainsExactTurn() async throws {
         let result = try await runFailureCase(
             ManagedStepProviderFailure(
                 disposition: .blockedConfiguration,
                 code: "fixture_provider_unauthorized"
             )
         )
-        XCTAssertEqual(result.run.state, .blockedConfiguration)
+        XCTAssertEqual(result.run.state, .waitingProvider)
         XCTAssertEqual(result.run.lastErrorCode, "fixture_provider_unauthorized")
-        XCTAssertNil(result.run.retryAt)
+        XCTAssertNotNil(result.run.retryAt)
+        XCTAssertEqual(
+            result.run.specification.work.metadata["provider_configuration_wait_count"],
+            "1"
+        )
         XCTAssertEqual(result.turn.state, .retryWait)
         XCTAssertEqual(result.turn.lastErrorCode, "fixture_provider_unauthorized")
+    }
+
+    func testProviderConfigurationRecoveryIsBoundedAndRetainedForConnectAndCheck() async throws {
+        let result = try await runFailureCase(
+            ManagedStepProviderFailure(
+                disposition: .blockedConfiguration,
+                code: "fixture_provider_unauthorized"
+            ),
+            configurationRecoveryAttempts: 2
+        )
+        XCTAssertEqual(result.run.state, .paused)
+        XCTAssertEqual(
+            result.run.specification.work.metadata[
+                "provider_configuration_auto_resume"
+            ],
+            "pending"
+        )
+        XCTAssertEqual(
+            result.run.specification.work.metadata[
+                "provider_configuration_wait_count"
+            ],
+            "2"
+        )
+        XCTAssertTrue(
+            try XCTUnwrap(result.run.specification.work.nextAction)
+                .contains("Connect and Check")
+        )
+        XCTAssertEqual(result.turn.state, .retryWait)
     }
 
     func testProviderContextOverflowPersistsObservationAndRequestsRollover() async throws {
@@ -430,7 +462,8 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
 
     private func runFailureCase(
         _ failure: ManagedStepProviderFailure,
-        persistedBudget: Bool = false
+        persistedBudget: Bool = false,
+        configurationRecoveryAttempts: Int? = nil
     ) async throws -> ManagedStepFailureResult {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-managed-failure-\(UUID().uuidString)", isDirectory: true)
@@ -487,15 +520,29 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
             broker: broker,
             budget: evaluator
         )
+        let clock = FixedClock(Date(timeIntervalSince1970: 10_000))
         let coordinator = try ProjectRunCoordinator(
             runID: run.runID,
             repository: repository,
             managerID: "managed-failure-manager",
+            retryPolicy: configurationRecoveryAttempts.map {
+                AutonomyRetryPolicy(
+                    maximumAttempts: $0,
+                    baseDelay: 1,
+                    maximumDelay: 1,
+                    totalDeadline: TimeInterval($0 + 1)
+                )
+            } ?? .init(),
             stepExecutor: stepper,
             completionValidator: EvidenceBoundCompletionValidator(),
+            clock: clock,
             maximumSteps: 5
         )
-        _ = try await coordinator.runActivation()
+        let activationCount = configurationRecoveryAttempts.map { $0 + 1 } ?? 1
+        for _ in 0..<activationCount {
+            _ = try await coordinator.runActivation()
+            clock.date = clock.date.addingTimeInterval(60)
+        }
         let storedRunValue = try await repository.autonomousRun(run.runID)
         let storedRun = try XCTUnwrap(storedRunValue)
         let providerSnapshot = await provider.snapshot()

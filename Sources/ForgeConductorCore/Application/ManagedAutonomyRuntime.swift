@@ -339,6 +339,12 @@ public actor ManagedAutonomyRuntime {
     private var desktopRunReservations: [DesktopRunSlot: DesktopRunReservation] = [:]
     private var servicesClosing = false
 
+    /// One durable compatibility repair is enough to move pre-fix runs back
+    /// through the normal state machine. The marker prevents a malformed
+    /// legacy record from being churned on every watchdog tick.
+    private static let automaticBlockedRecoveryMarker =
+        "forge.automatic_blocked_recovery.v1"
+
     public init(
         app: ForgeApp,
         registry: HostAdapterRegistry = .shared,
@@ -543,6 +549,12 @@ public actor ManagedAutonomyRuntime {
             let report = try await supervisor.recoverOnManagerStart()
             try Task.checkCancellation()
             guard !shutdownRequested else { throw AutonomyError.shutdown }
+            let recoveredBlockedRuns = try await recoverAutomaticallyResolvableBlockedRuns()
+            if recoveredBlockedRuns > 0 {
+                try await supervisor.tick()
+            }
+            try Task.checkCancellation()
+            guard !shutdownRequested else { throw AutonomyError.shutdown }
             try await desktopProviderRuns.start()
             startupReport = report
             started = true
@@ -564,9 +576,105 @@ public actor ManagedAutonomyRuntime {
         defer { tickInProgress = false }
         try await processSourceCancellations()
         guard !shutdownRequested else { throw AutonomyError.shutdown }
+        _ = try await recoverAutomaticallyResolvableBlockedRuns()
+        guard !shutdownRequested else { throw AutonomyError.shutdown }
         try await desktopProviderRuns.reconcile()
         guard !shutdownRequested else { throw AutonomyError.shutdown }
         try await supervisor.tick()
+    }
+
+    /// Repairs every durable configuration block written by older builds. The
+    /// exact pending completion request / side-effect intent remains intact;
+    /// only the manager-owned scheduler state advances so the current runtime
+    /// can rediscover the actual dependency and recover it normally.
+    @discardableResult
+    private func recoverAutomaticallyResolvableBlockedRuns() async throws -> Int {
+        let candidates = try await repository.nonterminalAutonomousRuns(
+            limit: AutonomySupervisor.maximumRecoveredRuns
+        )
+        var recovered = 0
+        for candidate in candidates where candidate.state == .blockedConfiguration {
+            try Task.checkCancellation()
+            guard !shutdownRequested,
+                  candidate.specification.work.metadata[
+                    Self.automaticBlockedRecoveryMarker
+                  ] == nil,
+                  controlledRuns.insert(candidate.runID).inserted else {
+                continue
+            }
+            defer { controlledRuns.remove(candidate.runID) }
+
+            let target: AutonomousRunState
+            let summary: String
+            if candidate.lastErrorCode == AutonomyError.completionValidationFailed.code,
+               candidate.completionRequestJSON != nil,
+               candidate.specification.work.pendingIntent == nil {
+                target = .validatingCompletion
+                summary = "Forge automatically resumed retained completion validation"
+            } else {
+                target = .recovering
+                summary = "Forge automatically resumed retained legacy recovery"
+            }
+
+            var lease: RunLease?
+            do {
+                let acquired = try await repository.acquireRunLease(
+                    runID: candidate.runID,
+                    ownerID: "automatic-block-recovery:\(UUID().uuidString.lowercased())"
+                )
+                lease = acquired
+                guard let current = try await repository.autonomousRun(candidate.runID),
+                      current.state == .blockedConfiguration,
+                      current.specification.work.metadata[
+                        Self.automaticBlockedRecoveryMarker
+                      ] == nil else {
+                    _ = try await repository.releaseRunLease(acquired)
+                    continue
+                }
+                var work = current.specification.work
+                work.metadata[Self.automaticBlockedRecoveryMarker] = "1"
+                work.nextAction = target == .validatingCompletion
+                    ? "Forge is re-evaluating the retained automatic completion evidence."
+                    : "Forge is re-evaluating the retained task automatically."
+                _ = try await repository.transitionAutonomousRun(
+                    runID: current.runID,
+                    lease: acquired,
+                    transition: AutonomousRunTransition(
+                        expectedState: current.state,
+                        expectedRevision: current.revision,
+                        nextState: target,
+                        eventType: "autonomous_run_automatic_block_recovery",
+                        eventSummary: summary,
+                        work: work
+                    )
+                )
+                _ = try await repository.releaseRunLease(acquired)
+                lease = nil
+                recovered += 1
+                diagnostics.info(
+                    "autonomy_blocked_run_recovered",
+                    [
+                        "run_id": current.runID.description,
+                        "target_state": target.rawValue,
+                    ],
+                    category: .manager
+                )
+            } catch is CancellationError {
+                if let lease { _ = try? await repository.releaseRunLease(lease) }
+                throw CancellationError()
+            } catch {
+                if let lease { _ = try? await repository.releaseRunLease(lease) }
+                diagnostics.warn(
+                    "autonomy_blocked_run_recovery_deferred",
+                    [
+                        "run_id": candidate.runID.description,
+                        "error": String(error.localizedDescription.prefix(1_024)),
+                    ],
+                    category: .manager
+                )
+            }
+        }
+        return recovered
     }
 
     /// Uses the existing watchdog and operator-control ownership. The durable
@@ -721,6 +829,44 @@ public actor ManagedAutonomyRuntime {
         return run
     }
 
+    /// Wakes only runs that were durably retained for automatic provider
+    /// recovery. `Connect and Check` calls this after the selected provider has
+    /// passed its contract probe, so an operator never has to press a second
+    /// Retry button merely to resume the exact saved operation.
+    @discardableResult
+    public func resumeProviderConfigurationWaits(
+        providerID: String
+    ) async throws -> Int {
+        guard started, !shutdownRequested else { throw AutonomyError.shutdown }
+        let candidates = try await repository.nonterminalAutonomousRuns(
+            limit: AutonomySupervisor.maximumRecoveredRuns
+        )
+        var resumed = 0
+        for candidate in candidates where candidate.providerID == providerID {
+            try Task.checkCancellation()
+            let waitCount = Int(
+                candidate.specification.work.metadata[
+                    "provider_configuration_wait_count"
+                ] ?? "0"
+            ) ?? 0
+            let retainedForAutomaticResume = candidate.specification.work.metadata[
+                "provider_configuration_auto_resume"
+            ] == "pending"
+            let action: ManagedAutonomyControlAction?
+            if candidate.state == .waitingProvider, waitCount > 0 {
+                action = .retry
+            } else if candidate.state == .paused, retainedForAutomaticResume {
+                action = .resume
+            } else {
+                action = nil
+            }
+            guard let action else { continue }
+            _ = try await controlRun(candidate.runID, action: action)
+            resumed += 1
+        }
+        return resumed
+    }
+
     public func handleDesktopProviderHook(
         _ request: DesktopProviderHookRequest,
         selectionRevision: String
@@ -792,6 +938,8 @@ public actor ManagedAutonomyRuntime {
             guard run.state == .paused else {
                 throw AutonomyError.invalidRequest("only a paused run can be resumed")
             }
+            work.metadata.removeValue(forKey: "provider_configuration_auto_resume")
+            work.metadata.removeValue(forKey: "provider_configuration_wait_count")
             let prior = work.metadata.removeValue(forKey: "paused_from_state")
             switch prior.flatMap(AutonomousRunState.init(rawValue:)) {
             case .created, .validating:
@@ -814,14 +962,15 @@ public actor ManagedAutonomyRuntime {
                     "only a waiting, blocked, or recoverable run can be retried"
                 )
             }
-            // Completion validation persists the exact request before a native
-            // gate can block on missing policy or environment. Once that blocker
-            // is repaired, retry the same durable request without manufacturing a
-            // continuity step that would require an unrelated budget observation.
+            // Older builds could persist a completion-validation block. Resume
+            // the exact durable request without manufacturing a continuity step
+            // that would require an unrelated budget observation.
             let resumesCompletionValidation = run.state == .blockedConfiguration
                 && run.lastErrorCode == AutonomyError.completionValidationFailed.code
                 && run.completionRequestJSON != nil
                 && run.specification.work.pendingIntent == nil
+            work.metadata.removeValue(forKey: "provider_configuration_auto_resume")
+            work.metadata.removeValue(forKey: "provider_configuration_wait_count")
             nextState = resumesCompletionValidation ? .validatingCompletion : .recovering
         case .checkpoint, .rollover:
             preconditionFailure("operator continuity actions are handled before generic controls")

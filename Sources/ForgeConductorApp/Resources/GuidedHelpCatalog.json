@@ -567,7 +567,7 @@
       "troubleshooting": [
         "Start disabled: open preparation explanation",
         "Provider missing: use the one offered recovery action",
-        "Run blocked: inspect classified reason and Retry"
+        "Task needs attention: follow the named recovery action; Forge preserves progress and resumes automatically where possible"
       ],
       "advanced_details": [
         "Run UUID",
@@ -691,17 +691,16 @@
         "Retain failed attempts as history"
       ],
       "controls": [
-        "View checks",
-        "Retry failed check",
-        "Open evidence",
-        "Advanced custom policy"
+        "Select built-in checks",
+        "View package requirements",
+        "Open evidence"
       ],
       "status_meanings": [
         "pending",
         "running",
         "passed",
         "failed recoverable",
-        "blocked dependency",
+        "waiting for evidence",
         "review required"
       ],
       "normal_workflow": [
@@ -711,7 +710,7 @@
       ],
       "troubleshooting": [
         "Earlier passing evidence stale after changes",
-        "Custom policy missing",
+        "Package requirement needs corrected evidence",
         "Subjective requirement needs review"
       ],
       "advanced_details": [

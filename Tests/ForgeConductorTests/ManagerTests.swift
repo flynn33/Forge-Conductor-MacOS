@@ -903,6 +903,65 @@ final class ManagerTests: XCTestCase {
         try? FileManager.default.removeItem(at: home)
     }
 
+    func testInlinePreparationRejectsConfigurationOwnedUnknownCompletionGate() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent("completion-origin-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: false)
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Completion Origin Fixture",
+            canonicalRoot: projectRoot
+        )
+        let node = ManagerNode(app: app)
+
+        XCTAssertThrowsError(try node.prepareAutonomousRun(
+            projectID: project.projectID,
+            expectedGeneration: project.generation,
+            mission: "Inspect the project and report the result.",
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture-model",
+            allowedTools: ["fs_read"],
+            completionGates: [
+                ProjectInstructionQueueStore.builtInCompletionGate,
+                "owner.configuration-created-gate",
+            ]
+        )) { error in
+            XCTAssertEqual((error as? AutonomyError)?.code, AutonomyError.invalidRequest("").code)
+            XCTAssertTrue(error.localizedDescription.contains(
+                "Package-defined completion requirements must come from the prepared instruction source"
+            ))
+        }
+
+        let prepared = try node.prepareAutonomousRun(
+            projectID: project.projectID,
+            expectedGeneration: project.generation,
+            mission: "Inspect the project and report the result.",
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture-model",
+            allowedTools: ["fs_read"],
+            completionGates: [
+                ProjectInstructionQueueStore.builtInCompletionGate,
+                CompletionCheckPreset.noUnresolvedOperations.rawValue,
+            ]
+        )
+        XCTAssertEqual(
+            prepared.validationPlan.completionGates,
+            [
+                ProjectInstructionQueueStore.builtInCompletionGate,
+                CompletionCheckPreset.noUnresolvedOperations.rawValue,
+            ]
+        )
+        XCTAssertFalse(
+            prepared.validationPlan.automaticPlan?.obligations.contains {
+                $0.kind == .customNativeGate
+            } == true
+        )
+    }
+
     func testManagerStartStopService() throws {
         let app = try ForgeApp.bootstrap(home: home)
         try app.config.update([
@@ -1016,7 +1075,9 @@ final class ManagerTests: XCTestCase {
                             workItem: "Implement the monitoring feed",
                             nextAction: "Run focused verification",
                             metadata: ["provider_assistant_summary": managedAssistantOutput]
-                        ) : AutonomousRunWork()
+                        ) : AutonomousRunWork(
+                            nextAction: "Install the required native gate policy or restore its required environment."
+                        )
                     ),
                     authorizationScope: scope
                 )
@@ -1059,6 +1120,21 @@ final class ManagerTests: XCTestCase {
             "Implement the monitoring feed",
             "The established public work-item projection remains available to Autonomy"
         )
+        let legacyRun = try XCTUnwrap(
+            redactedSnapshot.runs.first { $0.mission == "Earlier run" }
+        )
+        let legacyActivity = try node.operatorSnapshot(
+            limit: 100,
+            includeActivity: true,
+            activityRunID: legacyRun.runID,
+            activityProjectID: legacyRun.projectID,
+            activityProjectGeneration: legacyRun.projectGeneration
+        )
+        let sanitizedNextAction = try XCTUnwrap(legacyActivity.runs.first?.nextAction)
+        XCTAssertTrue(sanitizedNextAction.contains("automatically"))
+        XCTAssertFalse(sanitizedNextAction.localizedCaseInsensitiveContains("gate"))
+        XCTAssertFalse(sanitizedNextAction.localizedCaseInsensitiveContains("policy"))
+        XCTAssertFalse(sanitizedNextAction.localizedCaseInsensitiveContains("environment"))
         let activityRun = try XCTUnwrap(
             redactedSnapshot.runs.first { $0.mission.contains("Inspect") }
         )

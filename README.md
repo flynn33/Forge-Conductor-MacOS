@@ -7,21 +7,22 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.0** |
-| **Build** | **6** |
+| **Version** | **0.14.1** |
+| **Build** | **7** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.0 (6)` is the current development identity. It is
+> **Release status:** `0.14.1 (7)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
-binding. Provider schema and toggle behavior, canonical Xcode target
-membership, and the `0.14.0 (6)` identity are unchanged.
+binding. Those warning repairs preserve provider request schemas and canonical
+Xcode target membership; the intentional provider workflow changes are
+described below. The current patch identity is `0.14.1 (7)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
@@ -29,8 +30,8 @@ provider/runtime preparation, durable continuity, and large instruction
 packages. Integrated deterministic acceptance covers restart, provider
 interruption, forced rollover, corrected completion evidence, and multi-page
 instruction delivery. **Dashboard** now launches an ordered, state-aware
-**Guided Setup** wizard; local LM Studio recovery, actionable Autonomy and
-Continuity states, current-build Doctor checks, compact Managed Activity, and
+**Guided Setup** wizard; local LM Studio recovery, specific Autonomy and
+Continuity recovery states, current-build Doctor checks, compact Managed Activity, and
 the Rune Forge Policy Feed make setup and monitoring one connected workflow.
 Native distribution and shipment qualification remain separate.
 
@@ -51,7 +52,8 @@ Native distribution and shipment qualification remain separate.
 - Keeps one provider selected at a time through a single activation toggle per
   selectable provider, including LM Studio.
 - Keeps durable state isolated by project identity and generation.
-- Runs ordered instruction packages with bounded execution and explicit gates.
+- Runs ordered instruction packages with bounded execution and package-owned
+  completion requirements.
 - Coordinates checkpoints, handoffs, successor acknowledgement, and recovery.
 - Presents native macOS controls for projects, providers, runs, telemetry,
   diagnostics, and manager lifecycle.
@@ -101,15 +103,12 @@ Open **Dashboard** and choose **Guided Setup** in the title bar for the ordered,
 state-aware version of this workflow. The wizard saves its current step and
 routes each setup or recovery action to the view that owns it.
 
-1. Start the provider you intend to use. For LM Studio, open it and load a
-   supported tool-capable model; **Connect and Check** starts or discovers the
-   local HTTP server. For a desktop provider, install or update its supported
-   desktop application and CLI.
-2. Open Forge Conductor and start the Manager.
-3. In **Projects**, register the repository by picker or absolute path. Forge
-   authorizes that exact selected folder and preserves existing authorized
-   roots; the same path does not need to be entered in Manager first.
-4. In **Provider**, turn on LM Studio, Claude Code Desktop, or Codex Desktop.
+1. Open Forge Conductor and start the **Manager**.
+2. In **Provider**, prepare and select LM Studio, Claude Code Desktop, or Codex
+   Desktop. For LM Studio, open the application and load a supported
+   tool-capable model; **Connect and Check** starts or discovers the local HTTP
+   server. For a desktop provider, install or update its supported desktop
+   application and CLI.
    Only one provider can be selected. The toggle verifies or
    transactionally provisions the Forge-owned integration before selection;
    for LM Studio it runs **Connect and Check** first and selects only after the
@@ -130,7 +129,10 @@ routes each setup or recovery action to the view that owns it.
    The Grok Build card remains visible but non-selectable in this release. Its
    Forge-owned artifacts may be inspected or removed; no ready, run, or live
    support state is claimed.
-5. Add instruction packages to the registered project. Files are admitted by
+3. In **Projects**, register the repository by picker or absolute path. Forge
+   authorizes that exact selected folder and preserves existing authorized
+   roots; the same path does not need to be entered in Manager first.
+4. Add instruction packages to the registered project. Files are admitted by
    inspected content rather than a filename whitelist. Forge preserves the
    originals, normalizes UTF-8/UTF-16 and supported native PDF, DOCX, RTF, and
    HTML text into an immutable catalog, uses bounded native Vision OCR when a
@@ -145,7 +147,7 @@ routes each setup or recovery action to the view that owns it.
    bootstrap summary; managed runs page them through project/run-bound read-only
    tools sized against both the transport ceiling and current provider context.
    Large queue refreshes are also loaded in stable revision-bound pages.
-6. In **Autonomy**, select the project and one or more existing instruction
+5. In **Autonomy**, configure the task: select the project and one or more existing instruction
    packages in their displayed order, or type, paste, drop, or add a file,
    folder, or ZIP, then select **Start Task**. A single existing package keeps
    its exact stored content hash even if the original import path is gone;
@@ -158,7 +160,7 @@ routes each setup or recovery action to the view that owns it.
    defaults are omitted from the start request and resolved again by the
    Manager. Optional task label, LM Studio saved-model choice, and network
    authority remain under **Customize**; provider/adapter, raw capability IDs,
-   and raw completion-gate IDs are not routine inputs.
+   and raw completion-requirement IDs are not configuration inputs.
    Selecting **Show completion checks** exposes native checkboxes for a buildable
    project, no build errors, no build warnings, available tests, complete
    instruction delivery, and no unresolved operations. **On failure** selects
@@ -169,7 +171,7 @@ routes each setup or recovery action to the view that owns it.
    a deterministic typed completion plan, automatic continuity, and resource
    budget. The plan is bound to the exact project generation and instruction
    artifact and records why each build, test, report, artifact, unresolved-work,
-   or explicitly selected custom-policy obligation applies. Start verifies
+   or instruction-package requirement applies. Start verifies
    that descriptor again; changed inputs refresh preparation before any run is
    persisted. If a prerequisite is missing, the sheet reports an exact
    readiness state and offers the focused Projects, Model connection,
@@ -191,12 +193,21 @@ routes each setup or recovery action to the view that owns it.
    each automatic obligation. A corrected build or test can supersede an earlier
    failure, while an unrelated successful read cannot complete repair work and
    unresolved effects remain fail-closed. Long run histories are read in bounded
-   pages. The run detail shows the derived checks and keeps the signed custom
-   policy importer collapsed under **Advanced controls** for specialized use.
+   pages. The run detail shows the derived checks and package-owned requirements
+   as read-only evidence. Forge configuration exposes only the recognized
+   built-in checks; the bound instruction package exclusively supplies any
+   additional completion requirement.
    A settled task exposes **Delete Task…**. Forge confirms the action and
    deletes only a completed, cancelled, or terminally failed run whose runtime
    work is settled; project files are unchanged.
-7. Review the run's events and evidence.
+6. Review the exact prepared task summary and choose **Start**. If any reviewed
+   input changed, Forge refreshes the preparation before admission.
+7. Monitor the active package, current step, model/tool activity, continuity,
+   and policy events on **Dashboard**.
+8. If intervention is actually required, follow the named action in
+   **Autonomy**, **Provider**, **Continuity**, or **Rune Forge**. Retained legacy
+   configuration states recover automatically and do not require additional
+   Forge configuration or an environment reset.
 
 The run view leads with the task, current state/work, recent model and tool
 activity, automatic continuity, completion, and recovery. Provider, session,
@@ -418,9 +429,9 @@ release checklist.
 A passing build proves compilation. A passing unit or UI test proves only the
 tested flow. Signing, notarization, Gatekeeper acceptance, privileged-service
 execution, hardware coverage, public distribution, and shipment are separate
-gates.
+release checks.
 
-Current results and remaining gates are recorded in:
+Current results and remaining release checks are recorded in:
 
 - [Adversarial pre-release audit](docs/AUDIT-2026-09-20.md)
 - [Roadmap](ROADMAP.md)

@@ -199,33 +199,26 @@ public actor NativeValidationPolicyInstaller {
     }
 }
 
-/// The manager's production completion dependency. Automatic gates use compiled
-/// manager-owned validators; explicit custom-native gates load a bounded,
-/// no-follow policy from the protected namespace. Workspace JSON and model
-/// result hashes never register a handler. Custom definitions are immutable for
-/// the activation and rechecked around every native job. Restart revalidates.
+/// The manager's production completion dependency. Instruction packages own
+/// their completion identifiers, and Forge evaluates every identifier through
+/// the compiled, run-bound evidence plan. Configuration never installs or
+/// selects a separate gate policy.
 public actor InstalledNativeGateRegistry: RunCompletionValidating {
-    private enum PolicyResolutionError: Error {
-        case gateSetMismatch
-    }
-
     private let repository: ProjectControlPlaneRepository
-    private let root: URL
     private let clock: any Clock
-    private var active: [UUID: [NativeXCTestJobExecutor]] = [:]
     private var stopped = false
 
-    public init(repository: ProjectControlPlaneRepository, paths: AppPaths, clock: any Clock = SystemClock()) {
+    public init(
+        repository: ProjectControlPlaneRepository,
+        paths _: AppPaths,
+        clock: any Clock = SystemClock()
+    ) {
         self.repository = repository
-        root = paths.nativeValidationDir
         self.clock = clock
     }
 
     public func shutdown() async {
         stopped = true
-        for executors in active.values {
-            for executor in executors { await executor.shutdown() }
-        }
     }
 
     public func validate(_ run: AutonomousRunRecord) async throws -> CompletionValidationReceipt {
@@ -244,68 +237,11 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
                 )
             )
         }
-        let automaticGates = CompletionGateOwnership.automaticGates(in: allGates)
-        let customNativeGates = CompletionGateOwnership.customNativeGates(in: allGates)
         let automaticResults = try await automaticResults(
             for: run,
-            gates: automaticGates
+            gates: allGates
         )
-        guard !customNativeGates.isEmpty else {
-            return try receipt(
-                for: run,
-                orderedResults: automaticResults
-            )
-        }
-        guard active.count < 4 else {
-            return try receipt(
-                for: run,
-                orderedResults: automaticResults + blockedResults(
-                    gates: customNativeGates,
-                    summary: "Custom native validation is stopped or at its concurrency limit"
-                )
-            )
-        }
-        let activation = UUID()
-        active[activation] = []
-        do {
-            let registry = try await makeRegistry(
-                for: run,
-                customNativeGates: customNativeGates,
-                activation: activation
-            )
-            let customReceipt = try await registry.validate(run)
-            let customResults = customReceipt.results.filter {
-                customNativeGates.contains($0.gate)
-            }
-            let result = try receipt(
-                for: run,
-                orderedResults: automaticResults + customResults
-            )
-            await finish(activation)
-            return result
-        } catch is CancellationError {
-            await finish(activation)
-            throw CancellationError()
-        } catch PolicyResolutionError.gateSetMismatch {
-            await finish(activation)
-            return try receipt(
-                for: run,
-                orderedResults: automaticResults + blockedResults(
-                    gates: customNativeGates,
-                    summary: "No matching deterministic validator is registered for the run's custom completion checks",
-                    blocker: .unregisteredValidator
-                )
-            )
-        } catch {
-            await finish(activation)
-            return try receipt(
-                for: run,
-                orderedResults: automaticResults + blockedResults(
-                    gates: customNativeGates,
-                    summary: "Custom native validation is unavailable or invalid: \(error.localizedDescription.prefix(1_500))"
-                )
-            )
-        }
+        return try receipt(for: run, orderedResults: automaticResults)
     }
 
     private func automaticResults(
@@ -334,11 +270,6 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
             clock: clock
         ).validate(run)
         return evaluated.results.filter { gates.contains($0.gate) }
-    }
-
-    private func finish(_ activation: UUID) async {
-        let executors = active.removeValue(forKey: activation) ?? []
-        for executor in executors { await executor.shutdown() }
     }
 
     private func blockedResults(
@@ -375,91 +306,6 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
         )
     }
 
-    private func makeRegistry(
-        for run: AutonomousRunRecord,
-        customNativeGates: [String],
-        activation: UUID
-    ) async throws -> GateValidatorRegistry {
-        let relativePolicy = "policies/\(run.runID.description).json"
-        let policySnapshotter = try QualificationInputSnapshotter(root: root, inputs: [relativePolicy],
-                                                                 maximumBytes: 256 * 1_024, maximumFiles: 1,
-                                                                 maximumFileBytes: 256 * 1_024)
-        let policySnapshot = try await policySnapshotter.capture()
-        guard policySnapshot.absentInputs.isEmpty, policySnapshot.files.count == 1,
-              let file = policySnapshot.files.first, file.mode & 0o077 == 0 else {
-            throw AutonomyError.invalidRequest("native gate policy must be an owner-only regular file")
-        }
-        let data = try OwnerOnlyAtomicFile.read(from: root.appendingPathComponent(relativePolicy), maximumBytes: 256 * 1_024)
-        guard JSONSupport.sha256Hex(data) == file.sha256,
-              try await policySnapshotter.capture() == policySnapshot else {
-            throw AutonomyError.invalidRequest("native gate policy changed while loading")
-        }
-        let policy = try JSONDecoder().decode(InstalledNativeGatePolicy.self, from: data)
-        try policy.validate(for: run)
-        let policyGateIDs = Set(policy.gates.map(\.id))
-        let customGateIDs = Set(customNativeGates)
-        let legacyFullGateIDs = Set(run.specification.completionGates)
-        guard policyGateIDs == customGateIDs || policyGateIDs == legacyFullGateIDs else {
-            throw PolicyResolutionError.gateSetMismatch
-        }
-        guard let project = try await repository.project(run.projectID),
-              project.generation == run.projectGeneration,
-              try await repository.autonomousRun(run.runID) == run else {
-            throw AutonomyError.transitionConflict
-        }
-        let source = try QualificationInputSnapshotter(root: project.canonicalRoot, inputs: policy.sourceInputs)
-        let policyDigest = file.sha256
-        var validators: [CompletionGateValidator] = []
-        for definition in policy.gates where customGateIDs.contains(definition.id) {
-            try Task.checkCancellation()
-            guard !stopped else { throw AutonomyError.shutdown }
-            let capture: NativeXCTestGateHandler.InputCapture = { current in
-                guard current.runID == policy.runID, current.projectID == policy.projectID,
-                      current.projectGeneration == policy.projectGeneration,
-                      try await policySnapshotter.capture() == policySnapshot else {
-                    throw AutonomyError.transitionConflict
-                }
-                let snapshot = try await source.capture()
-                guard !snapshot.files.isEmpty, snapshot.absentInputs.isEmpty else {
-                    throw AutonomyError.invalidRequest("required qualification inputs are missing")
-                }
-                return try NativeGateInputs(
-                    sourceManifestSHA256: snapshot.sha256,
-                    buildIdentity: "\(policy.buildIdentity):package=\(definition.packageSHA256):policy=\(policyDigest)",
-                    policyRevision: policy.policyRevision, environmentIdentity: "\(policy.xcodeVersion):\(policy.architecture):\(ProcessInfo.processInfo.operatingSystemVersionString)"
-                )
-            }
-            let inputs = try await capture(run)
-            if let expectedSource = policy.candidateSourceSHA256, inputs.sourceManifestSHA256 != expectedSource {
-                throw AutonomyError.invalidRequest("prebuilt native policy belongs to a different source snapshot")
-            }
-            guard !stopped else { throw AutonomyError.shutdown }
-            let packageRoot = root.appendingPathComponent("packages/\(definition.packageID.uuidString.lowercased())")
-            // A package alias cannot escape the manager's protected namespace.
-            guard packageRoot.resolvingSymlinksInPath().path == packageRoot.standardizedFileURL.path else {
-                throw AutonomyError.invalidRequest("installed native package contains an aliased root")
-            }
-            let executor = NativeXCTestJobExecutor(repository: repository, policy: try NativeXCTestJobPolicy(
-                packageRoot: packageRoot, packageInputs: definition.packageInputs, packageSHA256: definition.packageSHA256,
-                signedProducts: definition.signedProducts, testRunPath: definition.testRunPath,
-                artifactRoot: root.appendingPathComponent("results/\(run.runID.description)/\(definition.id)"),
-                developerDirectory: AppPaths.nativeValidationDeveloperDirectory, xcodeVersion: policy.xcodeVersion,
-                testIdentifiers: definition.testIdentifiers, inputs: inputs, architecture: policy.architecture,
-                timeoutSeconds: definition.timeoutSeconds
-            ))
-            active[activation, default: []].append(executor)
-            let handler = try NativeXCTestGateHandler(
-                gate: definition.id, version: definition.version, handler: NativeXCTestJobExecutor.handlerIdentity,
-                policyRevision: policy.policyRevision, environmentIdentity: inputs.environmentIdentity,
-                requiredCases: definition.requiredCases, minimumCaseCount: definition.minimumCaseCount,
-                clock: clock, captureInputs: capture,
-                execute: { job, captured in try await executor.execute(job, inputs: captured) }
-            )
-            validators.append(handler.validator)
-        }
-        return try GateValidatorRegistry(validators: validators, clock: clock,
-                                        acceptancePolicy: .correction001(caseBindings: policy.correctionCaseBindings))
-    }
 }
 
 /// Fixed manager-owned validator for ordinary instruction packages. It pages

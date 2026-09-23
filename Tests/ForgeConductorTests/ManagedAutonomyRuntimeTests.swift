@@ -257,55 +257,66 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         }
     }
 
-    func testProductionCompletionHasNoHashFallbackWithMissingOrRejectingPolicy() async throws {
-        for installRejectingValidator in [false, true] {
-            let app = try ForgeApp.bootstrap(home: home.appendingPathComponent(UUID().uuidString))
-            let root = home.appendingPathComponent("project-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            _ = try app.config.update(["allowed_roots": [root.path]], save: true)
-            let file = root.appendingPathComponent("fixture.txt")
-            try Data("unrelated successful read".utf8).write(to: file)
-            let provider = ManagedRuntimeFixtureProvider(fixturePath: file.path)
-            let validator: GateValidatorRegistry? = installRejectingValidator
-                ? try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { _ in
-                    CompletionGateResult(gate: "fixture_read", passed: false, summary: "Required assertion failed")
-                }]) : nil
-            let runtime = try ManagedAutonomyRuntime(
-                app: app, registry: managedRuntimeFixtureRegistry(provider: provider),
-                maximumConcurrentRuns: 1, completionValidator: validator
-            )
-            let project = try await app.projectContexts.repository.registerProjectUnchecked(
-                projectID: ProjectID(), displayName: "Completion policy fixture", canonicalRoot: root
-            )
-            _ = try await runtime.start()
-            let run = try await runtime.createRun(managedRuntimeRunRequest(
-                projectID: project.projectID, generation: project.generation, projectRoot: root
-            ))
-            let deadline = ContinuousClock.now + .seconds(5)
-            var rejected = false
-            while ContinuousClock.now < deadline {
-                let events = try await app.projectContexts.repository.autonomyEvents(runID: run.runID)
-                if events.contains(where: { $0.eventType == "autonomous_completion_rejected" }) {
-                    rejected = true
-                    break
-                }
-                try await Task.sleep(for: .milliseconds(25))
+    func testProductionCompletionReturnsToRunningWhenEvidenceIsNotApproved() async throws {
+        let app = try ForgeApp.bootstrap(home: home.appendingPathComponent(UUID().uuidString))
+        let root = home.appendingPathComponent("project-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [root.path]], save: true)
+        let file = root.appendingPathComponent("fixture.txt")
+        try Data("unrelated successful read".utf8).write(to: file)
+        let provider = ManagedRuntimeFixtureProvider(fixturePath: file.path)
+        let validator = try GateValidatorRegistry(validators: [
+            CompletionGateValidator(gate: "fixture_read") { _ in
+                CompletionGateResult(
+                    gate: "fixture_read",
+                    passed: false,
+                    summary: "Required assertion failed"
+                )
+            },
+        ])
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            registry: managedRuntimeFixtureRegistry(provider: provider),
+            maximumConcurrentRuns: 1,
+            completionValidator: validator
+        )
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Completion evidence fixture",
+            canonicalRoot: root
+        )
+        _ = try await runtime.start()
+        let run = try await runtime.createRun(managedRuntimeRunRequest(
+            projectID: project.projectID,
+            generation: project.generation,
+            projectRoot: root
+        ))
+        let deadline = ContinuousClock.now + .seconds(5)
+        var rejected = false
+        while ContinuousClock.now < deadline {
+            let events = try await app.projectContexts.repository.autonomyEvents(runID: run.runID)
+            if events.contains(where: { $0.eventType == "autonomous_completion_rejected" }) {
+                rejected = true
+                break
             }
-            XCTAssertTrue(rejected, "Manager must execute the non-approving policy")
-            let current = try await runtime.run(run.runID)
-            XCTAssertNotEqual(current.state, .completed)
-            if !installRejectingValidator {
-                XCTAssertEqual(current.state, .blockedConfiguration, "Missing policy must stop repeated model requests")
-            }
-            XCTAssertNil(current.specification.work.metadata["completion_gate.fixture_read.proof_sha256"])
-            let snapshot = await provider.snapshot()
-            XCTAssertTrue(snapshot.receivedToolOutput, "A real stored read result must not satisfy the gate")
-            await runtime.shutdown()
-            app.shutdown()
+            try await Task.sleep(for: .milliseconds(25))
         }
+        XCTAssertTrue(rejected, "Manager must execute the non-approving completion check")
+        let current = try await runtime.run(run.runID)
+        XCTAssertNotEqual(current.state, .completed)
+        XCTAssertEqual(
+            current.state,
+            .running,
+            "Unmet completion evidence must continue the retained task instead of creating a configuration blocker"
+        )
+        XCTAssertNil(current.specification.work.metadata["completion_gate.fixture_read.proof_sha256"])
+        let snapshot = await provider.snapshot()
+        XCTAssertTrue(snapshot.receivedToolOutput, "A real stored read result must not satisfy the requirement")
+        await runtime.shutdown()
+        app.shutdown()
     }
 
-    func testRetryAfterCompletionPolicyRepairRevalidatesWithoutContinuityOrProviderReplay() async throws {
+    func testStartupAutomaticallyRevalidatesRetainedCompletionWithoutContinuityOrProviderReplay() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
         let root = home.appendingPathComponent("completion-retry-project", isDirectory: true)
@@ -315,8 +326,8 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             CompletionGateValidator(gate: "fixture_read") { _ in
                 return CompletionGateResult(
                     gate: "fixture_read", passed: true,
-                    summary: "Repaired native completion policy passed",
-                    evidenceReferences: ["fixture:completion-policy-repaired"]
+                    summary: "Retained completion evidence passed",
+                    evidenceReferences: ["fixture:completion-evidence-recovered"]
                 )
             },
         ])
@@ -332,7 +343,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         ))
         let lease = try await app.projectContexts.repository.acquireRunLease(
             runID: blocked.runID,
-            ownerID: "completion-policy-retry-fixture"
+            ownerID: "legacy-completion-retry-fixture"
         )
         for nextState in [
             AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion,
@@ -344,8 +355,8 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                     expectedState: blocked.state,
                     expectedRevision: blocked.revision,
                     nextState: nextState,
-                    eventType: "completion_policy_retry_fixture_\(nextState.rawValue)",
-                    eventSummary: "Prepare a durable completion validation retry fixture",
+                    eventType: "legacy_completion_retry_fixture_\(nextState.rawValue)",
+                    eventSummary: "Prepare a durable legacy completion retry fixture",
                     completionRequestJSON: nextState == .validatingCompletion
                         ? #"{"request":"complete after policy repair"}"# : nil
                 )
@@ -358,10 +369,10 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 expectedState: blocked.state,
                 expectedRevision: blocked.revision,
                 nextState: .blockedConfiguration,
-                eventType: "completion_policy_retry_fixture_blocked",
-                eventSummary: "Native completion policy is unavailable",
+                eventType: "legacy_completion_retry_fixture_blocked",
+                eventSummary: "A legacy build retained completion validation as blocked",
                 errorCode: AutonomyError.completionValidationFailed.code,
-                errorSummary: "Install the required native gate policy"
+                errorSummary: "Legacy completion validation requires automatic recovery"
             )
         )
         _ = try await app.projectContexts.repository.releaseRunLease(lease)
@@ -376,8 +387,6 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             completionValidator: validator
         )
         _ = try await runtime.start()
-        let retry = try await runtime.controlRun(blocked.runID, action: .retry)
-        XCTAssertEqual(retry.state, .validatingCompletion)
         let completed = try await waitForRun(
             repository: app.projectContexts.repository,
             runID: blocked.runID,
@@ -385,7 +394,165 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         )
         XCTAssertEqual(completed.state, .completed)
         let events = try await app.projectContexts.repository.autonomyEvents(runID: blocked.runID)
+        XCTAssertTrue(events.contains {
+            $0.eventType == "autonomous_run_automatic_block_recovery"
+        })
         XCTAssertFalse(events.contains { $0.eventType == "run_side_effect_intent_persisted" })
+        await runtime.shutdown()
+    }
+
+    func testStartupAutomaticallyDrainsUnclassifiedLegacyConfigurationBlock() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("legacy-blocked-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [root.path]], save: true)
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Legacy blocked fixture",
+            canonicalRoot: root
+        )
+        var legacy = try await app.projectContexts.repository.createAutonomousRun(
+            managedRuntimeRunRequest(
+                projectID: project.projectID,
+                generation: project.generation,
+                projectRoot: root
+            )
+        )
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: legacy.runID,
+            ownerID: "legacy-generic-block-fixture"
+        )
+        legacy = try await app.projectContexts.repository.transitionAutonomousRun(
+            runID: legacy.runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: legacy.state,
+                expectedRevision: legacy.revision,
+                nextState: .validating,
+                eventType: "legacy_generic_block_fixture_validating",
+                eventSummary: "Prepare a legacy generic recovery fixture"
+            )
+        )
+        legacy = try await app.projectContexts.repository.transitionAutonomousRun(
+            runID: legacy.runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: legacy.state,
+                expectedRevision: legacy.revision,
+                nextState: .blockedConfiguration,
+                eventType: "legacy_generic_block_fixture_blocked",
+                eventSummary: "A retired build left this task waiting for configuration",
+                errorCode: "legacy_configuration_wait",
+                errorSummary: "Retired configuration state"
+            )
+        )
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            registry: HostAdapterRegistry(),
+            maximumConcurrentRuns: 1
+        )
+        _ = try await runtime.start()
+        let recovered = try await runtime.run(legacy.runID)
+        XCTAssertNotEqual(recovered.state, .blockedConfiguration)
+        let events = try await app.projectContexts.repository.autonomyEvents(
+            runID: legacy.runID
+        )
+        XCTAssertTrue(events.contains {
+            $0.eventType == "autonomous_run_automatic_block_recovery"
+        })
+        await runtime.shutdown()
+    }
+
+    func testConnectAndCheckResumesBoundedProviderWaitExactlyOnce() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("provider-auto-resume-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        _ = try app.config.update(["allowed_roots": [root.path]], save: true)
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Provider Auto Resume Fixture",
+            canonicalRoot: root
+        )
+        var retained = try await app.projectContexts.repository.createAutonomousRun(
+            managedRuntimeRunRequest(
+                projectID: project.projectID,
+                generation: project.generation,
+                projectRoot: root
+            )
+        )
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: retained.runID,
+            ownerID: "provider-auto-resume-fixture"
+        )
+        for nextState in [
+            AutonomousRunState.validating, .ready, .starting, .running,
+        ] {
+            retained = try await app.projectContexts.repository.transitionAutonomousRun(
+                runID: retained.runID,
+                lease: lease,
+                transition: AutonomousRunTransition(
+                    expectedState: retained.state,
+                    expectedRevision: retained.revision,
+                    nextState: nextState,
+                    eventType: "provider_auto_resume_fixture_\(nextState.rawValue)",
+                    eventSummary: "Prepare a retained provider wait fixture"
+                )
+            )
+        }
+        var work = retained.specification.work
+        work.metadata["provider_configuration_auto_resume"] = "pending"
+        work.metadata["provider_configuration_wait_count"] = "3"
+        retained = try await app.projectContexts.repository.transitionAutonomousRun(
+            runID: retained.runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: retained.state,
+                expectedRevision: retained.revision,
+                nextState: .paused,
+                eventType: "provider_auto_resume_fixture_paused",
+                eventSummary: "Bounded automatic provider repair reached its deadline",
+                work: work,
+                errorCode: "fixture_provider_unauthorized",
+                errorSummary: "Provider connection requires repair"
+            )
+        )
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            registry: HostAdapterRegistry(),
+            maximumConcurrentRuns: 1
+        )
+        _ = try await runtime.start()
+
+        let resumed = try await runtime.resumeProviderConfigurationWaits(
+            providerID: "fixture-provider"
+        )
+        XCTAssertEqual(resumed, 1)
+        let events = try await app.projectContexts.repository.autonomyEvents(
+            runID: retained.runID
+        )
+        XCTAssertTrue(events.contains {
+            $0.eventType == "autonomous_run_resume_requested"
+        })
+        let currentValue = try await app.projectContexts.repository.autonomousRun(
+            retained.runID
+        )
+        let current = try XCTUnwrap(currentValue)
+        XCTAssertNil(
+            current.specification.work.metadata["provider_configuration_auto_resume"]
+        )
+        XCTAssertNil(
+            current.specification.work.metadata["provider_configuration_wait_count"]
+        )
+        let duplicateResume = try await runtime.resumeProviderConfigurationWaits(
+            providerID: "fixture-provider"
+        )
+        XCTAssertEqual(duplicateResume, 0)
         await runtime.shutdown()
     }
 
@@ -463,7 +630,11 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 registry: registry,
                 managerID: "managed-runtime-dashboard-independent",
                 maximumConcurrentRuns: 1,
-                completionValidator: try managedFixtureCompletionValidator(app: app, provider: provider)
+                completionValidator: try managedFixtureCompletionValidator(
+                    app: app,
+                    provider: provider,
+                    completionRequirement: ProjectInstructionQueueStore.builtInCompletionGate
+                )
             )
         }
         defer {
@@ -486,7 +657,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             adapterID: "fixture-adapter",
             modelKey: "fixture-model",
             allowedTools: ["fs_read"],
-            completionGates: ["fixture_read"]
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
         )
         let runIDValue = (started["run_id"] ?? started["runID"]) as? String
         let runID = try RunID(XCTUnwrap(UUID(
@@ -815,7 +986,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             "adapter_id": "fixture-adapter",
             "model_key": "fixture-model",
             "allowed_tools": ["fs_read"],
-            "completion_gates": ["fixture_read"],
+            "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
         ]
         let unauthorizedStart = try postJSON(endpoint, object: startRequest)
         XCTAssertEqual(unauthorizedStart.status, 401)
@@ -1163,7 +1334,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             modelKey: "fixture-model",
             specification: AutonomousRunSpecification(
                 allowedTools: ["fs_read"],
-                completionGates: ["fixture_read"]
+                completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
             ),
             authorizationScope: ToolAuthorizationScope(
                 canonicalRoots: [projectRoot],
@@ -1207,7 +1378,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             "adapter_id": "fixture-adapter",
             "model_key": "fixture-model",
             "allowed_tools": ["fs_read"],
-            "completion_gates": ["fixture_read"],
+            "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
         ]
         XCTAssertEqual(
             try postJSON(startURL, object: startRequest, bearerToken: token).status,
@@ -1399,9 +1570,10 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
                 eventSummary: "Validate the exact operator response receipt"
             )
         )
-        let receipt = try await GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { _ in
+        let completionRequirement = ProjectInstructionQueueStore.builtInCompletionGate
+        let receipt = try await GateValidatorRegistry(validators: [CompletionGateValidator(gate: completionRequirement) { _ in
             CompletionGateResult(
-                gate: "fixture_read",
+                gate: completionRequirement,
                 passed: true,
                 summary: "The production HTTP contract fixture passed",
                 evidenceReferences: ["fixture:operator-run-contract"]
@@ -1415,7 +1587,10 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let completedSnapshot = try HTTPTestHelpers.fetchJSON(snapshotURL)
         let completedSnapshotRun = try operatorRun(runID: runID, snapshot: completedSnapshot)
         XCTAssertEqual(completedStatus.object["state"] as? String, AutonomousRunState.completed.rawValue)
-        XCTAssertEqual(completedStatus.object["passed_gates"] as? [String], ["fixture_read"])
+        XCTAssertEqual(
+            completedStatus.object["passed_gates"] as? [String],
+            [completionRequirement]
+        )
         try assertExactOperatorRunProjection(completedStatus.object, equals: completedSnapshotRun)
         try assertExactOperatorRunProjection(completedStart.object, equals: completedSnapshotRun)
         XCTAssertEqual(completedStatus.object["lease_owner"] as? String, "operator-contract-lease-owner")
@@ -1881,9 +2056,10 @@ private func managedRuntimeFixtureRegistry(
 // supplied by the provider is intentionally insufficient.
 private func managedFixtureCompletionValidator(
     app: ForgeApp,
-    provider: ManagedRuntimeFixtureProvider
+    provider: ManagedRuntimeFixtureProvider,
+    completionRequirement: String = "fixture_read"
 ) throws -> GateValidatorRegistry {
-    try GateValidatorRegistry(validators: [CompletionGateValidator(gate: "fixture_read") { run in
+    try GateValidatorRegistry(validators: [CompletionGateValidator(gate: completionRequirement) { run in
         let snapshot = await provider.snapshot()
         let invocation = try await app.projectContexts.repository.toolInvocation(
             sessionID: run.activeSessionID ?? "", providerCallID: "call-manager-read"
@@ -1896,7 +2072,7 @@ private func managedFixtureCompletionValidator(
             && snapshot.receivedToolOutput
             && snapshot.previousResponseID == "resp-manager-root"
         return CompletionGateResult(
-            gate: "fixture_read", passed: passed,
+            gate: completionRequirement, passed: passed,
             summary: "Assert project-bound file invocation and provider consumption",
             evidenceReferences: invocation?.resultSHA256.map { [$0] } ?? []
         )

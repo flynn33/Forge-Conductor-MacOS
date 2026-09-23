@@ -218,13 +218,13 @@ final class BudgetPolicyIntegrationTests: XCTestCase {
                 expectedGeneration: .init(1), mission: "Observe the saved budget in a bounded deterministic provider turn",
                 providerID: BudgetIntegrationProvider.identifier, adapterID: BudgetIntegrationProvider.adapterID,
                 modelKey: BudgetIntegrationProvider.modelKey, allowedTools: ["fs_read"],
-                completionGates: ["budget_fixture_completion"])
+                completionGates: [ProjectInstructionQueueStore.builtInCompletionGate])
             let repository = try graph.application().projectContexts.repository
             let deadline = ContinuousClock.now + .seconds(10)
             var observation: ContextBudgetObservation?
             while ContinuousClock.now < deadline {
                 if let run = try await repository.autonomousRun(runID),
-                   let sessionID = run.activeSessionID, run.state == .blockedConfiguration {
+                   let sessionID = run.activeSessionID {
                     let identity = ContextBudgetIdentity(runID: runID, projectID: project.id,
                         projectGeneration: .init(1), sessionID: sessionID)
                     observation = try await repository.latestContextBudgetObservation(identity: identity)

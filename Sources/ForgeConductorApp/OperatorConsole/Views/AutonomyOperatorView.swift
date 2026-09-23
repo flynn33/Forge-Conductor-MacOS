@@ -12,7 +12,6 @@ struct AutonomyOperatorView: View {
     @State private var showingAdvancedOverrides = false
     @State private var showingToolSelection = false
     @State private var showingCompletionChecks = false
-    @State private var showingAdvancedCompletionControls = false
     private let onOpenProjects: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -36,7 +35,7 @@ struct AutonomyOperatorView: View {
                             .frame(width: 16)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(run.mission).lineLimit(1)
-                            Text(run.state.replacingOccurrences(of: "_", with: " "))
+                            Text(OperatorRunStatePresentation.displayName(run.state))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -60,7 +59,7 @@ struct AutonomyOperatorView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     OperatorHeader(
                         title: "Autonomy",
-                        subtitle: "Manager-owned provider sessions, leases, work, and completion gates",
+                        subtitle: "Manager-owned provider sessions, durable work, completion evidence, and automatic recovery",
                         isLoading: viewModel.isLoading,
                         titleAccessibilityIdentifier: "detail-autonomy",
                         subtitleAccessibilityIdentifier: "autonomy-operator-view",
@@ -188,113 +187,95 @@ struct AutonomyOperatorView: View {
                             }
                         }
                     } else if run.completionGates.isEmpty {
-                        Text("No completion-gate projection was published.")
+                        Text("No completion requirements were published.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(run.completionGates, id: \.self) { gate in
+                        ForEach(run.completionGates, id: \.self) { requirement in
                             Label(
-                                gate,
-                                systemImage: run.passedGates.contains(gate) ? "checkmark.circle.fill" : "circle"
+                                requirement,
+                                systemImage: run.passedGates.contains(requirement)
+                                    ? "checkmark.circle.fill" : "circle"
                             )
-                            .foregroundStyle(run.passedGates.contains(gate) ? .green : .secondary)
-                        }
-                    }
-                    if hasCustomNativeGates(run) {
-                        Button {
-                            showingAdvancedCompletionControls.toggle()
-                        } label: {
-                            Label(
-                                "Custom policy controls",
-                                systemImage: showingAdvancedCompletionControls
-                                    ? "chevron.down" : "chevron.right"
+                            .foregroundStyle(
+                                run.passedGates.contains(requirement) ? .green : .secondary
                             )
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("run-completion-advanced-toggle")
-                    } else {
-                        Text("These checks are evaluated automatically from the task's durable evidence. No separate gate policy or environment is required.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("run-completion-automatic-explanation")
                     }
-                    if showingAdvancedCompletionControls, hasCustomNativeGates(run) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Custom completion policy")
-                                .font(.headline)
-                            Text("Use an explicitly prepared signed native policy for specialized organizational checks. Routine tasks use the automatic plan above.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Button(
-                                "Import Custom Completion Policy…",
-                                action: viewModel.chooseNativePolicy
-                            )
-                            .disabled(viewModel.policyImportInFlight || run.completionGates.isEmpty)
-                            .accessibilityIdentifier("run-import-native-policy")
-                            if viewModel.policyImportInFlight {
-                                ProgressView("Preparing custom policy import…")
-                                    .controlSize(.small)
-                            }
-                            Text("Prepare the signed XCTest package in Forge's protected home first. The imported policy must match this run, project generation, and explicitly selected custom checks.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    Text("This is a read-only record of the task's completion requirements. Forge evaluates the selected built-in checks automatically; any additional requirement comes from the instruction package.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("run-completion-requirements-read-only")
                 }
             } label: {
                 HStack {
-                    Text("Completion checks")
+                    Text("Completion evidence")
                     Spacer()
                     GuidedHelpButton(context: .autonomyCompletionChecks)
                 }
             }
 
-            if let error = run.lastErrorSummary ?? run.lastErrorCode {
-                GroupBox("Failure and retry") {
+            if needsRecoveryGuidance(run) {
+                GroupBox("Status and recovery") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(error).textSelection(.enabled)
-                        LabeledContent("Classification", value: run.lastErrorCode ?? "Unavailable")
+                        Text(recoverySummary(run))
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("run-recovery-summary")
+                        LabeledContent("Task state", value: readableState(run.state))
+                        if let classification = nonBlank(run.lastErrorCode) {
+                            LabeledContent("Classification", value: classification)
+                        }
                         LabeledContent("Next retry", value: run.retryAt ?? "No retry scheduled")
                         Divider()
                         Text("How to continue")
                             .font(.headline)
+                        if let nextAction = displayableNextAction(run) {
+                            Text(nextAction)
+                                .font(.callout.weight(.medium))
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier("run-failure-next-action")
+                        }
                         if isProviderFailure(run) {
-                            Text("Reconnect the saved model provider, then return here and retry the task. Forge keeps the durable run state while the provider is repaired.")
+                            Text("Choose Connect and Check in Provider. Forge keeps the durable run state and resumes the exact retained operation automatically when the provider is ready.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-provider-connect-and-check-guidance")
                             Button("Open Provider", action: onOpenProvider)
                                 .accessibilityIdentifier("run-failure-open-provider")
                         } else if run.lastErrorCode == AutonomyError.completionValidationFailed.code {
-                            if failedCustomNativeGate(run) {
-                                Text("The named custom native check needs its matching signed policy. Import that policy, then retry the retained task.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Button(
-                                    "Import Custom Completion Policy…",
-                                    action: viewModel.chooseNativePolicy
-                                )
-                                .disabled(viewModel.policyImportInFlight)
-                                .accessibilityIdentifier("run-failure-import-native-policy")
-                            } else {
-                                Text("Correct the named automatic check in the project or instruction results. Package and preset checks do not require a separately installed native policy.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                if viewModel.canControl(.retry, run: run) {
-                                    Button("Retry Automatic Checks") { viewModel.control(.retry) }
-                                        .accessibilityIdentifier("run-failure-retry-checks")
-                                } else {
-                                    Text("Forge will evaluate the checks again when the running task next requests completion.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .accessibilityIdentifier("run-failure-automatic-recheck")
-                                }
-                            }
-                        } else {
-                            Text("Correct the condition named above, then choose Retry. No Forge-wide environment reset is required.")
+                            Text("Review the unmet requirement in Completion evidence. Built-in checks are evaluated by Forge, and instruction-package requirements remain owned by that package.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            Text("Forge preserves and re-evaluates the saved completion request automatically. If project output must change, correct it and choose Retry when that control is available.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-failure-automatic-recheck")
+                        } else if run.state == "blocked_configuration" {
+                            Text("Forge retained this older task and automatic recovery is already in progress. No configuration step is required; Refresh Run reads the latest durable state.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-blocked-automatic-recovery")
+                        } else if automaticallyWaiting(run) {
+                            Text("Forge retained this task and will continue automatically when the named dependency or retry time is ready. Use Refresh Run to read the latest durable state.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-waiting-fallback-guidance")
+                        } else if run.state == "failed_recoverable" {
+                            Text("The task state is preserved. Correct the condition shown above, then choose Retry to continue from that saved state.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-recoverable-fallback-guidance")
+                        } else if run.state == "failed_terminal" {
+                            Text("This task cannot continue. Review Technical details and the Dashboard activity feed, correct the underlying project or instruction-package issue, then start a new task.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-terminal-fallback-guidance")
+                        } else {
+                            Text("Review the exact state and Technical details, correct the named condition, then choose Retry when that control is available. The saved task remains intact.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("run-generic-fallback-guidance")
                         }
                     }
-                    .accessibilityIdentifier("run-failure-guidance")
                 }
             }
 
@@ -626,7 +607,7 @@ struct AutonomyOperatorView: View {
 
     private var completionCheckSelector: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Select the evidence Forge must verify before it marks this task complete. These checks are built in and need no separate gate policy.")
+            Text("Select the built-in evidence checks Forge should verify before it marks this task complete. Additional requirements come only from the instruction package and are read-only during the run.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             ForEach(CompletionCheckPreset.allCases) { check in
@@ -649,7 +630,7 @@ struct AutonomyOperatorView: View {
             if let plan = viewModel.preparedCompletionPlan,
                !plan.obligations.isEmpty {
                 Divider()
-                Text("Prepared validation plan")
+                Text("Prepared requirements · read only")
                     .font(.caption.weight(.semibold))
                 ForEach(plan.obligations) { obligation in
                     VStack(alignment: .leading, spacing: 3) {
@@ -677,28 +658,59 @@ struct AutonomyOperatorView: View {
         }
     }
 
-    private func hasCustomNativeGates(_ run: OperatorRun) -> Bool {
-        !CompletionGateOwnership.customNativeGates(in: run.completionGates).isEmpty
+    private func needsRecoveryGuidance(_ run: OperatorRun) -> Bool {
+        if nonBlank(run.lastErrorSummary) != nil || nonBlank(run.lastErrorCode) != nil {
+            return true
+        }
+        let state = run.state.lowercased()
+        return state.contains("blocked")
+            || state.contains("waiting")
+            || state.contains("awaiting")
+            || state.contains("failed")
+            || state == "retry_wait"
     }
 
-    /// Completion failure summaries carry the exact failed gate identifier.
-    /// A mixed run must not be routed to policy import merely because it owns a
-    /// custom gate when the actual failed evidence belongs to an automatic one.
-    private func failedCustomNativeGate(_ run: OperatorRun) -> Bool {
-        guard run.lastErrorCode == AutonomyError.completionValidationFailed.code,
-              let summary = run.lastErrorSummary else { return false }
-        return CompletionGateOwnership.customNativeGates(in: run.completionGates)
-            .contains { summary.contains("\($0):") }
+    private func recoverySummary(_ run: OperatorRun) -> String {
+        displayableRecoveryText(run.lastErrorSummary)
+            ?? nonBlank(run.lastErrorCode)
+            ?? "Forge retained this task in \(readableState(run.state)) state and preserved its durable progress."
+    }
+
+    private func displayableNextAction(_ run: OperatorRun) -> String? {
+        displayableRecoveryText(run.nextAction)
+    }
+
+    private func displayableRecoveryText(_ value: String?) -> String? {
+        guard let text = nonBlank(value) else { return nil }
+        let normalized = text.lowercased()
+        let describesRemovedConfiguration = normalized.contains("native gate")
+            || normalized.contains("gate policy")
+            || (normalized.contains("restore") && normalized.contains("environment"))
+        return describesRemovedConfiguration ? nil : text
+    }
+
+    private func automaticallyWaiting(_ run: OperatorRun) -> Bool {
+        ["waiting_resource", "retry_wait", "awaiting_bootstrap"].contains(run.state)
     }
 
     private func isProviderFailure(_ run: OperatorRun) -> Bool {
-        let context = [run.lastErrorCode, run.lastErrorSummary]
+        if run.state == "waiting_provider" { return true }
+        let context = [run.lastErrorCode, run.lastErrorSummary, run.nextAction]
             .compactMap { $0 }
             .joined(separator: " ")
             .lowercased()
         return context.contains("provider")
             || context.contains("lm studio")
             || context.contains("model connection")
+    }
+
+    private func nonBlank(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func readableState(_ state: String) -> String {
+        OperatorRunStatePresentation.displayName(state)
     }
 
     private func modeLabel(_ raw: String) -> String {

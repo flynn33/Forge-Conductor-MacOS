@@ -8,7 +8,7 @@ import Darwin
 import Foundation
 
 /// Owns the durable pull side of desktop-provider runs. Hook calls are short
-/// control-plane transactions; potentially long native completion gates run in
+/// control-plane transactions; potentially long completion checks run in
 /// one tracked task per run and are recovered after manager restart.
 actor DesktopProviderRunLifecycleService {
     private static let maximumConcurrentCompletionTasks = 16
@@ -229,7 +229,8 @@ actor DesktopProviderRunLifecycleService {
                 scheduleCompletion(runID: run.runID)
             }
             return .none
-        case .permissionRequest:
+        case .permissionRequest, .permissionDenied, .stopFailure, .notification,
+             .subagentStart, .subagentStop, .preCompact, .postCompact:
             return .none
         }
     }
@@ -467,7 +468,7 @@ actor DesktopProviderRunLifecycleService {
         )
         scheduleCompletion(runID: validating.runID)
         return .continueRun(
-            "Forge Conductor accepted the completion request for run \(run.runID.description) and is running its native completion checks. Keep this turn active until validation settles."
+            "Forge Conductor accepted the completion request for run \(run.runID.description) and is evaluating its completion requirements. Keep this turn active until validation settles."
         )
     }
 
@@ -545,8 +546,7 @@ actor DesktopProviderRunLifecycleService {
                     transition: AutonomousRunTransition(
                         expectedState: run.state,
                         expectedRevision: run.revision,
-                        nextState: receipt.results.contains(where: { $0.blocker != nil })
-                            ? .blockedConfiguration : .running,
+                        nextState: .running,
                         eventType: "desktop_plugin_completion_rejected",
                         eventSummary: summary,
                         work: work,
@@ -873,6 +873,10 @@ public struct DesktopProviderHookPolicyService: Sendable {
         let selected = snapshot.selectedProviderID == request.providerID
         switch request.event {
         case .sessionStart, .userPromptSubmit:
+            // Grok documents these as passive events whose stdout is ignored.
+            // Grok remains nonselectable until it exposes a supported ingress
+            // capable of carrying Forge's assignment context.
+            guard request.providerID != .grokBuild else { return .empty }
             let runContext = if case .context(let context) = runDirective {
                 "\n\n" + context
             } else {
@@ -894,10 +898,12 @@ public struct DesktopProviderHookPolicyService: Sendable {
             providerID: request.providerID
         ):
             return Self.deniedResponse(
+                providerID: request.providerID,
                 reason: "Forge Conductor denied this Forge MCP call because this desktop provider is not the active provider."
             )
         case .preToolUse, .permissionRequest, .postToolUse, .postToolUseFailure,
-             .stop, .sessionEnd:
+             .permissionDenied, .stop, .stopFailure, .notification, .subagentStart,
+             .subagentStop, .preCompact, .postCompact, .sessionEnd:
             // An empty response preserves the host's own permission decision. In
             // particular, Forge never emits an automatic allow decision.
             return .empty
@@ -912,6 +918,7 @@ public struct DesktopProviderHookPolicyService: Sendable {
             return .empty
         }
         return deniedResponse(
+            providerID: request.providerID,
             reason: "Forge Conductor denied this Forge MCP call because its local orchestration policy is unavailable."
         )
     }
@@ -940,7 +947,7 @@ public struct DesktopProviderHookPolicyService: Sendable {
         event: DesktopProviderHookEvent,
         context: String
     ) -> DesktopProviderHookResponse {
-        DesktopProviderHookResponse(object: [
+        return DesktopProviderHookResponse(object: [
             "hookSpecificOutput": .object([
                 "hookEventName": .string(event.rawValue),
                 "additionalContext": .string(context),
@@ -961,8 +968,17 @@ public struct DesktopProviderHookPolicyService: Sendable {
             .displayName ?? providerID.rawValue
     }
 
-    private static func deniedResponse(reason: String) -> DesktopProviderHookResponse {
-        DesktopProviderHookResponse(object: [
+    private static func deniedResponse(
+        providerID: ProviderIntegrationID,
+        reason: String
+    ) -> DesktopProviderHookResponse {
+        if providerID == .grokBuild {
+            return DesktopProviderHookResponse(object: [
+                "decision": .string("deny"),
+                "reason": .string(reason),
+            ])
+        }
+        return DesktopProviderHookResponse(object: [
             "hookSpecificOutput": .object([
                 "hookEventName": .string(DesktopProviderHookEvent.preToolUse.rawValue),
                 "permissionDecision": .string("deny"),

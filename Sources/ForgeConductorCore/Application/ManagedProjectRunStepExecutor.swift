@@ -600,7 +600,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 if strongestAction == .checkpoint { return .checkpointRequired(work) }
                 if let request = Self.completionRequest(from: turn.messages) {
                     // Legacy gate_evidence fields remain wire-compatible but carry
-                    // no authority. Only installed manager validators decide gates.
+                    // no authority. Manager-owned validators decide completion.
                     return .completionRequestedWithWork(request.summary, work)
                 }
                 work.nextAction = "Continue the mission from provider response \(turn.responseID)"
@@ -1304,11 +1304,11 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         if let instructions = run.specification.failurePolicy.customInstructions {
             lines.append("Failure and retry instructions: \(instructions)")
         }
-        lines.append("Completion gates: \(run.specification.completionGates.joined(separator: ", "))")
+        lines.append("Completion requirements: \(run.specification.completionGates.joined(separator: ", "))")
         lines.append(
             "When work is ready for deterministic validation, respond with exactly "
                 + "{\"forge_run_status\":\"completion_requested\",\"summary\":\"bounded summary\"}. "
-                + "The manager independently executes the registered completion gates."
+                + "The manager independently evaluates the registered completion requirements."
         )
         return lines.joined(separator: "\n")
     }

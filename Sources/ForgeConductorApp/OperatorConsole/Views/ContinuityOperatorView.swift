@@ -7,8 +7,6 @@ import ForgeConductorCore
 
 struct ContinuityOperatorView: View {
     @StateObject private var viewModel: ContinuityViewModel
-    @State private var showingAdvancedControls = false
-    @State private var showingTechnicalDetails = false
     private let onOpenAutonomy: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -71,9 +69,15 @@ struct ContinuityOperatorView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                        Text("Attempt \(operation.attempt) · \(operation.runID)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
                 .tag(operation.operationID)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("continuity-operation-row-\(operation.operationID)")
             }
         }
         .listStyle(.sidebar)
@@ -104,7 +108,7 @@ struct ContinuityOperatorView: View {
                 if let notice = viewModel.notice {
                     OperatorNoticeBanner(message: notice)
                 }
-                advancedControls
+                manualActions
                 if let operation = viewModel.selectedOperation {
                     operationDetail(operation)
                 } else if viewModel.errorMessage == nil, !viewModel.isLoading {
@@ -169,79 +173,72 @@ struct ContinuityOperatorView: View {
         }
     }
 
-    private var advancedControls: some View {
-        GroupBox {
+    private var manualActions: some View {
+        GroupBox("Optional manual actions") {
             VStack(alignment: .leading, spacing: 10) {
-                Button {
-                    showingAdvancedControls.toggle()
-                } label: {
-                    Label(
-                        "Advanced controls",
-                        systemImage: showingAdvancedControls ? "chevron.down" : "chevron.right"
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("continuity-advanced-toggle")
-                if showingAdvancedControls {
-                    if viewModel.runs.isEmpty {
-                        Text("No managed run is available for a manual continuity request.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Picker("Managed run", selection: $viewModel.selectedRunID) {
-                            Text("Select a managed run").tag(String?.none)
-                            ForEach(viewModel.runs) { run in
-                                Text("\(run.mission) · \(run.state)")
-                                    .tag(String?.some(run.runID))
-                            }
-                        }
-                        .accessibilityIdentifier("continuity-run-selection")
-
-                        if let run = viewModel.selectedRun {
-                            LabeledContent("Task state") {
-                                OperatorStateBadge(state: run.state)
-                                    .accessibilityIdentifier("continuity-selected-run-state")
-                            }
-                        }
-                    }
-
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 215), spacing: 10)],
-                        alignment: .leading,
-                        spacing: 8
-                    ) {
-                        HStack(spacing: 6) {
-                            Button("Save progress now", action: viewModel.requestCheckpoint)
-                                .disabled(!viewModel.canRequestCheckpoint)
-                                .accessibilityIdentifier("checkpoint-command")
-                            GuidedHelpButton(context: .continuitySaveProgress)
-                        }
-                        HStack(spacing: 6) {
-                            Button(
-                                "Start a fresh session and continue",
-                                action: viewModel.requestRollover
+                if viewModel.runs.isEmpty {
+                    Text("No managed run is available for a manual continuity request.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Managed run", selection: $viewModel.selectedRunID) {
+                        Text("Select a managed run").tag(String?.none)
+                        ForEach(viewModel.runs) { run in
+                            Text(
+                                "\(run.mission) · "
+                                    + OperatorRunStatePresentation.displayName(run.state)
                             )
-                            .disabled(!viewModel.canRequestRollover)
-                            .accessibilityIdentifier("rollover-command")
-                            GuidedHelpButton(context: .continuityFreshSession)
-                        }
-                        if let action = viewModel.controlInFlight {
-                            ProgressView()
-                                .controlSize(.small)
-                                .accessibilityLabel("Persisting \(action.rawValue) command")
+                                .tag(String?.some(run.runID))
                         }
                     }
-                    Text(viewModel.eligibilityMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("continuity-control-eligibility")
-                    Text("These optional controls send typed requests only. Eligibility, quiescing, exact observation binding, and durable transitions remain manager-owned.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("continuity-controls-authority")
+                    .accessibilityIdentifier("continuity-run-selection")
+
+                    if let run = viewModel.selectedRun {
+                        LabeledContent("Task state") {
+                            OperatorStateBadge(state: run.state)
+                                .accessibilityIdentifier("continuity-selected-run-state")
+                        }
+                        LabeledContent("Active session") {
+                            OperatorIdentifier(run.activeSessionID)
+                                .accessibilityIdentifier("continuity-active-session-id")
+                        }
+                    }
                 }
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 215), spacing: 10)],
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    HStack(spacing: 6) {
+                        Button("Save progress now", action: viewModel.requestCheckpoint)
+                            .disabled(!viewModel.canRequestCheckpoint)
+                            .accessibilityIdentifier("checkpoint-command")
+                        GuidedHelpButton(context: .continuitySaveProgress)
+                    }
+                    HStack(spacing: 6) {
+                        Button(
+                            "Start a fresh session and continue",
+                            action: viewModel.requestRollover
+                        )
+                        .disabled(!viewModel.canRequestRollover)
+                        .accessibilityIdentifier("rollover-command")
+                        GuidedHelpButton(context: .continuityFreshSession)
+                    }
+                    if let action = viewModel.controlInFlight {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel("Persisting \(action.rawValue) command")
+                    }
+                }
+                Text(viewModel.eligibilityMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("continuity-control-eligibility")
+                Text("These optional controls send typed requests only. Eligibility, quiescing, exact observation binding, and durable transitions remain manager-owned.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("continuity-controls-authority")
             }
-        } label: {
-            Text("Optional manual actions")
         }
     }
 
@@ -253,6 +250,8 @@ struct ContinuityOperatorView: View {
                         OperatorStateBadge(state: activityTitle(operation))
                             .accessibilityIdentifier("rollover-operation-state")
                     }
+                    LabeledContent("Exact operation state", value: operation.state)
+                        .accessibilityIdentifier("continuity-exact-operation-state")
                     Text(activityDescription(operation))
                         .foregroundStyle(.secondary)
                     if let error = operation.lastError {
@@ -261,82 +260,69 @@ struct ContinuityOperatorView: View {
                 }
             }
 
-            Button {
-                showingTechnicalDetails.toggle()
-            } label: {
-                Label(
-                    "Technical details",
-                    systemImage: showingTechnicalDetails ? "chevron.down" : "chevron.right"
-                )
+            GroupBox("Operation identity") {
+                VStack(alignment: .leading, spacing: 9) {
+                    LabeledContent("Mode", value: modeLabel(operation.mode))
+                    LabeledContent("Manager control state", value: operation.controlState ?? "Unavailable")
+                    LabeledContent("Operation ID") { OperatorIdentifier(operation.operationID) }
+                    LabeledContent("Run ID") { OperatorIdentifier(operation.runID) }
+                    LabeledContent("Project") { OperatorIdentifier(operation.projectID) }
+                    LabeledContent("Generation", value: "\(operation.projectGeneration)")
+                    LabeledContent("Attempt", value: "\(operation.attempt)")
+                    LabeledContent("Next retry", value: operation.retryAt ?? "No retry scheduled")
+                    if let error = operation.lastError {
+                        Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                    }
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("continuity-technical-toggle")
 
-            if showingTechnicalDetails {
-                GroupBox("Operation identity") {
-                    VStack(alignment: .leading, spacing: 9) {
-                        LabeledContent("Mode", value: modeLabel(operation.mode))
-                        LabeledContent("Manager control state", value: operation.controlState ?? "Unavailable")
-                        LabeledContent("Operation ID") { OperatorIdentifier(operation.operationID) }
-                        LabeledContent("Run ID") { OperatorIdentifier(operation.runID) }
-                        LabeledContent("Project") { OperatorIdentifier(operation.projectID) }
-                        LabeledContent("Generation", value: "\(operation.projectGeneration)")
-                        LabeledContent("Attempt", value: "\(operation.attempt)")
-                        LabeledContent("Next retry", value: operation.retryAt ?? "No retry scheduled")
-                        if let error = operation.lastError {
-                            Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            GroupBox("Context budget") {
+                if let budget = operation.budget {
+                    VStack(alignment: .leading, spacing: 10) {
+                        budgetGauge(budget)
+                        LabeledContent("Capacity", value: tokens(budget.capacityTokens))
+                        LabeledContent("Used", value: tokens(budget.usedTokens))
+                        LabeledContent("Response reserve", value: tokens(budget.responseReserveTokens))
+                        LabeledContent("Handoff reserve", value: tokens(budget.handoffReserveTokens))
+                        LabeledContent("Recovery reserve", value: tokens(budget.recoveryReserveTokens))
+                        LabeledContent("Remaining", value: tokens(budget.remainingTokens))
+                        LabeledContent("Source", value: budget.source ?? "Unavailable")
+                        LabeledContent("Confidence", value: budget.confidence ?? "Unavailable")
+                        HStack {
+                            Text("Checkpoint threshold: \(tokens(budget.checkpointThreshold))")
+                            Spacer()
+                            Text("Rollover threshold: \(tokens(budget.rolloverThreshold))")
                         }
-                    }
-                }
-
-                GroupBox("Context budget") {
-                    if let budget = operation.budget {
-                        VStack(alignment: .leading, spacing: 10) {
-                            budgetGauge(budget)
-                            LabeledContent("Capacity", value: tokens(budget.capacityTokens))
-                            LabeledContent("Used", value: tokens(budget.usedTokens))
-                            LabeledContent("Response reserve", value: tokens(budget.responseReserveTokens))
-                            LabeledContent("Handoff reserve", value: tokens(budget.handoffReserveTokens))
-                            LabeledContent("Recovery reserve", value: tokens(budget.recoveryReserveTokens))
-                            LabeledContent("Remaining", value: tokens(budget.remainingTokens))
-                            LabeledContent("Source", value: budget.source ?? "Unavailable")
-                            LabeledContent("Confidence", value: budget.confidence ?? "Unavailable")
-                            HStack {
-                                Text("Checkpoint threshold: \(tokens(budget.checkpointThreshold))")
-                                Spacer()
-                                Text("Rollover threshold: \(tokens(budget.rolloverThreshold))")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("context-threshold-labels")
-                        }
-                    } else {
-                        Text("No persisted context-budget observation was published.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("context-threshold-labels")
                     }
+                } else {
+                    Text("No persisted context-budget observation was published.")
+                        .foregroundStyle(.secondary)
                 }
+            }
 
-                GroupBox("Handoff and successor") {
-                    VStack(alignment: .leading, spacing: 9) {
-                        LabeledContent("Latest checkpoint") { OperatorIdentifier(operation.checkpointID) }
-                        LabeledContent("Handoff ID") { OperatorIdentifier(operation.handoffID) }
-                        LabeledContent("Handoff checksum") { OperatorIdentifier(operation.handoffSHA256) }
-                        LabeledContent("Predecessor") {
-                            OperatorIdentifier(operation.predecessorSessionID)
-                                .accessibilityIdentifier("continuity-predecessor-id")
-                        }
-                        LabeledContent("Accepted successor") {
-                            OperatorIdentifier(operation.successorSessionID)
-                                .accessibilityIdentifier("continuity-successor-id")
-                        }
-                        LabeledContent("Successor provider response") {
-                            OperatorIdentifier(operation.successorProviderResponseID)
-                        }
-                        LabeledContent("Acknowledgment checksum") {
-                            OperatorIdentifier(operation.acknowledgementSHA256)
-                        }
-                        LabeledContent("Automatic continuation issued", value: operation.continuationIssued ? "Yes" : "No")
+            GroupBox("Handoff and successor") {
+                VStack(alignment: .leading, spacing: 9) {
+                    LabeledContent("Latest checkpoint") { OperatorIdentifier(operation.checkpointID) }
+                    LabeledContent("Handoff ID") { OperatorIdentifier(operation.handoffID) }
+                    LabeledContent("Handoff checksum") { OperatorIdentifier(operation.handoffSHA256) }
+                    LabeledContent("Predecessor") {
+                        OperatorIdentifier(operation.predecessorSessionID)
+                            .accessibilityIdentifier("continuity-predecessor-id")
                     }
+                    LabeledContent("Accepted successor") {
+                        OperatorIdentifier(operation.successorSessionID)
+                            .accessibilityIdentifier("continuity-successor-id")
+                    }
+                    LabeledContent("Successor provider response") {
+                        OperatorIdentifier(operation.successorProviderResponseID)
+                    }
+                    LabeledContent("Acknowledgment checksum") {
+                        OperatorIdentifier(operation.acknowledgementSHA256)
+                    }
+                    LabeledContent("Automatic continuation issued", value: operation.continuationIssued ? "Yes" : "No")
                 }
             }
 
@@ -354,9 +340,10 @@ struct ContinuityOperatorView: View {
                                     .padding(.top, 5)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(event.summary)
-                                    Text(event.timestamp)
+                                    Text("\(event.timestamp) · \(event.kind)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("continuity-event-metadata-\(event.eventID)")
                                 }
                             }
                         }

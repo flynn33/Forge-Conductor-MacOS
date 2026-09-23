@@ -204,6 +204,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
     var projectCompletedPackages: Int
     var projectTotalPackages: Int
     var projectProgressState: String?
+    var guidedSetupPreparationFingerprint: String?
     var currentPackageName: String?
     var currentPackagePosition: Int?
     var currentPackageCompletedSteps: Int?
@@ -243,6 +244,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         projectCompletedPackages: 0,
         projectTotalPackages: 0,
         projectProgressState: nil,
+        guidedSetupPreparationFingerprint: nil,
         currentPackageName: nil,
         currentPackagePosition: nil,
         currentPackageCompletedSteps: nil,
@@ -327,6 +329,13 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         } else {
             "QUEUED"
         }
+        let guidedSetupPreparationFingerprint = Self.guidedSetupPreparationFingerprint(
+            selectedProvider: selectedProvider,
+            providerConfigurationRevision: operatorSnapshot?.runPreparation?.providerConfigurationRevision,
+            providerSelectionRevision: providerIntegrations?.selectionRevision,
+            project: progressProject,
+            packages: packages
+        )
         let activeStepTotal = activePackage?.totalStepCount ?? activePackage?.documentCount
         let activeCompletedSteps = activePackage?.completedStepCount
             ?? (activePackage?.state == "completed" ? activeStepTotal : 0)
@@ -377,6 +386,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
             projectCompletedPackages: completedPackages,
             projectTotalPackages: packages.count,
             projectProgressState: progressState,
+            guidedSetupPreparationFingerprint: guidedSetupPreparationFingerprint,
             currentPackageName: activePackage?.displayName,
             currentPackagePosition: activePackage.map { $0.position + 1 },
             currentPackageCompletedSteps: activeCompletedSteps,
@@ -395,6 +405,46 @@ struct RigOperationalSnapshot: Sendable, Equatable {
             policyEvidenceAvailable: policyEvidenceAvailable ?? (runeForge != nil),
             activityFeed: activityFeed
         )
+    }
+
+    /// Stable identity for the exact setup that the operator reviewed in Guided Setup.
+    /// Runtime state is deliberately excluded so starting a run does not invalidate the
+    /// review; project/provider/package identity changes do invalidate it.
+    static func guidedSetupPreparationFingerprint(
+        selectedProvider: RigProviderProjection,
+        providerConfigurationRevision: String?,
+        providerSelectionRevision: String?,
+        project: OperatorProject?,
+        packages: [OperatorInstructionPackage]
+    ) -> String? {
+        guard let providerID = selectedProvider.id,
+              let project,
+              !packages.isEmpty else { return nil }
+
+        let packageIdentities = packages
+            .sorted {
+                if $0.position == $1.position { return $0.id < $1.id }
+                return $0.position < $1.position
+            }
+            .map {
+                [
+                    String($0.position),
+                    $0.id,
+                    $0.packageID,
+                    $0.version,
+                    $0.contentSHA256,
+                ].joined(separator: ":")
+            }
+        let identity = ([
+            "forge-guided-setup-preparation-v2",
+            project.projectID,
+            String(project.projectGeneration),
+            providerID,
+            selectedProvider.model ?? "",
+            providerConfigurationRevision ?? "",
+            providerSelectionRevision ?? "",
+        ] + packageIdentities).joined(separator: "\u{0}")
+        return JSONSupport.sha256Hex(identity)
     }
 
     static func monitoredRun(

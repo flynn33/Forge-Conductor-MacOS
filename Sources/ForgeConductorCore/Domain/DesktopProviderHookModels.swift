@@ -33,7 +33,14 @@ public enum DesktopProviderHookEvent: String, CaseIterable, Codable, Sendable {
     case permissionRequest = "PermissionRequest"
     case postToolUse = "PostToolUse"
     case postToolUseFailure = "PostToolUseFailure"
+    case permissionDenied = "PermissionDenied"
     case stop = "Stop"
+    case stopFailure = "StopFailure"
+    case notification = "Notification"
+    case subagentStart = "SubagentStart"
+    case subagentStop = "SubagentStop"
+    case preCompact = "PreCompact"
+    case postCompact = "PostCompact"
     case sessionEnd = "SessionEnd"
 }
 
@@ -294,7 +301,12 @@ public struct DesktopProviderHookRequest: Sendable, Equatable {
             maximumBytes: DesktopProviderHookContract.maximumAssistantMessageBytes
         )
         let payloadEvent = try Self.boundedOptionalString(
-            object["hook_event_name"],
+            Self.providerField(
+                in: object,
+                providerID: providerID,
+                canonical: "hook_event_name",
+                grokAlias: "hookEventName"
+            ),
             field: "hook_event_name",
             maximumBytes: 64
         )

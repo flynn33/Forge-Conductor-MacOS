@@ -97,12 +97,12 @@ struct ProviderOperatorView: View {
                         operation: viewModel.currentProviderOperation,
                         selected: viewModel.isProviderSelected(descriptor.id),
                         actionsDisabled: viewModel.isProviderToggleDisabled(descriptor.id),
-                        repairAvailable: viewModel.isProviderRepairAvailable(descriptor.id),
+                        primaryActionAvailable: viewModel.isProviderRepairAvailable(descriptor.id),
                         removalDisabled: viewModel.isProviderRemovalDisabled(descriptor.id),
                         onToggle: { enabled in
                             viewModel.setProvider(descriptor.id, enabled: enabled)
                         },
-                        onRepair: {
+                        onPrimaryAction: {
                             viewModel.performProviderPrimaryAction(descriptor.id)
                         },
                         onRemove: {
@@ -378,16 +378,78 @@ struct ProviderOperatorView: View {
     }
 }
 
+struct ProviderReceiptEvidence: Equatable, Identifiable {
+    let key: String
+    let label: String
+    let value: String
+
+    var id: String { key }
+
+    static func visibleDetails(
+        from metadata: [String: String],
+        homeDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
+    ) -> [ProviderReceiptEvidence] {
+        metadata.compactMap { key, rawValue in
+            let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty, !isSensitive(key) else { return nil }
+            return ProviderReceiptEvidence(
+                key: key,
+                label: displayLabel(for: key),
+                value: abbreviated(value, for: key, homeDirectory: homeDirectory)
+            )
+        }
+        .sorted {
+            if $0.label == $1.label { return $0.key < $1.key }
+            return $0.label < $1.label
+        }
+    }
+
+    private static func isSensitive(_ key: String) -> Bool {
+        let normalized = key.lowercased()
+        return ["authorization", "credential", "password", "secret", "token"]
+            .contains { normalized.contains($0) }
+    }
+
+    private static func displayLabel(for key: String) -> String {
+        key.replacingOccurrences(of: "-", with: "_")
+            .split(separator: "_")
+            .map { component in
+                switch component.lowercased() {
+                case "app": "App"
+                case "cli": "CLI"
+                case "id": "ID"
+                case "mcp": "MCP"
+                case "sha256", "sha": "SHA-256"
+                default: component.capitalized
+                }
+            }
+            .joined(separator: " ")
+    }
+
+    private static func abbreviated(
+        _ value: String,
+        for key: String,
+        homeDirectory: String
+    ) -> String {
+        guard key.localizedCaseInsensitiveContains("path"),
+              !homeDirectory.isEmpty,
+              value == homeDirectory || value.hasPrefix(homeDirectory + "/") else {
+            return value
+        }
+        return "~" + value.dropFirst(homeDirectory.count)
+    }
+}
+
 private struct ProviderSelectionCard: View {
     let descriptor: ProviderIntegrationDescriptor
     let integration: ProviderIntegrationProviderSnapshot?
     let operation: ProviderIntegrationOperationSnapshot?
     let selected: Bool
     let actionsDisabled: Bool
-    let repairAvailable: Bool
+    let primaryActionAvailable: Bool
     let removalDisabled: Bool
     let onToggle: @MainActor @Sendable (Bool) -> Void
-    let onRepair: () -> Void
+    let onPrimaryAction: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
@@ -401,14 +463,22 @@ private struct ProviderSelectionCard: View {
                 Divider()
 
                 LabeledContent("Selection", value: selected ? "Active" : "Inactive")
+                LabeledContent(
+                    "Availability",
+                    value: descriptor.selectable ? "Selectable" : "Not selectable"
+                )
+                .accessibilityIdentifier("provider-availability-\(descriptor.id.rawValue)")
                 LabeledContent("Setup", value: setupLabel)
                 LabeledContent("Execution", value: executionLabel)
 
                 if let receipt = integration?.receipt {
                     LabeledContent("Artifact version", value: receipt.artifactVersion)
                     LabeledContent("Verified", value: receipt.verifiedAt)
-                    ForEach(receiptConnectionDetails, id: \.key) { detail in
+                    ForEach(receiptEvidence) { detail in
                         LabeledContent(detail.label, value: detail.value)
+                            .accessibilityIdentifier(
+                                "provider-receipt-\(descriptor.id.rawValue)-\(detail.key)"
+                            )
                     }
                 }
 
@@ -419,8 +489,8 @@ private struct ProviderSelectionCard: View {
                 if showsActions {
                     Divider()
                     HStack(spacing: 10) {
-                        if repairAvailable {
-                            Button(repairActionLabel, action: onRepair)
+                        if primaryActionAvailable {
+                            Button("Connect and Check", action: onPrimaryAction)
                                 .disabled(actionsDisabled)
                                 .accessibilityIdentifier("provider-repair-\(descriptor.id.rawValue)")
                         }
@@ -472,34 +542,14 @@ private struct ProviderSelectionCard: View {
     }
 
     private var showsActions: Bool {
+        if primaryActionAvailable { return true }
         if integration?.receipt != nil { return true }
-        guard repairAvailable else { return false }
-        if selected { return true }
-        guard let operation, operation.providerID == descriptor.id else { return false }
-        return operation.phase == .failedRecoverable || operation.phase == .awaitingUserAction
+        return false
     }
 
-    private var repairActionLabel: String {
-        descriptor.executionStrategy == .managedProviderPush
-            ? "Connect and Check"
-            : "Repair Integration"
-    }
-
-    private var receiptConnectionDetails: [(key: String, label: String, value: String)] {
+    private var receiptEvidence: [ProviderReceiptEvidence] {
         guard let metadata = integration?.receipt?.metadata else { return [] }
-        return metadata
-            .filter { key, _ in
-                let normalized = key.lowercased()
-                return normalized.contains("mcp") || normalized.contains("connection")
-            }
-            .map { key, value in
-                (
-                    key: key,
-                    label: "Receipt \(key.replacingOccurrences(of: "_", with: " ").capitalized)",
-                    value: value
-                )
-            }
-            .sorted { $0.key < $1.key }
+        return ProviderReceiptEvidence.visibleDetails(from: metadata)
     }
 
     private var iconName: String {

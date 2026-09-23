@@ -2,7 +2,7 @@
 
 Start with the shortest document that answers the question. Historical evidence
 is retained for auditability, but it is not current operating guidance. Current
-operating documents describe repository identity **0.14.0, build 6** unless a
+operating documents describe repository identity **0.14.1, build 7** unless a
 source-bound historical receipt says otherwise.
 
 ## Use and setup
@@ -12,10 +12,10 @@ source-bound historical receipt says otherwise.
 | [User guide](../USER-GUIDE.md) | Install, configure, and operate Forge Conductor |
 | [Xcode guide](../XCODE.md) | Build, test, archive, sign, and inspect the native app |
 | [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow the ordered project-run wizard or open contextual offline help |
-| [Provider integrations](PROVIDER-INTEGRATIONS.md) | Select LM Studio, Claude, or Codex; inspect, repair, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
+| [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect the managed provider; deploy, inspect, and repair LM Studio MCP roles |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Queue ordered project work |
-| [Native completion](NATIVE-COMPLETION.md) | Distinguish automatic checks from explicit custom native gates |
+| [Completion evidence](NATIVE-COMPLETION.md) | Understand built-in evidence checks and instruction-package-owned requirements |
 | [Automation and usability remediation](AUTOMATION-USABILITY-REMEDIATION.md) | Track the revision-2 minimal-input remediation and its evidence |
 
 ## Architecture and contracts
@@ -40,7 +40,7 @@ source-bound historical receipt says otherwise.
 | Document | Purpose |
 | --- | --- |
 | [Roadmap](../ROADMAP.md) | Canonical phase and milestone record |
-| [Qualification status](QUALIFICATION-STATUS.md) | Current evidence and remaining release gates |
+| [Qualification status](QUALIFICATION-STATUS.md) | Current evidence and remaining release checks |
 | [Adversarial pre-release audit](AUDIT-2026-09-20.md) | September 20 source findings, corrections, verification, and release boundaries |
 | [Delivery workflow](DELIVERY-WORKFLOW.md) | Local-first update and verification process |
 | [Functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) | Detailed candidate and artifact receipts |

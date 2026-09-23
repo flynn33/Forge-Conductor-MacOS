@@ -56,98 +56,256 @@ public struct LMStudioKeychainCredentialStore: LMStudioCredentialStoring {
 /// and kept off the actor executor because the shared process runner is
 /// intentionally synchronous.
 struct LMStudioLocalServerController: Sendable {
+    typealias Command = @Sendable (
+        _ executable: String,
+        _ arguments: [String],
+        _ timeoutSeconds: TimeInterval
+    ) async throws -> ProcessResult
+    typealias Delay = @Sendable (_ duration: Duration) async throws -> Void
+
     private struct Status: Decodable {
         let running: Bool
         let port: Int?
+
+        private enum CodingKeys: String, CodingKey {
+            case running
+            case port
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            running = try container.decode(Bool.self, forKey: .running)
+            if let integerPort = try? container.decode(Int.self, forKey: .port) {
+                port = integerPort
+            } else if let stringPort = try? container.decode(String.self, forKey: .port) {
+                port = Int(stringPort)
+            } else {
+                port = nil
+            }
+        }
     }
 
-    private let runner: ProcessRunner
+    private enum StatusObservation {
+        case running(port: Int)
+        case stopped
+        case unusable
+    }
+
+    private static let maximumExecutableCandidates = 6
+    private static let maximumOutputBytes = 8 * 1_024
+    private static let statusTimeoutSeconds: TimeInterval = 1.5
+    private static let startTimeoutSeconds: TimeInterval = 8
+    private static let readinessDelays: [Duration] = [
+        .zero,
+        .milliseconds(150),
+        .milliseconds(350),
+        .milliseconds(750),
+    ]
+
+    private let discoverExecutables: @Sendable () -> [String]
+    private let command: Command
+    private let delay: Delay
 
     init(runner: ProcessRunner = ProcessRunner()) {
-        self.runner = runner
+        discoverExecutables = {
+            Self.executablePaths(
+                homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+                discoveredPath: ProcessRunner.which("lms"),
+                isExecutable: { FileManager.default.isExecutableFile(atPath: $0) }
+            )
+        }
+        command = { executable, arguments, timeoutSeconds in
+            let cancellation = ToolCallCancellation(timeoutSeconds: timeoutSeconds)
+            return try await withTaskCancellationHandler {
+                try await Task.detached(priority: .utility) {
+                    try runner.run(
+                        executable: executable,
+                        arguments: arguments,
+                        timeoutSec: timeoutSeconds,
+                        maximumOutputBytes: Self.maximumOutputBytes,
+                        cancellation: cancellation
+                    )
+                }.value
+            } onCancel: {
+                cancellation.cancel()
+            }
+        }
+        delay = { duration in
+            try await Task.sleep(for: duration)
+        }
+    }
+
+    init(
+        discoverExecutables: @escaping @Sendable () -> [String],
+        command: @escaping Command,
+        delay: @escaping Delay = { try await Task.sleep(for: $0) }
+    ) {
+        self.discoverExecutables = discoverExecutables
+        self.command = command
+        self.delay = delay
     }
 
     func ensureRunningPort() async throws -> Int {
-        guard let executable = Self.executablePath() else {
+        let executables = Array(
+            discoverExecutables().prefix(Self.maximumExecutableCandidates)
+        )
+        guard !executables.isEmpty else {
             throw ProviderConfigurationError.offline
         }
-        if let port = try await status(executable: executable) {
+
+        var stoppedExecutables: [String] = []
+        var unusableExecutables: [String] = []
+        for executable in executables {
+            try Task.checkCancellation()
+            switch try await status(executable: executable) {
+            case .running(let port):
+                return port
+            case .stopped:
+                stoppedExecutables.append(executable)
+            case .unusable:
+                unusableExecutables.append(executable)
+            }
+        }
+
+        // Prefer a CLI that understood the status contract. If none did, retain
+        // one bounded attempt with the app-matched first candidate: some lms
+        // releases have reported the server as unavailable while start was still
+        // able to wake it and report the bound port.
+        let startupCandidates = stoppedExecutables + unusableExecutables
+        for executable in startupCandidates.prefix(1) {
+            if let port = try await startAndResolvePort(executable: executable) {
+                return port
+            }
+        }
+        throw ProviderConfigurationError.offline
+    }
+
+    private func startAndResolvePort(executable: String) async throws -> Int? {
+        let start: ProcessResult
+        do {
+            start = try await command(
+                executable,
+                ["server", "start"],
+                Self.startTimeoutSeconds
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return nil
+        }
+        guard !start.timedOut, !start.stdoutTruncated, !start.stderrTruncated else {
+            return nil
+        }
+
+        let startReportedPort = Self.portFromStartOutput(
+            start.stdout + "\n" + start.stderr
+        )
+        for readinessDelay in Self.readinessDelays {
+            try Task.checkCancellation()
+            if readinessDelay > .zero {
+                try await delay(readinessDelay)
+            }
+            if case .running(let port) = try await status(executable: executable) {
+                return port
+            }
+        }
+
+        // The normal HTTP inventory transport verifies this loopback port before
+        // the Manager may persist it. Retaining the CLI's bounded start result
+        // avoids a false offline result when lms starts the server successfully
+        // but its own status command briefly lags or misreports readiness.
+        return startReportedPort
+    }
+
+    private func status(executable: String) async throws -> StatusObservation {
+        let result: ProcessResult
+        do {
+            result = try await command(
+                executable,
+                ["server", "status", "--json", "--quiet"],
+                Self.statusTimeoutSeconds
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return .unusable
+        }
+        guard !result.timedOut, !result.stdoutTruncated, !result.stderrTruncated else {
+            return .unusable
+        }
+        guard result.exitCode == 0,
+              let status = Self.decodeStatus(from: result.stdout) else {
+            return .unusable
+        }
+        guard status.running else { return .stopped }
+        guard let port = status.port, (1...65_535).contains(port) else {
+            return .unusable
+        }
+        return .running(port: port)
+    }
+
+    private static func decodeStatus(from output: String) -> Status? {
+        guard output.utf8.count <= maximumOutputBytes else { return nil }
+        var candidates = output.split(whereSeparator: \Character.isNewline).reversed().map(String.init)
+        candidates.append(output)
+        for candidate in candidates {
+            let json: Substring
+            if let start = candidate.firstIndex(of: "{"),
+               let end = candidate.lastIndex(of: "}"), start <= end {
+                json = candidate[start...end]
+            } else {
+                continue
+            }
+            guard let data = String(json).data(using: .utf8) else { continue }
+            if let status = try? JSONDecoder().decode(Status.self, from: data) {
+                return status
+            }
+        }
+        return nil
+    }
+
+    private static func portFromStartOutput(_ output: String) -> Int? {
+        let tokens = output.split { !$0.isLetter && !$0.isNumber }
+        guard tokens.count >= 2 else { return nil }
+        for index in tokens.indices.dropLast() where tokens[index].lowercased() == "port" {
+            guard let port = Int(tokens[tokens.index(after: index)]),
+                  (1...65_535).contains(port) else { continue }
             return port
         }
+        return nil
+    }
 
-        let start = try await run(
-            executable: executable,
-            arguments: ["server", "start"],
-            timeoutSeconds: 8
+    static func executablePaths(
+        homeDirectory: URL,
+        discoveredPath: String?,
+        isExecutable: (String) -> Bool
+    ) -> [String] {
+        let systemApplication = URL(fileURLWithPath: "/Applications/LM Studio.app", isDirectory: true)
+        let userApplication = homeDirectory.appendingPathComponent(
+            "Applications/LM Studio.app",
+            isDirectory: true
         )
-        guard !start.timedOut, !start.stdoutTruncated, !start.stderrTruncated,
-              start.exitCode == 0 else {
-            throw ProviderConfigurationError.offline
-        }
-        try Task.checkCancellation()
-        guard let port = try await status(executable: executable) else {
-            throw ProviderConfigurationError.offline
-        }
-        return port
-    }
-
-    private func status(executable: String) async throws -> Int? {
-        let result = try await run(
-            executable: executable,
-            arguments: ["server", "status", "--json", "--quiet"],
-            timeoutSeconds: 4
-        )
-        guard !result.timedOut, !result.stdoutTruncated, !result.stderrTruncated else {
-            throw ProviderConfigurationError.offline
-        }
-        guard result.exitCode == 0 else { return nil }
-        guard let data = result.stdout.data(using: .utf8), data.count <= 8 * 1_024,
-              let status = try? JSONDecoder().decode(Status.self, from: data) else {
-            throw ProviderConfigurationError.offline
-        }
-        guard status.running else { return nil }
-        guard let port = status.port, (1...65_535).contains(port) else {
-            throw ProviderConfigurationError.offline
-        }
-        return port
-    }
-
-    private func run(
-        executable: String,
-        arguments: [String],
-        timeoutSeconds: TimeInterval
-    ) async throws -> ProcessResult {
-        let cancellation = ToolCallCancellation(timeoutSeconds: timeoutSeconds)
-        return try await withTaskCancellationHandler {
-            try await Task.detached(priority: .utility) {
-                try runner.run(
-                    executable: executable,
-                    arguments: arguments,
-                    timeoutSec: timeoutSeconds,
-                    maximumOutputBytes: 8 * 1_024,
-                    cancellation: cancellation
-                )
-            }.value
-        } onCancel: {
-            cancellation.cancel()
-        }
-    }
-
-    private static func executablePath() -> String? {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        var candidates = [
-            home.appendingPathComponent(".lmstudio/bin/lms").path,
-            "/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms",
-            home.appendingPathComponent(
-                "Applications/LM Studio.app/Contents/Resources/app/.webpack/lms"
-            ).path,
+        let bundledRelativePaths = [
+            "Contents/Resources/app/.webpack/lms",
+            "Contents/Resources/app.asar.unpacked/.webpack/lms",
         ]
-        if let discovered = ProcessRunner.which("lms") {
-            candidates.append(discovered)
+        var candidates = [systemApplication, userApplication].flatMap { application in
+            bundledRelativePaths.map { application.appendingPathComponent($0).path }
         }
+        candidates += [
+            discoveredPath,
+            homeDirectory.appendingPathComponent(".lmstudio/bin/lms").path,
+            "/opt/homebrew/bin/lms",
+            "/usr/local/bin/lms",
+        ].compactMap { $0 }
+
         var visited = Set<String>()
-        return candidates.first { path in
-            visited.insert(path).inserted && FileManager.default.isExecutableFile(atPath: path)
+        return candidates.filter { path in
+            let canonical = URL(fileURLWithPath: path)
+                .standardizedFileURL
+                .resolvingSymlinksInPath()
+                .path
+            return visited.insert(canonical).inserted && isExecutable(path)
         }
     }
 }

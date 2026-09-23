@@ -4,7 +4,6 @@
 import Foundation
 import AppKit
 import ForgeConductorCore
-import UniformTypeIdentifiers
 
 enum ToolCheckboxState: Equatable {
     case unchecked
@@ -39,7 +38,6 @@ final class AutonomyViewModel: ObservableObject {
     @Published var modelKey = ""
     @Published var modelOverrideKey = ""
     @Published var allowedTools = ""
-    @Published var completionGates = ""
     @Published var selectedCompletionChecks = CompletionCheckPreset.defaults
     @Published var failureBehavior = AutonomousFailureBehavior.retryAutomatically
     @Published var maximumRetries = 3
@@ -51,13 +49,11 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var lastStartedRunID: String?
     @Published private(set) var controlInFlight: OperatorRunControlAction?
     @Published private(set) var deletionInFlight = false
-    @Published private(set) var policyImportInFlight = false
     @Published private(set) var toolPermissionUpdateInFlight = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var notice: String?
 
     private let client: any OperatorManagerClientProtocol
-    private let policyInstaller = NativeValidationPolicyInstaller()
     private var loadTask: Task<Void, Never>?
     private var pendingStartRequest: OperatorRunStartRequest?
     private var didApplyPreparationDefaults = false
@@ -89,7 +85,7 @@ final class AutonomyViewModel: ObservableObject {
         guard provider?.health != "reachable", provider?.health != "contract_valid" else {
             return nil
         }
-        return "Authorize the project folder in Manager, then save the LM Studio endpoint and loaded model in Provider and choose Connect and Check."
+        return "Open Provider and choose Connect and Check. Forge will discover the local LM Studio service, select one compatible loaded model when unambiguous, and retain this task while recovery completes."
     }
 
     func providerTechnicalPresentation(
@@ -422,9 +418,6 @@ final class AutonomyViewModel: ObservableObject {
                         if allowedTools.isEmpty {
                             allowedTools = preparation.allowedTools.joined(separator: "\n")
                         }
-                        if completionGates.isEmpty {
-                            completionGates = preparation.completionGates.joined(separator: "\n")
-                        }
                         if let networkOverrideForNextPreparation {
                             networkAllowed = networkOverrideForNextPreparation
                             self.networkOverrideForNextPreparation = nil
@@ -475,12 +468,11 @@ final class AutonomyViewModel: ObservableObject {
         let modelKey = modelKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let modelOverrideKey = modelOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let allowedTools = parsedList(allowedTools)
-        let customCompletionGates = CompletionGateOwnership.customNativeGates(
-            in: parsedList(completionGates)
-        )
-        let completionGates = [ProjectInstructionQueueStore.builtInCompletionGate]
+        // The start form owns only Forge's built-in completion checks. Any
+        // additional requirement is sourced from the selected instruction
+        // artifact when `usingInstructionArtifact(_:)` binds this request.
+        let completionChecks = [ProjectInstructionQueueStore.builtInCompletionGate]
             + selectedCompletionChecks.map(\.rawValue).sorted()
-            + customCompletionGates
         let preparation = runPreparation
         let projectPermissions = toolPermissions.flatMap {
             $0.projectID == project.projectID
@@ -509,9 +501,8 @@ final class AutonomyViewModel: ObservableObject {
                 || Set(allowedTools) == Set(projectPermissions?.effectiveToolIDs
                     ?? preparation?.allowedTools ?? [])
                 ? nil : allowedTools,
-            completionGates: completionGates.isEmpty
-                || completionGates == preparation?.completionGates
-                ? nil : completionGates,
+            completionGates: completionChecks == preparation?.completionGates
+                ? nil : completionChecks,
             failurePolicy: AutonomousFailurePolicy(
                 behavior: failureBehavior,
                 maximumRetries: failureBehavior == .retryAutomatically ? maximumRetries : 0,
@@ -746,9 +737,6 @@ final class AutonomyViewModel: ObservableObject {
         if Set(parsedList(allowedTools)) == Set(preparation.allowedTools) {
             allowedTools = ""
         }
-        if parsedList(completionGates) == preparation.completionGates {
-            completionGates = ""
-        }
         if networkAllowed == preparation.networkAllowed {
             networkAllowed = false
         } else {
@@ -787,73 +775,6 @@ final class AutonomyViewModel: ObservableObject {
                 errorMessage = error.localizedDescription
             }
             isLoading = false
-        }
-    }
-
-    func chooseNativePolicy() {
-        guard !policyImportInFlight, let run = selectedRun,
-              projects.contains(where: { $0.projectID == run.projectID }) else { return }
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsOtherFileTypes = false
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Import Policy"
-        policyImportInFlight = true
-        panel.begin { [weak self] response in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                guard response == .OK, let file = panel.url else {
-                    self.policyImportInFlight = false
-                    return
-                }
-                self.importNativePolicy(file, selectedRunID: run.runID)
-            }
-        }
-    }
-
-    private func importNativePolicy(_ file: URL, selectedRunID: String) {
-        guard self.selectedRunID == selectedRunID else {
-            policyImportInFlight = false
-            return
-        }
-        errorMessage = nil
-        notice = nil
-        Task { [weak self] in
-            guard let self else { return }
-            defer { policyImportInFlight = false }
-            do {
-                let run = try await client.runStatus(runID: selectedRunID)
-                let project = try await client.projectStatus(projectID: run.projectID)
-                guard self.selectedRunID == run.runID,
-                      run.projectID == project.projectID,
-                      run.projectGeneration == project.projectGeneration,
-                      let runUUID = UUID(uuidString: run.runID),
-                      let projectUUID = UUID(uuidString: run.projectID) else {
-                    throw AutonomyError.invalidRequest("managed run or project generation changed before policy import")
-                }
-                let customNativeGates = CompletionGateOwnership.customNativeGates(
-                    in: run.completionGates
-                )
-                guard !customNativeGates.isEmpty else {
-                    throw AutonomyError.invalidRequest(
-                        "This task uses Forge-managed automatic checks and does not need a custom native policy."
-                    )
-                }
-                let binding = NativeValidationPolicyInstaller.RunBinding(
-                    runID: RunID(runUUID), projectID: ProjectID(projectUUID),
-                    projectGeneration: ProjectGeneration(run.projectGeneration),
-                    completionGates: customNativeGates,
-                    projectRoot: URL(fileURLWithPath: project.canonicalRoot, isDirectory: true)
-                )
-                let receipt = try await policyInstaller.importPolicy(from: file, for: binding)
-                guard self.selectedRunID == run.runID else { return }
-                notice = "Native validation policy imported for run \(receipt.runID). The manager will verify signed test results before completion."
-                refreshSelectedRun()
-            } catch {
-                errorMessage = "Native policy import failed: \(error.localizedDescription)"
-            }
         }
     }
 

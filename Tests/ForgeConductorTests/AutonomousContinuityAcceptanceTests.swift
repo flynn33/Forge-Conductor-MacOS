@@ -202,64 +202,61 @@ final class AutonomousContinuityAcceptanceTests: XCTestCase {
         runtime = nil
     }
 
-    func testProviderConfigurationBlockRemainsQuiescentAcrossManagerRestart() async throws {
+    func testProviderConfigurationRepairResumesAutomaticallyWithoutManualRetry() async throws {
         let proof = String(repeating: "d", count: 64)
         let provider = RestartAcceptanceProvider(
             scenario: .blockedConfiguration,
             completionProof: proof
         )
-        var activeApp: ForgeApp? = try ForgeApp.bootstrap(home: home)
-        defer { activeApp?.shutdown() }
-        let project = try registerProject(app: try XCTUnwrap(activeApp), name: "configuration")
-        var runtime: ManagedAutonomyRuntime? = try ManagedAutonomyRuntime(
-            app: try XCTUnwrap(activeApp),
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let project = try registerProject(app: app, name: "configuration")
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
             registry: restartAcceptanceRegistry(provider: provider),
             managerID: "acceptance-configuration-before-restart",
-            maximumConcurrentRuns: 1
+            maximumConcurrentRuns: 1,
+            completionValidator: try restartCompletionValidator(
+                provider: provider,
+                clock: SystemClock()
+            )
         )
-        _ = try await runtime?.start()
-        let created = try await runtime?.createRun(runRequest(
+        _ = try await runtime.start()
+        let created = try await runtime.createRun(runRequest(
             project: project,
-            mission: "Persist a provider configuration block",
+            mission: "Resume automatically after provider configuration repair",
             initialEvidence: [proof]
         ))
-        let runID = try XCTUnwrap(created?.runID)
-        let blocked = try await waitForRun(
-            repository: try XCTUnwrap(activeApp).projectContexts.repository,
-            runtime: try XCTUnwrap(runtime),
-            runID: runID,
-            state: .blockedConfiguration
+        let waiting = try await waitForRun(
+            repository: app.projectContexts.repository,
+            runtime: runtime,
+            runID: created.runID,
+            state: .waitingProvider
         )
-        XCTAssertEqual(blocked.lastErrorCode, "acceptance_provider_unauthorized")
-        XCTAssertNil(blocked.retryAt)
+        XCTAssertEqual(waiting.lastErrorCode, "acceptance_provider_unauthorized")
+        XCTAssertNotNil(waiting.retryAt)
+        XCTAssertNotEqual(waiting.state, .blockedConfiguration)
 
-        await runtime?.shutdown()
-        runtime = nil
-        activeApp?.shutdown()
-        activeApp = nil
-
-        let restartedApp = try ForgeApp.bootstrap(home: home)
-        activeApp = restartedApp
-        let restartedRuntime = try ManagedAutonomyRuntime(
-            app: restartedApp,
-            registry: restartAcceptanceRegistry(provider: provider),
-            managerID: "acceptance-configuration-after-restart",
-            maximumConcurrentRuns: 1
+        await provider.repairConfiguration()
+        try await Task.sleep(for: .seconds(2))
+        try await runtime.tick()
+        let completed = try await waitForRun(
+            repository: app.projectContexts.repository,
+            runtime: runtime,
+            runID: created.runID,
+            state: .completed
         )
-        runtime = restartedRuntime
-        let report = try await restartedRuntime.start()
-        XCTAssertEqual(report.discoveredRuns, 1)
-        XCTAssertTrue(report.activatedRuns.isEmpty)
-        try await Task.sleep(for: .milliseconds(100))
-        try await restartedRuntime.tick()
-        let retained = try await restartedRuntime.run(runID)
-        XCTAssertEqual(retained.state, .blockedConfiguration)
-        XCTAssertEqual(retained.lastErrorCode, "acceptance_provider_unauthorized")
+        XCTAssertEqual(completed.state, .completed)
+        let events = try await app.projectContexts.repository.autonomyEvents(
+            runID: created.runID
+        )
+        XCTAssertFalse(events.contains { event in
+            event.eventType == "autonomous_run_configuration_blocked"
+        })
         let snapshot = await provider.snapshot()
-        XCTAssertEqual(snapshot.rootAttempts, 1)
-        XCTAssertEqual(snapshot.completedRoots, 0)
-        await restartedRuntime.shutdown()
-        runtime = nil
+        XCTAssertEqual(snapshot.rootAttempts, 2)
+        XCTAssertEqual(snapshot.completedRoots, 1)
+        await runtime.shutdown()
     }
 
     private func registerProject(app: ForgeApp, name: String) throws -> AcceptanceProject {
@@ -737,7 +734,7 @@ private struct RestartAcceptanceFailure: ManagedProviderFailure, LocalizedError 
 }
 
 private actor RestartAcceptanceProvider: ManagedModelProvider {
-    enum Scenario: Sendable {
+    enum Scenario: Sendable, Equatable {
         case transientOutage
         case blockedConfiguration
     }
@@ -753,6 +750,7 @@ private actor RestartAcceptanceProvider: ManagedModelProvider {
     private let completionProof: String
     private var rootAttempts = 0
     private var completedRoots = 0
+    private var configurationAvailable = false
     private var idempotencyKeys: [String] = []
     private var receipts: [String: ProviderTurn] = [:]
 
@@ -791,13 +789,13 @@ private actor RestartAcceptanceProvider: ManagedModelProvider {
                 managedProviderFailureCode: "acceptance_provider_unavailable",
                 managedProviderRetryDelay: 0.01
             )
-        case .blockedConfiguration:
+        case .blockedConfiguration where !configurationAvailable:
             throw RestartAcceptanceFailure(
                 managedProviderFailureDisposition: .blockedConfiguration,
                 managedProviderFailureCode: "acceptance_provider_unauthorized",
                 managedProviderRetryDelay: nil
             )
-        case .transientOutage:
+        case .transientOutage, .blockedConfiguration:
             let turn = try ProviderTurn(
                 requestID: "restart-request",
                 responseID: "restart-response",
@@ -825,7 +823,7 @@ private actor RestartAcceptanceProvider: ManagedModelProvider {
 
     func continueSession(_ request: ProviderContinuationRequest) async throws -> ProviderTurn {
         if let existing = receipts[request.idempotencyKey] { return existing }
-        guard case .transientOutage = scenario,
+        guard (scenario == .transientOutage || scenario == .blockedConfiguration),
               request.previousResponseID == "restart-response" else {
             throw AutonomyError.invalidRequest("restart acceptance cannot continue this session")
         }
@@ -863,6 +861,10 @@ private actor RestartAcceptanceProvider: ManagedModelProvider {
     }
 
     func cancel(requestID: String) async {}
+
+    func repairConfiguration() {
+        configurationAvailable = true
+    }
 
     func snapshot() -> Snapshot {
         Snapshot(

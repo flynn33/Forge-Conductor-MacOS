@@ -84,6 +84,7 @@ struct OperatorErrorBanner: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("operator-unavailable")
+        .accessibilityLabel("Manager state unavailable. \(message)")
     }
 }
 
@@ -101,30 +102,43 @@ struct OperatorNoticeBanner: View {
     }
 }
 
+enum OperatorRunStatePresentation {
+    static func displayName(_ state: String) -> String {
+        state == "blocked_configuration"
+            ? "recovering automatically"
+            : state.replacingOccurrences(of: "_", with: " ")
+    }
+}
+
 struct OperatorStateBadge: View {
     let state: String
 
     var body: some View {
-        Text(state.replacingOccurrences(of: "_", with: " "))
+        Text(displayState)
             .font(.caption.weight(.semibold))
             .foregroundStyle(foreground)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(background, in: Capsule())
             .accessibilityLabel("State")
-            .accessibilityValue(state)
+            .accessibilityValue(displayState)
     }
 
     private var foreground: Color {
         switch state {
         case "completed", "active", "running", "healthy", "ready", "sealed": .green
         case "failed_terminal", "cancelled", "failed", "quarantined_stale": .red
-        case "waiting_provider", "waiting_resource", "awaiting_bootstrap", "retry_wait", "paused", "blocked_configuration": .orange
+        case "blocked_configuration": .blue
+        case "waiting_provider", "waiting_resource", "awaiting_bootstrap", "retry_wait", "paused": .orange
         default: .secondary
         }
     }
 
     private var background: Color { foreground.opacity(0.14) }
+
+    private var displayState: String {
+        OperatorRunStatePresentation.displayName(state)
+    }
 }
 
 struct OperatorIdentifier: View {

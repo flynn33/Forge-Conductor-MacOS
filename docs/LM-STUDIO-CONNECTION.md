@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.14.0**, build **6**. This connection document does
+Product identity: version **0.14.1**, build **7**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -43,9 +43,13 @@ The native Provider screen saves the LM Studio server origin and an exact model
 key. Saving is durable and does not prove the server is reachable. With a saved
 loopback endpoint, **Connect and Check** is the ordinary one-button path. Forge
 first attempts normal inventory. After a transport-level offline result, it
-locates LM Studio's supported `lms` CLI, reads `lms server status --json
---quiet`, starts the server with `lms server start` when needed, and retries only
-the configured endpoint and loopback variants on the exact CLI-reported port.
+locates LM Studio's supported `lms` CLI in the system or per-user application,
+the standard LM Studio user location, Homebrew locations, or `PATH`; reads `lms
+server status --json --quiet`; starts the server with `lms server start` when
+needed; and performs bounded readiness polling. Status parsing accepts the
+bounded JSON object even when the CLI surrounds it with diagnostic text and
+accepts a valid integer or string port. Forge retries only the configured
+endpoint and loopback variants on the exact CLI-reported or start-reported port.
 Each candidate must pass the ordinary model-inventory transport before Forge
 may persist the corrected endpoint. Forge does not scan ports.
 
@@ -67,9 +71,14 @@ unloaded compatibility data remains unavailable. LM Studio's OpenAI-compatible
 `/v1/models` lists downloaded models when just-in-time loading is enabled, so
 that list alone does not prove readiness.
 
-On September 17, 2026, this host's `lms ps` and native v0 inventory reported `qwen/qwen3.8-27b` loaded with a 262144-token context while the native v1 response returned the same model metadata with an empty `loaded_instances` array. The current Xcode **My Mac** Debug candidate reconciled that exact observation, reported the model loaded, and passed the manager connection probe. A disposable run then used one project-bound `fs_read`, persisted its completion request, and stopped at the expected missing native-policy blocker. After an exact signed policy import, Retry returned to completion validation without another provider/tool step; one required XCTest case passed with zero failures/skips and the run reached `completed` with `tests` passed.
+On September 17, 2026, this host's `lms ps` and native v0 inventory reported
+`qwen/qwen3.8-27b` loaded with a 262144-token context while the native v1
+response returned the same model metadata with an empty `loaded_instances`
+array. The Xcode **My Mac** Debug candidate reconciled that exact observation,
+reported the model loaded, and passed the manager connection probe. That is
+historical connection evidence bound to that source and host.
 
-Register the repository in **Projects** using the native picker or **Enter Project Path…**, then authorize its canonical folder in **Manager** settings. The manager runs independently of the Autonomy tab. A managed run cannot be admitted until its project root is authorized; **Autonomy** starts runs after a project is registered and the Provider connection is checked.
+Register the repository in **Projects** using the native picker or **Enter Project Path…**. Forge records the selected canonical folder through that project workflow; no separate Manager authorization step is required. The manager runs independently of the Autonomy tab, and **Autonomy** starts runs after the project is registered and **Connect and Check** has prepared the selected Provider.
 
 ## Authoritative connection path (stable)
 
@@ -182,7 +191,7 @@ Source of truth in code:
 | Exactly one compact JSON-RPC message plus `\n` per stdout frame; no `Content-Length` | `MCPStdioTransport` in `MCPServer.swift` |
 | Deployment smoke accepts only newline-delimited responses | `MCPServeVerifier` |
 | Unique `FORGE_DEPLOYMENT_ID` in both role entries forces every `mcp.json` deploy to be observable | `LMStudioEnvironment` / installer |
-| Hot reload, scoped LM Studio relaunch fallback, exact-revision synchronization gate, and runtime evidence | `NativeLMStudioHostActivator` |
+| Hot reload, scoped LM Studio relaunch fallback, exact-revision synchronization check, and runtime evidence | `NativeLMStudioHostActivator` |
 | `PRAGMA busy_timeout=3000` | `SQLiteStore` |
 | Transactional SwiftPM Core resource-bundle staging and bare-binary rejection | `ManagerInstaller` |
 | Registration never writes `forge-serve` | `LMStudioEnvironment` / installer |
@@ -190,7 +199,7 @@ Source of truth in code:
 
 ### Transactional operational deploy
 
-Deployment performs these gates before reporting success:
+Deployment performs these checks before reporting success:
 
 1. The selected executable must pass independent primary, fallback, and
    restricted CLU MCP handshakes.
@@ -261,7 +270,8 @@ The two registrations are separate LM Studio-hosted processes with distinct `ser
 
 ## Operator steps
 
-1. Build with `./script/build_and_run.sh` or the Xcode `ForgeConductor` / `forge-conductor` schemes.
+1. Build with the canonical Xcode `ForgeConductor` scheme or the direct
+   `swift build --product forge-conductor-app` command.
 2. Install CLI layout: `forge-conductor install` (does **not** write LM Studio by itself).
 3. Deploy and activate: **Deploy to LM Studio** in the GUI, or `forge-conductor install-lmstudio-plugin`.
 4. Load a tool-capable local model. Configuration, activation, and connection verification are already complete.

@@ -137,7 +137,7 @@ enum ManagerRunPreparationResolver {
         guard (1...256).contains(completionGates.count),
               completionGates.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 512 }) else {
             throw AutonomyError.invalidRequest(
-                "completion_gates must contain 1 through 256 bounded identifiers"
+                "completion_gates must contain 1 through 256 bounded completion-requirement identifiers"
             )
         }
 
@@ -2675,6 +2675,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
            let completedAt = cachedProbe.completedAt,
            let checkedAt = ISO8601.date(from: completedAt),
            (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
+            try resumeProviderConfigurationWaits(providerID: .lmStudio)
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
@@ -2691,6 +2692,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
            receipt.provider.health == "contract_valid",
            let checkedAt = ISO8601.date(from: receipt.checkedAt),
            (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
+            try resumeProviderConfigurationWaits(providerID: .lmStudio)
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
@@ -2790,6 +2792,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     provider: provider
                 )
             }
+            try resumeProviderConfigurationWaits(providerID: .lmStudio)
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
@@ -2812,6 +2815,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 recoveryAction: .retry,
                 detail: error.localizedDescription,
                 configuration: (try? readProviderConfiguration()) ?? configuration
+            )
+        }
+    }
+
+    private func resumeProviderConfigurationWaits(
+        providerID: ProviderIntegrationID
+    ) throws {
+        guard let autonomy = providerAutonomyRuntime() else { return }
+        _ = try Self.waitForAsync(timeoutSeconds: 5) {
+            try await autonomy.resumeProviderConfigurationWaits(
+                providerID: providerID.rawValue
             )
         }
     }
@@ -3210,6 +3224,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let source: ManagerPreparedRunSource
         let documents: [ManagerPreparedRunDocumentReference]
         let completionPlanningText: String
+        let sourceCompletionGates: [String]
     }
 
     private func preparedInstructionInput(
@@ -3235,7 +3250,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     byteCount: missionData.count,
                     sha256: sourceSHA256
                 )],
-                completionPlanningText: mission
+                completionPlanningText: mission,
+                sourceCompletionGates: []
             )
         }
         guard let runID else {
@@ -3270,8 +3286,34 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 projectID: projectID,
                 generation: expectedGeneration,
                 runID: runID
-            )
+            ),
+            sourceCompletionGates: artifact.completionGates
         )
+    }
+
+    /// Keeps completion ownership explicit: packages supply package requirements,
+    /// while configuration may only select Forge's built-in completion checks.
+    private static func resolvedCompletionGates(
+        requested: [String]?,
+        sourceDefined: [String]
+    ) throws -> [String]? {
+        let sourceSet = Set(sourceDefined)
+        let requested = requested ?? []
+        let unauthorized = requested.filter {
+            !CompletionGateOwnership.isManagerOwnedAutomatic($0)
+                && !sourceSet.contains($0)
+        }
+        guard unauthorized.isEmpty else {
+            throw AutonomyError.invalidRequest(
+                "Configuration may select only Forge completion checks. Package-defined completion requirements must come from the prepared instruction source."
+            )
+        }
+
+        var seen = Set<String>()
+        let combined = (sourceDefined + requested.filter {
+            CompletionGateOwnership.isManagerOwnedAutomatic($0)
+        }).filter { seen.insert($0).inserted }
+        return combined.isEmpty ? nil : combined
     }
 
     private func completionPlanningText(
@@ -3351,6 +3393,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            sourceCompletionGates: instruction.sourceCompletionGates,
             failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             maximumInlineOutputBytes: maximumInlineOutputBytes
@@ -3527,6 +3570,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         modelKey: String?,
         allowedTools: Set<String>?,
         completionGates: [String]?,
+        sourceCompletionGates: [String],
         failurePolicy: AutonomousFailurePolicy,
         expectedProviderConfigurationRevision: String? = nil,
         expectedToolCatalogRevision: String? = nil,
@@ -3593,6 +3637,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
            permissionSnapshot.catalogRevision != expectedToolCatalogRevision {
             throw ManagerRunPreparationError.staleToolCatalog
         }
+        let completionGates = try Self.resolvedCompletionGates(
+            requested: completionGates,
+            sourceDefined: sourceCompletionGates
+        )
         let resolved = try ManagerRunPreparationResolver.resolve(
             configuration: providerConfiguration,
             registeredToolNames: app.tools.toolNames,
@@ -3880,6 +3928,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
+            sourceCompletionGates: instruction.sourceCompletionGates,
             failurePolicy: failurePolicy,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,
             expectedToolCatalogRevision: expectedToolCatalogRevision,
@@ -4184,7 +4233,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             adapterID: nil,
             modelKey: nil,
             allowedTools: Set(package.allowedTools),
-            completionGates: package.completionGates,
+            completionGates: nil,
+            sourceCompletionGates: package.completionGates,
             failurePolicy: .default,
             networkAllowed: false,
             maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
@@ -4285,7 +4335,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                         finishProviderRunOperation()
                     } catch {
                         finishProviderRunOperation()
-                        await blockInstructionPackageIfRunWasNotCommitted(
+                        await retainInstructionPackageForAutomaticRetryIfRunWasNotCommitted(
                             store: store,
                             packageID: package.id,
                             runID: runID,
@@ -4322,7 +4372,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 finishProviderRunOperation()
             } catch {
                 finishProviderRunOperation()
-                await blockInstructionPackageIfRunWasNotCommitted(
+                await retainInstructionPackageForAutomaticRetryIfRunWasNotCommitted(
                     store: store,
                     packageID: package.id,
                     runID: runID,
@@ -4345,10 +4395,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     /// A queue record is committed before its autonomous run so a process crash can
-    /// recover the exact run identity. A returned creation failure receives one
-    /// repository reconciliation; when no run committed, the package is blocked and
-    /// automatic advancement stops instead of retrying forever on every watchdog tick.
-    private func blockInstructionPackageIfRunWasNotCommitted(
+    /// recover the exact run identity. When creation has not committed a run, retain
+    /// that identity in the running package; the existing watchdog retries the same
+    /// idempotent start automatically instead of publishing a configuration block.
+    private func retainInstructionPackageForAutomaticRetryIfRunWasNotCommitted(
         store: ProjectInstructionQueueStore,
         packageID: UUID,
         runID: RunID,
@@ -4358,10 +4408,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             guard try await app.projectContexts.repository.autonomousRun(runID) == nil else {
                 return
             }
-            _ = try store.reconcile(
+            _ = try store.recordAutomaticStartRetry(
                 packageID: packageID,
                 runID: runID,
-                runState: .blockedConfiguration,
                 error: String(error.localizedDescription.prefix(2_048))
             )
         } catch {
@@ -4661,9 +4710,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 run.specification.work.workItem,
                 maximumCharacters: 1_024
             ),
-            nextAction: includeActivity ? operatorSummary(
+            nextAction: includeActivity ? operatorRunRecoveryText(
                 run.specification.work.nextAction,
-                maximumCharacters: 2_048
+                maximumCharacters: 2_048,
+                replacement: "Forge retained this task and is re-evaluating its durable completion evidence automatically."
             ) : nil,
             lastAssistantMessage: includeActivity ? operatorTranscript(
                 run.specification.work.metadata["provider_assistant_summary"],
@@ -4694,7 +4744,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             completionPlan: run.specification.completionPlan,
             passedGates: Array(passedGates.prefix(128)),
             lastErrorCode: run.lastErrorCode.map { operatorIdentifier($0, maximumCharacters: 128) },
-            lastErrorSummary: operatorSummary(run.lastErrorSummary, maximumCharacters: 512),
+            lastErrorSummary: operatorRunRecoveryText(
+                run.lastErrorSummary,
+                maximumCharacters: 512,
+                replacement: "Forge retained this task for automatic completion-evidence recovery."
+            ),
             retryAt: run.retryAt,
             createdAt: run.createdAt,
             updatedAt: run.updatedAt
@@ -4914,8 +4968,19 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 "Forge will resume automatically when the provider is available.",
                 .reviewProvider
             )
-        case .blockedConfiguration, .failedRecoverable, .waitingResource, .retryWait:
-            let detail = operatorSummary(run.lastErrorSummary, maximumCharacters: 512)
+        case .blockedConfiguration:
+            return (
+                .restoring,
+                "Forge retained this task and is resuming it automatically from durable state.",
+                "Forge has everything needed for automatic recovery.",
+                .none
+            )
+        case .failedRecoverable, .waitingResource, .retryWait:
+            let detail = operatorRunRecoveryText(
+                run.lastErrorSummary,
+                maximumCharacters: 512,
+                replacement: "The retained completion evidence is not yet satisfied."
+            )
                 ?? "The task is protected, but its current requirement has not been satisfied."
             let errorContext = [run.lastErrorCode, run.lastErrorSummary]
                 .compactMap { $0 }
@@ -5304,6 +5369,25 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
         let flattened = redacted.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         return String(flattened.prefix(maximumCharacters))
+    }
+
+    /// Persisted runs from older builds can contain recovery instructions for a
+    /// configuration-owned completion-policy path that no longer exists. Keep
+    /// the durable record intact while preventing obsolete setup demands from
+    /// reappearing in current operator projections.
+    private static func operatorRunRecoveryText(
+        _ value: String?,
+        maximumCharacters: Int,
+        replacement: String
+    ) -> String? {
+        guard let summary = operatorSummary(value, maximumCharacters: maximumCharacters) else {
+            return nil
+        }
+        let normalized = summary.lowercased()
+        let describesRetiredSetup = normalized.contains("native gate")
+            || normalized.contains("gate policy")
+            || (normalized.contains("restore") && normalized.contains("environment"))
+        return describesRetiredSetup ? replacement : summary
     }
 
     /// Owner-facing managed-model text keeps its readable line structure while

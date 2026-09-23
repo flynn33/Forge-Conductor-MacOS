@@ -131,21 +131,6 @@ public enum AutomaticCompletionPlanResolver {
                      evidence: .preparedSource,
                      reason: CompletionCheckPreset.instructionPackagesComplete.detail)
 
-        let customGates = CompletionGateOwnership.customNativeGates(
-            in: input.completionGates
-        )
-        for gate in customGates {
-            let suffix = String(JSONSupport.sha256Hex(gate).prefix(16))
-            obligations.append(CompletionObligation(
-                id: "custom-native-gate-\(suffix)",
-                kind: .customNativeGate,
-                title: "Custom completion policy passes",
-                reason: "The task explicitly selected the registered completion gate \(gate).",
-                evidenceRequirements: [.customNativeReceipt],
-                customGateID: gate
-            ))
-        }
-
         if !obligations.contains(where: { $0.kind == .noRelevantUnresolvedSideEffect }) {
             obligations.append(CompletionObligation(
                 id: selectedPresets.contains(.noUnresolvedOperations)
@@ -162,8 +147,10 @@ public enum AutomaticCompletionPlanResolver {
               Set(obligations.map(\.id)).count == obligations.count else {
             throw AutonomyError.invalidRequest("Automatic completion planning produced an invalid obligation set.")
         }
-        let source: CompletionPlanSource = customGates.isEmpty
-            ? .automatic : .automaticWithCustomPolicy
+        // Package-defined requirements remain in the durable run contract and
+        // are evaluated by the manager-owned evidence validator. Configuration
+        // never creates a native-policy obligation.
+        let source: CompletionPlanSource = .automatic
         let planID = try stablePlanID(
             projectID: input.projectID,
             projectGeneration: input.projectGeneration,

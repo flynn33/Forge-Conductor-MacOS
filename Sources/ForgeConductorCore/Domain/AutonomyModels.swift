@@ -114,6 +114,8 @@ public enum CompletionObligationKind: String, Codable, Sendable, CaseIterable {
     case readOnlyReportDelivered = "read_only_report_delivered"
     case runtimeJobSucceeded = "runtime_job_succeeded"
     case noRelevantUnresolvedSideEffect = "no_relevant_unresolved_side_effect"
+    // Decode compatibility for plans persisted by builds that exposed a
+    // configuration-owned native-policy path. New plans never create it.
     case customNativeGate = "custom_native_gate"
 }
 
@@ -158,11 +160,9 @@ public enum CompletionCheckPreset: String, Codable, Sendable, CaseIterable, Iden
     ]
 }
 
-/// Classifies durable completion-gate identifiers by their actual execution
-/// owner. The built-in package gate and every native UI preset are evaluated by
-/// Forge's compiled automatic completion plan. Only an explicit, unknown gate
-/// identifier opts a run into the separately installed custom-native policy
-/// path.
+/// Identifies the bounded completion-check IDs that configuration may select.
+/// Other IDs are accepted only when they came from the bound instruction
+/// package and remain manager-evaluated package requirements.
 public enum CompletionGateOwnership {
     public static func isManagerOwnedAutomatic(_ gate: String) -> Bool {
         gate == ProjectInstructionQueueStore.builtInCompletionGate
@@ -174,6 +174,8 @@ public enum CompletionGateOwnership {
     }
 
     public static func customNativeGates(in gates: [String]) -> [String] {
+        // Compatibility helper for historical persisted records. Current
+        // admission does not use unknown identifiers to create a policy path.
         gates.filter { !isManagerOwnedAutomatic($0) }
     }
 }
@@ -190,6 +192,7 @@ public enum CompletionEvidenceRequirement: String, Codable, Sendable, CaseIterab
 
 public enum CompletionPlanSource: String, Codable, Sendable, CaseIterable {
     case automatic
+    // Decode compatibility only; current plans are always manager-automatic.
     case automaticWithCustomPolicy = "automatic_with_custom_policy"
 }
 
@@ -1221,7 +1224,7 @@ public enum AutonomyError: Error, LocalizedError, Equatable, Sendable {
         case .leaseRequired: "A current run lease is required"
         case .staleLease: "Run lease owner or epoch is stale"
         case .completionValidationRequired: "A deterministic completion receipt is required"
-        case .completionValidationFailed: "One or more deterministic completion gates failed"
+        case .completionValidationFailed: "One or more completion requirements were not satisfied"
         case .replayClassificationRequired(let tool): "Tool replay classification is required for \(tool)"
         case .replayBlocked(let classification): "Automatic replay is blocked for \(classification.rawValue)"
         case .intentConflict: "Side-effect identity conflicts with its durable intent"

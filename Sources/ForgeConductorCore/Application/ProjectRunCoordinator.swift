@@ -96,10 +96,9 @@ public struct CompletionGateValidator: Sendable {
     }
 }
 
-/// Validators are supplied by manager-owned automatic checks or an explicitly
-/// installed custom-native policy. This type is not decodable and has no
-/// model-tool registration surface. Missing validators fail closed and never
-/// select a provenance-only fallback.
+/// Validators are supplied by manager-owned completion checks. This type is not
+/// decodable and has no model-tool registration surface. Missing validators
+/// fail closed and never select a provenance-only fallback.
 public struct GateValidatorRegistry: RunCompletionValidating, Sendable {
     private let validators: [String: CompletionGateValidator]
     private let clock: any Clock
@@ -441,6 +440,14 @@ public actor ProjectRunCoordinator {
                 let failurePolicy = try run.specification.failurePolicy.validated()
                 let priorRetryCount = Int(run.specification.work.metadata["failure_retry_count"] ?? "0") ?? 0
                 let nextRetryCount = priorRetryCount + 1
+                let providerFailure = error as? any ManagedProviderFailure
+                let waitsForConfiguration = providerFailure?
+                    .managedProviderFailureDisposition == .blockedConfiguration
+                let priorConfigurationWaitCount = Int(
+                    run.specification.work.metadata[
+                        "provider_configuration_wait_count"
+                    ] ?? "0"
+                ) ?? 0
                 if failurePolicy.behavior == .pauseForReview {
                     run = try await transition(
                         run, to: .paused, lease: lease,
@@ -461,7 +468,8 @@ public actor ProjectRunCoordinator {
                     )
                     break
                 }
-                if nextRetryCount > failurePolicy.maximumRetries {
+                if !waitsForConfiguration,
+                   nextRetryCount > failurePolicy.maximumRetries {
                     run = try await transition(
                         run, to: .paused, lease: lease,
                         event: "autonomous_run_retry_limit_reached",
@@ -471,16 +479,42 @@ public actor ProjectRunCoordinator {
                     )
                     break
                 }
+                if waitsForConfiguration,
+                   priorConfigurationWaitCount >= retryPolicy.maximumAttempts {
+                    var pausedWork = run.specification.work
+                    pausedWork.metadata["provider_configuration_auto_resume"] = "pending"
+                    pausedWork.nextAction = "Open Provider and choose Connect and Check. Forge retained the exact operation and will resume it automatically after the provider passes its contract check."
+                    run = try await transition(
+                        run, to: .paused, lease: lease,
+                        event: "autonomous_run_provider_recovery_deadline_reached",
+                        summary: "Automatic provider recovery reached its bounded deadline",
+                        work: pausedWork,
+                        errorCode: providerFailure?.managedProviderFailureCode,
+                        errorSummary: String(error.localizedDescription.prefix(2_048))
+                    )
+                    break
+                }
                 var retryWork = run.specification.work
-                retryWork.metadata["failure_retry_count"] = String(nextRetryCount)
-                let attempt = max(1, nextRetryCount)
+                if waitsForConfiguration {
+                    retryWork.metadata["provider_configuration_wait_count"] = String(
+                        priorConfigurationWaitCount + 1
+                    )
+                } else {
+                    retryWork.metadata["failure_retry_count"] = String(nextRetryCount)
+                }
+                let attempt = max(
+                    1,
+                    waitsForConfiguration
+                        ? priorConfigurationWaitCount + 1
+                        : nextRetryCount
+                )
                 let seed = AutonomyRetryPolicy.deterministicSeed(runID: runID, attempt: attempt)
                 let policyDelay = try retryPolicy.delay(
                     attempt: min(attempt, retryPolicy.maximumAttempts),
                     deterministicSeed: seed
                 )
                 let summary = String(error.localizedDescription.prefix(2_048))
-                if let failure = error as? any ManagedProviderFailure {
+                if let failure = providerFailure {
                     switch failure.managedProviderFailureDisposition {
                     case .waitingProvider:
                         let providerDelay = failure.managedProviderRetryDelay
@@ -505,12 +539,25 @@ public actor ProjectRunCoordinator {
                             retryAt: ISO8601.string(from: clock.now().addingTimeInterval(delay))
                         )
                     case .blockedConfiguration:
+                        // A provider setting may require a user action in the host,
+                        // but the retained run does not require a second manual
+                        // Retry in Forge. Keep it in the scheduler's bounded
+                        // provider-wait path so Connect and Check can repair the
+                        // dependency and the exact pending turn resumes.
+                        let delay = min(
+                            retryPolicy.totalDeadline,
+                            max(retryPolicy.baseDelay, min(retryPolicy.maximumDelay, policyDelay))
+                        )
                         run = try await transition(
-                            run, to: .blockedConfiguration, lease: lease,
-                            event: "autonomous_run_configuration_blocked",
-                            summary: "Managed provider configuration requires correction",
+                            run, to: .waitingProvider, lease: lease,
+                            event: "autonomous_run_waiting_provider_configuration",
+                            summary: "Managed provider configuration is being repaired",
+                            work: retryWork,
                             errorCode: failure.managedProviderFailureCode,
-                            errorSummary: summary
+                            errorSummary: summary,
+                            retryAt: ISO8601.string(
+                                from: clock.now().addingTimeInterval(delay)
+                            )
                         )
                     case .cancelled:
                         run = try await transition(
@@ -585,12 +632,25 @@ public actor ProjectRunCoordinator {
         case .validating:
             _ = try await repository.validateAutonomousRunGeneration(run.runID)
             guard run.providerID?.isEmpty == false, run.modelKey?.isEmpty == false else {
+                var work = run.specification.work
+                work.metadata["provider_configuration_auto_resume"] = "pending"
+                work.metadata["provider_configuration_wait_count"] = "1"
+                work.nextAction = "Open Provider and choose Connect and Check. Forge will retain this task and resume it automatically after provider and model discovery succeeds."
+                let seed = AutonomyRetryPolicy.deterministicSeed(
+                    runID: run.runID,
+                    attempt: 1
+                )
+                let delay = try retryPolicy.delay(attempt: 1, deterministicSeed: seed)
                 return try await transition(
-                    run, to: .blockedConfiguration, lease: lease,
-                    event: "autonomous_run_configuration_blocked",
-                    summary: "Provider or model configuration is missing",
+                    run, to: .waitingProvider, lease: lease,
+                    event: "autonomous_run_waiting_provider_configuration",
+                    summary: "Provider and model discovery are required before this task can start",
+                    work: work,
                     errorCode: "provider_configuration_missing",
-                    errorSummary: "A provider and model are required"
+                    errorSummary: "Open Provider and choose Connect and Check; Forge will resume this task automatically when discovery succeeds.",
+                    retryAt: ISO8601.string(
+                        from: clock.now().addingTimeInterval(delay)
+                    )
                 )
             }
             return try await transition(
@@ -774,11 +834,10 @@ public actor ProjectRunCoordinator {
         var work = run.specification.work
         work.pendingIntent = nil
         work.metadata["completion_proof_sha256"] = receipt.proofSHA256
-        let blocked = receipt.results.contains { $0.blocker != nil }
         let failureSummary = Self.completionFailureSummary(receipt)
         work.nextAction = failureSummary
         return try await transition(
-            run, to: blocked ? .blockedConfiguration : .running, lease: protected.lease,
+            run, to: .running, lease: protected.lease,
             event: "autonomous_completion_rejected",
             summary: failureSummary,
             work: work,

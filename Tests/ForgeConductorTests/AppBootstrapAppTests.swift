@@ -62,6 +62,116 @@ final class OperatorStartupContentAppTests: XCTestCase {
     }
 }
 
+final class GuidedSetupProgressAppTests: XCTestCase {
+    func testLegacyCompletionDoesNotSuppressCurrentGuidedSetupExperience() throws {
+        let suiteName = "forge-guided-setup-test-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: GuidedSetupStorage.legacyCompletionKey)
+        XCTAssertTrue(GuidedSetupStorage.shouldPresent(in: defaults))
+
+        defaults.set(true, forKey: GuidedSetupStorage.currentCompletionKey)
+        XCTAssertFalse(GuidedSetupStorage.shouldPresent(in: defaults))
+    }
+
+    func testExactConfigurationReviewAdvancesRecommendationFromReviewToStart() {
+        let unreviewed = readyProgress(
+            preparationFingerprint: "preparation-a",
+            reviewedPreparationFingerprint: ""
+        )
+        XCTAssertEqual(unreviewed.preparationState, .needsReview(fingerprint: "preparation-a"))
+        XCTAssertEqual(unreviewed.recommendedStep, .configure)
+
+        let reviewed = readyProgress(
+            preparationFingerprint: "preparation-a",
+            reviewedPreparationFingerprint: "preparation-a"
+        )
+        XCTAssertEqual(reviewed.preparationState, .reviewed(fingerprint: "preparation-a"))
+        XCTAssertEqual(reviewed.recommendedStep, .start)
+    }
+
+    func testChangedPrerequisitesInvalidateReviewAndRouteToOwningStep() {
+        let changedPackage = readyProgress(
+            preparationFingerprint: "preparation-b",
+            reviewedPreparationFingerprint: "preparation-a"
+        )
+        XCTAssertEqual(changedPackage.preparationState, .needsReview(fingerprint: "preparation-b"))
+        XCTAssertEqual(changedPackage.recommendedStep, .configure)
+
+        let missingProvider = GuidedSetupProgress(
+            managerReady: changedPackage.managerReady,
+            providerReady: false,
+            projectIsRegistered: changedPackage.projectIsRegistered,
+            instructionPackageCount: changedPackage.instructionPackageCount,
+            preparationFingerprint: changedPackage.preparationFingerprint,
+            reviewedPreparationFingerprint: changedPackage.reviewedPreparationFingerprint,
+            activeRunState: changedPackage.activeRunState,
+            needsAttention: changedPackage.needsAttention
+        )
+        XCTAssertEqual(missingProvider.preparationState, .unavailable)
+        XCTAssertEqual(missingProvider.recommendedStep, .provider)
+
+        let missingInstructions = GuidedSetupProgress(
+            managerReady: true,
+            providerReady: true,
+            projectIsRegistered: true,
+            instructionPackageCount: 0,
+            preparationFingerprint: nil,
+            reviewedPreparationFingerprint: "preparation-a",
+            activeRunState: nil,
+            needsAttention: false
+        )
+        XCTAssertEqual(missingInstructions.recommendedStep, .instructions)
+    }
+
+    func testActiveRunAndAttentionAdvanceToMonitorOrRecovery() {
+        let running = readyProgress(
+            preparationFingerprint: "preparation-a",
+            reviewedPreparationFingerprint: "preparation-a",
+            activeRunState: "running"
+        )
+        XCTAssertEqual(running.recommendedStep, .monitor)
+
+        let attention = readyProgress(
+            preparationFingerprint: "preparation-a",
+            reviewedPreparationFingerprint: "preparation-a",
+            activeRunState: "blocked_configuration",
+            needsAttention: true
+        )
+        XCTAssertEqual(attention.recommendedStep, .recover)
+
+        let automaticLegacyRecovery = readyProgress(
+            preparationFingerprint: "preparation-a",
+            reviewedPreparationFingerprint: "preparation-a",
+            activeRunState: "blocked_configuration"
+        )
+        XCTAssertEqual(automaticLegacyRecovery.recommendedStep, .monitor)
+        XCTAssertEqual(
+            OperatorRunStatePresentation.displayName("blocked_configuration"),
+            "recovering automatically"
+        )
+    }
+
+    private func readyProgress(
+        preparationFingerprint: String,
+        reviewedPreparationFingerprint: String,
+        activeRunState: String? = nil,
+        needsAttention: Bool = false
+    ) -> GuidedSetupProgress {
+        GuidedSetupProgress(
+            managerReady: true,
+            providerReady: true,
+            projectIsRegistered: true,
+            instructionPackageCount: 1,
+            preparationFingerprint: preparationFingerprint,
+            reviewedPreparationFingerprint: reviewedPreparationFingerprint,
+            activeRunState: activeRunState,
+            needsAttention: needsAttention
+        )
+    }
+}
+
 @MainActor
 final class AppBootstrapAppTests: XCTestCase {
     private func home() -> URL {
@@ -561,6 +671,82 @@ final class RigOperationalSnapshotAppTests: XCTestCase {
         XCTAssertEqual(result.projectCompletedPackages, 1)
         XCTAssertEqual(result.projectTotalPackages, 2)
         XCTAssertEqual(result.projectProgressState, "RUNNING")
+    }
+
+    func testGuidedSetupPreparationFingerprintTracksExactReviewInputs() throws {
+        let projectID = UUID().uuidString
+        let packageRecordID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Fixture Project",
+          "canonical_root":"/tmp/fixture","project_generation":1,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        func packages(content: Character) throws -> [OperatorInstructionPackage] {
+            let queue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("""
+            {
+              "project_id":"\(projectID)","project_generation":1,"revision":1,
+              "running":false,"packages":[
+                {"id":"\(packageRecordID)","project_id":"\(projectID)",
+                 "project_generation":1,"package_id":"setup","version":"1",
+                 "display_name":"Setup","mission":"Configure","source_path":"/tmp/setup",
+                 "content_sha256":"\(String(repeating: content, count: 64))",
+                 "allowed_tools":[],"completion_gates":[],"document_count":1,
+                 "position":0,"state":"queued","created_at":"now","updated_at":"now"}
+              ]
+            }
+            """.utf8))
+            return queue.packages
+        }
+        let provider = RigProviderProjection(
+            id: "lmstudio",
+            displayName: "LM Studio",
+            executionMode: .managedModel,
+            model: "fixture/model",
+            readinessState: "contract_valid",
+            detail: "Ready",
+            isReady: true,
+            integrationEvidenceAvailable: true
+        )
+        let baseline = try XCTUnwrap(RigOperationalSnapshot.guidedSetupPreparationFingerprint(
+            selectedProvider: provider,
+            providerConfigurationRevision: "provider-1",
+            providerSelectionRevision: "selection-1",
+            project: project,
+            packages: packages(content: "a")
+        ))
+        XCTAssertEqual(
+            baseline,
+            RigOperationalSnapshot.guidedSetupPreparationFingerprint(
+                selectedProvider: provider,
+                providerConfigurationRevision: "provider-1",
+                providerSelectionRevision: "selection-1",
+                project: project,
+                packages: try packages(content: "a")
+            )
+        )
+        XCTAssertNotEqual(
+            baseline,
+            RigOperationalSnapshot.guidedSetupPreparationFingerprint(
+                selectedProvider: provider,
+                providerConfigurationRevision: "provider-2",
+                providerSelectionRevision: "selection-1",
+                project: project,
+                packages: try packages(content: "a")
+            )
+        )
+        XCTAssertNotEqual(
+            baseline,
+            RigOperationalSnapshot.guidedSetupPreparationFingerprint(
+                selectedProvider: provider,
+                providerConfigurationRevision: "provider-1",
+                providerSelectionRevision: "selection-1",
+                project: project,
+                packages: try packages(content: "b")
+            )
+        )
     }
 
     func testComposeBuildsBoundedRollingManagedActivityWithoutDuplicatingRefreshes() throws {

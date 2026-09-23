@@ -157,7 +157,7 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
         {"forge_run_status":"completion_requested","run_id":"\(runID.description)","summary":"Grok finished the assigned work."}
         """
         let payload: [String: Any] = [
-            "hook_event_name": "Stop",
+            "hookEventName": "Stop",
             "sessionId": "grok-session-1",
             "cwd": "/tmp/grok-project",
             "toolName": "forge-conductor__forge_status",
@@ -187,6 +187,16 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
             providerID: .grokBuild,
             event: .stop,
             hostPayload: try JSONSerialization.data(withJSONObject: conflicting)
+        )) { error in
+            XCTAssertEqual(error as? DesktopProviderHookError, .invalidEnvelope)
+        }
+
+        var conflictingEvent = payload
+        conflictingEvent["hook_event_name"] = "PreToolUse"
+        XCTAssertThrowsError(try DesktopProviderHookRequest(
+            providerID: .grokBuild,
+            event: .stop,
+            hostPayload: try JSONSerialization.data(withJSONObject: conflictingEvent)
         )) { error in
             XCTAssertEqual(error as? DesktopProviderHookError, .invalidEnvelope)
         }
@@ -220,24 +230,23 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
                 providerID: .grokBuild,
                 event: .preToolUse,
                 hostPayload: try JSONSerialization.data(withJSONObject: [
-                    "hook_event_name": "PreToolUse",
+                    "hookEventName": "PreToolUse",
                     "sessionId": "grok-session",
                     "cwd": "/tmp/project",
                     "toolName": "forge-conductor__project_memory_search",
                 ])
             )
         ).asDictionary()
-        let inactiveGrokOutput = try XCTUnwrap(
-            inactiveGrok["hookSpecificOutput"] as? [String: Any]
-        )
-        XCTAssertEqual(inactiveGrokOutput["permissionDecision"] as? String, "deny")
+        XCTAssertEqual(inactiveGrok["decision"] as? String, "deny")
+        XCTAssertNotNil(inactiveGrok["reason"] as? String)
+        XCTAssertNil(inactiveGrok["hookSpecificOutput"])
         let nearPrefix = policy.response(
             snapshot: snapshot,
             request: try DesktopProviderHookRequest(
                 providerID: .grokBuild,
                 event: .preToolUse,
                 hostPayload: try JSONSerialization.data(withJSONObject: [
-                    "hook_event_name": "PreToolUse",
+                    "hookEventName": "PreToolUse",
                     "sessionId": "grok-session",
                     "cwd": "/tmp/project",
                     "toolName": "forge-conductorial__project_memory_search",
@@ -257,14 +266,53 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
 
     func testActiveSessionContextDescribesOrchestrationMCPBoundary() throws {
         let response = DesktopProviderHookPolicyService().response(
-            snapshot: providerSnapshot(selected: .grokBuild),
-            request: try request(provider: .grokBuild, event: .sessionStart)
+            snapshot: providerSnapshot(selected: .codexDesktop),
+            request: try request(provider: .codexDesktop, event: .sessionStart)
         ).asDictionary()
         let output = try XCTUnwrap(response["hookSpecificOutput"] as? [String: Any])
         let context = try XCTUnwrap(output["additionalContext"] as? String)
         XCTAssertTrue(context.contains("orchestration and MCP layer"))
         XCTAssertTrue(context.contains("not a direct model API"))
         XCTAssertEqual(output["hookEventName"] as? String, "SessionStart")
+    }
+
+    func testGrokPassiveHooksEmitNoIgnoredAssignmentContext() throws {
+        let response = DesktopProviderHookPolicyService().response(
+            snapshot: providerSnapshot(selected: .grokBuild),
+            request: try DesktopProviderHookRequest(
+                providerID: .grokBuild,
+                event: .sessionStart,
+                hostPayload: try JSONSerialization.data(withJSONObject: [
+                    "hookEventName": "SessionStart",
+                    "sessionId": "grok-session",
+                    "cwd": "/tmp/project",
+                ])
+            ),
+            runDirective: .context("This text cannot be delivered by a passive Grok hook.")
+        )
+
+        XCTAssertEqual(response, .empty)
+    }
+
+    func testGrokFailureFallbackUsesDocumentedTopLevelDenial() throws {
+        let request = try DesktopProviderHookRequest(
+            providerID: .grokBuild,
+            event: .preToolUse,
+            hostPayload: try JSONSerialization.data(withJSONObject: [
+                "hookEventName": "PreToolUse",
+                "sessionId": "grok-session",
+                "cwd": "/tmp/project",
+                "toolName": "forge-conductor__project_memory_search",
+            ])
+        )
+
+        let response = DesktopProviderHookPolicyService.failureFallback(
+            for: request
+        ).asDictionary()
+
+        XCTAssertEqual(response["decision"] as? String, "deny")
+        XCTAssertNotNil(response["reason"] as? String)
+        XCTAssertNil(response["hookSpecificOutput"])
     }
 
     func testClientUsesCustomHomeConfigLoopbackAndBearer() async throws {
@@ -530,7 +578,7 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
             guard case .continueRun(let reason) = stop else {
                 return XCTFail("Completion validation must keep the host turn active")
             }
-            XCTAssertTrue(reason.contains("native completion checks"))
+            XCTAssertTrue(reason.contains("completion requirements"))
             let completed = try await waitForDesktopRun(
                 repository: app.projectContexts.repository,
                 runID: second.runID,
@@ -539,6 +587,100 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
             XCTAssertEqual(completed.state, .completed)
             let stillUntouched = try await app.projectContexts.repository.autonomousRun(first.runID)
             XCTAssertEqual(stillUntouched?.state, .created)
+        } catch {
+            await runtime.shutdown()
+            throw error
+        }
+        await runtime.shutdown()
+    }
+
+    func testDesktopUnmetRequirementReturnsToRunningInsteadOfBlockedConfiguration() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent(
+            "unmet-completion-requirement",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Unmet completion requirement",
+            canonicalRoot: projectRoot
+        )
+        let validator = try GateValidatorRegistry(validators: [
+            CompletionGateValidator(gate: "desktop_fixture") { _ in
+                CompletionGateResult(
+                    gate: "desktop_fixture",
+                    passed: false,
+                    summary: "More project evidence is required",
+                    blocker: .unregisteredValidator
+                )
+            },
+        ])
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            registry: HostAdapterRegistry(),
+            maximumConcurrentRuns: 1,
+            completionValidator: validator
+        )
+        _ = try await runtime.start()
+        do {
+            let run = try await runtime.createRun(desktopRunRequest(
+                project: project,
+                root: projectRoot,
+                selectionRevision: "unmet-requirement-selection"
+            ))
+            _ = try await runtime.handleDesktopProviderHook(
+                lifecycleRequest(
+                    event: .sessionStart,
+                    sessionID: "unmet-requirement-session",
+                    cwd: projectRoot.path
+                ),
+                selectionRevision: "unmet-requirement-selection"
+            )
+            let marker = try JSONSupport.canonicalJSON([
+                "forge_run_status": "completion_requested",
+                "run_id": run.runID.description,
+                "summary": "Request completion before the evidence is sufficient",
+            ])
+            _ = try await runtime.handleDesktopProviderHook(
+                lifecycleRequest(
+                    event: .stop,
+                    sessionID: "unmet-requirement-session",
+                    cwd: projectRoot.path,
+                    lastAssistantMessage: marker
+                ),
+                selectionRevision: "unmet-requirement-selection"
+            )
+
+            let deadline = ContinuousClock.now + .seconds(5)
+            var rejected = false
+            while ContinuousClock.now < deadline {
+                let events = try await app.projectContexts.repository.autonomyEvents(
+                    runID: run.runID
+                )
+                if events.contains(where: {
+                    $0.eventType == "desktop_plugin_completion_rejected"
+                }) {
+                    rejected = true
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(25))
+            }
+            XCTAssertTrue(rejected)
+            let retainedValue = try await app.projectContexts.repository.autonomousRun(
+                run.runID
+            )
+            let retained = try XCTUnwrap(retainedValue)
+            XCTAssertEqual(retained.state, .running)
+            XCTAssertNotEqual(retained.state, .blockedConfiguration)
+            XCTAssertEqual(
+                retained.lastErrorCode,
+                AutonomyError.completionValidationFailed.code
+            )
         } catch {
             await runtime.shutdown()
             throw error

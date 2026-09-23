@@ -1,12 +1,12 @@
 # Forge Conductor user guide
 
-Version **0.14.0**, build **6**. This guide covers the native Forge Conductor
+Version **0.14.1**, build **7**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.0 (6)` is the current development identity. It has not inherited the
+> `0.14.1 (7)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
-> open release gates.
+> open release checks.
 
 ## Find the right guide
 
@@ -17,7 +17,7 @@ application and its LM Studio and desktop-host integrations on macOS.
 | Select, provision, repair, or remove a provider integration | [Provider integrations](docs/PROVIDER-INTEGRATIONS.md) |
 | Connect or repair LM Studio MCP | [LM Studio connection](docs/LM-STUDIO-CONNECTION.md) |
 | Queue project instructions | [Instruction packages](docs/INSTRUCTION-PACKAGES.md) |
-| Configure protected completion | [Native completion](docs/NATIVE-COMPLETION.md) |
+| Understand completion evidence and package requirements | [Native completion](docs/NATIVE-COMPLETION.md) |
 | Understand current release evidence | [Qualification status](docs/QUALIFICATION-STATUS.md) |
 | Browse all current and historical docs | [Documentation guide](docs/README.md) |
 
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.0 binary:
+Confirm the registered command is a `serve`-capable 0.14.1 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.0
+forge-conductor version    # should print 0.14.1
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.0` and
-`CFBundleVersion` must be `6`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.1` and
+`CFBundleVersion` must be `7`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -221,8 +221,10 @@ Codex Desktop. Turning on another provider replaces the durable
 selection only after its integration is usable. Turning on LM Studio runs
 **Connect and Check** first and selects it only when the saved configuration is
 ready. Turning off the selected provider leaves no provider selected; it does
-not delete verified integration files. For Claude or Codex, **Repair
-Integration** re-inspects and transactionally regenerates Forge-owned files.
+not delete verified integration files. Every selectable provider card also has
+one **Connect and Check** action: on an inactive card it performs the complete
+provision, inspection, readiness, and selection workflow; on an active desktop
+card it verifies or repairs the Forge-owned integration.
 **Remove Integration** is available only while that provider
 is inactive and removes only artifacts and settings entries whose ownership
 Forge can prove. If supported host CLI or live inventory cannot verify that the
@@ -273,11 +275,13 @@ separate. For a Forge-managed autonomous queue, follow this order:
 4. Under **Instruction packages**, add a Markdown/text file, a folder of
    instructions, or a `.forgepackage`/`forge-package.json` manifest. Drag rows
    up or down to establish the execution order.
-5. Review the package capabilities, gates, failure behavior, and automatic
-   continuity. Package-declared capabilities and gates remain authoritative.
+5. Review the package capabilities, completion requirements, failure behavior,
+   and automatic continuity. Package-declared requirements remain authoritative
+   and read-only; Forge configuration exposes only the built-in checks.
 6. Choose **Start Ordered Autonomy**. Forge starts one managed run at a time for
    that project and advances only when the prior package completes. A failed,
-   cancelled, paused, or configuration-blocked run stops advancement.
+   cancelled, paused, or waiting run stops advancement until its retained state
+   is ready to continue.
 
 Each accepted package is copied to protected, content-addressed storage and
 bound to the selected project UUID and generation. The model's filesystem scope
@@ -300,8 +304,8 @@ In **Autonomy**, select a completed, cancelled, or terminally failed task and
 choose **Delete Task…** to remove that one settled run from Forge history.
 Forge confirms the destructive action, rejects deletion while runtime work is
 unsettled, and fences the request to the exact project generation. Project
-files are never removed. Active, paused, recoverable, or configuration-blocked
-tasks must first reach a terminal state.
+files are never removed. Active, paused, recoverable, or waiting tasks must
+first reach a terminal state.
 
 Use **Remove Selected Project…** below the project list, the row context menu,
 or **Remove Project…** in the detail pane to remove a registration. Forge asks
@@ -437,18 +441,18 @@ settings were saved but Keychain cleanup needs a retry after Keychain is unlocke
 These controls configure Forge-managed sessions; LM Studio MCP deployment remains
 in **LM Studio MCP**.
 
-If a run reaches **Blocked configuration**, Autonomy shows the named failed
-condition and the owning recovery action. Built-in and selectable Completion
-checks are manager-owned: correct the named build, warning, test, instruction-
-delivery, or reconciliation condition and choose **Retry Automatic Checks**.
-They do not require a separately installed gate policy or a special restored
-environment. Only a package that explicitly declares an unknown custom gate
-uses **Import Custom Completion Policy…** and its separately approved signed
-policy. Forge revalidates the persisted completion request without repeating the
-model turn or its tool calls. LM Studio connection failures route to
-**Provider → Connect and Check**; desktop integration failures route to that
-provider's operation card and exact repair, reload, activation, or trust action.
-Resource and other recoverable failures retain their specific recovery text.
+If a retained run needs attention, Autonomy shows the exact state and its owning
+recovery action even when an older record has no error text. Built-in selectable
+completion checks are Manager-owned: correct the named build, warning, test,
+instruction-delivery, or reconciliation evidence and choose **Retry** when that
+control is available. Additional completion requirements come only from the
+instruction package, are displayed read-only, and use the same durable
+Manager-evidence evaluation. Forge revalidates the persisted completion
+request without repeating the model turn or its tool calls. LM Studio connection
+failures route to **Provider → Connect and Check**; desktop integration failures
+route to that provider's **Connect and Check** action and any exact reload,
+activation, or trust action returned by the host. Resource and other recoverable
+failures retain their specific recovery text.
 
 ### 6.1 Provider-response recovery boundary
 
@@ -566,7 +570,8 @@ The wizard saves the selected step and walks through the operating order:
 2. connect and check the model provider;
 3. register the project;
 4. add and order instruction packages;
-5. review tools, completion checks, failure behavior, and continuity;
+5. review tools, built-in completion checks, package requirements, failure
+   behavior, and continuity;
 6. start ordered Autonomy or one direct task;
 7. monitor Dashboard, Autonomy, Continuity, Rune Forge, and Events & Evidence;
 8. resolve the named issue in its owning view and continue the durable run.
@@ -600,7 +605,7 @@ non-selectable provider all fail closed and route recovery to **Provider**.
 
 The Dashboard project row reports delivered instruction documents as **steps** and
 terminally completed queue items as **packages**. Its fraction combines those
-two bounded counts; failed or blocked packages report **ATTENTION** rather than
+two bounded counts; paused or failed packages report **ATTENTION** rather than
 inflating progress.
 
 Immediately below Load Trace and Orchestration Status, the bounded, coalesced
@@ -684,11 +689,9 @@ surface. Do not delete fallback because primary looks idle.
   volume; recursive directory `fs_delete` commits bounded bottom-up helper
   transactions. Their focused protocol/adversarial tests pass, while approved
   root-service execution remains unmeasured on this host.
-- Configure the managed provider using Provider controls and test the saved
-  connection before starting Autonomy. The current signed combined native case
-  also canceled and reopened the policy picker, imported an exact run-bound
-  manifest fixture, and read back the protected policy; a completed installed-stack run
-  remains open.
+- Configure the managed provider using **Connect and Check** before starting
+  Autonomy. Instruction-package requirements stay in the package contract and
+  built-in checks use Manager-owned evidence.
 - The local notarized Developer ID app ZIP passed Gatekeeper, but Installer
   notarization, public-download acceptance, unsupported existing-desktop attachment,
   privileged root-service E2, and the representative physical-hardware matrix
@@ -734,7 +737,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.0**, build **6**
+Doctor identifies the running source identity as version **0.14.1**, build **7**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally
@@ -752,7 +755,10 @@ On the new Mac:
 
 1. Clone or copy this folder.
 2. `swift test` then build/install as in §4.
-3. `forge-conductor install-lmstudio-plugin --binary` the **new Mac’s** installed CLI or app `serve` binary.
+3. Open **Dashboard → Guided Setup**, register the project, and use the Provider card’s **Connect and Check** action. Forge discovers or starts LM Studio, deploys or repairs the current provider integration, and verifies readiness in that one action.
 4. Copy `~/.forge-conductor/store.sqlite` and `memory/` only if you want the same packets and notes. Do not copy another machine’s `mcp.json` command paths.
+
+The `install-lmstudio-plugin` command remains an advanced repair tool; it is not
+part of the normal new-Mac setup path.
 
 Do not commit `.build/` or `dist/` (they are gitignored).

@@ -18,6 +18,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     var testHome: URL!
     private var operatorFixture: OperatorManagerUITestFixture?
     private var guidedModeDefaultsSuite: String?
+    private var guidedSetupDefaultsSuite: String?
 
     nonisolated override func setUpWithError() throws {
         MainActor.assumeIsolated {
@@ -30,6 +31,8 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app.launchEnvironment["FORGE_SKIP_PS"] = "1"
             guidedModeDefaultsSuite = "com.forge-conductor.guided-ui.\(testHome.lastPathComponent)"
             app.launchEnvironment["FORGE_GUIDED_MODE_DEFAULTS_SUITE"] = guidedModeDefaultsSuite
+            guidedSetupDefaultsSuite = "com.forge-conductor.setup-ui.\(testHome.lastPathComponent)"
+            app.launchEnvironment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"] = guidedSetupDefaultsSuite
             app.launch()
         }
     }
@@ -45,6 +48,11 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                     .removePersistentDomain(forName: guidedModeDefaultsSuite)
             }
             guidedModeDefaultsSuite = nil
+            if let guidedSetupDefaultsSuite {
+                UserDefaults(suiteName: guidedSetupDefaultsSuite)?
+                    .removePersistentDomain(forName: guidedSetupDefaultsSuite)
+            }
+            guidedSetupDefaultsSuite = nil
             if let testHome {
                 try? FileManager.default.removeItem(at: testHome)
             }
@@ -347,6 +355,90 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         return (element.value as? String) == "1"
     }
 
+    func testDashboardToolbarGuidedSetupButtonIsLabeledHittableAndOpensWizard() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let dashboard = app.buttons["tab-rig"]
+        XCTAssertTrue(dashboard.waitForExistence(timeout: 8))
+        dashboard.click()
+
+        let toolbar = app.toolbars.firstMatch
+        XCTAssertTrue(toolbar.waitForExistence(timeout: 5))
+        let guidedSetup = toolbar.descendants(matching: .any)["toolbar-guided-setup"]
+        XCTAssertTrue(
+            guidedSetup.waitForExistence(timeout: 5),
+            "Dashboard must expose a clearly labeled Guided Setup control in the window toolbar"
+        )
+        XCTAssertTrue(guidedSetup.label.contains("Guided Setup"))
+        XCTAssertTrue(guidedSetup.isHittable)
+        guidedSetup.click()
+
+        let wizard = app.descendants(matching: .any)["setup-guide"]
+        XCTAssertTrue(wizard.waitForExistence(timeout: 5))
+        let closeByIdentifier = app.buttons["guided-setup-close"]
+        let close = closeByIdentifier.exists ? closeByIdentifier : app.buttons["Close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 3))
+        close.click()
+        XCTAssertTrue(waitUntil(timeout: 3) { !wizard.exists })
+    }
+
+    func testLegacyFiveCardCompletionDoesNotSuppressCurrentGuidedSetupWizard() throws {
+        app.terminate()
+        let suiteName = try XCTUnwrap(guidedSetupDefaultsSuite)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.set(true, forKey: "forge.setupTutorial.completed.v1")
+        defaults.set(false, forKey: "forge.guidedSetup.completed.v2")
+        _ = defaults.synchronize()
+
+        app.launchArguments += ["--uitesting-show-guided-setup"]
+        app.launch()
+
+        let wizard = app.descendants(matching: .any)["setup-guide"]
+        XCTAssertTrue(
+            wizard.waitForExistence(timeout: 8),
+            "Completing the legacy five-card guide must not suppress the current ordered wizard"
+        )
+        XCTAssertTrue(app.buttons["guided-setup-step-8"].exists)
+    }
+
+    func testGuidedSetupReviewConfirmationAdvancesToStartAndPersists() throws {
+        let fixture = try OperatorManagerUITestFixture(initialRunState: "completed")
+        relaunch(with: fixture)
+
+        let guidedSetup = app.buttons["dashboard-guided-setup"]
+        XCTAssertTrue(guidedSetup.waitForExistence(timeout: 8))
+        guidedSetup.click()
+
+        let reviewStep = app.buttons["guided-setup-step-5"]
+        XCTAssertTrue(reviewStep.waitForExistence(timeout: 5))
+        makeHittable(reviewStep)
+        reviewStep.click()
+
+        let confirmByIdentifier = app.buttons["setup-guide-confirm-review"]
+        let confirm = confirmByIdentifier.exists
+            ? confirmByIdentifier
+            : app.buttons["Confirm Review and Continue"]
+        XCTAssertTrue(waitForEnabled(confirm, timeout: 5))
+        confirm.click()
+        let activeTitle = app.staticTexts["guided-setup-step-title"]
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { self.element(activeTitle, contains: "Start the automated run") }
+        )
+
+        let closeByIdentifier = app.buttons["guided-setup-close"]
+        let close = closeByIdentifier.exists ? closeByIdentifier : app.buttons["Close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 3))
+        close.click()
+
+        XCTAssertTrue(guidedSetup.waitForExistence(timeout: 3))
+        guidedSetup.click()
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { self.element(activeTitle, contains: "Start the automated run") },
+            "The explicitly confirmed preparation and selected step must resume after reopening"
+        )
+    }
+
     func testDashboardTitleButtonOpensOrderedGuidedSetupWizard() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
@@ -405,6 +497,17 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         }
         XCTAssertTrue(waitUntil(timeout: 3) { !wizard.exists })
         XCTAssertTrue(app.descendants(matching: .any)["detail-rig"].exists)
+
+        XCTAssertTrue(guidedSetup.waitForExistence(timeout: 3))
+        guidedSetup.click()
+        XCTAssertTrue(wizard.waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            element(
+                app.staticTexts["guided-setup-step-title"],
+                contains: "Resolve issues and continue"
+            ),
+            "Closing and reopening Guided Setup must resume the saved step"
+        )
     }
 
     func testStartTaskGuidePreservesEnteredInstructions() throws {
@@ -980,16 +1083,19 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.staticTexts["Automatic continuity"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Automatic continuity is monitoring this managed task."].exists)
         XCTAssertTrue(app.staticTexts["Working context"].exists)
-        let advanced = app.buttons["continuity-advanced-toggle"]
-        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["checkpoint-command"].exists)
-        advanced.click()
         let checkpoint = app.buttons["checkpoint-command"]
         let rollover = app.buttons["rollover-command"]
         XCTAssertTrue(waitForEnabled(checkpoint, timeout: 5))
         XCTAssertTrue(waitForEnabled(rollover, timeout: 5))
+        XCTAssertFalse(
+            app.buttons["continuity-advanced-toggle"].exists,
+            "Manual continuity actions must not be hidden behind an Advanced disclosure"
+        )
         XCTAssertEqual(checkpoint.label, "Save progress now")
         XCTAssertEqual(rollover.label, "Start a fresh session and continue")
+        let activeSession = app.descendants(matching: .any)["continuity-active-session-id"]
+        XCTAssertTrue(activeSession.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(activeSession, contains: "fixture-active-session"))
         XCTAssertTrue(app.descendants(matching: .any)["continuity-controls-authority"].exists)
         XCTAssertTrue(
             element(
@@ -1036,12 +1142,54 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(fixture.mutationAuthorizationCount, 3)
     }
 
+    func testContinuityOperationRestoresImmediatelyVisibleDurableDetail() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+
+        let operationList = app.descendants(matching: .any)["continuity-operation-list"]
+        XCTAssertTrue(operationList.waitForExistence(timeout: 5))
+        let row = app.descendants(matching: .any)[
+            "continuity-operation-row-\(fixture.continuityOperationID)"
+        ]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(row, contains: "Fixture managed run"))
+        XCTAssertTrue(element(row, contains: "Attempt 2"))
+        XCTAssertTrue(element(row, contains: fixture.runID))
+
+        XCTAssertFalse(
+            app.buttons["continuity-technical-toggle"].exists,
+            "Durable continuity detail must not be hidden behind a Technical disclosure"
+        )
+        let exactState = app.descendants(matching: .any)["continuity-exact-operation-state"]
+        XCTAssertTrue(exactState.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(exactState, contains: "awaiting_durable_acknowledgement"))
+        XCTAssertTrue(app.descendants(matching: .any)["context-gauge"].exists)
+        let successor = app.descendants(matching: .any)["continuity-successor-id"]
+        XCTAssertTrue(successor.exists)
+        XCTAssertTrue(element(successor, contains: "fixture-successor-session"))
+
+        let eventMetadata = app.descendants(matching: .any)[
+            "continuity-event-metadata-\(fixture.continuityEventID)"
+        ]
+        XCTAssertTrue(eventMetadata.exists)
+        XCTAssertTrue(element(eventMetadata, contains: "2026-08-31T12:00:06Z"))
+        XCTAssertTrue(element(eventMetadata, contains: "continuity_successor_created"))
+    }
+
     func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
         let provider = app.buttons["tab-provider"]
         XCTAssertTrue(provider.waitForExistence(timeout: 8))
         provider.click()
+        let advanced = app.buttons["provider-advanced-toggle"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        makeHittable(advanced)
+        advanced.click()
         let endpoint = app.textFields["provider-endpoint"]
         let model = app.textFields["provider-model-key"]
         let save = app.buttons["provider-save"]
@@ -1065,6 +1213,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(element(notice, contains: "Settings saved"))
         app.buttons["tab-projects"].click()
         provider.click()
+        if !app.textFields["provider-model-key"].waitForExistence(timeout: 1) {
+            let reopenedAdvanced = app.buttons["provider-advanced-toggle"]
+            XCTAssertTrue(reopenedAdvanced.waitForExistence(timeout: 5))
+            makeHittable(reopenedAdvanced)
+            reopenedAdvanced.click()
+        }
         XCTAssertTrue(waitForValue("fixture/configured-model", on: app.textFields["provider-model-key"]))
         XCTAssertTrue(app.buttons["provider-test-connection"].exists)
         XCTAssertTrue(app.buttons["provider-refresh-models"].exists)
@@ -1095,6 +1249,24 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             )
         }
 
+        for providerID in ["lmstudio", "claude-desktop", "codex-desktop"] {
+            let connectAndCheck = app.buttons["provider-repair-\(providerID)"]
+            XCTAssertTrue(
+                waitForEnabled(connectAndCheck, timeout: 5),
+                "Selectable provider \(providerID) should expose Connect and Check"
+            )
+            XCTAssertEqual(connectAndCheck.label, "Connect and Check")
+        }
+        XCTAssertFalse(
+            app.buttons["provider-repair-grok-build"].exists,
+            "Grok Build must remain visibly nonselectable"
+        )
+        let grokAvailability = app.descendants(matching: .any)[
+            "provider-availability-grok-build"
+        ]
+        XCTAssertTrue(grokAvailability.exists)
+        XCTAssertTrue(element(grokAvailability, contains: "Not selectable"))
+
         let connectAndCheck = app.buttons["provider-repair-lmstudio"]
         XCTAssertTrue(waitForEnabled(connectAndCheck, timeout: 5))
         XCTAssertEqual(connectAndCheck.label, "Connect and Check")
@@ -1118,6 +1290,24 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             completionNotice.exists
                 && self.element(completionNotice, contains: "integration passed verification")
         })
+        for key in [
+            "app_path",
+            "app_version",
+            "package_version",
+            "package_sha256",
+            "deployment_id",
+            "deployment_verified",
+            "mcp_enabled",
+            "hook_trust_review_required",
+            "restart_required",
+            "connection",
+        ] {
+            XCTAssertTrue(
+                app.descendants(matching: .any)["provider-receipt-lmstudio-\(key)"]
+                    .waitForExistence(timeout: 5),
+                "Receipt evidence \(key) should be visible"
+            )
+        }
     }
 
     func testProviderControlsSendExactProtectedRequestsAndSurfaceSuccessAndFailure() throws {
@@ -1128,26 +1318,26 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(provider.waitForExistence(timeout: 8))
         provider.click()
 
+        let advanced = app.buttons["provider-advanced-toggle"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        makeHittable(advanced)
+        advanced.click()
+
         let testConnection = app.buttons["provider-test-connection"]
         XCTAssertTrue(waitForEnabled(testConnection, timeout: 5))
         makeHittable(testConnection)
         testConnection.click()
 
-        let expectedConnection = OperatorManagerUITestFixture.ProviderProbeRecord(
-            adapterID: "forge.native-session-host",
-            mode: "connection"
-        )
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.providerProbeRecords == [expectedConnection]
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            fixture.providerPreparationCount == 1
+                && fixture.providerIntegrationMutationRecords.count == 1
         })
-        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 1)
-        XCTAssertEqual(
-            fixture.providerProbeBodies.map { String(decoding: $0, as: UTF8.self) },
-            ["{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"connection\"}"]
-        )
+        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 1)
+        XCTAssertEqual(fixture.providerIntegrationMutationAuthorizationCount, 1)
+        XCTAssertTrue(fixture.providerProbeRecords.isEmpty)
         let notice = app.descendants(matching: .any)["provider-probe-notice"]
         XCTAssertTrue(notice.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(notice, contains: "configured provider and model are reachable"))
+        XCTAssertTrue(element(notice, contains: "integration passed verification"))
 
         let runContractProbe = app.buttons["provider-run-contract-probe"]
         XCTAssertTrue(waitForEnabled(runContractProbe, timeout: 5))
@@ -1159,15 +1349,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             mode: "contract"
         )
         XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.providerProbeRecords == [expectedConnection, expectedContract]
+            fixture.providerProbeRecords == [expectedContract]
         })
-        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 2)
+        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 1)
         XCTAssertEqual(
             fixture.providerProbeBodies.map { String(decoding: $0, as: UTF8.self) },
-            [
-                "{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"connection\"}",
-                "{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"contract\"}",
-            ]
+            ["{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"contract\"}"]
         )
 
         let structuredFailure = app.descendants(matching: .any)["operator-unavailable"]
@@ -1551,10 +1738,57 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         XCTAssertTrue(app.staticTexts["Instruction artifact is registered"].exists)
         XCTAssertFalse(app.buttons["run-import-native-policy"].exists)
-        let advancedCompletion = app.descendants(matching: .any)["run-completion-advanced-toggle"]
-        XCTAssertTrue(advancedCompletion.waitForExistence(timeout: 5))
-        advancedCompletion.click()
-        XCTAssertTrue(app.buttons["run-import-native-policy"].waitForExistence(timeout: 5))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["run-completion-advanced-toggle"].exists,
+            "Autonomy must not expose Forge-owned completion-policy controls"
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["run-completion-requirements-read-only"]
+                .waitForExistence(timeout: 5),
+            "Run completion requirements must remain visible as a read-only record"
+        )
+    }
+
+    func testAutonomyBlockedAndProviderWaitingStatesExplainRecoveryWithoutErrorPayloads() throws {
+        let blockedFixture = try OperatorManagerUITestFixture(
+            initialRunState: "blocked_configuration"
+        )
+        relaunch(with: blockedFixture)
+
+        let autonomy = app.buttons["tab-autonomy"]
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["run-recovery-summary"]
+                .waitForExistence(timeout: 5),
+            "A blocked run must explain recovery even without an error code or summary"
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["run-blocked-automatic-recovery"].exists
+        )
+        XCTAssertFalse(app.buttons["run-recovery-open-projects"].exists)
+        XCTAssertFalse(app.buttons["run-recovery-open-provider"].exists)
+        XCTAssertFalse(app.buttons["run-import-native-policy"].exists)
+
+        let providerFixture = try OperatorManagerUITestFixture(
+            initialRunState: "waiting_provider"
+        )
+        relaunch(with: providerFixture)
+        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
+        autonomy.click()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["run-recovery-summary"]
+                .waitForExistence(timeout: 5),
+            "A provider wait must explain recovery even without an error code or summary"
+        )
+        XCTAssertTrue(app.buttons["run-failure-open-provider"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["run-provider-connect-and-check-guidance"]
+                .exists,
+            "Provider recovery must direct the user to Connect and Check"
+        )
     }
 
     func testOrdinaryStartHasNoRawTechnicalEditors() throws {
@@ -1889,6 +2123,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     let runtimeJobID = "33333333-3333-4333-8333-333333333333"
     let instructionPackageID = "44444444-4444-4444-8444-444444444444"
     let policyEventID = "55555555-5555-4555-8555-555555555555"
+    let continuityOperationID = "99999999-9999-4999-8999-999999999999"
+    let continuityEventID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
     private let listener: NWListener
     private let queue = DispatchQueue(label: "forge.operator-ui-fixture")
@@ -1897,6 +2133,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private let failContractProbe: Bool
     private let dropRelinkResponseCount: Int
     private let rejectFirstRelinkResponse: Bool
+    private let includeContinuityOperation: Bool
     private var mutableRunState: String
     private var mutableDeletedRun = false
     private var mutableDeletionRequestCount = 0
@@ -2011,7 +2248,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         dropFirstRelinkResponse: Bool = false,
         dropRelinkResponseCount: Int = 0,
         rejectFirstRelinkResponse: Bool = false,
-        initialRunState: String = "running"
+        initialRunState: String = "running",
+        includeContinuityOperation: Bool = false
     ) throws {
         self.failStartResponse = failStartResponse
         self.failContractProbe = failContractProbe
@@ -2020,6 +2258,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             dropFirstRelinkResponse ? 1 : 0
         )
         self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
+        self.includeContinuityOperation = includeContinuityOperation
         mutableRunState = initialRunState
         listener = try NWListener(using: .tcp, on: .any)
 
@@ -2913,6 +3152,15 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 at: 0
             )
         }
+        let continuityOperations = includeContinuityOperation ? [continuityOperation()] : []
+        let events: [[String: Any]]
+        if includeActivity {
+            events = managedActivityEvents()
+        } else if includeContinuityOperation {
+            events = [continuityEvent()]
+        } else {
+            events = []
+        }
         return [
             "projects": [project()],
             "runs": runs,
@@ -2931,11 +3179,59 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "next_automatic_action": "Forge will save progress before the rollover threshold.",
                 "recovery_action": "none",
             ]],
-            "continuity_operations": [],
+            "continuity_operations": continuityOperations,
             "runtime_jobs": [runtimeJob()],
             "provider": provider(),
             "runtime": runtimePolicy(),
-            "events": includeActivity ? managedActivityEvents() : [],
+            "events": events,
+        ]
+    }
+
+    private func continuityOperation() -> [String: Any] {
+        [
+            "operation_id": continuityOperationID,
+            "project_id": projectID,
+            "project_generation": 4,
+            "run_id": runID,
+            "mode": "managed_autonomous",
+            "state": "awaiting_durable_acknowledgement",
+            "control_state": "successor_bootstrapping",
+            "checkpoint_id": "fixture-checkpoint",
+            "handoff_id": "fixture-handoff",
+            "handoff_sha256": String(repeating: "d", count: 64),
+            "predecessor_session_id": "fixture-active-session",
+            "successor_session_id": "fixture-successor-session",
+            "successor_provider_response_id": "fixture-successor-response",
+            "attempt": 2,
+            "continuation_issued": false,
+            "budget": [
+                "capacity_tokens": 32_768,
+                "used_tokens": 26_000,
+                "response_reserve_tokens": 1_024,
+                "handoff_reserve_tokens": 2_048,
+                "recovery_reserve_tokens": 1_024,
+                "remaining_tokens": 6_768,
+                "source": "provider_exact",
+                "confidence": "exact",
+                "action": "rollover",
+                "checkpoint_threshold": 24_576,
+                "rollover_threshold": 27_852,
+            ] as [String: Any],
+            "updated_at": "2026-08-31T12:00:06Z",
+        ]
+    }
+
+    private func continuityEvent() -> [String: Any] {
+        [
+            "event_id": continuityEventID,
+            "timestamp": "2026-08-31T12:00:06Z",
+            "kind": "continuity_successor_created",
+            "summary": "The accepted successor session was created.",
+            "severity": "success",
+            "project_id": projectID,
+            "project_generation": 4,
+            "run_id": runID,
+            "operation_id": continuityOperationID,
         ]
     }
 
@@ -3093,7 +3389,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                     "id": descriptor.id,
                     "display_name": descriptor.name,
                     "execution_strategy": descriptor.strategy,
-                    "selectable": true,
+                    "selectable": descriptor.id != "grok-build",
                     "detail": descriptor.detail,
                 ],
                 "setup_state": configured ? "configured" : "not_configured",
@@ -3104,7 +3400,18 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                     "artifact_version": "fixture-1",
                     "installed_at": "2026-09-23T12:00:00Z",
                     "verified_at": "2026-09-23T12:00:00Z",
-                    "metadata": ["connection": "fixture-verified"],
+                    "metadata": [
+                        "app_path": "/Applications/LM Studio.app",
+                        "app_version": "0.3.31",
+                        "package_version": "fixture-1",
+                        "package_sha256": String(repeating: "a", count: 64),
+                        "deployment_id": "fixture-deployment-1",
+                        "deployment_verified": "true",
+                        "mcp_enabled": "true",
+                        "hook_trust_review_required": "false",
+                        "restart_required": "false",
+                        "connection": "fixture-verified",
+                    ],
                 ]
             }
             return provider
@@ -3300,7 +3607,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "refresh_interval_sec": 8,
             ] as [String: Any],
             "home": "/tmp/forge-operator-fixture",
-            "version": "0.14.0",
+            "version": "0.14.1",
         ]
     }
 

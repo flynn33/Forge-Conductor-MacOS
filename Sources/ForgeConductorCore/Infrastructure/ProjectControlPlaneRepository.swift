@@ -8967,7 +8967,7 @@ public actor ProjectControlPlaneRepository {
                 projectID: current.projectID,
                 eventType: "autonomous_run_completed",
                 severity: .info,
-                summary: "All deterministic completion gates passed",
+                summary: "All completion requirements passed",
                 metadata: [
                     "gate_count": String(receipt.results.count),
                     "proof_sha256": receipt.proofSHA256,
@@ -13738,13 +13738,13 @@ public actor ProjectControlPlaneRepository {
         guard (1...256).contains(request.specification.allowedTools.count),
               Set(request.specification.allowedTools).count == request.specification.allowedTools.count,
               (1...256).contains(request.specification.completionGates.count) else {
-            throw AutonomyError.invalidRequest("allowed tools and completion gates must contain 1 through 256 entries")
+            throw AutonomyError.invalidRequest("allowed tools and completion requirements must contain 1 through 256 entries")
         }
         for tool in request.specification.allowedTools where tool.isEmpty || tool.utf8.count > 256 {
             throw AutonomyError.invalidRequest("allowed tool identifier is invalid")
         }
         for gate in request.specification.completionGates where gate.isEmpty || gate.utf8.count > 512 {
-            throw AutonomyError.invalidRequest("completion gate identifier is invalid")
+            throw AutonomyError.invalidRequest("completion requirement identifier is invalid")
         }
         guard request.specification.work.evidenceReferences.count <= 256,
               request.specification.work.metadata.count <= 256 else {

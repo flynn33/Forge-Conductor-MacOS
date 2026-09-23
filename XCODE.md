@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.14.0**, build **6**. `VERSION` and
+Product identity: marketing version **0.14.1**, build **7**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -74,12 +74,19 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The `0.14.0 (6)` warning repair keeps the canonical graph unchanged. The
+The current `0.14.1 (7)` build retains the warning repair with the canonical
+graph unchanged. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
 descriptor per catalog request, and the existing `ProviderOperatorView.swift`
-member declares the toggle callback `@MainActor @Sendable`. A fresh Debug
-workspace build must compile both without the prior shared `[String: Any]`
-static-state and non-Sendable callback diagnostics.
+member declares the toggle callback `@MainActor @Sendable`. A fresh canonical
+arm64 Debug workspace build completed successfully for this source and reported
+no compiler warnings, including neither the prior shared `[String: Any]`
+static-state diagnostic nor the non-Sendable callback diagnostic.
+
+Xcode 27 schedules its AppIntents metadata processor even though extraction is
+disabled. Both project configurations set `LM_FORCE_LINK_GENERATION = YES` so
+the phase produces its empty no-AppIntents output without a false
+missing-framework warning; Forge Conductor does not add or link AppIntents.
 
 Both commands above are headless. `ForgeConductorAppTests` is a dedicated,
 nonparallel app-hosted scheme with an isolated Forge home; it validates app/core
@@ -338,7 +345,7 @@ failure. At that historical development-delivery checkpoint, Developer ID
 Release, archive, notarization, staple, Gatekeeper, privileged root-service E2,
 and the broader native UI/hardware matrix were not recorded as passes. The
 current patch-bound Developer ID app archive, notarization, staple, and local
-Gatekeeper checks are recorded above; the other gates remain open.
+Gatekeeper checks are recorded above; the other release checks remain open.
 
 The functional-development candidate now includes production move/recursive-
 directory deletion, one manager-owned real-provider forced rollover, the complete
@@ -449,15 +456,15 @@ containment test in CI. That repair and the later external-lock startup repair
 passed the follow-up CI runs. Local P01 completion-authority changes require
 fresh regression and native evidence at their own source binding. See the
 [qualification summary](docs/QUALIFICATION-STATUS.md) for the revision boundaries
-and [native completion policy](docs/NATIVE-COMPLETION.md) for trusted job setup.
-Native gate validation uses prebuilt, signed test products and semantic result
-records; unsigned app compilation does not provide that qualification.
+and [completion evidence](docs/NATIVE-COMPLETION.md) for built-in checks and
+instruction-package requirement ownership. Completion is evaluated from
+durable Manager evidence; an unsigned app compilation is build evidence only.
 
 Use the canonical Release archive/export path for distribution, with matching
 Developer ID team policy and secure timestamps. The shipping
 [validation runbook](.forge-codex/shipping/MACOS-VALIDATION-RUNBOOK.md) describes
 artifact checks, notarization and installation proof. The owner performs
-shipping manually after the hard gates pass.
+shipping manually after the required release checks pass.
 
 ### Provider and onboarding test membership
 
@@ -465,7 +472,7 @@ The Core target includes the provider configuration contract and native LM Studi
 configuration service. Service/store tests run in `ForgeConductorTests`; native
 HTTP-client and manager-route tests run in `ForgeConductorAppTests`.
 
-The 0.14.0 provider slice adds six explicit `ForgeConductorCore` source members:
+The historical 0.14.0 provider slice added six explicit `ForgeConductorCore` source members:
 `DesktopProviderHookBridge.swift`, `ProviderIntegrationAdapters.swift`,
 `ProviderIntegrationCoordinator.swift`, `DesktopProviderHookModels.swift`,
 `ProviderIntegrationModels.swift`, and `DesktopProviderPluginInstaller.swift`.
@@ -484,7 +491,7 @@ service, and repository). Its end-to-end protocol and lifecycle cases extend
 the existing `MCPProtocolAndDiagnosticsTests.swift` member, so no additional
 PBX source entry is required for that coverage.
 
-This target membership does not make every descriptor selectable. In 0.14.0,
+This target membership does not make every descriptor selectable. In 0.14.1,
 LM Studio, Claude Code Desktop, and Codex Desktop are selectable. Grok Build is
 compiled into the compatibility/cleanup surface but remains non-selectable
 because its documented startup and prompt hook outputs cannot deliver Forge's
@@ -498,17 +505,23 @@ plugin and manager path; completion ownership and retry behavior are in Core
 plus the existing Autonomy views; Continuity layout is in its existing operator
 view; and Doctor role inspection is in Core plus Manager Settings. No parallel
 project, generated UI target, or replacement app shell is introduced. Build and
-test evidence for this source revision must be recorded after running the
-canonical commands; older receipts do not qualify the 0.14.0 provider slice.
+test evidence for this working tree is recorded in
+`docs/QUALIFICATION-STATUS.md`: both SwiftPM products, the 1,844-test full
+SwiftPM suite, the canonical arm64 Debug workspace build, and focused native UI
+coverage passed. Publication binds that evidence to the resulting revision;
+older receipts do not qualify the 0.14.1 correction.
+
+The 0.14.1 source corrections remain in those existing app, Core,
+native-session-host, and test members. No source or resource membership is
+added or removed. The only project-graph edit aligns all 12
+`MARKETING_VERSION` settings to `0.14.1` and all 16
+`CURRENT_PROJECT_VERSION` settings to `7`; the project must not be regenerated.
 
 `ProductionOnboardingUITests` is in the native UI target and uses the actual
-folder panel and normal app bootstrap. The UI target now links the existing
-Core framework only to calculate the approved package manifest in its positive
-policy-picker fixture; source and resource memberships stay unchanged. Its
-Developer ID Release combined case opened/canceled the picker, selected an
-exact run-bound manifest fixture, and read back the owner-only policy at mode
-`0600`. The separate Core signed-package fixture verifies actual gate
-adjudication. Run UI cases serially with UI Automation enabled:
+folder panel and normal app bootstrap. Current Autonomy coverage verifies the
+selectable built-in checkboxes, read-only instruction-package requirements,
+and state-derived recovery guidance. Source and resource memberships stay
+unchanged. Run UI cases serially with UI Automation enabled:
 
 ```bash
 xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor   -destination 'platform=macOS,arch=arm64' -parallel-testing-enabled NO   -only-testing:ForgeConductorUITests/ProductionOnboardingUITests test

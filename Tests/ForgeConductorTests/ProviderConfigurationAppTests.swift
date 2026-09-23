@@ -369,6 +369,97 @@ final class ProviderConfigurationAppTests: XCTestCase {
     }
 
     @MainActor
+    func testInactiveDesktopPrimaryActionUsesActivationWorkflow() async throws {
+        let client = try LegacyLMProviderSelectionClient(selectedProviderID: .lmStudio)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.performProviderPrimaryAction(.codexDesktop)
+        for _ in 0..<500 {
+            if await client.selectionRequests.count == 1,
+               !viewModel.isSubmittingProviderMutation {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let selectionRequests = await client.selectionRequests
+        let repairRequests = await client.repairRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(selectionRequests.map(\.providerID), [.codexDesktop])
+        XCTAssertEqual(selectionRequests.first?.expectedRevision, "legacy-lm-revision")
+        XCTAssertEqual(repairRequests, [])
+        XCTAssertEqual(callOrder, ["selection"])
+    }
+
+    @MainActor
+    func testSelectedDesktopPrimaryActionInspectsAndRepairsIntegration() async throws {
+        let client = try LegacyLMProviderSelectionClient(selectedProviderID: .claudeDesktop)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.performProviderPrimaryAction(.claudeDesktop)
+        for _ in 0..<500 {
+            if await client.repairRequests.count == 1,
+               !viewModel.isSubmittingProviderMutation {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let selectionRequests = await client.selectionRequests
+        let repairRequests = await client.repairRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(repairRequests.map(\.providerID), [.claudeDesktop])
+        XCTAssertEqual(repairRequests.first?.expectedRevision, "legacy-lm-revision")
+        XCTAssertEqual(selectionRequests, [])
+        XCTAssertEqual(callOrder, ["repair"])
+    }
+
+    func testProviderReceiptEvidenceShowsOperationalMetadataAndRedactsSensitiveKeys() {
+        let details = ProviderReceiptEvidence.visibleDetails(
+            from: [
+                "cli_path": "/Users/fixture/Applications/codex",
+                "cli_version": "2.7.1",
+                "package_sha256": String(repeating: "a", count: 64),
+                "deployment_verified": "true",
+                "hook_trust_review_required": "false",
+                "restart_required": "true",
+                "connection": "verified",
+                "credential_token": "must-not-render",
+            ],
+            homeDirectory: "/Users/fixture"
+        )
+
+        XCTAssertEqual(Set(details.map(\.key)), [
+            "cli_path",
+            "cli_version",
+            "package_sha256",
+            "deployment_verified",
+            "hook_trust_review_required",
+            "restart_required",
+            "connection",
+        ])
+        XCTAssertEqual(details.first(where: { $0.key == "cli_path" })?.label, "CLI Path")
+        XCTAssertEqual(
+            details.first(where: { $0.key == "cli_path" })?.value,
+            "~/Applications/codex"
+        )
+        XCTAssertEqual(
+            details.first(where: { $0.key == "package_sha256" })?.label,
+            "Package SHA-256"
+        )
+    }
+
+    @MainActor
     func testLegacyNonselectableGrokReceiptOffersCleanupWithoutRepairOrToggle() async throws {
         let client = try LegacyLMProviderSelectionClient(
             selectedProviderID: nil,
@@ -384,6 +475,12 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertTrue(viewModel.isProviderToggleDisabled(.grokBuild))
         XCTAssertFalse(viewModel.isProviderRepairAvailable(.grokBuild))
         XCTAssertFalse(viewModel.isProviderRemovalDisabled(.grokBuild))
+        viewModel.performProviderPrimaryAction(.grokBuild)
+        try await Task.sleep(for: .milliseconds(20))
+        let ignoredRepairRequests = await client.repairRequests
+        let ignoredSelectionRequests = await client.selectionRequests
+        XCTAssertEqual(ignoredRepairRequests, [])
+        XCTAssertEqual(ignoredSelectionRequests, [])
         viewModel.removeProviderIntegration(.grokBuild)
         for _ in 0..<500 {
             if await client.removeRequests.count == 1,
@@ -1520,17 +1617,23 @@ final class ProviderConfigurationAppTests: XCTestCase {
             .waitingForProvider
         )
         let blockedPresentation = ManagerNode.continuityPresentation(
-            run: run(.blockedConfiguration),
+            run: run(
+                .blockedConfiguration,
+                errorSummary: "Install the required native gate policy or restore its required environment."
+            ),
             continuity: nil
         )
-        XCTAssertEqual(blockedPresentation.state, .blocked)
-        XCTAssertEqual(blockedPresentation.recoveryAction, .reviewRun)
+        XCTAssertEqual(blockedPresentation.state, .restoring)
+        XCTAssertEqual(blockedPresentation.recoveryAction, .none)
+        XCTAssertTrue(blockedPresentation.detail.contains("automatically"))
+        XCTAssertFalse(blockedPresentation.detail.localizedCaseInsensitiveContains("gate"))
+        XCTAssertFalse(blockedPresentation.detail.localizedCaseInsensitiveContains("policy"))
         XCTAssertFalse(blockedPresentation.nextAction.localizedCaseInsensitiveContains("environment"))
         XCTAssertFalse(blockedPresentation.nextAction.localizedCaseInsensitiveContains("install"))
         XCTAssertEqual(
             ManagerNode.continuityPresentation(
                 run: run(
-                    .blockedConfiguration,
+                    .failedRecoverable,
                     errorCode: "provider_unavailable",
                     errorSummary: "LM Studio is unavailable."
                 ),
@@ -1540,7 +1643,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         )
         let completionPresentation = ManagerNode.continuityPresentation(
             run: run(
-                .blockedConfiguration,
+                .failedRecoverable,
                 errorCode: AutonomyError.completionValidationFailed.code,
                 errorSummary: "forge.completion.tests: The selected tests did not pass."
             ),

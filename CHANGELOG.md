@@ -1,7 +1,7 @@
 # Changelog
 
 User-visible Forge Conductor changes are recorded here. Detailed test, signing,
-artifact, and gate receipts belong in the
+artifact, and qualification receipts belong in the
 [roadmap](ROADMAP.md), [qualification status](docs/QUALIFICATION-STATUS.md), and
 [functional-build record](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md).
 
@@ -12,16 +12,80 @@ Product versions do not by themselves claim shipment.
 
 ### Current development line
 
-- Version `0.14.0 (6)` is the current unreleased development identity. Its
-  provider-integration, secure desktop attachment, native UI, and qualification
-  changes are recorded in the development section below; no distribution or
-  shipment is claimed.
+- Version `0.14.1 (7)` is the current unreleased development identity. Its
+  guided setup, Autonomy, Continuity, provider-recovery, desktop-integration,
+  native UI, and qualification changes are recorded in the development section
+  below; no distribution or shipment is claimed.
+
+## [0.14.1] — 2026-09-23 (development)
+
+### Added
+
+- Added the persistent eight-step **Guided Setup** wizard to the Dashboard title
+  bar. It walks through Manager readiness, provider readiness, project
+  registration, instruction packages, Autonomy choices, review/start
+  confirmation, monitoring, and issue recovery while preserving the current
+  step.
+- Added universal **Connect and Check** actions to selectable provider cards.
+  An inactive card performs the complete manager-owned provision, inspection,
+  readiness, and selection flow; an active desktop card verifies or repairs its
+  installed integration.
+
+### Changed
+
+- Made completion ownership explicit: Forge configuration exposes only its
+  built-in evidence checkboxes, while an instruction package remains the sole
+  owner of any additional completion requirement. Package requirements are
+  displayed read-only and evaluated by the Manager from durable run evidence.
+  Unknown configuration-owned completion identifiers are rejected.
+- Restored Continuity's complete operation/history/detail behavior in an
+  adaptive layout that stays below the toolbar and removes the unused middle
+  frame when no operation is selected. Protection and recovery states now name
+  the retained condition and, when operator intervention is required, the
+  owning action; automatic recovery is stated directly when no action is needed.
+- Removed the remaining instruction-queue path that converted a transient
+  pre-run creation failure into a configuration block. Forge now retains the
+  exact durable run identity and retries it automatically through the existing
+  Manager watchdog; paused runs keep their package linkage without creating a
+  separate queue blocker.
+- Kept **Managed Activity** compact beside Storage at normal Dashboard widths;
+  the rolling response, tool, orchestration, and project-policy feed remains
+  bounded and expands only where the available width requires it.
+- Updated Settings Doctor guidance to report the running version/build and all
+  current LM Studio roles, including CLU, and to offer current-build deployment
+  for stale or missing owned registrations.
+- Advanced the development identity from `0.14.0 (6)` to `0.14.1 (7)` for this
+  backward-compatible operability correction. This is not a shipment claim.
 
 ### Fixed
 
 - Fixed Swift 6 strict-concurrency diagnostics in desktop MCP tool-description
   construction and the Provider activation binding without changing the MCP
   schema, provider-selection behavior, or Xcode target membership.
+- Fixed Xcode 27's no-AppIntents metadata phase so it produces its intended
+  empty output without emitting missing-framework warnings or adding an
+  AppIntents dependency.
+- Fixed LM Studio discovery on a second Mac by checking the supported system,
+  per-user, symlink, Homebrew, and `PATH` CLI locations; accepting bounded
+  status wrappers and string ports; starting the local server when needed; and
+  polling readiness before the normal authenticated inventory and contract probe.
+- Fixed Autonomy so completion checkboxes are selectable and retained run states
+  show a specific recovery explanation based on the owning project, provider,
+  or package requirement. Legacy configuration states recover automatically
+  without additional Forge configuration or an environment reset.
+- Fixed desktop provider activation so nonzero CLI results are accepted only for
+  narrowly recognized already-installed outcomes followed by live inventory
+  verification. Codex packages now carry the portable MCP schema, and Grok
+  packaging follows its documented passive event set without making Grok
+  selectable.
+- Fixed Continuity title, refresh, selected-operation, and empty-state geometry
+  so content no longer runs beneath the top bar and no supported detail surface
+  is removed.
+- Verified the final source with 1,844 SwiftPM tests (13 explicit skips, zero
+  failures), both SwiftPM products, a warning-free arm64 Xcode Debug build, and
+  native UI coverage for the full eight-step wizard, provider controls,
+  Autonomy recovery, Continuity detail/title-bar clearance, Dashboard panel
+  geometry, and every primary view at minimum and normal window sizes.
 
 ## [0.14.0] — 2026-09-23 (development)
 
@@ -100,15 +164,14 @@ Product versions do not by themselves claim shipment.
   identifiers for compatibility.
 - Made Autonomy completion checks inline, selectable checkboxes. Built-in and
   preset checks now run through the manager's compiled automatic completion
-  plan without an installed native policy; only instruction packages that
-  explicitly declare a custom native gate use the signed-policy path.
-- Preserved instruction-package tools and completion gates through single,
+  plan; the bound instruction package exclusively supplies any additional
+  completion requirements.
+- Preserved instruction-package tools and `completion_gates` schema values
+  through single,
   imported, and ordered composite run artifacts, while merging only explicitly
   selected manager-owned automatic checks for direct runs.
 - Reworked Autonomy failure guidance and Continuity protection states to show
-  the exact retained condition and route recovery to Provider or Autonomy. The
-  UI no longer asks users to install an unspecified gate policy or restore an
-  unspecified environment.
+  the exact retained condition and route recovery to Provider or Autonomy.
 - Removed Continuity's nested navigation container so its heading and refresh
   control stay below the toolbar and the empty operation state no longer leaves
   an unused middle frame.
@@ -247,8 +310,8 @@ Product versions do not by themselves claim shipment.
 - Added manager-owned automatic completion plans bound to the exact project
   generation and immutable instruction source. Direct and queued runs now
   persist typed, reasoned obligations for available builds/tests, read-only
-  reports, artifact registration, unresolved work, and explicitly selected
-  custom native policies.
+  reports, artifact registration, and unresolved work; instruction packages
+  exclusively supply any additional completion requirements.
 - Added direct Start Task selection of existing project instruction packages,
   including ordered multi-package composition that remains usable after the
   original import paths are removed.

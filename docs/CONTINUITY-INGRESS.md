@@ -7,7 +7,7 @@ CLU controls are implemented, and one complete production-adapter managed
 rollover is verified. Authenticated attachment to an existing desktop
 conversation remains unsupported without a host API. The original checkpoint
 kept product identity at `0.9.0 (1)`; the current repository identity is
-`0.14.0 (6)`.
+`0.14.1 (7)`.
 
 ## Source commit and delivery
 
@@ -248,7 +248,7 @@ forge-conductor manager task revoke --task UUID --expected-epoch N
 ```
 
 Preparation accepts the registered project ID and generation, exact assignment
-bytes and scope, provider selection, completion gates, explicit source limits and
+bytes and scope, provider selection, completion requirements, explicit source limits and
 absolute expiry. The manager checks current folder authorization. Preparation
 creates no run and does not contact a provider. The compatible source profile,
 `forge.native-task-source` version 1, supports approved `fs_read` work with a
@@ -506,7 +506,7 @@ Integration tests exercise real source/outbox commits, untouched reads, failed
 writes, interrupted receipts, expiry and shutdown with a fixture provider. Real
 provider pressure rollover and complete G04 qualification remain open. At that
 checkpoint, product identity remained `0.9.0 (1)`; the current repository
-identity is `0.14.0 (6)`.
+identity is `0.14.1 (7)`.
 
 At the September 8 component checkpoint, signed native and selected Release
 suites each passed 293 tests, and the separate packet suite passed 13 tests,

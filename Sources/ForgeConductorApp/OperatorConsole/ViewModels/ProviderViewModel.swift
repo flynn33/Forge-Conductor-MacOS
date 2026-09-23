@@ -242,6 +242,18 @@ final class ProviderViewModel: ObservableObject {
     }
 
     func performProviderPrimaryAction(_ providerID: ProviderIntegrationID) {
+        guard providerDescriptors.first(where: { $0.id == providerID })?.selectable == true else {
+            return
+        }
+
+        guard isProviderSelected(providerID) else {
+            // Activation is the manager-owned provision/inspect/select workflow.
+            // Keep the card action on that path for inactive providers instead of
+            // repairing an integration that is not yet the selected execution host.
+            setProvider(providerID, enabled: true)
+            return
+        }
+
         if providerID == .lmStudio {
             connectAndCheck(activateLMStudioIfReady: true)
         } else {

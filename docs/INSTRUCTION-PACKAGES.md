@@ -18,7 +18,7 @@ Instruction packages turn a registered local repository into an ordered work que
 5. In **Provider**, select and verify exactly one provider. LM Studio requires a
    current saved model/readiness receipt; desktop providers require a verified
    integration and retain their host-selected model.
-   Grok Build remains visible but cannot be selected or admit a run in 0.14.0
+   Grok Build remains visible but cannot be selected or admit a run in 0.14.1
    because its documented hook outputs cannot deliver the initial assignment
    context to the model.
 6. For an ordinary task, open **Autonomy**, select one or more imported packages,
@@ -99,7 +99,15 @@ Select a `.forgepackage` JSON file, a `forge-package.json` file, or a folder con
 }
 ```
 
-`entry_documents` must remain inside the selected package folder. `project_id`, when present, must match the selected registered project. Capabilities must name production tools exposed by the current Forge build. The built-in `forge.package.tool-success` gate requires at least one durable tool result from the exact run and rejects unresolved or failed tool invocations.
+`entry_documents` must remain inside the selected package folder. `project_id`,
+when present, must match the selected registered project. Capabilities must name
+production tools exposed by the current Forge build. `completion_gates` is the
+stable schema key for package-owned completion requirements. Those values are
+bound to the immutable package and displayed read-only in Autonomy; Forge
+configuration can select only its recognized built-in evidence checks. The
+built-in `forge.package.tool-success` requirement needs at least one durable
+tool result from the exact run and rejects unresolved or failed tool
+invocations.
 
 ## Ordering and execution
 
@@ -110,8 +118,15 @@ running managed autonomy service. LM Studio requires its exact saved model;
 desktop providers use the model chosen by their host. Forge creates a managed run scoped to the registered
 repository root, package project UUID, and current project generation. It
 advances to the next queued package only after the current package reaches
-`completed`. A failed, cancelled, paused, or configuration-blocked run stops
-automatic advancement so the operator can review it in **Autonomy**.
+`completed`. A failed, cancelled, paused, or terminally failed run stops
+automatic advancement so the operator can review it in **Autonomy**. Provider
+readiness uses the bounded `waiting_provider` recovery path and resumes the
+retained operation automatically after **Connect and Check** succeeds. A
+persisted legacy `blocked_configuration` value is recovered automatically; it
+does not require additional Forge configuration or an environment reset. If a
+run cannot be committed after the package receives its durable run identity,
+Forge retains that exact identity and retries it through the existing Manager
+watchdog instead of converting the package into a configuration blocker.
 
 **Stop Queue** prevents the next package from starting. It does not discard or silently cancel an already admitted autonomous run; that run remains visible in **Autonomy**.
 

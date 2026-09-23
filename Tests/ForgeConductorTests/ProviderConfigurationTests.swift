@@ -105,6 +105,83 @@ private final class ProviderRecoveryRecorder: @unchecked Sendable {
     }
 }
 
+private final class LMStudioCommandFixture: @unchecked Sendable {
+    struct Invocation: Equatable {
+        let executable: String
+        let arguments: [String]
+        let timeoutSeconds: TimeInterval
+    }
+
+    private struct CommandKey: Hashable {
+        let executable: String
+        let arguments: [String]
+    }
+
+    private let lock = NSLock()
+    private var results: [CommandKey: [ProcessResult]] = [:]
+    private var invocations: [Invocation] = []
+
+    func enqueue(
+        executable: String,
+        arguments: [String],
+        result: ProcessResult
+    ) {
+        lock.lock()
+        results[CommandKey(executable: executable, arguments: arguments), default: []]
+            .append(result)
+        lock.unlock()
+    }
+
+    func run(
+        executable: String,
+        arguments: [String],
+        timeoutSeconds: TimeInterval
+    ) throws -> ProcessResult {
+        lock.lock()
+        defer { lock.unlock() }
+        invocations.append(Invocation(
+            executable: executable,
+            arguments: arguments,
+            timeoutSeconds: timeoutSeconds
+        ))
+        let key = CommandKey(executable: executable, arguments: arguments)
+        guard var queued = results[key], !queued.isEmpty else {
+            throw NSError(
+                domain: "LMStudioCommandFixture",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "No result remains for \(arguments)"]
+            )
+        }
+        let result = queued.removeFirst()
+        results[key] = queued
+        return result
+    }
+
+    var recordedInvocations: [Invocation] {
+        lock.lock()
+        defer { lock.unlock() }
+        return invocations
+    }
+}
+
+private func lmStudioCommandResult(
+    exitCode: Int32 = 0,
+    stdout: String = "",
+    stderr: String = "",
+    timedOut: Bool = false,
+    stdoutTruncated: Bool = false,
+    stderrTruncated: Bool = false
+) -> ProcessResult {
+    ProcessResult(
+        exitCode: exitCode,
+        stdout: stdout,
+        stderr: stderr,
+        timedOut: timedOut,
+        stdoutTruncated: stdoutTruncated,
+        stderrTruncated: stderrTruncated
+    )
+}
+
 final class ProviderConfigurationTests: XCTestCase {
     private var directory: URL!
     private var credentials: ProviderCredentialFixture!
@@ -123,6 +200,153 @@ final class ProviderConfigurationTests: XCTestCase {
                          token: String? = nil) -> ProviderConfigurationUpdate {
         ProviderConfigurationUpdate(expectedRevision: revision, endpoint: endpoint, modelKey: model,
                                     credentialAction: action, token: token)
+    }
+
+    func testLocalServerDiscoveryPrefersAppMatchedCLIAndRetainsBoundedFallbacks() {
+        let paths = LMStudioLocalServerController.executablePaths(
+            homeDirectory: URL(fileURLWithPath: "/Users/fixture", isDirectory: true),
+            discoveredPath: "/custom/bin/lms",
+            isExecutable: { _ in true }
+        )
+
+        XCTAssertEqual(
+            paths.prefix(2),
+            [
+                "/Applications/LM Studio.app/Contents/Resources/app/.webpack/lms",
+                "/Applications/LM Studio.app/Contents/Resources/app.asar.unpacked/.webpack/lms",
+            ]
+        )
+        XCTAssertLessThan(
+            try XCTUnwrap(paths.firstIndex(of: "/custom/bin/lms")),
+            try XCTUnwrap(paths.firstIndex(of: "/Users/fixture/.lmstudio/bin/lms"))
+        )
+        XCTAssertEqual(Set(paths).count, paths.count)
+    }
+
+    func testLocalServerRecoveryFallsBackFromStaleCLIToRunningAppCLI() async throws {
+        let fixture = LMStudioCommandFixture()
+        let stale = "/fixture/stale-lms"
+        let current = "/fixture/app-lms"
+        let statusArguments = ["server", "status", "--json", "--quiet"]
+        fixture.enqueue(
+            executable: stale,
+            arguments: statusArguments,
+            result: lmStudioCommandResult(exitCode: 1, stderr: "unsupported command")
+        )
+        fixture.enqueue(
+            executable: current,
+            arguments: statusArguments,
+            result: lmStudioCommandResult(stdout: #"{"running":true,"port":4321}"#)
+        )
+        let controller = LMStudioLocalServerController(
+            discoverExecutables: { [stale, current] },
+            command: { executable, arguments, timeoutSeconds in
+                try fixture.run(
+                    executable: executable,
+                    arguments: arguments,
+                    timeoutSeconds: timeoutSeconds
+                )
+            },
+            delay: { _ in }
+        )
+
+        let port = try await controller.ensureRunningPort()
+        XCTAssertEqual(port, 4_321)
+        XCTAssertEqual(
+            fixture.recordedInvocations.map(\.executable),
+            [stale, current]
+        )
+        XCTAssertTrue(fixture.recordedInvocations.allSatisfy {
+            $0.arguments == statusArguments
+        })
+    }
+
+    func testLocalServerRecoveryPollsAfterStartAndAcceptsBoundedStatusPreamble() async throws {
+        let fixture = LMStudioCommandFixture()
+        let executable = "/fixture/app-lms"
+        let statusArguments = ["server", "status", "--json", "--quiet"]
+        fixture.enqueue(
+            executable: executable,
+            arguments: statusArguments,
+            result: lmStudioCommandResult(stdout: #"{"running":false}"#)
+        )
+        fixture.enqueue(
+            executable: executable,
+            arguments: ["server", "start"],
+            result: lmStudioCommandResult(stdout: "Waking up LM Studio service...\n")
+        )
+        fixture.enqueue(
+            executable: executable,
+            arguments: statusArguments,
+            result: lmStudioCommandResult(stdout: #"{"running":false}"#)
+        )
+        fixture.enqueue(
+            executable: executable,
+            arguments: statusArguments,
+            result: lmStudioCommandResult(
+                stdout: "LM Studio notice\n" + #"{"running":true,"port":"5678"}"# + "\n"
+            )
+        )
+        let controller = LMStudioLocalServerController(
+            discoverExecutables: { [executable] },
+            command: { command, arguments, timeoutSeconds in
+                try fixture.run(
+                    executable: command,
+                    arguments: arguments,
+                    timeoutSeconds: timeoutSeconds
+                )
+            },
+            delay: { _ in }
+        )
+
+        let port = try await controller.ensureRunningPort()
+        XCTAssertEqual(port, 5_678)
+        XCTAssertEqual(
+            fixture.recordedInvocations.map(\.arguments),
+            [statusArguments, ["server", "start"], statusArguments, statusArguments]
+        )
+    }
+
+    func testLocalServerRecoveryUsesStartReportedPortWhenStatusTemporarilyMisreports() async throws {
+        let fixture = LMStudioCommandFixture()
+        let executable = "/fixture/app-lms"
+        let statusArguments = ["server", "status", "--json", "--quiet"]
+        for _ in 0..<5 {
+            fixture.enqueue(
+                executable: executable,
+                arguments: statusArguments,
+                result: lmStudioCommandResult(exitCode: 1, stderr: "status unavailable")
+            )
+        }
+        fixture.enqueue(
+            executable: executable,
+            arguments: ["server", "start"],
+            result: lmStudioCommandResult(
+                stdout: "Success! Server is now running on port 6789\n"
+            )
+        )
+        let controller = LMStudioLocalServerController(
+            discoverExecutables: { [executable] },
+            command: { command, arguments, timeoutSeconds in
+                try fixture.run(
+                    executable: command,
+                    arguments: arguments,
+                    timeoutSeconds: timeoutSeconds
+                )
+            },
+            delay: { _ in }
+        )
+
+        let port = try await controller.ensureRunningPort()
+        XCTAssertEqual(port, 6_789)
+        XCTAssertEqual(
+            fixture.recordedInvocations.filter { $0.arguments == statusArguments }.count,
+            5
+        )
+        XCTAssertEqual(
+            fixture.recordedInvocations.filter { $0.arguments == ["server", "start"] }.count,
+            1
+        )
     }
 
     func testNoninteractiveKeychainDenialLockedAndCancellationReturnTypedFailure() throws {

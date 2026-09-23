@@ -179,26 +179,26 @@ an obsolete generation remains fenced rather than silently rebound.
 The Manager now derives one bounded `AutomaticCompletionPlan` during the shared
 direct and queued preparation path. The plan is deterministically identified
 from the exact project identity/generation, immutable instruction digest,
-reasoned obligation set, and whether an owner-selected custom policy is present.
+and reasoned obligation set.
 It records typed evidence requirements and human-review state for build, test,
 requested-output, artifact-registration, read-only-report, runtime-job,
-unresolved-side-effect, and custom-native-policy obligation kinds.
+and unresolved-side-effect obligation kinds.
 
 The compiled resolver inspects the prepared instruction text and shallow native
 project structure. A read-only analysis receives report evidence without a
 mutation/build requirement; a repair in a SwiftPM or Xcode project receives the
 available build and test obligations. Every plan requires exact prepared-source
-registration and reconciliation of relevant unresolved effects. Custom native
-gates enter the plan only when explicitly configured. The resolver reads only
-bounded canonical instruction windows and never delegates approval of evidence
-or hashes to the model.
+registration and reconciliation of relevant unresolved effects. Forge exposes
+recognized built-in checks, while the bound instruction package exclusively
+supplies any additional requirements. The resolver reads only bounded canonical
+instruction windows and never delegates approval of evidence or hashes to the
+model.
 
 The prepared descriptor and durable run specification both carry the same plan,
 and run metadata records its ID and revision. The fields are optional when
 decoding pre-r3 records, preserving existing durable runs. Start Task and run
-detail expose the derived obligation titles and reasons. Signed custom native
-policy import remains available only after expanding **Advanced controls**; it
-is not part of the routine path.
+detail expose the derived obligation titles and reasons. Package-owned
+requirements remain read-only in Forge configuration.
 
 The built-in validator now traverses durable tool history in 128-record keyset
 pages, retaining only bounded latest evidence for each obligation and rejecting
@@ -463,8 +463,8 @@ fail closed.
 Routine Completion Checks are now a selectable native checklist. Stable preset
 identifiers compile into typed obligations for build success, warning-free
 complete output, tests, full instruction delivery, and reconciled operations;
-only unknown configured identifiers remain signed custom-native gates. The
-task descriptor also binds a typed failure policy: pause for review, bounded
+the bound instruction package exclusively supplies any additional requirements.
+The task descriptor also binds a typed failure policy: pause for review, bounded
 automatic retry, or terminal stop, with optional bounded instructions included
 in the managed model context. Retry exhaustion pauses for review.
 
@@ -514,14 +514,12 @@ CLI-reported port and loopback host variants, verifies inventory before saving
 an endpoint correction, resolves a compatible loaded model, and runs the
 contract probe. The bounded recovery does not scan ports or load models.
 
-Completion ownership is explicit. The built-in package gate and every native
-Completion Check preset are evaluated by the manager's compiled automatic plan.
-Only unknown identifiers explicitly declared by an instruction package are
-custom native gates that can require an imported signed policy. Autonomy keeps
-the completion checklist inline and selectable, explains blocked states, and
-routes automatic-check, custom-gate, provider, and generic recovery separately.
-It no longer tells ordinary runs to install a native policy or restore an
-undefined environment.
+Completion ownership is explicit. Forge's built-in Completion Check presets are
+evaluated by the manager's compiled automatic plan, while the exact instruction
+package exclusively supplies any additional requirements. Autonomy keeps the
+completion checklist inline and selectable, presents package requirements as
+read-only, explains retained states, and routes provider, completion, and
+generic recovery to their owning views.
 
 Continuity no longer nests another navigation split inside the app shell. Its
 header and Refresh control occupy the accessible content region, the empty
@@ -536,6 +534,48 @@ This section records current implementation and operating behavior only. Its
 source-bound build, regression, native-layout, publication, and synchronization
 evidence belongs in the roadmap, changelog, and qualification status after the
 corresponding commands finish; no earlier result is promoted to this slice.
+
+## 0.14.1 scope correction and continuity restoration
+
+The 0.14.1 patch supersedes the 0.13.0 completion-ownership interpretation
+above. Autonomy exposes selectable built-in evidence checks. Additional
+completion identifiers can enter a run only from the exact bound instruction
+package, remain read-only in the prepared and running task, and are evaluated
+by the Manager from durable run evidence. An unknown identifier sent as Forge
+configuration is rejected. Historical wire names and decode cases are retained
+only where compatibility requires them; they do not create a current operator
+workflow.
+
+Autonomy's recovery panel now derives guidance from the durable state even when
+an older run omitted error text. Provider waits route to **Connect and Check**
+and preserve the exact run. Completion evidence explains the unmet package or
+built-in requirement and re-evaluation path.
+
+Continuity retains its full operation list, selected-operation detail, history,
+protection status, refresh, and recovery actions. The restored adaptive layout
+keeps the title and Refresh control below the application toolbar, collapses the
+unused middle frame only when no operation is selected, and explains what a
+protection-attention state retained and which owning view can resolve it.
+
+The Dashboard title bar owns the real **Guided Setup** entry point. The
+resumable eight-step wizard now ends review with an explicit start confirmation,
+then explains the Dashboard/Autonomy/Continuity/Rune Forge monitoring map and
+issue recovery. Managed Activity remains compact beside Storage at normal
+widths and uses the existing bounded rolling feed.
+
+Provider work remains in scope. Every selectable provider card presents one
+**Connect and Check** action. Inactive cards run provision, inspection,
+readiness, and selection; active desktop cards verify or repair. LM Studio
+recovery discovers supported system, per-user, Homebrew, and `PATH` CLI
+locations, tolerates bounded status wrappers and string ports, starts the local
+server when needed, and polls readiness before the existing authenticated
+inventory and contract probe. Desktop package generation and activation remain
+fail-closed on unverifiable CLI output, with only narrowly recognized
+already-installed results accepted before independent inventory verification.
+
+The product identity for this correction is `0.14.1 (7)`. Distribution,
+notarization, installed-build, and live external-host qualification remain
+separate from source and deterministic test evidence.
 
 ## Verification
 
@@ -588,7 +628,7 @@ corresponding commands finish; no earlier result is promoted to this slice.
   as a pass. The signed implementation is published and synchronized at
   `01c874e17c9a26c8f3111981748ed1bd3bdc1f81`.
 - AC-01 through AC-04 verification covers deterministic replay, read-only versus repair
-  classification, SwiftPM build/test detection, explicit custom-policy
+  classification, SwiftPM build/test detection, package-requirement ownership,
   obligations, direct and queued persistence, exact source/project/generation
   binding, outcome supersession, unrelated-read rejection, wrong-scope and stale
   source rejection, tampered plan identity, 300-record bounded aggregation, and

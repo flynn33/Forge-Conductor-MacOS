@@ -1796,6 +1796,30 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         return state.packages[index]
     }
 
+    /// Retains the exact durable run identity after a transient create failure.
+    /// The Manager watchdog can then retry the same idempotent start without
+    /// changing the package into an operator-owned configuration state.
+    @discardableResult
+    public func recordAutomaticStartRetry(
+        packageID: UUID,
+        runID: RunID,
+        error: String
+    ) throws -> ProjectInstructionPackage {
+        lock.lock(); defer { lock.unlock() }
+        guard let index = state.packages.firstIndex(where: { $0.id == packageID }) else {
+            throw ProjectInstructionQueueError.packageNotFound(packageID)
+        }
+        guard state.packages[index].state == .running,
+              state.packages[index].runID == runID else {
+            throw ProjectInstructionQueueError.activePackage(packageID)
+        }
+        let prior = state
+        state.packages[index].lastError = String(error.prefix(2_048))
+        state.packages[index].updatedAt = ISO8601.string(from: clock.now())
+        try commitUnlocked(restoring: prior)
+        return state.packages[index]
+    }
+
     @discardableResult
     public func reconcile(
         packageID: UUID,
@@ -1823,8 +1847,11 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             state.packages[index].state = .failed
             state.runningProjects.removeAll { $0 == projectKey }
         case .blockedConfiguration, .paused:
-            state.packages[index].state = .blocked
-            state.runningProjects.removeAll { $0 == projectKey }
+            // A paused run still owns this exact package, and legacy
+            // blocked-configuration runs are recovered by the autonomy
+            // watchdog. Keep the package linked and nonterminal instead of
+            // manufacturing a separate queue blocker.
+            state.packages[index].state = .running
         default:
             return state.packages[index]
         }

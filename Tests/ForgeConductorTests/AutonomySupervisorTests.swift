@@ -1461,14 +1461,14 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
-    func testOnlyExplicitCustomGateRequiresInstalledNativePolicy() async throws {
+    func testPackageDefinedCompletionIdentifierUsesManagerEvidenceWithoutPolicy() async throws {
         try await withRepository { repository, root in
             let automaticGates = [
                 ProjectInstructionQueueStore.builtInCompletionGate,
                 CompletionCheckPreset.noUnresolvedOperations.rawValue,
             ]
-            let customGate = "owner.release-qualification"
-            let gates = automaticGates + [customGate]
+            let packageRequirement = "owner.release-qualification"
+            let gates = automaticGates + [packageRequirement]
             let fixture = try await makeAutomaticCompletionRun(
                 repository: repository,
                 root: root,
@@ -1481,16 +1481,18 @@ final class AutonomySupervisorTests: XCTestCase {
 
             let receipt = try await registry.validate(fixture.run)
 
-            XCTAssertFalse(receipt.passed)
+            XCTAssertTrue(receipt.passed)
             XCTAssertEqual(receipt.results.map(\.gate), gates)
-            XCTAssertTrue(receipt.results.prefix(automaticGates.count).allSatisfy(\.passed))
-            let custom = try XCTUnwrap(receipt.results.last)
-            XCTAssertEqual(custom.gate, customGate)
-            XCTAssertFalse(custom.passed)
-            XCTAssertEqual(custom.blocker, .unavailableEnvironment)
-            XCTAssertTrue(custom.summary.contains("Custom native validation"))
-            XCTAssertEqual(CompletionGateOwnership.automaticGates(in: gates), automaticGates)
-            XCTAssertEqual(CompletionGateOwnership.customNativeGates(in: gates), [customGate])
+            XCTAssertTrue(receipt.results.allSatisfy(\.passed))
+            XCTAssertTrue(receipt.results.allSatisfy { $0.blocker == nil })
+            XCTAssertTrue(receipt.results.allSatisfy {
+                !$0.summary.localizedCaseInsensitiveContains("native policy")
+            })
+            XCTAssertFalse(FileManager.default.fileExists(
+                atPath: fixture.paths.nativeValidationDir
+                    .appendingPathComponent("policies/\(fixture.run.runID.description).json")
+                    .path
+            ))
             await registry.shutdown()
         }
     }
@@ -1570,21 +1572,18 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
-    func testInstalledNativePolicyRejectsUntrustedAndStaleDefinitions() async throws {
+    func testProductionCompletionIgnoresLegacyNativePolicyFiles() async throws {
         for scenario in ["missing", "malformed", "oversized", "public-mode", "hard-link", "parent-link",
                          "wrong-run", "wrong-generation", "wrong-source", "old-policy", "duplicate-gate", "path-traversal",
                          "unknown-gate", "missing-correction-case"] {
             try await withRepository { repository, root in
                 let gate = scenario == "missing-correction-case" ? "G01" : "tests"
-                let fixture = try await makeRun(repository: repository, root: root, completionGates: [gate])
-                let project = root.appendingPathComponent("project")
-                try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
-                try Data("qualification input".utf8).write(to: project.appendingPathComponent("source.txt"))
-                let lease = try await repository.acquireRunLease(runID: fixture.run.runID, ownerID: "policy-regression", policy: fixture.leasePolicy)
-                var run = fixture.run
-                for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
-                    run = try await repository.transitionAutonomousRun(runID: run.runID, lease: lease, transition: transition(run, to: state))
-                }
+                let fixture = try await makeAutomaticCompletionRun(
+                    repository: repository,
+                    root: root,
+                    completionGates: [gate]
+                )
+                let run = fixture.run
                 let definition = InstalledNativeGatePolicy.Gate(
                     id: scenario == "unknown-gate" ? "other" : gate, version: 2, packageID: UUID(),
                     packageInputs: ["plan.xctestrun", "product"], packageSHA256: String(repeating: "a", count: 64),
@@ -1592,17 +1591,16 @@ final class AutonomySupervisorTests: XCTestCase {
                     testIdentifiers: ["ForgeConductorTests/Effect/testWork"], requiredCases: ["Effect/testWork()"],
                     minimumCaseCount: 1, timeoutSeconds: 1
                 )
-                let candidateSource = try await QualificationInputSnapshotter(root: project, inputs: ["source.txt"]).capture()
                 let policy = InstalledNativeGatePolicy(
                     schemaVersion: 1,
                     policyRevision: scenario == "old-policy" ? "old" : CompletionGateAcceptancePolicy.correction001Revision,
                     runID: scenario == "wrong-run" ? RunID() : run.runID, projectID: run.projectID,
                     projectGeneration: scenario == "wrong-generation" ? ProjectGeneration(2) : run.projectGeneration,
-                    sourceInputs: ["source.txt"], candidateSourceSHA256: scenario == "wrong-source" ? String(repeating: "0", count: 64) : candidateSource.sha256,
+                    sourceInputs: ["source.txt"], candidateSourceSHA256: String(repeating: scenario == "wrong-source" ? "0" : "a", count: 64),
                     buildIdentity: "policy-fixture", xcodeVersion: "Xcode fixture", architecture: "arm64",
                     correctionCaseBindings: [:], gates: scenario == "duplicate-gate" ? [definition, definition] : [definition]
                 )
-                let paths = AppPaths(home: root.appendingPathComponent("manager"))
+                let paths = fixture.paths
                 let policyFile = paths.nativeValidationDir.appendingPathComponent("policies/\(run.runID.description).json")
                 if scenario != "missing" {
                     let data = scenario == "malformed" ? Data("not JSON".utf8)
@@ -1623,12 +1621,16 @@ final class AutonomySupervisorTests: XCTestCase {
                 }
                 let registry = InstalledNativeGateRegistry(repository: repository, paths: paths)
                 let receipt = try await registry.validate(run)
-                XCTAssertFalse(receipt.passed, scenario)
+                XCTAssertTrue(receipt.passed, scenario)
+                XCTAssertTrue(receipt.hasValidProof(), scenario)
                 XCTAssertEqual(receipt.results.count, 1)
-                XCTAssertNotNil(receipt.results.first?.blocker, scenario)
-                if ["unknown-gate", "missing-correction-case"].contains(scenario) {
-                    XCTAssertEqual(receipt.results.first?.blocker, .unregisteredValidator, scenario)
-                }
+                XCTAssertEqual(receipt.results.first?.gate, gate, scenario)
+                XCTAssertTrue(receipt.results.first?.passed == true, scenario)
+                XCTAssertNil(receipt.results.first?.blocker, scenario)
+                XCTAssertFalse(
+                    receipt.results.first?.summary.localizedCaseInsensitiveContains("policy") == true,
+                    scenario
+                )
                 XCTAssertFalse(FileManager.default.fileExists(atPath: paths.nativeValidationDir.appendingPathComponent("results").path), scenario)
                 await registry.shutdown()
             }

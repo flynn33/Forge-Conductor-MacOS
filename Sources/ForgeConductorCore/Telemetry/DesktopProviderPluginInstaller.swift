@@ -143,6 +143,7 @@ public struct DesktopProviderPluginStatus: Sendable, Equatable {
 public struct DesktopProviderPluginCommandResult: Sendable, Equatable {
     public var exitCode: Int32
     public var stdout: String
+    public var stderr: String
     public var timedOut: Bool
     public var stdoutTruncated: Bool
     public var stderrTruncated: Bool
@@ -150,12 +151,14 @@ public struct DesktopProviderPluginCommandResult: Sendable, Equatable {
     public init(
         exitCode: Int32,
         stdout: String = "",
+        stderr: String = "",
         timedOut: Bool = false,
         stdoutTruncated: Bool = false,
         stderrTruncated: Bool = false
     ) {
         self.exitCode = exitCode
         self.stdout = stdout
+        self.stderr = stderr
         self.timedOut = timedOut
         self.stdoutTruncated = stdoutTruncated
         self.stderrTruncated = stderrTruncated
@@ -241,6 +244,7 @@ public struct DesktopProviderPluginNativeCommandRunner: DesktopProviderPluginCom
         return DesktopProviderPluginCommandResult(
             exitCode: result.exitCode,
             stdout: result.stdout,
+            stderr: result.stderr,
             timedOut: result.timedOut,
             stdoutTruncated: result.stdoutTruncated,
             stderrTruncated: result.stderrTruncated
@@ -654,6 +658,7 @@ private extension DesktopProviderPluginInstaller {
     struct HostActivationCommand {
         var arguments: [String]
         var verifiesInventory: Bool
+        var acceptedIdempotentPhrases: [String] = []
     }
 
     func validate(_ request: DesktopProviderPluginRequest) throws {
@@ -815,13 +820,29 @@ private extension DesktopProviderPluginInstaller {
     }
 
     func hooksObject(request: DesktopProviderPluginRequest) -> [String: Any] {
-        let commonEvents = [
-            "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
-            "PostToolUse", "Stop", "SessionEnd",
-        ]
-        let events = request.host == .codexDesktop
-            ? commonEvents
-            : commonEvents + ["PostToolUseFailure"]
+        let events: [String]
+        switch request.host {
+        case .claudeCodeDesktop:
+            events = [
+                "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
+                "PostToolUse", "PostToolUseFailure", "Stop", "SessionEnd",
+            ]
+        case .codexDesktop:
+            events = [
+                "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
+                "PostToolUse", "Stop", "SessionEnd",
+            ]
+        case .grokBuild:
+            // Grok's native hook contract has no PermissionRequest event. Its
+            // documented passive events keep Forge's record aligned with the
+            // host without changing Grok's permission policy.
+            events = [
+                "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+                "PostToolUseFailure", "PermissionDenied", "Stop", "StopFailure",
+                "Notification", "SubagentStart", "SubagentStop", "PreCompact",
+                "PostCompact", "SessionEnd",
+            ]
+        }
         let executable = shellQuote(request.forgeExecutable.standardizedFileURL.path)
         let forgeHome = shellQuote(roots.forgeHome.path)
         let hooks = Dictionary(uniqueKeysWithValues: events.map { event in
@@ -846,7 +867,11 @@ private extension DesktopProviderPluginInstaller {
             ],
         ]
         if portable { server["type"] = "stdio" }
-        return ["mcpServers": [Self.pluginName: server]]
+        var object: [String: Any] = ["mcpServers": [Self.pluginName: server]]
+        if portable {
+            object["$schema"] = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
+        }
+        return object
     }
 
     var skillData: Data {
@@ -1486,14 +1511,19 @@ private extension DesktopProviderPluginInstaller {
                 ),
                 HostActivationCommand(
                     arguments: ["plugin", "marketplace", "add", package.target.path],
-                    verifiesInventory: false
+                    verifiesInventory: false,
+                    acceptedIdempotentPhrases: [
+                        "already added",
+                        "already exists",
+                    ]
                 ),
                 HostActivationCommand(
                     arguments: [
                         "plugin", "install",
                         "\(Self.pluginName)@\(Self.marketplaceName)", "--scope", "user",
                     ],
-                    verifiesInventory: false
+                    verifiesInventory: false,
+                    acceptedIdempotentPhrases: ["already installed"]
                 ),
                 HostActivationCommand(
                     arguments: ["plugin", "list", "--json"],
@@ -1505,7 +1535,11 @@ private extension DesktopProviderPluginInstaller {
             commands = [
                 HostActivationCommand(
                     arguments: ["plugin", "add", "\(Self.pluginName)@\(marketplace)"],
-                    verifiesInventory: false
+                    verifiesInventory: false,
+                    acceptedIdempotentPhrases: [
+                        "already added",
+                        "already installed",
+                    ]
                 ),
                 HostActivationCommand(
                     arguments: ["plugin", "list", "--json"],
@@ -1520,7 +1554,8 @@ private extension DesktopProviderPluginInstaller {
                 ),
                 HostActivationCommand(
                     arguments: ["plugin", "enable", Self.pluginName],
-                    verifiesInventory: false
+                    verifiesInventory: false,
+                    acceptedIdempotentPhrases: ["already enabled"]
                 ),
                 HostActivationCommand(
                     arguments: ["plugin", "list", "--json"],
@@ -1546,8 +1581,11 @@ private extension DesktopProviderPluginInstaller {
                     timedOut: result.timedOut,
                     outputTruncated: truncated
                 ))
-                guard result.exitCode == 0, !result.timedOut, !truncated else {
-                    if !command.verifiesInventory { continue }
+                guard !result.timedOut, !truncated else {
+                    return HostActivation(cliAvailable: true, succeeded: false, attempts: attempts)
+                }
+                if result.exitCode != 0,
+                   !isRecognizedIdempotentActivationOutcome(result, command: command) {
                     return HostActivation(cliAvailable: true, succeeded: false, attempts: attempts)
                 }
                 if command.verifiesInventory,
@@ -1566,12 +1604,38 @@ private extension DesktopProviderPluginInstaller {
                     timedOut: false,
                     outputTruncated: false
                 ))
-                if command.verifiesInventory {
-                    return HostActivation(cliAvailable: true, succeeded: false, attempts: attempts)
-                }
+                return HostActivation(cliAvailable: true, succeeded: false, attempts: attempts)
             }
         }
         return HostActivation(cliAvailable: true, succeeded: true, attempts: attempts)
+    }
+
+    /// A nonzero mutation is accepted only when the host reports one of the
+    /// command-specific, already-present outcomes below and a later inventory
+    /// command independently verifies the active plugin. Timeouts and truncated
+    /// output never reach this path, so incomplete diagnostics cannot be treated
+    /// as idempotent success.
+    func isRecognizedIdempotentActivationOutcome(
+        _ result: DesktopProviderPluginCommandResult,
+        command: HostActivationCommand
+    ) -> Bool {
+        guard !command.verifiesInventory,
+              !command.acceptedIdempotentPhrases.isEmpty else {
+            return false
+        }
+        let output = (result.stdout + "\n" + result.stderr)
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        guard !output.isEmpty,
+              ![
+                "different source", "failed", "error", "invalid", "refusing",
+                "not already", "is not already", "isn't already", "wasn't already",
+              ]
+                .contains(where: output.contains) else {
+            return false
+        }
+        return command.acceptedIdempotentPhrases.contains(where: output.contains)
     }
 
     func inspectLiveActivation(

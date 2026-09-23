@@ -206,7 +206,7 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
 }
 
 final class OperatorProjectContractTests: XCTestCase {
-    func testInstructionArtifactOwnsToolsAndCustomGatesWhileRetainingAutomaticSelections() throws {
+    func testInstructionArtifactOwnsToolsAndPackageRequirementsWhileRetainingAutomaticSelections() throws {
         let runID = RunID()
         let projectID = ProjectID()
         let builtIn = ProjectInstructionQueueStore.builtInCompletionGate
@@ -321,7 +321,6 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.providerID, "lmstudio")
         XCTAssertEqual(viewModel.modelKey, "fixture/tool-model")
         XCTAssertFalse(viewModel.allowedTools.isEmpty)
-        XCTAssertEqual(viewModel.completionGates, ProjectInstructionQueueStore.builtInCompletionGate)
         XCTAssertTrue(viewModel.canStart)
         let defaultRequest = try XCTUnwrap(viewModel.makeStartRequest())
         XCTAssertNil(defaultRequest.providerID)
@@ -360,7 +359,6 @@ final class OperatorProjectContractTests: XCTestCase {
 
         viewModel.modelKey = "fixture/pinned-model"
         viewModel.allowedTools = "fs_read"
-        viewModel.completionGates = "fixture-check"
         viewModel.networkAllowed = true
         viewModel.failureBehavior = .pauseForReview
         viewModel.failureInstructions = "Preserve the failing evidence for operator review."
@@ -369,7 +367,6 @@ final class OperatorProjectContractTests: XCTestCase {
 
         XCTAssertEqual(viewModel.modelKey, "fixture/pinned-model")
         XCTAssertEqual(viewModel.allowedTools, "fs_read")
-        XCTAssertEqual(viewModel.completionGates, "fixture-check")
         XCTAssertTrue(viewModel.networkAllowed)
         let overrideRequest = try XCTUnwrap(viewModel.makeStartRequest())
         XCTAssertNil(overrideRequest.providerID)
@@ -378,7 +375,7 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(overrideRequest.allowedTools, ["fs_read"])
         XCTAssertEqual(
             Set(try XCTUnwrap(overrideRequest.completionGates)),
-            Set([ProjectInstructionQueueStore.builtInCompletionGate, "fixture-check"]
+            Set([ProjectInstructionQueueStore.builtInCompletionGate]
                 + CompletionCheckPreset.defaults.map(\.rawValue))
         )
         XCTAssertEqual(overrideRequest.networkAllowed, true)
@@ -440,7 +437,8 @@ final class OperatorProjectContractTests: XCTestCase {
                     providerConfigurationRevision: "fixture-provider-revision-2",
                     modelKey: "fixture/pinned-model",
                     allowedTools: ["fs_read"],
-                    completionGates: ["fixture-check"],
+                    completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+                        + CompletionCheckPreset.defaults.map(\.rawValue).sorted(),
                     networkAllowed: true
                 ),
                 "/api/manager/runs/start": try JSONSupport.data(from: [
@@ -470,7 +468,6 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.providerID, "lmstudio")
         XCTAssertEqual(viewModel.modelKey, "fixture/pinned-model")
         XCTAssertEqual(viewModel.allowedTools, "fs_read")
-        XCTAssertEqual(viewModel.completionGates, "fixture-check")
         XCTAssertTrue(viewModel.networkAllowed)
         let preparedBodies = OperatorProjectContractURLProtocol.requestedBodies(
             path: "/api/manager/runs/prepare"

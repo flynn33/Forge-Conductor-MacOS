@@ -224,12 +224,11 @@ final class ProjectInstructionQueueTests: XCTestCase {
             completionGates: [ProjectInstructionQueueStore.builtInCompletionGate, "org.example.native"]
         ))
         XCTAssertNotEqual(repair.planID, first.planID)
-        XCTAssertEqual(repair.source, .automaticWithCustomPolicy)
+        XCTAssertEqual(repair.source, .automatic)
         XCTAssertTrue(repair.obligations.contains { $0.kind == .projectBuild })
         XCTAssertTrue(repair.obligations.contains { $0.kind == .projectTests })
-        XCTAssertTrue(repair.obligations.contains {
-            $0.kind == .customNativeGate && $0.customGateID == "org.example.native"
-        })
+        XCTAssertFalse(repair.obligations.contains { $0.kind == .customNativeGate })
+        XCTAssertFalse(repair.obligations.contains { $0.customGateID != nil })
     }
 
     func testSelectableCompletionPresetsCompileIntoTypedNativeObligations() throws {
@@ -1342,6 +1341,70 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertFalse(final.running)
         XCTAssertEqual(final.packages.map(\.state), [.completed, .failed])
         XCTAssertEqual(final.packages.last?.lastError, "fixture failure")
+    }
+
+    func testRunCreationFailureRemainsAutomaticAndRetainsExactRunIdentity() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.external.appendingPathComponent("automatic-start-retry.md")
+        try "Retry the same durable task automatically.".write(
+            to: source,
+            atomically: true,
+            encoding: .utf8
+        )
+        let imported = try fixture.store.importPackage(
+            sourceURL: source,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        _ = try fixture.store.start(
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let runID = RunID()
+        _ = try fixture.store.markStarted(packageID: package.id, runID: runID)
+
+        let retained = try fixture.store.recordAutomaticStartRetry(
+            packageID: package.id,
+            runID: runID,
+            error: "temporary run-store outage"
+        )
+
+        XCTAssertEqual(retained.state, .running)
+        XCTAssertEqual(retained.runID, runID)
+        XCTAssertEqual(retained.lastError, "temporary run-store outage")
+        XCTAssertEqual(fixture.store.runningPackages().map(\.id), [package.id])
+        XCTAssertNil(fixture.store.nextRunnable())
+
+        let reopened = try ProjectInstructionQueueStore(
+            paths: fixture.paths,
+            clock: fixture.clock
+        )
+        let afterRestart = try XCTUnwrap(reopened.runningPackages().first)
+        XCTAssertEqual(afterRestart.state, .running)
+        XCTAssertEqual(afterRestart.runID, runID)
+        XCTAssertEqual(afterRestart.lastError, "temporary run-store outage")
+
+        let paused = try reopened.reconcile(
+            packageID: package.id,
+            runID: runID,
+            runState: .paused,
+            error: "operator review"
+        )
+        XCTAssertEqual(paused.state, .running)
+        XCTAssertEqual(paused.runID, runID)
+        XCTAssertEqual(paused.lastError, "operator review")
+
+        let legacyRecovery = try reopened.reconcile(
+            packageID: package.id,
+            runID: runID,
+            runState: .blockedConfiguration,
+            error: "retained legacy state"
+        )
+        XCTAssertEqual(legacyRecovery.state, .running)
+        XCTAssertEqual(legacyRecovery.runID, runID)
+        XCTAssertEqual(legacyRecovery.lastError, "retained legacy state")
     }
 
     func testNewProjectGenerationHasIndependentQueueAndProjectRemovalClearsIt() throws {

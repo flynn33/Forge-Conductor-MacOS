@@ -447,7 +447,7 @@ struct RigDashboardView: View {
                     }
                     Spacer(minLength: 8)
                     if let state = runtime.activeRunState {
-                        Text(state.uppercased())
+                        Text(OperatorRunStatePresentation.displayName(state).uppercased())
                             .foregroundStyle(.mint)
                     }
                 }
@@ -488,7 +488,10 @@ struct RigDashboardView: View {
                     Text("CURRENT PACKAGE · No active instruction package")
                 }
                 if let state = runtime.activeRunState {
-                    Text("ACTIVE MANAGED RUN · \(state.uppercased())")
+                    Text(
+                        "ACTIVE MANAGED RUN · "
+                            + OperatorRunStatePresentation.displayName(state).uppercased()
+                    )
                         .foregroundStyle(.mint)
                     if let phase = runtime.currentPhase {
                         Text("PHASE · \(phase)")

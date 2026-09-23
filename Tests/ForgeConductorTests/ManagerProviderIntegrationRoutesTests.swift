@@ -411,8 +411,8 @@ final class ManagerProviderIntegrationRoutesTests: XCTestCase {
         ])
         await adapter.setBlocked(true)
 
-        let firstPreparation = Task {
-            try await self.asyncRequest(
+        let firstPreparation = Task { @Sendable in
+            try await Self.asyncStatusCode(
                 port: port,
                 path: "/api/manager/runs/prepare",
                 method: "POST",
@@ -458,8 +458,8 @@ final class ManagerProviderIntegrationRoutesTests: XCTestCase {
         XCTAssertEqual(overlapState.maximumActive, 1)
 
         await adapter.release()
-        let firstResponse = try await firstPreparation.value
-        XCTAssertEqual(firstResponse.response.statusCode, 200)
+        let firstStatusCode = try await firstPreparation.value
+        XCTAssertEqual(firstStatusCode, 200)
         await adapter.setBlocked(false)
         let retry = try request(
             port: port,
@@ -509,14 +509,20 @@ final class ManagerProviderIntegrationRoutesTests: XCTestCase {
         return (data, response, object)
     }
 
-    private func asyncRequest(
+    private static func asyncStatusCode(
         port: Int,
         path: String,
         method: String,
         body: Data = Data(),
         token: String?
-    ) async throws -> (data: Data, response: HTTPURLResponse, object: [String: Any]) {
-        let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)\(path)"))
+    ) async throws -> Int {
+        guard let url = URL(string: "http://127.0.0.1:\(port)\(path)") else {
+            throw NSError(
+                domain: "ManagerProviderIntegrationRoutesTests.AsyncRequest",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Could not construct the loopback request URL"]
+            )
+        }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 10
@@ -527,10 +533,9 @@ final class ManagerProviderIntegrationRoutesTests: XCTestCase {
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await URLSession.shared.data(for: request)
         let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
-        let object = (try? JSONSupport.object(from: data)) ?? [:]
-        return (data, httpResponse, object)
+        return httpResponse.statusCode
     }
 
     private func waitForTerminalOperation(

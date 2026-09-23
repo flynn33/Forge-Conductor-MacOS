@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.14.0)
+# Context & Agent Continuity (v0.14.1)
 
 ## Summary
 
@@ -81,11 +81,12 @@ or recovery retries can repeat inference. Manager tool-effect reconciliation
 prevents the same reconciled tool effect from executing twice. This is
 mitigation, not elimination of the provider-response race.
 
-Release qualification still requires one threshold-forced manager-owned run
-against the real provider that proves exact successor acknowledgment,
-predecessor fencing and idempotent sealing, automatic continuation, GUI-closed
-operation, and recovery from every durable crash state. Unit and synthetic-host
-tests do not satisfy that boundary.
+The retained qualification record includes one threshold-forced
+manager-owned provider run with successor acknowledgment, predecessor fencing,
+idempotent sealing, automatic continuation, and GUI-closed operation. The
+deterministic crash matrix covers the other durable transitions. Those records
+remain bound to their exact revisions; current source and an installed build
+still require their own qualification before shipment.
 
 The native **Provider** screen creates and updates validated, revisioned
 endpoint/model settings through authenticated manager routes. Credentials can
@@ -103,18 +104,19 @@ The Continuity header, status, and Refresh control remain above the content
 panes so they are reachable below the app title bar. When no operation exists,
 the view uses the full detail width instead of reserving an empty list column.
 When operations exist, the bounded operation list and detail pane share the
-available width.
+available width. Optional checkpoint/rollover actions, exact operation identity,
+context budget, handoff/successor fields, and event history remain present; the
+layout correction does not remove those capabilities.
 
 **Protection** is an operator-facing state, not a generic alarm. The detail and
 next-action text explain the exact transition:
 
 - provider failures retain the saved task and offer **Open Provider**. LM Studio
-  readiness is repaired with **Connect and Check**; a desktop-host failure uses
-  the exact action or **Repair Integration** shown on that provider's card;
+  readiness and desktop integration verification/repair use that provider
+  card's **Connect and Check** action; any host reload, activation, or trust
+  action remains explicit;
 - automatic completion failures offer **Open Autonomy**, where the named check
-  is corrected and retried without a gate policy or restored environment;
-- an explicitly declared custom native gate is handled in Autonomy with its
-  matching signed policy; and
+  or package-owned requirement is corrected and retried;
 - other recoverable states route to the exact recorded run condition in
   Autonomy while continuity preserves durable task state.
 

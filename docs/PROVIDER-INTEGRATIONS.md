@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.14.0**, build **6**. This document describes the
+Product identity: version **0.14.1**, build **7**. This document describes the
 implemented integration contract; qualification remains evidence-bound per
 host.
 
@@ -10,7 +10,7 @@ selectable provider's toggle provisions or verifies its Forge-owned integration
 before changing the durable selection. Turning on a different provider replaces
 the selection; turning off the selected provider leaves no provider selected.
 An installed integration may remain configured while inactive. The selectable
-providers in 0.14.0 are LM Studio, Claude Code Desktop, and Codex Desktop. Grok
+providers in 0.14.1 are LM Studio, Claude Code Desktop, and Codex Desktop. Grok
 Build remains visible but non-selectable.
 
 A desktop provider with a nonterminal task cannot be selected, deselected,
@@ -25,7 +25,7 @@ hook path of an active desktop session.
 | LM Studio | `lmstudio` | `managed_provider_push` | Forge sends bounded managed-model turns to the saved LM Studio endpoint and owns the managed run lifecycle. |
 | Claude Code Desktop | `claude-desktop` | `desktop_plugin_pull` | Claude owns the model and desktop session; its Forge plugin, hooks, and MCP registration connect that session to Forge orchestration. |
 | Codex Desktop | `codex-desktop` | `desktop_plugin_pull` | Codex owns the model and desktop task; its Forge plugin, hooks, and MCP registration connect that task to Forge orchestration. |
-| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.0. |
+| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.1. |
 
 The selectable desktop providers are not alternate model APIs inside Forge. Forge does not
 send their prompts, select their model, create a private desktop conversation,
@@ -60,10 +60,13 @@ project-scoped MCP tools and the authenticated hook context; checkpoint and
 handoff behavior therefore occurs at the host/plugin boundary rather than by
 Forge creating or replacing a private desktop conversation.
 
-## What one toggle does
+## What Connect and Check does
 
-Activation for a selectable provider is a revision-fenced, idempotent Manager
-operation:
+Every selectable provider card exposes one **Connect and Check** action. On an
+inactive card it performs the complete revision-fenced, idempotent activation
+operation and selects the provider only after readiness. On the selected LM
+Studio card it repeats inventory and contract verification; on a selected
+desktop card it verifies or repairs the Forge-owned integration:
 
 1. Inspect the host and any existing Forge-owned package and registration.
 2. Verify the same-build `forge-conductor` bridge.
@@ -71,8 +74,10 @@ operation:
    required.
 4. Commit only Forge-owned files and compatible settings entries, with rollback
    if a commit or verification step fails.
-5. Use the host's supported CLI when it is available, then verify the committed
-   registration.
+5. Use the host's supported CLI when it is available. A nonzero mutation result
+   is accepted only for a narrowly recognized already-present outcome and only
+   when a later live inventory call independently verifies the exact enabled
+   plugin; timeouts, truncation, and ambiguous output fail closed.
 6. Change the durable selection only after provisioning reaches a usable state.
 
 The previous selection is retained when provisioning fails or requires a
@@ -139,6 +144,8 @@ conflicts, and preserves unrelated settings entries.
 - Forge writes the portable plugin to `~/plugins/forge-conductor/` with
   `plugin.json`, the `.codex-plugin/plugin.json` compatibility manifest,
   `hooks/hooks.json`, the `forge-run` skill, and `mcp.json`.
+- The portable `mcp.json` includes the Agent Plugins 1.0 MCP schema declaration
+  as well as the Forge stdio registration.
 - Forge merges the local source `./plugins/forge-conductor` into the personal
   marketplace at `~/.agents/plugins/marketplace.json`.
 - When the `codex` CLI is available, Forge uses the supported plugin add and
@@ -155,6 +162,8 @@ conflicts, and preserves unrelated settings entries.
   (or `~/.grok/plugins/forge-conductor/` when `GROK_HOME` is unset).
 - A legacy or staged package may contain `plugin.json`, `hooks/hooks.json`, the
   `forge-run` skill, and `.mcp.json`; those files are not readiness evidence.
+- Generated compatibility hooks use Grok's documented passive event set and do
+  not emit a permission decision for an event Grok does not support.
 - The card is non-selectable and run admission rejects `grok-build`. Forge does
   not represent CLI validation, enablement, or inventory presence as live
   assignment support.
@@ -217,8 +226,9 @@ shell, filesystem, completion, memory, or continuity checks.
 
 ## Repair, deactivate, and remove
 
-- **Repair Integration** re-inspects and transactionally regenerates a
-  selectable desktop host's Forge-owned package and compatible registration.
+- **Connect and Check** on the selected desktop provider re-inspects and
+  transactionally regenerates its Forge-owned package and compatible
+  registration when repair is needed.
 - Turning a toggle off deactivates selection but retains the verified package
   and redacted receipt, making later reactivation inexpensive.
 - **Remove Integration** is available only while that provider is inactive. It

@@ -34,15 +34,15 @@ steps are the supported operating order:
 
 1. **Confirm Forge is ready** — verify Manager is running.
 2. **Select and verify the provider** — start LM Studio, Claude Code Desktop,
-   or Codex Desktop, turn on that provider's single activation
-   toggle, and complete the exact connection, reload, activation, or trust
-   action shown by Provider. The LM Studio toggle runs **Connect and Check**
-   before selection; the same action remains available under **LM Studio
-   Advanced** for an explicit recheck.
+   or Codex Desktop and choose that card's **Connect and Check** action. For an
+   inactive provider, the action performs the manager-owned provision,
+   inspection, readiness, and selection workflow; for an active desktop
+   provider, it verifies or repairs the integration. Complete only an exact
+   reload, activation, or trust action reported by the host.
 3. **Register the project** — select the exact repository; normal registration
    authorizes that folder without a separate parent-root setup step.
 4. **Add and order instructions** — import packages, review their capabilities
-   and gates, and arrange execution order.
+   and package-owned completion requirements, and arrange execution order.
 5. **Review automation behavior** — confirm tools, automatic completion checks,
    failure handling, and continuity behavior.
 6. **Start the automated run** — launch the ordered queue from Projects or one
@@ -56,7 +56,12 @@ steps are the supported operating order:
 Every step states its readiness condition, ordinary actions, recovery guidance,
 and links to the owning view. **Next required step** uses current Manager,
 Provider, project, package, and run state to recommend a step. It is navigation
-guidance only: it does not change configuration, start a run, or approve a gate.
+guidance only: it does not change configuration, start a run, or approve
+completion evidence; those remain explicit controls in their owning views.
+
+The review step distinguishes selectable built-in evidence checks from
+instruction-package requirements. Package requirements are read-only in Forge
+configuration and remain part of the bound instruction artifact.
 
 Only one provider can be selected. Desktop-host activation may transactionally
 install or update Forge-owned plugin, hook, skill, and MCP files, but the wizard
@@ -68,7 +73,7 @@ desktop provider with unfinished tasks cannot be selected, deselected,
 repaired, or removed until those tasks are finished or cancelled through
 Autonomy.
 
-Grok Build remains visible in Provider but is non-selectable in 0.14.0. Its
+Grok Build remains visible in Provider but is non-selectable in 0.14.1. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.
