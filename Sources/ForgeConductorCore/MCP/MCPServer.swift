@@ -406,7 +406,7 @@ public final class MCPServer: @unchecked Sendable {
             return desktopProviderID != nil || MCPToolAccessPolicy.permits(name, role: role)
         }
         if desktopProviderID != nil {
-            descriptors.append(Self.desktopAttachmentToolDescriptor)
+            descriptors.append(Self.makeDesktopAttachmentToolDescriptor())
         }
         return descriptors.sorted {
             ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "")
@@ -487,35 +487,37 @@ public final class MCPServer: @unchecked Sendable {
         }
     }
 
-    private static let desktopAttachmentToolDescriptor: [String: Any] = [
-        "name": DesktopProviderMCPAttachmentContract.toolName,
-        "description": "Attach this provider-specific MCP process to the exact active Forge desktop run authorized by the current hook assignment.",
-        "inputSchema": [
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-                "attachment_token", "provider_id", "run_id", "project_id",
-                "project_generation", "session_sha256", "selection_revision",
-                "deployment_id",
-            ],
-            "properties": [
-                "attachment_token": ["type": "string", "pattern": "^[0-9a-f]{64}$"],
-                "provider_id": [
-                    "type": "string",
-                    "enum": [
-                        ProviderIntegrationID.claudeDesktop.rawValue,
-                        ProviderIntegrationID.codexDesktop.rawValue,
-                    ],
+    private static func makeDesktopAttachmentToolDescriptor() -> [String: Any] {
+        [
+            "name": DesktopProviderMCPAttachmentContract.toolName,
+            "description": "Attach this provider-specific MCP process to the exact active Forge desktop run authorized by the current hook assignment.",
+            "inputSchema": [
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "attachment_token", "provider_id", "run_id", "project_id",
+                    "project_generation", "session_sha256", "selection_revision",
+                    "deployment_id",
                 ],
-                "run_id": ["type": "string", "format": "uuid"],
-                "project_id": ["type": "string", "format": "uuid"],
-                "project_generation": ["type": "integer", "minimum": 1],
-                "session_sha256": ["type": "string", "pattern": "^[0-9a-f]{64}$"],
-                "selection_revision": ["type": "string", "minLength": 1, "maxLength": ProviderIntegrationContract.maximumRevisionBytes],
-                "deployment_id": ["type": "string", "minLength": 1, "maxLength": ProviderIntegrationContract.maximumArtifactVersionBytes],
+                "properties": [
+                    "attachment_token": ["type": "string", "pattern": "^[0-9a-f]{64}$"],
+                    "provider_id": [
+                        "type": "string",
+                        "enum": [
+                            ProviderIntegrationID.claudeDesktop.rawValue,
+                            ProviderIntegrationID.codexDesktop.rawValue,
+                        ],
+                    ],
+                    "run_id": ["type": "string", "format": "uuid"],
+                    "project_id": ["type": "string", "format": "uuid"],
+                    "project_generation": ["type": "integer", "minimum": 1],
+                    "session_sha256": ["type": "string", "pattern": "^[0-9a-f]{64}$"],
+                    "selection_revision": ["type": "string", "minLength": 1, "maxLength": ProviderIntegrationContract.maximumRevisionBytes],
+                    "deployment_id": ["type": "string", "minLength": 1, "maxLength": ProviderIntegrationContract.maximumArtifactVersionBytes],
+                ] as [String: Any],
             ] as [String: Any],
-        ] as [String: Any],
-    ]
+        ]
+    }
 
     private static func isNotification(_ message: [String: Any]) -> Bool {
         let id = message["id"]

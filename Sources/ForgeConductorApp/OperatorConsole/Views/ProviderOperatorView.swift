@@ -386,7 +386,7 @@ private struct ProviderSelectionCard: View {
     let actionsDisabled: Bool
     let repairAvailable: Bool
     let removalDisabled: Bool
-    let onToggle: (Bool) -> Void
+    let onToggle: @MainActor @Sendable (Bool) -> Void
     let onRepair: () -> Void
     let onRemove: () -> Void
 
