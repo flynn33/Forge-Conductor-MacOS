@@ -109,7 +109,11 @@ title-bar clearance, compact Storage/Managed Activity geometry, and all-primary-
 view containment/alignment at minimum and normal widths. The UI runner still
 emits its known nonfailing main-thread runtime diagnostic; this is not presented
 as a compiler warning. Live loaded-model LM Studio, live Claude/Codex hosts,
-installed-build evidence and shipment remain separate.
+installed-build evidence and shipment remain separate. The wiki was published
+at `54c714a71f872152f4af6869428c63018cd44a09`; a checksum comparison found no
+tracked-file difference between canonical `main` and
+`/Users/flynn/Downloads/Forge-Conductor-MacOS-main`, whose clean workspace build
+also completed with no warning or error lines.
 
 The earlier September 17 distribution-evidence source is owner-authored revision
 `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
