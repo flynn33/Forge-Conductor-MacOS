@@ -26,6 +26,51 @@ private enum ManagerConcurrentRegistrationFixtureError: Error {
     case barrierTimedOut
 }
 
+private final class ManagerBoundedResponseProtocol: URLProtocol, @unchecked Sendable {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var body = Data()
+    nonisolated(unsafe) private static var declaredLength: Int?
+
+    static func configure(body: Data, declaredLength: Int?) {
+        lock.lock()
+        self.body = body
+        self.declaredLength = declaredLength
+        lock.unlock()
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.lock.lock()
+        let body = Self.body
+        let declaredLength = Self.declaredLength
+        Self.lock.unlock()
+        guard let url = request.url else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        var headers = ["Content-Type": "application/json"]
+        if let declaredLength {
+            headers["Content-Length"] = String(declaredLength)
+        }
+        guard let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+        ) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 private final class ManagerConcurrentRegistrationBarrier: @unchecked Sendable {
     private let condition = NSCondition()
     private var arrivals = 0
@@ -931,7 +976,8 @@ final class ManagerTests: XCTestCase {
     }
 
     func testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths() async throws {
-        let app = try ForgeApp.bootstrap(home: home)
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: home, clock: clock)
         let port = Int.random(in: 19_000...28_000)
         try app.config.update(["dashboard": ["port": port] as [String: Any]], save: true)
         let projectRoot = home.appendingPathComponent("operator-project", isDirectory: true)
@@ -947,7 +993,13 @@ final class ManagerTests: XCTestCase {
             networkAllowed: false,
             maximumInlineOutputBytes: 1_024
         )
-        for mission in ["Earlier run", "Inspect api_key=supersecretvalue without exposing it"] {
+        let managedAssistantOutput = "First response line\n"
+            + "Second response line with api_key=supersecretvalue\n"
+            + String(repeating: "bounded model output · ", count: 700)
+        for (index, mission) in [
+            "Earlier run",
+            "Inspect api_key=supersecretvalue without exposing it",
+        ].enumerated() {
             _ = try await app.projectContexts.repository.createAutonomousRun(
                 AutonomousRunRequest(
                     projectID: project.projectID,
@@ -958,7 +1010,13 @@ final class ManagerTests: XCTestCase {
                     modelKey: "fixture-model",
                     specification: AutonomousRunSpecification(
                         allowedTools: ["project_memory.search"],
-                        completionGates: ["fixture-gate"]
+                        completionGates: ["fixture-gate"],
+                        work: index == 1 ? AutonomousRunWork(
+                            currentPhase: "Execute package step",
+                            workItem: "Implement the monitoring feed",
+                            nextAction: "Run focused verification",
+                            metadata: ["provider_assistant_summary": managedAssistantOutput]
+                        ) : AutonomousRunWork()
                     ),
                     authorizationScope: scope
                 )
@@ -992,7 +1050,132 @@ final class ManagerTests: XCTestCase {
         )
         XCTAssertTrue(mission.contains("<redacted>"))
         XCTAssertFalse(mission.contains("supersecretvalue"))
+        XCTAssertTrue(redactedSnapshot.runs.allSatisfy {
+            $0.currentPhase == nil && $0.nextAction == nil
+                && $0.lastAssistantMessage == nil && $0.lastToolSummary == nil
+        })
+        XCTAssertEqual(
+            redactedSnapshot.runs.first(where: { $0.mission.contains("Inspect") })?.workItem,
+            "Implement the monitoring feed",
+            "The established public work-item projection remains available to Autonomy"
+        )
+        let activityRun = try XCTUnwrap(
+            redactedSnapshot.runs.first { $0.mission.contains("Inspect") }
+        )
+        clock.date = clock.date.addingTimeInterval(60)
+        for index in 0..<101 {
+            _ = try await app.projectContexts.repository.createAutonomousRun(
+                AutonomousRunRequest(
+                    projectID: project.projectID,
+                    projectGeneration: project.generation,
+                    mission: "Newer bounded run \(index)",
+                    providerID: "lmstudio",
+                    adapterID: "forge.native-session-host",
+                    modelKey: "fixture-model",
+                    specification: AutonomousRunSpecification(
+                        allowedTools: ["project_memory.search"],
+                        completionGates: ["fixture-gate"]
+                    ),
+                    authorizationScope: scope
+                )
+            )
+        }
+        XCTAssertFalse(
+            try node.operatorSnapshot(limit: 100).runs.contains { $0.runID == activityRun.runID },
+            "The fixture run must be outside the global recent-run window"
+        )
+        let activitySnapshot = try node.operatorSnapshot(
+            limit: 100,
+            includeActivity: true,
+            activityRunID: activityRun.runID,
+            activityProjectID: activityRun.projectID,
+            activityProjectGeneration: activityRun.projectGeneration
+        )
+        let monitoredRun = try XCTUnwrap(
+            activitySnapshot.runs.first { $0.currentPhase == "Execute package step" }
+        )
+        XCTAssertEqual(activitySnapshot.runs.count, 1)
+        XCTAssertEqual(activitySnapshot.projects.count, 1)
+        XCTAssertTrue(activitySnapshot.pendingProjectRegistrations.isEmpty)
+        XCTAssertTrue(activitySnapshot.runtimeJobs.isEmpty)
+        XCTAssertEqual(monitoredRun.workItem, "Implement the monitoring feed")
+        XCTAssertEqual(monitoredRun.nextAction, "Run focused verification")
+        let assistantMessage = try XCTUnwrap(monitoredRun.lastAssistantMessage)
+        XCTAssertTrue(assistantMessage.contains("First response line\nSecond response line"))
+        XCTAssertTrue(assistantMessage.contains("<redacted>"))
+        XCTAssertFalse(assistantMessage.contains("supersecretvalue"))
+        XCTAssertLessThanOrEqual(assistantMessage.utf8.count, 8 * 1_024)
         XCTAssertNotNil(snapshot["next_cursor"] as? String)
+
+        let activityURL = try XCTUnwrap(URL(string: base
+            + "/api/manager/operator/activity?limit=100"
+            + "&run_id=\(activityRun.runID)"
+            + "&project_id=\(activityRun.projectID)"
+            + "&project_generation=\(activityRun.projectGeneration)"))
+        XCTAssertEqual(try HTTPTestHelpers.fetchStatusCode(activityURL), 401)
+        var activityRequest = URLRequest(url: activityURL)
+        let credential = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
+        activityRequest.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+        let (activityData, activityResponse) = try HTTPTestHelpers.fetch(activityRequest)
+        XCTAssertEqual(activityResponse.statusCode, 200)
+        let activityObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: activityData) as? [String: Any]
+        )
+        let activityRuns = try XCTUnwrap(activityObject["runs"] as? [[String: Any]])
+        let httpActivityRun = try XCTUnwrap(
+            activityRuns.first { $0["run_id"] as? String == activityRun.runID }
+        )
+        XCTAssertEqual(httpActivityRun["work_item"] as? String, "Implement the monitoring feed")
+        XCTAssertNotNil(httpActivityRun["last_assistant_message"] as? String)
+
+        for suffix in [
+            "?limit=100",
+            "?limit=100&run_id=not-a-uuid&project_id=\(activityRun.projectID)"
+                + "&project_generation=\(activityRun.projectGeneration)",
+            "?limit=100&run_id=\(activityRun.runID)&project_id=\(activityRun.projectID)"
+                + "&project_generation=0",
+            "?limit=100&run_id=\(activityRun.runID)&project_id=\(activityRun.projectID)"
+                + "&project_generation=9223372036854775808",
+            "?limit=100&run_id=\(activityRun.runID)&run_id=\(activityRun.runID)"
+                + "&project_id=\(activityRun.projectID)"
+                + "&project_generation=\(activityRun.projectGeneration)",
+        ] {
+            var invalidRequest = URLRequest(url: try XCTUnwrap(
+                URL(string: base + "/api/manager/operator/activity" + suffix)
+            ))
+            invalidRequest.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+            let (_, invalidResponse) = try HTTPTestHelpers.fetch(invalidRequest)
+            XCTAssertEqual(invalidResponse.statusCode, 400, "Expected rejected activity query: \(suffix)")
+        }
+
+        var mismatchedRequest = URLRequest(url: try XCTUnwrap(URL(string: base
+            + "/api/manager/operator/activity?limit=100"
+            + "&run_id=\(activityRun.runID)"
+            + "&project_id=\(activityRun.projectID)"
+            + "&project_generation=\(activityRun.projectGeneration + 1)")))
+        mismatchedRequest.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+        let (mismatchData, mismatchResponse) = try HTTPTestHelpers.fetch(mismatchedRequest)
+        XCTAssertEqual(mismatchResponse.statusCode, 409)
+        let mismatchObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: mismatchData) as? [String: Any]
+        )
+        XCTAssertEqual(mismatchObject["code"] as? String, ProjectContextError.projectScopeMismatch.code)
+
+        var unknownRunRequest = URLRequest(url: try XCTUnwrap(URL(string: base
+            + "/api/manager/operator/activity?limit=100"
+            + "&run_id=\(UUID().uuidString.lowercased())"
+            + "&project_id=\(activityRun.projectID)"
+            + "&project_generation=\(activityRun.projectGeneration)")))
+        unknownRunRequest.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+        let (unknownRunData, unknownRunResponse) = try HTTPTestHelpers.fetch(unknownRunRequest)
+        XCTAssertEqual(unknownRunResponse.statusCode, 409)
+        let unknownRunObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: unknownRunData) as? [String: Any]
+        )
+        XCTAssertEqual(
+            unknownRunObject["code"] as? String,
+            ProjectContextError.projectScopeMismatch.code
+        )
 
         for suffix in [
             "?limit=0",
@@ -1005,6 +1188,157 @@ final class ManagerTests: XCTestCase {
             )
             XCTAssertEqual(code, 400, "Expected a rejected snapshot query for \(suffix)")
         }
+    }
+
+    func testManagerClientsStreamResponsesThroughAnExactByteCeiling() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ManagerBoundedResponseProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let request = URLRequest(url: try XCTUnwrap(
+            URL(string: "http://127.0.0.1:7788/bounded-response")
+        ))
+
+        ManagerBoundedResponseProtocol.configure(
+            body: Data(repeating: 0x20, count: 256),
+            declaredLength: nil
+        )
+        let (boundary, _) = try await BoundedURLSessionLoader.data(
+            for: request,
+            using: session,
+            maximumBytes: 256
+        )
+        XCTAssertEqual(boundary.count, 256)
+
+        ManagerBoundedResponseProtocol.configure(
+            body: Data(repeating: 0x20, count: 257),
+            declaredLength: nil
+        )
+        do {
+            _ = try await BoundedURLSessionLoader.data(
+                for: request,
+                using: session,
+                maximumBytes: 256
+            )
+            XCTFail("The loader accepted a chunked response above its byte ceiling")
+        } catch let error as BoundedURLSessionLoaderError {
+            XCTAssertEqual(error, .responseTooLarge)
+        }
+
+        ManagerBoundedResponseProtocol.configure(
+            body: Data("{}".utf8),
+            declaredLength: ManagerDashboardClient.ordinaryMaximumResponseBytes + 1
+        )
+        let client = ManagerDashboardClient(
+            host: "127.0.0.1",
+            port: 7788,
+            session: session,
+            credentials: ManagerRelinkCredentialFixture()
+        )
+        do {
+            _ = try await client.status()
+            XCTFail("The manager client accepted a declared response above its byte ceiling")
+        } catch let error as ManagerDashboardClient.ClientError {
+            XCTAssertEqual(error.errorDescription, "Manager response exceeded the bounded UI response limit")
+            guard case .responseTooLarge = error else {
+                return XCTFail("Unexpected manager response error: \(error)")
+            }
+        }
+    }
+
+    func testExactOperatorActivityRetainsRequestedRunContinuityWhenAnotherRunIsNewer() async throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_100_000))
+        let app = try ForgeApp.bootstrap(home: home, clock: clock)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent(
+            "exact-activity-continuity-project",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        let node = ManagerNode(app: app)
+        let registered = try node.registerProject(
+            path: projectRoot.path,
+            displayName: "Exact Activity Continuity"
+        )
+        let projectUUID = try XCTUnwrap(
+            (registered["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        )
+        let projectID = ProjectID(projectUUID)
+        let targetRunID = RunID()
+        try await app.projectContexts.repository.reserveContinuityRun(
+            runID: targetRunID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Requested activity run",
+            mode: .managedAutonomous
+        )
+        let targetOperationID = UUID()
+        _ = try await app.projectContexts.repository.enqueueContinuityCommand(
+            ContinuityCommandRequest(
+                operationID: targetOperationID,
+                runID: targetRunID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                type: .checkpoint,
+                requestedBy: "operator-activity-test",
+                reason: "retain the requested run's continuity",
+                idempotencyKey: "exact-activity-target-\(targetOperationID)",
+                payloadSHA256: String(repeating: "a", count: 64)
+            )
+        )
+
+        clock.date = clock.date.addingTimeInterval(60)
+        let newerRunID = RunID()
+        try await app.projectContexts.repository.reserveContinuityRun(
+            runID: newerRunID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Newer unrelated run",
+            mode: .managedAutonomous
+        )
+        let newerOperationID = UUID()
+        _ = try await app.projectContexts.repository.enqueueContinuityCommand(
+            ContinuityCommandRequest(
+                operationID: newerOperationID,
+                runID: newerRunID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                type: .checkpoint,
+                requestedBy: "operator-activity-test",
+                reason: "newer continuity for another run",
+                idempotencyKey: "exact-activity-newer-\(newerOperationID)",
+                payloadSHA256: String(repeating: "b", count: 64)
+            )
+        )
+
+        let projectLatest = try await app.projectContexts.repository
+            .operatorLatestContinuityCommand(projectID: projectID)
+        XCTAssertEqual(
+            projectLatest?.runID,
+            newerRunID,
+            "The regression requires the other run's continuity to be newer"
+        )
+
+        let snapshot = try node.operatorSnapshot(
+            limit: 100,
+            includeActivity: true,
+            activityRunID: targetRunID.description,
+            activityProjectID: projectID.description,
+            activityProjectGeneration: ProjectGeneration.initial.rawValue
+        )
+        XCTAssertEqual(snapshot.runs.map(\.runID), [targetRunID.description])
+        XCTAssertEqual(snapshot.continuityOperations.count, 1)
+        XCTAssertEqual(snapshot.continuityOperations.first?.runID, targetRunID.description)
+        XCTAssertEqual(
+            snapshot.continuityOperations.first?.operationID,
+            targetOperationID.uuidString.lowercased()
+        )
+        XCTAssertFalse(snapshot.continuityOperations.contains {
+            $0.operationID == newerOperationID.uuidString.lowercased()
+        })
     }
 
     func testProjectMutationRoutesMatchExactOperatorProjectionAndResetReceipt() async throws {

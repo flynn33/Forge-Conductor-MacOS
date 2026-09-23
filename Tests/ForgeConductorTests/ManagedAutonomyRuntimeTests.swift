@@ -1268,7 +1268,7 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             inputSHA256: JSONSupport.sha256Hex("operator-contract-input")
         )
         _ = try await repository.persistProviderTurnIntent(turn, lease: lease)
-        _ = try await repository.persistToolInvocationIntent(
+        let invocation = try await repository.persistToolInvocationIntent(
             ToolInvocationIntent(
                 turnID: turn.turnID,
                 runID: runID,
@@ -1283,6 +1283,67 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             ),
             lease: lease
         )
+        let assistantActivity = "Inspected the requested file.\n"
+            + "api_key=operator-contract-secret\n"
+            + String(repeating: "🛠", count: 2_000)
+        try await repository.recordManagedAssistantActivity(
+            runID: runID,
+            turnID: turn.turnID,
+            summary: assistantActivity,
+            lease: lease
+        )
+        try await repository.recordManagedAssistantActivity(
+            runID: runID,
+            turnID: turn.turnID,
+            summary: assistantActivity,
+            lease: lease
+        )
+        _ = try await repository.transitionToolInvocation(
+            invocationID: invocation.invocationID,
+            expected: .intent,
+            to: .executing,
+            lease: lease
+        )
+        let toolResult = try JSONSupport.canonicalJSON([
+            "ok": true,
+            "payload": [
+                "path": fixtureURL.path,
+                "api_key": "operator-contract-tool-secret",
+                "password": "operator-contract-password-secret",
+                "content": "fixture tool output",
+            ],
+        ])
+        _ = try await repository.transitionToolInvocation(
+            invocationID: invocation.invocationID,
+            expected: .executing,
+            to: .completed,
+            lease: lease,
+            resultSHA256: JSONSupport.sha256Hex(toolResult),
+            resultSummary: toolResult
+        )
+
+        let publicEvents = try await repository.operatorAutonomyEvents(limit: 101)
+        XCTAssertFalse(publicEvents.contains { $0.eventType.hasPrefix("managed_activity_") })
+        let activityEvents = try await repository.operatorAutonomyEvents(
+            limit: 101,
+            runID: runID,
+            includeManagedActivity: true
+        )
+        XCTAssertEqual(
+            activityEvents.filter { $0.eventType == "managed_activity_assistant_response" }.count,
+            1,
+            "Provider-turn replay must not duplicate the durable assistant projection"
+        )
+        let storedAssistant = try XCTUnwrap(
+            activityEvents.first { $0.eventType == "managed_activity_assistant_response" }
+        )
+        XCTAssertLessThanOrEqual(storedAssistant.summary.utf8.count, 2_048)
+        XCTAssertNoThrow(try XCTUnwrap(storedAssistant.summary.data(using: .utf8)))
+        XCTAssertEqual(
+            activityEvents.filter { $0.eventType.hasPrefix("managed_activity_tool_") }
+                .map(\.eventType),
+            ["managed_activity_tool_completed", "managed_activity_tool_executing"]
+        )
 
         let startReplay = try postJSON(startURL, object: startRequest, bearerToken: token)
         let status = try postJSON(statusURL, object: ["run_id": runID.description])
@@ -1293,6 +1354,27 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         )
         let pausedSnapshot = try HTTPTestHelpers.fetchJSON(snapshotURL)
         let pausedSnapshotRun = try operatorRun(runID: runID, snapshot: pausedSnapshot)
+        let activityURL = try XCTUnwrap(URL(string: base
+            + "/api/manager/operator/activity?limit=100"
+            + "&run_id=\(runID.description)"
+            + "&project_id=\(projectID.description)"
+            + "&project_generation=\(generation.rawValue)"))
+        var activityRequest = URLRequest(url: activityURL)
+        activityRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (activityData, activityResponse) = try HTTPTestHelpers.fetch(activityRequest)
+        XCTAssertEqual(activityResponse.statusCode, 200)
+        let activityObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: activityData) as? [String: Any]
+        )
+        let managedEvents = try XCTUnwrap(activityObject["events"] as? [[String: Any]])
+            .filter { ($0["kind"] as? String)?.hasPrefix("managed_activity_") == true }
+        XCTAssertEqual(managedEvents.count, 3)
+        let managedEventText = managedEvents.compactMap { $0["summary"] as? String }
+            .joined(separator: "\n")
+        XCTAssertTrue(managedEventText.contains("<redacted>"))
+        XCTAssertFalse(managedEventText.contains("operator-contract-secret"))
+        XCTAssertFalse(managedEventText.contains("operator-contract-tool-secret"))
+        XCTAssertFalse(managedEventText.contains("operator-contract-password-secret"))
         for response in [startReplay.object, status.object, control.object] {
             XCTAssertEqual(response["ok"] as? Bool, true)
             try assertExactOperatorRunProjection(response, equals: pausedSnapshotRun)
@@ -1683,6 +1765,8 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
             "continuity_mode", "provider_id", "adapter_id", "model_key", "provider_instance_id",
             "active_session_id", "predecessor_session_id", "active_operation_id",
             "continuation_pending", "lease_owner", "work_item", "last_model_turn_at",
+            "last_model_turn_id", "last_model_turn_kind", "last_model_turn_state",
+            "last_tool_invocation_id", "last_tool_name", "last_tool_state",
             "last_tool_activity_at", "completion_gates", "passed_gates", "last_error_code",
             "last_error_summary", "retry_at", "created_at", "updated_at",
         ]

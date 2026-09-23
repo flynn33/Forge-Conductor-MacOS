@@ -49,6 +49,16 @@ final class ContinuityBootstrapAuthorityTests: XCTestCase {
             let invocation = try await fixture.repository.toolInvocation(prepared.invocationID)
             XCTAssertEqual(invocation?.state, .completed)
             XCTAssertEqual(invocation?.resultSHA256, proof.toolResultSHA256)
+            let activity = try await fixture.repository.operatorAutonomyEvents(
+                limit: 101,
+                runID: fixture.receipt.runID,
+                includeManagedActivity: true
+            )
+            XCTAssertEqual(
+                activity.filter { $0.eventType.hasPrefix("managed_activity_tool_") }
+                    .map(\.eventType),
+                ["managed_activity_tool_completed", "managed_activity_tool_executing"]
+            )
             await fixture.repository.close()
             let reopened = try ProjectControlPlaneRepository(databaseURL: fixture.database)
             do {
@@ -61,6 +71,17 @@ final class ContinuityBootstrapAuthorityTests: XCTestCase {
                 let result = try await reopened.continuityBootstrapProviderResult(grant: grant,
                     turnID: prepared.turn.turnID, lease: fixture.lease)
                 XCTAssertEqual(result, prepared.result)
+                let replayedActivity = try await reopened.operatorAutonomyEvents(
+                    limit: 101,
+                    runID: fixture.receipt.runID,
+                    includeManagedActivity: true
+                )
+                XCTAssertEqual(
+                    replayedActivity.filter { $0.eventType == "managed_activity_tool_completed" }
+                        .count,
+                    1,
+                    "Replaying an exact retrieval proof must not duplicate the activity event"
+                )
                 await fails { _ = try await reopened.validateAutonomousRunExecutionAdmission(fixture.receipt.runID) }
                 await reopened.close()
             } catch { await reopened.close(); throw error }

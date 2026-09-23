@@ -6,6 +6,10 @@ import ForgeConductorCore
 
 protocol RuneForgeManagerClientProtocol: Sendable {
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot
+    func runeForgeSnapshot(
+        projectID: String?,
+        projectGeneration: UInt64?
+    ) async throws -> StjornarvaldManagerSnapshot
     func addRuneForgeSource(path: String, requestID: UUID) async throws -> DevelopmentPolicySource
     func refreshRuneForgeSource(
         sourceID: PolicySourceID,
@@ -27,6 +31,17 @@ protocol RuneForgeManagerClientProtocol: Sendable {
         filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt
+}
+
+extension RuneForgeManagerClientProtocol {
+    func runeForgeSnapshot(
+        projectID: String?,
+        projectGeneration: UInt64?
+    ) async throws -> StjornarvaldManagerSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Project-scoped policy monitoring is unavailable from this manager client."
+        )
+    }
 }
 
 struct RuneForgeSourceItem: Identifiable, Equatable, Sendable {
@@ -138,6 +153,7 @@ final class RuneForgeViewModel: ObservableObject {
     static let pollingInterval: Duration = .seconds(5)
     static let maximumSources = 100
     static let maximumViolations = 100
+    static let maximumEvents = 100
 
     @Published private(set) var sources: [RuneForgeSourceItem] = []
     @Published private(set) var violations: [StjornarvaldViolationPageItem] = []
@@ -220,7 +236,7 @@ final class RuneForgeViewModel: ObservableObject {
             events = Array(
                 snapshot.violationEvents
                     .sorted { $0.sequence > $1.sequence }
-                    .prefix(Self.maximumViolations)
+                    .prefix(Self.maximumEvents)
             )
             governingPolicy = snapshot.governingPolicy
             health = snapshot.health
@@ -394,6 +410,17 @@ final class RuneForgeViewModel: ObservableObject {
         case .reopened: "Reopened"
         case .disputed: "Interpretation observation"
         case .unresolvedAtHandoff: "Delivery pending"
+        }
+    }
+
+    static func eventStateTitle(_ type: PolicyViolationEventType) -> String {
+        switch type {
+        case .opened: "Policy violation"
+        case .repeated: "Repeated"
+        case .evidenceUpdated: "Evidence updated"
+        case .corrected: "Corrected"
+        case .reopened: "Reopened"
+        case .disputed: "Interpretation observation"
         }
     }
 

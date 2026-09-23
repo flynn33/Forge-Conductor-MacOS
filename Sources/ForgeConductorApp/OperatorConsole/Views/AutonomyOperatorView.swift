@@ -252,7 +252,11 @@ struct AutonomyOperatorView: View {
                 }
             }
 
-            HStack(spacing: 10) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 104), spacing: 10)],
+                alignment: .leading,
+                spacing: 8
+            ) {
                 Button("Pause") { viewModel.control(.pause) }
                     .accessibilityIdentifier("run-pause")
                     .disabled(!viewModel.canControl(.pause, run: run))
@@ -280,7 +284,6 @@ struct AutonomyOperatorView: View {
                         .controlSize(.small)
                         .accessibilityLabel("Deleting settled task")
                 }
-                Spacer()
                 Button("Refresh Run", action: viewModel.refreshSelectedRun)
                     .disabled(viewModel.controlInFlight != nil)
             }
@@ -314,7 +317,8 @@ struct AutonomyOperatorView: View {
     }
 
     private var startSheet: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Start Task").font(.title2.bold())
                 Spacer()
@@ -527,9 +531,11 @@ struct AutonomyOperatorView: View {
                 .disabled(!viewModel.canStart)
                 .accessibilityIdentifier("run-start-confirm")
             }
+            }
+            .padding(22)
         }
-        .padding(22)
         .frame(width: 620)
+        .frame(minHeight: 520, idealHeight: 680, maxHeight: 720)
         .guidedHelpContext(.autonomyStartTask)
         .sheet(isPresented: $showingToolSelection) {
             VStack(alignment: .leading, spacing: 14) {
@@ -562,44 +568,52 @@ struct AutonomyOperatorView: View {
                 }
                 Text("Choose the deterministic checks Forge must satisfy before this task can complete. Forge may also derive relevant checks from the project and instructions.")
                     .foregroundStyle(.secondary)
-                ForEach(CompletionCheckPreset.allCases) { check in
-                    Toggle(
-                        isOn: Binding(
-                            get: { viewModel.selectedCompletionChecks.contains(check) },
-                            set: { viewModel.setCompletionCheck(check, selected: $0) }
-                        )
-                    ) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(check.title)
-                            Text(check.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(CompletionCheckPreset.allCases) { check in
+                            Toggle(
+                                isOn: Binding(
+                                    get: { viewModel.selectedCompletionChecks.contains(check) },
+                                    set: { viewModel.setCompletionCheck(check, selected: $0) }
+                                )
+                            ) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(check.title)
+                                    Text(check.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                            .accessibilityIdentifier("run-completion-check-\(check.rawValue)")
+                        }
+                        Divider()
+                        if let plan = viewModel.preparedCompletionPlan,
+                           !plan.obligations.isEmpty {
+                            Text("Prepared validation plan").font(.caption.weight(.semibold))
+                            ForEach(plan.obligations) { obligation in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Label(obligation.title, systemImage: "checkmark.seal")
+                                    Text(obligation.reason)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityIdentifier("run-completion-automatic")
+                        } else if viewModel.completionGates.isEmpty {
+                            Text("Checks will be derived during task preparation.")
+                                .accessibilityIdentifier("run-completion-automatic")
+                        } else {
+                            ForEach(
+                                viewModel.completionGates.split(separator: "\n"),
+                                id: \.self
+                            ) { gate in
+                                Label(String(gate), systemImage: "checkmark.seal")
+                            }
                         }
                     }
-                    .toggleStyle(.checkbox)
-                    .accessibilityIdentifier("run-completion-check-\(check.rawValue)")
                 }
                 Divider()
-                if let plan = viewModel.preparedCompletionPlan, !plan.obligations.isEmpty {
-                    Text("Prepared validation plan").font(.caption.weight(.semibold))
-                    ForEach(plan.obligations) { obligation in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Label(obligation.title, systemImage: "checkmark.seal")
-                            Text(obligation.reason)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .accessibilityIdentifier("run-completion-automatic")
-                } else if viewModel.completionGates.isEmpty {
-                    Text("Checks will be derived during task preparation.")
-                        .accessibilityIdentifier("run-completion-automatic")
-                } else {
-                    ForEach(viewModel.completionGates.split(separator: "\n"), id: \.self) { gate in
-                        Label(String(gate), systemImage: "checkmark.seal")
-                    }
-                }
-                Spacer()
                 HStack {
                     Spacer()
                     Button("Done") { showingCompletionChecks = false }

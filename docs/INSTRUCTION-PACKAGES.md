@@ -100,6 +100,16 @@ automatic advancement so the operator can review it in **Autonomy**.
 
 **Stop Queue** prevents the next package from starting. It does not discard or silently cancel an already admitted autonomous run; that run remains visible in **Autonomy**.
 
+**FORGE RIG** monitors the active queue without changing it. Its project status
+shows delivered document steps and completed packages; the Managed Activity
+frame names a current package only when its `run_id` exactly links it to the
+nonterminal active run. Failed, cancelled, terminal, and unrelated packages are
+never combined with that run. The first queued package is shown separately as
+**Next Package**. For an exact active package the frame shows the next inferred
+current step and durable delivered count together with the run's current phase,
+work item, and next action. The display refreshes every five seconds only while
+Rig is visible and does not treat a missing Manager snapshot as completed work.
+
 ## Storage and project linkage
 
 Forge copies accepted content to an owner-only, content-addressed snapshot under:

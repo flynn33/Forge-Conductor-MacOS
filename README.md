@@ -161,6 +161,29 @@ The run view leads with the task, current state/work, recent model and tool
 activity, automatic continuity, completion, and recovery. Provider, session,
 lease, project, and run identifiers remain available under **Technical details**.
 
+For at-a-glance monitoring, **FORGE RIG** places a bounded, coalesced
+**Managed Activity** projection immediately below Load Trace and Orchestration
+Status. It shows the active project and instruction package, the current
+inferred step plus durable delivered count, current phase/work/next action, the
+durable managed LM Studio response and tool-transition feed, orchestration
+events, and newest exact project/generation Rune Forge policy events. Detailed
+activity text is loaded through authenticated
+`GET /api/manager/operator/activity` with an exact run/project/generation
+identity. The public snapshot preserves bounded, redacted mission and work-item
+text plus non-sensitive state, identity, and event metadata for compatibility,
+but omits current phase/next action, assistant/model-error/tool summaries, and
+`managed_activity_*` rows.
+Durable summaries are capped at 2 KiB and retained per run as at most 128
+assistant plus 128 tool rows; the app applies an 8 KiB presentation cap while
+retaining at most 100 rolling rows. Both native clients stream responses through
+a 4 MiB ceiling. It is a turn-level operational view, not token streaming or a
+second persisted full conversation transcript.
+
+At normal widths, CPU shares a row with GPU and Storage shares an equalized row
+with the compact Managed Activity frame; constrained widths stack those panels
+vertically. The activity list scrolls internally so it does not lengthen the
+entire Rig board.
+
 The **Continuity** view leads with automatic protection for the selected task:
 its plain-language state, most recent progress save, remaining working context,
 and Forge's next automatic action. Active rollover activity keeps its event
@@ -230,10 +253,10 @@ Detailed deployment and recovery behavior is documented in
 
 | Surface | Responsibility |
 | --- | --- |
-| **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry plus color/load status for headless LM Studio, Autonomy, Continuity, Rune Forge observation, and durable project instruction/package progress |
+| **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry plus color/load status, durable instruction progress, and a redacted, exact-run Managed Activity projection for current work, managed responses, tool transitions, orchestration, and project-scoped policy events |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
-| **Rune Forge** | Native Development Policy source selection, bounded Stjornarvald violation/history inspection, delivery state, cached degraded operation, and atomic filtered policy-log export as JSONL, JSON, Markdown, or CSV |
+| **Rune Forge** | Native Development Policy source selection, a verbose bounded Policy Feed, violation/history inspection, delivery state, cached degraded operation, and atomic filtered policy-log export as JSONL, JSON, Markdown, or CSV |
 | **Autonomy** | Manager-owned runs, selectable native completion checks, per-task failure/retry instructions, continuity, and confirmed deletion of settled task history |
 | **Provider** | Local endpoint, model inventory, credentials, and contract probes |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |

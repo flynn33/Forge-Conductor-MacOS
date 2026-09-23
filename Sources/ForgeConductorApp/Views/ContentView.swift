@@ -70,6 +70,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
             .accessibilityElement(children: .contain)
+            .accessibilityLabel("\(model.selectedTab.rawValue) content")
             .accessibilityIdentifier("detail-\(model.selectedTab.accessibilityID)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

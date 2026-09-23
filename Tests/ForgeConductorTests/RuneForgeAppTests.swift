@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import XCTest
-import ForgeConductorCore
+@testable import ForgeConductorCore
 #if SWIFT_PACKAGE
 @testable import ForgeConductorApp
 #else
@@ -114,6 +114,105 @@ final class RuneForgeAppTests: XCTestCase {
         )
     }
 
+    func testPolicyFeedEventsAreNewestFirstAndBounded() async {
+        let events = (1...RuneForgeViewModel.maximumEvents + 1).map {
+            policyEvent(sequence: Int64($0))
+        }
+        let viewModel = RuneForgeViewModel(
+            client: SnapshotRuneForgeClient(snapshot: policySnapshot(events: events))
+        )
+
+        await viewModel.refreshNow()
+
+        XCTAssertEqual(viewModel.events.count, RuneForgeViewModel.maximumEvents)
+        XCTAssertEqual(viewModel.events.first?.sequence, Int64(RuneForgeViewModel.maximumEvents + 1))
+        XCTAssertEqual(viewModel.events.last?.sequence, 2)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testPolicyEventStateTitlesExposeEveryStateWithoutRelyingOnColor() {
+        XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.opened), "Policy violation")
+        XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.repeated), "Repeated")
+        XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.evidenceUpdated), "Evidence updated")
+        XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.corrected), "Corrected")
+        XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.reopened), "Reopened")
+        XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.disputed), "Interpretation observation")
+    }
+
+    private func policySnapshot(events: [PolicyViolationEvent]) -> StjornarvaldManagerSnapshot {
+        let sourceID = PolicySourceID()
+        return StjornarvaldManagerSnapshot(
+            schemaVersion: StjornarvaldManagerSnapshot.schemaVersion,
+            health: StjornarvaldManagerHealth(
+                state: .running,
+                policyIdentity: "fixture-policy",
+                evaluatorID: "fixture-evaluator",
+                startedAt: Date(timeIntervalSince1970: 1),
+                lastEvaluationAt: Date(timeIntervalSince1970: 2),
+                lastCommittedCursor: events.last?.sequence ?? 0,
+                processedObservationCount: events.count,
+                indexedSourceBatchCount: 1,
+                consecutiveFailureCount: 0,
+                lastError: nil
+            ),
+            governingPolicy: GoverningPolicyIdentity(
+                bindingID: "fixture-policy",
+                authority: "Fixture",
+                repositoryURL: "https://example.invalid/policy",
+                version: "1",
+                revision: "fixture-revision",
+                sourceID: sourceID
+            ),
+            sources: [],
+            violationEvents: events,
+            nextEventCursor: nil,
+            limitations: []
+        )
+    }
+
+    private func policyEvent(sequence: Int64) -> PolicyViolationEvent {
+        let sourceID = PolicySourceID()
+        let rule = PolicyRule(
+            id: PolicyRuleID("fixture-rule-\(sequence)"),
+            source: PolicySourceReference(
+                sourceID: sourceID,
+                revision: "fixture-revision",
+                path: "/tmp/policy.md",
+                locator: "line \(sequence)"
+            ),
+            statement: "Keep the implementation native.",
+            policyArea: "runtime",
+            applicability: "fixture",
+            confidence: 1
+        )
+        let candidate = PolicyViolationCandidate(
+            rule: rule,
+            observationID: UUID(),
+            subjectIdentity: "fixture-subject",
+            summary: "Fixture policy event \(sequence)",
+            evidenceReferences: ["fixture.swift:\(sequence)"],
+            explanation: "The fixture observed a policy mismatch.",
+            confidence: 0.9,
+            assumptions: ["The fixture is representative."],
+            alternatives: ["Retain the native implementation."],
+            suggestedCorrection: "Use the approved native framework."
+        )
+        return PolicyViolationEvent(
+            schemaVersion: "1.0.0",
+            sequence: sequence,
+            id: UUID(),
+            type: .opened,
+            occurredAt: Date(timeIntervalSince1970: TimeInterval(sequence)),
+            violationID: PolicyViolationID(),
+            fingerprint: "fixture-fingerprint-\(sequence)",
+            candidate: candidate,
+            noticeState: "presented",
+            priorEventSHA256: nil,
+            eventSHA256: String(repeating: "a", count: 64),
+            developmentContinues: true
+        )
+    }
+
     private func waitUntil(
         timeout: Duration = .seconds(2),
         predicate: @escaping @MainActor () -> Bool
@@ -125,6 +224,47 @@ final class RuneForgeAppTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
     }
+}
+
+private struct SnapshotRuneForgeClient: RuneForgeManagerClientProtocol {
+    let snapshot: StjornarvaldManagerSnapshot
+
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot { snapshot }
+
+    func addRuneForgeSource(
+        path: String,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource { throw URLError(.unsupportedURL) }
+
+    func refreshRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource { throw URLError(.unsupportedURL) }
+
+    func removeRuneForgeSource(
+        sourceID: PolicySourceID,
+        requestID: UUID
+    ) async throws -> DevelopmentPolicySource { throw URLError(.unsupportedURL) }
+
+    func runeForgeViolations(
+        cursor: Int64,
+        limit: Int,
+        state: PolicyViolationProjectionState?
+    ) async throws -> StjornarvaldViolationPage {
+        StjornarvaldViolationPage(violations: [], nextCursor: nil, controlsExecution: false)
+    }
+
+    func scheduleRuneForgeScan(
+        requestID: UUID,
+        reason: String
+    ) async throws -> StjornarvaldScanReceipt { throw URLError(.unsupportedURL) }
+
+    func requestRuneForgeExport(
+        format: StjornarvaldExportFormat,
+        destination: String,
+        filters: StjornarvaldExportFilters,
+        requestID: UUID
+    ) async throws -> StjornarvaldExportReceipt { throw URLError(.unsupportedURL) }
 }
 
 private struct DeferredRuneForgeClient: RuneForgeManagerClientProtocol {

@@ -52,10 +52,20 @@ the selected operation. Provider guidance distinguishes unsaved settings,
 verified readiness, and connection/setup work. Runtimes guidance reports the
 selected job state or that no runtime job needs attention.
 
+FORGE RIG guidance explains the bounded, coalesced Managed Activity projection,
+including its current inferred instruction step, durable delivered count,
+rolling durable managed-response/tool/orchestration/project-policy rows,
+authenticated exact run/project/generation boundary, explicit source
+availability, five-second view-owned refresh, 100-row presentation bound,
+128-assistant plus 128-tool per-run retention, 2 KiB durable event, 8 KiB
+presentation, and 4 MiB streamed-response bounds, and the explicit boundary
+that it is not token streaming or a second full transcript.
+
 Rune Forge guidance explains Development Policy source selection, immediate
 acceptance, bounded interpretation states, violation and occurrence history,
-delivery status, cached degraded behavior, scanning, removal, and the current
-four-format export workflow. It also states the non-interference boundary: Stjornarvald
+delivery status, the verbose newest-first Policy Feed, cached degraded behavior,
+scanning, removal, and the current four-format export workflow. It also states
+the non-interference boundary: Stjornarvald
 reports guidance but does not authorize tools, admit runs, or decide completion.
 
 Unavailable or disconnected provider state does not prevent the bundled guide

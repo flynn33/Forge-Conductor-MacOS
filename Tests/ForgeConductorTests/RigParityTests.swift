@@ -199,7 +199,8 @@ final class RigParityTests: XCTestCase {
     func testRigPanelChecklistDocumented() {
         // Ensures we do not silently drop panel IDs from the parity checklist.
         let expected = [
-            "sys_strip", "load_trace", "cpu_cores", "gpu_cores", "storage", "orchestration",
+            "sys_strip", "load_trace", "managed_activity", "cpu_cores", "gpu_cores",
+            "storage", "orchestration",
             "mcp_servers", "mcp_tools", "sub_agents", "hot_processes", "live_stream",
         ]
         XCTAssertEqual(TelemetryContract.rigPanels, expected)

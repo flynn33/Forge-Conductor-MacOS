@@ -397,7 +397,8 @@ public enum TelemetryContract {
     public static let snapshotKeys: Set<String> = ["system", "forge", "updated", "history"]
 
     public static let rigPanels: [String] = [
-        "sys_strip", "load_trace", "cpu_cores", "gpu_cores", "storage", "orchestration",
+        "sys_strip", "load_trace", "managed_activity", "cpu_cores", "gpu_cores",
+        "storage", "orchestration",
         "mcp_servers", "mcp_tools", "sub_agents", "hot_processes", "live_stream",
     ]
 

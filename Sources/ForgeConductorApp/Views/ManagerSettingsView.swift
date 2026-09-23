@@ -245,36 +245,47 @@ struct ManagerSettingsView: View {
                         .accessibilityIdentifier("settings-filesystem-service-message")
                 }
 
-                HStack(spacing: 10) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 132), spacing: 10)],
+                    alignment: .leading,
+                    spacing: 8
+                ) {
                     Button("Enable") { model.enableSecureFilesystemService() }
                         .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
                         .disabled(!model.secureFilesystemSettingsControlAvailability.enable)
                         .accessibilityIdentifier("settings-filesystem-service-enable")
                     Button("Update / Reinstall") {
                         model.reinstallSecureFilesystemService()
                     }
+                    .frame(maxWidth: .infinity)
                     .disabled(!model.secureFilesystemSettingsControlAvailability.update)
                     .accessibilityIdentifier("settings-filesystem-service-reinstall")
                     Button("Disable") { model.disableSecureFilesystemService() }
+                        .frame(maxWidth: .infinity)
                         .disabled(!model.secureFilesystemSettingsControlAvailability.disable)
                         .accessibilityIdentifier("settings-filesystem-service-disable")
                     Button("Open System Settings") {
                         model.openSecureFilesystemApprovalSettings()
                     }
+                    .frame(maxWidth: .infinity)
                     .disabled(!model.secureFilesystemSettingsControlAvailability.approval)
                     .accessibilityIdentifier("settings-filesystem-service-approval")
                     Button("Refresh") { model.refreshSecureFilesystemServiceStatus() }
+                        .frame(maxWidth: .infinity)
                         .disabled(!model.secureFilesystemSettingsControlAvailability.refresh)
                         .accessibilityIdentifier("settings-filesystem-service-refresh")
                     Button("Reconcile recovery") {
                         model.reconcileSecureFilesystemRecovery()
                     }
+                    .frame(maxWidth: .infinity)
                     .disabled(!model.secureFilesystemSettingsControlAvailability.reconcile)
                     .accessibilityIdentifier("settings-filesystem-recovery-reconcile")
                     if model.secureFilesystemServiceLifecycleState.canRetryResolution {
                         Button(model.secureFilesystemServiceLifecycleRecoveryActionLabel) {
                             model.recoverSecureFilesystemServiceLifecycle()
                         }
+                        .frame(maxWidth: .infinity)
                         .disabled(
                             !model.secureFilesystemSettingsControlAvailability.lifecycleRecovery
                         )
@@ -285,6 +296,7 @@ struct ManagerSettingsView: View {
                     if model.isSecureFilesystemServiceOperationActive {
                         ProgressView()
                             .controlSize(.small)
+                            .frame(maxWidth: .infinity)
                             .accessibilityLabel(model.secureFilesystemServiceOperationStatusLabel)
                             .accessibilityIdentifier("settings-filesystem-operation-progress")
                     }
@@ -336,7 +348,6 @@ struct ManagerSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding(16)
         .onAppear {
             model.loadSettingsFromConfig()
             model.refreshSecureFilesystemServiceStatus()

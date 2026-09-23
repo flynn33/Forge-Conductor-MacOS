@@ -418,8 +418,19 @@ struct OperatorRun: Decodable, Sendable, Equatable, Identifiable {
     let activeOperationID: String?
     let continuationPending: Bool
     let leaseOwner: String?
+    let currentPhase: String?
     let workItem: String?
+    let nextAction: String?
+    let lastAssistantMessage: String?
+    let lastModelTurnID: String?
+    let lastModelTurnKind: String?
+    let lastModelTurnState: String?
+    let lastModelTurnErrorSummary: String?
     let lastModelTurnAt: String?
+    let lastToolInvocationID: String?
+    let lastToolName: String?
+    let lastToolState: String?
+    let lastToolSummary: String?
     let lastToolActivityAt: String?
     let completionGates: [String]
     let completionPlan: AutomaticCompletionPlan?
@@ -448,8 +459,19 @@ struct OperatorRun: Decodable, Sendable, Equatable, Identifiable {
         case activeOperationID = "active_operation_id"
         case continuationPending = "continuation_pending"
         case leaseOwner = "lease_owner"
+        case currentPhase = "current_phase"
         case workItem = "work_item"
+        case nextAction = "next_action"
+        case lastAssistantMessage = "last_assistant_message"
+        case lastModelTurnID = "last_model_turn_id"
+        case lastModelTurnKind = "last_model_turn_kind"
+        case lastModelTurnState = "last_model_turn_state"
+        case lastModelTurnErrorSummary = "last_model_turn_error_summary"
         case lastModelTurnAt = "last_model_turn_at"
+        case lastToolInvocationID = "last_tool_invocation_id"
+        case lastToolName = "last_tool_name"
+        case lastToolState = "last_tool_state"
+        case lastToolSummary = "last_tool_summary"
         case lastToolActivityAt = "last_tool_activity_at"
         case completionGates = "completion_gates"
         case completionPlan = "completion_plan"
@@ -479,8 +501,25 @@ struct OperatorRun: Decodable, Sendable, Equatable, Identifiable {
         activeOperationID = try container.decodeIfPresent(String.self, forKey: .activeOperationID)
         continuationPending = try container.decodeIfPresent(Bool.self, forKey: .continuationPending) ?? false
         leaseOwner = try container.decodeIfPresent(String.self, forKey: .leaseOwner)
+        currentPhase = try container.decodeIfPresent(String.self, forKey: .currentPhase)
         workItem = try container.decodeIfPresent(String.self, forKey: .workItem)
+        nextAction = try container.decodeIfPresent(String.self, forKey: .nextAction)
+        lastAssistantMessage = try container.decodeIfPresent(String.self, forKey: .lastAssistantMessage)
+        lastModelTurnID = try container.decodeIfPresent(String.self, forKey: .lastModelTurnID)
+        lastModelTurnKind = try container.decodeIfPresent(String.self, forKey: .lastModelTurnKind)
+        lastModelTurnState = try container.decodeIfPresent(String.self, forKey: .lastModelTurnState)
+        lastModelTurnErrorSummary = try container.decodeIfPresent(
+            String.self,
+            forKey: .lastModelTurnErrorSummary
+        )
         lastModelTurnAt = try container.decodeIfPresent(String.self, forKey: .lastModelTurnAt)
+        lastToolInvocationID = try container.decodeIfPresent(
+            String.self,
+            forKey: .lastToolInvocationID
+        )
+        lastToolName = try container.decodeIfPresent(String.self, forKey: .lastToolName)
+        lastToolState = try container.decodeIfPresent(String.self, forKey: .lastToolState)
+        lastToolSummary = try container.decodeIfPresent(String.self, forKey: .lastToolSummary)
         lastToolActivityAt = try container.decodeIfPresent(String.self, forKey: .lastToolActivityAt)
         completionGates = try container.decodeIfPresent([String].self, forKey: .completionGates) ?? []
         completionPlan = try container.decodeIfPresent(AutomaticCompletionPlan.self, forKey: .completionPlan)
@@ -814,12 +853,14 @@ struct OperatorProvider: Decodable, Sendable, Equatable {
 }
 
 struct OperatorEvent: Decodable, Sendable, Equatable, Identifiable {
+    let sequence: Int64?
     let eventID: String
     let timestamp: String
     let kind: String
     let summary: String
     let severity: String?
     let projectID: String?
+    let projectGeneration: UInt64?
     let runID: String?
     let operationID: String?
     let jobID: String?
@@ -829,9 +870,11 @@ struct OperatorEvent: Decodable, Sendable, Equatable, Identifiable {
     var id: String { eventID }
 
     enum CodingKeys: String, CodingKey {
+        case sequence
         case eventID = "event_id"
         case timestamp, kind, summary, severity
         case projectID = "project_id"
+        case projectGeneration = "project_generation"
         case runID = "run_id"
         case operationID = "operation_id"
         case jobID = "job_id"

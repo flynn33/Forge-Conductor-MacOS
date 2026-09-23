@@ -6,6 +6,45 @@
 
 import Foundation
 
+public enum BoundedURLSessionLoaderError: Error, Sendable, Equatable {
+    case invalidMaximumBytes
+    case responseTooLarge
+}
+
+/// Streams one URL response into a strictly bounded buffer. The declared length
+/// is rejected before body consumption when available, while chunked or missing-
+/// length responses are stopped at the same byte ceiling during iteration.
+public enum BoundedURLSessionLoader {
+    public static func data(
+        for request: URLRequest,
+        using session: URLSession,
+        maximumBytes: Int
+    ) async throws -> (Data, URLResponse) {
+        guard maximumBytes > 0 else {
+            throw BoundedURLSessionLoaderError.invalidMaximumBytes
+        }
+        let (bytes, response) = try await session.bytes(for: request)
+        defer { bytes.task.cancel() }
+        let expectedLength = response.expectedContentLength
+        guard expectedLength < 0 || expectedLength <= Int64(maximumBytes) else {
+            throw BoundedURLSessionLoaderError.responseTooLarge
+        }
+        var data = Data()
+        if expectedLength > 0 {
+            data.reserveCapacity(Int(expectedLength))
+        } else {
+            data.reserveCapacity(min(maximumBytes, 8 * 1_024))
+        }
+        for try await byte in bytes {
+            guard data.count < maximumBytes else {
+                throw BoundedURLSessionLoaderError.responseTooLarge
+            }
+            data.append(byte)
+        }
+        return (data, response)
+    }
+}
+
 private struct ManagerStjornarvaldObservationRequest: Encodable {
     let processID: String
     let bootID: String
@@ -66,6 +105,7 @@ private struct ManagerStjornarvaldViolationPageRequest: Encodable {
 /// one persistent manager instead of attempting to bind a second HTTP server.
 public final class ManagerDashboardClient: @unchecked Sendable {
     static let ordinaryRequestTimeoutSeconds: TimeInterval = 2
+    static let ordinaryMaximumResponseBytes = 4 * 1_024 * 1_024
     static let responseSchedulingAllowanceSeconds: TimeInterval = 1
     static let lifecycleMutationRequestTimeoutSeconds: TimeInterval =
         ManagerNode.lifecycleTransitionWaitTimeoutSeconds
@@ -83,6 +123,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     public enum ClientError: Error, LocalizedError, Sendable {
         case invalidEndpoint
         case invalidResponse
+        case responseTooLarge
         case invalidRequest(String)
         case rejected(status: Int, message: String)
         case reconciliationRequired(status: Int, code: String, message: String)
@@ -91,6 +132,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
             switch self {
             case .invalidEndpoint: "Manager loopback endpoint is invalid"
             case .invalidResponse: "Manager returned a non-HTTP response"
+            case .responseTooLarge: "Manager response exceeded the bounded UI response limit"
             case .invalidRequest(let message): message
             case .rejected(let status, let message):
                 "Manager request failed with HTTP \(status): \(message)"
@@ -313,10 +355,40 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         }
     }
 
-    public func stjornarvaldSnapshot() async throws -> StjornarvaldManagerSnapshot {
+    public func stjornarvaldSnapshot(
+        eventCursor: Int64? = nil,
+        limit: Int = 50,
+        newestFirst: Bool = false,
+        projectID: String? = nil,
+        projectGeneration: UInt64? = nil
+    ) async throws -> StjornarvaldManagerSnapshot {
+        guard (1...100).contains(limit),
+              eventCursor.map({ $0 > 0 }) ?? true,
+              !(newestFirst && eventCursor != nil),
+              (projectID == nil) == (projectGeneration == nil),
+              projectID == nil || newestFirst else {
+            throw ClientError.invalidRequest(
+                "Stjornarvald snapshot requires a limit from 1 through 100; cursors and project filters must follow the snapshot ordering contract"
+            )
+        }
+        var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        if let eventCursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: String(eventCursor)))
+        }
+        if newestFirst {
+            queryItems.append(URLQueryItem(name: "order", value: "newest"))
+        }
+        if let projectID, let projectGeneration {
+            queryItems.append(URLQueryItem(name: "project_id", value: projectID))
+            queryItems.append(URLQueryItem(
+                name: "project_generation",
+                value: String(projectGeneration)
+            ))
+        }
         let object = try await request(
             method: "GET",
-            path: "/api/manager/stjornarvald/snapshot"
+            path: "/api/manager/stjornarvald/snapshot",
+            queryItems: queryItems
         )
         do {
             return try JSONDecoder().decode(
@@ -588,12 +660,14 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     private func request(
         method: String,
         path: String,
+        queryItems: [URLQueryItem] = [],
         body: [String: Any]? = nil,
         timeoutInterval: TimeInterval = ManagerDashboardClient.ordinaryRequestTimeoutSeconds
     ) async throws -> [String: Any] {
         try await request(
             method: method,
             path: path,
+            queryItems: queryItems,
             body: try body.map { try JSONSupport.data(from: $0) },
             timeoutInterval: timeoutInterval
         )
@@ -602,6 +676,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
     private func request(
         method: String,
         path: String,
+        queryItems: [URLQueryItem] = [],
         body: Data?,
         authorizationHeader: String? = nil,
         timeoutInterval: TimeInterval
@@ -614,6 +689,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         components.host = host
         components.port = port
         components.path = path
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
         guard let url = components.url else { throw ClientError.invalidEndpoint }
 
         var request = URLRequest(url: url)
@@ -637,7 +713,19 @@ public final class ManagerDashboardClient: @unchecked Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await BoundedURLSessionLoader.data(
+                for: request,
+                using: session,
+                maximumBytes: Self.ordinaryMaximumResponseBytes
+            )
+        } catch BoundedURLSessionLoaderError.responseTooLarge {
+            throw ClientError.responseTooLarge
+        } catch BoundedURLSessionLoaderError.invalidMaximumBytes {
+            throw ClientError.invalidRequest("Manager response byte limit is invalid")
+        }
         guard let http = response as? HTTPURLResponse else {
             throw ClientError.invalidResponse
         }

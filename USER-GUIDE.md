@@ -248,6 +248,13 @@ left column lists Development Policy sources and current violations; selecting
 an item shows its identity, interpretation state, evidence, suggested
 correction, delivery state, and bounded occurrence history.
 
+The Rune Forge sidebar includes a verbose **Policy Feed** built from the newest
+bounded Manager snapshot. It shows policy violations, repeats, evidence
+updates, corrections, reopenings, and interpretation observations in event
+order, including rule, summary, suggested correction, confidence, delivery
+state, and source locator when available. The feed is a presentation of the
+authoritative policy log, not a second policy store.
+
 Use **Add Development Policy…** to choose any one local file or folder. Forge
 does not restrict the picker by file extension or content type. The selection
 appears immediately as accepted, even if the Manager is temporarily
@@ -463,7 +470,7 @@ Default bind: `http://127.0.0.1:7788/` (loopback).
 
 | Surface | What it shows |
 |---------|----------------|
-| Rig | Host CPU / RAM / GPU / disk plus headless LM Studio, Autonomy, Continuity, Rune Forge, and project-progress status/load indicators |
+| Rig | Host CPU / RAM / GPU / disk plus headless LM Studio, Autonomy, Continuity, Rune Forge, project progress, and a bounded, redacted, coalesced Managed Activity projection |
 | LM Studio MCP | Live Forge stdio servers, configured roles, LM Studio host processes |
 | Agents / Tools / Feed | Sessions and recent tool audit |
 | Manager / Settings | Start/stop the HTTP control plane; inspect and change the persisted project-shell policy |
@@ -480,6 +487,30 @@ The Rig project row reports delivered instruction documents as **steps** and
 terminally completed queue items as **packages**. Its fraction combines those
 two bounded counts; failed or blocked packages report **ATTENTION** rather than
 inflating progress.
+
+Immediately below Load Trace and Orchestration Status, the bounded, coalesced
+**Managed Activity** projection identifies the active project and package, the
+current inferred step, durable delivered count, phase, work item, and next
+action. Its rolling rows combine durable bounded managed-model responses,
+redacted at the operator boundary, and tool transitions with Manager
+orchestration events and the newest policy events for the exact active project
+generation. Forge obtains detailed activity text from authenticated
+`GET /api/manager/operator/activity` with an exact run/project/generation
+identity. The public snapshot retains bounded, redacted mission and work-item
+text plus non-sensitive state, identity, and event metadata, but excludes
+current phase/next action, assistant/model-error/tool summaries, and the
+`managed_activity_*` rows. Durable activity
+summaries are capped at 2 KiB and retained per run as at most 128 assistant plus
+128 tool rows; the app presentation boundary is 8 KiB and the five-second
+monitor retains at most 100 app-local rows. Response bodies are streamed through
+a 4 MiB client ceiling. It is not token streaming and does not reconstruct or
+persist a second full LM Studio transcript. When Manager data is unavailable,
+the panel labels Manager, instruction, and policy source availability rather
+than presenting retained rows as fresh evidence.
+
+Storage and Managed Activity share one aligned row at normal window widths; the
+activity list uses a compact internal scroller. At constrained widths the Rig
+stacks the frames, preserving readable content instead of clipping it.
 
 The MCP list shows Forge stdio roles (`mcp-stdio`, `mcp-stdio-fallback`) and configured-but-not-started roles. LM Studio helper and model-backend processes are not listed as MCP servers.
 

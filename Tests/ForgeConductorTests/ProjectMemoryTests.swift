@@ -49,6 +49,91 @@ final class ProjectMemoryTests: XCTestCase {
         try? FileManager.default.removeItem(at: home.deletingLastPathComponent())
     }
 
+    func testRedactorRemovesQuotedJSONCredentialFields() throws {
+        let input = #"{"api_key":"json-api-secret","password":"json-password-secret","authorization":"Bearer json-bearer-secret","safe":"retained"}"#
+        let redacted = try XCTUnwrap(ProjectMemoryRedactor().redact(input))
+        XCTAssertFalse(redacted.contains("json-api-secret"))
+        XCTAssertFalse(redacted.contains("json-password-secret"))
+        XCTAssertFalse(redacted.contains("json-bearer-secret"))
+        XCTAssertTrue(redacted.contains("<redacted>"))
+        XCTAssertTrue(redacted.contains("retained"))
+    }
+
+    func testRedactorRecursivelyRemovesNormalizedStructuredJSONCredentials() throws {
+        let input = #"""
+        {
+          "provider": {
+            "apiKey": "camel-api-secret-value",
+            "client_secret": "client-secret-value",
+            "requests": [
+              {"access-token": "access-token-secret-value"},
+              {"refresh_token": "refresh-token-secret-value"},
+              {"authorization": {"scheme": "Bearer", "credentials": "nested-auth-secret-value"}}
+            ],
+            "escaped": {"api\u005fkey": "escaped-key-secret-value"},
+            "safe": "retained"
+          },
+          "token": "generic-token-secret-value",
+          "password": "password-secret-value",
+          "secret": "generic-secret-value"
+        }
+        """#
+
+        let redacted = try XCTUnwrap(ProjectMemoryRedactor().redact(input))
+        XCTAssertLessThanOrEqual(redacted.utf8.count, input.utf8.count)
+        for secret in [
+            "camel-api-secret-value", "client-secret-value", "access-token-secret-value",
+            "refresh-token-secret-value", "nested-auth-secret-value", "escaped-key-secret-value",
+            "generic-token-secret-value", "password-secret-value", "generic-secret-value",
+        ] {
+            XCTAssertFalse(redacted.contains(secret), secret)
+        }
+
+        let data = try XCTUnwrap(redacted.data(using: .utf8))
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let provider = try XCTUnwrap(root["provider"] as? [String: Any])
+        XCTAssertEqual(provider["apiKey"] as? String, "<redacted>")
+        XCTAssertEqual(provider["client_secret"] as? String, "<redacted>")
+        XCTAssertEqual(provider["safe"] as? String, "retained")
+        let escaped = try XCTUnwrap(provider["escaped"] as? [String: Any])
+        XCTAssertEqual(escaped["api_key"] as? String, "<redacted>")
+        let requests = try XCTUnwrap(provider["requests"] as? [[String: Any]])
+        XCTAssertEqual(requests[0]["access-token"] as? String, "<redacted>")
+        XCTAssertEqual(requests[1]["refresh_token"] as? String, "<redacted>")
+        XCTAssertEqual(requests[2]["authorization"] as? String, "<redacted>")
+        XCTAssertEqual(root["token"] as? String, "<redacted>")
+        XCTAssertEqual(root["password"] as? String, "<redacted>")
+        XCTAssertEqual(root["secret"] as? String, "<redacted>")
+    }
+
+    func testRedactorPreservesPlainTextBehaviorAndStructuredByteBound() throws {
+        let plainText = "api_key=legacy-secret refresh_token=refresh-secret " +
+            "client_secret=client-secret authorization: Bearer bearer-secret-value retained"
+        let plainTextRedacted = try XCTUnwrap(ProjectMemoryRedactor().redact(plainText))
+        XCTAssertFalse(plainTextRedacted.contains("legacy-secret"))
+        XCTAssertFalse(plainTextRedacted.contains("refresh-secret"))
+        XCTAssertFalse(plainTextRedacted.contains("client-secret"))
+        XCTAssertFalse(plainTextRedacted.contains("bearer-secret-value"))
+        XCTAssertTrue(plainTextRedacted.contains("retained"))
+
+        let safeJSON = " { \"safe\" : \"retained\" } "
+        XCTAssertEqual(try ProjectMemoryRedactor().redact(safeJSON), safeJSON)
+
+        let compactCredential = #"{"password":0}"#
+        let compactRedacted = try XCTUnwrap(ProjectMemoryRedactor().redact(compactCredential))
+        XCTAssertEqual(compactRedacted, "\"<redacted>\"")
+        XCTAssertLessThanOrEqual(compactRedacted.utf8.count, compactCredential.utf8.count)
+        XCTAssertEqual(
+            try JSONSerialization.jsonObject(
+                with: try XCTUnwrap(compactRedacted.data(using: .utf8)),
+                options: [.fragmentsAllowed]
+            ) as? String,
+            "<redacted>"
+        )
+    }
+
     func testToolConformanceIsAdditiveAndInitializeAdvertisesCapabilities() throws {
         let app = try bootstrapApplication()
         defer { app.shutdown() }

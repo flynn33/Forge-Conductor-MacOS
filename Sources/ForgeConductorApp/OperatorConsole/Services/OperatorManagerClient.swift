@@ -6,6 +6,12 @@ import ForgeConductorCore
 
 protocol OperatorManagerClientProtocol: Sendable {
     func snapshot(limit: Int, cursor: String?) async throws -> OperatorSnapshot
+    func activitySnapshot(
+        limit: Int,
+        runID: String,
+        projectID: String,
+        projectGeneration: UInt64
+    ) async throws -> OperatorSnapshot
     func autonomyStatus() async throws -> OperatorAutonomySummary
     func settings() async throws -> ManagerSettings
     func updateSettings(_ patch: ManagerSettingsPatch) async throws -> ManagerSettings
@@ -86,6 +92,17 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func activitySnapshot(
+        limit: Int,
+        runID: String,
+        projectID: String,
+        projectGeneration: UInt64
+    ) async throws -> OperatorSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Authenticated managed activity is unavailable from this manager client."
+        )
+    }
+
     func deleteRun(
         runID: String,
         projectID: String,
@@ -323,6 +340,26 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         )
     }
 
+    func activitySnapshot(
+        limit: Int = 100,
+        runID: String,
+        projectID: String,
+        projectGeneration: UInt64
+    ) async throws -> OperatorSnapshot {
+        let boundedLimit = min(max(limit, 1), 100)
+        return try await request(
+            method: "GET",
+            path: "/api/manager/operator/activity",
+            queryItems: [
+                URLQueryItem(name: "limit", value: "\(boundedLimit)"),
+                URLQueryItem(name: "run_id", value: runID),
+                URLQueryItem(name: "project_id", value: projectID),
+                URLQueryItem(name: "project_generation", value: String(projectGeneration)),
+            ],
+            unavailableMessage: "Authenticated managed activity is unavailable. Update or restart the manager from this build, then retry."
+        )
+    }
+
     func autonomyStatus() async throws -> OperatorAutonomySummary {
         try await request(method: "GET", path: "/api/manager/autonomy/status")
     }
@@ -393,6 +430,10 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                 throw OperatorManagerClientError.invalidEndpoint
             case .invalidResponse:
                 throw OperatorManagerClientError.invalidResponse
+            case .responseTooLarge:
+                throw OperatorManagerClientError.responseTooLarge(
+                    maximumBytes: Self.maximumResponseBytes
+                )
             case .invalidRequest(let message):
                 throw OperatorManagerClientError.invalidPayload(message)
             case .rejected(let status, let message):
@@ -856,6 +897,10 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                 throw OperatorManagerClientError.invalidEndpoint
             case .invalidResponse:
                 throw OperatorManagerClientError.invalidResponse
+            case .responseTooLarge:
+                throw OperatorManagerClientError.responseTooLarge(
+                    maximumBytes: Self.maximumResponseBytes
+                )
             case .invalidRequest(let message):
                 throw OperatorManagerClientError.invalidPayload(message)
             case .rejected(let status, let message):
@@ -1070,12 +1115,25 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await BoundedURLSessionLoader.data(
+                for: request,
+                using: session,
+                maximumBytes: Self.maximumResponseBytes
+            )
+        } catch BoundedURLSessionLoaderError.responseTooLarge {
+            throw OperatorManagerClientError.responseTooLarge(
+                maximumBytes: Self.maximumResponseBytes
+            )
+        } catch BoundedURLSessionLoaderError.invalidMaximumBytes {
+            throw OperatorManagerClientError.invalidPayload(
+                "Manager response byte limit is invalid"
+            )
+        }
         guard let http = response as? HTTPURLResponse else {
             throw OperatorManagerClientError.invalidResponse
-        }
-        guard data.count <= Self.maximumResponseBytes else {
-            throw OperatorManagerClientError.responseTooLarge(maximumBytes: Self.maximumResponseBytes)
         }
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 404, let unavailableMessage {
@@ -1232,6 +1290,20 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
     func snapshot(limit: Int, cursor: String?) async throws -> OperatorSnapshot {
         try await current.snapshot(limit: limit, cursor: cursor)
+    }
+
+    func activitySnapshot(
+        limit: Int,
+        runID: String,
+        projectID: String,
+        projectGeneration: UInt64
+    ) async throws -> OperatorSnapshot {
+        try await current.activitySnapshot(
+            limit: limit,
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: projectGeneration
+        )
     }
 
     func autonomyStatus() async throws -> OperatorAutonomySummary {
@@ -1434,7 +1506,19 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
 extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
-        try await managerClient.stjornarvaldSnapshot()
+        try await managerClient.stjornarvaldSnapshot(limit: 100, newestFirst: true)
+    }
+
+    func runeForgeSnapshot(
+        projectID: String?,
+        projectGeneration: UInt64?
+    ) async throws -> StjornarvaldManagerSnapshot {
+        try await managerClient.stjornarvaldSnapshot(
+            limit: 100,
+            newestFirst: true,
+            projectID: projectID,
+            projectGeneration: projectGeneration
+        )
     }
 
     func addRuneForgeSource(
@@ -1507,6 +1591,16 @@ extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
 extension OperatorManagerClientRouter: RuneForgeManagerClientProtocol {
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
         try await runeForgeClient.runeForgeSnapshot()
+    }
+
+    func runeForgeSnapshot(
+        projectID: String?,
+        projectGeneration: UInt64?
+    ) async throws -> StjornarvaldManagerSnapshot {
+        try await runeForgeClient.runeForgeSnapshot(
+            projectID: projectID,
+            projectGeneration: projectGeneration
+        )
     }
 
     func addRuneForgeSource(

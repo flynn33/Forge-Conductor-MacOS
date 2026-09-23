@@ -131,6 +131,100 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
         await coordinator.shutdown()
     }
 
+    func testSnapshotNewestFirstReturnsLatestBoundedWindowAndRejectsCursor() async throws {
+        let fixture = try CoordinatorFixture()
+        defer { fixture.cleanup() }
+        let coordinator = StjornarvaldManagerCoordinator(paths: fixture.paths)
+        _ = coordinator.submitObservations((1...3).map {
+            fixture.observation(key: "newest-snapshot-\($0)")
+        })
+        coordinator.start()
+        defer { coordinator.stop() }
+        try await waitUntil { coordinator.health().lastCommittedCursor == 3 }
+
+        let cursorPage = try coordinator.snapshot(limit: 2)
+        XCTAssertEqual(cursorPage.violationEvents.map(\.sequence), [1, 2])
+        XCTAssertEqual(cursorPage.nextEventCursor, 2)
+
+        let newestPage = try coordinator.snapshot(limit: 2, newestFirst: true)
+        XCTAssertEqual(newestPage.violationEvents.map(\.sequence), [3, 2])
+        XCTAssertNil(newestPage.nextEventCursor)
+        let scopedPage = try coordinator.snapshot(
+            limit: 2,
+            newestFirst: true,
+            projectID: "coordinator-project",
+            projectGeneration: 1
+        )
+        XCTAssertEqual(scopedPage.violationEvents.map(\.sequence), [3, 2])
+        XCTAssertTrue(try coordinator.snapshot(
+            limit: 2,
+            newestFirst: true,
+            projectID: "coordinator-project",
+            projectGeneration: 2
+        ).violationEvents.isEmpty)
+        XCTAssertThrowsError(
+            try coordinator.snapshot(eventCursor: 1, limit: 2, newestFirst: true)
+        )
+        XCTAssertThrowsError(try coordinator.snapshot(
+            newestFirst: true,
+            projectID: "coordinator-project"
+        ))
+        await coordinator.shutdown()
+    }
+
+    func testSnapshotBoundsAggregateViolationEventBytes() async throws {
+        let fixture = try CoordinatorFixture()
+        defer { fixture.cleanup() }
+        let coordinator = StjornarvaldManagerCoordinator(paths: fixture.paths)
+        var log: StjornarvaldPolicyLogStore? = try StjornarvaldPolicyLogStore(
+            databaseURL: fixture.paths.stjornarvaldPolicyLogSQLite,
+            jsonlURL: fixture.paths.stjornarvaldPolicyLogJSONL
+        )
+        let sourceID = PolicySourceID()
+        let candidate = PolicyViolationCandidate(
+            rule: PolicyRule(
+                id: PolicyRuleID("bounded-snapshot"),
+                source: PolicySourceReference(
+                    sourceID: sourceID,
+                    revision: "fixture",
+                    path: "Policy.md",
+                    locator: "aggregate-bound"
+                ),
+                statement: "Keep operator policy snapshots bounded.",
+                policyArea: "operability",
+                applicability: "manager snapshot",
+                confidence: 1
+            ),
+            observationID: UUID(),
+            scope: DevelopmentObservationScope(
+                projectID: "coordinator-project",
+                projectGeneration: 1
+            ),
+            subjectIdentity: "StjornarvaldManagerSnapshot",
+            summary: "Large but valid policy evidence",
+            evidenceReferences: (0..<32).map {
+                "evidence-\($0)-" + String(repeating: "x", count: 3_900)
+            },
+            explanation: "The snapshot must not multiply valid per-event bounds by 100.",
+            confidence: 1,
+            suggestedCorrection: "Apply an aggregate serialized-event budget."
+        )
+        for _ in 0..<12 { _ = try log?.record(candidate, eventID: UUID()) }
+        log = nil
+
+        let snapshot = try coordinator.snapshot(limit: 100, newestFirst: true)
+        let encodedBytes = try snapshot.violationEvents.reduce(into: 0) {
+            $0 += try JSONEncoder().encode($1).count
+        }
+        XCTAssertFalse(snapshot.violationEvents.isEmpty)
+        XCTAssertLessThan(snapshot.violationEvents.count, 12)
+        XCTAssertLessThanOrEqual(
+            encodedBytes,
+            StjornarvaldManagerCoordinator.maximumSnapshotViolationEventBytes
+        )
+        await coordinator.shutdown()
+    }
+
     func testObservationSubmissionProducesBoundedPendingNoticeWithoutControlAuthority() async throws {
         let fixture = try CoordinatorFixture()
         defer { fixture.cleanup() }
@@ -287,6 +381,20 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
             ),
             400
         )
+        for invalidQuery in [
+            "order=oldest",
+            "order=newest&cursor=1",
+            "order=newest&order=newest",
+            "order=newest&limit=101",
+        ] {
+            XCTAssertEqual(
+                try HTTPTestHelpers.fetchStatusCode(
+                    XCTUnwrap(URL(string: base + "/snapshot?\(invalidQuery)"))
+                ),
+                400,
+                "Expected rejected Stjornarvald snapshot query: \(invalidQuery)"
+            )
+        }
 
         let addURL = try XCTUnwrap(URL(string: base + "/sources/add"))
         var request = URLRequest(url: addURL)
@@ -374,6 +482,50 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
         XCTAssertEqual(presented.deliveryIDs, [deliveryID])
         XCTAssertEqual(presented.state, .presented)
         XCTAssertFalse(presented.controlsExecution)
+
+        let additional = try await client.submitStjornarvaldObservations(
+            processID: "route-test",
+            bootID: "route-boot",
+            observations: [
+                fixture.observation(key: "route-observation-2"),
+                fixture.observation(key: "route-observation-3"),
+            ]
+        )
+        XCTAssertEqual(additional.receipts.count, 2)
+        try await waitUntilAsync {
+            guard let snapshot = try? await client.stjornarvaldSnapshot(
+                limit: 3,
+                newestFirst: true
+            ) else { return false }
+            return snapshot.violationEvents.first?.sequence == 3
+        }
+        let cursorSnapshot = try await client.stjornarvaldSnapshot(limit: 2)
+        XCTAssertEqual(cursorSnapshot.violationEvents.map(\.sequence), [1, 2])
+        XCTAssertEqual(cursorSnapshot.nextEventCursor, 2)
+        let newestSnapshot = try await client.stjornarvaldSnapshot(
+            limit: 2,
+            newestFirst: true
+        )
+        XCTAssertEqual(newestSnapshot.violationEvents.map(\.sequence), [3, 2])
+        XCTAssertNil(newestSnapshot.nextEventCursor)
+        let scopedSnapshot = try await client.stjornarvaldSnapshot(
+            limit: 2,
+            newestFirst: true,
+            projectID: "coordinator-project",
+            projectGeneration: 1
+        )
+        XCTAssertEqual(scopedSnapshot.violationEvents.map(\.sequence), [3, 2])
+        do {
+            _ = try await client.stjornarvaldSnapshot(
+                eventCursor: 1,
+                newestFirst: true
+            )
+            XCTFail("Client accepted a cursor with newest-first ordering")
+        } catch let error as ManagerDashboardClient.ClientError {
+            guard case .invalidRequest = error else {
+                return XCTFail("Unexpected client validation error: \(error)")
+            }
+        }
         await node!.stjornarvald.shutdown()
     }
 

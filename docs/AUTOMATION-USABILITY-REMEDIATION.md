@@ -473,8 +473,41 @@ by continuity. Fully delivered documents are counted as steps, terminally
 completed queue items are counted as packages, and the view-owned five-second
 refresh stops when Rig detaches.
 
+The same refresh now drives a bounded, redacted, coalesced Managed Activity
+projection directly below the top Rig instruments. It combines the active
+package, current inferred step, and durable delivered count with current
+phase/work/next action, durable managed responses and tool transitions, bounded
+orchestration events, and the newest policy events for the exact active project
+generation. The public operator snapshot retains bounded, redacted mission and
+work-item text plus non-sensitive state, identity, and event metadata. An
+authenticated endpoint returns current phase/next action,
+assistant/model-error/tool summaries, and `managed_activity_*` events only for
+an exact run/project/generation identity; mismatches fail closed. Durable summaries are
+capped at 2 KiB and retained per run as at most 128 assistant plus 128 tool
+rows; presentation retains at most 100 app-local rows with an 8 KiB row cap.
+Both native clients stream responses through an exact 4 MiB ceiling. The
+projection is not token streaming and does not add a second full transcript or
+an independent polling/render loop. Manager, instruction, and policy source
+availability remains visible when prior rows are retained. Rune Forge exposes
+the global newest bounded policy snapshot as a verbose Policy Feed while Rig
+uses the exact active project scope, preserving non-interference.
+
+At normal widths, intrinsic Grid rows pair CPU/GPU and Storage/Managed Activity;
+the activity frame has a compact 130-point internal scroller. Constrained widths
+stack those frames. MCP, agent/process, Manager, Autonomy, Continuity, and Rune
+Forge layouts use the same adaptive sizing discipline.
+
 ## Verification
 
+- The current Managed Activity and Policy Feed change passed the complete
+  SwiftPM suite with 1,720 tests, 13 explicit environment/live skips, and zero
+  failures. App-hosted Rig/Rune Forge passed 17/17. A fresh final native UI run
+  passed 3/3 with zero skips: all 14 primary views remained contained and
+  aligned at minimum size, the populated Storage/Managed Activity row remained
+  compact and equal-height, and the populated Rune Forge Policy Feed rendered
+  its exact scoped content. Both SwiftPM products, the canonical Apple
+  Development-signed Debug app build, and project-local signed smoke-bundle
+  staging passed. Publication remains separate.
 - Phase 7 combined verification passed the full SwiftPM suite with 1,623 tests,
   12 explicit environment/runtime skips, and zero failures. Focused provider
   resolution, managed autonomy, budget policy, runtime discovery, forced

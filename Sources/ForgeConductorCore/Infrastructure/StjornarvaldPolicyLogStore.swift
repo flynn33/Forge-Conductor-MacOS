@@ -168,6 +168,28 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
         return try eventsUnlocked(after: max(sequence, 0), limit: min(max(limit, 1), 1_000))
     }
 
+    /// Returns the newest bounded event window in newest-first order. Cursor-based
+    /// readers retain their existing chronological contract through `events(after:limit:)`.
+    public func newestEvents(
+        limit: Int = 100,
+        projectID: String? = nil,
+        projectGeneration: UInt64? = nil
+    ) throws -> [PolicyViolationEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard (projectID == nil) == (projectGeneration == nil),
+              projectGeneration.map({ $0 <= UInt64(Int64.max) }) ?? true else {
+            throw StjornarvaldPolicyLogError.invalidRecord(
+                "newest event project filter requires a bounded project identity"
+            )
+        }
+        return try newestEventsUnlocked(
+            limit: min(max(limit, 1), 1_000),
+            projectID: projectID,
+            projectGeneration: projectGeneration
+        )
+    }
+
     public func event(id: UUID) throws -> PolicyViolationEvent? {
         lock.lock()
         defer { lock.unlock() }
@@ -399,6 +421,8 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
                   policy_revision TEXT NOT NULL,
                   source_path TEXT NOT NULL,
                   source_locator TEXT NOT NULL,
+                  project_id TEXT,
+                  project_generation INTEGER,
                   scope_json TEXT NOT NULL,
                   observation_json TEXT NOT NULL,
                   interpretation_json TEXT NOT NULL,
@@ -425,16 +449,77 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
                 );
                 """
             )
+            let hasEventProjectColumns = try scalarIntUnlocked(
+                "SELECT COUNT(*) FROM pragma_table_info('stj_violation_events') "
+                    + "WHERE name IN ('project_id','project_generation');"
+            ) == 2
+            if !hasEventProjectColumns {
+                try execUnlocked("ALTER TABLE stj_violation_events ADD COLUMN project_id TEXT;")
+                try execUnlocked(
+                    "ALTER TABLE stj_violation_events ADD COLUMN project_generation INTEGER;"
+                )
+            }
+            // Schema version 1 remains readable by older compatible binaries. Such
+            // a writer can insert a scoped event without the additive columns. Only
+            // repair rows whose canonical JSON contains a complete project scope;
+            // truly global events remain NULL without being rewritten on every open.
+            let scopeRepairCount = try scalarIntUnlocked("""
+            SELECT COUNT(*) FROM stj_violation_events
+            WHERE json_type(scope_json,'$.projectID')='text'
+              AND json_type(scope_json,'$.projectGeneration')='integer'
+              AND (
+                project_id IS NULL OR project_generation IS NULL
+                OR project_id<>json_extract(scope_json,'$.projectID')
+                OR project_generation<>json_extract(scope_json,'$.projectGeneration')
+              );
+            """)
+            if scopeRepairCount > 0 {
+                try execUnlocked("DROP TRIGGER IF EXISTS stj_violation_events_no_update;")
+                try execUnlocked("DROP TRIGGER IF EXISTS stj_violation_events_no_delete;")
+                try execUnlocked("""
+                UPDATE stj_violation_events
+                SET project_id=json_extract(scope_json,'$.projectID'),
+                    project_generation=json_extract(scope_json,'$.projectGeneration')
+                WHERE json_type(scope_json,'$.projectID')='text'
+                  AND json_type(scope_json,'$.projectGeneration')='integer'
+                  AND (
+                    project_id IS NULL OR project_generation IS NULL
+                    OR project_id<>json_extract(scope_json,'$.projectID')
+                    OR project_generation<>json_extract(scope_json,'$.projectGeneration')
+                  );
+                """)
+                try execUnlocked("""
+                CREATE TRIGGER stj_violation_events_no_update
+                  BEFORE UPDATE ON stj_violation_events
+                  BEGIN SELECT RAISE(ABORT, 'policy violation events are append-only'); END;
+                CREATE TRIGGER stj_violation_events_no_delete
+                  BEFORE DELETE ON stj_violation_events
+                  BEGIN SELECT RAISE(ABORT, 'policy violation events are append-only'); END;
+                """)
+            }
+            try execUnlocked("""
+            CREATE INDEX IF NOT EXISTS stj_violation_events_project_sequence
+              ON stj_violation_events(project_id, project_generation, sequence DESC);
+            """)
             let now = ISO8601.string(from: Date())
             try executeUnlocked(
                 "INSERT INTO stj_schema_meta(schema_version,created_at,migrated_at) " +
                 "SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM stj_schema_meta);",
                 [.integer(Int64(Self.schemaVersion)), .text(now), .text(now)]
             )
-            guard try scalarIntUnlocked("SELECT COUNT(*) FROM stj_schema_meta;") == 1,
-                  try scalarIntUnlocked("SELECT schema_version FROM stj_schema_meta LIMIT 1;") == Self.schemaVersion else {
+            guard try scalarIntUnlocked("SELECT COUNT(*) FROM stj_schema_meta;") == 1 else {
                 throw StjornarvaldPolicyLogError.openFailed("unsupported schema")
             }
+            let priorVersion = try scalarIntUnlocked(
+                "SELECT schema_version FROM stj_schema_meta LIMIT 1;"
+            )
+            guard (1...Self.schemaVersion).contains(priorVersion) else {
+                throw StjornarvaldPolicyLogError.openFailed("unsupported schema")
+            }
+            try executeUnlocked(
+                "UPDATE stj_schema_meta SET schema_version=?,migrated_at=?;",
+                [.integer(Int64(Self.schemaVersion)), .text(now)]
+            )
             try executeUnlocked(
                 "INSERT OR IGNORE INTO stj_jsonl_mirror_state" +
                 "(singleton_id,mirrored_sequence,last_event_sha256,repair_pending,updated_at) VALUES(1,0,NULL,0,?);",
@@ -452,8 +537,13 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='stj_schema_meta';"
         ) == 1
         if hasMetadata {
-            guard try scalarIntUnlocked("SELECT COUNT(*) FROM stj_schema_meta;") == 1,
-                  try scalarIntUnlocked("SELECT schema_version FROM stj_schema_meta LIMIT 1;") == Self.schemaVersion else {
+            guard try scalarIntUnlocked("SELECT COUNT(*) FROM stj_schema_meta;") == 1 else {
+                throw StjornarvaldPolicyLogError.openFailed("unsupported or malformed schema")
+            }
+            let version = try scalarIntUnlocked(
+                "SELECT schema_version FROM stj_schema_meta LIMIT 1;"
+            )
+            guard (1...Self.schemaVersion).contains(version) else {
                 throw StjornarvaldPolicyLogError.openFailed("unsupported or malformed schema")
             }
             return
@@ -539,15 +629,19 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
         try executeUnlocked("""
         INSERT INTO stj_violation_events(
           sequence,event_id,violation_id,event_type,occurred_at,rule_id,policy_revision,
-          source_path,source_locator,scope_json,observation_json,interpretation_json,
+          source_path,source_locator,project_id,project_generation,scope_json,
+          observation_json,interpretation_json,
           suggested_correction,notice_state,prior_event_sha256,event_sha256,development_continues
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1);
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1);
         """, [
             .integer(event.sequence), .text(event.id.uuidString.lowercased()),
             .text(event.violationID.description), .text(event.type.rawValue),
             .text(ISO8601.string(from: event.occurredAt)), .text(event.candidate.rule.id.rawValue),
             .text(event.candidate.rule.source.revision), .text(event.candidate.rule.source.path),
-            .text(event.candidate.rule.source.locator), .text(scopeJSON), .text(candidateJSON),
+            .text(event.candidate.rule.source.locator),
+            event.candidate.scope.projectID.map(SQLiteValue.text) ?? .null,
+            event.candidate.scope.projectGeneration.map { .integer(Int64($0)) } ?? .null,
+            .text(scopeJSON), .text(candidateJSON),
             .text(interpretation), .text(event.candidate.suggestedCorrection),
             .text(event.noticeState), event.priorEventSHA256.map(SQLiteValue.text) ?? .null,
             .text(event.eventSHA256),
@@ -647,25 +741,64 @@ public final class StjornarvaldPolicyLogStore: @unchecked Sendable {
             let step = sqlite3_step(statement)
             if step == SQLITE_DONE { break }
             guard step == SQLITE_ROW else { throw sqliteErrorUnlocked() }
-            guard let eventID = UUID(uuidString: text(statement, 1)),
-                  let violationID = UUID(uuidString: text(statement, 2)),
-                  let type = PolicyViolationEventType(rawValue: text(statement, 3)),
-                  let occurredAt = ISO8601.date(from: text(statement, 4)),
-                  let data = text(statement, 5).data(using: .utf8),
-                  let candidate = try? Self.decode(PolicyViolationCandidate.self, from: data) else {
-                throw StjornarvaldPolicyLogError.invalidRecord("malformed violation event")
-            }
-            let prior = sqlite3_column_type(statement, 7) == SQLITE_NULL ? nil : text(statement, 7)
-            result.append(PolicyViolationEvent(
-                schemaVersion: "1.0.0", sequence: sqlite3_column_int64(statement, 0),
-                id: eventID, type: type, occurredAt: occurredAt,
-                violationID: PolicyViolationID(violationID),
-                fingerprint: try Self.fingerprint(for: candidate), candidate: candidate,
-                noticeState: text(statement, 6), priorEventSHA256: prior,
-                eventSHA256: text(statement, 8), developmentContinues: true
-            ))
+            result.append(try eventUnlocked(from: statement))
         }
         return result
+    }
+
+    private func newestEventsUnlocked(
+        limit: Int,
+        projectID: String?,
+        projectGeneration: UInt64?
+    ) throws -> [PolicyViolationEvent] {
+        let filter: String
+        let bindings: [SQLiteValue]
+        if let projectID, let projectGeneration {
+            filter = " WHERE project_id=? AND project_generation=?"
+            bindings = [
+                .text(projectID),
+                .integer(Int64(projectGeneration)),
+                .integer(Int64(limit)),
+            ]
+        } else {
+            filter = ""
+            bindings = [.integer(Int64(limit))]
+        }
+        let statement = try prepareUnlocked("""
+        SELECT sequence,event_id,violation_id,event_type,occurred_at,observation_json,
+          notice_state,prior_event_sha256,event_sha256
+        FROM stj_violation_events\(filter) ORDER BY sequence DESC LIMIT ?;
+        """)
+        defer { sqlite3_finalize(statement) }
+        try bind(bindings, to: statement)
+        var result: [PolicyViolationEvent] = []
+        while true {
+            let step = sqlite3_step(statement)
+            if step == SQLITE_DONE { break }
+            guard step == SQLITE_ROW else { throw sqliteErrorUnlocked() }
+            result.append(try eventUnlocked(from: statement))
+        }
+        return result
+    }
+
+    private func eventUnlocked(from statement: OpaquePointer) throws -> PolicyViolationEvent {
+        guard let eventID = UUID(uuidString: text(statement, 1)),
+              let violationID = UUID(uuidString: text(statement, 2)),
+              let type = PolicyViolationEventType(rawValue: text(statement, 3)),
+              let occurredAt = ISO8601.date(from: text(statement, 4)),
+              let data = text(statement, 5).data(using: .utf8),
+              let candidate = try? Self.decode(PolicyViolationCandidate.self, from: data) else {
+            throw StjornarvaldPolicyLogError.invalidRecord("malformed violation event")
+        }
+        let prior = sqlite3_column_type(statement, 7) == SQLITE_NULL ? nil : text(statement, 7)
+        return PolicyViolationEvent(
+            schemaVersion: "1.0.0", sequence: sqlite3_column_int64(statement, 0),
+            id: eventID, type: type, occurredAt: occurredAt,
+            violationID: PolicyViolationID(violationID),
+            fingerprint: try Self.fingerprint(for: candidate), candidate: candidate,
+            noticeState: text(statement, 6), priorEventSHA256: prior,
+            eventSHA256: text(statement, 8), developmentContinues: true
+        )
     }
 
     private func repairJSONLMirrorUnlocked() throws {

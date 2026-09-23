@@ -344,6 +344,560 @@ final class RigOperationalSnapshotAppTests: XCTestCase {
         XCTAssertEqual(result.projectTotalPackages, 2)
         XCTAssertEqual(result.projectProgressState, "RUNNING")
     }
+
+    func testComposeBuildsBoundedRollingManagedActivityWithoutDuplicatingRefreshes() throws {
+        let projectID = UUID().uuidString
+        let runID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Activity Project",
+          "canonical_root":"/tmp/activity","project_generation":1,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let queue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("""
+        {
+          "project_id":"\(projectID)","project_generation":1,"revision":4,
+          "running":true,"total_packages":1,"packages":[
+            {"id":"\(UUID().uuidString)","project_id":"\(projectID)",
+             "project_generation":1,"package_id":"monitoring","version":"1",
+             "display_name":"Monitoring Package","mission":"Expose run progress",
+             "source_path":"/tmp/monitoring","content_sha256":"\(String(repeating: "c", count: 64))",
+             "allowed_tools":[],"completion_gates":[],"document_count":5,
+             "completed_step_count":2,"total_step_count":5,"position":0,
+             "state":"running","run_id":"\(runID)",
+             "created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}
+          ]
+        }
+        """.utf8))
+        let firstOperatorSnapshot = try operatorSnapshot(
+            projectID: projectID,
+            runID: runID,
+            assistantMessage: "First managed response\nwith detail",
+            turnTimestamp: "2026-01-01T00:00:02Z"
+        )
+        let runeForge = policySnapshot(
+            event: policyEvent(projectID: projectID, occurredAt: Date(timeIntervalSince1970: 1_767_225_603))
+        )
+        let first = RigOperationalSnapshot.compose(
+            operatorSnapshot: firstOperatorSnapshot,
+            autonomy: nil,
+            runeForge: runeForge,
+            instructionQueue: queue,
+            progressProject: project
+        )
+
+        XCTAssertEqual(first.currentPackageName, "Monitoring Package")
+        XCTAssertEqual(first.currentPackagePosition, 1)
+        XCTAssertEqual(first.currentPackageCompletedSteps, 2)
+        XCTAssertEqual(first.currentStep, 3)
+        XCTAssertEqual(first.currentStepTotal, 5)
+        XCTAssertEqual(first.currentPhase, "Implementation")
+        XCTAssertEqual(first.currentWorkItem, "Add managed activity")
+        XCTAssertEqual(first.currentNextAction, "Run verification")
+        XCTAssertTrue(first.operatorEvidenceAvailable)
+        XCTAssertTrue(first.instructionEvidenceAvailable)
+        XCTAssertTrue(first.policyEvidenceAvailable)
+        XCTAssertEqual(first.activityFeed.first?.category, .policy)
+        XCTAssertEqual(Set(first.activityFeed.map(\.category)), [
+            .prompt, .session, .tool, .instruction, .orchestration, .policy,
+        ])
+
+        let secondOperatorSnapshot = try operatorSnapshot(
+            projectID: projectID,
+            runID: runID,
+            assistantMessage: "Second managed response",
+            turnTimestamp: "2026-01-01T00:00:04Z"
+        )
+        let second = RigOperationalSnapshot.compose(
+            operatorSnapshot: secondOperatorSnapshot,
+            autonomy: nil,
+            runeForge: runeForge,
+            instructionQueue: queue,
+            progressProject: project,
+            priorActivity: first.activityFeed
+        )
+        XCTAssertEqual(second.activityFeed.filter { $0.category == .session }.count, 4)
+        XCTAssertEqual(second.activityFeed.filter { $0.category == .tool }.count, 2)
+        let repeated = RigOperationalSnapshot.compose(
+            operatorSnapshot: secondOperatorSnapshot,
+            autonomy: nil,
+            runeForge: runeForge,
+            instructionQueue: queue,
+            progressProject: project,
+            priorActivity: second.activityFeed
+        )
+        XCTAssertEqual(repeated.activityFeed, second.activityFeed)
+
+        let oversizedHistory = (0..<150).map { index in
+            RigActivityEntry(
+                id: "history-\(index)",
+                occurredAt: Date(timeIntervalSince1970: TimeInterval(index)),
+                category: .orchestration,
+                title: "History",
+                message: String(repeating: "x", count: 10_000),
+                projectID: nil,
+                severity: .informational
+            )
+        }
+        let bounded = RigOperationalSnapshot.compose(
+            operatorSnapshot: nil,
+            autonomy: nil,
+            runeForge: nil,
+            priorActivity: oversizedHistory
+        )
+        XCTAssertEqual(bounded.activityFeed.count, RigOperationalSnapshot.maximumActivityEntries)
+        XCTAssertEqual(bounded.activityFeed.first?.id, "history-149")
+        XCTAssertLessThanOrEqual(
+            try XCTUnwrap(bounded.activityFeed.first).message.utf8.count,
+            RigOperationalSnapshot.maximumActivityMessageBytes
+        )
+        XCTAssertFalse(bounded.operatorEvidenceAvailable)
+        XCTAssertFalse(bounded.instructionEvidenceAvailable)
+        XCTAssertFalse(bounded.policyEvidenceAvailable)
+    }
+
+    func testComposeDoesNotCombineDirectRunWithUnrelatedQueuedOrFailedPackage() throws {
+        let projectID = UUID().uuidString
+        let runID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Association Project",
+          "canonical_root":"/tmp/association","project_generation":3,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let queue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("""
+        {
+          "project_id":"\(projectID)","project_generation":3,"revision":8,
+          "running":false,"total_packages":3,"packages":[
+            {"id":"\(UUID().uuidString)","project_id":"\(projectID)",
+             "project_generation":3,"package_id":"failed","version":"1",
+             "display_name":"Failed Package","mission":"Failed","source_path":"/tmp/failed",
+             "content_sha256":"\(String(repeating: "a", count: 64))",
+             "allowed_tools":[],"completion_gates":[],"document_count":2,"position":0,
+             "state":"failed","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"},
+            {"id":"\(UUID().uuidString)","project_id":"\(projectID)",
+             "project_generation":3,"package_id":"cancelled","version":"1",
+             "display_name":"Cancelled Package","mission":"Cancelled","source_path":"/tmp/cancelled",
+             "content_sha256":"\(String(repeating: "b", count: 64))",
+             "allowed_tools":[],"completion_gates":[],"document_count":2,"position":1,
+             "state":"cancelled","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"},
+            {"id":"\(UUID().uuidString)","project_id":"\(projectID)",
+             "project_generation":3,"package_id":"queued","version":"1",
+             "display_name":"Queued Package","mission":"Queued","source_path":"/tmp/queued",
+             "content_sha256":"\(String(repeating: "c", count: 64))",
+             "allowed_tools":[],"completion_gates":[],"document_count":4,"position":2,
+             "state":"queued","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}
+          ]
+        }
+        """.utf8))
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {"runs":[{
+          "run_id":"\(runID)","project_id":"\(projectID)","project_generation":3,
+          "mission":"Direct managed task","state":"running","continuity_mode":"automatic",
+          "current_phase":"Direct phase","work_item":"Direct work",
+          "next_action":"Direct next","created_at":"2026-01-01T00:00:00Z"
+        }]}
+        """.utf8))
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: snapshot,
+            autonomy: nil,
+            runeForge: nil,
+            instructionQueue: queue,
+            progressProject: project
+        )
+
+        XCTAssertNil(result.currentPackageName)
+        XCTAssertEqual(result.currentWorkItem, "Direct work")
+        XCTAssertEqual(result.nextPackageName, "Queued Package")
+        XCTAssertEqual(result.nextPackagePosition, 3)
+        XCTAssertEqual(result.nextPackageStepTotal, 4)
+        XCTAssertFalse(result.activityFeed.contains { $0.category == .instruction })
+    }
+
+    func testMonitoredRunPrefersTheExactInstructionPackageRun() throws {
+        let projectID = UUID().uuidString
+        let newestRunID = UUID().uuidString
+        let packageRunID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Selection Project",
+          "canonical_root":"/tmp/selection","project_generation":5,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {"runs":[
+          {"run_id":"\(newestRunID)","project_id":"\(projectID)",
+           "project_generation":5,"mission":"New direct task","state":"running",
+           "continuity_mode":"automatic"},
+          {"run_id":"\(packageRunID)","project_id":"\(projectID)",
+           "project_generation":5,"mission":"Instruction task","state":"running",
+           "continuity_mode":"automatic"}
+        ]}
+        """.utf8))
+        let queue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("""
+        {
+          "project_id":"\(projectID)","project_generation":5,"revision":1,
+          "running":true,"total_packages":1,"packages":[{
+            "id":"\(UUID().uuidString)","project_id":"\(projectID)",
+            "project_generation":5,"package_id":"selected","version":"1",
+            "display_name":"Selected Package","mission":"Follow the package",
+            "source_path":"/tmp/selected","content_sha256":"\(String(repeating: "d", count: 64))",
+            "allowed_tools":[],"completion_gates":[],"document_count":2,
+            "completed_step_count":0,"total_step_count":2,"position":0,
+            "state":"running","run_id":"\(packageRunID)",
+            "created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:01Z"
+          }]
+        }
+        """.utf8))
+
+        XCTAssertEqual(
+            RigOperationalSnapshot.monitoredRun(
+                operatorSnapshot: snapshot,
+                instructionQueue: queue,
+                progressProject: project
+            )?.runID,
+            packageRunID
+        )
+    }
+
+    func testMonitoredRunIDRetainsPackageRunOutsideRecentSnapshot() throws {
+        let projectID = UUID().uuidString
+        let recentRunID = UUID().uuidString
+        let packageRunID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Deep History Project",
+          "canonical_root":"/tmp/deep-history","project_generation":6,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let boundedPublicSnapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {"runs":[{
+          "run_id":"\(recentRunID)","project_id":"\(projectID)",
+          "project_generation":6,"mission":"New direct task","state":"running",
+          "continuity_mode":"automatic"
+        }]}
+        """.utf8))
+        let queue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("""
+        {
+          "project_id":"\(projectID)","project_generation":6,"revision":2,
+          "running":true,"total_packages":1,"packages":[{
+            "id":"\(UUID().uuidString)","project_id":"\(projectID)",
+            "project_generation":6,"package_id":"historical-run","version":"1",
+            "display_name":"Historical Package","mission":"Continue the package",
+            "source_path":"/tmp/historical","content_sha256":"\(String(repeating: "e", count: 64))",
+            "allowed_tools":[],"completion_gates":[],"document_count":3,
+            "completed_step_count":1,"total_step_count":3,"position":0,
+            "state":"running","run_id":"\(packageRunID)",
+            "created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:01Z"
+          }]
+        }
+        """.utf8))
+
+        XCTAssertNil(
+            RigOperationalSnapshot.monitoredRun(
+                operatorSnapshot: boundedPublicSnapshot,
+                instructionQueue: queue,
+                progressProject: project
+            )
+        )
+        XCTAssertEqual(
+            RigOperationalSnapshot.monitoredRunID(
+                operatorSnapshot: boundedPublicSnapshot,
+                instructionQueue: queue,
+                progressProject: project
+            ),
+            packageRunID
+        )
+    }
+
+    func testComposeDropsPriorRunActivityWhenMonitoredRunChangesWithinGeneration() throws {
+        let projectID = UUID().uuidString
+        let priorRunID = UUID().uuidString
+        let activeRunID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Run Isolation Project",
+          "canonical_root":"/tmp/run-isolation","project_generation":4,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {"runs":[{
+          "run_id":"\(activeRunID)","project_id":"\(projectID)",
+          "project_generation":4,"mission":"Current managed task","state":"running",
+          "continuity_mode":"automatic","created_at":"2026-01-01T00:00:04Z"
+        }]}
+        """.utf8))
+        let priorActivity = [
+            RigActivityEntry(
+                id: "prior-run-assistant",
+                occurredAt: Date(timeIntervalSince1970: 3),
+                category: .session,
+                title: "Prior response",
+                message: "Must not cross the run boundary",
+                projectID: projectID,
+                projectGeneration: 4,
+                runID: priorRunID,
+                severity: .informational
+            ),
+            RigActivityEntry(
+                id: "prior-run-policy",
+                occurredAt: Date(timeIntervalSince1970: 2),
+                category: .policy,
+                title: "Prior run policy",
+                message: "Run-scoped policy must not cross the run boundary",
+                projectID: projectID,
+                projectGeneration: 4,
+                runID: priorRunID,
+                severity: .warning
+            ),
+            RigActivityEntry(
+                id: "project-policy",
+                occurredAt: Date(timeIntervalSince1970: 1),
+                category: .policy,
+                title: "Project policy",
+                message: "Project-scoped policy remains applicable",
+                projectID: projectID,
+                projectGeneration: 4,
+                severity: .warning
+            ),
+            RigActivityEntry(
+                id: "global-policy",
+                occurredAt: Date(timeIntervalSince1970: 0),
+                category: .policy,
+                title: "Global policy",
+                message: "Global policy remains applicable",
+                projectID: nil,
+                severity: .warning
+            ),
+        ]
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: snapshot,
+            autonomy: nil,
+            runeForge: nil,
+            progressProject: project,
+            priorActivity: priorActivity
+        )
+
+        XCTAssertFalse(result.activityFeed.contains { $0.runID == priorRunID })
+        XCTAssertTrue(result.activityFeed.contains { $0.runID == activeRunID })
+        XCTAssertTrue(result.activityFeed.contains { $0.id == "project-policy" })
+        XCTAssertTrue(result.activityFeed.contains { $0.id == "global-policy" })
+    }
+
+    func testComposeDropsRetainedActivityFromPriorProjectGeneration() throws {
+        let projectID = UUID().uuidString
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Reset Project",
+          "canonical_root":"/tmp/reset","project_generation":2,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let stale = RigActivityEntry(
+            id: "stale-generation",
+            occurredAt: Date(),
+            category: .policy,
+            title: "Old violation",
+            message: "Generation one",
+            projectID: projectID,
+            projectGeneration: 1,
+            severity: .warning
+        )
+        let unproven = RigActivityEntry(
+            id: "unproven-generation",
+            occurredAt: Date(),
+            category: .orchestration,
+            title: "Unscoped project event",
+            message: "The project is known but its generation is not",
+            projectID: projectID,
+            projectGeneration: nil,
+            severity: .informational
+        )
+        let publicSnapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {
+          "events":[{
+            "sequence":9,"event_id":"prior-generation-public-event",
+            "timestamp":"2026-01-01T00:00:01Z","kind":"run_progressed",
+            "summary":"Generation is not proven by the public projection","severity":"info",
+            "project_id":"\(projectID)"
+          }]
+        }
+        """.utf8))
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: publicSnapshot,
+            autonomy: nil,
+            runeForge: nil,
+            progressProject: project,
+            priorActivity: [stale, unproven]
+        )
+
+        XCTAssertTrue(result.activityFeed.isEmpty)
+    }
+
+    func testComposeUsesDurableSequenceForSameSecondManagedActivityOrdering() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let runID = UUID().uuidString.lowercased()
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Ordering Project",
+          "canonical_root":"/tmp/ordering","project_generation":1,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {
+          "runs":[{
+            "run_id":"\(runID)","project_id":"\(projectID)","project_generation":1,
+            "mission":"Verify event ordering","state":"running",
+            "continuity_mode":"automatic"
+          }],
+          "events":[
+            {"sequence":42,"event_id":"completed","timestamp":"2026-01-01T00:00:01Z",
+             "kind":"managed_activity_tool_completed","summary":"completed","severity":"info",
+             "project_id":"\(projectID)","project_generation":1,"run_id":"\(runID)"},
+            {"sequence":41,"event_id":"executing","timestamp":"2026-01-01T00:00:01Z",
+             "kind":"managed_activity_tool_executing","summary":"executing","severity":"info",
+             "project_id":"\(projectID)","project_generation":1,"run_id":"\(runID)"}
+          ]
+        }
+        """.utf8))
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: snapshot,
+            autonomy: nil,
+            runeForge: nil,
+            progressProject: project
+        )
+
+        XCTAssertEqual(
+            result.activityFeed.filter { $0.id.hasPrefix("operator:") }.map(\.id),
+            ["operator:completed", "operator:executing"]
+        )
+    }
+
+    private func operatorSnapshot(
+        projectID: String,
+        runID: String,
+        assistantMessage: String,
+        turnTimestamp: String
+    ) throws -> OperatorSnapshot {
+        let assistantData = try JSONEncoder().encode(assistantMessage)
+        let assistantJSON = try XCTUnwrap(String(data: assistantData, encoding: .utf8))
+        return try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {
+          "runs":[{
+            "run_id":"\(runID)","project_id":"\(projectID)","project_generation":1,
+            "mission":"Monitor the run","state":"running","continuity_mode":"automatic",
+            "current_phase":"Implementation","work_item":"Add managed activity",
+            "next_action":"Run verification","last_assistant_message":\(assistantJSON),
+            "last_model_turn_id":"\(UUID().uuidString)",
+            "last_model_turn_kind":"normal_continuation","last_model_turn_state":"completed",
+            "last_model_turn_at":"\(turnTimestamp)",
+            "last_tool_invocation_id":"\(UUID().uuidString)",
+            "last_tool_name":"project_memory.search","last_tool_state":"completed",
+            "last_tool_summary":"Found matching project context",
+            "last_tool_activity_at":"\(turnTimestamp)","updated_at":"\(turnTimestamp)"
+          }],
+          "events":[{
+            "event_id":"event-1","timestamp":"2026-01-01T00:00:01Z",
+            "kind":"run_progressed","summary":"Managed run advanced","severity":"info",
+            "project_id":"\(projectID)","project_generation":1,"run_id":"\(runID)"
+          }]
+        }
+        """.utf8))
+    }
+
+    private func policySnapshot(event: PolicyViolationEvent) -> StjornarvaldManagerSnapshot {
+        let sourceID = event.candidate.rule.source.sourceID
+        return StjornarvaldManagerSnapshot(
+            schemaVersion: StjornarvaldManagerSnapshot.schemaVersion,
+            health: StjornarvaldManagerHealth(
+                state: .running,
+                policyIdentity: "fixture-policy",
+                evaluatorID: "fixture-evaluator",
+                startedAt: event.occurredAt,
+                lastEvaluationAt: event.occurredAt,
+                lastCommittedCursor: event.sequence,
+                processedObservationCount: 1,
+                indexedSourceBatchCount: 1,
+                consecutiveFailureCount: 0,
+                lastError: nil
+            ),
+            governingPolicy: GoverningPolicyIdentity(
+                bindingID: "fixture-policy",
+                authority: "Fixture",
+                repositoryURL: "https://example.invalid/policy",
+                version: "1",
+                revision: "fixture",
+                sourceID: sourceID
+            ),
+            sources: [],
+            violationEvents: [event],
+            nextEventCursor: nil,
+            limitations: []
+        )
+    }
+
+    private func policyEvent(projectID: String, occurredAt: Date) -> PolicyViolationEvent {
+        let sourceID = PolicySourceID()
+        let rule = PolicyRule(
+            id: PolicyRuleID("fixture-native-rule"),
+            source: PolicySourceReference(
+                sourceID: sourceID,
+                revision: "fixture",
+                path: "/tmp/policy.md",
+                locator: "line 12"
+            ),
+            statement: "Keep the shipping runtime native.",
+            policyArea: "runtime",
+            applicability: "fixture",
+            confidence: 1
+        )
+        return PolicyViolationEvent(
+            schemaVersion: "1.0.0",
+            sequence: 1,
+            id: UUID(),
+            type: .opened,
+            occurredAt: occurredAt,
+            violationID: PolicyViolationID(),
+            fingerprint: "fixture-fingerprint",
+            candidate: PolicyViolationCandidate(
+                rule: rule,
+                observationID: UUID(),
+                scope: DevelopmentObservationScope(
+                    projectID: projectID,
+                    projectGeneration: 1
+                ),
+                subjectIdentity: "fixture-subject",
+                summary: "Unapproved runtime observed",
+                evidenceReferences: ["Sources/Fixture.swift:12"],
+                explanation: "The runtime is outside the approved native stack.",
+                confidence: 0.95,
+                assumptions: ["The source is a shipping target."],
+                alternatives: ["Use the native framework."],
+                suggestedCorrection: "Replace the runtime with the native framework."
+            ),
+            noticeState: "presented",
+            priorEventSHA256: nil,
+            eventSHA256: String(repeating: "a", count: 64),
+            developmentContinues: true
+        )
+    }
 }
 
 @MainActor

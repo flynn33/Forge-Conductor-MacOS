@@ -581,8 +581,9 @@ public struct ManagerProjectRelinkResult: Codable, Sendable, Equatable {
 
 /// Bounded, read-only projection consumed by the native operator views.
 /// Every nested value is intentionally smaller than its underlying durable record:
-/// request bodies, tool arguments, provider output, and runtime output are not part of
-/// this contract.
+/// request bodies, tool arguments, runtime output, and full provider transcripts are
+/// not part of this contract. A run may include only its latest secret-redacted,
+/// byte-capped assistant projection for owner-facing live monitoring.
 public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     public let generatedAt: String
     public let limit: Int
@@ -1153,8 +1154,19 @@ public struct ManagerOperatorRun: Encodable, Sendable, Equatable {
     public let activeOperationID: String?
     public let continuationPending: Bool
     public let leaseOwner: String?
+    public let currentPhase: String?
     public let workItem: String?
+    public let nextAction: String?
+    public let lastAssistantMessage: String?
+    public let lastModelTurnID: String?
+    public let lastModelTurnKind: String?
+    public let lastModelTurnState: String?
+    public let lastModelTurnErrorSummary: String?
     public let lastModelTurnAt: String?
+    public let lastToolInvocationID: String?
+    public let lastToolName: String?
+    public let lastToolState: String?
+    public let lastToolSummary: String?
     public let lastToolActivityAt: String?
     public let completionGates: [String]
     public let completionPlan: AutomaticCompletionPlan?
@@ -1181,8 +1193,19 @@ public struct ManagerOperatorRun: Encodable, Sendable, Equatable {
         case activeOperationID = "active_operation_id"
         case continuationPending = "continuation_pending"
         case leaseOwner = "lease_owner"
+        case currentPhase = "current_phase"
         case workItem = "work_item"
+        case nextAction = "next_action"
+        case lastAssistantMessage = "last_assistant_message"
+        case lastModelTurnID = "last_model_turn_id"
+        case lastModelTurnKind = "last_model_turn_kind"
+        case lastModelTurnState = "last_model_turn_state"
+        case lastModelTurnErrorSummary = "last_model_turn_error_summary"
         case lastModelTurnAt = "last_model_turn_at"
+        case lastToolInvocationID = "last_tool_invocation_id"
+        case lastToolName = "last_tool_name"
+        case lastToolState = "last_tool_state"
+        case lastToolSummary = "last_tool_summary"
         case lastToolActivityAt = "last_tool_activity_at"
         case completionGates = "completion_gates"
         case completionPlan = "completion_plan"
@@ -1516,12 +1539,14 @@ public struct ManagerOperatorRuntime: Codable, Sendable, Equatable {
 }
 
 public struct ManagerOperatorEvent: Encodable, Sendable, Equatable {
+    public let sequence: Int64
     public let eventID: String
     public let timestamp: String
     public let kind: String
     public let summary: String
     public let severity: String
     public let projectID: String?
+    public let projectGeneration: UInt64?
     public let runID: String?
     public let operationID: String?
     public let jobID: String?
@@ -1529,9 +1554,11 @@ public struct ManagerOperatorEvent: Encodable, Sendable, Equatable {
     public let artifactID: String?
 
     enum CodingKeys: String, CodingKey {
+        case sequence
         case eventID = "event_id"
         case timestamp, kind, summary, severity
         case projectID = "project_id"
+        case projectGeneration = "project_generation"
         case runID = "run_id"
         case operationID = "operation_id"
         case jobID = "job_id"

@@ -10,7 +10,63 @@ import AppKit
 import ForgeConductorCore
 import SwiftUI
 
+enum RigActivityCategory: String, Sendable, Equatable {
+    case prompt = "PROMPT"
+    case session = "LM STUDIO"
+    case tool = "TOOL"
+    case instruction = "STEP"
+    case orchestration = "ORCHESTRATION"
+    case policy = "POLICY"
+}
+
+enum RigActivitySeverity: Sendable, Equatable {
+    case informational
+    case success
+    case warning
+    case failure
+}
+
+struct RigActivityEntry: Identifiable, Sendable, Equatable {
+    let id: String
+    let occurredAt: Date
+    let category: RigActivityCategory
+    let title: String
+    let message: String
+    let projectID: String?
+    let projectGeneration: UInt64?
+    let runID: String?
+    let severity: RigActivitySeverity
+    let durableSequence: Int64?
+
+    init(
+        id: String,
+        occurredAt: Date,
+        category: RigActivityCategory,
+        title: String,
+        message: String,
+        projectID: String?,
+        projectGeneration: UInt64? = nil,
+        runID: String? = nil,
+        severity: RigActivitySeverity,
+        durableSequence: Int64? = nil
+    ) {
+        self.id = id
+        self.occurredAt = occurredAt
+        self.category = category
+        self.title = title
+        self.message = message
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.runID = runID
+        self.severity = severity
+        self.durableSequence = durableSequence
+    }
+}
+
 struct RigOperationalSnapshot: Sendable, Equatable {
+    static let maximumActivityEntries = 100
+    static let maximumActivityMessageBytes = 8 * 1_024
+
     var providerHealth: String?
     var providerModel: String?
     var autonomyStarted: Bool?
@@ -31,6 +87,22 @@ struct RigOperationalSnapshot: Sendable, Equatable {
     var projectCompletedPackages: Int
     var projectTotalPackages: Int
     var projectProgressState: String?
+    var currentPackageName: String?
+    var currentPackagePosition: Int?
+    var currentPackageCompletedSteps: Int?
+    var nextPackageName: String?
+    var nextPackagePosition: Int?
+    var nextPackageStepTotal: Int?
+    var currentStep: Int?
+    var currentStepTotal: Int?
+    var currentPhase: String?
+    var currentWorkItem: String?
+    var currentNextAction: String?
+    var activeRunState: String?
+    var operatorEvidenceAvailable: Bool
+    var instructionEvidenceAvailable: Bool
+    var policyEvidenceAvailable: Bool
+    var activityFeed: [RigActivityEntry]
 
     static let unavailable = RigOperationalSnapshot(
         providerHealth: nil,
@@ -52,7 +124,23 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         projectTotalSteps: 0,
         projectCompletedPackages: 0,
         projectTotalPackages: 0,
-        projectProgressState: nil
+        projectProgressState: nil,
+        currentPackageName: nil,
+        currentPackagePosition: nil,
+        currentPackageCompletedSteps: nil,
+        nextPackageName: nil,
+        nextPackagePosition: nil,
+        nextPackageStepTotal: nil,
+        currentStep: nil,
+        currentStepTotal: nil,
+        currentPhase: nil,
+        currentWorkItem: nil,
+        currentNextAction: nil,
+        activeRunState: nil,
+        operatorEvidenceAvailable: false,
+        instructionEvidenceAvailable: false,
+        policyEvidenceAvailable: false,
+        activityFeed: []
     )
 
     static func compose(
@@ -60,7 +148,11 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         autonomy: OperatorAutonomySummary?,
         runeForge: StjornarvaldManagerSnapshot?,
         instructionQueue: OperatorInstructionQueue? = nil,
-        progressProject: OperatorProject? = nil
+        progressProject: OperatorProject? = nil,
+        operatorEvidenceAvailable: Bool? = nil,
+        instructionEvidenceAvailable: Bool? = nil,
+        policyEvidenceAvailable: Bool? = nil,
+        priorActivity: [RigActivityEntry] = []
     ) -> Self {
         let automaticContinuity = operatorSnapshot?.continuityReadiness.filter(\.automatic) ?? []
         let activeContinuityStates: Set<ManagedContinuityDisplayState> = [
@@ -82,6 +174,18 @@ struct RigOperationalSnapshot: Sendable, Equatable {
             $0.interpretationState == .indexed || $0.interpretationState == .partiallyIndexed
         }
         let packages = instructionQueue?.packages ?? []
+        let terminalPackageStates: Set<String> = ["completed", "cancelled", "failed"]
+        let activeRun = monitoredRun(
+            operatorSnapshot: operatorSnapshot,
+            instructionQueue: instructionQueue,
+            progressProject: progressProject
+        )
+        let activePackage = activeRun.flatMap { run in
+            packages.first {
+                $0.runID == run.runID && !terminalPackageStates.contains($0.state)
+            }
+        }
+        let nextPackage = packages.first { $0.state == "queued" }
         let completedPackages = packages.filter { $0.state == "completed" }.count
         let completedSteps = packages.reduce(0) {
             $0 + ($1.completedStepCount ?? ($1.state == "completed" ? $1.documentCount ?? 0 : 0))
@@ -100,6 +204,30 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         } else {
             "QUEUED"
         }
+        let activeStepTotal = activePackage?.totalStepCount ?? activePackage?.documentCount
+        let activeCompletedSteps = activePackage?.completedStepCount
+            ?? (activePackage?.state == "completed" ? activeStepTotal : 0)
+        let activeStep: Int? = if let activeStepTotal, activeStepTotal > 0 {
+            activePackage?.state == "completed"
+                ? activeStepTotal
+                : min(max((activeCompletedSteps ?? 0) + 1, 1), activeStepTotal)
+        } else {
+            nil
+        }
+        let activeProjectID = progressProject?.projectID ?? activeRun?.projectID
+        let activeProjectGeneration = progressProject?.projectGeneration
+            ?? activeRun?.projectGeneration
+        let activityFeed = composeActivityFeed(
+            operatorSnapshot: operatorSnapshot,
+            runeForge: runeForge,
+            activeRun: activeRun,
+            activePackage: activePackage,
+            activeStep: activeStep,
+            activeStepTotal: activeStepTotal,
+            activeProjectID: activeProjectID,
+            activeProjectGeneration: activeProjectGeneration,
+            priorActivity: priorActivity
+        )
         return Self(
             providerHealth: operatorSnapshot?.provider?.health,
             providerModel: operatorSnapshot?.provider?.modelKey,
@@ -124,8 +252,409 @@ struct RigOperationalSnapshot: Sendable, Equatable {
             projectTotalSteps: totalSteps,
             projectCompletedPackages: completedPackages,
             projectTotalPackages: packages.count,
-            projectProgressState: progressState
+            projectProgressState: progressState,
+            currentPackageName: activePackage?.displayName,
+            currentPackagePosition: activePackage.map { $0.position + 1 },
+            currentPackageCompletedSteps: activeCompletedSteps,
+            nextPackageName: nextPackage?.displayName,
+            nextPackagePosition: nextPackage.map { $0.position + 1 },
+            nextPackageStepTotal: nextPackage?.totalStepCount ?? nextPackage?.documentCount,
+            currentStep: activeStep,
+            currentStepTotal: activeStepTotal,
+            currentPhase: activeRun?.currentPhase,
+            currentWorkItem: activeRun?.workItem,
+            currentNextAction: activeRun?.nextAction,
+            activeRunState: activeRun?.state ?? activePackage?.state,
+            operatorEvidenceAvailable: operatorEvidenceAvailable ?? (operatorSnapshot != nil),
+            instructionEvidenceAvailable: instructionEvidenceAvailable
+                ?? (instructionQueue != nil || (operatorSnapshot != nil && progressProject == nil)),
+            policyEvidenceAvailable: policyEvidenceAvailable ?? (runeForge != nil),
+            activityFeed: activityFeed
         )
+    }
+
+    static func monitoredRun(
+        operatorSnapshot: OperatorSnapshot?,
+        instructionQueue: OperatorInstructionQueue?,
+        progressProject: OperatorProject?
+    ) -> OperatorRun? {
+        guard let monitoredRunID = monitoredRunID(
+            operatorSnapshot: operatorSnapshot,
+            instructionQueue: instructionQueue,
+            progressProject: progressProject
+        ) else {
+            return nil
+        }
+        return operatorSnapshot?.runs.first { run in
+            run.runID == monitoredRunID
+                && (progressProject == nil
+                    || (run.projectID == progressProject?.projectID
+                        && run.projectGeneration == progressProject?.projectGeneration))
+        }
+    }
+
+    static func monitoredRunID(
+        operatorSnapshot: OperatorSnapshot?,
+        instructionQueue: OperatorInstructionQueue?,
+        progressProject: OperatorProject?
+    ) -> String? {
+        let terminalRunStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
+        let terminalPackageStates: Set<String> = ["completed", "cancelled", "failed"]
+        let projectRuns = operatorSnapshot?.runs.filter { run in
+            guard let progressProject else { return true }
+            return run.projectID == progressProject.projectID
+                && run.projectGeneration == progressProject.projectGeneration
+        } ?? []
+        let activeRuns = projectRuns.filter { !terminalRunStates.contains($0.state) }
+        for package in instructionQueue?.packages ?? []
+            where !terminalPackageStates.contains(package.state) {
+            guard progressProject == nil
+                    || (package.projectID == progressProject?.projectID
+                        && package.projectGeneration == progressProject?.projectGeneration),
+                  let runID = package.runID else {
+                continue
+            }
+            return runID
+        }
+        return activeRuns.first?.runID
+    }
+
+    private static func composeActivityFeed(
+        operatorSnapshot: OperatorSnapshot?,
+        runeForge: StjornarvaldManagerSnapshot?,
+        activeRun: OperatorRun?,
+        activePackage: OperatorInstructionPackage?,
+        activeStep: Int?,
+        activeStepTotal: Int?,
+        activeProjectID: String?,
+        activeProjectGeneration: UInt64?,
+        priorActivity: [RigActivityEntry]
+    ) -> [RigActivityEntry] {
+        var entries: [RigActivityEntry] = []
+        let operatorEvents = (operatorSnapshot?.events ?? []).filter { event in
+            includes(
+                eventProjectID: event.projectID,
+                eventProjectGeneration: event.projectGeneration,
+                activeProjectID: activeProjectID,
+                activeProjectGeneration: activeProjectGeneration,
+                eventRunID: event.runID,
+                activeRunID: activeRun?.runID
+            )
+        }
+        let hasDurableAssistantActivity = operatorEvents.contains {
+            $0.kind == "managed_activity_assistant_response"
+        }
+        let hasDurableToolActivity = operatorEvents.contains {
+            $0.kind.hasPrefix("managed_activity_tool_")
+        }
+
+        for event in operatorEvents where includes(
+            eventProjectID: event.projectID,
+            eventProjectGeneration: event.projectGeneration,
+            activeProjectID: activeProjectID,
+            activeProjectGeneration: activeProjectGeneration,
+            eventRunID: event.runID,
+            activeRunID: activeRun?.runID
+        ) {
+            entries.append(
+                RigActivityEntry(
+                    id: "operator:\(event.eventID)",
+                    occurredAt: ISO8601.date(from: event.timestamp) ?? .distantPast,
+                    category: operatorCategory(for: event.kind),
+                    title: humanized(event.kind),
+                    message: bounded(event.summary),
+                    projectID: event.projectID,
+                    projectGeneration: event.projectGeneration,
+                    runID: event.runID,
+                    severity: operatorSeverity(kind: event.kind, severity: event.severity),
+                    durableSequence: event.sequence
+                )
+            )
+        }
+
+        if let activePackage {
+            let progress = if let activeStep, let activeStepTotal {
+                "Step \(activeStep) of \(activeStepTotal)"
+            } else {
+                "Step count unavailable"
+            }
+            let context = [
+                progress,
+                activeRun?.workItem.map { "Work item: \($0)" },
+                activeRun?.nextAction.map { "Next: \($0)" },
+            ].compactMap { $0 }.joined(separator: " · ")
+            entries.append(
+                RigActivityEntry(
+                    id: "instruction:\(activePackage.id):\(activeStep ?? 0):\(activePackage.updatedAt)",
+                    occurredAt: ISO8601.date(from: activePackage.updatedAt) ?? .distantPast,
+                    category: .instruction,
+                    title: activePackage.displayName,
+                    message: bounded(context),
+                    projectID: activePackage.projectID,
+                    projectGeneration: activePackage.projectGeneration,
+                    runID: activePackage.runID,
+                    severity: activePackage.state == "failed" || activePackage.state == "blocked"
+                        ? .warning : .informational
+                )
+            )
+        }
+
+        if let activeRun,
+           !activeRun.mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let digest = String(JSONSupport.sha256Hex(activeRun.mission).prefix(16))
+            entries.append(
+                RigActivityEntry(
+                    id: "prompt:\(activeRun.runID):\(digest)",
+                    occurredAt: activeRun.createdAt.flatMap(ISO8601.date(from:)) ?? .distantPast,
+                    category: .prompt,
+                    title: activeRun.workItem ?? activeRun.currentPhase ?? "Managed task input",
+                    message: bounded(activeRun.mission),
+                    projectID: activeRun.projectID,
+                    projectGeneration: activeRun.projectGeneration,
+                    runID: activeRun.runID,
+                    severity: .informational
+                )
+            )
+        }
+
+        if let activeRun,
+           let state = activeRun.lastModelTurnState {
+            let turnIdentity = activeRun.lastModelTurnID
+                ?? activeRun.lastModelTurnAt
+                ?? "latest"
+            let kind = activeRun.lastModelTurnKind.map(humanized) ?? "Managed model turn"
+            let detail = [
+                "State: \(humanized(state))",
+                activeRun.lastModelTurnErrorSummary.map { "Error: \($0)" },
+            ].compactMap { $0 }.joined(separator: " · ")
+            entries.append(
+                RigActivityEntry(
+                    id: "model:\(activeRun.runID):\(turnIdentity):\(state)",
+                    occurredAt: activeRun.lastModelTurnAt.flatMap(ISO8601.date(from:))
+                        ?? .distantPast,
+                    category: .session,
+                    title: kind,
+                    message: bounded(detail),
+                    projectID: activeRun.projectID,
+                    projectGeneration: activeRun.projectGeneration,
+                    runID: activeRun.runID,
+                    severity: modelTurnSeverity(state)
+                )
+            )
+        }
+
+        if let activeRun,
+           let message = activeRun.lastAssistantMessage,
+           !hasDurableAssistantActivity,
+           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let digest = String(JSONSupport.sha256Hex(message).prefix(16))
+            let timestamp = activeRun.lastModelTurnAt ?? activeRun.updatedAt
+            entries.append(
+                RigActivityEntry(
+                    id: "session:\(activeRun.runID):\(timestamp ?? digest):\(digest)",
+                    occurredAt: timestamp.flatMap(ISO8601.date(from:)) ?? .distantPast,
+                    category: .session,
+                    title: activeRun.workItem ?? activeRun.currentPhase ?? "Managed model response",
+                    message: bounded(message),
+                    projectID: activeRun.projectID,
+                    projectGeneration: activeRun.projectGeneration,
+                    runID: activeRun.runID,
+                    severity: .informational
+                )
+            )
+        }
+
+        if let activeRun,
+           let toolName = activeRun.lastToolName,
+           let toolState = activeRun.lastToolState,
+           !hasDurableToolActivity {
+            let toolIdentity = activeRun.lastToolInvocationID
+                ?? activeRun.lastToolActivityAt
+                ?? toolName
+            let summary = activeRun.lastToolSummary.map { "\(humanized(toolState)) · \($0)" }
+                ?? humanized(toolState)
+            entries.append(
+                RigActivityEntry(
+                    id: "tool:\(activeRun.runID):\(toolIdentity):\(toolState)",
+                    occurredAt: activeRun.lastToolActivityAt.flatMap(ISO8601.date(from:))
+                        ?? .distantPast,
+                    category: .tool,
+                    title: toolName,
+                    message: bounded(summary),
+                    projectID: activeRun.projectID,
+                    projectGeneration: activeRun.projectGeneration,
+                    runID: activeRun.runID,
+                    severity: toolSeverity(toolState)
+                )
+            )
+        }
+
+        for event in runeForge?.violationEvents ?? [] where includes(
+            eventProjectID: event.candidate.scope.projectID,
+            eventProjectGeneration: scopeGeneration(event.candidate.scope.projectGeneration),
+            activeProjectID: activeProjectID,
+            activeProjectGeneration: activeProjectGeneration,
+            eventRunID: event.candidate.scope.runID,
+            activeRunID: activeRun?.runID
+        ) {
+            let candidate = event.candidate
+            let policyContext = [
+                candidate.summary,
+                "Rule \(candidate.rule.id.description) · \(candidate.rule.source.path)#\(candidate.rule.source.locator)",
+                "Why: \(candidate.explanation)",
+                "Suggested correction: \(candidate.suggestedCorrection)",
+            ].joined(separator: "\n")
+            entries.append(
+                RigActivityEntry(
+                    id: "policy:\(event.id.uuidString.lowercased())",
+                    occurredAt: event.occurredAt,
+                    category: .policy,
+                    title: humanized(event.type.rawValue),
+                    message: bounded(policyContext),
+                    projectID: candidate.scope.projectID,
+                    projectGeneration: scopeGeneration(candidate.scope.projectGeneration),
+                    runID: candidate.scope.runID,
+                    severity: policySeverity(for: event.type),
+                    durableSequence: event.sequence
+                )
+            )
+        }
+
+        let retained = priorActivity.filter {
+            includes(
+                eventProjectID: $0.projectID,
+                eventProjectGeneration: $0.projectGeneration,
+                activeProjectID: activeProjectID,
+                activeProjectGeneration: activeProjectGeneration,
+                eventRunID: $0.runID,
+                activeRunID: activeRun?.runID
+            )
+        }
+        var unique: [String: RigActivityEntry] = [:]
+        for entry in retained {
+            unique[entry.id] = RigActivityEntry(
+                id: entry.id,
+                occurredAt: entry.occurredAt,
+                category: entry.category,
+                title: entry.title,
+                message: bounded(entry.message),
+                projectID: entry.projectID,
+                projectGeneration: entry.projectGeneration,
+                runID: entry.runID,
+                severity: entry.severity,
+                durableSequence: entry.durableSequence
+            )
+        }
+        for entry in entries { unique[entry.id] = entry }
+        return unique.values.sorted {
+            if $0.occurredAt != $1.occurredAt { return $0.occurredAt > $1.occurredAt }
+            let lhsSource = $0.id.split(separator: ":", maxSplits: 1).first
+            let rhsSource = $1.id.split(separator: ":", maxSplits: 1).first
+            if lhsSource == rhsSource,
+               let lhsSequence = $0.durableSequence,
+               let rhsSequence = $1.durableSequence,
+               lhsSequence != rhsSequence {
+                return lhsSequence > rhsSequence
+            }
+            return $0.id > $1.id
+        }.prefix(maximumActivityEntries).map { $0 }
+    }
+
+    private static func includes(
+        eventProjectID: String?,
+        eventProjectGeneration: UInt64?,
+        activeProjectID: String?,
+        activeProjectGeneration: UInt64?,
+        eventRunID: String?,
+        activeRunID: String?
+    ) -> Bool {
+        if let activeProjectID, let eventProjectID {
+            guard eventProjectID == activeProjectID else { return false }
+            if let activeProjectGeneration {
+                guard eventProjectGeneration == activeProjectGeneration else { return false }
+            }
+        }
+        guard let activeRunID else { return true }
+        return eventRunID == nil || eventRunID == activeRunID
+    }
+
+    private static func scopeGeneration(_ value: Int?) -> UInt64? {
+        guard let value, value >= 0 else { return nil }
+        return UInt64(value)
+    }
+
+    private static func operatorCategory(for kind: String) -> RigActivityCategory {
+        let normalized = kind.lowercased()
+        if normalized.contains("tool") { return .tool }
+        if normalized.contains("provider") || normalized.contains("assistant")
+            || normalized.contains("model") { return .session }
+        return normalized.contains("instruction")
+            || normalized.contains("package")
+            || normalized.contains("step") ? .instruction : .orchestration
+    }
+
+    private static func operatorSeverity(
+        kind: String,
+        severity: String?
+    ) -> RigActivitySeverity {
+        let normalizedKind = kind.lowercased()
+        if normalizedKind.hasSuffix("_completed") { return .success }
+        if normalizedKind.contains("failed") || normalizedKind.contains("cancelled") {
+            return .failure
+        }
+        if normalizedKind.contains("ambiguous") || normalizedKind.contains("retry") {
+            return .warning
+        }
+        return switch severity?.lowercased() {
+        case "success", "healthy": .success
+        case "warning", "warn", "caution": .warning
+        case "error", "failure", "failed", "critical": .failure
+        default: .informational
+        }
+    }
+
+    private static func policySeverity(for type: PolicyViolationEventType) -> RigActivitySeverity {
+        switch type {
+        case .corrected: .success
+        case .opened, .repeated, .reopened: .warning
+        case .evidenceUpdated, .disputed: .informational
+        }
+    }
+
+    private static func modelTurnSeverity(_ state: String) -> RigActivitySeverity {
+        switch state.lowercased() {
+        case "completed": .success
+        case "failed", "cancelled": .failure
+        case "ambiguous", "retry_wait": .warning
+        default: .informational
+        }
+    }
+
+    private static func toolSeverity(_ state: String) -> RigActivitySeverity {
+        switch state.lowercased() {
+        case "completed": .success
+        case "failed", "cancelled", "quarantined_stale": .failure
+        case "ambiguous": .warning
+        default: .informational
+        }
+    }
+
+    private static func humanized(_ value: String) -> String {
+        value.replacingOccurrences(of: "_", with: " ").uppercased()
+    }
+
+    private static func bounded(_ value: String) -> String {
+        var output = ""
+        output.reserveCapacity(min(value.utf8.count, maximumActivityMessageBytes))
+        var byteCount = 0
+        for scalar in value.unicodeScalars {
+            let scalarText = String(scalar)
+            let scalarBytes = scalarText.utf8.count
+            guard byteCount + scalarBytes <= maximumActivityMessageBytes else { break }
+            output.append(scalarText)
+            byteCount += scalarBytes
+        }
+        return output
     }
 }
 
@@ -462,33 +991,85 @@ public final class AppModel: ObservableObject {
     private func refreshRigOperationalSnapshot() async {
         async let operatorRequest: OperatorSnapshot? = try? operatorManagerClient.snapshot(limit: 100)
         async let autonomyRequest: OperatorAutonomySummary? = try? operatorManagerClient.autonomyStatus()
-        async let runeForgeRequest: StjornarvaldManagerSnapshot? = try? operatorManagerClient.runeForgeSnapshot()
-        let (operatorSnapshot, autonomy, runeForge) = await (
-            operatorRequest, autonomyRequest, runeForgeRequest
-        )
+        let (operatorSnapshot, autonomy) = await (operatorRequest, autonomyRequest)
         let terminalStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
         let activeRun = operatorSnapshot?.runs.first { !terminalStates.contains($0.state) }
         let progressProject = operatorSnapshot?.projects.first {
             $0.projectID == activeRun?.projectID
                 && $0.projectGeneration == activeRun?.projectGeneration
         } ?? operatorSnapshot?.projects.first
-        let instructionQueue: OperatorInstructionQueue?
-        if let progressProject {
-            instructionQueue = try? await operatorManagerClient.instructionQueue(
-                projectID: progressProject.projectID,
-                generation: progressProject.projectGeneration
+        async let runeForgeRequest: StjornarvaldManagerSnapshot? = try? operatorManagerClient
+            .runeForgeSnapshot(
+                projectID: progressProject?.projectID,
+                projectGeneration: progressProject?.projectGeneration
             )
-        } else {
-            instructionQueue = nil
-        }
-        guard !Task.isCancelled else { return }
-        rigOperationalSnapshot = RigOperationalSnapshot.compose(
+        let instructionResult = await rigInstructionQueue(
+            for: progressProject,
+            operatorEvidenceAvailable: operatorSnapshot != nil
+        )
+        let monitoredRunID = RigOperationalSnapshot.monitoredRunID(
             operatorSnapshot: operatorSnapshot,
-            autonomy: autonomy,
-            runeForge: runeForge,
-            instructionQueue: instructionQueue,
+            instructionQueue: instructionResult.queue,
             progressProject: progressProject
         )
+        async let activityRequest = rigActivitySnapshot(
+            publicSnapshot: operatorSnapshot,
+            activeRunID: monitoredRunID,
+            project: progressProject
+        )
+        let (runeForge, activityResult) = await (runeForgeRequest, activityRequest)
+        guard !Task.isCancelled else { return }
+        rigOperationalSnapshot = RigOperationalSnapshot.compose(
+            operatorSnapshot: activityResult.snapshot,
+            autonomy: autonomy,
+            runeForge: runeForge,
+            instructionQueue: instructionResult.queue,
+            progressProject: progressProject,
+            operatorEvidenceAvailable: activityResult.available,
+            instructionEvidenceAvailable: instructionResult.available,
+            policyEvidenceAvailable: runeForge != nil,
+            priorActivity: rigOperationalSnapshot.activityFeed
+        )
+    }
+
+    private func rigActivitySnapshot(
+        publicSnapshot: OperatorSnapshot?,
+        activeRunID: String?,
+        project: OperatorProject?
+    ) async -> (snapshot: OperatorSnapshot?, available: Bool) {
+        guard let publicSnapshot else { return (nil, false) }
+        guard let activeRunID, let project else { return (publicSnapshot, true) }
+        do {
+            return (
+                try await operatorManagerClient.activitySnapshot(
+                    limit: 100,
+                    runID: activeRunID,
+                    projectID: project.projectID,
+                    projectGeneration: project.projectGeneration
+                ),
+                true
+            )
+        } catch {
+            return (publicSnapshot, false)
+        }
+    }
+
+    private func rigInstructionQueue(
+        for project: OperatorProject?,
+        operatorEvidenceAvailable: Bool
+    ) async -> (queue: OperatorInstructionQueue?, available: Bool) {
+        guard let project else { return (nil, operatorEvidenceAvailable) }
+        do {
+            return (
+                try await operatorManagerClient.instructionQueue(
+                    projectID: project.projectID,
+                    generation: project.projectGeneration
+                ),
+                true
+            )
+        } catch {
+            return (nil, false)
+        }
     }
 
     func stopBootstrap() async {

@@ -225,6 +225,7 @@ public struct StjornarvaldExportReceipt: Codable, Sendable, Equatable {
 public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
     public static let maximumSourceBatchesPerActivation = 8
     public static let maximumObservationsPerActivation = 32
+    public static let maximumSnapshotViolationEventBytes = 1 * 1_024 * 1_024
     public static let idleInterval: TimeInterval = 1
     public static let maximumBackoff: TimeInterval = 30
 
@@ -389,23 +390,50 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
 
     public func snapshot(
         eventCursor: Int64 = 0,
-        limit: Int = 50
+        limit: Int = 50,
+        newestFirst: Bool = false,
+        projectID: String? = nil,
+        projectGeneration: UInt64? = nil
     ) throws -> StjornarvaldManagerSnapshot {
         guard eventCursor >= 0, (1...100).contains(limit),
+              !(newestFirst && eventCursor != 0),
+              (projectID == nil) == (projectGeneration == nil),
+              (projectID == nil || newestFirst),
               let sourceCatalog, let logStore else {
             throw StjornarvaldObservationError.unavailable(
                 "Stjornarvald snapshot is unavailable or outside bounds"
             )
         }
-        let page = try logStore.events(after: eventCursor, limit: limit + 1)
-        let visible = Array(page.prefix(limit))
+        let page = if newestFirst {
+            try logStore.newestEvents(
+                limit: limit,
+                projectID: projectID,
+                projectGeneration: projectGeneration
+            )
+        } else {
+            try logStore.events(after: eventCursor, limit: limit + 1)
+        }
+        var visible: [PolicyViolationEvent] = []
+        visible.reserveCapacity(min(page.count, limit))
+        var encodedEventBytes = 0
+        for event in page.prefix(limit) {
+            let eventBytes = try JSONEncoder().encode(event).count
+            guard visible.isEmpty
+                    || encodedEventBytes + eventBytes
+                        <= Self.maximumSnapshotViolationEventBytes else {
+                break
+            }
+            visible.append(event)
+            encodedEventBytes += eventBytes
+        }
+        let hasMoreEvents = page.count > visible.count
         return StjornarvaldManagerSnapshot(
             schemaVersion: StjornarvaldManagerSnapshot.schemaVersion,
             health: health(),
             governingPolicy: RavenForgeDevelopmentPolicyAdapter.identity,
             sources: try sourceCatalog.sources(limit: limit),
             violationEvents: visible,
-            nextEventCursor: page.count > limit ? visible.last?.sequence : nil,
+            nextEventCursor: !newestFirst && hasMoreEvents ? visible.last?.sequence : nil,
             limitations: [
                 "Presented notices prove transport, not model comprehension or correction.",
                 "Source bodies and unbounded history are excluded from this snapshot.",

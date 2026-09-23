@@ -522,10 +522,19 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     public func stjornarvaldSnapshotDictionary(
         eventCursor: Int64 = 0,
-        limit: Int = 50
+        limit: Int = 50,
+        newestFirst: Bool = false,
+        projectID: String? = nil,
+        projectGeneration: UInt64? = nil
     ) throws -> [String: Any] {
         try JSONSupport.object(from: JSONEncoder().encode(
-            stjornarvald.snapshot(eventCursor: eventCursor, limit: limit)
+            stjornarvald.snapshot(
+                eventCursor: eventCursor,
+                limit: limit,
+                newestFirst: newestFirst,
+                projectID: projectID,
+                projectGeneration: projectGeneration
+            )
         ))
     }
 
@@ -665,21 +674,59 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     /// current newest-first view so the console never presents stale control state.
     public func operatorSnapshot(
         limit: Int = 50,
-        beforeEventSequence: Int64? = nil
+        beforeEventSequence: Int64? = nil,
+        includeActivity: Bool = false,
+        activityRunID: String? = nil,
+        activityProjectID: String? = nil,
+        activityProjectGeneration: UInt64? = nil
     ) throws -> ManagerOperatorSnapshot {
-        guard (1...100).contains(limit), beforeEventSequence.map({ $0 > 0 }) ?? true else {
+        let requestedProjectGeneration = activityProjectGeneration.map { ProjectGeneration($0) }
+        let activityIdentityComplete = activityRunID != nil
+            && activityProjectID != nil && requestedProjectGeneration != nil
+        let requestedRunID = activityRunID.flatMap(UUID.init(uuidString:)).map(RunID.init)
+        let requestedProjectID = activityProjectID.flatMap(UUID.init(uuidString:))
+            .map(ProjectID.init)
+        guard (1...100).contains(limit), beforeEventSequence.map({ $0 > 0 }) ?? true,
+              includeActivity == activityIdentityComplete,
+              !includeActivity || (requestedRunID != nil && requestedProjectID != nil) else {
             throw AutonomyError.invalidRequest("operator snapshot query is outside bounds")
         }
         let app = self.app
         let persisted = try Self.waitForAsync(timeoutSeconds: 10) {
             let control = app.projectContexts.repository
-            let projects = try await control.operatorProjects(limit: limit)
+            let projects: [ProjectControlRecord]
+            let runRecords: [AutonomousRunRecord]
+            if includeActivity {
+                guard let requestedRunID, let requestedProjectID,
+                      let requestedProjectGeneration,
+                      let run = try await control.autonomousRun(requestedRunID),
+                      run.projectID == requestedProjectID,
+                      run.projectGeneration == requestedProjectGeneration,
+                      let project = try await control.project(requestedProjectID),
+                      project.generation == requestedProjectGeneration else {
+                    throw ProjectContextError.projectScopeMismatch
+                }
+                projects = [project]
+                runRecords = [run]
+            } else {
+                projects = try await control.operatorProjects(limit: limit)
+                runRecords = try await control.operatorAutonomousRuns(limit: limit)
+            }
             let projectIDs = projects.map(\.projectID)
             let bindings = try await control.operatorBindings(projectIDs: projectIDs)
             let resetReceipts = try await control.operatorLatestResetReceipts(projectIDs: projectIDs)
-            let runRecords = try await control.operatorAutonomousRuns(limit: limit)
             let runs = try await control.operatorRunReadModels(runs: runRecords)
-            let commandRecords = try await control.operatorContinuityCommands(limit: limit)
+            let commandRecords: [ContinuityCommand]
+            if includeActivity, let requestedProjectID, let requestedRunID,
+               let requestedProjectGeneration {
+                commandRecords = try await control.operatorLatestContinuityCommand(
+                    projectID: requestedProjectID,
+                    projectGeneration: requestedProjectGeneration,
+                    runID: requestedRunID
+                ).map { [$0] } ?? []
+            } else {
+                commandRecords = try await control.operatorContinuityCommands(limit: limit)
+            }
             var evidenceByOperation: [UUID: ManagerOperatorContinuityEvidence] = [:]
             evidenceByOperation.reserveCapacity(commandRecords.count)
             for command in commandRecords {
@@ -706,11 +753,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 commands: commandRecords,
                 evidenceByOperation: evidenceByOperation
             )
-            let runtimeJobs = try await app.runtimeJobs.repository.operatorRecentJobs(limit: limit)
+            let runtimeJobs = includeActivity
+                ? [] : try await app.runtimeJobs.repository.operatorRecentJobs(limit: limit)
             let runtimeCapabilities = await app.runtimeJobs.service.capabilities()
             let events = try await control.operatorAutonomyEvents(
                 limit: limit + 1,
-                beforeSequence: beforeEventSequence
+                beforeSequence: beforeEventSequence,
+                runID: includeActivity ? requestedRunID : nil,
+                includeManagedActivity: includeActivity
             )
             return ManagerOperatorPersistenceSnapshot(
                 projects: projects,
@@ -739,23 +789,34 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
         }
         let projectedProjectIDs = Set(projectRows.map { $0.projectID.lowercased() })
-        let pendingProjectRegistrations = try app.projectMemory.identities
-            .pendingRegistrations(
-                limit: limit,
-                excludingProjectIDs: projectedProjectIDs
-            )
-            .map { pending in
-                ManagerOperatorPendingProjectRegistration(
-                    projectID: pending.preparation.descriptor.id,
-                    state: "reconciliation_required",
-                    requestPath: pending.requestedPath,
-                    requestedDisplayName: pending.requestedDisplayName,
-                    repositoryIdentityAssertion: pending.repositoryIdentityAssertion,
-                    operationID: pending.preparation.operationID,
-                    createdAt: pending.createdAt
+        let pendingProjectRegistrations: [ManagerOperatorPendingProjectRegistration]
+        if includeActivity {
+            pendingProjectRegistrations = []
+        } else {
+            pendingProjectRegistrations = try app.projectMemory.identities
+                .pendingRegistrations(
+                    limit: limit,
+                    excludingProjectIDs: projectedProjectIDs
                 )
-            }
-        let runRows = persisted.runs.map(Self.operatorRun)
+                .map { pending in
+                    ManagerOperatorPendingProjectRegistration(
+                        projectID: pending.preparation.descriptor.id,
+                        state: "reconciliation_required",
+                        requestPath: pending.requestedPath,
+                        requestedDisplayName: pending.requestedDisplayName,
+                        repositoryIdentityAssertion: pending.repositoryIdentityAssertion,
+                        operationID: pending.preparation.operationID,
+                        createdAt: pending.createdAt
+                    )
+                }
+        }
+        let runRows = persisted.runs.map {
+            let matchesActivity = includeActivity
+                && requestedRunID == $0.run.runID
+                && requestedProjectID == $0.run.projectID
+                && $0.run.projectGeneration.rawValue == activityProjectGeneration
+            return Self.operatorRun($0, includeActivity: matchesActivity)
+        }
         let continuityReadinessRows = Self.operatorContinuityReadiness(
             projects: persisted.projects,
             runs: persisted.runs,
@@ -844,18 +905,31 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 selectedRun: persisted.runs.first(where: { !$0.run.state.isTerminal })
                     ?? persisted.runs.first
             ),
-            events: visibleEvents.map(Self.operatorEvent),
+            events: visibleEvents.map {
+                Self.operatorEvent(
+                    $0,
+                    projectGeneration: includeActivity ? activityProjectGeneration : nil
+                )
+            },
             nextCursor: nextCursor
         )
     }
 
     public func operatorSnapshotDictionary(
         limit: Int = 50,
-        beforeEventSequence: Int64? = nil
+        beforeEventSequence: Int64? = nil,
+        includeActivity: Bool = false,
+        activityRunID: String? = nil,
+        activityProjectID: String? = nil,
+        activityProjectGeneration: UInt64? = nil
     ) throws -> [String: Any] {
         try operatorSnapshot(
             limit: limit,
-            beforeEventSequence: beforeEventSequence
+            beforeEventSequence: beforeEventSequence,
+            includeActivity: includeActivity,
+            activityRunID: activityRunID,
+            activityProjectID: activityProjectID,
+            activityProjectGeneration: activityProjectGeneration
         ).asDictionary()
     }
 
@@ -3986,7 +4060,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private static func operatorRun(
-        _ detail: ManagerOperatorRunReadModel
+        _ detail: ManagerOperatorRunReadModel,
+        includeActivity: Bool = false
     ) -> ManagerOperatorRun {
         let run = detail.run
         let receipt = run.completionRequestJSON.flatMap {
@@ -4020,8 +4095,42 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             activeOperationID: run.activeOperationID?.uuidString.lowercased(),
             continuationPending: run.continuationPending,
             leaseOwner: leaseOwner,
-            workItem: operatorSummary(run.specification.work.workItem, maximumCharacters: 1_024),
+            currentPhase: includeActivity ? operatorSummary(
+                run.specification.work.currentPhase,
+                maximumCharacters: 512
+            ) : nil,
+            workItem: operatorSummary(
+                run.specification.work.workItem,
+                maximumCharacters: 1_024
+            ),
+            nextAction: includeActivity ? operatorSummary(
+                run.specification.work.nextAction,
+                maximumCharacters: 2_048
+            ) : nil,
+            lastAssistantMessage: includeActivity ? operatorTranscript(
+                run.specification.work.metadata["provider_assistant_summary"],
+                maximumBytes: 8 * 1_024
+            ) : nil,
+            lastModelTurnID: detail.latestProviderTurn?
+                .intent.turnID.uuidString.lowercased(),
+            lastModelTurnKind: detail.latestProviderTurn?.intent.kind.rawValue,
+            lastModelTurnState: detail.latestProviderTurn?.state.rawValue,
+            lastModelTurnErrorSummary: includeActivity ? operatorSummary(
+                detail.latestProviderTurn?.lastErrorSummary,
+                maximumCharacters: 2_048
+            ) : nil,
             lastModelTurnAt: detail.latestProviderTurn?.updatedAt,
+            lastToolInvocationID: detail.latestToolInvocation?
+                .invocationID.uuidString.lowercased(),
+            lastToolName: detail.latestToolInvocation.map {
+                operatorIdentifier($0.toolName, maximumCharacters: 512)
+            },
+            lastToolState: detail.latestToolInvocation?.state.rawValue,
+            lastToolSummary: includeActivity ? operatorTranscript(
+                detail.latestToolInvocation?.resultSummary
+                    ?? detail.latestToolInvocation?.lastErrorSummary,
+                maximumBytes: 8 * 1_024
+            ) : nil,
             lastToolActivityAt: detail.latestToolInvocation?.updatedAt,
             completionGates: Array(run.specification.completionGates.prefix(128)),
             completionPlan: run.specification.completionPlan,
@@ -4546,16 +4655,24 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         })
     }
 
-    private static func operatorEvent(_ event: AutonomyEvent) -> ManagerOperatorEvent {
+    private static func operatorEvent(
+        _ event: AutonomyEvent,
+        projectGeneration: UInt64? = nil
+    ) -> ManagerOperatorEvent {
         let metadata = (try? JSONSerialization.jsonObject(with: Data(event.metadataJSON.utf8)))
             as? [String: String] ?? [:]
+        let summary = event.eventType.hasPrefix("managed_activity_")
+            ? operatorTranscript(event.summary, maximumBytes: 2_048)
+            : operatorSummary(event.summary, maximumCharacters: 512)
         return ManagerOperatorEvent(
+            sequence: event.sequence,
             eventID: event.eventID.uuidString.lowercased(),
             timestamp: event.createdAt,
             kind: event.eventType,
-            summary: operatorSummary(event.summary, maximumCharacters: 512) ?? "<redacted>",
+            summary: summary ?? "<redacted>",
             severity: event.severity.rawValue,
             projectID: event.projectID?.description,
+            projectGeneration: projectGeneration,
             runID: event.runID?.description,
             operationID: operatorUUID(metadata["operation_id"]),
             jobID: operatorUUID(metadata["job_id"]),
@@ -4598,6 +4715,33 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
         let flattened = redacted.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         return String(flattened.prefix(maximumCharacters))
+    }
+
+    /// Owner-facing managed-model text keeps its readable line structure while
+    /// remaining secret-redacted and strictly bounded at the operator boundary.
+    private static func operatorTranscript(
+        _ value: String?,
+        maximumBytes: Int
+    ) -> String? {
+        guard let value, maximumBytes > 0 else { return nil }
+        let redacted: String
+        do {
+            redacted = try operatorRedactor.redact(value) ?? ""
+        } catch {
+            return "<redacted>"
+        }
+
+        var output = ""
+        output.reserveCapacity(min(redacted.utf8.count, maximumBytes))
+        var byteCount = 0
+        for scalar in redacted.unicodeScalars {
+            let scalarText = String(scalar)
+            let scalarBytes = scalarText.utf8.count
+            guard byteCount + scalarBytes <= maximumBytes else { break }
+            output.append(scalarText)
+            byteCount += scalarBytes
+        }
+        return output
     }
 
     private func finishProviderProbe(

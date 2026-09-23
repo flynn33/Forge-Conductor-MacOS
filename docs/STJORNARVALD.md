@@ -307,6 +307,23 @@ The Manager now owns the Stjornarvald composition boundary:
 - process clients retain up to 10,000 observations in an owner-only FIFO
   outbox and resume sequential submission after Manager outage.
 
+The snapshot read contract accepts `limit` values from 1 through 100. Selecting
+`order=newest` returns the newest bounded events and forbids a cursor; supplying
+both is rejected. `project_id` and `project_generation` are accepted only as a
+pair and only with newest-first ordering; matching is exact across both fields.
+The default chronological form preserves its existing cursor behavior for
+forward paging. Snapshot event payloads also obey a 1 MiB aggregate serialized
+budget, so valid per-event bounds cannot multiply into an oversized five-second
+poll.
+
+The schema-version-1 event store additively owns nullable `project_id` and
+`project_generation` projection columns. On open, it backfills only scoped rows
+whose canonical `scope_json` lacks or disagrees with that projection, restores
+the append-only triggers in the same transaction, and uses
+`stj_violation_events_project_sequence` for exact newest-first lookups. This
+repairs events written by a compatible older version-1 writer without rewriting
+legitimately unscoped history on every launch.
+
 `swift test --filter StjornarvaldManagerCoordinatorTests` and the canonical
 workspace `ForgeConductor` scheme each executed nine cases with zero failures.
 They cover lifecycle restart, evaluator exclusion, degraded bootstrap, owner
@@ -497,6 +514,23 @@ installer, notarized artifact, installation replacement, or shipment candidate
 was created; those remain separate owner-directed release work. See the
 [acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) and
 [implementation handoff](RUNE-FORGE-STJORNARVALD-HANDOFF.md).
+
+## Current Policy Feed presentation
+
+After RF-SJ-10 acceptance, the current native presentation adds a verbose
+**Policy Feed** to Rune Forge and includes the newest policy events in the Rig's
+bounded, coalesced Managed Activity projection. Rune Forge consumes the global
+newest bounded Manager snapshot; Rig requests the exact active project and
+generation. Neither creates a second log or requests unbounded history.
+Rows distinguish violations, repeats, evidence updates, corrections,
+reopenings, and interpretation observations, with source/rule, confidence,
+suggested correction, and delivery state when present. The Rig retains at most
+100 combined app-local activity rows on its existing five-second view-owned
+refresh; exact project/generation rows require an exact generation, so public
+operator events lacking that generation cannot be relabeled into the active
+generation. These presentation
+changes do not alter the RF-SJ non-interference contract, policy evaluation,
+notice delivery, or canonical development results.
 
 Rune Forge Development Policy and Stjornarvald are implemented. Every selected
 policy source is accepted; Raven Forge Development is continuously applied;

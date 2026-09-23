@@ -233,6 +233,22 @@ private struct ManagerOperatorSnapshotQuery {
     let cursor: Int64?
 }
 
+private struct ManagerOperatorActivityQuery {
+    let limit: Int
+    let cursor: Int64?
+    let runID: String
+    let projectID: String
+    let projectGeneration: UInt64
+}
+
+private struct ManagerStjornarvaldSnapshotQuery {
+    let limit: Int
+    let cursor: Int64?
+    let newestFirst: Bool
+    let projectID: String?
+    let projectGeneration: UInt64?
+}
+
 private struct StjornarvaldObservationSubmitRequest: Decodable {
     let processID: String
     let bootID: String
@@ -323,6 +339,20 @@ private enum ManagerOperatorSnapshotQueryError: Error, LocalizedError {
         switch self {
         case .invalidTarget: "Malformed manager request target"
         case .invalidParameter: "Snapshot accepts one limit from 1 through 100 and one positive cursor"
+        }
+    }
+}
+
+private enum ManagerStjornarvaldSnapshotQueryError: Error, LocalizedError {
+    case invalidParameter
+    case cursorWithNewestOrder
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidParameter:
+            "Stjornarvald snapshot accepts one limit from 1 through 100, one positive cursor, and order=newest"
+        case .cursorWithNewestOrder:
+            "Stjornarvald snapshot cursor cannot be combined with order=newest"
         }
     }
 }
@@ -452,15 +482,58 @@ public final class ManagerRoutes: @unchecked Sendable {
                     "message": error.localizedDescription,
                 ])
             }
+        case ("GET", "/api/manager/operator/activity"):
+            do {
+                let query = try Self.operatorActivityQuery(target.queryItems)
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.operatorSnapshotDictionary(
+                        limit: query.limit,
+                        beforeEventSequence: query.cursor,
+                        includeActivity: true,
+                        activityRunID: query.runID,
+                        activityProjectID: query.projectID,
+                        activityProjectGeneration: query.projectGeneration
+                    )
+                )
+            } catch let error as ManagerOperatorSnapshotQueryError {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": "invalid_activity_query",
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectContextError {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as AutonomyError {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch {
+                http.respondJSON(connection, status: 503, object: [
+                    "ok": false,
+                    "code": "operator_activity_unavailable",
+                    "message": error.localizedDescription,
+                ])
+            }
         case ("GET", "/api/manager/stjornarvald/snapshot"):
             do {
-                let query = try Self.operatorSnapshotQuery(target.queryItems)
+                let query = try Self.stjornarvaldSnapshotQuery(target.queryItems)
                 http.respondJSON(
                     connection,
                     status: 200,
                     object: try manager.stjornarvaldSnapshotDictionary(
                         eventCursor: query.cursor ?? 0,
-                        limit: query.limit
+                        limit: query.limit,
+                        newestFirst: query.newestFirst,
+                        projectID: query.projectID,
+                        projectGeneration: query.projectGeneration
                     )
                 )
             } catch {
@@ -2204,6 +2277,99 @@ public final class ManagerRoutes: @unchecked Sendable {
             cursor = nil
         }
         return ManagerOperatorSnapshotQuery(limit: limit, cursor: cursor)
+    }
+
+    private static func stjornarvaldSnapshotQuery(
+        _ items: [URLQueryItem]
+    ) throws -> ManagerStjornarvaldSnapshotQuery {
+        guard items.allSatisfy({
+            $0.name == "limit" || $0.name == "cursor" || $0.name == "order"
+                || $0.name == "project_id" || $0.name == "project_generation"
+        }), items.filter({ $0.name == "limit" }).count <= 1,
+            items.filter({ $0.name == "cursor" }).count <= 1,
+            items.filter({ $0.name == "order" }).count <= 1,
+            items.filter({ $0.name == "project_id" }).count <= 1,
+            items.filter({ $0.name == "project_generation" }).count <= 1 else {
+            throw ManagerStjornarvaldSnapshotQueryError.invalidParameter
+        }
+        let base: ManagerOperatorSnapshotQuery
+        do {
+            base = try operatorSnapshotQuery(items.filter {
+                $0.name != "order" && $0.name != "project_id"
+                    && $0.name != "project_generation"
+            })
+        } catch {
+            throw ManagerStjornarvaldSnapshotQueryError.invalidParameter
+        }
+        let newestFirst: Bool
+        if let order = items.first(where: { $0.name == "order" }) {
+            guard order.value == "newest" else {
+                throw ManagerStjornarvaldSnapshotQueryError.invalidParameter
+            }
+            newestFirst = true
+        } else {
+            newestFirst = false
+        }
+        guard !(newestFirst && base.cursor != nil) else {
+            throw ManagerStjornarvaldSnapshotQueryError.cursorWithNewestOrder
+        }
+        let projectID = items.first(where: { $0.name == "project_id" })?.value
+        let generationValue = items.first(where: { $0.name == "project_generation" })?.value
+        let projectGeneration: UInt64?
+        if let generationValue {
+            guard isDecimal(generationValue, maximumDigits: 19),
+                  let parsed = UInt64(generationValue), parsed > 0,
+                  parsed <= UInt64(Int64.max) else {
+                throw ManagerStjornarvaldSnapshotQueryError.invalidParameter
+            }
+            projectGeneration = parsed
+        } else {
+            projectGeneration = nil
+        }
+        guard (projectID == nil) == (projectGeneration == nil),
+              projectID.map({ !$0.isEmpty && $0.utf8.count <= 512 }) ?? true,
+              projectID == nil || newestFirst else {
+            throw ManagerStjornarvaldSnapshotQueryError.invalidParameter
+        }
+        return ManagerStjornarvaldSnapshotQuery(
+            limit: base.limit,
+            cursor: base.cursor,
+            newestFirst: newestFirst,
+            projectID: projectID,
+            projectGeneration: projectGeneration
+        )
+    }
+
+    private static func operatorActivityQuery(
+        _ items: [URLQueryItem]
+    ) throws -> ManagerOperatorActivityQuery {
+        let identityNames: Set<String> = ["run_id", "project_id", "project_generation"]
+        guard items.allSatisfy({
+            $0.name == "limit" || $0.name == "cursor" || identityNames.contains($0.name)
+        }), identityNames.allSatisfy({ name in items.filter { $0.name == name }.count == 1 }) else {
+            throw ManagerOperatorSnapshotQueryError.invalidParameter
+        }
+        let base = try operatorSnapshotQuery(items.filter { !identityNames.contains($0.name) })
+        guard let runValue = items.first(where: { $0.name == "run_id" })?.value,
+              let runID = UUID(uuidString: runValue)?.uuidString.lowercased(),
+              let projectValue = items.first(where: { $0.name == "project_id" })?.value,
+              let projectID = UUID(uuidString: projectValue)?.uuidString.lowercased(),
+              let generationValue = items.first(where: {
+                  $0.name == "project_generation"
+              })?.value,
+              isDecimal(generationValue, maximumDigits: 19),
+              let projectGeneration = UInt64(generationValue),
+              projectGeneration > 0,
+              projectGeneration <= UInt64(Int64.max) else {
+            throw ManagerOperatorSnapshotQueryError.invalidParameter
+        }
+        return ManagerOperatorActivityQuery(
+            limit: base.limit,
+            cursor: base.cursor,
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: projectGeneration
+        )
     }
 
     private static func isDecimal(_ value: String, maximumDigits: Int) -> Bool {

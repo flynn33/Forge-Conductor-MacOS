@@ -62,6 +62,161 @@ final class StjornarvaldPolicyLogTests: XCTestCase {
         XCTAssertEqual(events.dropFirst().map(\.priorEventSHA256), events.dropLast().map(\.eventSHA256))
     }
 
+    func testNewestEventsReturnsBoundedDescendingWindowWithoutChangingCursorOrder() throws {
+        let fixture = try Fixture()
+        let store = try fixture.makeStore()
+        for index in 1...4 {
+            _ = try store.record(
+                fixture.candidate(summary: "Observation \(index)"),
+                eventID: UUID(uuidString: String(
+                    format: "10000000-0000-4000-8000-%012d",
+                    index
+                ))!,
+                occurredAt: Date(timeIntervalSince1970: TimeInterval(index))
+            )
+        }
+
+        XCTAssertEqual(try store.events(limit: 2).map(\.sequence), [1, 2])
+        XCTAssertEqual(try store.newestEvents(limit: 2).map(\.sequence), [4, 3])
+        XCTAssertEqual(try store.events(after: 2, limit: 2).map(\.sequence), [3, 4])
+    }
+
+    func testNewestEventsUsesExactIndexedProjectGenerationScope() throws {
+        let fixture = try Fixture()
+        let store = try fixture.makeStore()
+        _ = try store.record(
+            fixture.candidate(
+                summary: "Target project violation",
+                projectID: "target-project",
+                projectGeneration: 7
+            )
+        )
+        for index in 1...105 {
+            _ = try store.record(
+                fixture.candidate(
+                    summary: "Other project violation \(index)",
+                    projectID: "other-project",
+                    projectGeneration: 9
+                )
+            )
+        }
+
+        let scoped = try store.newestEvents(
+            limit: 100,
+            projectID: "target-project",
+            projectGeneration: 7
+        )
+        XCTAssertEqual(scoped.count, 1)
+        XCTAssertEqual(scoped.first?.candidate.summary, "Target project violation")
+        XCTAssertTrue(try store.newestEvents(
+            limit: 100,
+            projectID: "target-project",
+            projectGeneration: 8
+        ).isEmpty)
+        XCTAssertThrowsError(try store.newestEvents(
+            projectID: "target-project",
+            projectGeneration: nil
+        ))
+
+        var database: OpaquePointer?
+        XCTAssertEqual(
+            sqlite3_open_v2(fixture.database.path, &database, SQLITE_OPEN_READONLY, nil),
+            SQLITE_OK
+        )
+        let handle = try XCTUnwrap(database)
+        defer { sqlite3_close(handle) }
+        var statement: OpaquePointer?
+        XCTAssertEqual(sqlite3_prepare_v2(
+            handle,
+            "EXPLAIN QUERY PLAN SELECT sequence FROM stj_violation_events "
+                + "WHERE project_id=? AND project_generation=? ORDER BY sequence DESC LIMIT ?;",
+            -1,
+            &statement,
+            nil
+        ), SQLITE_OK)
+        let plan = try XCTUnwrap(statement)
+        defer { sqlite3_finalize(plan) }
+        sqlite3_bind_text(plan, 1, "target-project", -1, nil)
+        sqlite3_bind_int64(plan, 2, 7)
+        sqlite3_bind_int64(plan, 3, 100)
+        XCTAssertEqual(sqlite3_step(plan), SQLITE_ROW)
+        let detail = String(cString: sqlite3_column_text(plan, 3))
+        XCTAssertTrue(detail.contains("stj_violation_events_project_sequence"), detail)
+    }
+
+    func testReopenBackfillsScopeColumnsLeftNullByCompatibleVersionOneWriter() throws {
+        let fixture = try Fixture()
+        var store: StjornarvaldPolicyLogStore? = try fixture.makeStore()
+        _ = try store?.record(fixture.candidate(
+            summary: "Compatible writer event",
+            projectID: "compat-project",
+            projectGeneration: 11
+        ))
+        _ = try store?.record(fixture.candidate(
+            summary: "Unscoped global event",
+            projectID: nil,
+            projectGeneration: nil
+        ))
+        store = nil
+
+        var database: OpaquePointer?
+        XCTAssertEqual(
+            sqlite3_open_v2(fixture.database.path, &database, SQLITE_OPEN_READWRITE, nil),
+            SQLITE_OK
+        )
+        let handle = try XCTUnwrap(database)
+        XCTAssertEqual(sqlite3_exec(
+            handle,
+            "DROP TRIGGER stj_violation_events_no_update;"
+                + "UPDATE stj_violation_events SET project_id=NULL,project_generation=NULL;",
+            nil,
+            nil,
+            nil
+        ), SQLITE_OK)
+        sqlite3_close(handle)
+
+        store = try fixture.makeStore()
+        let scoped = try XCTUnwrap(store).newestEvents(
+            projectID: "compat-project",
+            projectGeneration: 11
+        )
+        XCTAssertEqual(scoped.map(\.candidate.summary), ["Compatible writer event"])
+        store = nil
+        store = try fixture.makeStore()
+        store = nil
+        store = try fixture.makeStore()
+        database = nil
+        XCTAssertEqual(
+            sqlite3_open_v2(fixture.database.path, &database, SQLITE_OPEN_READWRITE, nil),
+            SQLITE_OK
+        )
+        let reopenedHandle = try XCTUnwrap(database)
+        defer { sqlite3_close(reopenedHandle) }
+        var unscopedStatement: OpaquePointer?
+        XCTAssertEqual(sqlite3_prepare_v2(
+            reopenedHandle,
+            "SELECT COUNT(*) FROM stj_violation_events "
+                + "WHERE project_id IS NULL AND project_generation IS NULL;",
+            -1,
+            &unscopedStatement,
+            nil
+        ), SQLITE_OK)
+        let unscoped = try XCTUnwrap(unscopedStatement)
+        XCTAssertEqual(sqlite3_step(unscoped), SQLITE_ROW)
+        XCTAssertEqual(sqlite3_column_int(unscoped, 0), 1)
+        sqlite3_finalize(unscoped)
+        var message: UnsafeMutablePointer<CChar>?
+        XCTAssertNotEqual(sqlite3_exec(
+            reopenedHandle,
+            "UPDATE stj_violation_events SET project_id='mutated';",
+            nil,
+            nil,
+            &message
+        ), SQLITE_OK)
+        XCTAssertTrue(message.map { String(cString: $0).contains("append-only") } ?? false)
+        sqlite3_free(message)
+    }
+
     func testSQLiteRejectsEventUpdateAndDelete() throws {
         let fixture = try Fixture()
         let store = try fixture.makeStore()
@@ -330,7 +485,11 @@ private final class Fixture {
         try StjornarvaldPolicyLogStore(databaseURL: database, jsonlURL: jsonl)
     }
 
-    func candidate(summary: String = "Observed a disallowed runtime dependency.") -> PolicyViolationCandidate {
+    func candidate(
+        summary: String = "Observed a disallowed runtime dependency.",
+        projectID: String? = "project-1",
+        projectGeneration: Int? = 7
+    ) -> PolicyViolationCandidate {
         PolicyViolationCandidate(
             rule: PolicyRule(
                 id: PolicyRuleID("RFD-NATIVE-001"),
@@ -347,8 +506,8 @@ private final class Fixture {
             ),
             observationID: UUID(uuidString: "50000000-0000-4000-8000-000000000001")!,
             scope: DevelopmentObservationScope(
-                projectID: "project-1",
-                projectGeneration: 7,
+                projectID: projectID,
+                projectGeneration: projectGeneration,
                 runID: "run-1",
                 sessionID: "session-1",
                 clientID: "client-1"

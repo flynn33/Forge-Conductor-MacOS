@@ -14,37 +14,43 @@
     {
       "id": "rig",
       "title": "FORGE RIG guide",
-      "purpose": "Understand live system, model, tool, and orchestration telemetry without treating it as setup.",
+      "purpose": "Understand live system, managed-model, instruction-progress, policy, tool, and orchestration telemetry without treating it as setup.",
       "forge_handles_automatically": [
         "Collect and coalesce supported telemetry",
         "Mark unavailable or stale measurements",
-        "Keep active automation manager-owned"
+        "Keep active automation manager-owned",
+        "Keep Managed Activity to 100 app-local rows, retain at most 128 assistant plus 128 tool rows per run, and cap displayed rows at 8 KiB"
       ],
       "controls": [
         "Refresh",
         "Auto-refresh",
         "Instrument panels",
         "History traces",
-        "Activity panels"
+        "Activity panels",
+        "Managed Activity feed"
       ],
       "status_meanings": [
         "live: recent measurements",
         "stale: last sample exceeded freshness window",
         "unavailable: collector or source cannot provide a verified value",
-        "disconnected: source is not currently reachable"
+        "disconnected: source is not currently reachable",
+        "Managed Activity is latest bounded state, not a persisted full conversation transcript"
       ],
       "normal_workflow": [
         "Use the Rig to observe health and load",
+        "Use Managed Activity to follow the current package, step, model output, orchestration, and policy events",
         "Open the relevant feature tab to change behavior"
       ],
       "troubleshooting": [
         "No data: check Manager and provider status",
         "Stale data: refresh and inspect source age",
-        "A missing metric is not evidence of zero usage"
+        "A missing metric is not evidence of zero usage",
+        "No managed activity: confirm that Manager and Autonomy are running and a task is active"
       ],
       "advanced_details": [
         "Sampling cadence",
         "Measurement source and scope",
+        "Five-second operational refresh, 100-row presentation bound, 128+128 per-run durable bound, 8 KiB row cap, and 4 MiB streamed response ceiling",
         "Raw identifiers and collector diagnostics"
       ],
       "control_anchors": [
@@ -1073,13 +1079,14 @@
         "Accept every selected file or folder format before interpretation",
         "Apply the pinned Raven Forge Development baseline",
         "Keep bounded source, violation, correction, repetition, reopening, and delivery history",
+        "Present the newest bounded policy snapshot in the verbose Policy Feed",
         "Continue ordinary tools, runs, queues, and completion when policy processing is degraded"
       ],
       "controls": [
         "Add Development Policy",
         "Refresh policy sources and scan",
         "Inspect source identity and interpretation state",
-        "Inspect policy violations and delivery state",
+        "Inspect the verbose Policy Feed, policy violations, and delivery state",
         "Export Policy Log"
       ],
       "status_meanings": [
@@ -1087,12 +1094,14 @@
         "Cataloging and Partially indexed describe best-effort interpretation",
         "Delivery pending means the durable violation has not reached a future agent boundary",
         "Corrected, Repeated, and Reopened append history rather than replacing it",
-        "Development continuing means no tool, run, queue, or completion was restricted"
+        "Development continuing means no tool, run, queue, or completion was restricted",
+        "Policy Feed rows present the newest Manager snapshot and do not create a second policy log"
       ],
       "normal_workflow": [
         "Choose Add Development Policy and select any one file or folder",
         "Confirm that it appears immediately in Policy sources",
         "Open a source to inspect its path, revision, and interpretation observation",
+        "Review Policy Feed for the newest violation, repeat, evidence-update, correction, reopen, and interpretation events",
         "Open a violation to inspect its exact rule, evidence, confidence, correction, and delivery state",
         "Use Export Policy Log when a portable history is needed"
       ],
@@ -1100,7 +1109,8 @@
         "Manager unavailable: cached sources and violations remain visible; retry refresh later",
         "Source unavailable: keep the source active and restore or refresh its selected path",
         "Partially indexed: inspect the interpretation observation for unsupported or opaque content",
-        "Delivery pending: development continues and the notice waits for a safe future agent boundary"
+        "Delivery pending: development continues and the notice waits for a safe future agent boundary",
+        "No Policy Feed rows: refresh after Manager reconnects; an empty newest snapshot is not proof that historical events never occurred"
       ],
       "advanced_details": [
         "Source and revision identifiers",

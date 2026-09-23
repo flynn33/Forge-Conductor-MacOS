@@ -164,21 +164,31 @@ struct ContinuityOperatorView: View {
                         }
                     }
 
-                    HStack(spacing: 10) {
-                        Button("Save progress now", action: viewModel.requestCheckpoint)
-                            .disabled(!viewModel.canRequestCheckpoint)
-                            .accessibilityIdentifier("checkpoint-command")
-                        GuidedHelpButton(context: .continuitySaveProgress)
-                        Button("Start a fresh session and continue", action: viewModel.requestRollover)
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 215), spacing: 10)],
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        HStack(spacing: 6) {
+                            Button("Save progress now", action: viewModel.requestCheckpoint)
+                                .disabled(!viewModel.canRequestCheckpoint)
+                                .accessibilityIdentifier("checkpoint-command")
+                            GuidedHelpButton(context: .continuitySaveProgress)
+                        }
+                        HStack(spacing: 6) {
+                            Button(
+                                "Start a fresh session and continue",
+                                action: viewModel.requestRollover
+                            )
                             .disabled(!viewModel.canRequestRollover)
                             .accessibilityIdentifier("rollover-command")
-                        GuidedHelpButton(context: .continuityFreshSession)
+                            GuidedHelpButton(context: .continuityFreshSession)
+                        }
                         if let action = viewModel.controlInFlight {
                             ProgressView()
                                 .controlSize(.small)
                                 .accessibilityLabel("Persisting \(action.rawValue) command")
                         }
-                        Spacer()
                     }
                     Text(viewModel.eligibilityMessage)
                         .font(.caption)

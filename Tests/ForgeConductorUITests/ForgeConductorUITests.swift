@@ -206,6 +206,50 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 3))
     }
 
+    func testRuneForgePolicyFeedRouteShowsBoundedEventSurface() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let tab = app.buttons["tab-rune-forge"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 8))
+        tab.click()
+
+        let route = app.descendants(matching: .any)["rune-policy-feed-route"]
+        XCTAssertTrue(route.waitForExistence(timeout: 5))
+        route.click()
+        let feed = app.descendants(matching: .any)["rune-policy-feed"]
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        let policyEvent = app.descendants(matching: .any)[
+            "rune-policy-event-55555555-5555-4555-8555-555555555555"
+        ]
+        XCTAssertTrue(
+            policyEvent.waitForExistence(timeout: 5),
+            "Rune Forge must render the populated, newest-first violation event"
+        )
+        feed.swipeUp()
+        let summary = policyEvent.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Summary"))
+            .firstMatch
+        let scope = policyEvent.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Scope"))
+            .firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 3))
+        XCTAssertTrue(scope.waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            element(
+                summary,
+                contains: "Fixture policy violation: documentation evidence is missing."
+            ),
+            "The populated Summary field must expose its fixture text: \(summary.debugDescription)"
+        )
+        XCTAssertTrue(
+            element(scope, contains: "Project: \(fixture.projectID)"),
+            "The verbose policy event must display its exact project scope"
+        )
+        XCTAssertGreaterThanOrEqual(fixture.policySnapshotRequestCount, 1)
+        XCTAssertGreaterThanOrEqual(fixture.policyViolationRequestCount, 1)
+    }
+
     func testRefreshToolbarExists() throws {
         let refresh = app.buttons["toolbar-refresh"]
         XCTAssertTrue(
@@ -484,6 +528,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
     private func element(_ element: XCUIElement, contains text: String) -> Bool {
         if element.label.localizedCaseInsensitiveContains(text) { return true }
+        if element.title.localizedCaseInsensitiveContains(text) { return true }
         if (element.value as? String)?.localizedCaseInsensitiveContains(text) == true { return true }
         return element.descendants(matching: .staticText)
             .matching(NSPredicate(format: "label CONTAINS[c] %@", text))
@@ -619,6 +664,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testRigShowsBoundedOperationalIndicatorCluster() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowForWideGrid(window)
+
         let rig = app.buttons["tab-rig"]
         XCTAssertTrue(rig.waitForExistence(timeout: 8))
         rig.click()
@@ -626,6 +677,119 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app.descendants(matching: .any)["rig-operational-indicators"]
                 .waitForExistence(timeout: 5)
         )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["rig-managed-activity-feed"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.activityRequestCount > 0 && fixture.scopedPolicySnapshotRequestCount > 0
+        })
+
+        let rootScroll = try XCTUnwrap(
+            largestScrollView(),
+            "Forge Rig must remain hosted in its primary vertical scroll surface"
+        )
+        let storage = app.descendants(matching: .any)["rig-storage-panel"]
+        let activity = app.descendants(matching: .any)["rig-managed-activity-feed"]
+        for _ in 0..<6 where !storage.frame.intersects(window.frame)
+            || !activity.frame.intersects(window.frame) {
+            rootScroll.swipeUp()
+        }
+        XCTAssertTrue(
+            storage.frame.intersects(window.frame),
+            "Storage must be visible in the instrumentation grid"
+        )
+        XCTAssertTrue(
+            activity.frame.intersects(window.frame),
+            "Managed Activity must be visible beside Storage"
+        )
+        XCTAssertEqual(storage.frame.minY, activity.frame.minY, accuracy: 2)
+        XCTAssertEqual(storage.frame.height, activity.frame.height, accuracy: 2)
+        XCTAssertLessThan(storage.frame.maxX, activity.frame.minX)
+        XCTAssertLessThanOrEqual(
+            activity.frame.width,
+            storage.frame.width * 1.10,
+            "Managed Activity must remain a compact peer of Storage"
+        )
+
+        XCTAssertTrue(app.staticTexts["CURRENT PACKAGE · No active instruction package"].exists)
+        XCTAssertTrue(app.staticTexts["ACTIVE MANAGED RUN · RUNNING"].exists)
+        XCTAssertTrue(app.staticTexts["PHASE · Implementation"].exists)
+        XCTAssertTrue(app.staticTexts["WORK · Render managed activity"].exists)
+        XCTAssertTrue(app.staticTexts["NEXT · Verify the live activity feed"].exists)
+        XCTAssertTrue(
+            app.staticTexts["NEXT PACKAGE · Fixture Instructions · POSITION 1 · 1 STEPS"].exists,
+            "An unrelated queued package must be shown as next work, not the current package"
+        )
+        let assistantActivity = app.descendants(matching: .any)[
+            "rig-activity-row-operator:fixture-assistant-event"
+        ]
+        XCTAssertTrue(assistantActivity.waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            element(assistantActivity, contains: "Bounded assistant response from LM Studio."),
+            "The authenticated activity feed must expose the current managed-session response"
+        )
+    }
+
+    func testMinimumWindowKeepsEveryPrimaryViewContainedAndAligned() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowToMinimum(window)
+
+        let tabs: [(id: String, detail: String, title: String)] = [
+            ("tab-rig", "detail-rig", "FORGE RIG"),
+            ("tab-mcp", "detail-mcp", "LM Studio MCP"),
+            ("tab-agents", "detail-agents", "Agents"),
+            ("tab-tools", "detail-tools", "Tools"),
+            ("tab-feed", "detail-feed", "Live Feed"),
+            ("tab-projects", "detail-projects", "Projects"),
+            ("tab-rune-forge", "detail-rune-forge", "Rune Forge"),
+            ("tab-autonomy", "detail-autonomy", "Autonomy"),
+            ("tab-continuity", "detail-continuity", "Continuity"),
+            ("tab-runtimes", "detail-runtimes", "Runtimes"),
+            ("tab-provider", "detail-provider", "Provider"),
+            ("tab-evidence", "detail-evidence", "Events & Evidence"),
+            ("tab-diagnostics", "detail-diagnostics", "Diagnostics"),
+            ("tab-manager", "detail-manager", "Manager"),
+        ]
+        var referenceFrame: CGRect?
+        for tab in tabs {
+            let button = app.buttons[tab.id]
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing \(tab.id)")
+            button.click()
+            let marker = app.descendants(matching: .any)[tab.detail]
+            XCTAssertTrue(marker.waitForExistence(timeout: 5), "Missing \(tab.detail)")
+            let detail = try XCTUnwrap(
+                app.descendants(matching: .any)
+                    .matching(NSPredicate(format: "label == %@", "\(tab.title) content"))
+                    .allElementsBoundByIndex
+                    .max { lhs, rhs in
+                        lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+                    },
+                "Missing selected-detail container for \(tab.title)"
+            )
+            let frame = detail.frame
+            XCTAssertGreaterThan(frame.width, 600, "\(tab.detail) is unexpectedly narrow")
+            XCTAssertGreaterThan(frame.height, 500, "\(tab.detail) is unexpectedly short")
+            XCTAssertTrue(
+                frameIsContained(frame, in: window.frame, tolerance: 2),
+                "\(tab.detail) escaped the minimum window: detail=\(frame), window=\(window.frame)"
+            )
+            XCTAssertTrue(
+                frameIsContained(marker.frame, in: frame, tolerance: 2),
+                "\(tab.detail) heading escaped its selected-detail container"
+            )
+            if let referenceFrame {
+                XCTAssertEqual(frame.minX, referenceFrame.minX, accuracy: 2, "\(tab.detail) left edge")
+                XCTAssertEqual(frame.maxX, referenceFrame.maxX, accuracy: 2, "\(tab.detail) right edge")
+                XCTAssertEqual(frame.minY, referenceFrame.minY, accuracy: 2, "\(tab.detail) top edge")
+                XCTAssertEqual(frame.maxY, referenceFrame.maxY, accuracy: 2, "\(tab.detail) bottom edge")
+            } else {
+                referenceFrame = frame
+            }
+        }
     }
 
     func testTerminalTaskRequiresConfirmationAndCanBeDeleted() throws {
@@ -1327,6 +1491,62 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.windows.firstMatch.exists)
     }
 
+    private func resizeMainWindowToMinimum(_ window: XCUIElement) {
+        let initialFrame = window.frame
+        if initialFrame.width <= 1_120, initialFrame.height <= 780 {
+            return
+        }
+        let handle = window.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.998, dy: 0.998)
+        )
+        handle.click(
+            forDuration: 0.2,
+            thenDragTo: handle.withOffset(CGVector(dx: -800, dy: -600))
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 3) {
+                window.frame.width < initialFrame.width - 100
+                    && window.frame.height < initialFrame.height - 100
+            },
+            "The resizable main window did not reach its minimum-size boundary"
+        )
+        XCTAssertLessThanOrEqual(window.frame.width, 1_120)
+        XCTAssertLessThanOrEqual(window.frame.height, 780)
+    }
+
+    private func resizeMainWindowForWideGrid(_ window: XCUIElement) {
+        guard window.frame.width < 1_380 else { return }
+        let windowMenu = app.menuBars.menuBarItems["Window"]
+        XCTAssertTrue(windowMenu.exists)
+        windowMenu.click()
+        let zoom = app.menuItems["Zoom"]
+        XCTAssertTrue(zoom.waitForExistence(timeout: 3))
+        zoom.click()
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { window.frame.width >= 1_350 },
+            "Forge Rig could not enter the normal-width two-column layout"
+        )
+    }
+
+    private func largestScrollView() -> XCUIElement? {
+        app.scrollViews.allElementsBoundByIndex
+            .filter { $0.exists }
+            .max { lhs, rhs in
+                lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+            }
+    }
+
+    private func frameIsContained(
+        _ child: CGRect,
+        in parent: CGRect,
+        tolerance: CGFloat
+    ) -> Bool {
+        child.minX >= parent.minX - tolerance
+            && child.minY >= parent.minY - tolerance
+            && child.maxX <= parent.maxX + tolerance
+            && child.maxY <= parent.maxY + tolerance
+    }
+
     private func relaunch(with fixture: OperatorManagerUITestFixture) {
         app.terminate()
         operatorFixture?.stop()
@@ -1453,6 +1673,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     let runID = "22222222-2222-4222-8222-222222222222"
     let runtimeJobID = "33333333-3333-4333-8333-333333333333"
     let instructionPackageID = "44444444-4444-4444-8444-444444444444"
+    let policyEventID = "55555555-5555-4555-8555-555555555555"
 
     private let listener: NWListener
     private let queue = DispatchQueue(label: "forge.operator-ui-fixture")
@@ -1499,6 +1720,10 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableToolSelectionMode = "explicit"
     private var mutableSelectedToolIDs: [String] = []
     private var mutableToolPermissionUpdateCount = 0
+    private var mutableActivityRequestCount = 0
+    private var mutablePolicySnapshotRequestCount = 0
+    private var mutableScopedPolicySnapshotRequestCount = 0
+    private var mutablePolicyViolationRequestCount = 0
     private(set) var port: UInt16 = 0
 
     var startRequestCount: Int { locked { mutableStartRequestCount } }
@@ -1530,6 +1755,12 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var selectedToolIDs: [String] { locked { mutableSelectedToolIDs } }
     var toolSelectionMode: String { locked { mutableToolSelectionMode } }
     var toolPermissionUpdateCount: Int { locked { mutableToolPermissionUpdateCount } }
+    var activityRequestCount: Int { locked { mutableActivityRequestCount } }
+    var policySnapshotRequestCount: Int { locked { mutablePolicySnapshotRequestCount } }
+    var scopedPolicySnapshotRequestCount: Int {
+        locked { mutableScopedPolicySnapshotRequestCount }
+    }
+    var policyViolationRequestCount: Int { locked { mutablePolicyViolationRequestCount } }
 
     init(
         failStartResponse: Bool = false,
@@ -1637,7 +1868,12 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         }
     }
 
-    private func parse(_ data: Data) -> (path: String, headers: [String: String], body: Data)? {
+    private func parse(_ data: Data) -> (
+        path: String,
+        queryItems: [URLQueryItem],
+        headers: [String: String],
+        body: Data
+    )? {
         let delimiter = Data("\r\n\r\n".utf8)
         guard let headerRange = data.range(of: delimiter) else {
             return nil
@@ -1666,12 +1902,25 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         let bodyStart = headerRange.upperBound
         guard data.distance(from: bodyStart, to: data.endIndex) >= contentLength else { return nil }
         let bodyEnd = data.index(bodyStart, offsetBy: contentLength)
-        let target = parts[1].split(separator: "?", maxSplits: 1).first.map(String.init) ?? ""
-        return (target, parsedHeaders, Data(data[bodyStart..<bodyEnd]))
+        let target = String(parts[1])
+        guard let components = URLComponents(string: "http://127.0.0.1\(target)") else {
+            return nil
+        }
+        return (
+            components.path,
+            components.queryItems ?? [],
+            parsedHeaders,
+            Data(data[bodyStart..<bodyEnd])
+        )
     }
 
     private func route(
-        _ request: (path: String, headers: [String: String], body: Data),
+        _ request: (
+            path: String,
+            queryItems: [URLQueryItem],
+            headers: [String: String],
+            body: Data
+        ),
         connection: NWConnection
     ) {
         switch request.path {
@@ -1697,6 +1946,67 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             respond(status: 200, object: managerSettings(), to: connection)
         case "/api/manager/operator/snapshot":
             respond(status: 200, object: snapshot(), to: connection)
+        case "/api/manager/operator/activity":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  exactQuery(
+                    request.queryItems,
+                    equals: [
+                        "limit": "100",
+                        "run_id": runID,
+                        "project_id": projectID,
+                        "project_generation": String(locked { mutableProjectGeneration }),
+                    ]
+                  ) else {
+                respond(
+                    status: 401,
+                    object: ["message": "missing activity authority or exact scope"],
+                    to: connection
+                )
+                return
+            }
+            locked { mutableActivityRequestCount += 1 }
+            respond(status: 200, object: snapshot(includeActivity: true), to: connection)
+        case "/api/manager/stjornarvald/snapshot":
+            let generation = String(locked { mutableProjectGeneration })
+            let unscoped = exactQuery(
+                request.queryItems,
+                equals: ["limit": "100", "order": "newest"]
+            )
+            let scoped = exactQuery(
+                request.queryItems,
+                equals: [
+                    "limit": "100",
+                    "order": "newest",
+                    "project_id": projectID,
+                    "project_generation": generation,
+                ]
+            )
+            guard unscoped || scoped else {
+                respond(status: 400, object: ["message": "invalid policy snapshot scope"], to: connection)
+                return
+            }
+            locked {
+                mutablePolicySnapshotRequestCount += 1
+                if scoped { mutableScopedPolicySnapshotRequestCount += 1 }
+            }
+            respond(status: 200, object: policySnapshot(), to: connection)
+        case "/api/manager/stjornarvald/violations":
+            guard let object = try? JSONSerialization.jsonObject(with: request.body)
+                as? [String: Any],
+                  (object["cursor"] as? NSNumber)?.int64Value == 0,
+                  (object["limit"] as? NSNumber)?.intValue == 100 else {
+                respond(status: 400, object: ["message": "invalid violation projection request"], to: connection)
+                return
+            }
+            locked { mutablePolicyViolationRequestCount += 1 }
+            respond(
+                status: 200,
+                object: [
+                    "violations": [],
+                    "controlsExecution": false,
+                ],
+                to: connection
+            )
         case "/api/manager/autonomy/status":
             let activeRunIDs = locked {
                 mutableDeletedRun || ["completed", "cancelled", "failed_terminal"]
@@ -2148,6 +2458,19 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         }
     }
 
+    private func exactQuery(
+        _ items: [URLQueryItem],
+        equals expected: [String: String]
+    ) -> Bool {
+        guard items.count == expected.count else { return false }
+        var observed: [String: String] = [:]
+        for item in items {
+            guard observed[item.name] == nil, let value = item.value else { return false }
+            observed[item.name] = value
+        }
+        return observed == expected
+    }
+
     private func preparedRunResult(
         object: [String: Any],
         generation: UInt64,
@@ -2236,18 +2559,19 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         ]
     }
 
-    private func snapshot() -> [String: Any] {
+    private func snapshot(includeActivity: Bool = false) -> [String: Any] {
         let state = locked { mutableRunState }
         let acceptedStart = locked { mutableAcceptedStart }
         let acceptedStartRunID = locked { mutableAcceptedStartRunID }
         let deletedRun = locked { mutableDeletedRun }
-        var runs = deletedRun ? [] : [run(state: state)]
+        var runs = deletedRun ? [] : [run(state: state, includeActivity: includeActivity)]
         if acceptedStart, let acceptedStartRunID {
             runs.insert(
                 run(
                     id: acceptedStartRunID,
                     state: "created",
-                    mission: "Continue the fixture mission"
+                    mission: "Continue the fixture mission",
+                    includeActivity: includeActivity
                 ),
                 at: 0
             )
@@ -2274,7 +2598,104 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "runtime_jobs": [runtimeJob()],
             "provider": provider(),
             "runtime": runtimePolicy(),
-            "events": [],
+            "events": includeActivity ? managedActivityEvents() : [],
+        ]
+    }
+
+    private func managedActivityEvents() -> [[String: Any]] {
+        [[
+            "event_id": "fixture-assistant-event",
+            "timestamp": "2026-08-31T12:00:05Z",
+            "kind": "managed_activity_assistant_response",
+            "summary": "Bounded assistant response from LM Studio.",
+            "severity": "info",
+            "project_id": projectID,
+            "project_generation": Int(locked { mutableProjectGeneration }),
+            "run_id": runID,
+        ], [
+            "event_id": "fixture-tool-event",
+            "timestamp": "2026-08-31T12:00:04Z",
+            "kind": "managed_activity_tool_completed",
+            "summary": "project_memory.search completed with a bounded result.",
+            "severity": "success",
+            "project_id": projectID,
+            "project_generation": Int(locked { mutableProjectGeneration }),
+            "run_id": runID,
+        ]]
+    }
+
+    private func policySnapshot() -> [String: Any] {
+        let sourceID = "66666666-6666-4666-8666-666666666666"
+        let violationID = "77777777-7777-4777-8777-777777777777"
+        return [
+            "schemaVersion": "1.0.0",
+            "health": [
+                "state": "running",
+                "policyIdentity": "raven-forge-development-policy",
+                "evaluatorID": "fixture-policy-evaluator",
+                "startedAt": 809_956_800.0,
+                "lastEvaluationAt": 809_956_805.0,
+                "lastCommittedCursor": 1,
+                "processedObservationCount": 1,
+                "indexedSourceBatchCount": 1,
+                "consecutiveFailureCount": 0,
+            ],
+            "governingPolicy": [
+                "bindingID": "fixture-policy-binding",
+                "authority": "Raven Forge Development",
+                "repositoryURL": "https://example.invalid/raven-forge-policy",
+                "version": "1",
+                "revision": "fixture-policy-revision",
+                "sourceID": ["rawValue": sourceID],
+            ],
+            "sources": [],
+            "violationEvents": [[
+                "schemaVersion": "1.0.0",
+                "sequence": 1,
+                "id": policyEventID,
+                "type": "violation_opened",
+                "occurredAt": 809_956_805.0,
+                "violationID": ["rawValue": violationID],
+                "fingerprint": String(repeating: "f", count: 64),
+                "candidate": [
+                    "rule": [
+                        "id": ["rawValue": "RF-FIXTURE-001"],
+                        "source": [
+                            "sourceID": ["rawValue": sourceID],
+                            "revision": "fixture-policy-revision",
+                            "path": "docs/DEVELOPMENT-POLICY.md",
+                            "locator": "verification",
+                        ],
+                        "statement": "Document verified changes.",
+                        "policyArea": "verification",
+                        "applicability": "all product changes",
+                        "confidence": 1.0,
+                        "assumptions": [],
+                        "alternatives": [],
+                        "controlsExecution": false,
+                    ],
+                    "observationID": "88888888-8888-4888-8888-888888888888",
+                    "scope": [
+                        "projectID": projectID,
+                        "projectGeneration": Int(locked { mutableProjectGeneration }),
+                        "runID": runID,
+                        "sessionID": "fixture-active-session",
+                        "clientID": "forge-conductor-ui-test",
+                    ],
+                    "subjectIdentity": "fixture-change",
+                    "summary": "Fixture policy violation: documentation evidence is missing.",
+                    "evidenceReferences": ["fixture://policy/evidence/1"],
+                    "explanation": "The change has executable evidence but no matching documentation receipt.",
+                    "confidence": 0.98,
+                    "assumptions": ["The fixture change is user-facing."],
+                    "alternatives": ["Defer only with an explicit roadmap record."],
+                    "suggestedCorrection": "Update the current documentation before closing the phase.",
+                ],
+                "noticeState": "pending",
+                "eventSHA256": String(repeating: "e", count: 64),
+                "developmentContinues": true,
+            ]],
+            "limitations": ["Fixture history is intentionally bounded."],
         ]
     }
 
@@ -2497,9 +2918,10 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private func run(
         id: String? = nil,
         state: String,
-        mission: String = "Fixture managed run"
+        mission: String = "Fixture managed run",
+        includeActivity: Bool = false
     ) -> [String: Any] {
-        [
+        var value: [String: Any] = [
             "run_id": id ?? runID,
             "project_id": projectID,
             "project_generation": 4,
@@ -2517,7 +2939,25 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 generation: 4
             ),
             "passed_gates": [],
+            "created_at": "2026-08-31T12:00:00Z",
+            "updated_at": "2026-08-31T12:00:05Z",
         ]
+        if includeActivity {
+            value["current_phase"] = "Implementation"
+            value["work_item"] = "Render managed activity"
+            value["next_action"] = "Verify the live activity feed"
+            value["last_assistant_message"] = "Bounded assistant response from LM Studio."
+            value["last_model_turn_id"] = "fixture-model-turn"
+            value["last_model_turn_kind"] = "assistant_response"
+            value["last_model_turn_state"] = "completed"
+            value["last_model_turn_at"] = "2026-08-31T12:00:03Z"
+            value["last_tool_invocation_id"] = "fixture-tool-invocation"
+            value["last_tool_name"] = "project_memory.search"
+            value["last_tool_state"] = "completed"
+            value["last_tool_summary"] = "Returned one bounded project-memory result."
+            value["last_tool_activity_at"] = "2026-08-31T12:00:04Z"
+        }
+        return value
     }
 
     private func automaticCompletionPlan(

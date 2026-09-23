@@ -572,6 +572,12 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 work.metadata["provider_context_capacity"] = String(usage.capacity)
             }
             if let summary = Self.boundedAssistantSummary(turn.messages) {
+                try await repository.recordManagedAssistantActivity(
+                    runID: run.runID,
+                    turnID: record.intent.turnID,
+                    summary: summary,
+                    lease: lease
+                )
                 work.metadata["provider_assistant_summary"] = summary
             }
 

@@ -64,6 +64,43 @@ task, coalesces each response into one value snapshot, and stops on detach. The
 Metal gauges reuse the Rig's existing bounded renderer and add no independent
 render clock.
 
+## Managed activity feed
+
+Directly below Load Trace and Orchestration Status, the native Rig presents one
+bounded, coalesced **Managed Activity** projection. The five-second operational
+refresh composes the active project and instruction package, current inferred
+document step, durable delivered count, current run phase/work item/next
+action, Manager orchestration events, durable managed-provider responses and
+tool transitions, and the newest policy events for the active project
+generation. The public snapshot retains bounded, redacted mission and work-item
+text plus non-sensitive state, identity, and event metadata. The Rig uses
+authenticated `GET /api/manager/operator/activity` with exact run, project, and
+generation identity for current phase/next action,
+assistant/model-error/tool summaries, and managed activity rows. Its durable
+summaries are capped at 2 KiB, sequence ordered, redacted at the owner boundary,
+retained as at most 128 assistant plus 128 tool rows per run, and displayed
+through an 8 KiB UTF-8 cap.
+
+The app retains at most 100 rolling presentation rows and merges them by stable
+identity rather than enqueueing an unbounded task per update. The frame stops
+refreshing with the Rig view. It does not add a render clock, persist a second
+event log, stream provider tokens, or create a full LM Studio conversation
+transcript. Durable Manager events, instruction coverage, and the Stjornarvald
+policy log remain the authoritative sources; Manager, instruction, and policy
+availability is labeled so retained rows are not presented as fresh evidence.
+
+Rune Forge presents the newest policy events again in its verbose **Policy
+Feed** so policy-specific review does not require selecting every violation.
+That global newest feed and Rig's exact project/generation feed are bounded by a 100-event,
+1 MiB serialized-event Manager window; both native clients stream ordinary
+responses through a strict 4 MiB ceiling and cancel on overflow. Both preserve
+Stjornarvald's non-interference boundary.
+
+At normal widths, intrinsic Grid rows align CPU/GPU, Storage/Managed Activity,
+MCP servers/tools, and agents/processes. Managed Activity scrolls within a
+compact 130-point region, and constrained widths stack the instrumentation
+panels instead of clipping them.
+
 ## Qualification boundary
 
 Telemetry contract and stream tests qualify only this subsystem. The retained

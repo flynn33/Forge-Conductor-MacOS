@@ -72,6 +72,33 @@ Manager connection. An `NSSavePanel`-backed format menu exports JSONL, JSON,
 Markdown, or CSV without database or file work on the main actor. The Manager
 response reports the event count, byte count, digest, destination, and retry
 identity.
+
+The Rig's view-owned five-second operational monitor also composes a bounded,
+coalesced, app-local Managed Activity projection. The public Manager operator
+DTO retains bounded, redacted mission and work-item text plus non-sensitive
+state, identity, and event metadata. Authenticated
+`GET /api/manager/operator/activity` requires the exact run, project, and
+generation before returning current phase/next action,
+assistant/model-error/tool summaries, or managed activity rows. Provider
+responses and tool transitions append idempotent
+2 KiB content-hashed projections, retained per run as at most 128 assistant and
+128 tool rows; the append-only non-activity audit lineage excludes those rolling
+projection rows so retention cannot create audit-chain gaps. Event sequence
+preserves same-second order. Both native clients stream Manager responses
+through a strict 4 MiB ceiling. The app merges those events with an exact
+project/generation Stjornarvald snapshot into at most 100 rolling rows,
+applies an 8 KiB presentation cap, and stops updating when the view-owned
+monitor stops. This is not token streaming and does not add a second full
+provider transcript. Rune Forge separately renders the global newest bounded
+policy snapshot as a verbose Policy Feed without changing evaluation or
+execution.
+
+The Rig uses intrinsic `Grid` rows for CPU/GPU, Storage/Managed Activity,
+MCP servers/tools, and agents/processes. The compact activity region scrolls
+internally, while `ViewThatFits` supplies a vertical fallback at constrained
+widths. Settings, Autonomy, Continuity, and Rune Forge controls use adaptive
+grids or bounded scrollable sheets rather than fixed overflowing action rows.
+
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 Its 40-row implementation result and explicit physical accessibility limit are

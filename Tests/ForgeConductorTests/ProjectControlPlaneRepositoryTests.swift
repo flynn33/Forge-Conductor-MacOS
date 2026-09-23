@@ -1704,6 +1704,313 @@ final class ProjectControlPlaneRepositoryTests: XCTestCase {
         }
     }
 
+    func testManagedActivityRetentionIsBoundedHashLinkedAndReplaySafe() async throws {
+        try await withRepository { repository, root in
+            let projectRoot = root.appendingPathComponent(
+                "managed-activity-retention",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(
+                at: projectRoot,
+                withIntermediateDirectories: true
+            )
+            let project = try await repository.registerProjectUnchecked(
+                projectID: ProjectID(),
+                displayName: "Managed Activity Retention",
+                canonicalRoot: projectRoot
+            )
+            let run = try await repository.createAutonomousRun(
+                AutonomousRunRequest(
+                    runID: RunID(),
+                    projectID: project.projectID,
+                    projectGeneration: project.generation,
+                    mission: "Prove bounded durable managed activity retention",
+                    providerID: "fixture-provider",
+                    adapterID: "fixture-adapter",
+                    modelKey: "fixture-model",
+                    specification: AutonomousRunSpecification(
+                        allowedTools: ["fs_read"],
+                        completionGates: ["fixture_gate"]
+                    ),
+                    authorizationScope: scope(root: projectRoot, tools: ["fs_read"])
+                )
+            )
+            let lease = try await repository.acquireRunLease(
+                runID: run.runID,
+                ownerID: "managed-activity-retention"
+            )
+            let sessionID = "managed-activity-retention-session"
+            try await repository.reserveProviderSession(
+                ProviderSessionIntent(
+                    sessionID: sessionID,
+                    runID: run.runID,
+                    projectID: run.projectID,
+                    projectGeneration: run.projectGeneration,
+                    providerID: "fixture-provider",
+                    adapterID: "fixture-adapter",
+                    modelKey: "fixture-model",
+                    idempotencyKey: sessionID,
+                    contextCapacity: 32_768
+                ),
+                lease: lease
+            )
+
+            let assistantLimit =
+                ProjectControlPlaneRepository.maximumManagedAssistantActivityEventsPerRun
+            var firstTurnID: UUID?
+            var newestTurnID: UUID?
+            for index in 0...assistantLimit {
+                let suffix = String(format: "%012llx", UInt64(index))
+                let turnID = try XCTUnwrap(
+                    UUID(uuidString: "00000000-0000-4000-8000-\(suffix)")
+                )
+                if index == 0 { firstTurnID = turnID }
+                newestTurnID = turnID
+                _ = try await repository.persistProviderTurnIntent(
+                    ProviderTurnIntent(
+                        turnID: turnID,
+                        runID: run.runID,
+                        sessionID: sessionID,
+                        projectID: run.projectID,
+                        projectGeneration: run.projectGeneration,
+                        kind: .normalContinuation,
+                        idempotencyKey: "managed-activity-turn-\(index)",
+                        inputSHA256: JSONSupport.sha256Hex("managed-activity-input-\(index)")
+                    ),
+                    lease: lease
+                )
+                try await repository.recordManagedAssistantActivity(
+                    runID: run.runID,
+                    turnID: turnID,
+                    summary: "assistant-\(index)",
+                    lease: lease
+                )
+            }
+
+            var events = try await repository.autonomyEvents(runID: run.runID, limit: 1_000)
+            try assertAuditLineageIsContinuous(
+                try await allAutonomyEvents(repository)
+            )
+            var assistantEvents = events.filter {
+                $0.eventType == "managed_activity_assistant_response"
+            }
+            XCTAssertEqual(assistantEvents.count, assistantLimit)
+            try assertManagedActivityContentHashes(assistantEvents)
+            let firstTurn = try XCTUnwrap(firstTurnID)
+            XCTAssertFalse(assistantEvents.contains {
+                $0.metadataJSON.contains(firstTurn.uuidString.lowercased())
+            })
+            let sequenceBeforeAssistantReplay = try XCTUnwrap(events.first?.sequence)
+            try await repository.recordManagedAssistantActivity(
+                runID: run.runID,
+                turnID: firstTurn,
+                summary: "assistant-0",
+                lease: lease
+            )
+            events = try await repository.autonomyEvents(runID: run.runID, limit: 1_000)
+            try assertAuditLineageIsContinuous(
+                try await allAutonomyEvents(repository)
+            )
+            assistantEvents = events.filter {
+                $0.eventType == "managed_activity_assistant_response"
+            }
+            XCTAssertEqual(assistantEvents.count, assistantLimit)
+            XCTAssertEqual(events.first?.sequence, sequenceBeforeAssistantReplay)
+            XCTAssertFalse(assistantEvents.contains {
+                $0.metadataJSON.contains(firstTurn.uuidString.lowercased())
+            })
+
+            let invocation = try await repository.persistToolInvocationIntent(
+                ToolInvocationIntent(
+                    turnID: try XCTUnwrap(newestTurnID),
+                    runID: run.runID,
+                    sessionID: sessionID,
+                    projectID: run.projectID,
+                    projectGeneration: run.projectGeneration,
+                    providerCallID: "managed-activity-retention-tool",
+                    toolName: "fs_read",
+                    replayClass: .readOnly,
+                    idempotencyKey: nil,
+                    argumentsSHA256: JSONSupport.sha256Hex("{}")
+                ),
+                lease: lease
+            )
+            let toolLimit = ProjectControlPlaneRepository.maximumManagedToolActivityEventsPerRun
+            var toolState = ToolInvocationState.intent
+            var firstToolSequence: Int64?
+            for index in 0...toolLimit {
+                let next: ToolInvocationState = toolState == .executing ? .failed : .executing
+                _ = try await repository.transitionToolInvocation(
+                    invocationID: invocation.invocationID,
+                    expected: toolState,
+                    to: next,
+                    lease: lease,
+                    errorCode: next == .failed ? "fixture_retry" : nil,
+                    errorSummary: next == .failed ? "Retry the bounded fixture tool" : nil
+                )
+                toolState = next
+                if index == 0 {
+                    firstToolSequence = try await repository.autonomyEvents(
+                        runID: run.runID,
+                        limit: 10
+                    ).first(where: { $0.eventType.hasPrefix("managed_activity_tool_") })?
+                        .sequence
+                }
+            }
+
+            events = try await repository.autonomyEvents(runID: run.runID, limit: 1_000)
+            try assertAuditLineageIsContinuous(
+                try await allAutonomyEvents(repository)
+            )
+            let toolEvents = events.filter { $0.eventType.hasPrefix("managed_activity_tool_") }
+            XCTAssertEqual(toolEvents.count, toolLimit)
+            try assertManagedActivityContentHashes(toolEvents)
+            XCTAssertFalse(toolEvents.contains { $0.sequence == firstToolSequence })
+            XCTAssertEqual(
+                assistantEvents.count + toolEvents.count,
+                ProjectControlPlaneRepository.maximumManagedActivityEventsPerRun
+            )
+            let sequenceBeforeInvalidToolReplay = try XCTUnwrap(events.first?.sequence)
+            do {
+                _ = try await repository.transitionToolInvocation(
+                    invocationID: invocation.invocationID,
+                    expected: .failed,
+                    to: .executing,
+                    lease: lease
+                )
+                XCTFail("A stale tool-state replay appended another activity event")
+            } catch {
+                XCTAssertEqual(error as? AutonomyError, .transitionConflict)
+            }
+            events = try await repository.autonomyEvents(runID: run.runID, limit: 1_000)
+            try assertAuditLineageIsContinuous(
+                try await allAutonomyEvents(repository)
+            )
+            XCTAssertEqual(events.first?.sequence, sequenceBeforeInvalidToolReplay)
+            XCTAssertEqual(
+                events.filter { $0.eventType.hasPrefix("managed_activity_") }.count,
+                ProjectControlPlaneRepository.maximumManagedActivityEventsPerRun
+            )
+
+            await repository.close()
+            let reopened = try ProjectControlPlaneRepository(
+                databaseURL: root.appendingPathComponent("control-plane.sqlite3"),
+                clock: FixedClock(Date(timeIntervalSince1970: 1_000))
+            )
+            do {
+                try await reopened.recordManagedAssistantActivity(
+                    runID: run.runID,
+                    turnID: firstTurn,
+                    summary: "assistant-0",
+                    lease: lease
+                )
+                let reopenedEvents = try await reopened.autonomyEvents(
+                    runID: run.runID,
+                    limit: 1_000
+                )
+                try self.assertAuditLineageIsContinuous(
+                    try await self.allAutonomyEvents(reopened)
+                )
+                try self.assertManagedActivityContentHashes(
+                    reopenedEvents.filter { $0.eventType.hasPrefix("managed_activity_") }
+                )
+                XCTAssertEqual(reopenedEvents.first?.sequence, sequenceBeforeInvalidToolReplay)
+                XCTAssertEqual(
+                    reopenedEvents.filter { $0.eventType.hasPrefix("managed_activity_") }.count,
+                    ProjectControlPlaneRepository.maximumManagedActivityEventsPerRun
+                )
+                await reopened.close()
+            } catch {
+                await reopened.close()
+                throw error
+            }
+        }
+    }
+
+    private func allAutonomyEvents(
+        _ repository: ProjectControlPlaneRepository
+    ) async throws -> [AutonomyEvent] {
+        var events: [AutonomyEvent] = []
+        var beforeSequence: Int64?
+        while true {
+            let page = try await repository.operatorAutonomyEvents(
+                limit: 101,
+                beforeSequence: beforeSequence,
+                includeManagedActivity: true
+            )
+            events.append(contentsOf: page)
+            guard page.count == 101, let oldest = page.last else { return events }
+            XCTAssertLessThan(events.count, 10_000, "Fixture event pagination did not converge")
+            beforeSequence = oldest.sequence
+        }
+    }
+
+    private func assertAuditLineageIsContinuous(
+        _ events: [AutonomyEvent],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let auditEvents = events
+            .filter { !$0.eventType.hasPrefix("managed_activity_") }
+            .sorted { $0.sequence < $1.sequence }
+        for (prior, current) in zip(auditEvents, auditEvents.dropFirst()) {
+            XCTAssertEqual(
+                current.previousEventSHA256,
+                prior.eventSHA256,
+                "Bounded managed-activity pruning created an audit-lineage gap",
+                file: file,
+                line: line
+            )
+        }
+        let managedHashes = Set(
+            events
+                .filter { $0.eventType.hasPrefix("managed_activity_") }
+                .map(\.eventSHA256)
+        )
+        XCTAssertTrue(
+            auditEvents.allSatisfy {
+                $0.previousEventSHA256.map { !managedHashes.contains($0) } ?? true
+            },
+            "An audit event depends on a prunable managed-activity projection",
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertManagedActivityContentHashes(
+        _ events: [AutonomyEvent],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        for event in events {
+            XCTAssertNil(
+                event.previousEventSHA256,
+                "Managed activity must remain outside the append-only audit lineage",
+                file: file,
+                line: line
+            )
+            XCTAssertEqual(
+                event.eventSHA256,
+                JSONSupport.sha256Hex(
+                    [
+                        event.eventID.uuidString.lowercased(),
+                        event.runID?.description ?? "",
+                        event.projectID?.description ?? "",
+                        event.eventType,
+                        event.severity.rawValue,
+                        event.summary,
+                        event.metadataJSON,
+                        "",
+                        event.createdAt,
+                    ].joined(separator: "|")
+                ),
+                "Managed activity content hash is not independently verifiable",
+                file: file,
+                line: line
+            )
+        }
+    }
+
     private func scope(
         root: URL,
         tools: Set<String> = ["project_memory.search"],
@@ -1799,7 +2106,11 @@ extension ProjectControlPlaneRepository {
             let summary = "Project transition adversarial test fixture"
             let createdAt = ISO8601.string(from: Date())
             let previous = try database.scalarText(
-                "SELECT event_sha256 FROM autonomy_events ORDER BY sequence DESC LIMIT 1"
+                """
+                SELECT event_sha256 FROM autonomy_events
+                WHERE event_type NOT GLOB 'managed_activity_*'
+                ORDER BY sequence DESC LIMIT 1
+                """
             )
             let eventSHA256 = JSONSupport.sha256Hex(
                 [

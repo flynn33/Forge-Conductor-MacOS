@@ -35,28 +35,23 @@ struct RigDashboardView: View {
                     }
                 }
 
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 260), spacing: 14, alignment: .top)],
-                    alignment: .leading,
-                    spacing: 14
-                ) {
-                    coreBarsPanel
-                    gpuCoresPanel
-                    storagePanel
-                }
-                .frame(minHeight: 190)
+                instrumentationPanels
 
                 orchestrationPanel
 
-                HStack(alignment: .top, spacing: 14) {
-                    mcpServersPanel
-                    mcpToolsPanel
+                Grid(alignment: .topLeading, horizontalSpacing: 14) {
+                    GridRow {
+                        mcpServersPanel
+                        mcpToolsPanel
+                    }
                 }
                 .frame(minHeight: 220)
 
-                HStack(alignment: .top, spacing: 14) {
-                    agentsPanel
-                    processesPanel
+                Grid(alignment: .topLeading, horizontalSpacing: 14) {
+                    GridRow {
+                        agentsPanel
+                        processesPanel
+                    }
                 }
                 .frame(minHeight: 200)
 
@@ -215,14 +210,295 @@ struct RigDashboardView: View {
         case "QUEUED", "NO PACKAGES": .unavailable
         default: .unavailable
         }
+        let detail: String
+        if let package = runtime.currentPackageName,
+           let step = runtime.currentStep,
+           let stepTotal = runtime.currentStepTotal {
+            detail = "\(package) · step \(step)/\(stepTotal) · "
+                + "\(runtime.projectCompletedPackages)/\(runtime.projectTotalPackages) packages"
+        } else {
+            detail = "\(runtime.projectCompletedSteps)/\(runtime.projectTotalSteps) steps · "
+                + "\(runtime.projectCompletedPackages)/\(runtime.projectTotalPackages) packages"
+        }
         return OrchestrationCardState(
             title: "PROJECT · \(runtime.projectName ?? "NO SELECTION")",
             state: state,
-            detail: "\(runtime.projectCompletedSteps)/\(runtime.projectTotalSteps) steps · "
-                + "\(runtime.projectCompletedPackages)/\(runtime.projectTotalPackages) packages",
+            detail: detail,
             fraction: total > 0 ? min(max(Double(completed) / Double(total), 0), 1) : 0,
             tone: tone
         )
+    }
+
+    // MARK: Managed run activity
+
+    private var instrumentationPanels: some View {
+        ViewThatFits(in: .horizontal) {
+            Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 14) {
+                GridRow {
+                    coreBarsPanel
+                        .frame(
+                            minWidth: 340,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                    gpuCoresPanel
+                        .frame(
+                            minWidth: 340,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                }
+                GridRow {
+                    storagePanel
+                        .frame(
+                            minWidth: 340,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                    managedActivityFeedPanel
+                        .frame(
+                            minWidth: 340,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .topLeading
+                        )
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                coreBarsPanel.frame(minHeight: 170)
+                gpuCoresPanel.frame(minHeight: 190)
+                storagePanel.frame(minHeight: 220)
+                managedActivityFeedPanel
+            }
+        }
+    }
+
+    private var managedActivityFeedPanel: some View {
+        let runtime = model.rigOperationalSnapshot
+        return panel(
+            "MANAGED ACTIVITY",
+            meta: "\(runtime.activityFeed.count)/\(RigOperationalSnapshot.maximumActivityEntries) · 5 s"
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                managedActivityEvidenceStatus(runtime)
+                currentInstructionStatus(runtime)
+                Divider().overlay(Color.cyan.opacity(0.16))
+                if runtime.activityFeed.isEmpty {
+                    Text("Waiting for managed-session, instruction, orchestration, or policy activity.")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+                } else {
+                    ScrollView(.vertical) {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(runtime.activityFeed) { entry in
+                                managedActivityRow(entry)
+                            }
+                        }
+                    }
+                    .frame(height: 130)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-managed-activity-feed")
+    }
+
+    private func managedActivityEvidenceStatus(_ runtime: RigOperationalSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("SOURCE STATUS")
+                .foregroundStyle(.secondary)
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 145), spacing: 6)],
+                alignment: .leading,
+                spacing: 6
+            ) {
+                managedActivitySourceBadge(
+                    "MANAGER",
+                    available: runtime.operatorEvidenceAvailable
+                )
+                managedActivitySourceBadge(
+                    "INSTRUCTIONS",
+                    available: runtime.instructionEvidenceAvailable
+                )
+                managedActivitySourceBadge(
+                    "POLICY",
+                    available: runtime.policyEvidenceAvailable
+                )
+            }
+        }
+        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func managedActivitySourceBadge(_ label: String, available: Bool) -> some View {
+        Text("\(label) \(available ? "LIVE" : "UNAVAILABLE")")
+            .foregroundStyle(available ? Color.mint : Color.orange)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule().stroke(
+                    (available ? Color.mint : Color.orange).opacity(0.55),
+                    lineWidth: 1
+                )
+            )
+    }
+
+    @ViewBuilder
+    private func currentInstructionStatus(_ runtime: RigOperationalSnapshot) -> some View {
+        if let package = runtime.currentPackageName {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PROJECT · \(runtime.projectName ?? "NO SELECTION")")
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text("CURRENT PACKAGE")
+                        .foregroundStyle(.cyan)
+                    Text(package)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if let position = runtime.currentPackagePosition,
+                       runtime.projectTotalPackages > 0 {
+                        Text("\(position)/\(runtime.projectTotalPackages)")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    if let state = runtime.activeRunState {
+                        Text(state.uppercased())
+                            .foregroundStyle(.mint)
+                    }
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if let step = runtime.currentStep, let total = runtime.currentStepTotal {
+                        let delivered = runtime.currentPackageCompletedSteps ?? max(step - 1, 0)
+                        Text("CURRENT STEP \(step) OF \(total) · \(delivered) DELIVERED")
+                            .foregroundStyle(.orange)
+                    } else {
+                        Text("STEP —")
+                            .foregroundStyle(.secondary)
+                    }
+                    if let phase = runtime.currentPhase {
+                        Text("· \(phase)").foregroundStyle(.secondary)
+                    }
+                    if let workItem = runtime.currentWorkItem {
+                        Text("· \(workItem)")
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    }
+                }
+                if let nextAction = runtime.currentNextAction {
+                    Text("NEXT · \(nextAction)")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .accessibilityElement(children: .combine)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PROJECT · \(runtime.projectName ?? "NO SELECTION")")
+                if !runtime.operatorEvidenceAvailable {
+                    Text("CURRENT PACKAGE · Awaiting verified Manager snapshot")
+                } else if !runtime.instructionEvidenceAvailable {
+                    Text("CURRENT PACKAGE · Instruction queue unavailable")
+                } else {
+                    Text("CURRENT PACKAGE · No active instruction package")
+                }
+                if let state = runtime.activeRunState {
+                    Text("ACTIVE MANAGED RUN · \(state.uppercased())")
+                        .foregroundStyle(.mint)
+                    if let phase = runtime.currentPhase {
+                        Text("PHASE · \(phase)")
+                    }
+                    if let workItem = runtime.currentWorkItem {
+                        Text("WORK · \(workItem)")
+                    }
+                    if let nextAction = runtime.currentNextAction {
+                        Text("NEXT · \(nextAction)")
+                    }
+                }
+                if let nextPackage = runtime.nextPackageName {
+                    let position = runtime.nextPackagePosition.map(String.init) ?? "—"
+                    let steps = runtime.nextPackageStepTotal.map(String.init) ?? "—"
+                    Text(
+                        "NEXT PACKAGE · \(nextPackage) · POSITION \(position)"
+                            + " · \(steps) STEPS"
+                    )
+                    .foregroundStyle(.orange)
+                }
+            }
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func managedActivityRow(_ entry: RigActivityEntry) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text(activityTime(entry.occurredAt))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 74, alignment: .leading)
+                Text(entry.category.rawValue)
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(activityColor(entry.severity))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().stroke(activityColor(entry.severity).opacity(0.55)))
+                Text(activitySeverityTitle(entry.severity))
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(activityColor(entry.severity))
+                Text(entry.title)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+            }
+            Text(entry.message)
+                .foregroundStyle(.primary.opacity(0.88))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 10, design: .monospaced))
+        .padding(9)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(activityColor(entry.severity).opacity(0.055))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(activityColor(entry.severity).opacity(0.24), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(entry.category.rawValue) \(activitySeverityTitle(entry.severity)) \(entry.title): \(entry.message)"
+        )
+        .accessibilityIdentifier("rig-activity-row-\(entry.id)")
+    }
+
+    private func activityTime(_ date: Date) -> String {
+        guard date != .distantPast else { return "—" }
+        return date.formatted(date: .omitted, time: .standard)
+    }
+
+    private func activityColor(_ severity: RigActivitySeverity) -> Color {
+        switch severity {
+        case .informational: .cyan
+        case .success: .mint
+        case .warning: .orange
+        case .failure: .red
+        }
+    }
+
+    private func activitySeverityTitle(_ severity: RigActivitySeverity) -> String {
+        switch severity {
+        case .informational: "INFO"
+        case .success: "SUCCESS"
+        case .warning: "WARNING"
+        case .failure: "FAILURE"
+        }
     }
 
     // MARK: Header
@@ -444,6 +720,8 @@ struct RigDashboardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-storage-panel")
     }
 
     private func ioStat(_ title: String, _ mbs: Double, _ iops: Double, frac: Double, tint: Color) -> some View {
@@ -453,7 +731,7 @@ struct RigDashboardView: View {
             MetalBarGauge(fraction: frac, tint: tint).frame(height: 8).clipShape(Capsule())
             Text(String(format: "%.0f IOPS", iops)).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: Orchestration
@@ -821,7 +1099,7 @@ struct RigDashboardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .clipped()
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.035)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.15), lineWidth: 1))

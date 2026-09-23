@@ -1895,25 +1895,177 @@ final class ProjectIdentityResolver: @unchecked Sendable {
 }
 
 public struct ProjectMemoryRedactor: Sendable {
-    private static let patterns: [String] = [
+    private static let maximumStructuredJSONDepth = 64
+    private static let redactionMarker = "<redacted>"
+    private static let structuredRedactionFallback = "\"<redacted>\""
+    private static let quotedJSONCredentialPattern =
+        #"(?i)\"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|authorization)\"\s*:\s*(?:\"(?:\\.|[^\"\\])*\"|[^,}\s]+)"#
+    private static let plainTextPatterns: [String] = [
         #"(?i)authorization:\s*(bearer|basic)\s+[A-Za-z0-9._~+\-/=]+"#,
         #"\bsk-[A-Za-z0-9_-]{16,}\b"#,
         #"\bgh[pousr]_[A-Za-z0-9]{20,}\b"#,
         #"\bAKIA[A-Z0-9]{16}\b"#,
-        #"(?i)\b(api[_-]?key|access[_-]?token|secret|password)\s*[:=]\s*[^\s,;]+"#,
+        #"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password)\s*[:=]\s*[^\s,;]+"#,
+    ]
+    private static let sensitiveKeyComponentSequences: [[String]] = [
+        ["api", "key"],
+        ["access", "token"],
+        ["refresh", "token"],
+        ["client", "secret"],
+        ["secret"],
+        ["password"],
+        ["authorization"],
+    ]
+    private static let combinedSensitiveKeyComponents: Set<String> = [
+        "apikey", "accesstoken", "refreshtoken", "clientsecret",
+        "secret", "token", "password", "authorization",
     ]
 
     public init() {}
 
     public func redact(_ value: String?) throws -> String? {
-        guard var output = value else { return nil }
-        if output.contains("-----BEGIN PRIVATE KEY-----") || output.contains("-----BEGIN OPENSSH PRIVATE KEY-----") { // Redaction patterns.
+        guard let value else { return nil }
+        if value.contains("-----BEGIN PRIVATE KEY-----") || value.contains("-----BEGIN OPENSSH PRIVATE KEY-----") { // Redaction patterns.
             throw ProjectMemoryError.redactionRejected("private key material is not accepted")
         }
-        for pattern in Self.patterns {
-            let regex = try NSRegularExpression(pattern: pattern)
+
+        let expressions = try ([Self.quotedJSONCredentialPattern] + Self.plainTextPatterns).map {
+            try NSRegularExpression(pattern: $0)
+        }
+        if let structured = Self.redactedStructuredJSON(value, expressions: expressions) {
+            return structured
+        }
+        return Self.applying(expressions, to: value)
+    }
+
+    /// Redacts JSON structurally so alternate key spellings, arrays, and object-valued
+    /// authorization fields cannot bypass a text pattern. Returning `nil` means the
+    /// value was not a JSON object/array or required no structured transformation.
+    private static func redactedStructuredJSON(
+        _ value: String,
+        expressions: [NSRegularExpression]
+    ) -> String? {
+        guard let source = value.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: source),
+              object is [String: Any] || object is [Any] else {
+            return nil
+        }
+
+        var didRedact = false
+        let redacted = redactJSONObject(
+            object,
+            depth: 0,
+            expressions: expressions,
+            didRedact: &didRedact
+        )
+        guard didRedact else { return nil }
+        guard JSONSerialization.isValidJSONObject(redacted),
+              let encoded = try? JSONSerialization.data(
+                  withJSONObject: redacted,
+                  options: [.sortedKeys, .withoutEscapingSlashes]
+              ),
+              let output = String(data: encoded, encoding: .utf8) else {
+            return structuredRedactionFallback.utf8.count <= source.count
+                ? structuredRedactionFallback
+                : redactionMarker
+        }
+
+        // The service validates field budgets before redaction. Never let JSON
+        // normalization expand a value beyond the already-validated byte budget.
+        if encoded.count <= source.count { return output }
+        return structuredRedactionFallback.utf8.count <= source.count
+            ? structuredRedactionFallback
+            : redactionMarker
+    }
+
+    private static func redactJSONObject(
+        _ object: Any,
+        depth: Int,
+        expressions: [NSRegularExpression],
+        didRedact: inout Bool
+    ) -> Any {
+        if depth >= maximumStructuredJSONDepth,
+           object is [String: Any] || object is [Any] {
+            didRedact = true
+            return redactionMarker
+        }
+
+        if let dictionary = object as? [String: Any] {
+            var output: [String: Any] = [:]
+            output.reserveCapacity(dictionary.count)
+            for (key, nestedValue) in dictionary {
+                if isSensitiveJSONKey(key) {
+                    output[key] = redactionMarker
+                    didRedact = true
+                } else {
+                    output[key] = redactJSONObject(
+                        nestedValue,
+                        depth: depth + 1,
+                        expressions: expressions,
+                        didRedact: &didRedact
+                    )
+                }
+            }
+            return output
+        }
+
+        if let array = object as? [Any] {
+            var output: [Any] = []
+            output.reserveCapacity(array.count)
+            for nestedValue in array {
+                output.append(redactJSONObject(
+                    nestedValue,
+                    depth: depth + 1,
+                    expressions: expressions,
+                    didRedact: &didRedact
+                ))
+            }
+            return output
+        }
+
+        if let string = object as? String {
+            let redacted = applying(expressions, to: string)
+            didRedact = didRedact || redacted != string
+            return redacted
+        }
+        return object
+    }
+
+    private static func isSensitiveJSONKey(_ key: String) -> Bool {
+        let camelSeparated = key.replacingOccurrences(
+            of: #"([\p{Ll}\p{N}])([\p{Lu}])"#,
+            with: "$1_$2",
+            options: .regularExpression
+        )
+        let components = camelSeparated.lowercased().split {
+            !$0.isLetter && !$0.isNumber
+        }.map(String.init)
+        guard !components.isEmpty else { return false }
+
+        if components.contains(where: combinedSensitiveKeyComponents.contains) ||
+            combinedSensitiveKeyComponents.contains(components.joined()) {
+            return true
+        }
+        return sensitiveKeyComponentSequences.contains { sequence in
+            guard sequence.count <= components.count else { return false }
+            return (0...(components.count - sequence.count)).contains { start in
+                Array(components[start..<(start + sequence.count)]) == sequence
+            }
+        }
+    }
+
+    private static func applying(
+        _ expressions: [NSRegularExpression],
+        to value: String
+    ) -> String {
+        var output = value
+        for expression in expressions {
             let range = NSRange(output.startIndex..<output.endIndex, in: output)
-            output = regex.stringByReplacingMatches(in: output, range: range, withTemplate: "<redacted>")
+            output = expression.stringByReplacingMatches(
+                in: output,
+                range: range,
+                withTemplate: redactionMarker
+            )
         }
         return output
     }

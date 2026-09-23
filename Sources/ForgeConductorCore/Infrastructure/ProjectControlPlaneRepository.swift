@@ -167,6 +167,11 @@ public actor ProjectControlPlaneRepository {
     static let maximumActiveContinuityTasksPerProject = 128
     static let maximumContinuityIngressAcceptances = 1_024
     static let maximumContinuityAuthorityTombstones = 32_768
+    public static let maximumManagedActivityEventsPerRun = 256
+    static let maximumManagedAssistantActivityEventsPerRun =
+        maximumManagedActivityEventsPerRun / 2
+    static let maximumManagedToolActivityEventsPerRun =
+        maximumManagedActivityEventsPerRun - maximumManagedAssistantActivityEventsPerRun
 
     public let databaseURL: URL
 
@@ -6056,6 +6061,22 @@ public actor ProjectControlPlaneRepository {
                 VALUES(?,?,?,?)
                 """, bindings: [.text(grant.grantID.uuidString.lowercased()), .text(invocationID.uuidString.lowercased()),
                     .text(String(decoding: proof.canonicalProofJSON, as: UTF8.self)), .text(proof.proofSHA256)])
+            let resultSummary = String(decoding: proof.canonicalToolResultJSON, as: UTF8.self)
+            try appendAutonomyEventUnlocked(
+                runID: invocation.runID,
+                projectID: invocation.projectID,
+                eventType: "managed_activity_tool_completed",
+                severity: .info,
+                summary: Self.utf8Prefix(
+                    "\(invocation.toolName) · completed\n\(resultSummary)",
+                    maximumBytes: 2_048
+                ),
+                metadata: [
+                    "invocation_id": invocation.invocationID.uuidString.lowercased(),
+                    "tool_name": invocation.toolName,
+                ],
+                connection: connection
+            )
             return proof
         }
     }
@@ -7628,6 +7649,29 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Resolves the newest continuity command for one exact run identity. This
+    /// prevents a newer command for another run in the same project from hiding
+    /// the requested run's durable continuity state in an exact activity view.
+    public func operatorLatestContinuityCommand(
+        projectID: ProjectID,
+        projectGeneration: ProjectGeneration,
+        runID: RunID
+    ) throws -> ContinuityCommand? {
+        try requiredConnection().first(
+            Self.continuityCommandSelect
+                + """
+                 WHERE project_id=? AND project_generation=? AND run_id=?
+                 ORDER BY updated_at DESC,command_id DESC LIMIT 1
+                """,
+            bindings: [
+                .text(projectID.description),
+                .int64(try Self.sqliteGeneration(projectGeneration)),
+                .text(runID.description),
+            ],
+            map: Self.decodeContinuityCommand
+        )
+    }
+
     /// Resolves only bounded, durable detail rows needed by the operator projection.
     /// No provider calls, memory reads, or process work occurs here.
     public func operatorContinuityReadModels(
@@ -8599,26 +8643,94 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Commits one bounded assistant projection for the owner-facing managed
+    /// activity feed. The turn identity makes recovery replay idempotent.
+    public func recordManagedAssistantActivity(
+        runID: RunID,
+        turnID: UUID,
+        summary: String,
+        lease: RunLease
+    ) throws {
+        let boundedSummary = Self.utf8Prefix(summary, maximumBytes: 2_048)
+        guard !boundedSummary.isEmpty else {
+            throw AutonomyError.invalidRequest("managed assistant activity is empty")
+        }
+        let connection = try requiredConnection()
+        let timestamp = ISO8601.string(from: clock.now())
+        try connection.transaction {
+            try verifyRunLeaseUnlocked(lease, timestamp: timestamp, connection: connection)
+            guard let run = try autonomousRunUnlocked(runID, connection: connection),
+                  run.runID == lease.runID else {
+                throw AutonomyError.runNotFound(runID)
+            }
+            guard let turn = try providerTurnUnlocked(turnID, connection: connection),
+                  turn.intent.runID == runID else {
+                throw AutonomyError.providerTurnNotFound(turnID)
+            }
+            let turnIdentity = turnID.uuidString.lowercased()
+            let existing = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM autonomy_events
+                WHERE run_id=? AND event_type='managed_activity_assistant_response'
+                  AND json_extract(metadata_json,'$.turn_id')=?;
+                """,
+                bindings: [.text(runID.description), .text(turnIdentity)]
+            )
+            guard existing == 0 else { return }
+            guard try managedAssistantTurnIsWithinRetentionWindowUnlocked(
+                turnID: turnID,
+                runID: runID,
+                connection: connection
+            ) else {
+                // A replay for an assistant turn older than the retained rolling
+                // window must remain a no-op after its original event is pruned.
+                return
+            }
+            try appendAutonomyEventUnlocked(
+                runID: runID,
+                projectID: run.projectID,
+                eventType: "managed_activity_assistant_response",
+                severity: .info,
+                summary: boundedSummary,
+                metadata: ["turn_id": turnIdentity],
+                connection: connection
+            )
+        }
+    }
+
     /// Global, cursor-bounded event feed for the operator snapshot. The cursor is the
     /// exclusive durable sequence returned by the prior page.
     public func operatorAutonomyEvents(
         limit: Int,
-        beforeSequence: Int64? = nil
+        beforeSequence: Int64? = nil,
+        runID: RunID? = nil,
+        includeManagedActivity: Bool = false
     ) throws -> [AutonomyEvent] {
         guard (1...101).contains(limit), beforeSequence.map({ $0 > 0 }) ?? true else {
             throw AutonomyError.invalidRequest("operator event query is outside bounds")
         }
         var sql = """
-        SELECT sequence,event_id,run_id,project_id,event_type,severity,summary,
-               metadata_json,previous_event_sha256,event_sha256,created_at
-        FROM autonomy_events
+        SELECT e.sequence,e.event_id,e.run_id,e.project_id,e.event_type,e.severity,e.summary,
+               e.metadata_json,e.previous_event_sha256,e.event_sha256,e.created_at
+        FROM autonomy_events e
         """
         var bindings: [ControlPlaneSQLiteBinding] = []
+        var predicates: [String] = []
+        if let runID {
+            predicates.append("e.run_id=?")
+            bindings.append(.text(runID.description))
+        }
+        if !includeManagedActivity {
+            predicates.append("e.event_type NOT GLOB 'managed_activity_*'")
+        }
         if let beforeSequence {
-            sql += " WHERE sequence<?"
+            predicates.append("e.sequence<?")
             bindings.append(.int64(beforeSequence))
         }
-        sql += " ORDER BY sequence DESC LIMIT ?"
+        if !predicates.isEmpty {
+            sql += " WHERE " + predicates.joined(separator: " AND ")
+        }
+        sql += " ORDER BY e.sequence DESC LIMIT ?"
         bindings.append(.int64(Int64(limit)))
         return try requiredConnection().all(
             sql,
@@ -9795,6 +9907,31 @@ public actor ProjectControlPlaneRepository {
             guard let updated = try toolInvocationUnlocked(invocationID, connection: connection) else {
                 throw ProjectContextError.integrityFailure("tool invocation could not be read after transition")
             }
+            let activityDetail = boundedResult ?? boundedError
+            let activitySummary = Self.utf8Prefix(
+                [
+                    "\(current.toolName) · \(next.rawValue)",
+                    activityDetail,
+                ].compactMap { $0 }.joined(separator: "\n"),
+                maximumBytes: 2_048
+            )
+            let severity: AutonomyEventSeverity = switch next {
+            case .failed, .cancelled, .quarantinedStale: .error
+            case .ambiguous: .warning
+            default: .info
+            }
+            try appendAutonomyEventUnlocked(
+                runID: current.runID,
+                projectID: current.projectID,
+                eventType: "managed_activity_tool_\(next.rawValue)",
+                severity: severity,
+                summary: activitySummary,
+                metadata: [
+                    "invocation_id": current.invocationID.uuidString.lowercased(),
+                    "tool_name": current.toolName,
+                ],
+                connection: connection
+            )
             return updated
         }
     }
@@ -12923,8 +13060,17 @@ public actor ProjectControlPlaneRepository {
         }
         let eventID = UUID().uuidString.lowercased()
         let timestamp = ISO8601.string(from: clock.now())
-        let previous = try connection.scalarText(
-            "SELECT event_sha256 FROM autonomy_events ORDER BY sequence DESC LIMIT 1"
+        let managedActivity = Self.isManagedActivityEventType(eventType)
+        // Managed activity is a bounded operator projection, not part of the
+        // append-only audit lineage. Keeping its content hash independent lets
+        // routine rolling-window deletion remain distinguishable from an audit
+        // chain gap. Audit events always link across intervening projection rows.
+        let previous = managedActivity ? nil : try connection.scalarText(
+            """
+            SELECT event_sha256 FROM autonomy_events
+            WHERE event_type NOT GLOB 'managed_activity_*'
+            ORDER BY sequence DESC LIMIT 1
+            """
         )
         let hash = JSONSupport.sha256Hex(
             [eventID, runID?.description ?? "", projectID?.description ?? "", eventType,
@@ -12943,6 +13089,89 @@ public actor ProjectControlPlaneRepository {
                 .optionalText(previous), .text(hash), .text(timestamp),
             ]
         )
+        if managedActivity, let runID {
+            if eventType == "managed_activity_assistant_response" {
+                try pruneManagedAssistantActivityUnlocked(
+                    runID: runID,
+                    connection: connection
+                )
+            } else if eventType.hasPrefix("managed_activity_tool_") {
+                try pruneManagedToolActivityUnlocked(
+                    runID: runID,
+                    connection: connection
+                )
+            }
+        }
+    }
+
+    private func managedAssistantTurnIsWithinRetentionWindowUnlocked(
+        turnID: UUID,
+        runID: RunID,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> Bool {
+        try connection.scalarInt(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT turn_id FROM provider_turns
+                WHERE run_id=?
+                ORDER BY created_at DESC,turn_id DESC
+                LIMIT ?
+            ) WHERE turn_id=?
+            """,
+            bindings: [
+                .text(runID.description),
+                .int64(Int64(Self.maximumManagedAssistantActivityEventsPerRun)),
+                .text(turnID.uuidString.lowercased()),
+            ]
+        ) == 1
+    }
+
+    private func pruneManagedAssistantActivityUnlocked(
+        runID: RunID,
+        connection: ControlPlaneSQLiteConnection
+    ) throws {
+        try connection.execute(
+            """
+            DELETE FROM autonomy_events
+            WHERE run_id=? AND event_type='managed_activity_assistant_response'
+              AND COALESCE(json_extract(metadata_json,'$.turn_id'),'') NOT IN (
+                SELECT turn_id FROM provider_turns
+                WHERE run_id=?
+                ORDER BY created_at DESC,turn_id DESC
+                LIMIT ?
+              )
+            """,
+            bindings: [
+                .text(runID.description),
+                .text(runID.description),
+                .int64(Int64(Self.maximumManagedAssistantActivityEventsPerRun)),
+            ]
+        )
+    }
+
+    private func pruneManagedToolActivityUnlocked(
+        runID: RunID,
+        connection: ControlPlaneSQLiteConnection
+    ) throws {
+        try connection.execute(
+            """
+            DELETE FROM autonomy_events
+            WHERE sequence IN (
+                SELECT sequence FROM autonomy_events
+                WHERE run_id=? AND event_type GLOB 'managed_activity_tool_*'
+                ORDER BY sequence DESC
+                LIMIT -1 OFFSET ?
+            )
+            """,
+            bindings: [
+                .text(runID.description),
+                .int64(Int64(Self.maximumManagedToolActivityEventsPerRun)),
+            ]
+        )
+    }
+
+    private static func isManagedActivityEventType(_ eventType: String) -> Bool {
+        eventType.hasPrefix("managed_activity_")
     }
 
     private static func decodeAutonomyEvent(_ row: ControlPlaneSQLiteRow) throws -> AutonomyEvent {
@@ -13169,7 +13398,11 @@ public actor ProjectControlPlaneRepository {
         let timestamp = ISO8601.string(from: clock.now())
         let metadataJSON = try Self.canonicalEventMetadata(metadata)
         let previous = try connection.scalarText(
-            "SELECT event_sha256 FROM autonomy_events ORDER BY sequence DESC LIMIT 1"
+            """
+            SELECT event_sha256 FROM autonomy_events
+            WHERE event_type NOT GLOB 'managed_activity_*'
+            ORDER BY sequence DESC LIMIT 1
+            """
         )
         let hash = JSONSupport.sha256Hex(
             [eventID, projectID.description, eventType, severity, summary, metadataJSON, previous ?? "", timestamp]
@@ -13684,6 +13917,23 @@ public actor ProjectControlPlaneRepository {
             throw ProjectContextError.invalidIdentifier(field)
         }
         return value
+    }
+
+    private static func utf8Prefix(_ value: String, maximumBytes: Int) -> String {
+        guard maximumBytes > 0, value.utf8.count > maximumBytes else {
+            return maximumBytes > 0 ? value : ""
+        }
+        var output = ""
+        output.reserveCapacity(maximumBytes)
+        var byteCount = 0
+        for scalar in value.unicodeScalars {
+            let text = String(scalar)
+            let count = text.utf8.count
+            guard byteCount + count <= maximumBytes else { break }
+            output.append(text)
+            byteCount += count
+        }
+        return output
     }
 
     private struct StoredAuthorizationScope: Codable {
@@ -15209,6 +15459,8 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
         ON provider_turns(state, retry_at, created_at);
     CREATE INDEX IF NOT EXISTS idx_provider_turns_response
         ON provider_turns(provider_response_id) WHERE provider_response_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_provider_turns_run_created
+        ON provider_turns(run_id, created_at DESC, turn_id DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_one_automatic_continuation
         ON provider_turns(operation_id)
         WHERE request_kind = 'automatic_continuation' AND operation_id IS NOT NULL;
@@ -15390,6 +15642,9 @@ private final class ControlPlaneSQLiteConnection: @unchecked Sendable {
     );
     CREATE INDEX IF NOT EXISTS idx_events_run_sequence ON autonomy_events(run_id, sequence DESC);
     CREATE INDEX IF NOT EXISTS idx_events_project_sequence ON autonomy_events(project_id, sequence DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_events_managed_assistant_turn
+        ON autonomy_events(run_id, json_extract(metadata_json,'$.turn_id'))
+        WHERE event_type='managed_activity_assistant_response';
 
     CREATE TABLE IF NOT EXISTS stale_result_quarantine_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -10,6 +10,37 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Added
+
+- Added a bounded, redacted, coalesced **Managed Activity** projection directly
+  below the Rig's Load Trace and Orchestration Status. It identifies the active
+  project and instruction package, current inferred step and durable delivered
+  count, current phase/work/next action, durable managed-model responses and
+  tool transitions, orchestration events, and the newest exact
+  project/generation-scoped Rune Forge policy events. Detailed activity text
+  comes from an authenticated endpoint fenced by exact run, project, and
+  generation. The public operator snapshot preserves bounded, redacted mission
+  and work-item text plus non-sensitive state, identity, and event metadata,
+  but omits current phase/next action, assistant/model-error/tool summaries,
+  and managed activity rows.
+  Durable activity summaries are capped at 2 KiB and retained per run as at
+  most 128 assistant plus 128 tool rows. Each rolling row is independently
+  content-hashed and excluded from the append-only non-activity audit lineage,
+  so retention cannot create an audit-chain gap. Both native clients stream
+  responses through a strict 4 MiB ceiling. The existing view-owned five-second
+  refresh keeps at most 100 app-local rolling rows with an 8 KiB presentation
+  cap; this surface is not token streaming and does not create a second full
+  conversation transcript.
+- Added a verbose **Policy Feed** to Rune Forge so operators can follow the
+  newest bounded violation, repeat, evidence-update, correction, reopen, and
+  interpretation events without opening each violation. Policy reporting
+  remains additive and does not authorize, pause, or alter development work.
+- Rebalanced the Rig so CPU/GPU and Storage/Managed Activity occupy aligned,
+  equalized two-column rows at normal widths, with a compact 130-point rolling
+  activity region and a vertical fallback at constrained widths. MCP,
+  agent/process, Manager, Autonomy, Continuity, and Rune Forge controls now use
+  adaptive layouts to avoid clipping and make better use of available space.
+
 ## [0.11.0] — 2026-09-21 (development)
 
 ### Added
