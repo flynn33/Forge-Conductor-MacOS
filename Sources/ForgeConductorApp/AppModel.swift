@@ -63,12 +63,129 @@ struct RigActivityEntry: Identifiable, Sendable, Equatable {
     }
 }
 
+enum RigProviderExecutionMode: String, Sendable, Equatable {
+    case managedModel
+    case desktopHost
+    case unavailable
+}
+
+/// Bounded, selection-aware provider state shared by Dashboard and Guided Setup.
+/// LM Studio continues to use its live API/model probe. Desktop hosts are ready
+/// only when the manager reports matching run preparation and a committed Forge
+/// integration receipt with no setup operation still in flight.
+struct RigProviderProjection: Sendable, Equatable {
+    let id: String?
+    let displayName: String
+    let executionMode: RigProviderExecutionMode
+    let model: String?
+    let readinessState: String?
+    let detail: String
+    let isReady: Bool
+    let integrationEvidenceAvailable: Bool
+
+    static let unavailable = RigProviderProjection(
+        id: nil,
+        displayName: "No provider",
+        executionMode: .unavailable,
+        model: nil,
+        readinessState: nil,
+        detail: "Select and connect a provider in Provider.",
+        isReady: false,
+        integrationEvidenceAvailable: false
+    )
+
+    static func compose(
+        operatorSnapshot: OperatorSnapshot?,
+        integrations: ProviderIntegrationsSnapshot?
+    ) -> Self {
+        let integrationEvidenceAvailable = integrations != nil
+        let preparation = operatorSnapshot?.runPreparation
+        let fallbackProviderID = preparation?.providerID
+            .flatMap(ProviderIntegrationID.init(rawValue:))
+            ?? (operatorSnapshot?.provider == nil ? nil : .lmStudio)
+        let selectedProviderID = integrationEvidenceAvailable
+            ? integrations?.selectedProviderID
+            : fallbackProviderID
+
+        guard let selectedProviderID else {
+            return RigProviderProjection(
+                id: nil,
+                displayName: "No provider",
+                executionMode: .unavailable,
+                model: nil,
+                readinessState: preparation?.state,
+                detail: "Select and connect a provider in Provider.",
+                isReady: false,
+                integrationEvidenceAvailable: integrationEvidenceAvailable
+            )
+        }
+
+        let selectedIntegration = integrations?.providers.first {
+            $0.descriptor.id == selectedProviderID
+        }
+        let descriptor = selectedIntegration?.descriptor
+            ?? ProviderIntegrationDescriptor.supported.first { $0.id == selectedProviderID }
+        let displayName = descriptor?.displayName ?? selectedProviderID.rawValue
+        let preparationMatchesSelection = preparation?.providerID == selectedProviderID.rawValue
+        let preparationMatchesRevision = preparation?.providerConfigurationRevision
+            == integrations?.selectionRevision
+
+        if descriptor?.executionStrategy == .desktopPluginPull {
+            let selectable = descriptor?.selectable == true
+            let isReady = selectable
+                && integrationEvidenceAvailable
+                && selectedIntegration?.receipt != nil
+                && integrations?.currentOperation == nil
+                && preparationMatchesSelection
+                && preparationMatchesRevision
+                && preparation?.state == "ready"
+            let detail: String
+            if !selectable {
+                detail = "\(displayName) is not available for automated runs in this build because its host does not expose supported automatic task ingress."
+            } else if preparationMatchesSelection,
+                      preparationMatchesRevision,
+                      let preparationDetail = preparation?.detail {
+                detail = preparationDetail
+            } else if !integrationEvidenceAvailable {
+                detail = "Desktop-provider status is unavailable from Manager."
+            } else {
+                detail = "Refresh Provider so Manager can verify the selected desktop integration."
+            }
+            return RigProviderProjection(
+                id: selectedProviderID.rawValue,
+                displayName: displayName,
+                executionMode: .desktopHost,
+                model: preparationMatchesSelection ? preparation?.modelKey : nil,
+                readinessState: preparationMatchesSelection ? preparation?.state : nil,
+                detail: detail,
+                isReady: isReady,
+                integrationEvidenceAvailable: integrationEvidenceAvailable
+            )
+        }
+
+        let health = operatorSnapshot?.provider?.health
+        return RigProviderProjection(
+            id: selectedProviderID.rawValue,
+            displayName: displayName,
+            executionMode: .managedModel,
+            model: operatorSnapshot?.provider?.modelKey,
+            readinessState: preparationMatchesSelection ? preparation?.state : health,
+            detail: preparationMatchesSelection
+                ? (preparation?.detail ?? "LM Studio provider status is available.")
+                : "LM Studio uses the live provider API and loaded-model check.",
+            isReady: health == "reachable" || health == "contract_valid",
+            integrationEvidenceAvailable: integrationEvidenceAvailable
+        )
+    }
+}
+
 struct RigOperationalSnapshot: Sendable, Equatable {
     static let maximumActivityEntries = 100
     static let maximumActivityMessageBytes = 8 * 1_024
 
     var providerHealth: String?
     var providerModel: String?
+    var selectedProvider: RigProviderProjection
     var autonomyStarted: Bool?
     var autonomyActiveCount: Int
     var autonomyDeferredCount: Int
@@ -107,6 +224,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
     static let unavailable = RigOperationalSnapshot(
         providerHealth: nil,
         providerModel: nil,
+        selectedProvider: .unavailable,
         autonomyStarted: nil,
         autonomyActiveCount: 0,
         autonomyDeferredCount: 0,
@@ -147,6 +265,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         operatorSnapshot: OperatorSnapshot?,
         autonomy: OperatorAutonomySummary?,
         runeForge: StjornarvaldManagerSnapshot?,
+        providerIntegrations: ProviderIntegrationsSnapshot? = nil,
         instructionQueue: OperatorInstructionQueue? = nil,
         progressProject: OperatorProject? = nil,
         operatorEvidenceAvailable: Bool? = nil,
@@ -155,6 +274,10 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         priorActivity: [RigActivityEntry] = []
     ) -> Self {
         let automaticContinuity = operatorSnapshot?.continuityReadiness.filter(\.automatic) ?? []
+        let selectedProvider = RigProviderProjection.compose(
+            operatorSnapshot: operatorSnapshot,
+            integrations: providerIntegrations
+        )
         let activeContinuityStates: Set<ManagedContinuityDisplayState> = [
             .savingProgress, .rolloverQueued, .quiescing, .creatingSuccessor,
             .restoring, .continuing,
@@ -231,6 +354,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         return Self(
             providerHealth: operatorSnapshot?.provider?.health,
             providerModel: operatorSnapshot?.provider?.modelKey,
+            selectedProvider: selectedProvider,
             autonomyStarted: autonomy?.started,
             autonomyActiveCount: autonomy?.activeRunIDs.count ?? 0,
             autonomyDeferredCount: autonomy?.deferredRunIDs.count ?? 0,
@@ -998,7 +1122,13 @@ public final class AppModel: ObservableObject {
     private func refreshRigOperationalSnapshot() async {
         async let operatorRequest: OperatorSnapshot? = try? operatorManagerClient.snapshot(limit: 100)
         async let autonomyRequest: OperatorAutonomySummary? = try? operatorManagerClient.autonomyStatus()
-        let (operatorSnapshot, autonomy) = await (operatorRequest, autonomyRequest)
+        async let providerIntegrationsRequest: ProviderIntegrationsSnapshot? = try?
+            operatorManagerClient.providerIntegrations()
+        let (operatorSnapshot, autonomy, providerIntegrations) = await (
+            operatorRequest,
+            autonomyRequest,
+            providerIntegrationsRequest
+        )
         let terminalStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
         let activeRun = operatorSnapshot?.runs.first { !terminalStates.contains($0.state) }
         let progressProject = operatorSnapshot?.projects.first {
@@ -1030,6 +1160,7 @@ public final class AppModel: ObservableObject {
             operatorSnapshot: activityResult.snapshot,
             autonomy: autonomy,
             runeForge: runeForge,
+            providerIntegrations: providerIntegrations,
             instructionQueue: instructionResult.queue,
             progressProject: progressProject,
             operatorEvidenceAvailable: activityResult.available,

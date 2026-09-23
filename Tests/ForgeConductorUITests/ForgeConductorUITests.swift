@@ -1070,6 +1070,56 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.buttons["provider-refresh-models"].exists)
     }
 
+    func testProviderCardsExposeSingleSelectionAndLMStudioConnectAndCheck() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let provider = app.buttons["tab-provider"]
+        XCTAssertTrue(provider.waitForExistence(timeout: 8))
+        provider.click()
+
+        let providerIDs = ["lmstudio", "claude-desktop", "codex-desktop", "grok-build"]
+        for providerID in providerIDs {
+            XCTAssertTrue(
+                app.descendants(matching: .any)["provider-card-\(providerID)"]
+                    .waitForExistence(timeout: 5),
+                "Provider card \(providerID) should be visible"
+            )
+        }
+
+        for providerID in providerIDs {
+            let toggle = app.descendants(matching: .any)["provider-toggle-\(providerID)"]
+            XCTAssertTrue(
+                waitForToggleState(providerID == "lmstudio", on: toggle),
+                "Only LM Studio should be selected in the provider registry fixture"
+            )
+        }
+
+        let connectAndCheck = app.buttons["provider-repair-lmstudio"]
+        XCTAssertTrue(waitForEnabled(connectAndCheck, timeout: 5))
+        XCTAssertEqual(connectAndCheck.label, "Connect and Check")
+        makeHittable(connectAndCheck)
+        connectAndCheck.click()
+
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            fixture.providerPreparationCount == 1
+                && fixture.providerIntegrationMutationRecords.count == 1
+        })
+        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 1)
+        let repair = try XCTUnwrap(fixture.providerIntegrationMutationRecords.first)
+        XCTAssertEqual(repair.kind, "repair")
+        XCTAssertEqual(repair.providerID, "lmstudio")
+        XCTAssertEqual(repair.expectedRevision, "provider-revision-1")
+        XCTAssertNotNil(UUID(uuidString: repair.idempotencyKey))
+        XCTAssertEqual(repair.idempotencyKey, repair.idempotencyKey.lowercased())
+        XCTAssertEqual(fixture.providerIntegrationMutationAuthorizationCount, 1)
+        let completionNotice = app.descendants(matching: .any)["provider-probe-notice"]
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            completionNotice.exists
+                && self.element(completionNotice, contains: "integration passed verification")
+        })
+    }
+
     func testProviderControlsSendExactProtectedRequestsAndSurfaceSuccessAndFailure() throws {
         let fixture = try OperatorManagerUITestFixture(failContractProbe: true)
         relaunch(with: fixture)
@@ -1827,6 +1877,13 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         let mode: String
     }
 
+    struct ProviderIntegrationMutationRecord: Equatable {
+        let kind: String
+        let providerID: String
+        let expectedRevision: String
+        let idempotencyKey: String
+    }
+
     let projectID = "11111111-1111-4111-8111-111111111111"
     let runID = "22222222-2222-4222-8222-222222222222"
     let runtimeJobID = "33333333-3333-4333-8333-333333333333"
@@ -1869,6 +1926,12 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableProviderLastProbeMode: String?
     private var mutableProviderLastProbeError: String?
     private var mutableProviderLastProbeAt: String?
+    private var mutableProviderPreparationCount = 0
+    private var mutableProviderPreparationAuthorizationCount = 0
+    private var mutableProviderIntegrationRevision = 1
+    private var mutableConfiguredProviderIntegrationIDs: Set<String> = []
+    private var mutableProviderIntegrationMutationRecords: [ProviderIntegrationMutationRecord] = []
+    private var mutableProviderIntegrationMutationAuthorizationCount = 0
     private var mutableRuntimeJobState = "queued"
     private var mutableRuntimeCancellationJobIDs: [String] = []
     private var mutableRuntimeCancellationBodies: [Data] = []
@@ -1882,7 +1945,17 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutablePolicySnapshotRequestCount = 0
     private var mutableScopedPolicySnapshotRequestCount = 0
     private var mutablePolicyViolationRequestCount = 0
+    private let supportedProviderIntegrationIDs: Set<String> = [
+        "lmstudio",
+        "claude-desktop",
+        "codex-desktop",
+        "grok-build",
+    ]
     private(set) var port: UInt16 = 0
+
+    private var providerIntegrationRevision: String {
+        "provider-revision-\(mutableProviderIntegrationRevision)"
+    }
 
     var startRequestCount: Int { locked { mutableStartRequestCount } }
     var controlRequestCount: Int { locked { mutableControlRequestCount } }
@@ -1904,6 +1977,18 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var providerProbeBodies: [Data] { locked { mutableProviderProbeBodies } }
     var providerProbeAuthorizationCount: Int {
         locked { mutableProviderProbeAuthorizationCount }
+    }
+    var providerPreparationCount: Int {
+        locked { mutableProviderPreparationCount }
+    }
+    var providerPreparationAuthorizationCount: Int {
+        locked { mutableProviderPreparationAuthorizationCount }
+    }
+    var providerIntegrationMutationRecords: [ProviderIntegrationMutationRecord] {
+        locked { mutableProviderIntegrationMutationRecords }
+    }
+    var providerIntegrationMutationAuthorizationCount: Int {
+        locked { mutableProviderIntegrationMutationAuthorizationCount }
     }
     var runtimeCancellationJobIDs: [String] { locked { mutableRuntimeCancellationJobIDs } }
     var runtimeCancellationBodies: [Data] { locked { mutableRuntimeCancellationBodies } }
@@ -2027,6 +2112,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     }
 
     private func parse(_ data: Data) -> (
+        method: String,
         path: String,
         queryItems: [URLQueryItem],
         headers: [String: String],
@@ -2065,6 +2151,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             return nil
         }
         return (
+            String(parts[0]),
             components.path,
             components.queryItems ?? [],
             parsedHeaders,
@@ -2074,6 +2161,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
 
     private func route(
         _ request: (
+            method: String,
             path: String,
             queryItems: [URLQueryItem],
             headers: [String: String],
@@ -2283,6 +2371,97 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             } else {
                 respond(status: outcome.status, object: outcome.receipt, to: connection)
             }
+        case "/api/manager/providers":
+            guard request.method == "GET", request.body.isEmpty else {
+                respond(status: 405, object: ["message": "provider registry is read-only"], to: connection)
+                return
+            }
+            respond(status: 200, object: providerIntegrations(), to: connection)
+        case let path where path.hasPrefix("/api/manager/providers/")
+            && path.hasSuffix("/repair"):
+            let providerID = String(
+                path.dropFirst("/api/manager/providers/".count).dropLast("/repair".count)
+            )
+            guard request.method == "POST",
+                  request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  supportedProviderIntegrationIDs.contains(providerID),
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  Set(object.keys) == ["expected_revision", "provider_id", "idempotency_key"],
+                  object["provider_id"] as? String == providerID,
+                  let expectedRevision = object["expected_revision"] as? String,
+                  expectedRevision == locked({ providerIntegrationRevision }),
+                  let idempotencyKey = object["idempotency_key"] as? String,
+                  let idempotencyUUID = UUID(uuidString: idempotencyKey),
+                  idempotencyKey == idempotencyUUID.uuidString.lowercased() else {
+                respond(
+                    status: 409,
+                    object: ["message": "missing provider repair authority or stale selection revision"],
+                    to: connection
+                )
+                return
+            }
+            let resultingRevision = locked { () -> String in
+                mutableProviderIntegrationMutationRecords.append(.init(
+                    kind: "repair",
+                    providerID: providerID,
+                    expectedRevision: expectedRevision,
+                    idempotencyKey: idempotencyKey
+                ))
+                mutableProviderIntegrationMutationAuthorizationCount += 1
+                mutableMutationAuthorizationCount += 1
+                mutableConfiguredProviderIntegrationIDs.insert(providerID)
+                mutableProviderIntegrationRevision += 1
+                return providerIntegrationRevision
+            }
+            respond(
+                status: 200,
+                object: providerIntegrationOperation(
+                    operationID: "66666666-6666-4666-8666-666666666666",
+                    kind: "repair",
+                    providerID: providerID,
+                    expectedRevision: expectedRevision,
+                    resultingRevision: resultingRevision,
+                    detail: "\(providerID) integration passed verification."
+                ),
+                to: connection
+            )
+        case "/api/manager/provider/prepare":
+            guard request.method == "POST",
+                  request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  object.isEmpty else {
+                respond(
+                    status: 401,
+                    object: ["message": "missing provider preparation authority or invalid payload"],
+                    to: connection
+                )
+                return
+            }
+            let configuration = locked { () -> [String: Any] in
+                mutableProviderPreparationCount += 1
+                mutableProviderPreparationAuthorizationCount += 1
+                mutableMutationAuthorizationCount += 1
+                return [
+                    "revision": mutableProviderConfigurationRevision,
+                    "endpoint": mutableProviderConfiguredEndpoint,
+                    "modelKey": "fixture-model",
+                    "credentialConfigured": false,
+                    "saved": true,
+                    "credentialCleanupPending": false,
+                ]
+            }
+            respond(
+                status: 200,
+                object: [
+                    "schema_version": 1,
+                    "state": "ready",
+                    "recovery_action": "none",
+                    "detail": "LM Studio is reachable and the loaded model passed the managed-provider contract.",
+                    "configuration": configuration,
+                    "provider": provider(),
+                ],
+                to: connection
+            )
         case "/api/manager/provider/configuration":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true else {
                 respond(status: 401, object: ["message": "missing provider configuration authorization"], to: connection)
@@ -2874,6 +3053,95 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         ]
     }
 
+    private func providerIntegrations() -> [String: Any] {
+        let state = locked {
+            (
+                providerIntegrationRevision,
+                mutableConfiguredProviderIntegrationIDs
+            )
+        }
+        let descriptors: [(id: String, name: String, strategy: String, detail: String)] = [
+            (
+                "lmstudio",
+                "LM Studio",
+                "managed_provider_push",
+                "Forge sends bounded managed-model turns to LM Studio."
+            ),
+            (
+                "claude-desktop",
+                "Claude Code Desktop",
+                "desktop_plugin_pull",
+                "Claude Code Desktop executes work through a Forge-managed plugin."
+            ),
+            (
+                "codex-desktop",
+                "Codex Desktop",
+                "desktop_plugin_pull",
+                "Codex Desktop executes work through a Forge-managed plugin."
+            ),
+            (
+                "grok-build",
+                "Grok Build",
+                "desktop_plugin_pull",
+                "Grok Build executes work through a Forge-managed plugin."
+            ),
+        ]
+        let providers: [[String: Any]] = descriptors.map { descriptor in
+            let configured = state.1.contains(descriptor.id)
+            var provider: [String: Any] = [
+                "descriptor": [
+                    "id": descriptor.id,
+                    "display_name": descriptor.name,
+                    "execution_strategy": descriptor.strategy,
+                    "selectable": true,
+                    "detail": descriptor.detail,
+                ],
+                "setup_state": configured ? "configured" : "not_configured",
+            ]
+            if configured {
+                provider["receipt"] = [
+                    "provider_id": descriptor.id,
+                    "artifact_version": "fixture-1",
+                    "installed_at": "2026-09-23T12:00:00Z",
+                    "verified_at": "2026-09-23T12:00:00Z",
+                    "metadata": ["connection": "fixture-verified"],
+                ]
+            }
+            return provider
+        }
+        return [
+            "selection_revision": state.0,
+            "selected_provider_id": "lmstudio",
+            "providers": providers,
+            "current_operation": NSNull(),
+            "recent_operations": [],
+        ]
+    }
+
+    private func providerIntegrationOperation(
+        operationID: String,
+        kind: String,
+        providerID: String,
+        expectedRevision: String,
+        resultingRevision: String,
+        detail: String
+    ) -> [String: Any] {
+        [
+            "operation_id": operationID,
+            "kind": kind,
+            "provider_id": providerID,
+            "phase": "active",
+            "expected_revision": expectedRevision,
+            "resulting_revision": resultingRevision,
+            "idempotency_key_sha256": String(repeating: "a", count: 64),
+            "intent_sha256": String(repeating: "b", count: 64),
+            "detail": detail,
+            "accepted_at": "2026-09-23T12:00:00Z",
+            "updated_at": "2026-09-23T12:00:01Z",
+            "completed_at": "2026-09-23T12:00:01Z",
+        ]
+    }
+
     private func provider() -> [String: Any] {
         let state = locked {
             (
@@ -3032,7 +3300,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "refresh_interval_sec": 8,
             ] as [String: Any],
             "home": "/tmp/forge-operator-fixture",
-            "version": "0.13.0",
+            "version": "0.14.0",
         ]
     }
 

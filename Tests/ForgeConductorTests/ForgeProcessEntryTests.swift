@@ -44,6 +44,22 @@ final class ForgeProcessEntryTests: XCTestCase {
         )
     }
 
+    func testParseModeProviderHookIsAlwaysHeadless() {
+        XCTAssertEqual(
+            ForgeProcessEntry.parseMode(arguments: [
+                "/app", "provider-hook", "claude-desktop", "SessionStart",
+                "--home", "/tmp/forge-home",
+            ]),
+            .providerHook
+        )
+        // Malformed hook arguments must be handled as a headless error rather
+        // than falling through into SwiftUI startup.
+        XCTAssertEqual(
+            ForgeProcessEntry.parseMode(arguments: ["/app", "provider-hook"]),
+            .providerHook
+        )
+    }
+
     func testHomeOverride() {
         let url = ForgeProcessEntry.homeOverride(from: [
             "/app", "manager", "run", "--home", "~/somewhere",

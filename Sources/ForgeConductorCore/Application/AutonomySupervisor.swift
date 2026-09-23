@@ -235,6 +235,13 @@ public actor AutonomySupervisor {
     }
 
     private func isReadyForActivation(_ run: AutonomousRunRecord) -> Bool {
+        // Desktop orchestration hosts pull work through their Forge-owned plugin hook.
+        // They must never be handed to the managed provider-push coordinator,
+        // including during manager restart recovery and watchdog rediscovery.
+        guard run.specification.work.metadata["execution_strategy"]
+            != ProviderExecutionStrategy.desktopPluginPull.rawValue else {
+            return false
+        }
         guard run.state.isExecutable else { return false }
         if [.waitingProvider, .waitingResource, .retryWait].contains(run.state),
            let retryAt = run.retryAt,

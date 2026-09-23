@@ -71,6 +71,8 @@ enum ForgeConductorMain {
                 try cmdQualificationFilesystemHealth(rest)
             case "serve":
                 try cmdServe(rest)
+            case "provider-hook":
+                try DesktopProviderHookCommand.run(arguments: rest)
             case "dashboard":
                 try cmdDashboard(rest)
             case "manager":
@@ -83,7 +85,13 @@ enum ForgeConductorMain {
                 exit(2)
             }
         } catch {
-            fputs("error: \(error)\n", stderr)
+            if command == "provider-hook" {
+                // Hook stdout is reserved for JSON and hook diagnostics must not
+                // disclose credentials, host payloads, or configured paths.
+                fputs("forge-conductor provider-hook failed\n", stderr)
+            } else {
+                fputs("error: \(error)\n", stderr)
+            }
             exit(1)
         }
     }
@@ -100,7 +108,10 @@ enum ForgeConductorMain {
           install-lmstudio-plugin [--binary PATH]  Deploy to LM Studio (primary+failover mcpBridge + mcp.json)
           doctor               Validate install, port conflicts, endpoint protection
           status               Print runtime status JSON
-          serve                Run MCP server on stdio (for LM Studio)
+          serve [--desktop-provider claude-desktop|codex-desktop]
+                               Run MCP server on stdio for its explicit host role
+          provider-hook <provider-id> <event> --home PATH
+                               Internal authenticated desktop-provider hook bridge
           dashboard [--host HOST] [--port PORT] [--open]
                                Start standalone control surface (no supervisor)
           manager              Supervised dashboard node (keeps UI up)
@@ -281,8 +292,19 @@ enum ForgeConductorMain {
     }
 
     static func cmdServe(_ args: [String]) throws {
+        let desktopProviderID = try ForgeProcessEntry.desktopProviderID(
+            inServeArguments: args
+        )
         let app = try ForgeApp.bootstrap(home: homeOverride(args))
-        let server = MCPServer(app: app)
+        let server = if let desktopProviderID {
+            MCPServer(
+                app: app,
+                role: .primary,
+                desktopProviderID: desktopProviderID
+            )
+        } else {
+            MCPServer(app: app)
+        }
         do {
             try server.run()
         } catch {

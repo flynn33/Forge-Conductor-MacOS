@@ -357,6 +357,15 @@ private enum ManagerStjornarvaldSnapshotQueryError: Error, LocalizedError {
     }
 }
 
+private enum ManagerProviderIntegrationRoute {
+    case snapshot
+    case select
+    case operation(operationID: String)
+    case cancel(operationID: String)
+    case repair(pathProviderID: String)
+    case remove(pathProviderID: String)
+}
+
 /// Manager control plane routes: start/stop/restart/settings/shutdown.
 public final class ManagerRoutes: @unchecked Sendable {
     public static let maximumProjectRegistrationPathBytes = 4_096
@@ -367,6 +376,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumInstructionQueueBodyBytes = 16_384
     static let maximumRuntimeJobCancelBodyBytes = 256
     static let maximumProviderProbeBodyBytes = 512
+    static let maximumProviderIntegrationBodyBytes = 16_384
     static let maximumRunControlBodyBytes = 256
     static let maximumRunDeletionBodyBytes = 256
     static let maximumToolPermissionBodyBytes = 128 * 1_024
@@ -430,7 +440,25 @@ public final class ManagerRoutes: @unchecked Sendable {
             ])
             return
         }
+        if let providerRoute = Self.providerIntegrationRoute(
+            method: method,
+            path: target.path
+        ) {
+            dispatchProviderIntegration(
+                providerRoute,
+                queryItems: target.queryItems,
+                body: body,
+                connection: connection
+            )
+            return
+        }
         switch (method, target.path) {
+        case ("POST", "/api/manager/providers/hooks"):
+            dispatchDesktopProviderHook(
+                queryItems: target.queryItems,
+                body: body,
+                connection: connection
+            )
         case ("POST", "/api/manager/continuity/tasks/prepare"),
              ("POST", "/api/manager/continuity/tasks/rotate"),
              ("POST", "/api/manager/continuity/tasks/revoke"):
@@ -1450,28 +1478,56 @@ public final class ManagerRoutes: @unchecked Sendable {
             let completionGates = try optionalStringArray(object, key: "completion_gates")
             let failurePolicy = try failurePolicy(object)
             let networkAllowed = try optionalBoolean(object, key: "network_allowed") ?? false
-            let result = manager.inspectAutonomousRunPreparation(
-                runID: preparationRunID,
-                projectID: try projectID(object),
-                expectedGeneration: try projectGeneration(object),
-                assignmentID: try optionalString(
-                    object,
-                    key: "assignment_id",
-                    maximumBytes: 1_024
-                ),
-                mission: mission,
-                instructionArtifactSHA256: instructionArtifactSHA256,
-                providerID: providerID,
-                adapterID: adapterID,
-                modelKey: modelKey,
-                allowedTools: allowedTools,
-                completionGates: completionGates,
-                failurePolicy: failurePolicy,
-                networkAllowed: networkAllowed,
-                maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
-                    ?? ProjectContextService.defaultInlineOutputLimit
+            let runProjectID = try projectID(object)
+            let runProjectGeneration = try projectGeneration(object)
+            let assignmentID = try optionalString(
+                object,
+                key: "assignment_id",
+                maximumBytes: 1_024
             )
-            http.respondJSON(connection, status: 200, object: try result.asDictionary())
+            let maximumInlineOutputBytes = integer(object["maximum_inline_output_bytes"])
+                ?? ProjectContextService.defaultInlineOutputLimit
+            guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false,
+                    "code": "provider_readiness_busy",
+                    "message": "A provider readiness check is already in progress. Retry after it settles.",
+                    "retryable": true,
+                ])
+                return
+            }
+            Self.providerProbeQueue.async { [self] in
+                defer { Self.providerOperationAdmission.signal() }
+                let result = manager.inspectAutonomousRunPreparation(
+                    runID: preparationRunID,
+                    projectID: runProjectID,
+                    expectedGeneration: runProjectGeneration,
+                    assignmentID: assignmentID,
+                    mission: mission,
+                    instructionArtifactSHA256: instructionArtifactSHA256,
+                    providerID: providerID,
+                    adapterID: adapterID,
+                    modelKey: modelKey,
+                    allowedTools: allowedTools,
+                    completionGates: completionGates,
+                    failurePolicy: failurePolicy,
+                    networkAllowed: networkAllowed,
+                    maximumInlineOutputBytes: maximumInlineOutputBytes
+                )
+                do {
+                    try http.respondJSON(
+                        connection,
+                        status: 200,
+                        object: result.asDictionary()
+                    )
+                } catch {
+                    http.respondJSON(connection, status: 500, object: [
+                        "ok": false,
+                        "code": "run_preparation_response_failed",
+                        "message": "Run preparation completed but its bounded response could not be encoded.",
+                    ])
+                }
+            }
         case ("POST", "/api/manager/runs/start"):
             guard body.count <= Self.maximumRunAdmissionBodyBytes else {
                 http.respondJSON(connection, status: 413, object: [
@@ -1572,52 +1628,83 @@ public final class ManagerRoutes: @unchecked Sendable {
                 object,
                 key: "instruction_artifact_sha256"
             )
-            do {
-                let result = try manager.startAutonomousRun(
-                    runID: RunID(runUUID),
-                    projectID: try projectID(object),
-                    expectedGeneration: try projectGeneration(object),
-                    assignmentID: object["assignment_id"] as? String,
-                    mission: mission,
-                    instructionArtifactSHA256: instructionArtifactSHA256,
-                    providerID: providerID,
-                    adapterID: adapterID,
-                    modelKey: modelKey,
-                    allowedTools: allowedTools,
-                    completionGates: completionGates,
-                    failurePolicy: failurePolicy,
-                    expectedProviderConfigurationRevision:
-                        expectedProviderConfigurationRevision,
-                    expectedToolCatalogRevision: expectedToolCatalogRevision,
-                    expectedPreparedRunRevision: expectedPreparedRunRevision,
-                    networkAllowed: networkAllowed,
-                    maximumInlineOutputBytes: integer(object["maximum_inline_output_bytes"])
-                        ?? ProjectContextService.defaultInlineOutputLimit
-                )
-                http.respondJSON(connection, status: 202, object: result)
-            } catch let error as AutonomyError {
-                guard case .invalidToolConfiguration = error else { throw error }
-                http.respondJSON(connection, status: 422, object: [
-                    "ok": false,
-                    "code": error.code,
-                    "message": error.localizedDescription,
-                    "retryable": false,
-                ])
-            } catch let error as ManagerRunPreparationError {
+            let runProjectID = try projectID(object)
+            let runProjectGeneration = try projectGeneration(object)
+            let assignmentID = object["assignment_id"] as? String
+            let maximumInlineOutputBytes = integer(object["maximum_inline_output_bytes"])
+                ?? ProjectContextService.defaultInlineOutputLimit
+            guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
                 http.respondJSON(connection, status: 409, object: [
                     "ok": false,
-                    "code": "run_preparation_stale",
-                    "message": error.localizedDescription,
+                    "code": "provider_readiness_busy",
+                    "message": "A provider readiness check or run admission is already in progress. Retry after it settles.",
                     "retryable": true,
                 ])
-            } catch let error as ProjectContextError {
-                guard case .projectRootNotAuthorized = error else { throw error }
-                http.respondJSON(connection, status: 403, object: [
-                    "ok": false,
-                    "code": error.code,
-                    "message": error.localizedDescription,
-                    "retryable": false,
-                ])
+                return
+            }
+            Self.providerProbeQueue.async { [self] in
+                defer { Self.providerOperationAdmission.signal() }
+                do {
+                    let result = try manager.startAutonomousRun(
+                        runID: RunID(runUUID),
+                        projectID: runProjectID,
+                        expectedGeneration: runProjectGeneration,
+                        assignmentID: assignmentID,
+                        mission: mission,
+                        instructionArtifactSHA256: instructionArtifactSHA256,
+                        providerID: providerID,
+                        adapterID: adapterID,
+                        modelKey: modelKey,
+                        allowedTools: allowedTools,
+                        completionGates: completionGates,
+                        failurePolicy: failurePolicy,
+                        expectedProviderConfigurationRevision:
+                            expectedProviderConfigurationRevision,
+                        expectedToolCatalogRevision: expectedToolCatalogRevision,
+                        expectedPreparedRunRevision: expectedPreparedRunRevision,
+                        networkAllowed: networkAllowed,
+                        maximumInlineOutputBytes: maximumInlineOutputBytes
+                    )
+                    http.respondJSON(connection, status: 202, object: result)
+                } catch let error as AutonomyError {
+                    let status = if case .invalidToolConfiguration = error { 422 } else { 409 }
+                    http.respondJSON(connection, status: status, object: [
+                        "ok": false,
+                        "code": error.code,
+                        "message": error.localizedDescription,
+                        "retryable": false,
+                    ])
+                } catch let error as ManagerRunPreparationError {
+                    http.respondJSON(connection, status: 409, object: [
+                        "ok": false,
+                        "code": "run_preparation_stale",
+                        "message": error.localizedDescription,
+                        "retryable": true,
+                    ])
+                } catch let error as ProviderIntegrationError {
+                    let failure = Self.providerIntegrationHTTPFailure(error)
+                    respondProviderIntegrationFailure(
+                        connection,
+                        status: failure.status,
+                        code: failure.code,
+                        message: error.localizedDescription
+                    )
+                } catch let error as ProjectContextError {
+                    let status = if case .projectRootNotAuthorized = error { 403 } else { 409 }
+                    http.respondJSON(connection, status: status, object: [
+                        "ok": false,
+                        "code": error.code,
+                        "message": error.localizedDescription,
+                        "retryable": false,
+                    ])
+                } catch {
+                    http.respondJSON(connection, status: 500, object: [
+                        "ok": false,
+                        "code": "run_start_failed",
+                        "message": "Run start did not complete.",
+                        "retryable": true,
+                    ])
+                }
             }
         case ("POST", "/api/manager/runs/status"):
             let object = try JSONSupport.object(from: body)
@@ -1736,6 +1823,373 @@ public final class ManagerRoutes: @unchecked Sendable {
             }
         default:
             http.respond(connection, status: 404, body: "Not Found", contentType: "text/plain")
+        }
+    }
+
+    private func dispatchProviderIntegration(
+        _ route: ManagerProviderIntegrationRoute,
+        queryItems: [URLQueryItem],
+        body: Data,
+        connection: NWConnection
+    ) {
+        guard queryItems.isEmpty else {
+            respondProviderIntegrationFailure(
+                connection,
+                status: 400,
+                code: "invalid_provider_integration_request",
+                message: "Provider integration endpoints do not accept query parameters."
+            )
+            return
+        }
+        guard body.count <= Self.maximumProviderIntegrationBodyBytes else {
+            respondProviderIntegrationFailure(
+                connection,
+                status: 413,
+                code: "provider_integration_body_too_large",
+                message: "Provider integration requests must remain within the bounded body size."
+            )
+            return
+        }
+
+        let requiresBoundedWorker: Bool
+        switch route {
+        case .snapshot, .operation:
+            requiresBoundedWorker = false
+        case .select, .cancel, .repair, .remove:
+            requiresBoundedWorker = true
+        }
+        guard requiresBoundedWorker else {
+            performProviderIntegration(route, body: body, connection: connection)
+            return
+        }
+        guard Self.providerOperationAdmission.wait(timeout: .now()) == .success else {
+            respondProviderIntegrationFailure(
+                connection,
+                status: 409,
+                code: "provider_operation_busy",
+                message: "A provider operation or readiness check is already in progress. Retry after it settles."
+            )
+            return
+        }
+        Self.providerProbeQueue.async { [self] in
+            defer { Self.providerOperationAdmission.signal() }
+            performProviderIntegration(route, body: body, connection: connection)
+        }
+    }
+
+    private func performProviderIntegration(
+        _ route: ManagerProviderIntegrationRoute,
+        body: Data,
+        connection: NWConnection
+    ) {
+        do {
+            switch route {
+            case .snapshot:
+                guard body.isEmpty else {
+                    throw ProviderIntegrationError.invalidRequest(
+                        field: "body",
+                        reason: "snapshot_requires_empty_body"
+                    )
+                }
+                try respondProviderIntegration(
+                    connection,
+                    status: 200,
+                    value: manager.providerIntegrations()
+                )
+            case .select:
+                try Self.validateProviderIntegrationObject(
+                    body,
+                    requiredKeys: ["expected_revision", "idempotency_key"],
+                    allowedKeys: ["expected_revision", "provider_id", "idempotency_key"]
+                )
+                let request = try JSONDecoder().decode(
+                    ProviderSelectionRequest.self,
+                    from: body
+                )
+                try respondProviderIntegration(
+                    connection,
+                    status: 202,
+                    value: manager.selectProviderIntegration(request)
+                )
+            case .operation(let operationID):
+                guard body.isEmpty else {
+                    throw ProviderIntegrationError.invalidRequest(
+                        field: "body",
+                        reason: "operation_status_requires_empty_body"
+                    )
+                }
+                try respondProviderIntegration(
+                    connection,
+                    status: 200,
+                    value: manager.providerIntegrationOperation(operationID: operationID)
+                )
+            case .cancel(let operationID):
+                try Self.validateEmptyProviderIntegrationObject(body)
+                try respondProviderIntegration(
+                    connection,
+                    status: 200,
+                    value: manager.cancelProviderIntegrationOperation(
+                        operationID: operationID
+                    )
+                )
+            case .repair(let pathProviderID):
+                let request = try decodeProviderIntegrationMutation(body)
+                try Self.validatePathProviderID(
+                    pathProviderID,
+                    matches: request.providerID
+                )
+                try respondProviderIntegration(
+                    connection,
+                    status: 202,
+                    value: manager.repairProviderIntegration(request)
+                )
+            case .remove(let pathProviderID):
+                let request = try decodeProviderIntegrationMutation(body)
+                try Self.validatePathProviderID(
+                    pathProviderID,
+                    matches: request.providerID
+                )
+                try respondProviderIntegration(
+                    connection,
+                    status: 202,
+                    value: manager.removeProviderIntegration(request)
+                )
+            }
+        } catch let error as ProviderIntegrationError {
+            let failure = Self.providerIntegrationHTTPFailure(error)
+            respondProviderIntegrationFailure(
+                connection,
+                status: failure.status,
+                code: failure.code,
+                message: error.localizedDescription
+            )
+        } catch is DecodingError {
+            respondProviderIntegrationFailure(
+                connection,
+                status: 400,
+                code: "invalid_provider_integration_request",
+                message: "Provider integration request JSON is invalid."
+            )
+        } catch {
+            respondProviderIntegrationFailure(
+                connection,
+                status: 500,
+                code: "provider_integration_failed",
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func dispatchDesktopProviderHook(
+        queryItems: [URLQueryItem],
+        body: Data,
+        connection: NWConnection
+    ) {
+        guard queryItems.isEmpty else {
+            http.respondJSON(connection, status: 400, object: [
+                "ok": false,
+                "code": "invalid_provider_hook_request",
+                "message": "Desktop provider hook requests do not accept query parameters.",
+            ])
+            return
+        }
+        guard body.count <= DesktopProviderHookContract.maximumEnvelopeBytes else {
+            http.respondJSON(connection, status: 413, object: [
+                "ok": false,
+                "code": "provider_hook_body_too_large",
+                "message": "Desktop provider hook input exceeds its bounded envelope size.",
+            ])
+            return
+        }
+        do {
+            let request = try DesktopProviderHookRequest(envelopeData: body)
+            let response = try manager.desktopProviderHookResponse(request)
+            http.respondJSON(
+                connection,
+                status: 200,
+                object: response.asDictionary()
+            )
+        } catch let error as DesktopProviderHookError {
+            http.respondJSON(connection, status: 400, object: [
+                "ok": false,
+                "code": "invalid_provider_hook_request",
+                "message": error.localizedDescription,
+            ])
+        } catch {
+            http.respondJSON(connection, status: 503, object: [
+                "ok": false,
+                "code": "provider_hook_policy_unavailable",
+                "message": "Desktop provider orchestration policy is unavailable.",
+            ])
+        }
+    }
+
+    private func decodeProviderIntegrationMutation(
+        _ body: Data
+    ) throws -> ProviderIntegrationMutationRequest {
+        try Self.validateProviderIntegrationObject(
+            body,
+            requiredKeys: ["expected_revision", "provider_id", "idempotency_key"],
+            allowedKeys: ["expected_revision", "provider_id", "idempotency_key"]
+        )
+        return try JSONDecoder().decode(
+            ProviderIntegrationMutationRequest.self,
+            from: body
+        )
+    }
+
+    private func respondProviderIntegration<Value: Encodable>(
+        _ connection: NWConnection,
+        status: Int,
+        value: Value
+    ) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        http.respondJSON(
+            connection,
+            status: status,
+            object: try JSONSupport.object(from: encoder.encode(value))
+        )
+    }
+
+    private func respondProviderIntegrationFailure(
+        _ connection: NWConnection,
+        status: Int,
+        code: String,
+        message: String
+    ) {
+        http.respondJSON(connection, status: status, object: [
+            "ok": false,
+            "code": code,
+            "message": message,
+            "retryable": status == 503,
+        ])
+    }
+
+    static func providerIntegrationHTTPFailure(
+        _ error: ProviderIntegrationError
+    ) -> (status: Int, code: String) {
+        switch error {
+        case .invalidRequest:
+            (400, "invalid_provider_integration_request")
+        case .providerNotSelectable:
+            (400, "provider_not_selectable")
+        case .revisionConflict:
+            (409, "provider_selection_revision_conflict")
+        case .idempotencyConflict:
+            (409, "provider_idempotency_conflict")
+        case .operationBusy:
+            (409, "provider_operation_busy")
+        case .providerHasNonterminalRuns:
+            (409, "provider_has_nonterminal_runs")
+        case .providerNotReady:
+            (409, "provider_not_ready")
+        case .selectedProviderCannotBeRemoved:
+            (409, "selected_provider_cannot_be_removed")
+        case .operationNotCancellable:
+            (409, "provider_operation_not_cancellable")
+        case .operationNotFound:
+            (404, "provider_operation_not_found")
+        case .adapterUnavailable:
+            (503, "provider_adapter_unavailable")
+        case .invalidAdapterResult:
+            (500, "invalid_provider_adapter_result")
+        case .ledgerCorrupt:
+            (500, "provider_integration_ledger_corrupt")
+        case .persistenceFailed:
+            (500, "provider_integration_persistence_failed")
+        }
+    }
+
+    private static func providerIntegrationRoute(
+        method: String,
+        path: String
+    ) -> ManagerProviderIntegrationRoute? {
+        switch (method, path) {
+        case ("GET", "/api/manager/providers"):
+            return .snapshot
+        case ("PUT", "/api/manager/providers/selection"):
+            return .select
+        default:
+            break
+        }
+
+        let operationPrefix = "/api/manager/provider-operations/"
+        if method == "GET", path.hasPrefix(operationPrefix) {
+            let operationID = String(path.dropFirst(operationPrefix.count))
+            guard !operationID.isEmpty, !operationID.contains("/") else { return nil }
+            return .operation(operationID: operationID)
+        }
+        if method == "POST", path.hasPrefix(operationPrefix), path.hasSuffix("/cancel") {
+            let suffix = String(path.dropFirst(operationPrefix.count))
+            let operationID = String(suffix.dropLast("/cancel".count))
+            guard !operationID.isEmpty, !operationID.contains("/") else { return nil }
+            return .cancel(operationID: operationID)
+        }
+
+        let providerPrefix = "/api/manager/providers/"
+        guard path.hasPrefix(providerPrefix) else { return nil }
+        let suffix = String(path.dropFirst(providerPrefix.count))
+        if method == "POST", suffix.hasSuffix("/repair") {
+            let providerID = String(suffix.dropLast("/repair".count))
+            guard !providerID.isEmpty, !providerID.contains("/") else { return nil }
+            return .repair(pathProviderID: providerID)
+        }
+        if method == "DELETE", suffix.hasSuffix("/integration") {
+            let providerID = String(suffix.dropLast("/integration".count))
+            guard !providerID.isEmpty, !providerID.contains("/") else { return nil }
+            return .remove(pathProviderID: providerID)
+        }
+        return nil
+    }
+
+    private static func validateProviderIntegrationObject(
+        _ body: Data,
+        requiredKeys: Set<String>,
+        allowedKeys: Set<String>
+    ) throws {
+        let object: [String: Any]
+        do {
+            object = try JSONSupport.object(from: body)
+        } catch {
+            throw ProviderIntegrationError.invalidRequest(
+                field: "body",
+                reason: "expected_json_object"
+            )
+        }
+        let keys = Set(object.keys)
+        guard keys.isSuperset(of: requiredKeys), keys.isSubset(of: allowedKeys) else {
+            throw ProviderIntegrationError.invalidRequest(
+                field: "body",
+                reason: "unexpected_or_missing_fields"
+            )
+        }
+    }
+
+    private static func validateEmptyProviderIntegrationObject(_ body: Data) throws {
+        guard body.isEmpty || ((try? JSONSupport.object(from: body))?.isEmpty == true) else {
+            throw ProviderIntegrationError.invalidRequest(
+                field: "body",
+                reason: "cancellation_requires_empty_object"
+            )
+        }
+    }
+
+    private static func validatePathProviderID(
+        _ pathProviderID: String,
+        matches bodyProviderID: ProviderIntegrationID
+    ) throws {
+        guard let parsed = ProviderIntegrationID(rawValue: pathProviderID) else {
+            throw ProviderIntegrationError.invalidRequest(
+                field: "provider_id",
+                reason: "unsupported_path_provider"
+            )
+        }
+        guard parsed == bodyProviderID else {
+            throw ProviderIntegrationError.invalidRequest(
+                field: "provider_id",
+                reason: "path_body_mismatch"
+            )
         }
     }
 

@@ -4,20 +4,33 @@ Instruction packages turn a registered local repository into an ordered work que
 
 ## Setup
 
-1. In LM Studio, load a tool-capable model. Forge can discover or start the
-   local server when **Connect and Check** runs.
+1. Start the provider you intend to use. For LM Studio, load a tool-capable
+   model; its activation toggle runs **Connect and Check** before selection. For
+   Claude Code Desktop or Codex Desktop, start the supported host
+   and complete the exact activation, reload, or trust action reported by its
+   provider card.
 2. In Forge Conductor **Manager**, start the manager if it is stopped.
 3. In **Projects**, register the local repository folder and select it. The
    registration authorizes that exact canonical root without widening access to
    its parent.
 4. Under **Instruction packages**, choose **Add Instructions…** and arrange
    packages by dragging rows.
-5. For an ordinary task, open **Autonomy**, select one or more imported packages,
-   and choose **Start Task**. Forge runs the manager-owned **Connect and Check**
-   preparation and returns one exact Provider action if it cannot choose safely.
-6. To run the whole project queue, first save the Provider model, then choose
-   **Start Ordered Autonomy** in Projects. Endpoint, credential, exact-model,
-   inventory, and probe controls remain under **Advanced connection settings**.
+5. In **Provider**, select and verify exactly one provider. LM Studio requires a
+   current saved model/readiness receipt; desktop providers require a verified
+   integration and retain their host-selected model.
+   Grok Build remains visible but cannot be selected or admit a run in 0.14.0
+   because its documented hook outputs cannot deliver the initial assignment
+   context to the model.
+6. For an ordinary task, open **Autonomy**, select one or more imported packages,
+   and choose **Start Task**. Forge prepares the run against that exact durable
+   provider selection and returns one exact Provider action if it is not ready.
+   A selectable desktop host receives the exact assignment through its hook and
+   must complete the instructed one-time `desktop_run_attach` before any
+   project-scoped Forge tool is available.
+7. To run the whole project queue, choose **Start Ordered Autonomy** in Projects.
+   LM Studio endpoint, credential, exact-model, inventory, and probe controls
+   remain under **LM Studio Advanced**; they are not prerequisites for a
+   desktop-host run.
 
 The question-mark toolbar button opens the same setup sequence inside the app.
 
@@ -92,8 +105,9 @@ Select a `.forgepackage` JSON file, a `forge-package.json` file, or a folder con
 
 The Projects list order is authoritative. Drag rows before starting the queue. Forge persists every order change with a queue revision so concurrent or stale edits fail instead of silently overwriting a newer order.
 
-**Start Ordered Autonomy** requires a saved Provider model and a running managed
-autonomy service. Forge creates a managed run scoped to the registered
+**Start Ordered Autonomy** requires one selected, verified provider and a
+running managed autonomy service. LM Studio requires its exact saved model;
+desktop providers use the model chosen by their host. Forge creates a managed run scoped to the registered
 repository root, package project UUID, and current project generation. It
 advances to the next queued package only after the current package reaches
 `completed`. A failed, cancelled, paused, or configuration-blocked run stops

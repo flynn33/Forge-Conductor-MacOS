@@ -85,6 +85,22 @@ protocol OperatorManagerClientProtocol: Sendable {
     func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
     func providerModels() async throws -> ProviderModelInventory
     func prepareProvider() async throws -> ManagerProviderPreparationResult
+    func providerIntegrations() async throws -> ProviderIntegrationsSnapshot
+    func updateProviderSelection(
+        _ request: ProviderSelectionRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot
+    func providerOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot
+    func cancelProviderOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot
+    func repairProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot
+    func removeProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -116,6 +132,52 @@ extension OperatorManagerClientProtocol {
     func prepareProvider() async throws -> ManagerProviderPreparationResult {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Automatic provider preparation is unavailable from this manager client."
+        )
+    }
+
+    func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Provider selection is unavailable from this manager client."
+        )
+    }
+
+    func updateProviderSelection(
+        _ request: ProviderSelectionRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Provider selection is unavailable from this manager client."
+        )
+    }
+
+    func providerOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Provider setup status is unavailable from this manager client."
+        )
+    }
+
+    func cancelProviderOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Provider setup cancellation is unavailable from this manager client."
+        )
+    }
+
+    func repairProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Provider integration repair is unavailable from this manager client."
+        )
+    }
+
+    func removeProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Provider integration removal is unavailable from this manager client."
         )
     }
 
@@ -319,6 +381,76 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             path: "/api/manager/provider/prepare",
             body: EmptyProviderPreparationBody(),
             unavailableMessage: "Automatic provider preparation is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 45
+        )
+    }
+
+    func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
+        try await request(
+            method: "GET",
+            path: "/api/manager/providers",
+            unavailableMessage: "Provider selection is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 25
+        )
+    }
+
+    func updateProviderSelection(
+        _ selection: ProviderSelectionRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await request(
+            method: "PUT",
+            path: "/api/manager/providers/selection",
+            body: selection,
+            unavailableMessage: "Provider selection is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 45
+        )
+    }
+
+    func providerOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        let identifier = try validatedProviderOperationID(operationID)
+        return try await request(
+            method: "GET",
+            path: "/api/manager/provider-operations/\(identifier)",
+            unavailableMessage: "Provider setup status is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 12
+        )
+    }
+
+    func cancelProviderOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        let identifier = try validatedProviderOperationID(operationID)
+        return try await request(
+            method: "POST",
+            path: "/api/manager/provider-operations/\(identifier)/cancel",
+            body: EmptyProviderPreparationBody(),
+            unavailableMessage: "Provider setup cancellation is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 18
+        )
+    }
+
+    func repairProviderIntegration(
+        _ mutation: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await request(
+            method: "POST",
+            path: "/api/manager/providers/\(mutation.providerID.rawValue)/repair",
+            body: mutation,
+            unavailableMessage: "Provider integration repair is unavailable. Update or restart the manager from this build.",
+            timeoutInterval: 45
+        )
+    }
+
+    func removeProviderIntegration(
+        _ mutation: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await request(
+            method: "DELETE",
+            path: "/api/manager/providers/\(mutation.providerID.rawValue)/integration",
+            body: mutation,
+            unavailableMessage: "Provider integration removal is unavailable. Update or restart the manager from this build.",
             timeoutInterval: 45
         )
     }
@@ -1043,6 +1175,25 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         )
     }
 
+    private func validatedProviderOperationID(_ value: String) throws -> String {
+        let bytes = Array(value.utf8)
+        guard !bytes.isEmpty,
+              bytes.count <= ProviderIntegrationContract.maximumOperationIDBytes,
+              bytes.allSatisfy({ byte in
+                  (48...57).contains(byte)
+                      || (65...90).contains(byte)
+                      || (97...122).contains(byte)
+                      || byte == 45
+                      || byte == 46
+                      || byte == 95
+              }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "provider operation identifier contains unsupported path characters"
+            )
+        }
+        return value
+    }
+
     private func request<Response: Decodable>(
         method: String,
         path: String,
@@ -1226,6 +1377,22 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
         throw error
     }
     func providerModels() async throws -> ProviderModelInventory { throw error }
+    func providerIntegrations() async throws -> ProviderIntegrationsSnapshot { throw error }
+    func updateProviderSelection(
+        _ request: ProviderSelectionRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot { throw error }
+    func providerOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot { throw error }
+    func cancelProviderOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot { throw error }
+    func repairProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot { throw error }
+    func removeProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot { throw error }
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -1487,6 +1654,40 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 
     func prepareProvider() async throws -> ManagerProviderPreparationResult {
         try await current.prepareProvider()
+    }
+
+    func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
+        try await current.providerIntegrations()
+    }
+
+    func updateProviderSelection(
+        _ request: ProviderSelectionRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await current.updateProviderSelection(request)
+    }
+
+    func providerOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await current.providerOperation(operationID: operationID)
+    }
+
+    func cancelProviderOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await current.cancelProviderOperation(operationID: operationID)
+    }
+
+    func repairProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await current.repairProviderIntegration(request)
+    }
+
+    func removeProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        try await current.removeProviderIntegration(request)
     }
 
     func probeProvider(

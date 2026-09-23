@@ -500,6 +500,36 @@ public final class ProjectContextService: @unchecked Sendable {
         }
     }
 
+    func attachDesktopProviderMCPClient(
+        _ request: DesktopProviderMCPAttachmentRequest,
+        clientID: ClientID,
+        launchProviderID: ProviderIntegrationID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        try wait(cancellation: cancellation, committedResultWins: true) { control in
+            try await self.repository.attachDesktopProviderMCPClient(
+                request,
+                clientID: clientID,
+                launchProviderID: launchProviderID,
+                cancellation: control
+            )
+        }
+    }
+
+    func desktopProviderMCPAttachmentContext(
+        clientID: ClientID,
+        launchProviderID: ProviderIntegrationID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try await self.repository.desktopProviderMCPAttachmentContext(
+                clientID: clientID,
+                launchProviderID: launchProviderID,
+                cancellation: control
+            )
+        }
+    }
+
     public func invocationContext(
         for clientID: ClientID,
         cancellation: ToolCallCancellation? = nil

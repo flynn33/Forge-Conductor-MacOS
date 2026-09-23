@@ -492,6 +492,148 @@ final class OperatorProjectContractTests: XCTestCase {
     }
 
     @MainActor
+    func testDesktopProviderStartSkipsLMPreparationAndSubmitsExactRun() async throws {
+        let projectID = UUID().uuidString.lowercased()
+        let project = try XCTUnwrap(JSONSerialization.jsonObject(with: Self.projectData(
+            projectID: projectID,
+            generation: 1,
+            root: "/tmp/operator-desktop-provider",
+            resetPriorGeneration: 0
+        )) as? [String: Any])
+        let mission = "Run this task through the selected Codex desktop integration."
+        let digest = String(repeating: "6", count: 64)
+        let bootstrap = "Follow the run instruction artifact. Snapshot: \(digest)"
+        let selectionRevision = "fixture-codex-selection-revision"
+        OperatorProjectContractURLProtocol.configure(
+            responses: [
+                "/api/manager/operator/snapshot": try JSONSupport.data(from: [
+                    "projects": [project],
+                    "runs": [],
+                    "provider": [
+                        "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                        "provider_id": "lmstudio",
+                        "health": "unavailable",
+                    ],
+                    "run_preparation": [
+                        "state": "ready",
+                        "provider_id": ProviderIntegrationID.codexDesktop.rawValue,
+                        "adapter_id": "forge.desktop-plugin.codex-desktop",
+                        "model_key": "host-selected",
+                        "schema_version": 1,
+                        "provider_configuration_revision": selectionRevision,
+                        "tool_catalog_revision": String(repeating: "a", count: 64),
+                        "allowed_tools": ["instruction_catalog", "instruction_read"],
+                        "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                        "network_allowed": false,
+                    ],
+                ]),
+                "/api/manager/autonomy/status": try JSONSupport.data(from: [
+                    "started": true,
+                    "active_run_ids": [],
+                    "deferred_run_ids": [],
+                ]),
+                "/api/manager/provider/prepare": try JSONSupport.data(from: [
+                    "ok": false,
+                    "code": "provider_connection_failed",
+                    "message": "LM Studio is unavailable.",
+                ]),
+                "/api/manager/runs/instruction-artifacts/import": try JSONSupport.data(from: [
+                    "ok": true,
+                    "run_id": "__REQUEST_RUN_ID__",
+                    "project_id": projectID,
+                    "project_generation": UInt64(1),
+                    "mission": bootstrap,
+                    "source_path": "/private/tmp/desktop-provider-instructions.txt",
+                    "content_sha256": digest,
+                    "document_count": 1,
+                    "instruction_byte_count": mission.utf8.count,
+                    "unresolved_document_count": 0,
+                    "created_at": "2026-09-23T00:00:00Z",
+                ]),
+                "/api/manager/runs/prepare": try Self.preparedArtifactRunData(
+                    projectID: projectID,
+                    generation: 1,
+                    snapshotSHA256: digest,
+                    providerConfigurationRevision: selectionRevision,
+                    modelKey: "host-selected",
+                    allowedTools: ["instruction_catalog", "instruction_read"],
+                    providerID: ProviderIntegrationID.codexDesktop.rawValue,
+                    adapterID: "forge.desktop-plugin.codex-desktop"
+                ),
+                "/api/manager/runs/start": try JSONSupport.data(from: [
+                    "run_id": "__REQUEST_RUN_ID__",
+                    "project_id": projectID,
+                    "project_generation": UInt64(1),
+                    "mission": bootstrap,
+                    "state": "created",
+                    "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
+                    "provider_id": ProviderIntegrationID.codexDesktop.rawValue,
+                    "adapter_id": "forge.desktop-plugin.codex-desktop",
+                    "model_key": "host-selected",
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "passed_gates": [],
+                ]),
+            ],
+            statuses: ["/api/manager/provider/prepare": 502]
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let viewModel = AutonomyViewModel(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        ))
+
+        viewModel.load()
+        try await Self.waitUntilIdle(viewModel)
+        XCTAssertTrue(viewModel.usesDesktopProviderPreparation)
+        XCTAssertNil(viewModel.providerPrerequisiteMessage)
+        XCTAssertEqual(viewModel.guidedHelpState.status, "Ready for a task")
+        XCTAssertFalse(
+            viewModel.guidedHelpState.detail.localizedCaseInsensitiveContains("LM Studio")
+        )
+        viewModel.mission = mission
+        let request = try XCTUnwrap(viewModel.makeStartRequest())
+        XCTAssertNil(request.providerID)
+        XCTAssertNil(request.adapterID)
+        XCTAssertNil(request.modelKey)
+
+        viewModel.startRun()
+        try await Self.waitUntilStartIdle(viewModel)
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertNotNil(viewModel.lastStartedRunID)
+        let startedRun = try XCTUnwrap(viewModel.runs.first)
+        let technical = viewModel.providerTechnicalPresentation(for: startedRun)
+        XCTAssertEqual(technical.label, "Provider execution")
+        XCTAssertEqual(technical.state, "host_managed")
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/provider/prepare"
+            ).count,
+            0
+        )
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/prepare"
+            ).count,
+            1
+        )
+        let startBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/runs/start"
+        )
+        XCTAssertEqual(startBodies.count, 1)
+        let submittedStart = try JSONSupport.object(from: try XCTUnwrap(startBodies.first))
+        XCTAssertEqual(
+            submittedStart["expected_provider_configuration_revision"] as? String,
+            selectionRevision
+        )
+    }
+
+    @MainActor
     func testQuickPasteAndSelectedOrDroppedSourceUseArtifactReferenceBeforePrepareAndStart() async throws {
         let projectID = UUID().uuidString.lowercased()
         let project = try XCTUnwrap(
@@ -1647,7 +1789,9 @@ final class OperatorProjectContractTests: XCTestCase {
         modelKey: String = "fixture/artifact-model",
         allowedTools: [String] = ["instruction_catalog", "instruction_read"],
         completionGates: [String] = [ProjectInstructionQueueStore.builtInCompletionGate],
-        networkAllowed: Bool = false
+        networkAllowed: Bool = false,
+        providerID: String = ProviderIntegrationID.lmStudio.rawValue,
+        adapterID: String = ManagerNode.nativeSessionHostAdapterID
     ) throws -> Data {
         let descriptor = try ManagerPreparedRunDescriptor.make(
             detail: "The exact artifact-backed run inputs are ready.",
@@ -1663,8 +1807,8 @@ final class OperatorProjectContractTests: XCTestCase {
                 byteCount: 52_000,
                 sha256: String(repeating: "d", count: 64)
             )],
-            providerID: "lmstudio",
-            adapterID: ManagerNode.nativeSessionHostAdapterID,
+            providerID: providerID,
+            adapterID: adapterID,
             modelKey: modelKey,
             providerConfigurationRevision: providerConfigurationRevision,
             toolCatalogRevision: String(repeating: "a", count: 64),

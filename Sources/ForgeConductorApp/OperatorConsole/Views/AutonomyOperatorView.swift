@@ -85,9 +85,8 @@ struct AutonomyOperatorView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("autonomy-project-prerequisite")
-                    } else if viewModel.provider?.health != "reachable"
-                                && viewModel.provider?.health != "contract_valid" {
-                        Text("Authorize the project folder in Manager, then save the LM Studio endpoint and loaded model in Provider and run Test Connection.")
+                    } else if let prerequisite = viewModel.providerPrerequisiteMessage {
+                        Text(prerequisite)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("autonomy-provider-prerequisite")
@@ -346,8 +345,9 @@ struct AutonomyOperatorView: View {
                     LabeledContent("Project generation", value: "\(run.projectGeneration)")
                     LabeledContent("Assignment ID") { OperatorIdentifier(run.assignmentID) }
                     LabeledContent("Provider", value: run.providerID ?? "Unavailable")
-                    LabeledContent("Provider health") {
-                        OperatorStateBadge(state: viewModel.provider?.health ?? "unavailable")
+                    let providerPresentation = viewModel.providerTechnicalPresentation(for: run)
+                    LabeledContent(providerPresentation.label) {
+                        OperatorStateBadge(state: providerPresentation.state)
                     }
                     LabeledContent("Adapter", value: run.adapterID ?? "Unavailable")
                     LabeledContent("Model", value: run.modelKey ?? "Unavailable")

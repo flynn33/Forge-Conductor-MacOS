@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.13.0**, build **5**. `VERSION` and
+Product identity: marketing version **0.14.0**, build **6**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -458,6 +458,32 @@ The Core target includes the provider configuration contract and native LM Studi
 configuration service. Service/store tests run in `ForgeConductorTests`; native
 HTTP-client and manager-route tests run in `ForgeConductorAppTests`.
 
+The 0.14.0 provider slice adds six explicit `ForgeConductorCore` source members:
+`DesktopProviderHookBridge.swift`, `ProviderIntegrationAdapters.swift`,
+`ProviderIntegrationCoordinator.swift`, `DesktopProviderHookModels.swift`,
+`ProviderIntegrationModels.swift`, and `DesktopProviderPluginInstaller.swift`.
+Its four Core test members are `DesktopProviderHookBridgeTests.swift`,
+`DesktopProviderPluginInstallerTests.swift`,
+`ManagerProviderIntegrationRoutesTests.swift`, and
+`ProviderIntegrationCoordinatorTests.swift`. Each file must remain in the
+canonical target's PBX sources phase; SwiftPM's path-based discovery is not
+evidence that the Xcode app or test target compiles it. The generated desktop
+package manifests and configuration are Swift-owned runtime content, not bundle
+resources or a new copy-files phase.
+
+The provider-specific MCP attachment implementation remains in existing Core
+members (`ForgeProcessEntry.swift`, `MCPServer.swift`, project-context models,
+service, and repository). Its end-to-end protocol and lifecycle cases extend
+the existing `MCPProtocolAndDiagnosticsTests.swift` member, so no additional
+PBX source entry is required for that coverage.
+
+This target membership does not make every descriptor selectable. In 0.14.0,
+LM Studio, Claude Code Desktop, and Codex Desktop are selectable. Grok Build is
+compiled into the compatibility/cleanup surface but remains non-selectable
+because its documented startup and prompt hook outputs cannot deliver Forge's
+initial assignment context to the model; neither an Xcode build nor a staged
+Grok package is a run-readiness claim.
+
 The 0.13.0 operator workflow changes remain in existing canonical target
 members: the Dashboard title-bar wizard is owned by the app's `ContentView` and
 `RigDashboardView`; Provider local-server recovery is in the native session-host
@@ -466,7 +492,7 @@ plus the existing Autonomy views; Continuity layout is in its existing operator
 view; and Doctor role inspection is in Core plus Manager Settings. No parallel
 project, generated UI target, or replacement app shell is introduced. Build and
 test evidence for this source revision must be recorded after running the
-canonical commands; older 0.12.0 receipts do not qualify it.
+canonical commands; older receipts do not qualify the 0.14.0 provider slice.
 
 `ProductionOnboardingUITests` is in the native UI target and uses the actual
 folder panel and normal app bootstrap. The UI target now links the existing

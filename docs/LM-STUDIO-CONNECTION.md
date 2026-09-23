@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.13.0**, build **5**. This connection document does
+Product identity: version **0.14.0**, build **6**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -20,15 +20,24 @@ Forge-managed sessions use a separate Foundation-native HTTP transport in the
 native session-host plugin; the stdio registration below serves externally
 owned LM Studio chats.
 
-### Process entry (one binary, three modes)
+### Process entry (one binary, four modes)
 
 | Argv | Mode |
 |------|------|
 | _(none)_ | GUI |
 | `serve` / `mcp` / `mcp-serve` | Stdio MCP (`ForgeProcessEntry` → `MCPServer`) |
 | `manager run [--home …] [--open]` | Dashboard manager (LaunchAgent path) |
+| `provider-hook <provider> <event> --home …` | Internal bounded desktop-host hook bridge; not an interactive operator command |
 
 ## Native managed-run setup
+
+Turn on **LM Studio** in Provider before preparing new LM Studio work. The
+mutually exclusive activation toggle runs the manager-owned **Connect and
+Check** workflow, verifies the transactional MCP deployment and exact saved
+model contract, and commits the durable `lmstudio` selection only after that
+readiness succeeds. Selecting a desktop host instead does not reuse this HTTP
+model path; see
+[Provider integrations](PROVIDER-INTEGRATIONS.md).
 
 The native Provider screen saves the LM Studio server origin and an exact model
 key. Saving is durable and does not prove the server is reachable. With a saved

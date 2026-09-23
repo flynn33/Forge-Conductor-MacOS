@@ -12,6 +12,11 @@ enum ToolCheckboxState: Equatable {
     case checked
 }
 
+struct AutonomyProviderTechnicalPresentation: Equatable {
+    let label: String
+    let state: String
+}
+
 @MainActor
 final class AutonomyViewModel: ObservableObject {
     @Published private(set) var runs: [OperatorRun] = []
@@ -30,7 +35,7 @@ final class AutonomyViewModel: ObservableObject {
     @Published private(set) var instructionSourcePath: String?
     @Published var assignmentID = ""
     @Published var providerID = ""
-    @Published var adapterID = "forge.native-session-host"
+    @Published var adapterID = ""
     @Published var modelKey = ""
     @Published var modelOverrideKey = ""
     @Published var allowedTools = ""
@@ -64,6 +69,46 @@ final class AutonomyViewModel: ObservableObject {
 
     var selectedRun: OperatorRun? { runs.first { $0.runID == selectedRunID } }
     var selectedProject: OperatorProject? { projects.first { $0.projectID == selectedProjectID } }
+    var usesDesktopProviderPreparation: Bool {
+        guard let providerID = runPreparation?.providerID,
+              let identifier = ProviderIntegrationID(rawValue: providerID),
+              let descriptor = ProviderIntegrationDescriptor.supported.first(where: {
+                  $0.id == identifier
+              }) else { return false }
+        return descriptor.executionStrategy == .desktopPluginPull
+    }
+
+    var providerPrerequisiteMessage: String? {
+        if usesDesktopProviderPreparation {
+            guard runPreparation?.state == "ready" else {
+                return runPreparation?.detail
+                    ?? "Repair the selected desktop provider integration in Provider before starting this task."
+            }
+            return nil
+        }
+        guard provider?.health != "reachable", provider?.health != "contract_valid" else {
+            return nil
+        }
+        return "Authorize the project folder in Manager, then save the LM Studio endpoint and loaded model in Provider and choose Connect and Check."
+    }
+
+    func providerTechnicalPresentation(
+        for run: OperatorRun
+    ) -> AutonomyProviderTechnicalPresentation {
+        if let providerID = run.providerID,
+           let identifier = ProviderIntegrationID(rawValue: providerID),
+           ProviderIntegrationDescriptor.supported.first(where: { $0.id == identifier })?
+            .executionStrategy == .desktopPluginPull {
+            return AutonomyProviderTechnicalPresentation(
+                label: "Provider execution",
+                state: "host_managed"
+            )
+        }
+        return AutonomyProviderTechnicalPresentation(
+            label: "Provider health",
+            state: provider?.health ?? "unavailable"
+        )
+    }
     var preparedCompletionPlan: AutomaticCompletionPlan? {
         projectRunPreparation?.descriptor?.validationPlan.automaticPlan
     }
@@ -500,7 +545,9 @@ final class AutonomyViewModel: ObservableObject {
                     do {
                         if admittedRequest.providerID == nil,
                            admittedRequest.adapterID == nil,
-                           admittedRequest.modelKey == nil {
+                           admittedRequest.modelKey == nil,
+                           (runPreparation?.providerID == nil
+                            || runPreparation?.providerID == ProviderIntegrationID.lmStudio.rawValue) {
                             do {
                                 let providerPreparation = try await client.prepareProvider()
                                 guard providerPreparation.state == .ready else {

@@ -2,7 +2,7 @@
 
 Start with the shortest document that answers the question. Historical evidence
 is retained for auditability, but it is not current operating guidance. Current
-operating documents describe repository identity **0.13.0, build 5** unless a
+operating documents describe repository identity **0.14.0, build 6** unless a
 source-bound historical receipt says otherwise.
 
 ## Use and setup
@@ -12,6 +12,7 @@ source-bound historical receipt says otherwise.
 | [User guide](../USER-GUIDE.md) | Install, configure, and operate Forge Conductor |
 | [Xcode guide](../XCODE.md) | Build, test, archive, sign, and inspect the native app |
 | [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow the ordered project-run wizard or open contextual offline help |
+| [Provider integrations](PROVIDER-INTEGRATIONS.md) | Select LM Studio, Claude, or Codex; inspect, repair, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect the managed provider; deploy, inspect, and repair LM Studio MCP roles |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Queue ordered project work |
 | [Native completion](NATIVE-COMPLETION.md) | Distinguish automatic checks from explicit custom native gates |

@@ -1077,6 +1077,640 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
     }
 }
 
+final class DesktopProviderMCPAttachmentTests: XCTestCase {
+    func testHookAttachmentUnlocksOnlyFrozenRunToolsEndToEnd() async throws {
+        try await withFixture { fixture in
+            let arguments = try await claim(
+                fixture,
+                runtime: fixture.runtime,
+                sessionID: "codex-session-e2e"
+            )
+            let token = try XCTUnwrap(arguments["attachment_token"] as? String)
+            let runBindingValue = try await fixture.app.projectContexts.repository.binding(
+                for: ProjectBindingOwner(
+                    kind: .autonomousRun,
+                    id: fixture.runID.description
+                )
+            )
+            let runBinding = try XCTUnwrap(runBindingValue)
+            XCTAssertNotNil(runBinding.leaseOwner)
+            XCTAssertFalse(runBinding.leaseOwner?.contains(token) == true)
+
+            let generic = MCPServer(
+                app: fixture.app,
+                clientID: ClientID("generic-serve-client")
+            )
+            XCTAssertEqual(
+                try toolPayload(generic, name: "desktop_run_attach", arguments: arguments)["code"] as? String,
+                "tool_not_allowed"
+            )
+
+            let clientID = ClientID("desktop-e2e-client")
+            let server = MCPServer(
+                app: fixture.app,
+                clientID: clientID,
+                desktopProviderID: .codexDesktop
+            )
+            let initialize = try response(server, method: "initialize", params: [
+                "protocolVersion": "2025-11-25",
+            ])
+            let initializeResult = try XCTUnwrap(initialize["result"] as? [String: Any])
+            let serverInfo = try XCTUnwrap(initializeResult["serverInfo"] as? [String: Any])
+            XCTAssertEqual(serverInfo["name"] as? String, "forge-conductor-codex-desktop")
+            let capabilities = try XCTUnwrap(
+                initializeResult["capabilities"] as? [String: Any]
+            )
+            let attachmentCapability = try XCTUnwrap(
+                capabilities["desktopRunAttachment"] as? [String: Any]
+            )
+            XCTAssertEqual(attachmentCapability["providerID"] as? String, "codex-desktop")
+            XCTAssertEqual(attachmentCapability["requiredBeforeTools"] as? Bool, true)
+
+            let listed = try response(server, method: "tools/list")
+            let listedResult = try XCTUnwrap(listed["result"] as? [String: Any])
+            let toolNames = Set(
+                (try XCTUnwrap(listedResult["tools"] as? [[String: Any]]))
+                    .compactMap { $0["name"] as? String }
+            )
+            XCTAssertTrue(toolNames.isSuperset(of: [
+                "desktop_run_attach", "instruction_catalog", "instruction_read",
+                "fs_read", "fs_write",
+            ]))
+
+            XCTAssertEqual(
+                try toolPayload(
+                    server,
+                    name: "instruction_catalog",
+                    arguments: ["snapshot_sha256": fixture.snapshotSHA256]
+                )["code"] as? String,
+                "desktop_attachment_required"
+            )
+
+            let attached = try toolPayload(
+                server,
+                name: "desktop_run_attach",
+                arguments: arguments
+            )
+            XCTAssertEqual(attached["attached"] as? Bool, true)
+            XCTAssertEqual(attached["run_id"] as? String, fixture.runID.description)
+            XCTAssertNil(attached["attachment_token"])
+            let consumedBindingValue = try await fixture.app.projectContexts.repository.binding(
+                for: ProjectBindingOwner(
+                    kind: .autonomousRun,
+                    id: fixture.runID.description
+                )
+            )
+            let consumedBinding = try XCTUnwrap(consumedBindingValue)
+            XCTAssertEqual(consumedBinding.bindingID, runBinding.bindingID)
+            XCTAssertEqual(consumedBinding.projectID, runBinding.projectID)
+            XCTAssertEqual(consumedBinding.projectGeneration, runBinding.projectGeneration)
+            XCTAssertEqual(consumedBinding.runID, runBinding.runID)
+            XCTAssertEqual(consumedBinding.authorizationScope, runBinding.authorizationScope)
+            XCTAssertNil(consumedBinding.leaseOwner)
+            XCTAssertNil(consumedBinding.leaseExpiresAt)
+
+            let catalog = try toolPayload(
+                server,
+                name: "instruction_catalog",
+                arguments: ["snapshot_sha256": fixture.snapshotSHA256]
+            )
+            XCTAssertEqual(catalog["ok"] as? Bool, true)
+            let documents = try XCTUnwrap(catalog["documents"] as? [[String: Any]])
+            let documentID = try XCTUnwrap(documents.first?["id"] as? String)
+            let document = try toolPayload(
+                server,
+                name: "instruction_read",
+                arguments: [
+                    "snapshot_sha256": fixture.snapshotSHA256,
+                    "document_id": documentID,
+                ]
+            )
+            XCTAssertEqual(document["ok"] as? Bool, true)
+            XCTAssertTrue(
+                (document["content"] as? String)?.contains("attachment fixture") == true
+            )
+
+            let read = try toolPayload(
+                server,
+                name: "fs_read",
+                arguments: ["path": fixture.instructionSource.path]
+            )
+            XCTAssertEqual(read["ok"] as? Bool, true)
+            let forbiddenURL = fixture.projectRoot.appendingPathComponent("forbidden.txt")
+            let forbidden = try toolPayload(
+                server,
+                name: "fs_write",
+                arguments: ["path": forbiddenURL.path, "content": "must not be written"]
+            )
+            XCTAssertEqual(forbidden["code"] as? String, "tool_not_granted")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: forbiddenURL.path))
+        }
+    }
+
+    func testAttachmentRejectsWrongRoleScopeReplayConflictAndExpiry() async throws {
+        try await withFixture { fixture in
+            XCTAssertEqual(
+                try ForgeProcessEntry.desktopProviderID(inServeArguments: [
+                    "serve", "--desktop-provider", "codex-desktop",
+                ]),
+                .codexDesktop
+            )
+            XCTAssertNil(try ForgeProcessEntry.desktopProviderID(inServeArguments: ["serve"]))
+            XCTAssertThrowsError(try ForgeProcessEntry.desktopProviderID(inServeArguments: [
+                "serve", "--desktop-provider", "codex-desktop",
+                "--desktop-provider", "claude-desktop",
+            ]))
+            XCTAssertThrowsError(try ForgeProcessEntry.desktopProviderID(inServeArguments: [
+                "serve", "--desktop-provider", "lmstudio",
+            ]))
+
+            let original = try await claim(
+                fixture,
+                runtime: fixture.runtime,
+                sessionID: "identity-session"
+            )
+            let wrongRole = MCPServer(
+                app: fixture.app,
+                clientID: ClientID("wrong-provider-role"),
+                desktopProviderID: .claudeDesktop
+            )
+            XCTAssertEqual(
+                try toolPayload(wrongRole, name: "desktop_run_attach", arguments: original)["code"] as? String,
+                "tool_not_allowed"
+            )
+
+            let verifier = MCPServer(
+                app: fixture.app,
+                clientID: ClientID("identity-verifier"),
+                desktopProviderID: .codexDesktop
+            )
+            var wrongSession = original
+            wrongSession["session_sha256"] = String(repeating: "a", count: 64)
+            XCTAssertEqual(
+                try toolPayload(verifier, name: "desktop_run_attach", arguments: wrongSession)["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+            var wrongProject = original
+            wrongProject["project_id"] = ProjectID().description
+            XCTAssertEqual(
+                try toolPayload(verifier, name: "desktop_run_attach", arguments: wrongProject)["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+            var wrongRun = original
+            wrongRun["run_id"] = RunID().description
+            XCTAssertEqual(
+                try toolPayload(verifier, name: "desktop_run_attach", arguments: wrongRun)["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+            var wrongDeployment = original
+            wrongDeployment["deployment_id"] = "different-deployment"
+            XCTAssertEqual(
+                try toolPayload(verifier, name: "desktop_run_attach", arguments: wrongDeployment)["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+            var extraField = original
+            extraField["unexpected"] = true
+            XCTAssertEqual(
+                try toolPayload(verifier, name: "desktop_run_attach", arguments: extraField)["code"] as? String,
+                "desktop_attachment_invalid"
+            )
+
+            let currentRunValue = try await fixture.app.projectContexts.repository.autonomousRun(
+                fixture.runID
+            )
+            let currentRun = try XCTUnwrap(currentRunValue)
+            let conflictID = ClientID("prebound-conflicting-client")
+            _ = try await fixture.app.projectContexts.repository.bind(
+                owner: ProjectBindingOwner(kind: .mcpClient, id: conflictID.rawValue),
+                projectID: currentRun.projectID,
+                generation: currentRun.projectGeneration,
+                authorizationScope: fixture.authorizationScope
+            )
+            let conflictServer = MCPServer(
+                app: fixture.app,
+                clientID: conflictID,
+                desktopProviderID: .codexDesktop
+            )
+            XCTAssertEqual(
+                try toolPayload(conflictServer, name: "desktop_run_attach", arguments: original)["code"] as? String,
+                "desktop_attachment_conflict"
+            )
+
+            XCTAssertEqual(
+                try toolPayload(verifier, name: "desktop_run_attach", arguments: original)["attached"] as? Bool,
+                true
+            )
+            let replay = MCPServer(
+                app: fixture.app,
+                clientID: ClientID("replay-client"),
+                desktopProviderID: .codexDesktop
+            )
+            XCTAssertEqual(
+                try toolPayload(replay, name: "desktop_run_attach", arguments: original)["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+
+            let superseded = try await claim(
+                fixture,
+                runtime: fixture.runtime,
+                sessionID: "identity-session",
+                event: .userPromptSubmit
+            )
+            let fresh = try await claim(
+                fixture,
+                runtime: fixture.runtime,
+                sessionID: "identity-session",
+                event: .userPromptSubmit
+            )
+            XCTAssertNotEqual(
+                superseded["attachment_token"] as? String,
+                fresh["attachment_token"] as? String
+            )
+            XCTAssertEqual(
+                try toolPayload(
+                    MCPServer(
+                        app: fixture.app,
+                        clientID: ClientID("superseded-client"),
+                        desktopProviderID: .codexDesktop
+                    ),
+                    name: "desktop_run_attach",
+                    arguments: superseded
+                )["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+            XCTAssertEqual(
+                try toolPayload(
+                    MCPServer(
+                        app: fixture.app,
+                        clientID: ClientID("fresh-client"),
+                        desktopProviderID: .codexDesktop
+                    ),
+                    name: "desktop_run_attach",
+                    arguments: fresh
+                )["attached"] as? Bool,
+                true
+            )
+
+            let expiring = try await claim(
+                fixture,
+                runtime: fixture.runtime,
+                sessionID: "identity-session",
+                event: .userPromptSubmit
+            )
+            fixture.clock.date.addTimeInterval(
+                DesktopProviderMCPAttachmentContract.capabilityLifetime + 1
+            )
+            XCTAssertEqual(
+                try toolPayload(
+                    MCPServer(
+                        app: fixture.app,
+                        clientID: ClientID("expired-client"),
+                        desktopProviderID: .codexDesktop
+                    ),
+                    name: "desktop_run_attach",
+                    arguments: expiring
+                )["code"] as? String,
+                "desktop_attachment_rejected"
+            )
+        }
+    }
+
+    func testAttachmentBindingsRemainBoundedAcrossRestartReclaimsAndTerminalState() async throws {
+        try await withFixture { fixture in
+            let initial = try await claim(
+                fixture,
+                runtime: fixture.runtime,
+                sessionID: "interrupted-session"
+            )
+            let interruptedServer = MCPServer(
+                app: fixture.app,
+                clientID: ClientID("interrupted-client"),
+                desktopProviderID: .codexDesktop
+            )
+            XCTAssertEqual(
+                try toolPayload(interruptedServer, name: "desktop_run_attach", arguments: initial)["attached"] as? Bool,
+                true
+            )
+            let initialBindingCount = try await fixture.app.projectContexts.repository
+                .desktopProviderMCPBindingCount(runID: fixture.runID)
+            XCTAssertEqual(initialBindingCount, 1)
+
+            await fixture.runtime.shutdown()
+            let restarted = try ManagedAutonomyRuntime(
+                app: fixture.app,
+                registry: HostAdapterRegistry(),
+                maximumConcurrentRuns: 1
+            )
+            _ = try await restarted.start()
+            do {
+                let restartBindingCount = try await fixture.app.projectContexts.repository
+                    .desktopProviderMCPBindingCount(runID: fixture.runID)
+                XCTAssertEqual(restartBindingCount, 0)
+                XCTAssertEqual(
+                    try toolPayload(
+                        interruptedServer,
+                        name: "fs_read",
+                        arguments: ["path": fixture.instructionSource.path]
+                    )["code"] as? String,
+                    "desktop_attachment_required"
+                )
+
+                for index in 0..<12 {
+                    let sessionID = "reclaimed-session-\(index)"
+                    let arguments = try await claim(
+                        fixture,
+                        runtime: restarted,
+                        sessionID: sessionID
+                    )
+                    let server = MCPServer(
+                        app: fixture.app,
+                        clientID: ClientID("reclaimed-client-\(index)"),
+                        desktopProviderID: .codexDesktop
+                    )
+                    XCTAssertEqual(
+                        try toolPayload(
+                            server,
+                            name: "desktop_run_attach",
+                            arguments: arguments
+                        )["attached"] as? Bool,
+                        true
+                    )
+                    let attachedBindingCount = try await fixture.app.projectContexts.repository
+                        .desktopProviderMCPBindingCount(runID: fixture.runID)
+                    XCTAssertEqual(attachedBindingCount, 1)
+                    _ = try await restarted.handleDesktopProviderHook(
+                        try Self.hookRequest(
+                            event: .sessionEnd,
+                            sessionID: sessionID,
+                            cwd: fixture.projectRoot.path
+                        ),
+                        selectionRevision: fixture.selectionRevision
+                    )
+                    let endedBindingCount = try await fixture.app.projectContexts.repository
+                        .desktopProviderMCPBindingCount(runID: fixture.runID)
+                    XCTAssertEqual(endedBindingCount, 0)
+                }
+
+                let terminalArguments = try await claim(
+                    fixture,
+                    runtime: restarted,
+                    sessionID: "terminal-session"
+                )
+                let terminalServer = MCPServer(
+                    app: fixture.app,
+                    clientID: ClientID("terminal-client"),
+                    desktopProviderID: .codexDesktop
+                )
+                XCTAssertEqual(
+                    try toolPayload(
+                        terminalServer,
+                        name: "desktop_run_attach",
+                        arguments: terminalArguments
+                    )["attached"] as? Bool,
+                    true
+                )
+                let runValue = try await fixture.app.projectContexts.repository.autonomousRun(
+                    fixture.runID
+                )
+                var run = try XCTUnwrap(runValue)
+                let lease = try await fixture.app.projectContexts.repository.acquireRunLease(
+                    runID: fixture.runID,
+                    ownerID: "attachment-terminal-test"
+                )
+                run = try await fixture.app.projectContexts.repository.transitionAutonomousRun(
+                    runID: fixture.runID,
+                    lease: lease,
+                    transition: AutonomousRunTransition(
+                        expectedState: run.state,
+                        expectedRevision: run.revision,
+                        nextState: .cancelRequested,
+                        eventType: "attachment_test_cancel_requested",
+                        eventSummary: "Attachment fixture requested cancellation"
+                    )
+                )
+                let requestedBindingCount = try await fixture.app.projectContexts.repository
+                    .desktopProviderMCPBindingCount(runID: fixture.runID)
+                XCTAssertEqual(requestedBindingCount, 1)
+                _ = try await fixture.app.projectContexts.repository.transitionAutonomousRun(
+                    runID: fixture.runID,
+                    lease: lease,
+                    transition: AutonomousRunTransition(
+                        expectedState: run.state,
+                        expectedRevision: run.revision,
+                        nextState: .cancelled,
+                        eventType: "attachment_test_cancelled",
+                        eventSummary: "Attachment fixture cancellation completed"
+                    )
+                )
+                _ = try await fixture.app.projectContexts.repository.releaseRunLease(lease)
+                let finalBindingCount = try await fixture.app.projectContexts.repository
+                    .desktopProviderMCPBindingCount()
+                XCTAssertEqual(finalBindingCount, 0)
+                XCTAssertEqual(
+                    try toolPayload(
+                        terminalServer,
+                        name: "fs_read",
+                        arguments: ["path": fixture.instructionSource.path]
+                    )["code"] as? String,
+                    "desktop_attachment_required"
+                )
+            } catch {
+                await restarted.shutdown()
+                throw error
+            }
+            await restarted.shutdown()
+        }
+    }
+
+    private struct Fixture {
+        let root: URL
+        let projectRoot: URL
+        let instructionSource: URL
+        let app: ForgeApp
+        let runtime: ManagedAutonomyRuntime
+        let clock: FixedClock
+        let project: ProjectControlRecord
+        let runID: RunID
+        let snapshotSHA256: String
+        let selectionRevision: String
+        let authorizationScope: ToolAuthorizationScope
+    }
+
+    private func withFixture(
+        _ body: (Fixture) async throws -> Void
+    ) async throws {
+        let fixture = try await makeFixture()
+        do {
+            try await body(fixture)
+        } catch {
+            await fixture.runtime.shutdown()
+            _ = fixture.app.shutdown()
+            try? FileManager.default.removeItem(at: fixture.root)
+            throw error
+        }
+        await fixture.runtime.shutdown()
+        _ = fixture.app.shutdown()
+        try? FileManager.default.removeItem(at: fixture.root)
+    }
+
+    private func makeFixture() async throws -> Fixture {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-desktop-attachment-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let clock = FixedClock(try XCTUnwrap(ISO8601.date(from: "2026-09-23T12:00:00Z")))
+        let app = try ForgeApp.bootstrap(home: home, clock: clock)
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: false)
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+            projectID: ProjectID(),
+            displayName: "Desktop Attachment Fixture",
+            canonicalRoot: projectRoot
+        )
+        let runID = RunID()
+        let instructionSource = projectRoot.appendingPathComponent("instructions.txt")
+        try "Read every attachment fixture instruction before acting.\n".write(
+            to: instructionSource,
+            atomically: true,
+            encoding: .utf8
+        )
+        let instructionStore = try ProjectInstructionQueueStore(paths: app.paths, clock: clock)
+        let artifact = try instructionStore.importRunArtifact(
+            sourceURL: instructionSource,
+            projectID: project.projectID,
+            generation: project.generation,
+            runID: runID
+        )
+        let allowedTools: Set<String> = [
+            "instruction_catalog", "instruction_read", "fs_read",
+        ]
+        let scope = ToolAuthorizationScope(
+            canonicalRoots: [projectRoot],
+            allowedTools: allowedTools,
+            networkAllowed: false,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        let selectionRevision = "desktop-selection-r1"
+        let request = AutonomousRunRequest(
+            runID: runID,
+            projectID: project.projectID,
+            projectGeneration: project.generation,
+            mission: "Complete the immutable desktop attachment fixture",
+            providerID: ProviderIntegrationID.codexDesktop.rawValue,
+            adapterID: "forge.desktop-plugin.codex-desktop",
+            modelKey: "host-selected",
+            specification: AutonomousRunSpecification(
+                allowedTools: allowedTools.sorted(),
+                completionGates: ["desktop_attachment_fixture"],
+                work: AutonomousRunWork(metadata: [
+                    "execution_strategy": ProviderExecutionStrategy.desktopPluginPull.rawValue,
+                    "provider_selection_revision": selectionRevision,
+                    "provider_deployment_id": "desktop-deployment-r1",
+                    "source_kind": ManagerPreparedRunSourceKind.instructionArtifact.rawValue,
+                    "source_snapshot_sha256": artifact.contentSHA256,
+                ])
+            ),
+            authorizationScope: scope
+        )
+        let runtime = try ManagedAutonomyRuntime(
+            app: app,
+            registry: HostAdapterRegistry(),
+            maximumConcurrentRuns: 1
+        )
+        _ = try await runtime.start()
+        _ = try await runtime.createRun(request)
+        return Fixture(
+            root: root,
+            projectRoot: projectRoot,
+            instructionSource: instructionSource,
+            app: app,
+            runtime: runtime,
+            clock: clock,
+            project: project,
+            runID: runID,
+            snapshotSHA256: artifact.contentSHA256,
+            selectionRevision: selectionRevision,
+            authorizationScope: scope
+        )
+    }
+
+    private func claim(
+        _ fixture: Fixture,
+        runtime: ManagedAutonomyRuntime,
+        sessionID: String,
+        event: DesktopProviderHookEvent = .sessionStart
+    ) async throws -> [String: Any] {
+        let directive = try await runtime.handleDesktopProviderHook(
+            try Self.hookRequest(
+                event: event,
+                sessionID: sessionID,
+                cwd: fixture.projectRoot.path
+            ),
+            selectionRevision: fixture.selectionRevision
+        )
+        guard case .context(let context) = directive else {
+            throw AttachmentFixtureError.missingAssignment
+        }
+        let prefix = "call desktop_run_attach exactly once with this exact argument object: "
+        let suffix = ". This single-use attachment expires at "
+        guard let start = context.range(of: prefix)?.upperBound,
+              let end = context.range(of: suffix, range: start..<context.endIndex)?.lowerBound else {
+            throw AttachmentFixtureError.missingAttachment
+        }
+        return try JSONSupport.object(from: Data(context[start..<end].utf8))
+    }
+
+    private static func hookRequest(
+        event: DesktopProviderHookEvent,
+        sessionID: String,
+        cwd: String
+    ) throws -> DesktopProviderHookRequest {
+        try DesktopProviderHookRequest(
+            providerID: .codexDesktop,
+            event: event,
+            hostPayload: JSONSerialization.data(withJSONObject: [
+                "hook_event_name": event.rawValue,
+                "session_id": sessionID,
+                "cwd": cwd,
+            ], options: [.sortedKeys])
+        )
+    }
+
+    private func response(
+        _ server: MCPServer,
+        method: String,
+        params: [String: Any]? = nil
+    ) throws -> [String: Any] {
+        var request: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": UUID().uuidString.lowercased(),
+            "method": method,
+        ]
+        if let params { request["params"] = params }
+        return try XCTUnwrap(server.handle(request))
+    }
+
+    private func toolPayload(
+        _ server: MCPServer,
+        name: String,
+        arguments: [String: Any]
+    ) throws -> [String: Any] {
+        let call = try response(server, method: "tools/call", params: [
+            "name": name,
+            "arguments": arguments,
+        ])
+        let result = try XCTUnwrap(call["result"] as? [String: Any])
+        return try XCTUnwrap(result["structuredContent"] as? [String: Any])
+    }
+
+    private enum AttachmentFixtureError: Error {
+        case missingAssignment
+        case missingAttachment
+    }
+}
+
 private final class MCPWireFixture {
     let projectRoot: URL
     let responses: MCPWireResponseReader

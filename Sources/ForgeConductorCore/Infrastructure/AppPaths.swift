@@ -79,6 +79,11 @@ public final class AppPaths: @unchecked Sendable {
     public var managedProvidersDir: URL {
         home.appendingPathComponent("managed-providers", isDirectory: true)
     }
+    /// Mutually exclusive provider selection, bounded setup history, and
+    /// redacted Forge-owned integration receipts.
+    public var providerIntegrationsLedger: URL {
+        managedProvidersDir.appendingPathComponent("provider-integrations.json")
+    }
     /// Immutable instruction content and its durable project-scoped queue.
     /// Provider tools receive only the accepted snapshot, never the selected source path.
     public var instructionPackagesDir: URL {
@@ -141,6 +146,7 @@ public final class AppPaths: @unchecked Sendable {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         for dir in [
+            managedProvidersDir,
             stjornarvaldDir, stjornarvaldOutboxDir, stjornarvaldClientOutboxDir,
             stjornarvaldSourceStoreDir,
             stjornarvaldExtractedDir, stjornarvaldExportsDir, stjornarvaldStagingDir,

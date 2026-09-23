@@ -207,7 +207,7 @@ frameworks, read-only to model project work.
 Tool names, structured response fields, shell default/opt-out settings,
 completion-request compatibility, and durable run/lease identities are
 preserved. The original completion checkpoint retained source identity
-`0.9.0 (1)`; the current repository identity is `0.13.0 (5)`. Neither the
+`0.9.0 (1)`; the current repository identity is `0.14.0 (6)`. Neither the
 checkpoint nor the current development identity constitutes release approval.
 
 ## Regression evidence

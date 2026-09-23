@@ -8,7 +8,9 @@ import Foundation
 import Darwin
 import CoreFoundation
 
-/// JSON-RPC 2.0 MCP server over stdio for **LM Studio** (local models).
+/// JSON-RPC 2.0 MCP server over stdio. Ordinary launches retain the existing
+/// LM Studio roles; an explicit desktop-provider launch is fenced until its
+/// host session consumes a hook-issued run attachment.
 public final class MCPServer: @unchecked Sendable {
     public static let defaultMaximumConcurrentRequests = 8
     public static let defaultShutdownWaitSeconds: TimeInterval = 15
@@ -26,6 +28,7 @@ public final class MCPServer: @unchecked Sendable {
     private let app: ForgeApp
     private let clientID: ClientID
     private let role: LMStudioConnectorRole
+    private let desktopProviderID: ProviderIntegrationID?
     private let deploymentID: String
     private let toolDefinitionCatalog: Result<ToolDefinitionCatalog, Error>
     private let maximumConcurrentRequests: Int
@@ -55,6 +58,7 @@ public final class MCPServer: @unchecked Sendable {
         role: LMStudioConnectorRole = LMStudioConnectorRole(
             environmentValue: ProcessInfo.processInfo.environment["FORGE_MCP_ROLE"]
         ),
+        desktopProviderID: ProviderIntegrationID? = nil,
         maximumConcurrentRequests: Int = MCPServer.defaultMaximumConcurrentRequests,
         shutdownWaitSeconds: TimeInterval = MCPServer.defaultShutdownWaitSeconds,
         requestTimeoutSeconds: TimeInterval = MCPServer.defaultRequestTimeoutSeconds,
@@ -65,6 +69,7 @@ public final class MCPServer: @unchecked Sendable {
         self.app = app
         self.clientID = clientID
         self.role = role
+        self.desktopProviderID = desktopProviderID
         self.maximumConcurrentRequests = max(1, min(maximumConcurrentRequests, 64))
         self.admission = MCPRequestAdmission(maximumActiveRequests: maximumConcurrentRequests)
         self.shutdownWaitSeconds = max(0.1, min(shutdownWaitSeconds, 30))
@@ -103,8 +108,8 @@ public final class MCPServer: @unchecked Sendable {
 
         app.diagnostics.info("mcp_serve_start", [
             "client_id": clientID.rawValue,
-            "role": role.rawValue,
-            "host_kind": role.hostKind,
+            "role": launchRoleIdentity,
+            "host_kind": launchHostKind,
             "deployment_id": deploymentID,
         ])
         // Best-effort presence; never block MCP handshake on a locked GUI store.
@@ -129,7 +134,7 @@ public final class MCPServer: @unchecked Sendable {
             try? app.store.presenceDelete(clientID: presenceID)
             app.diagnostics.info("mcp_serve_end", [
                 "client_id": clientID.rawValue,
-                "role": role.rawValue,
+                "role": launchRoleIdentity,
                 "deployment_id": deploymentID,
             ])
         }
@@ -239,7 +244,7 @@ public final class MCPServer: @unchecked Sendable {
             switch method {
             case "initialize":
                 // Distinct names so LM Studio can list primary vs fail-forward fallback.
-                let serverName = role.serverID
+                let serverName = launchServerID
                 // Negotiate protocol: LM Studio 0.4.x sends 2025-11-25; older clients send 2024-11-05.
                 // Echo a version we support so the host does not hang ~60s on mismatch.
                 let params = message["params"] as? [String: Any] ?? [:]
@@ -255,24 +260,33 @@ public final class MCPServer: @unchecked Sendable {
                     "server": serverName,
                     "deployment_id": deploymentID,
                 ], category: .mcp)
+                var capabilities: [String: Any] = [
+                    "tools": ["listChanged": false] as [String: Any],
+                    "projectMemory": [
+                        "capabilityVersion": ProjectMemoryService.capabilityVersion,
+                        "schemaVersion": ProjectMemoryRepository.schemaVersion,
+                        "limits": app.projectMemory.limits.asDictionary(),
+                    ] as [String: Any],
+                    "projectContext": [
+                        "schemaVersion": ProjectControlPlaneRepository.schemaVersion,
+                        "durableBindings": true,
+                        "generationFencing": true,
+                        "missingContextCode": ProjectContextError.projectContextRequired(
+                            ProjectBindingOwner(kind: .mcpClient, id: "capability-probe")
+                        ).code,
+                    ] as [String: Any],
+                ]
+                if let desktopProviderID {
+                    capabilities["desktopRunAttachment"] = [
+                        "version": 1,
+                        "requiredBeforeTools": true,
+                        "providerID": desktopProviderID.rawValue,
+                        "tool": DesktopProviderMCPAttachmentContract.toolName,
+                    ] as [String: Any]
+                }
                 return ok(id: id, result: [
                     "protocolVersion": negotiated,
-                    "capabilities": [
-                        "tools": ["listChanged": false] as [String: Any],
-                        "projectMemory": [
-                            "capabilityVersion": ProjectMemoryService.capabilityVersion,
-                            "schemaVersion": ProjectMemoryRepository.schemaVersion,
-                            "limits": app.projectMemory.limits.asDictionary(),
-                        ] as [String: Any],
-                        "projectContext": [
-                            "schemaVersion": ProjectControlPlaneRepository.schemaVersion,
-                            "durableBindings": true,
-                            "generationFencing": true,
-                            "missingContextCode": ProjectContextError.projectContextRequired(
-                                ProjectBindingOwner(kind: .mcpClient, id: "capability-probe")
-                            ).code,
-                        ] as [String: Any],
-                    ] as [String: Any],
+                    "capabilities": capabilities,
                     "serverInfo": [
                         "name": serverName,
                         "version": ForgeApp.version,
@@ -291,7 +305,32 @@ public final class MCPServer: @unchecked Sendable {
             case "tools/call":
                 let params = message["params"] as? [String: Any] ?? [:]
                 let name = params["name"] as? String ?? ""
-                guard MCPToolAccessPolicy.permits(name, role: role) else {
+                if name == DesktopProviderMCPAttachmentContract.toolName {
+                    return desktopAttachmentResponse(
+                        id: id,
+                        suppliedArguments: params["arguments"],
+                        cancellation: requestCancellation
+                    )
+                }
+                if let desktopProviderID {
+                    do {
+                        _ = try app.projectContexts.desktopProviderMCPAttachmentContext(
+                            clientID: clientID,
+                            launchProviderID: desktopProviderID,
+                            cancellation: requestCancellation
+                        )
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch is ToolCallDeadlineExceeded {
+                        throw ToolCallDeadlineExceeded()
+                    } catch {
+                        return toolCallResponse(id: id, result: .failure(
+                            code: "desktop_attachment_required",
+                            message: "This desktop provider session must attach to its active Forge run before using tools. Request a fresh assignment context if attachment was rejected."
+                        ))
+                    }
+                }
+                guard desktopProviderID != nil || MCPToolAccessPolicy.permits(name, role: role) else {
                     return toolCallResponse(id: id, result: .failure(
                         code: "tool_not_allowed", message: "This tool is not available through the CLU role."
                     ))
@@ -349,24 +388,134 @@ public final class MCPServer: @unchecked Sendable {
     }
 
     private var presenceID: String {
-        "\(clientID.rawValue):\(role.rawValue)"
+        "\(clientID.rawValue):\(launchRoleIdentity)"
     }
 
     private func refreshPresence() {
         try? app.store.presenceUpsert(
             clientID: presenceID,
-            hostKind: role.hostKind,
+            hostKind: launchHostKind,
             pid: ProcessInfo.processInfo.processIdentifier,
             cwd: FileManager.default.currentDirectoryPath
         )
     }
 
     private func toolDescriptors() throws -> [[String: Any]] {
-        try toolDefinitionCatalog.get().mcpDescriptors().filter {
+        var descriptors = try toolDefinitionCatalog.get().mcpDescriptors().filter {
             guard let name = $0["name"] as? String else { return false }
-            return MCPToolAccessPolicy.permits(name, role: role)
+            return desktopProviderID != nil || MCPToolAccessPolicy.permits(name, role: role)
+        }
+        if desktopProviderID != nil {
+            descriptors.append(Self.desktopAttachmentToolDescriptor)
+        }
+        return descriptors.sorted {
+            ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "")
         }
     }
+
+    private var launchServerID: String {
+        desktopProviderID.map { "forge-conductor-\($0.rawValue)" } ?? role.serverID
+    }
+
+    private var launchHostKind: String {
+        desktopProviderID.map { "mcp-stdio-\($0.rawValue)" } ?? role.hostKind
+    }
+
+    private var launchRoleIdentity: String {
+        desktopProviderID.map { "desktop-provider:\($0.rawValue)" } ?? role.rawValue
+    }
+
+    private func desktopAttachmentResponse(
+        id: Any?,
+        suppliedArguments: Any?,
+        cancellation: ToolCallCancellation
+    ) -> [String: Any] {
+        guard let desktopProviderID else {
+            return MCPToolResponse.object(id: id, result: .failure(
+                code: "tool_not_allowed",
+                message: "Desktop run attachment is available only to a provider-specific Forge MCP launch."
+            ))
+        }
+        guard let arguments = suppliedArguments as? [String: Any] else {
+            return MCPToolResponse.object(id: id, result: .failure(
+                code: "desktop_attachment_invalid",
+                message: "Desktop run attachment requires its exact hook-issued argument object."
+            ))
+        }
+        do {
+            let request = try DesktopProviderMCPAttachmentRequest(arguments: arguments)
+            let context = try app.projectContexts.attachDesktopProviderMCPClient(
+                request,
+                clientID: clientID,
+                launchProviderID: desktopProviderID,
+                cancellation: cancellation
+            )
+            return MCPToolResponse.object(id: id, result: .success([
+                "attached": true,
+                "provider_id": desktopProviderID.rawValue,
+                "run_id": context.runID?.description ?? request.runID.description,
+                "project_id": context.projectID.description,
+                "project_generation": context.projectGeneration.rawValue,
+            ]))
+        } catch is CancellationError {
+            return errorResponse(id: id, code: -32800, message: "Cancelled")
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineExceededResponse(id: id, method: "tools/call")
+        } catch let error as DesktopProviderMCPAttachmentError {
+            let code: String
+            let message: String
+            switch error {
+            case .invalidRequest:
+                code = "desktop_attachment_invalid"
+                message = "Desktop run attachment requires its exact hook-issued argument object."
+            case .unavailableForLaunchRole:
+                code = "tool_not_allowed"
+                message = "This MCP process was not launched for the capability's desktop provider."
+            case .clientConflict:
+                code = "desktop_attachment_conflict"
+                message = "This MCP client already has a conflicting Forge project binding."
+            case .attachmentRequired, .rejected, .expired, .consumed, .staleAuthority:
+                code = "desktop_attachment_rejected"
+                message = "The desktop run attachment is expired, consumed, stale, or does not match the active host session. Request a fresh Forge assignment context."
+            }
+            return MCPToolResponse.object(id: id, result: .failure(code: code, message: message))
+        } catch {
+            return MCPToolResponse.object(id: id, result: .failure(
+                code: "desktop_attachment_rejected",
+                message: "The desktop run attachment could not be verified. Request a fresh Forge assignment context."
+            ))
+        }
+    }
+
+    private static let desktopAttachmentToolDescriptor: [String: Any] = [
+        "name": DesktopProviderMCPAttachmentContract.toolName,
+        "description": "Attach this provider-specific MCP process to the exact active Forge desktop run authorized by the current hook assignment.",
+        "inputSchema": [
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "attachment_token", "provider_id", "run_id", "project_id",
+                "project_generation", "session_sha256", "selection_revision",
+                "deployment_id",
+            ],
+            "properties": [
+                "attachment_token": ["type": "string", "pattern": "^[0-9a-f]{64}$"],
+                "provider_id": [
+                    "type": "string",
+                    "enum": [
+                        ProviderIntegrationID.claudeDesktop.rawValue,
+                        ProviderIntegrationID.codexDesktop.rawValue,
+                    ],
+                ],
+                "run_id": ["type": "string", "format": "uuid"],
+                "project_id": ["type": "string", "format": "uuid"],
+                "project_generation": ["type": "integer", "minimum": 1],
+                "session_sha256": ["type": "string", "pattern": "^[0-9a-f]{64}$"],
+                "selection_revision": ["type": "string", "minLength": 1, "maxLength": ProviderIntegrationContract.maximumRevisionBytes],
+                "deployment_id": ["type": "string", "minLength": 1, "maxLength": ProviderIntegrationContract.maximumArtifactVersionBytes],
+            ] as [String: Any],
+        ] as [String: Any],
+    ]
 
     private static func isNotification(_ message: [String: Any]) -> Bool {
         let id = message["id"]

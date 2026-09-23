@@ -42,12 +42,24 @@ struct ManagerResolvedRunPreparation: Sendable, Equatable {
     let allowedTools: Set<String>
     let completionGates: [String]
     let networkAllowed: Bool
+    let executionStrategy: ProviderExecutionStrategy
+    let providerSelectionRevision: String?
+    let providerDeploymentID: String?
 }
 
 private struct ManagerPreparedRunContext: Sendable {
     let descriptor: ManagerPreparedRunDescriptor
     let authorizedRoot: URL
     let resolved: ManagerResolvedRunPreparation
+}
+
+private struct ManagerProviderIntegrationRunBinding: Sendable {
+    let providerID: String
+    let adapterID: String
+    let modelKey: String?
+    let executionStrategy: ProviderExecutionStrategy
+    let selectionRevision: String
+    let deploymentID: String?
 }
 
 private struct ManagerProviderReadinessReceipt: Codable, Sendable {
@@ -76,7 +88,10 @@ enum ManagerRunPreparationResolver {
         modelKey requestedModelKey: String? = nil,
         allowedTools requestedAllowedTools: Set<String>? = nil,
         completionGates requestedCompletionGates: [String]? = nil,
-        networkAllowed: Bool = false
+        networkAllowed: Bool = false,
+        executionStrategy: ProviderExecutionStrategy = .managedProviderPush,
+        providerSelectionRevision: String? = nil,
+        providerDeploymentID: String? = nil
     ) throws -> ManagerResolvedRunPreparation {
         let providerID = requestedProviderID ?? "lmstudio"
         let adapterID = requestedAdapterID ?? ManagerNode.nativeSessionHostAdapterID
@@ -132,7 +147,10 @@ enum ManagerRunPreparationResolver {
             modelKey: modelKey,
             allowedTools: allowedTools,
             completionGates: completionGates,
-            networkAllowed: networkAllowed
+            networkAllowed: networkAllowed,
+            executionStrategy: executionStrategy,
+            providerSelectionRevision: providerSelectionRevision,
+            providerDeploymentID: providerDeploymentID
         )
     }
 }
@@ -195,6 +213,10 @@ enum ManagerProjectContentClearCheckpoint: Sendable {
     case controlPlaneCommitted
 }
 
+enum ManagerInstructionRunAdmissionCheckpoint: Sendable, Equatable {
+    case providerResolved
+}
+
 enum ManagerProjectContentClearInterruption: Error, Sendable {
     case simulatedProcessExit(ManagerProjectContentClearCheckpoint)
 }
@@ -228,9 +250,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     /// Serializes listener/config transitions without holding `lock` across
     /// Network.framework callbacks. Acquisition is always deadline-bounded.
     private let lifecycleTransitionLock = NSLock()
+    /// Serializes durable provider-selection acceptance with run-start admission.
+    /// The lock is held only across bounded manager/coordinator transactions.
+    private let providerSelectionAdmissionLock = NSLock()
+    /// Live desktop readiness invokes a host CLI. Keep one inspection in flight
+    /// and retain admission until the underlying adapter task actually drains,
+    /// including after the synchronous caller's deadline expires.
+    private let desktopProviderInspectionAdmission = ManagerBoundedAdmissionGate()
     private let runtime = ManagerRuntime()
     private let managedAutonomyFactory: ManagedAutonomyFactory
     private let hostAdapterRegistry: HostAdapterRegistry
+    private let providerIntegrationCoordinatorResult: Result<ProviderIntegrationCoordinator, Error>
     private let providerProbeTimeoutSeconds: TimeInterval
     private let generationResetCheckpoint: @Sendable (ProjectID, ProjectGeneration) throws -> Void
     private let projectRelinkCheckpoint: @Sendable (ManagerProjectRelinkCheckpoint) throws -> Void
@@ -239,6 +269,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     ) throws -> Void
     private let projectContentClearCheckpoint: @Sendable (
         ManagerProjectContentClearCheckpoint
+    ) throws -> Void
+    private let instructionRunAdmissionCheckpoint: @Sendable (
+        ManagerInstructionRunAdmissionCheckpoint
     ) throws -> Void
     private var providerConfigurationInProgress = false
     private var providerRunOperations = 0
@@ -298,6 +331,28 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         self.init(app: app, managedAutonomyFactory: managedAutonomyFactory,
             hostAdapterRegistry: hostAdapterRegistry, generationResetCheckpoint: { _, _ in },
             projectRelinkCheckpoint: { _ in }, projectRegistrationCheckpoint: { _ in })
+    }
+
+    convenience init(
+        app: ForgeApp,
+        providerIntegrationCoordinator: ProviderIntegrationCoordinator,
+        hostAdapterRegistry: HostAdapterRegistry = .shared,
+        instructionRunAdmissionCheckpoint: @escaping @Sendable (
+            ManagerInstructionRunAdmissionCheckpoint
+        ) throws -> Void = { _ in }
+    ) {
+        self.init(
+            app: app,
+            managedAutonomyFactory: {
+                try ManagedAutonomyRuntime(app: $0, registry: hostAdapterRegistry)
+            },
+            hostAdapterRegistry: hostAdapterRegistry,
+            providerIntegrationCoordinator: providerIntegrationCoordinator,
+            generationResetCheckpoint: { _, _ in },
+            projectRelinkCheckpoint: { _ in },
+            projectRegistrationCheckpoint: { _ in },
+            instructionRunAdmissionCheckpoint: instructionRunAdmissionCheckpoint
+        )
     }
 
     convenience init(
@@ -388,6 +443,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         app: ForgeApp,
         managedAutonomyFactory: @escaping ManagedAutonomyFactory,
         hostAdapterRegistry: HostAdapterRegistry,
+        providerIntegrationCoordinator: ProviderIntegrationCoordinator? = nil,
         providerProbeTimeoutSeconds: TimeInterval = ManagerNode.maximumProviderProbeTimeoutSeconds,
         generationResetCheckpoint: @escaping @Sendable (
             ProjectID,
@@ -401,6 +457,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ) throws -> Void,
         projectContentClearCheckpoint: @escaping @Sendable (
             ManagerProjectContentClearCheckpoint
+        ) throws -> Void = { _ in },
+        instructionRunAdmissionCheckpoint: @escaping @Sendable (
+            ManagerInstructionRunAdmissionCheckpoint
         ) throws -> Void = { _ in }
     ) {
         self.app = app
@@ -420,6 +479,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
         self.managedAutonomyFactory = managedAutonomyFactory
         self.hostAdapterRegistry = hostAdapterRegistry
+        self.providerIntegrationCoordinatorResult = if let providerIntegrationCoordinator {
+            .success(providerIntegrationCoordinator)
+        } else {
+            Result { try ProviderIntegrationAdapterFactory.makeCoordinator(app: app) }
+        }
         self.providerProbeTimeoutSeconds = min(
             max(providerProbeTimeoutSeconds, Self.minimumProviderProbeTimeoutSeconds),
             Self.maximumProviderProbeTimeoutSeconds
@@ -428,6 +492,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         self.projectRelinkCheckpoint = projectRelinkCheckpoint
         self.projectRegistrationCheckpoint = projectRegistrationCheckpoint
         self.projectContentClearCheckpoint = projectContentClearCheckpoint
+        self.instructionRunAdmissionCheckpoint = instructionRunAdmissionCheckpoint
     }
 
     deinit {
@@ -860,9 +925,29 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
         let providerConfigured = providerConfiguration?.saved == true
             && configuredModel?.isEmpty == false
+        let integrationSnapshot = try? providerIntegrations()
+        let selectedIntegration = integrationSnapshot.flatMap { snapshot in
+            snapshot.providers.first { provider in
+                provider.descriptor.id == snapshot.selectedProviderID
+            }
+        }
+        let selectedDesktopProvider = selectedIntegration.flatMap { provider in
+            provider.descriptor.executionStrategy == .desktopPluginPull ? provider : nil
+        }
         let preparationState: String
         let preparationDetail: String
-        if providerConfigured,
+        if let selectedDesktopProvider,
+           integrationSnapshot?.currentOperation == nil,
+           selectedDesktopProvider.receipt != nil {
+            preparationState = "ready"
+            preparationDetail = "The selected desktop provider will verify its live Forge integration before this task starts."
+        } else if let selectedDesktopProvider {
+            preparationState = selectedDesktopProvider.receipt == nil
+                ? "waiting_dependency" : "automatically_preparing"
+            preparationDetail = selectedDesktopProvider.receipt == nil
+                ? "Repair the selected desktop provider integration before starting this task."
+                : "Wait for the selected desktop provider integration operation to finish."
+        } else if providerConfigured,
            provider.health == "reachable" || provider.health == "contract_valid" {
             preparationState = "ready"
             preparationDetail = "Saved provider, registered capabilities, completion checks, and continuity defaults are ready."
@@ -886,11 +971,16 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runPreparation: ManagerOperatorRunPreparation(
                 schemaVersion: 1,
                 state: preparationState,
-                providerID: providerConfigured ? "lmstudio" : nil,
-                adapterID: Self.nativeSessionHostAdapterID,
-                modelKey: providerConfigured ? configuredModel : nil,
-                providerConfigurationRevision: providerConfigured
-                    ? providerConfiguration?.revision : nil,
+                providerID: selectedDesktopProvider?.descriptor.id.rawValue
+                    ?? (providerConfigured ? ProviderIntegrationID.lmStudio.rawValue : nil),
+                adapterID: selectedDesktopProvider.map {
+                    "forge.desktop-plugin.\($0.descriptor.id.rawValue)"
+                } ?? Self.nativeSessionHostAdapterID,
+                modelKey: selectedDesktopProvider == nil
+                    ? (providerConfigured ? configuredModel : nil) : "host-selected",
+                providerConfigurationRevision: selectedDesktopProvider == nil
+                    ? (providerConfigured ? providerConfiguration?.revision : nil)
+                    : integrationSnapshot?.selectionRevision,
                 toolCatalogRevision: toolCatalogRevision,
                 allowedTools: ordinaryTools,
                 completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
@@ -2089,11 +2179,18 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         try requireActiveProject(projectID, generation: expectedGeneration)
         lock.lock(); let autonomyAvailable = managedAutonomy != nil && !managedAutonomyClosing; lock.unlock()
         guard autonomyAvailable else { throw AutonomyError.shutdown }
-        let provider = try readProviderConfiguration()
-        guard provider.saved, let model = provider.modelKey, !model.isEmpty else {
-            throw ProjectInstructionQueueError.queueBlocked(
-                "Save an LM Studio endpoint and model in Provider before starting the instruction queue."
-            )
+        let binding = try providerIntegrationRunBinding(
+            requestedProviderID: nil,
+            requestedAdapterID: nil,
+            requestedModelKey: nil
+        )
+        if binding?.executionStrategy == .managedProviderPush {
+            let provider = try readProviderConfiguration()
+            guard provider.saved, provider.modelKey?.isEmpty == false else {
+                throw ProjectInstructionQueueError.queueBlocked(
+                    "Configure the selected provider before starting the instruction queue."
+                )
+            }
         }
         let snapshot = try instructionQueueStore().start(
             projectID: projectID,
@@ -2329,6 +2426,213 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     // MARK: - Managed provider controls
 
+    /// Returns the single durable provider selection and bounded integration
+    /// operation history. Receipts contain only Forge-owned artifact metadata.
+    public func providerIntegrations() throws -> ProviderIntegrationsSnapshot {
+        let coordinator = try providerIntegrationCoordinatorResult.get()
+        return try Self.waitForAsync(timeoutSeconds: 5) {
+            await coordinator.snapshot()
+        }
+    }
+
+    @discardableResult
+    public func selectProviderIntegration(
+        _ request: ProviderSelectionRequest
+    ) throws -> ProviderIntegrationOperationSnapshot {
+        let coordinator = try providerIntegrationCoordinatorResult.get()
+        guard providerSelectionAdmissionLock.lock(before: Date(timeIntervalSinceNow: 5)) else {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        defer { providerSelectionAdmissionLock.unlock() }
+
+        let snapshot = try Self.waitForAsync(timeoutSeconds: 5) {
+            await coordinator.snapshot()
+        }
+        if let replay = try Self.providerOperationReplay(
+            kind: request.providerID == nil ? .deactivate : .activate,
+            providerID: request.providerID,
+            expectedRevision: request.expectedRevision,
+            idempotencyKey: request.idempotencyKey,
+            in: snapshot
+        ) {
+            return replay
+        }
+        lock.lock()
+        let hasAdmittedProviderWork = providerRunOperations > 0
+        lock.unlock()
+        if hasAdmittedProviderWork {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        if let selectedProviderID = snapshot.selectedProviderID,
+           DesktopProviderHookRequest.isDesktopProvider(selectedProviderID),
+           try hasNonterminalDesktopRuns(providerID: selectedProviderID) {
+            throw ProviderIntegrationError.providerHasNonterminalRuns(
+                providerID: selectedProviderID
+            )
+        }
+        if let requestedProviderID = request.providerID,
+           requestedProviderID != snapshot.selectedProviderID,
+           DesktopProviderHookRequest.isDesktopProvider(requestedProviderID),
+           try hasNonterminalDesktopRuns(providerID: requestedProviderID) {
+            throw ProviderIntegrationError.providerHasNonterminalRuns(
+                providerID: requestedProviderID
+            )
+        }
+        if request.providerID == .lmStudio {
+            try requireCurrentLMStudioSelectionReadiness()
+        }
+        return try Self.waitForAsync(timeoutSeconds: 5) {
+            try await coordinator.select(request)
+        }
+    }
+
+    private static func providerOperationReplay(
+        kind: ProviderIntegrationOperationKind,
+        providerID: ProviderIntegrationID?,
+        expectedRevision: String,
+        idempotencyKey: String,
+        in snapshot: ProviderIntegrationsSnapshot
+    ) throws -> ProviderIntegrationOperationSnapshot? {
+        let idempotencyHash = JSONSupport.sha256Hex(idempotencyKey)
+        let intentHash = JSONSupport.sha256Hex(
+            "\(kind.rawValue)\u{0}\(providerID?.rawValue ?? "none")\u{0}\(expectedRevision)"
+        )
+        let operations = (snapshot.currentOperation.map { [$0] } ?? [])
+            + snapshot.recentOperations
+        guard let existing = operations.first(where: {
+            $0.idempotencyKeySHA256 == idempotencyHash
+        }) else {
+            return nil
+        }
+        guard existing.intentSHA256 == intentHash else {
+            throw ProviderIntegrationError.idempotencyConflict
+        }
+        return existing
+    }
+
+    public func providerIntegrationOperation(
+        operationID: String
+    ) throws -> ProviderIntegrationOperationSnapshot {
+        let coordinator = try providerIntegrationCoordinatorResult.get()
+        return try Self.waitForAsync(timeoutSeconds: 5) {
+            try await coordinator.operation(operationID: operationID)
+        }
+    }
+
+    /// Applies selection policy to one authenticated desktop-host hook request.
+    /// The policy never grants host permission; it adds context or narrowly
+    /// denies inactive Forge MCP calls.
+    public func desktopProviderHookResponse(
+        _ request: DesktopProviderHookRequest
+    ) throws -> DesktopProviderHookResponse {
+        let snapshot = try providerIntegrations()
+        let directive: DesktopProviderRunHookDirective
+        if snapshot.selectedProviderID == request.providerID,
+           let autonomy = providerAutonomyRuntime() {
+            directive = try Self.waitForAsync(timeoutSeconds: 5) {
+                try await autonomy.handleDesktopProviderHook(
+                    request,
+                    selectionRevision: snapshot.selectionRevision
+                )
+            }
+        } else {
+            directive = .none
+        }
+        return DesktopProviderHookPolicyService().response(
+            snapshot: snapshot,
+            request: request,
+            runDirective: directive
+        )
+    }
+
+    @discardableResult
+    public func cancelProviderIntegrationOperation(
+        operationID: String
+    ) throws -> ProviderIntegrationOperationSnapshot {
+        let coordinator = try providerIntegrationCoordinatorResult.get()
+        return try Self.waitForAsync(timeoutSeconds: 10) {
+            try await coordinator.cancel(operationID: operationID)
+        }
+    }
+
+    @discardableResult
+    public func repairProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) throws -> ProviderIntegrationOperationSnapshot {
+        let coordinator = try providerIntegrationCoordinatorResult.get()
+        guard providerSelectionAdmissionLock.lock(before: Date(timeIntervalSinceNow: 5)) else {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        defer { providerSelectionAdmissionLock.unlock() }
+
+        let snapshot = try Self.waitForAsync(timeoutSeconds: 5) {
+            await coordinator.snapshot()
+        }
+        if let replay = try Self.providerOperationReplay(
+            kind: .repair,
+            providerID: request.providerID,
+            expectedRevision: request.expectedRevision,
+            idempotencyKey: request.idempotencyKey,
+            in: snapshot
+        ) {
+            return replay
+        }
+        lock.lock()
+        let hasAdmittedProviderWork = providerRunOperations > 0
+        lock.unlock()
+        if hasAdmittedProviderWork {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        if DesktopProviderHookRequest.isDesktopProvider(request.providerID),
+           try hasNonterminalDesktopRuns(providerID: request.providerID) {
+            throw ProviderIntegrationError.providerHasNonterminalRuns(
+                providerID: request.providerID
+            )
+        }
+        return try Self.waitForAsync(timeoutSeconds: 5) {
+            try await coordinator.repair(request)
+        }
+    }
+
+    @discardableResult
+    public func removeProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) throws -> ProviderIntegrationOperationSnapshot {
+        let coordinator = try providerIntegrationCoordinatorResult.get()
+        guard providerSelectionAdmissionLock.lock(before: Date(timeIntervalSinceNow: 5)) else {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        defer { providerSelectionAdmissionLock.unlock() }
+
+        let snapshot = try Self.waitForAsync(timeoutSeconds: 5) {
+            await coordinator.snapshot()
+        }
+        if let replay = try Self.providerOperationReplay(
+            kind: .remove,
+            providerID: request.providerID,
+            expectedRevision: request.expectedRevision,
+            idempotencyKey: request.idempotencyKey,
+            in: snapshot
+        ) {
+            return replay
+        }
+        lock.lock()
+        let hasAdmittedProviderWork = providerRunOperations > 0
+        lock.unlock()
+        if hasAdmittedProviderWork {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        if DesktopProviderHookRequest.isDesktopProvider(request.providerID),
+           try hasNonterminalDesktopRuns(providerID: request.providerID) {
+            throw ProviderIntegrationError.providerHasNonterminalRuns(
+                providerID: request.providerID
+            )
+        }
+        return try Self.waitForAsync(timeoutSeconds: 5) {
+            try await coordinator.remove(request)
+        }
+    }
+
     public func readProviderConfiguration() throws -> ProviderConfigurationSnapshot {
         try performProviderConfiguration { service in try await service.read() }
     }
@@ -2522,6 +2826,40 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             throw ProviderConfigurationError.persistenceFailed
         }
         return receipt
+    }
+
+    private func requireCurrentLMStudioSelectionReadiness() throws {
+        let configuration: ProviderConfigurationSnapshot
+        let receipt: ManagerProviderReadinessReceipt
+        do {
+            configuration = try readProviderConfiguration()
+            receipt = try providerReadinessReceipt()
+        } catch {
+            throw ProviderIntegrationError.providerNotReady(providerID: .lmStudio)
+        }
+        let modelKey = configuration.modelKey?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let fingerprint = receipt.provider.contractFingerprint ?? ""
+        guard configuration.saved,
+              !configuration.credentialCleanupPending,
+              let modelKey,
+              !modelKey.isEmpty,
+              receipt.configurationRevision == configuration.revision,
+              receipt.provider.adapterID == Self.nativeSessionHostAdapterID,
+              receipt.provider.providerID == ProviderIntegrationID.lmStudio.rawValue,
+              receipt.provider.health == "contract_valid",
+              receipt.provider.endpoint == configuration.endpoint,
+              receipt.provider.credentialConfigured == configuration.credentialConfigured,
+              receipt.provider.modelKey == modelKey,
+              receipt.provider.toolUseCapable == true,
+              receipt.provider.lastProbeMode == ManagerProviderProbeMode.contract.rawValue,
+              fingerprint.utf8.count == 64,
+              receipt.provider.lastProbeAt == receipt.checkedAt,
+              let checkedAt = ISO8601.date(from: receipt.checkedAt),
+              (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) else {
+            throw ProviderIntegrationError.providerNotReady(providerID: .lmStudio)
+        }
     }
 
     private func persistProviderReadinessReceipt(
@@ -3055,6 +3393,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             ManagerPreparedRunDescriptor?
         )
         var resultProjectGeneration = expectedGeneration.rawValue
+        let effectiveIntegrationID = providerID.flatMap(ProviderIntegrationID.init(rawValue:))
+            ?? (try? providerIntegrations().selectedProviderID)
         do {
             let descriptor = try prepareAutonomousRun(
                 runID: runID,
@@ -3127,7 +3467,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 let savedModel = configuration?.modelKey?.trimmingCharacters(
                     in: .whitespacesAndNewlines
                 )
-                if modelKey == nil,
+                if effectiveIntegrationID == .lmStudio,
+                   modelKey == nil,
                    configuration?.saved != true || savedModel?.isEmpty != false {
                     result = (
                         .waitingDependency,
@@ -3139,7 +3480,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     result = (
                         .needsChoice,
                         error.localizedDescription,
-                        .reviewPermissions,
+                        effectiveIntegrationID.map { identifier in
+                            ProviderIntegrationDescriptor.supported.first(where: {
+                                $0.id == identifier
+                            })?.executionStrategy == .desktopPluginPull
+                                ? .retryPreparation : .reviewPermissions
+                        } ?? .reviewPermissions,
                         nil
                     )
                 }
@@ -3205,23 +3551,36 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
         }
         let authorizedRoot = try authorizedProjectRoot(project.canonicalRoot)
+        let integrationBinding = try providerIntegrationRunBinding(
+            requestedProviderID: providerID,
+            requestedAdapterID: adapterID,
+            requestedModelKey: modelKey
+        )
         let providerConfiguration: ProviderConfigurationSnapshot?
-        do {
-            providerConfiguration = try readProviderConfiguration()
-        } catch ProviderConfigurationError.unavailable {
-            // Preserve the established model-explicit admission contract for
-            // statically registered adapters that do not expose the native
-            // provider-settings surface. Ordinary minimal-input admission still
-            // requires the saved manager-owned configuration below.
-            guard modelKey != nil,
-                  expectedProviderConfigurationRevision == nil else {
-                throw ProviderConfigurationError.unavailable
-            }
+        if integrationBinding?.executionStrategy == .desktopPluginPull {
             providerConfiguration = nil
+        } else {
+            do {
+                providerConfiguration = try readProviderConfiguration()
+            } catch ProviderConfigurationError.unavailable {
+                // Preserve the established model-explicit admission contract for
+                // statically registered adapters that do not expose the native
+                // provider-settings surface. Ordinary minimal-input admission still
+                // requires the saved manager-owned configuration below.
+                guard modelKey != nil,
+                      expectedProviderConfigurationRevision == nil else {
+                    throw ProviderConfigurationError.unavailable
+                }
+                providerConfiguration = nil
+            }
         }
-        if let expectedProviderConfigurationRevision,
-           providerConfiguration?.revision != expectedProviderConfigurationRevision {
-            throw ManagerRunPreparationError.staleProviderConfiguration
+        if let expectedProviderConfigurationRevision {
+            let actualRevision = integrationBinding?.executionStrategy == .desktopPluginPull
+                ? integrationBinding?.selectionRevision
+                : providerConfiguration?.revision
+            if actualRevision != expectedProviderConfigurationRevision {
+                throw ManagerRunPreparationError.staleProviderConfiguration
+            }
         }
         let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
         let permissionSnapshot = try toolPermissionStoreResult.get().snapshot(
@@ -3237,12 +3596,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let resolved = try ManagerRunPreparationResolver.resolve(
             configuration: providerConfiguration,
             registeredToolNames: app.tools.toolNames,
-            providerID: providerID,
-            adapterID: adapterID,
-            modelKey: modelKey,
+            providerID: integrationBinding?.providerID ?? providerID,
+            adapterID: integrationBinding?.adapterID ?? adapterID,
+            modelKey: integrationBinding?.modelKey ?? modelKey,
             allowedTools: allowedTools ?? Set(permissionSnapshot.effectiveToolIDs),
             completionGates: completionGates,
-            networkAllowed: networkAllowed
+            networkAllowed: networkAllowed,
+            executionStrategy: integrationBinding?.executionStrategy ?? .managedProviderPush,
+            providerSelectionRevision: integrationBinding?.selectionRevision,
+            providerDeploymentID: integrationBinding?.deploymentID
         )
         if source.kind != .inlineMission {
             let missing = Set(["instruction_catalog", "instruction_read"])
@@ -3286,8 +3648,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             providerID: resolved.providerID,
             adapterID: resolved.adapterID,
             modelKey: resolved.modelKey,
-            providerConfigurationRevision: providerConfiguration?.revision
-                ?? ManagerRunPreparationResolver.explicitConfigurationRevision,
+            providerConfigurationRevision: integrationBinding?.executionStrategy == .desktopPluginPull
+                ? integrationBinding!.selectionRevision
+                : providerConfiguration?.revision
+                    ?? ManagerRunPreparationResolver.explicitConfigurationRevision,
             toolCatalogRevision: permissionSnapshot.catalogRevision,
             allowedTools: resolved.allowedTools.sorted(),
             networkAllowed: resolved.networkAllowed,
@@ -3308,11 +3672,136 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
     }
 
+    /// Resolves product providers through the single durable selection. Unknown
+    /// explicit provider identifiers retain the established registered-adapter
+    /// path used by development and compatibility integrations.
+    private func providerIntegrationRunBinding(
+        requestedProviderID: String?,
+        requestedAdapterID: String?,
+        requestedModelKey: String?
+    ) throws -> ManagerProviderIntegrationRunBinding? {
+        let requestedProductProvider = requestedProviderID.flatMap(ProviderIntegrationID.init(rawValue:))
+        if requestedProviderID != nil, requestedProductProvider == nil {
+            return nil
+        }
+
+        let snapshot = try providerIntegrations()
+        guard let selectedProviderID = snapshot.selectedProviderID else {
+            throw AutonomyError.invalidRequest(
+                "Select a provider in Provider before preparing managed work"
+            )
+        }
+        if let requestedProductProvider,
+           requestedProductProvider != selectedProviderID {
+            throw AutonomyError.invalidRequest(
+                "provider_id does not match the currently selected provider"
+            )
+        }
+        guard let provider = snapshot.providers.first(where: {
+            $0.descriptor.id == selectedProviderID
+        }) else {
+            throw AutonomyError.invalidRequest(
+                "The selected provider is missing from the supported provider registry"
+            )
+        }
+
+        switch provider.descriptor.executionStrategy {
+        case .managedProviderPush:
+            if let requestedAdapterID,
+               requestedAdapterID != Self.nativeSessionHostAdapterID {
+                throw AutonomyError.invalidRequest(
+                    "adapter_id does not match the selected LM Studio integration"
+                )
+            }
+            return ManagerProviderIntegrationRunBinding(
+                providerID: selectedProviderID.rawValue,
+                adapterID: Self.nativeSessionHostAdapterID,
+                modelKey: requestedModelKey,
+                executionStrategy: .managedProviderPush,
+                selectionRevision: snapshot.selectionRevision,
+                deploymentID: provider.receipt?.artifactVersion
+            )
+        case .desktopPluginPull:
+            guard snapshot.currentOperation == nil else {
+                throw AutonomyError.invalidRequest(
+                    "Wait for the current provider integration operation to finish before preparing desktop-host work"
+                )
+            }
+            guard let receipt = provider.receipt else {
+                throw AutonomyError.invalidRequest(
+                    "Repair the selected desktop provider integration before preparing work"
+                )
+            }
+            let coordinator = try providerIntegrationCoordinatorResult.get()
+            let inspection = try Self.waitForAsync(timeoutSeconds: 20) {
+                guard self.desktopProviderInspectionAdmission.tryAcquire() else {
+                    throw ProviderIntegrationError.operationBusy(
+                        operationID: "desktop-provider-inspection"
+                    )
+                }
+                defer { self.desktopProviderInspectionAdmission.release() }
+                return try await coordinator.inspect(providerID: selectedProviderID)
+            }
+            guard inspection.state == .ready,
+                  let liveReceipt = inspection.receipt,
+                  Self.sameDesktopDeployment(liveReceipt, receipt) else {
+                throw AutonomyError.invalidRequest(
+                    "Repair the selected desktop provider integration before preparing work; its live package or host registration no longer matches the selected deployment"
+                )
+            }
+            let expectedAdapterID = "forge.desktop-plugin.\(selectedProviderID.rawValue)"
+            if let requestedAdapterID, requestedAdapterID != expectedAdapterID {
+                throw AutonomyError.invalidRequest(
+                    "adapter_id does not match the selected desktop provider integration"
+                )
+            }
+            if let requestedModelKey, requestedModelKey != "host-selected" {
+                throw AutonomyError.invalidRequest(
+                    "Desktop providers choose their model in the host; model_key must be host-selected"
+                )
+            }
+            return ManagerProviderIntegrationRunBinding(
+                providerID: selectedProviderID.rawValue,
+                adapterID: expectedAdapterID,
+                modelKey: "host-selected",
+                executionStrategy: .desktopPluginPull,
+                selectionRevision: snapshot.selectionRevision,
+                deploymentID: liveReceipt.artifactVersion
+            )
+        }
+    }
+
+    private func hasNonterminalDesktopRuns(
+        providerID: ProviderIntegrationID
+    ) throws -> Bool {
+        let runs = try Self.waitForAsync(timeoutSeconds: 5) {
+            try await self.app.projectContexts.repository.nonterminalAutonomousRuns(limit: 1_024)
+        }
+        if runs.contains(where: { $0.providerID == providerID.rawValue }) {
+            return true
+        }
+        // The repository intentionally bounds recovery reads. If the page is full,
+        // absence cannot be proven, so provider switching fails closed.
+        return runs.count == 1_024
+    }
+
+    private static func sameDesktopDeployment(
+        _ live: ProviderIntegrationReceipt,
+        _ durable: ProviderIntegrationReceipt
+    ) -> Bool {
+        live.providerID == durable.providerID
+            && live.artifactVersion == durable.artifactVersion
+            && live.installedAt == durable.installedAt
+            && live.metadata == durable.metadata
+    }
+
     private static func preparedRunMetadata(
-        _ descriptor: ManagerPreparedRunDescriptor
+        _ descriptor: ManagerPreparedRunDescriptor,
+        resolved: ManagerResolvedRunPreparation
     ) -> [String: String] {
-        [
+        var metadata = [
             "prepared_run_revision": descriptor.revision,
+            "source_kind": descriptor.source.kind.rawValue,
             "source_snapshot_sha256": descriptor.source.snapshotSHA256,
             "provider_configuration_revision": descriptor.providerConfigurationRevision,
             "tool_catalog_revision": descriptor.toolCatalogRevision,
@@ -3323,7 +3812,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 .uuidString.lowercased() ?? "",
             "completion_plan_revision": descriptor.validationPlan.automaticPlan
                 .map { String($0.revision) } ?? "",
+            "execution_strategy": resolved.executionStrategy.rawValue,
         ]
+        if let revision = resolved.providerSelectionRevision {
+            metadata["provider_selection_revision"] = revision
+        }
+        if let deploymentID = resolved.providerDeploymentID {
+            metadata["provider_deployment_id"] = deploymentID
+        }
+        return metadata
     }
 
     private static func validatePreparedMission(_ mission: String) throws {
@@ -3356,6 +3853,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         networkAllowed: Bool = false,
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit
     ) throws -> [String: Any] {
+        guard providerSelectionAdmissionLock.lock(before: Date(timeIntervalSinceNow: 5)) else {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        defer { providerSelectionAdmissionLock.unlock() }
         lock.lock()
         let autonomy = managedAutonomy
         lock.unlock()
@@ -3404,7 +3905,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 completionPlan: context.descriptor.validationPlan.automaticPlan,
                 failurePolicy: context.descriptor.failurePolicy ?? .default,
                 work: AutonomousRunWork(
-                    metadata: Self.preparedRunMetadata(context.descriptor)
+                    metadata: Self.preparedRunMetadata(
+                        context.descriptor,
+                        resolved: context.resolved
+                    )
                 )
             ),
             authorizationScope: ToolAuthorizationScope(
@@ -3654,12 +4158,6 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         runID: RunID
     ) throws -> AutonomousRunRequest {
         try requireActiveProject(package.projectID, generation: package.projectGeneration)
-        let provider = try readProviderConfiguration()
-        guard provider.saved, provider.modelKey?.isEmpty == false else {
-            throw ProjectInstructionQueueError.queueBlocked(
-                "Save an LM Studio endpoint and model in Provider before starting the instruction queue."
-            )
-        }
         let documents = try instructionQueueStore().documentReferences(
             contentSHA256: package.contentSHA256
         )
@@ -3691,7 +4189,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             networkAllowed: false,
             maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
         )
-        var metadata = Self.preparedRunMetadata(context.descriptor)
+        var metadata = Self.preparedRunMetadata(
+            context.descriptor,
+            resolved: context.resolved
+        )
         metadata.merge([
             "instruction_package_id": package.id.uuidString.lowercased(),
             "instruction_package_name": package.packageID,
@@ -3722,6 +4223,30 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
     }
 
+    /// Resolves the provider binding and reserves provider-run admission while
+    /// holding the same bounded fence used by selection and selected-provider
+    /// repair. Once this returns, `providerRunOperations` prevents a mutation
+    /// from being accepted until the matching create attempt drains.
+    private func admittedInstructionRunRequest(
+        store: ProjectInstructionQueueStore,
+        package: ProjectInstructionPackage,
+        runID: RunID,
+        markStarted: Bool
+    ) throws -> AutonomousRunRequest {
+        guard providerSelectionAdmissionLock.lock(before: Date(timeIntervalSinceNow: 5)) else {
+            throw ProviderIntegrationError.operationBusy(operationID: "provider-run-admission")
+        }
+        defer { providerSelectionAdmissionLock.unlock() }
+
+        let request = try instructionRunRequest(package: package, runID: runID)
+        try instructionRunAdmissionCheckpoint(.providerResolved)
+        if markStarted {
+            _ = try store.markStarted(packageID: package.id, runID: runID)
+        }
+        try beginProviderRunOperation()
+        return request
+    }
+
     private func reconcileInstructionQueue(
         autonomy: ManagedAutonomyRuntime
     ) async {
@@ -3749,8 +4274,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                         )
                     }
                 } else {
-                    let request = try instructionRunRequest(package: package, runID: runID)
-                    try beginProviderRunOperation()
+                    let request = try admittedInstructionRunRequest(
+                        store: store,
+                        package: package,
+                        runID: runID,
+                        markStarted: false
+                    )
                     do {
                         _ = try await autonomy.createRun(request)
                         finishProviderRunOperation()
@@ -3782,9 +4311,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         guard !Task.isCancelled, let package = store.nextRunnable() else { return }
         do {
             let runID = RunID()
-            let request = try instructionRunRequest(package: package, runID: runID)
-            _ = try store.markStarted(packageID: package.id, runID: runID)
-            try beginProviderRunOperation()
+            let request = try admittedInstructionRunRequest(
+                store: store,
+                package: package,
+                runID: runID,
+                markStarted: true
+            )
             do {
                 _ = try await autonomy.createRun(request)
                 finishProviderRunOperation()
@@ -5736,6 +6268,25 @@ private final class ManagerAsyncCompletion: @unchecked Sendable {
             callbacks.append(callback)
             lock.unlock()
         }
+    }
+}
+
+private final class ManagerBoundedAdmissionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = false
+
+    func tryAcquire() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !active else { return false }
+        active = true
+        return true
+    }
+
+    func release() {
+        lock.lock()
+        active = false
+        lock.unlock()
     }
 }
 

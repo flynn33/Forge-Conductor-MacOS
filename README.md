@@ -1,19 +1,20 @@
 # Forge Conductor for macOS
 
 Forge Conductor is a native Swift control plane, dashboard, and MCP server for
-running project-scoped work with local models in
-[LM Studio](https://lmstudio.ai).
+running project-scoped work through managed local models in
+[LM Studio](https://lmstudio.ai) or Forge-owned integration packages for
+supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.13.0** |
-| **Build** | **5** |
+| **Version** | **0.14.0** |
+| **Build** | **6** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.13.0 (5)` is the current development identity. It is
+> **Release status:** `0.14.0 (6)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
@@ -32,6 +33,18 @@ Native distribution and shipment qualification remain separate.
 
 - Connects LM Studio models to native filesystem, Git, memory, shell, and
   continuity tools through MCP.
+- Provides Forge-owned plugins, hooks, and MCP registrations that connect
+  Claude Code Desktop and Codex Desktop to the same project-scoped
+  orchestration after each host's required reload, activation, or trust review.
+  Every desktop MCP process starts in a fenced provider role and must consume a
+  short-lived, single-use hook capability for the exact active run before any
+  project tool is available.
+- Keeps Grok Build visible for cleanup and forward compatibility, but does not
+  allow it to be selected for automated work: Grok's current documented
+  startup/prompt hooks cannot deliver Forge's initial assignment context to the
+  model.
+- Keeps one provider selected at a time through a single activation toggle per
+  selectable provider, including LM Studio.
 - Keeps durable state isolated by project identity and generation.
 - Runs ordered instruction packages with bounded execution and explicit gates.
 - Coordinates checkpoints, handoffs, successor acknowledgement, and recovery.
@@ -83,23 +96,35 @@ Open **Dashboard** and choose **Guided Setup** in the title bar for the ordered,
 state-aware version of this workflow. The wizard saves its current step and
 routes each setup or recovery action to the view that owns it.
 
-1. Start LM Studio and load a supported tool-capable local model. **Connect and
-   Check** starts or discovers its local HTTP server.
+1. Start the provider you intend to use. For LM Studio, open it and load a
+   supported tool-capable model; **Connect and Check** starts or discovers the
+   local HTTP server. For a desktop provider, install or update its supported
+   desktop application and CLI.
 2. Open Forge Conductor and start the Manager.
 3. In **Projects**, register the repository by picker or absolute path. Forge
    authorizes that exact selected folder and preserves existing authorized
    roots; the same path does not need to be entered in Manager first.
-4. Usually no Provider visit is required. **Start Task** runs the same
-   manager-owned **Connect and Check** workflow exposed in **Provider**. For a
-   saved loopback configuration, it first discovers or starts the local server,
-   then it
-   resolves the saved or local-default endpoint, discovers models, preserves a
-   compatible pin or selects the only compatible loaded model, performs the
-   managed contract probe, and saves a revision-bound readiness receipt. When
-   Forge cannot decide safely, it gives one exact action such as starting LM
-   Studio, loading or selecting a model, or supplying a credential. Endpoint,
+4. In **Provider**, turn on LM Studio, Claude Code Desktop, or Codex Desktop.
+   Only one provider can be selected. The toggle verifies or
+   transactionally provisions the Forge-owned integration before selection;
+   for LM Studio it runs **Connect and Check** first and selects only after the
+   saved configuration is ready;
+   switching away leaves an installed integration available for later use.
+   A desktop provider with a nonterminal task cannot be selected, deselected,
+   repaired, or removed until that task is finished or cancelled, preventing
+   mutation of an active host session's hook path.
+   Claude and Codex still require their normal user review of hook trust. Forge
+   never auto-approves a host permission prompt. For LM Studio, the activation
+   toggle and the explicit **Connect and Check** button use the same manager-owned
+   workflow. It resolves the
+   saved or local-default endpoint, discovers models, preserves a compatible
+   pin or selects the only compatible loaded model, performs the managed
+   contract probe, and saves a revision-bound readiness receipt. Endpoint,
    exact model identifiers, credentials, inventory refresh, and probe details
-   remain under **Advanced connection settings**.
+   remain under **LM Studio Advanced**.
+   The Grok Build card remains visible but non-selectable in this release. Its
+   Forge-owned artifacts may be inspected or removed; no ready, run, or live
+   support state is claimed.
 5. Add instruction packages to the registered project. Files are admitted by
    inspected content rather than a filename whitelist. Forge preserves the
    originals, normalizes UTF-8/UTF-16 and supported native PDF, DOCX, RTF, and
@@ -123,11 +148,12 @@ routes each setup or recovery action to the view that owns it.
    ordered run artifact. Every quick-text input, regardless of size, is also
    published through this immutable project/run-bound pipeline. Prepare and
    Start carry the artifact digest rather than the full instruction body. Forge
-   uses the saved model plus manager-owned capability and completion defaults;
-   unchanged technical defaults are omitted from the start request and resolved
-   again by the Manager. Optional task label, saved-model
-   choice, and network authority remain under **Customize**; provider/adapter,
-   raw capability IDs, and raw completion-gate IDs are not routine inputs.
+   uses the saved LM Studio model or the desktop host's selected model plus
+   manager-owned capability and completion defaults; unchanged technical
+   defaults are omitted from the start request and resolved again by the
+   Manager. Optional task label, LM Studio saved-model choice, and network
+   authority remain under **Customize**; provider/adapter, raw capability IDs,
+   and raw completion-gate IDs are not routine inputs.
    Selecting **Show completion checks** exposes native checkboxes for a buildable
    project, no build errors, no build warnings, available tests, complete
    instruction delivery, and no unresolved operations. **On failure** selects
@@ -189,6 +215,13 @@ retaining at most 100 rolling rows. Both native clients stream responses through
 a 4 MiB ceiling. It is a turn-level operational view, not token streaming or a
 second persisted full conversation transcript.
 
+The Dashboard provider card and Guided Setup use the durable selected-provider
+contract rather than treating LM Studio health as a universal prerequisite.
+Claude or Codex can show **HOST READY** while LM Studio is offline only when
+their preparation is ready and the matching selection revision and verified
+receipt agree. Missing, stale, or non-selectable provider evidence fails closed
+and routes the operator back to **Provider**.
+
 At normal widths, CPU shares a row with GPU and Storage shares an equalized row
 with the compact Managed Activity frame; constrained widths stack those panels
 vertically. The activity list scrolls internally so it does not lengthen the
@@ -248,6 +281,46 @@ fences the current generation. Durable project memory and historical evidence
 remain available if the same repository is registered again. The app always
 shows a destructive-action confirmation before removal.
 
+## Provider selection
+
+The **Provider** tab presents mutually exclusive activation toggles for
+`lmstudio`, `claude-desktop`, and `codex-desktop`. LM Studio uses
+Forge-managed inference (`managed_provider_push`). The desktop products own
+their model session while Forge supplies orchestration and tools
+(`desktop_plugin_pull`). Forge installs supported plugin, hook, MCP, and host
+configuration artifacts where possible; it does not automate a private desktop
+UI or approve host permissions. Inactive installed Claude/Codex integrations
+can be repaired or selectively removed without altering unrelated host
+settings. The
+`grok-build` card remains visible but non-selectable because Grok's documented
+startup/prompt hook outputs do not supply Forge's initial assignment context to
+the model. Forge may clean up artifacts it owns, but does not report Grok as
+ready or admit a Grok run.
+
+Desktop removal is also fail-closed: when supported host CLI or live inventory
+cannot verify that registration is gone, Forge reports **Awaiting User Action**
+and preserves its owned artifacts and receipt. Remove the registration in the
+host, then retry; Forge does not claim success from deleting source files alone.
+
+Desktop project access is fail-closed as well. The generated MCP registration
+uses `serve --desktop-provider <provider-id>` and exposes no Forge project tool
+until `desktop_run_attach` consumes the current hook-issued capability. That
+capability is bound to the provider, session, run, project generation,
+selection revision, and deployment, expires after five minutes, and cannot be
+replayed. Session end, terminal run state, or replacement assignment revokes
+the attached client.
+
+See [Provider integrations](docs/PROVIDER-INTEGRATIONS.md) for paths, trust,
+failure behavior, repair, and removal.
+
+The packages, authenticated loopback bridge, transactional installation, and
+Manager contracts have deterministic source coverage. A generated receipt
+proves the Forge-owned artifact identity at its verification boundary; it does
+not prove that a desktop application is open, has reloaded the integration, or
+that a person accepted a host trust prompt. Live acceptance is recorded
+separately for Claude and Codex in the
+[qualification status](docs/QUALIFICATION-STATUS.md).
+
 ## LM Studio connection
 
 LM Studio is the MCP host. It launches Forge Conductor's `serve` command over
@@ -279,7 +352,7 @@ Detailed deployment and recovery behavior is documented in
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
 | **Rune Forge** | Native Development Policy source selection, a verbose bounded Policy Feed, violation/history inspection, delivery state, cached degraded operation, and atomic filtered policy-log export as JSONL, JSON, Markdown, or CSV |
 | **Autonomy** | Manager-owned runs, selectable native completion checks, per-task failure/retry instructions, continuity, and confirmed deletion of settled task history |
-| **Provider** | Local endpoint, model inventory, credentials, and contract probes |
+| **Provider** | Mutually exclusive LM Studio, Claude Code Desktop, and Codex Desktop activation; visible deferred Grok Build cleanup/compatibility state; transactional provisioning, repair/removal, operation state, and advanced LM Studio connection controls |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
 | **Events & Evidence** | Bounded audit events, receipts, diagnostics, and exports |
 

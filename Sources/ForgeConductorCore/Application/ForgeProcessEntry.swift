@@ -16,9 +16,27 @@ import Darwin
 ///
 /// Until this router runs, the SwiftUI `@main` ignored argv and never spoke MCP.
 public enum ForgeProcessEntry {
+    public enum ServeArgumentError: Error, LocalizedError, Equatable {
+        case duplicateDesktopProvider
+        case missingDesktopProvider
+        case unsupportedDesktopProvider(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .duplicateDesktopProvider:
+                "--desktop-provider may be specified only once"
+            case .missingDesktopProvider:
+                "--desktop-provider requires claude-desktop or codex-desktop"
+            case .unsupportedDesktopProvider(let value):
+                "unsupported desktop provider: \(value)"
+            }
+        }
+    }
+
     public enum Mode: Equatable {
         case gui
         case serve
+        case providerHook
         case managerRun(openBrowser: Bool)
         case managerOther // start/stop/restart/status — delegated if needed
     }
@@ -30,6 +48,10 @@ public enum ForgeProcessEntry {
         case "serve", "mcp-serve", "mcp":
             // `mcp` alone or `mcp serve` → stdio MCP
             return .serve
+        case "provider-hook":
+            // Argument validation happens in the bounded hook command. Classify
+            // even malformed invocations as headless so they can never start UI.
+            return .providerHook
         case "manager":
             let sub = args.dropFirst().first ?? "run"
             if sub == "run" || sub.hasPrefix("-") {
@@ -52,13 +74,49 @@ public enum ForgeProcessEntry {
         return nil
     }
 
+    /// Returns the immutable package role selected by a generated desktop MCP
+    /// command. Environment variables cannot opt an ordinary `serve` process
+    /// into this authority-bearing role.
+    public static func desktopProviderID(
+        inServeArguments arguments: [String]
+    ) throws -> ProviderIntegrationID? {
+        let indices = arguments.indices.filter { arguments[$0] == "--desktop-provider" }
+        guard indices.count <= 1 else { throw ServeArgumentError.duplicateDesktopProvider }
+        guard let index = indices.first else { return nil }
+        let valueIndex = arguments.index(after: index)
+        guard valueIndex < arguments.endIndex,
+              !arguments[valueIndex].hasPrefix("-") else {
+            throw ServeArgumentError.missingDesktopProvider
+        }
+        let value = arguments[valueIndex]
+        guard let providerID = ProviderIntegrationID(rawValue: value),
+              DesktopProviderMCPAttachmentRequest.isSelectableDesktopProvider(providerID) else {
+            throw ServeArgumentError.unsupportedDesktopProvider(value)
+        }
+        return providerID
+    }
+
     /// Run stdio MCP until stdin closes. Does not return on success (process exits 0).
-    public static func runServe(home: URL? = nil) -> Never {
+    public static func runServe(
+        home: URL? = nil,
+        arguments: [String] = CommandLine.arguments
+    ) -> Never {
         do {
-            let app = try ForgeApp.bootstrap(home: home ?? homeOverride())
+            let desktopProviderID = try desktopProviderID(inServeArguments: arguments)
+            let app = try ForgeApp.bootstrap(
+                home: home ?? homeOverride(from: arguments)
+            )
             // MCP owns stdout. Normal lifecycle diagnostics are persisted by
             // DiagnosticLog; keep stderr quiet unless startup actually fails.
-            let server = MCPServer(app: app)
+            let server = if let desktopProviderID {
+                MCPServer(
+                    app: app,
+                    role: .primary,
+                    desktopProviderID: desktopProviderID
+                )
+            } else {
+                MCPServer(app: app)
+            }
             do {
                 try server.run()
             } catch {
@@ -90,13 +148,30 @@ public enum ForgeProcessEntry {
         }
     }
 
+    /// Run one authenticated desktop-provider hook without bootstrapping `ForgeApp`.
+    public static func runProviderHook(
+        arguments: [String] = CommandLine.arguments
+    ) -> Never {
+        do {
+            try DesktopProviderHookCommand.run(arguments: Array(arguments.dropFirst(2)))
+            exit(0)
+        } catch {
+            // Hook stdout is a protocol channel. Keep diagnostics generic and
+            // never include payloads, credentials, or configured filesystem paths.
+            fputs("forge-conductor provider-hook failed\n", stderr)
+            exit(2)
+        }
+    }
+
     /// Handle non-GUI modes. Returns only when mode is `.gui` (caller should start SwiftUI).
     public static func runNonGUIIfNeeded(arguments: [String] = CommandLine.arguments) {
         switch parseMode(arguments: arguments) {
         case .gui:
             return
         case .serve:
-            runServe(home: homeOverride(from: arguments))
+            runServe(home: homeOverride(from: arguments), arguments: arguments)
+        case .providerHook:
+            runProviderHook(arguments: arguments)
         case .managerRun(let open):
             runManager(home: homeOverride(from: arguments), openBrowser: open)
         case .managerOther:

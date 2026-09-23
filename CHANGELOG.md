@@ -10,6 +10,64 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Current development line
+
+- Version `0.14.0 (6)` is the current unreleased development identity. Its
+  provider-integration, secure desktop attachment, native UI, and qualification
+  changes are recorded in the development section below; no distribution or
+  shipment is claimed.
+
+## [0.14.0] — 2026-09-23 (development)
+
+### Added
+
+- Added mutually exclusive Provider activation for LM Studio, Claude Code
+  Desktop, and Codex Desktop. LM Studio retains Forge-managed model turns;
+  selectable desktop providers retain their host-selected model and session.
+- Added a visible, non-selectable Grok Build compatibility card. Forge can
+  inspect or remove its own staged artifacts, but does not advertise Grok as
+  ready or admit Grok runs because the documented Grok startup/prompt hook
+  outputs cannot deliver Forge's initial assignment context to the model.
+- Added transactional Forge-owned desktop plugin, hook, skill, and MCP
+  provisioning with ownership verification, compatible settings merges,
+  supported-CLI JSON activation verification, rollback, repair, selective
+  removal, restart reconciliation, cancellation, and a bounded redacted
+  operation ledger. Generated hooks and MCP registrations share the same
+  explicit Forge home.
+- Made desktop removal fail closed at the host-registration boundary. When
+  supported CLI/live inventory cannot verify unregister, Forge preserves its
+  owned files and receipt, reports **Awaiting User Action**, and settles an
+  idempotent retry only after host removal is verifiable.
+- Added authenticated loopback Manager endpoints for provider snapshots,
+  selection, operations, repair, removal, and bounded desktop hook events, plus
+  the internal `provider-hook <provider-id> <event> --home <path>` bridge.
+- Added provider-fenced desktop MCP launches and the `desktop_run_attach`
+  bootstrap. Hook assignment context carries a five-minute, single-use
+  capability bound to the exact provider, session, run, project generation,
+  selection revision, and deployment; all other Forge tools fail closed until
+  attachment, and session/run termination revokes the binding.
+
+### Changed
+
+- Bound Autonomy preparation and admission to the exact durable provider
+  selection and verified deployment revision. Desktop runs record
+  `desktop_plugin_pull` and `host-selected`; they do not activate LM Studio's
+  managed-provider-push runtime or claim to own a private desktop conversation.
+- Serialized provider mutations against run admission and reject selecting,
+  deselecting, repairing, or removing a desktop provider until its nonterminal
+  tasks are finished or cancelled, so its host hook path cannot be stranded.
+- Reworked Provider into activation and operation cards while retaining LM
+  Studio endpoint, model, credential, inventory, and contract-probe controls
+  under **LM Studio Advanced**. Turning on LM Studio runs **Connect and Check**
+  first and changes selection only after current readiness is verified.
+- Made Dashboard and Guided Setup project the selected provider's readiness.
+  Claude or Codex can report **HOST READY** independently of LM Studio health
+  only when ready preparation, the current selection revision, and its verified
+  receipt agree; stale, missing, or non-selectable evidence fails closed.
+- Advanced the development identity from `0.13.0 (5)` to `0.14.0 (6)` for this
+  backward-compatible provider-integration feature release. This is not a
+  shipment claim, and live desktop-host acceptance remains separate.
+
 ## [0.13.0] — 2026-09-23 (development)
 
 ### Added

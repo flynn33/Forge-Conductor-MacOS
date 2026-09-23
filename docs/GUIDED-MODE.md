@@ -33,8 +33,12 @@ opens on first use and remembers the selected step across relaunches. Its eight
 steps are the supported operating order:
 
 1. **Confirm Forge is ready** — verify Manager is running.
-2. **Connect the model provider** — load a tool-capable model in LM Studio, then
-   use Provider's single **Connect and Check** action.
+2. **Select and verify the provider** — start LM Studio, Claude Code Desktop,
+   or Codex Desktop, turn on that provider's single activation
+   toggle, and complete the exact connection, reload, activation, or trust
+   action shown by Provider. The LM Studio toggle runs **Connect and Check**
+   before selection; the same action remains available under **LM Studio
+   Advanced** for an explicit recheck.
 3. **Register the project** — select the exact repository; normal registration
    authorizes that folder without a separate parent-root setup step.
 4. **Add and order instructions** — import packages, review their capabilities
@@ -53,6 +57,21 @@ Every step states its readiness condition, ordinary actions, recovery guidance,
 and links to the owning view. **Next required step** uses current Manager,
 Provider, project, package, and run state to recommend a step. It is navigation
 guidance only: it does not change configuration, start a run, or approve a gate.
+
+Only one provider can be selected. Desktop-host activation may transactionally
+install or update Forge-owned plugin, hook, skill, and MCP files, but the wizard
+does not approve host permissions. Claude and Codex can require a user trust
+review; any remaining host action stays visible in Provider. LM Studio uses a
+Forge-managed session, while desktop providers retain their model and
+conversation and exchange orchestration context at the hook boundary. A
+desktop provider with unfinished tasks cannot be selected, deselected,
+repaired, or removed until those tasks are finished or cancelled through
+Autonomy.
+
+Grok Build remains visible in Provider but is non-selectable in 0.14.0. Its
+documented startup and prompt hook outputs cannot deliver Forge's initial
+assignment context to the model, so Guided Setup never treats Grok package
+presence as readiness and cannot advance a Grok run.
 
 ## Context inside sheets and focused controls
 
@@ -77,9 +96,11 @@ product controls rather than hidden guide side effects.
 
 Autonomy guidance distinguishes loading, missing project, provider action, and
 task-ready states. Continuity explains whether operations exist and the state of
-the selected operation. Provider guidance distinguishes unsaved settings,
-verified readiness, and connection/setup work. Runtimes guidance reports the
-selected job state or that no runtime job needs attention.
+the selected operation. Provider guidance distinguishes the durable selection,
+provisioning operation, remaining desktop-host action, verified deployment,
+repair/removal availability, and LM Studio's unsaved or unverified advanced
+connection settings. Runtimes guidance reports the selected job state or that
+no runtime job needs attention.
 
 Dashboard guidance explains the bounded, coalesced Managed Activity projection,
 including its current inferred instruction step, durable delivered count,
@@ -89,6 +110,11 @@ availability, five-second view-owned refresh, 100-row presentation bound,
 128-assistant plus 128-tool per-run retention, 2 KiB durable event, 8 KiB
 presentation, and 4 MiB streamed-response bounds, and the explicit boundary
 that it is not token streaming or a second full transcript.
+Its provider step and Dashboard card use the same selected-provider projection:
+Claude or Codex can report **HOST READY** independently of LM Studio health only
+when ready preparation, the matching selection revision, and a verified receipt
+agree. Missing, stale, in-flight, or non-selectable evidence fails closed and
+keeps the Provider step actionable.
 
 Rune Forge guidance explains Development Policy source selection, immediate
 acceptance, bounded interpretation states, violation and occurrence history,

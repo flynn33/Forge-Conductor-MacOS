@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.13.0)
+# Context & Agent Continuity (v0.14.0)
 
 ## Summary
 
@@ -108,8 +108,9 @@ available width.
 **Protection** is an operator-facing state, not a generic alarm. The detail and
 next-action text explain the exact transition:
 
-- provider or LM Studio failures retain the saved task and offer **Open
-  Provider**, where **Connect and Check** repairs readiness;
+- provider failures retain the saved task and offer **Open Provider**. LM Studio
+  readiness is repaired with **Connect and Check**; a desktop-host failure uses
+  the exact action or **Repair Integration** shown on that provider's card;
 - automatic completion failures offer **Open Autonomy**, where the named check
   is corrected and retried without a gate policy or restored environment;
 - an explicitly declared custom native gate is handled in Autonomy with its

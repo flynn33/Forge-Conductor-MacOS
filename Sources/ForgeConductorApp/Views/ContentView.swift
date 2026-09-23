@@ -252,6 +252,37 @@ struct ContentView: View {
     }
 }
 
+struct GuidedSetupProviderStatus: Equatable {
+    let isReady: Bool
+    let label: String
+    let detail: String
+
+    static func compose(_ provider: RigProviderProjection) -> Self {
+        guard provider.isReady else {
+            return Self(
+                isReady: false,
+                label: "Next",
+                detail: provider.id == nil
+                    ? "Select and connect a model provider."
+                    : provider.detail
+            )
+        }
+        if provider.executionMode == .desktopHost {
+            return Self(
+                isReady: true,
+                label: "Ready",
+                detail: "\(provider.displayName) is ready for host-managed execution."
+            )
+        }
+        return Self(
+            isReady: true,
+            label: "Ready",
+            detail: provider.model.map { "Connected to \($0)." }
+                ?? "The configured provider is reachable."
+        )
+    }
+}
+
 private struct GuidedSetupWizardView: View {
     private enum Kind {
         case manager
@@ -297,14 +328,16 @@ private struct GuidedSetupWizardView: View {
             title: "Connect the model provider",
             symbol: "network",
             purpose: "Forge needs one reachable, tool-capable model before it can prepare autonomous work.",
-            readyWhen: "Provider reports Reachable or Contract valid and names the selected model.",
+            readyWhen: "Provider shows Ready. LM Studio names its validated model; desktop hosts show an active Forge integration and host-managed execution.",
             actions: [
                 "For LM Studio, install/load a tool-capable model, then choose Connect and Check once.",
                 "Forge discovers the local server, starts it when possible, selects a loaded compatible model, and validates the contract.",
-                "For another supported provider, select and connect it in Provider.",
+                "For Claude Code Desktop or Codex Desktop, select the provider and let Forge install and verify its host integration.",
+                "Grok Build remains visible for status, but it is not start-ready until its host exposes supported automatic task ingress.",
             ],
             recovery: [
                 "If connection fails, keep LM Studio open with a model loaded and run Connect and Check again.",
+                "For a desktop host, follow the exact activation or repair action shown on its Provider card.",
                 "The Provider view shows the exact next action; no port guessing should be necessary for local LM Studio.",
             ],
             destinations: [(.provider, "Open Provider")]
@@ -533,7 +566,7 @@ private struct GuidedSetupWizardView: View {
     }
 
     private var providerReady: Bool {
-        ["reachable", "contract_valid"].contains(snapshot.providerHealth)
+        GuidedSetupProviderStatus.compose(snapshot.selectedProvider).isReady
     }
 
     private var needsAttention: Bool {
@@ -657,11 +690,21 @@ private struct GuidedSetupWizardView: View {
                 ? ("Ready", "Manager is running.", "checkmark.circle.fill", .green)
                 : ("Action required", "Manager is not running.", "exclamationmark.triangle.fill", .orange)
         case .provider:
-            if providerReady {
-                return ("Ready", snapshot.providerModel.map { "Connected to \($0)." }
-                    ?? "The configured provider is reachable.", "checkmark.circle.fill", .green)
+            let providerStatus = GuidedSetupProviderStatus.compose(snapshot.selectedProvider)
+            if providerStatus.isReady {
+                return (
+                    providerStatus.label,
+                    providerStatus.detail,
+                    "checkmark.circle.fill",
+                    .green
+                )
             }
-            return ("Next", "Connect and validate a model provider.", "arrow.right.circle.fill", .accentColor)
+            return (
+                providerStatus.label,
+                providerStatus.detail,
+                "arrow.right.circle.fill",
+                .accentColor
+            )
         case .project:
             if let project = snapshot.projectName {
                 return ("Ready", "\(project) is the current registered project.", "checkmark.circle.fill", .green)

@@ -48,8 +48,12 @@ cards and one full-width project-progress row. They combine the existing bounded
 telemetry frame with a separate
 five-second, view-owned Manager refresh:
 
-- **LM Studio** distinguishes a reachable headless Provider API from process
-  presence alone and labels its desktop Chat as separate.
+- **Provider** projects the durable selected provider. LM Studio distinguishes
+  a reachable headless Provider API from process presence alone and labels its
+  desktop Chat as separate. Claude or Codex can show **HOST READY** independent
+  of LM Studio health only when ready preparation, the current selection
+  revision, and a verified receipt agree. Missing, stale, in-flight, or
+  non-selectable evidence fails closed.
 - **Autonomy** reports manager service state plus bounded active/deferred load.
 - **Continuity** reports automatic monitoring, active rollover, attention, and
   the greatest available context-load fraction.
@@ -129,6 +133,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.13.0`
+`0.14.0`
 
-Build: `5`
+Build: `6`

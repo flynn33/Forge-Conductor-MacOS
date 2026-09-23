@@ -33,7 +33,7 @@ final class DashboardTests: XCTestCase {
             .appendingPathComponent("forge-dash2-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: home) }
 
-        // Seed production telemetry UI so / serves FORGE RIG (same path as live install).
+        // Seed production telemetry UI so / serves Dashboard (same path as live install).
         try Self.seedTelemetryStatic(into: home)
 
         let app = try ForgeApp.bootstrap(home: home)
@@ -47,8 +47,9 @@ final class DashboardTests: XCTestCase {
         let (data, http) = try HTTPTestHelpers.fetch(url)
         XCTAssertEqual(http.statusCode, 200)
         let body = String(data: data, encoding: .utf8) ?? ""
-        // Package resources serve FORGE RIG; fallback control surface uses Forge-Conductor.
-        let okTitle = body.contains("FORGE") || body.contains("Forge-Conductor") || body.contains("Forge Conductor")
+        // Package resources serve Dashboard; fallback control surface uses Forge-Conductor.
+        let okTitle = body.contains("DASHBOARD") || body.contains("Dashboard")
+            || body.contains("Forge-Conductor") || body.contains("Forge Conductor")
         XCTAssertTrue(okTitle, "Unexpected index body prefix: \(body.prefix(120))")
         XCTAssertTrue(
             body.contains("/api/snapshot") || body.contains("/api/status") || body.contains("api/"),

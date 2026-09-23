@@ -59,11 +59,20 @@ extension AutonomyViewModel {
                 recommendedAction: "Register or relink the project in Projects."
             )
         }
-        if provider?.health != "reachable" && provider?.health != "contract_valid" {
+        if usesDesktopProviderPreparation, runPreparation?.state != "ready" {
+            return .init(
+                status: "Desktop provider action is required",
+                detail: runPreparation?.detail
+                    ?? "The selected desktop provider integration is not ready for a managed task.",
+                recommendedAction: "Open Provider and choose Repair Integration for the selected desktop provider."
+            )
+        }
+        if !usesDesktopProviderPreparation,
+           provider?.health != "reachable" && provider?.health != "contract_valid" {
             return .init(
                 status: "Provider action is required",
                 detail: "The saved model provider is not currently ready for a managed task.",
-                recommendedAction: "Open Provider and test the saved connection."
+                recommendedAction: "Open Provider and choose Connect and Check for LM Studio."
             )
         }
         return .init(
@@ -112,6 +121,55 @@ extension ProviderViewModel {
                 recommendedAction: nil
             )
         }
+        let selectedID = selectedProviderID
+        let selectedDescriptor = selectedID.flatMap { identifier in
+            providerDescriptors.first(where: { $0.id == identifier })
+        }
+        let selectedIntegration = selectedID.flatMap { integration(for: $0) }
+        let selectedOperation = currentProviderOperation.flatMap { operation in
+            operation.providerID == selectedID ? operation : nil
+        }
+        if selectedDescriptor?.executionStrategy == .desktopPluginPull {
+            if selectedDescriptor?.selectable != true {
+                return .init(
+                    status: "Desktop provider is not supported",
+                    detail: selectedDescriptor?.detail
+                        ?? "This desktop provider cannot currently receive a complete Forge assignment.",
+                    recommendedAction: selectedIntegration?.receipt == nil
+                        ? "Choose a supported execution provider."
+                        : "Deactivate it and remove the legacy integration, then choose a supported provider."
+                )
+            }
+            if let selectedOperation,
+               (selectedOperation.phase == .awaitingUserAction
+                || selectedOperation.phase == .failedRecoverable) {
+                return .init(
+                    status: "Desktop provider action is required",
+                    detail: selectedOperation.detail
+                        ?? "The selected desktop provider integration needs attention.",
+                    recommendedAction: "Complete the named host action, then choose Repair Integration."
+                )
+            }
+            if selectedIntegration?.receipt != nil, selectedOperation?.isTerminal != false {
+                return .init(
+                    status: "Desktop provider is ready",
+                    detail: "The selected Forge-owned desktop integration has a verified deployment receipt. Live activation is checked again when a task starts.",
+                    recommendedAction: nil
+                )
+            }
+            return .init(
+                status: "Desktop provider setup is required",
+                detail: "The selected desktop provider does not yet have a verified Forge integration.",
+                recommendedAction: "Choose Repair Integration for the selected desktop provider."
+            )
+        }
+        if selectedID == nil {
+            return .init(
+                status: "An execution provider is required",
+                detail: "No provider is selected for managed tasks.",
+                recommendedAction: "Activate LM Studio or a supported desktop provider."
+            )
+        }
         if hasUnsavedChanges {
             return .init(
                 status: "Provider changes are not saved",
@@ -132,7 +190,7 @@ extension ProviderViewModel {
                 ? "Settings are saved, but a usable connection has not been confirmed."
                 : "No complete provider configuration is saved.",
             recommendedAction: configuration?.saved == true
-                ? "Choose Test Connection."
+                ? "Choose Connect and Check."
                 : "Enter the LM Studio endpoint and model, then save."
         )
     }

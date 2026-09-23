@@ -1,15 +1,23 @@
 # Forge Conductor architecture
 
-Forge Conductor is a native macOS orchestration server for local models hosted by LM Studio. The same codebase supplies a SwiftUI/Metal operator app, a CLI, a persistent local manager, and MCP stdio connector processes.
+Forge Conductor is a native macOS orchestration server for managed local models
+hosted by LM Studio and for Forge-integrated desktop coding hosts. The same
+codebase supplies a SwiftUI/Metal operator app, a CLI, a persistent local
+manager, desktop hook/plugin packages, and MCP stdio connector processes.
 
 ## Design rules
 
 1. `ForgeConductorCore` contains reusable domain and service modules; executable targets are composition and presentation shells.
-2. Dependencies point inward through Swift protocols. LM Studio installation and MCP verification are injected ports, not hard-coded global calls.
+2. Dependencies point inward through Swift protocols. Provider installation,
+   host CLI execution, hook forwarding, and MCP verification are injected ports,
+   not hard-coded global calls.
 3. The Apple-native stack is Foundation, SwiftUI, AppKit, Combine, Metal, Network, IOKit, Mach, SQLite3, and FileManager. The runtime does not require Node or Python.
 4. Framework features are exposed through modular `ToolPackHandling` implementations and stable MCP tool names.
-5. Primary and fallback LM Studio connectors are independent processes with typed identities and aggregate health.
-6. Persistent sessions, active bindings, memory notes, and context handoffs survive process restarts.
+5. Primary and fallback LM Studio connectors are independent processes with
+   typed identities and aggregate health; desktop hosts retain ownership of
+   their model and session.
+6. Persistent sessions, provider selection, active bindings, memory notes, and
+   context handoffs survive process restarts.
 
 The implemented Rune Forge Development Policy feature adds a manager-owned,
 non-interfering observer and policy-log boundary without entering tool
@@ -99,6 +107,13 @@ internally, while `ViewThatFits` supplies a vertical fallback at constrained
 widths. Settings, Autonomy, Continuity, and Rune Forge controls use adaptive
 grids or bounded scrollable sheets rather than fixed overflowing action rows.
 
+Dashboard and Guided Setup derive provider readiness from the durable selected
+provider. A Claude or Codex selection can project **HOST READY** independently
+of LM Studio health only when the descriptor is selectable, a verified receipt
+exists, no mutation is in flight, and ready preparation matches both provider
+identity and selection revision. Missing, stale, or non-selectable evidence is
+never promoted to ready.
+
 Its pinned authority, current-source ownership map, preserved surfaces, and
 delivery state are recorded in [Rune Forge and Stjornarvald](STJORNARVALD.md).
 Its 40-row implementation result and explicit physical accessibility limit are
@@ -162,6 +177,7 @@ ForgeApp.bootstrap(home:)
   -> ManagedAutonomyRuntime + ManagedContinuityWorker
   -> ResourcePolicy + RuntimeDiagnostics
   -> LM Studio installer/verifier/deploy services
+  -> ProviderIntegrationCoordinator + provider adapters + desktop hook policy
   -> ToolAuthorizationService -> ToolRouter -> modular tool packs
   -> TelemetryService
 ```
@@ -191,6 +207,63 @@ use the saved revision. Unsaved edits, active runs, and overlapping operations
 cannot silently replace that configuration. The router forwards these controls
 to the current manager after replacement. See the
 [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
+
+## Provider integration ownership
+
+`ProviderIntegrationCoordinator` is the single actor owner of the durable,
+mutually exclusive provider selection, deployment receipts, current operation,
+and bounded recent-operation ledger. Every activation, deactivation, repair,
+or removal request is revision-fenced and idempotency-keyed. Selection changes
+only after the requested adapter reaches a usable state; failure or cancellation
+retains the prior selection. Startup converts an interrupted operation to an
+honest recovered terminal state rather than replaying an unknown host mutation.
+Manager admission serializes provider mutations against run creation. A
+desktop provider with a nonterminal run cannot be selected, deselected,
+repaired, or removed.
+
+LM Studio's adapter composes the existing transactional primary, fallback, and
+continuity-role deployment with `managed_provider_push`. Claude and Codex
+adapters use `DesktopProviderPluginInstaller` to stage deterministic
+Forge-owned plugin, hook, skill, and MCP files, merge compatible host settings,
+invoke a supported host CLI when available, verify the committed result, and
+roll back a failed commit. Foreign paths, symbolic links, malformed settings,
+and unproved ownership are refused. Removal is available only while a provider
+is inactive and is limited to artifacts Forge can prove it owns.
+Host unregister is a separate verified boundary: an unavailable or inconclusive
+supported CLI/live inventory leaves local artifacts and the receipt intact in
+**Awaiting User Action**. Source-file deletion alone is never recorded as host
+removal; a retry after manual unregister settles idempotently.
+
+The Grok descriptor and ownership adapter remain for recognition and cleanup,
+but `grok-build` is non-selectable and cannot admit a run. Grok's documented
+passive startup output does not affect model context and prompt-submit stdout is
+discarded, so a staged or enabled package is not assignment-ingress evidence.
+
+Generated desktop hooks and MCP registrations use the same explicit canonical
+Forge home. Hooks invoke `provider-hook ... --home <forge-home>` and MCP invokes
+`serve --home <forge-home> --desktop-provider <provider-id>`; neither depends on
+a GUI application's inherited shell environment to locate Forge state. The
+command-line provider role is immutable and starts without project authority.
+The current hook assignment carries a five-minute, single-use capability whose
+digest is stored on the autonomous-run binding. `desktop_run_attach` atomically
+consumes it and copies that run's frozen authorization scope to the exact MCP
+client. Provider, session, run, project generation, selection revision, and
+deployment must all still match. Every other project tool is rejected before
+attachment, and replacement assignment, session end, terminal state, restart
+recovery, or deletion revokes the binding. Supported host CLI JSON inventories
+must report the exact Forge plugin enabled before activation is considered
+verified. Host reload and permission/trust acceptance remain separate user
+actions when the host requires them.
+
+Selectable desktop runs bind `desktop_plugin_pull`, `host-selected`, the provider-selection
+revision, and verified deployment identity. They do not activate the managed
+provider coordinator; checkpoint and continuity context crosses the
+authenticated desktop-hook boundary while the host retains its conversation.
+`DesktopProviderHookBridge` accepts bounded event envelopes and sends them only
+to the authenticated loopback Manager route. Its policy never auto-allows a
+permission request and can deny only a recognized Forge MCP call when that host
+is inactive or local policy is unavailable. See
+[Provider integrations](PROVIDER-INTEGRATIONS.md).
 
 ## Project instruction queue ownership
 
@@ -248,6 +321,9 @@ resolve executable
 - Dashboard HTTP binds only to `localhost`, `127.0.0.1`, or `::1`.
 - Browser mutations require same-origin JSON. Wildcard CORS is not emitted.
 - Privileged tool invocation is not exposed over HTTP; it is available over the LM Studio MCP stdio boundary.
+- Desktop provider hooks use the owner-only Manager bearer, reject redirects
+  and non-loopback destinations, and validate bounded request/response JSON.
+  They never auto-approve host permissions.
 - Agent grant/deny lists and configured workspace roots are enforced before tool dispatch.
 - Ordinary filesystem authorization canonicalizes paths and rejects traversal or
   symlink escape before dispatch. Privileged destructive mutation has additional
@@ -307,6 +383,14 @@ mitigate one ambiguity; without a provider request-ID lookup, retries can still
 repeat inference even though reconciled tool effects do not execute twice. Unit
 and synthetic-host results remain accurately distinguished from the live result.
 
+The 0.14.0 desktop-provider package, coordinator, route, hook, recovery, and
+ownership contracts require deterministic focused evidence and a canonical
+Xcode build. Those checks do not prove that Claude or Codex is open, has
+reloaded an integration, has accepted hook trust, or has completed a live
+session. Live acceptance is recorded separately per selectable host; one host
+cannot qualify the other. Grok requires a future supported assignment-ingress
+contract and fresh evidence before it can become selectable.
+
 ## Persistence
 
 `~/.forge-conductor` (or `FORGE_CONDUCTOR_HOME`) contains:
@@ -322,6 +406,10 @@ and synthetic-host results remain accurately distinguished from the live result.
 - `agents/*.md` for replaceable playbook modules
 - `memory/handoffs/*` and `memory/current-task.md` as rebuildable continuity projections
 - `config.json` for local configuration
+- `managed-providers/provider-integrations.json` for the bounded durable
+  selection, operation ledger, and redacted deployment receipts
+- `managed-providers/desktop-provider-plugins/` for Forge-owned staged desktop
+  packages and transaction backups
 - `instruction-packages/Store/<sha256>/` for immutable accepted instruction content
 - `instruction-packages/queue.json` for the owner-only project package order and durable run links
 
@@ -339,5 +427,5 @@ The staged bundle contains `Contents/Helpers/forge-conductor`,
 `Contents/MacOS/forge-filesystem-daemon`. Nested code is signed before the app
 seal and each artifact is strictly verified.
 
-Version: `0.13.0`
-Build: `5`
+Version: `0.14.0`
+Build: `6`

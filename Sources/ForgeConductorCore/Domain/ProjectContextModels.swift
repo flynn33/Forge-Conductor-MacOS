@@ -175,6 +175,148 @@ public struct ToolInvocationContext: Codable, Sendable, Equatable {
     }
 }
 
+/// One short-lived, single-use authority delivered only through a desktop
+/// provider's authenticated hook response. The raw token is never persisted;
+/// the control plane retains only its digest until an MCP client consumes it.
+public struct DesktopProviderMCPAttachmentCapability: Sendable, Equatable {
+    public let token: String
+    public let providerID: ProviderIntegrationID
+    public let runID: RunID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let sessionSHA256: String
+    public let selectionRevision: String
+    public let deploymentID: String
+    public let expiresAt: String
+
+    public var toolArguments: [String: Any] {
+        [
+            "attachment_token": token,
+            "provider_id": providerID.rawValue,
+            "run_id": runID.description,
+            "project_id": projectID.description,
+            "project_generation": Int(projectGeneration.rawValue),
+            "session_sha256": sessionSHA256,
+            "selection_revision": selectionRevision,
+            "deployment_id": deploymentID,
+        ]
+    }
+}
+
+/// Exact public input for the context-free desktop MCP bootstrap tool. Every
+/// non-secret identity is repeated so a copied token cannot be silently applied
+/// to a different host session, run, project generation, or deployment.
+public struct DesktopProviderMCPAttachmentRequest: Sendable, Equatable {
+    public let token: String
+    public let providerID: ProviderIntegrationID
+    public let runID: RunID
+    public let projectID: ProjectID
+    public let projectGeneration: ProjectGeneration
+    public let sessionSHA256: String
+    public let selectionRevision: String
+    public let deploymentID: String
+
+    public init(arguments: [String: Any]) throws {
+        let expectedKeys: Set<String> = [
+            "attachment_token", "provider_id", "run_id", "project_id",
+            "project_generation", "session_sha256", "selection_revision",
+            "deployment_id",
+        ]
+        guard Set(arguments.keys) == expectedKeys,
+              let token = arguments["attachment_token"] as? String,
+              Self.isLowercaseSHA256(token),
+              let providerRaw = arguments["provider_id"] as? String,
+              let providerID = ProviderIntegrationID(rawValue: providerRaw),
+              Self.isSelectableDesktopProvider(providerID),
+              let runRaw = arguments["run_id"] as? String,
+              let runUUID = UUID(uuidString: runRaw),
+              runRaw == runUUID.uuidString.lowercased(),
+              let projectRaw = arguments["project_id"] as? String,
+              let projectUUID = UUID(uuidString: projectRaw),
+              projectRaw == projectUUID.uuidString.lowercased(),
+              let generationValue = JSONSupport.exactInteger(arguments["project_generation"]),
+              generationValue > 0,
+              let generation = UInt64(exactly: generationValue),
+              let sessionSHA256 = arguments["session_sha256"] as? String,
+              Self.isLowercaseSHA256(sessionSHA256),
+              let selectionRevision = arguments["selection_revision"] as? String,
+              Self.validText(
+                selectionRevision,
+                maximumBytes: ProviderIntegrationContract.maximumRevisionBytes
+              ),
+              let deploymentID = arguments["deployment_id"] as? String,
+              Self.validText(
+                deploymentID,
+                maximumBytes: ProviderIntegrationContract.maximumArtifactVersionBytes
+              ) else {
+            throw DesktopProviderMCPAttachmentError.invalidRequest
+        }
+        self.token = token
+        self.providerID = providerID
+        self.runID = RunID(runUUID)
+        self.projectID = ProjectID(projectUUID)
+        self.projectGeneration = ProjectGeneration(generation)
+        self.sessionSHA256 = sessionSHA256
+        self.selectionRevision = selectionRevision
+        self.deploymentID = deploymentID
+    }
+
+    init(capability: DesktopProviderMCPAttachmentCapability) throws {
+        try self.init(arguments: capability.toolArguments)
+    }
+
+    static func isSelectableDesktopProvider(_ providerID: ProviderIntegrationID) -> Bool {
+        providerID == .claudeDesktop || providerID == .codexDesktop
+    }
+
+    static func isLowercaseSHA256(_ value: String) -> Bool {
+        value.utf8.count == 64 && value.unicodeScalars.allSatisfy {
+            (48...57).contains($0.value) || (97...102).contains($0.value)
+        }
+    }
+
+    private static func validText(_ value: String, maximumBytes: Int) -> Bool {
+        !value.isEmpty && value.utf8.count <= maximumBytes
+            && !value.unicodeScalars.contains {
+                CharacterSet.controlCharacters.contains($0)
+            }
+    }
+}
+
+public enum DesktopProviderMCPAttachmentError: Error, LocalizedError, Sendable, Equatable {
+    case invalidRequest
+    case unavailableForLaunchRole
+    case attachmentRequired
+    case rejected
+    case expired
+    case consumed
+    case staleAuthority
+    case clientConflict
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidRequest:
+            "The desktop MCP attachment request is invalid."
+        case .unavailableForLaunchRole:
+            "Desktop MCP attachment is unavailable for this server role."
+        case .attachmentRequired:
+            "Attach this desktop provider session before using Forge MCP tools."
+        case .rejected, .expired, .consumed, .staleAuthority:
+            "The desktop MCP attachment authority is invalid, expired, consumed, or stale."
+        case .clientConflict:
+            "This MCP client already has a conflicting project binding."
+        }
+    }
+}
+
+enum DesktopProviderMCPAttachmentContract {
+    static let toolName = "desktop_run_attach"
+    static let capabilityLifetime: TimeInterval = 5 * 60
+    static let capabilityMarkerPrefix = "desktop-attach-capability:v1:"
+    static let attachedMarkerPrefix = "desktop-attachment:v1:"
+    static let tokenByteCount = 32
+}
+
 public struct ProjectControlRecord: Codable, Sendable, Equatable {
     public let projectID: ProjectID
     public let displayName: String

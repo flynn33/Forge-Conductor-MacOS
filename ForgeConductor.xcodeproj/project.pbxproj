@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D14000000000000000000001 /* Application/DesktopProviderHookBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000001 /* Application/DesktopProviderHookBridge.swift */; };
+		D14000000000000000000002 /* Application/ProviderIntegrationAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000002 /* Application/ProviderIntegrationAdapters.swift */; };
+		D14000000000000000000003 /* Application/ProviderIntegrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000003 /* Application/ProviderIntegrationCoordinator.swift */; };
+		D14000000000000000000004 /* Domain/DesktopProviderHookModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000004 /* Domain/DesktopProviderHookModels.swift */; };
+		D14000000000000000000005 /* Domain/ProviderIntegrationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000005 /* Domain/ProviderIntegrationModels.swift */; };
+		D14000000000000000000006 /* Telemetry/DesktopProviderPluginInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000006 /* Telemetry/DesktopProviderPluginInstaller.swift */; };
+		D14000000000000000000007 /* DesktopProviderHookBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000007 /* DesktopProviderHookBridgeTests.swift */; };
+		D14000000000000000000008 /* DesktopProviderPluginInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000008 /* DesktopProviderPluginInstallerTests.swift */; };
+		D14000000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift */; };
+		D1400000000000000000000A /* ProviderIntegrationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F0000000000000000000A /* ProviderIntegrationCoordinatorTests.swift */; };
 		001774C6E9F20520035EF582 /* ContinuityOperationControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D47CF181E6BFB758EEA5F3 /* ContinuityOperationControlTests.swift */; };
 		A10100000000000000000001 /* Domain/StjornarvaldContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100000000000000000001 /* Domain/StjornarvaldContracts.swift */; };
 		A10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift */; };
@@ -612,6 +622,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D14F00000000000000000001 /* Application/DesktopProviderHookBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/DesktopProviderHookBridge.swift; sourceTree = "<group>"; };
+		D14F00000000000000000002 /* Application/ProviderIntegrationAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProviderIntegrationAdapters.swift; sourceTree = "<group>"; };
+		D14F00000000000000000003 /* Application/ProviderIntegrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProviderIntegrationCoordinator.swift; sourceTree = "<group>"; };
+		D14F00000000000000000004 /* Domain/DesktopProviderHookModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/DesktopProviderHookModels.swift; sourceTree = "<group>"; };
+		D14F00000000000000000005 /* Domain/ProviderIntegrationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProviderIntegrationModels.swift; sourceTree = "<group>"; };
+		D14F00000000000000000006 /* Telemetry/DesktopProviderPluginInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry/DesktopProviderPluginInstaller.swift; sourceTree = "<group>"; };
+		D14F00000000000000000007 /* DesktopProviderHookBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopProviderHookBridgeTests.swift; sourceTree = "<group>"; };
+		D14F00000000000000000008 /* DesktopProviderPluginInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopProviderPluginInstallerTests.swift; sourceTree = "<group>"; };
+		D14F00000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagerProviderIntegrationRoutesTests.swift; sourceTree = "<group>"; };
+		D14F0000000000000000000A /* ProviderIntegrationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderIntegrationCoordinatorTests.swift; sourceTree = "<group>"; };
 		01D901C4FF89B93FC118B0E5 /* Tests/ForgeConductorTests/NativeSourcePressureJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/NativeSourcePressureJournalTests.swift; sourceTree = SOURCE_ROOT; };
 		06F486323EB3408683EF6EDB /* Dashboard/OperationalRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dashboard/OperationalRoutes.swift; sourceTree = "<group>"; };
 		07FA0BDDBC7AAEE2DEEE463D /* Tests/ForgeConductorTests/SourceDerivedToolResultBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ForgeConductorTests/SourceDerivedToolResultBudgetTests.swift; sourceTree = SOURCE_ROOT; };
@@ -1120,6 +1140,10 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				D14F00000000000000000007 /* DesktopProviderHookBridgeTests.swift */,
+				D14F00000000000000000008 /* DesktopProviderPluginInstallerTests.swift */,
+				D14F00000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift */,
+				D14F0000000000000000000A /* ProviderIntegrationCoordinatorTests.swift */,
 				F10100000000000000000003 /* StjornarvaldPolicyLogTests.swift */,
 				F10200000000000000000003 /* StjornarvaldPolicySourceCatalogTests.swift */,
 				F10300000000000000000003 /* StjornarvaldRavenPolicyTests.swift */,
@@ -1403,6 +1427,12 @@
 		EF8AADDA82404E2F8ED4A976 /* ForgeConductorCore */ = {
 			isa = PBXGroup;
 			children = (
+				D14F00000000000000000001 /* Application/DesktopProviderHookBridge.swift */,
+				D14F00000000000000000002 /* Application/ProviderIntegrationAdapters.swift */,
+				D14F00000000000000000003 /* Application/ProviderIntegrationCoordinator.swift */,
+				D14F00000000000000000004 /* Domain/DesktopProviderHookModels.swift */,
+				D14F00000000000000000005 /* Domain/ProviderIntegrationModels.swift */,
+				D14F00000000000000000006 /* Telemetry/DesktopProviderPluginInstaller.swift */,
 				F10100000000000000000001 /* Domain/StjornarvaldContracts.swift */,
 				F10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift */,
 				F10200000000000000000001 /* Infrastructure/StjornarvaldNativePolicyExtractor.swift */,
@@ -1979,6 +2009,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D14000000000000000000007 /* DesktopProviderHookBridgeTests.swift in Sources */,
+				D14000000000000000000008 /* DesktopProviderPluginInstallerTests.swift in Sources */,
+				D14000000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift in Sources */,
+				D1400000000000000000000A /* ProviderIntegrationCoordinatorTests.swift in Sources */,
 				A10100000000000000000003 /* StjornarvaldPolicyLogTests.swift in Sources */,
 				A10200000000000000000003 /* StjornarvaldPolicySourceCatalogTests.swift in Sources */,
 				A10300000000000000000003 /* StjornarvaldRavenPolicyTests.swift in Sources */,
@@ -2233,6 +2267,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D14000000000000000000001 /* Application/DesktopProviderHookBridge.swift in Sources */,
+				D14000000000000000000002 /* Application/ProviderIntegrationAdapters.swift in Sources */,
+				D14000000000000000000003 /* Application/ProviderIntegrationCoordinator.swift in Sources */,
+				D14000000000000000000004 /* Domain/DesktopProviderHookModels.swift in Sources */,
+				D14000000000000000000005 /* Domain/ProviderIntegrationModels.swift in Sources */,
+				D14000000000000000000006 /* Telemetry/DesktopProviderPluginInstaller.swift in Sources */,
 				A10100000000000000000001 /* Domain/StjornarvaldContracts.swift in Sources */,
 				A10100000000000000000002 /* Infrastructure/StjornarvaldPolicyLogStore.swift in Sources */,
 				A10200000000000000000001 /* Infrastructure/StjornarvaldNativePolicyExtractor.swift in Sources */,
@@ -2607,7 +2647,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2623,7 +2663,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SKIP_INSTALL = YES;
@@ -2691,13 +2731,13 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -2718,7 +2758,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2737,7 +2777,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2757,7 +2797,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2775,7 +2815,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2791,7 +2831,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2802,7 +2842,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2901,7 +2941,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2917,7 +2957,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -2931,7 +2971,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2944,7 +2984,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2994,7 +3034,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3019,7 +3059,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3043,7 +3083,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3068,7 +3108,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3124,7 +3164,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3133,7 +3173,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3149,7 +3189,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3158,7 +3198,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3173,7 +3213,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3181,7 +3221,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3197,7 +3237,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3205,7 +3245,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3220,13 +3260,13 @@
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.13.0;
+				MARKETING_VERSION = 0.14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

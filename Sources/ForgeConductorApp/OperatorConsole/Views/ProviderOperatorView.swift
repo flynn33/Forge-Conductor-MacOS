@@ -17,7 +17,7 @@ struct ProviderOperatorView: View {
             VStack(alignment: .leading, spacing: 16) {
                 OperatorHeader(
                     title: "Provider",
-                    subtitle: "Automatic model readiness for managed tasks",
+                    subtitle: "Choose one execution provider. Forge manages LM Studio inference and orchestrates work in supported desktop coding hosts.",
                     isLoading: viewModel.isBusy,
                     titleAccessibilityIdentifier: "detail-provider",
                     subtitleAccessibilityIdentifier: "provider-operator-view",
@@ -32,12 +32,15 @@ struct ProviderOperatorView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("provider-probe-notice")
                 }
-                readiness
+                providerSelection
+                if let operation = viewModel.currentProviderOperation {
+                    providerOperation(operation)
+                }
                 Button {
                     showingAdvancedSettings.toggle()
                 } label: {
                     Label(
-                        "Advanced connection settings",
+                        "LM Studio Advanced",
                         systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
                     )
                 }
@@ -45,6 +48,7 @@ struct ProviderOperatorView: View {
                 .accessibilityIdentifier("provider-advanced-toggle")
                 if showingAdvancedSettings {
                     VStack(alignment: .leading, spacing: 16) {
+                        readiness
                         configurationEditor
                         if let provider = viewModel.provider {
                             providerDetail(provider)
@@ -56,8 +60,106 @@ struct ProviderOperatorView: View {
             .padding(20)
         }
         .task { viewModel.load() }
-        .onDisappear { viewModel.clearCredentialEntry() }
+        .onDisappear {
+            viewModel.clearCredentialEntry()
+            viewModel.stopObservingProviderOperation()
+        }
         .guidedHelpState(viewModel.guidedHelpState, for: .provider)
+    }
+
+    private var providerSelection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Execution provider")
+                    .font(.headline)
+                Spacer()
+                if let selected = viewModel.selectedProviderID,
+                   let descriptor = viewModel.providerDescriptors.first(where: { $0.id == selected }) {
+                    Text("Active: \(descriptor.displayName)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("No active provider")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 300), spacing: 12)],
+                alignment: .leading,
+                spacing: 12
+            ) {
+                ForEach(viewModel.providerDescriptors, id: \.displayName) { descriptor in
+                    ProviderSelectionCard(
+                        descriptor: descriptor,
+                        integration: viewModel.integration(for: descriptor.id),
+                        operation: viewModel.currentProviderOperation,
+                        selected: viewModel.isProviderSelected(descriptor.id),
+                        actionsDisabled: viewModel.isProviderToggleDisabled(descriptor.id),
+                        repairAvailable: viewModel.isProviderRepairAvailable(descriptor.id),
+                        removalDisabled: viewModel.isProviderRemovalDisabled(descriptor.id),
+                        onToggle: { enabled in
+                            viewModel.setProvider(descriptor.id, enabled: enabled)
+                        },
+                        onRepair: {
+                            viewModel.performProviderPrimaryAction(descriptor.id)
+                        },
+                        onRemove: {
+                            viewModel.removeProviderIntegration(descriptor.id)
+                        }
+                    )
+                }
+            }
+
+            if viewModel.isLoadingProviderRegistry, viewModel.integrations == nil {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Loading provider selection…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func providerOperation(
+        _ operation: ProviderIntegrationOperationSnapshot
+    ) -> some View {
+        GroupBox("Provider setup") {
+            VStack(alignment: .leading, spacing: 9) {
+                LabeledContent("Operation", value: operation.kind.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
+                if let providerID = operation.providerID,
+                   let descriptor = viewModel.providerDescriptors.first(where: { $0.id == providerID }) {
+                    LabeledContent("Provider", value: descriptor.displayName)
+                }
+                LabeledContent("Phase", value: operation.phase.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
+                if let detail = operation.detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                if let code = operation.errorCode, !code.isEmpty {
+                    LabeledContent("Error code", value: code)
+                        .foregroundStyle(.red)
+                }
+                if !operation.isTerminal {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityIdentifier("provider-operation-progress")
+                        Text("Forge is applying and verifying the provider integration.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Cancel", action: viewModel.cancelCurrentProviderOperation)
+                            .disabled(!viewModel.canCancelProviderOperation)
+                            .accessibilityIdentifier("provider-operation-cancel")
+                    }
+                }
+            }
+        }
     }
 
     private var readiness: some View {
@@ -273,5 +375,143 @@ struct ProviderOperatorView: View {
         case .supplyCredential: "Supply the required provider credential"
         case .retry: "Retry Connect and Check"
         }
+    }
+}
+
+private struct ProviderSelectionCard: View {
+    let descriptor: ProviderIntegrationDescriptor
+    let integration: ProviderIntegrationProviderSnapshot?
+    let operation: ProviderIntegrationOperationSnapshot?
+    let selected: Bool
+    let actionsDisabled: Bool
+    let repairAvailable: Bool
+    let removalDisabled: Bool
+    let onToggle: (Bool) -> Void
+    let onRepair: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(descriptor.detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                LabeledContent("Selection", value: selected ? "Active" : "Inactive")
+                LabeledContent("Setup", value: setupLabel)
+                LabeledContent("Execution", value: executionLabel)
+
+                if let receipt = integration?.receipt {
+                    LabeledContent("Artifact version", value: receipt.artifactVersion)
+                    LabeledContent("Verified", value: receipt.verifiedAt)
+                    ForEach(receiptConnectionDetails, id: \.key) { detail in
+                        LabeledContent(detail.label, value: detail.value)
+                    }
+                }
+
+                if let operation, operation.providerID == descriptor.id {
+                    LabeledContent("Latest operation", value: phaseLabel(operation.phase))
+                }
+
+                if showsActions {
+                    Divider()
+                    HStack(spacing: 10) {
+                        if repairAvailable {
+                            Button(repairActionLabel, action: onRepair)
+                                .disabled(actionsDisabled)
+                                .accessibilityIdentifier("provider-repair-\(descriptor.id.rawValue)")
+                        }
+                        if integration?.receipt != nil {
+                            Button("Remove Integration", role: .destructive, action: onRemove)
+                                .disabled(removalDisabled)
+                                .accessibilityIdentifier("provider-remove-\(descriptor.id.rawValue)")
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: iconName)
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                Text(descriptor.displayName)
+                    .font(.headline)
+                Spacer()
+                Toggle(
+                    "Activate \(descriptor.displayName)",
+                    isOn: Binding(
+                        get: { selected },
+                        set: onToggle
+                    )
+                )
+                .labelsHidden()
+                .disabled(actionsDisabled)
+                .accessibilityLabel("Activate \(descriptor.displayName)")
+                .accessibilityIdentifier("provider-toggle-\(descriptor.id.rawValue)")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("provider-card-\(descriptor.id.rawValue)")
+    }
+
+    private var setupLabel: String {
+        switch integration?.setupState ?? .notConfigured {
+        case .configured: "Configured"
+        case .notConfigured: "Not configured"
+        }
+    }
+
+    private var executionLabel: String {
+        switch descriptor.executionStrategy {
+        case .managedProviderPush: "Managed model execution"
+        case .desktopPluginPull: "Desktop host orchestration"
+        }
+    }
+
+    private var showsActions: Bool {
+        if integration?.receipt != nil { return true }
+        guard repairAvailable else { return false }
+        if selected { return true }
+        guard let operation, operation.providerID == descriptor.id else { return false }
+        return operation.phase == .failedRecoverable || operation.phase == .awaitingUserAction
+    }
+
+    private var repairActionLabel: String {
+        descriptor.executionStrategy == .managedProviderPush
+            ? "Connect and Check"
+            : "Repair Integration"
+    }
+
+    private var receiptConnectionDetails: [(key: String, label: String, value: String)] {
+        guard let metadata = integration?.receipt?.metadata else { return [] }
+        return metadata
+            .filter { key, _ in
+                let normalized = key.lowercased()
+                return normalized.contains("mcp") || normalized.contains("connection")
+            }
+            .map { key, value in
+                (
+                    key: key,
+                    label: "Receipt \(key.replacingOccurrences(of: "_", with: " ").capitalized)",
+                    value: value
+                )
+            }
+            .sorted { $0.key < $1.key }
+    }
+
+    private var iconName: String {
+        switch descriptor.id {
+        case .lmStudio: "cpu"
+        case .claudeDesktop: "sparkles"
+        case .codexDesktop: "chevron.left.forwardslash.chevron.right"
+        case .grokBuild: "terminal"
+        }
+    }
+
+    private func phaseLabel(_ phase: ProviderIntegrationOperationPhase) -> String {
+        phase.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }

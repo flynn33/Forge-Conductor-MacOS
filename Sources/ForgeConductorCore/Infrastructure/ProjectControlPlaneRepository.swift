@@ -3,6 +3,7 @@
 
 import Foundation
 import Darwin
+import Security
 import SQLite3
 
 // Opaque values are issued only in this repository file. Identifiers remain locators,
@@ -5119,6 +5120,11 @@ public actor ProjectControlPlaneRepository {
                 bindings: [.text(timestamp), .text(claim.acceptance.runID.description), .text(claim.acceptance.operationID.uuidString.lowercased())]) == 1 else {
                 throw ContinuityOperationControlError.conflict
             }
+            try revokeDesktopProviderMCPAttachmentsUnlocked(
+                runID: claim.acceptance.runID,
+                timestamp: timestamp,
+                connection: connection
+            )
             try connection.execute("UPDATE continuity_ingress_holds SET state='cancelled',updated_at=? WHERE operation_id=? AND run_id=?",
                 bindings: [.text(timestamp), .text(claim.acceptance.operationID.uuidString.lowercased()), .text(claim.acceptance.runID.description)])
             try connection.execute("UPDATE project_bindings SET active=0,updated_at=? WHERE owner_kind='provider_session' AND owner_id IN (SELECT session_id FROM provider_sessions WHERE run_id=? AND operation_id=?)",
@@ -6193,6 +6199,306 @@ public actor ProjectControlPlaneRepository {
         }
     }
 
+    /// Replaces any prior unconsumed authority for this run and temporarily
+    /// fences its prior desktop MCP client. The raw token leaves this method
+    /// exactly once and only its digest is committed to the existing run binding.
+    func issueDesktopProviderMCPAttachment(
+        runID: RunID,
+        providerID: ProviderIntegrationID,
+        sessionID: String,
+        selectionRevision: String,
+        deploymentID: String,
+        lifetime: TimeInterval = DesktopProviderMCPAttachmentContract.capabilityLifetime
+    ) throws -> DesktopProviderMCPAttachmentCapability {
+        guard DesktopProviderMCPAttachmentRequest.isSelectableDesktopProvider(providerID),
+              !sessionID.isEmpty,
+              sessionID.utf8.count <= DesktopProviderHookContract.maximumSessionIDBytes,
+              !selectionRevision.isEmpty,
+              selectionRevision.utf8.count <= ProviderIntegrationContract.maximumRevisionBytes,
+              !deploymentID.isEmpty,
+              deploymentID.utf8.count <= ProviderIntegrationContract.maximumArtifactVersionBytes,
+              lifetime.isFinite,
+              lifetime > 0,
+              lifetime <= DesktopProviderMCPAttachmentContract.capabilityLifetime else {
+            throw DesktopProviderMCPAttachmentError.invalidRequest
+        }
+        let token = try Self.secureDesktopAttachmentToken()
+        let sessionSHA256 = JSONSupport.sha256Hex(sessionID)
+        let issuedAt = clock.now()
+        let expiresAt = ISO8601.string(from: issuedAt.addingTimeInterval(lifetime))
+
+        return try controlledTransaction(
+            cancellation: nil,
+            fullDurability: true
+        ) { connection in
+            guard let run = try autonomousRunUnlocked(runID, connection: connection) else {
+                throw DesktopProviderMCPAttachmentError.staleAuthority
+            }
+            let request = try DesktopProviderMCPAttachmentRequest(arguments: [
+                "attachment_token": token,
+                "provider_id": providerID.rawValue,
+                "run_id": run.runID.description,
+                "project_id": run.projectID.description,
+                "project_generation": Int(run.projectGeneration.rawValue),
+                "session_sha256": sessionSHA256,
+                "selection_revision": selectionRevision,
+                "deployment_id": deploymentID,
+            ])
+            let runBinding = try validatedDesktopAttachmentRunUnlocked(
+                request,
+                run: run,
+                connection: connection
+            )
+            let identitySHA256 = try Self.desktopAttachmentIdentitySHA256(
+                request,
+                authorizationScope: runBinding.authorizationScope
+            )
+            let capabilityMarker = DesktopProviderMCPAttachmentContract.capabilityMarkerPrefix
+                + JSONSupport.sha256Hex(token) + ":" + identitySHA256
+            guard capabilityMarker.utf8.count <= 512 else {
+                throw DesktopProviderMCPAttachmentError.invalidRequest
+            }
+            let timestamp = ISO8601.string(from: issuedAt)
+
+            // A new hook context supersedes every earlier client for this run.
+            // Deactivate before deletion so no prior client remains usable at
+            // any point in this transaction's resulting committed state.
+            try connection.execute(
+                """
+                UPDATE project_bindings SET active=0,updated_at=?
+                WHERE owner_kind='mcp_client' AND run_id=? AND active=1
+                  AND lease_owner LIKE ?
+                """,
+                bindings: [
+                    .text(timestamp), .text(runID.description),
+                    .text(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + "%"),
+                ]
+            )
+            // The fresh capability is the only reattachment path. Removing the
+            // now-inactive prior client rows keeps repeated host/MCP restarts from
+            // accumulating one durable binding per generated client identifier.
+            try connection.execute(
+                """
+                DELETE FROM project_bindings
+                WHERE owner_kind='mcp_client' AND run_id=? AND active=0
+                  AND lease_owner LIKE ?
+                """,
+                bindings: [
+                    .text(runID.description),
+                    .text(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + "%"),
+                ]
+            )
+            let changed = try connection.execute(
+                """
+                UPDATE project_bindings SET lease_owner=?,lease_expires_at=?,updated_at=?
+                WHERE binding_id=? AND owner_kind='autonomous_run' AND owner_id=?
+                  AND project_id=? AND project_generation=? AND run_id=? AND active=1
+                """,
+                bindings: [
+                    .text(capabilityMarker), .text(expiresAt), .text(timestamp),
+                    .text(runBinding.bindingID.uuidString.lowercased()),
+                    .text(runID.description), .text(run.projectID.description),
+                    .int64(try Self.sqliteGeneration(run.projectGeneration)),
+                    .text(runID.description),
+                ]
+            )
+            guard changed == 1 else {
+                throw DesktopProviderMCPAttachmentError.staleAuthority
+            }
+            return DesktopProviderMCPAttachmentCapability(
+                token: token,
+                providerID: providerID,
+                runID: run.runID,
+                projectID: run.projectID,
+                projectGeneration: run.projectGeneration,
+                sessionSHA256: sessionSHA256,
+                selectionRevision: selectionRevision,
+                deploymentID: deploymentID,
+                expiresAt: expiresAt
+            )
+        }
+    }
+
+    /// Atomically consumes one hook-issued capability and binds this exact MCP
+    /// process to the autonomous run's frozen authorization scope.
+    func attachDesktopProviderMCPClient(
+        _ request: DesktopProviderMCPAttachmentRequest,
+        clientID: ClientID,
+        launchProviderID: ProviderIntegrationID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        guard request.providerID == launchProviderID,
+              DesktopProviderMCPAttachmentRequest.isSelectableDesktopProvider(
+                launchProviderID
+              ),
+              !clientID.rawValue.isEmpty,
+              clientID.rawValue.utf8.count <= 1_024,
+              !clientID.rawValue.hasPrefix("desktop-attach-") else {
+            throw DesktopProviderMCPAttachmentError.unavailableForLaunchRole
+        }
+        return try controlledTransaction(
+            cancellation: cancellation,
+            fullDurability: true
+        ) { connection in
+            guard let run = try autonomousRunUnlocked(request.runID, connection: connection) else {
+                throw DesktopProviderMCPAttachmentError.staleAuthority
+            }
+            let runBinding = try validatedDesktopAttachmentRunUnlocked(
+                request,
+                run: run,
+                connection: connection
+            )
+            let identitySHA256 = try Self.desktopAttachmentIdentitySHA256(
+                request,
+                authorizationScope: runBinding.authorizationScope
+            )
+            let capabilityMarker = DesktopProviderMCPAttachmentContract.capabilityMarkerPrefix
+                + JSONSupport.sha256Hex(request.token) + ":" + identitySHA256
+            guard runBinding.leaseOwner != nil else {
+                throw DesktopProviderMCPAttachmentError.consumed
+            }
+            guard runBinding.leaseOwner == capabilityMarker,
+                  let expiryString = runBinding.leaseExpiresAt,
+                  let expiry = ISO8601.date(from: expiryString) else {
+                throw DesktopProviderMCPAttachmentError.rejected
+            }
+            guard expiry > clock.now() else {
+                throw DesktopProviderMCPAttachmentError.expired
+            }
+
+            let owner = ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue)
+            let attachedMarker = DesktopProviderMCPAttachmentContract.attachedMarkerPrefix
+                + identitySHA256
+            if let existing = try bindingUnlocked(
+                owner: owner,
+                includeInactive: true,
+                connection: connection
+            ) {
+                guard !existing.active,
+                      existing.leaseOwner?.hasPrefix(
+                        DesktopProviderMCPAttachmentContract.attachedMarkerPrefix
+                      ) == true else {
+                    throw DesktopProviderMCPAttachmentError.clientConflict
+                }
+                let changed = try connection.execute(
+                    """
+                    UPDATE project_bindings SET project_id=?,project_generation=?,run_id=?,
+                        authorization_scope_json=?,lease_owner=?,lease_expires_at=NULL,
+                        active=1,updated_at=?
+                    WHERE owner_kind='mcp_client' AND owner_id=? AND active=0
+                    """,
+                    bindings: [
+                        .text(run.projectID.description),
+                        .int64(try Self.sqliteGeneration(run.projectGeneration)),
+                        .text(run.runID.description),
+                        .text(try Self.scopeJSON(runBinding.authorizationScope)),
+                        .text(attachedMarker),
+                        .text(ISO8601.string(from: clock.now())),
+                        .text(clientID.rawValue),
+                    ]
+                )
+                guard changed == 1 else {
+                    throw DesktopProviderMCPAttachmentError.clientConflict
+                }
+            } else {
+                let timestamp = ISO8601.string(from: clock.now())
+                try connection.execute(
+                    """
+                    INSERT INTO project_bindings(
+                        binding_id,owner_kind,owner_id,project_id,project_generation,run_id,
+                        authorization_scope_json,lease_owner,lease_expires_at,active,
+                        created_at,updated_at
+                    ) VALUES(?,'mcp_client',?,?,?,?,?,?,NULL,1,?,?)
+                    """,
+                    bindings: [
+                        .text(UUID().uuidString.lowercased()), .text(clientID.rawValue),
+                        .text(run.projectID.description),
+                        .int64(try Self.sqliteGeneration(run.projectGeneration)),
+                        .text(run.runID.description),
+                        .text(try Self.scopeJSON(runBinding.authorizationScope)),
+                        .text(attachedMarker), .text(timestamp), .text(timestamp),
+                    ]
+                )
+            }
+
+            let consumed = try connection.execute(
+                """
+                UPDATE project_bindings SET lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+                WHERE binding_id=? AND owner_kind='autonomous_run' AND owner_id=?
+                  AND active=1 AND lease_owner=? AND lease_expires_at=?
+                """,
+                bindings: [
+                    .text(ISO8601.string(from: clock.now())),
+                    .text(runBinding.bindingID.uuidString.lowercased()),
+                    .text(run.runID.description), .text(capabilityMarker), .text(expiryString),
+                ]
+            )
+            guard consumed == 1,
+                  let attached = try bindingUnlocked(
+                    owner: owner,
+                    includeInactive: false,
+                    connection: connection
+                  ) else {
+                throw DesktopProviderMCPAttachmentError.consumed
+            }
+            _ = try validatedDesktopMCPBindingUnlocked(
+                attached,
+                expectedProviderID: launchProviderID,
+                connection: connection
+            )
+            return attached.invocationContext(clientID: clientID)
+        }
+    }
+
+    func desktopProviderMCPAttachmentContext(
+        clientID: ClientID,
+        launchProviderID: ProviderIntegrationID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue)
+        return try controlledOperation(cancellation: cancellation) { connection in
+            guard let binding = try bindingUnlocked(
+                owner: owner,
+                includeInactive: false,
+                connection: connection
+            ) else {
+                throw DesktopProviderMCPAttachmentError.attachmentRequired
+            }
+            _ = try validatedDesktopMCPBindingUnlocked(
+                binding,
+                expectedProviderID: launchProviderID,
+                connection: connection
+            )
+            return binding.invocationContext(clientID: clientID)
+        }
+    }
+
+    func desktopProviderMCPBindingCount(runID: RunID? = nil) throws -> Int {
+        try controlledOperation(cancellation: nil) { connection in
+            if let runID {
+                return try connection.scalarInt(
+                    """
+                    SELECT COUNT(*) FROM project_bindings
+                    WHERE owner_kind='mcp_client' AND run_id=? AND lease_owner LIKE ?
+                    """,
+                    bindings: [
+                        .text(runID.description),
+                        .text(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + "%"),
+                    ]
+                )
+            }
+            return try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM project_bindings
+                WHERE owner_kind='mcp_client' AND lease_owner LIKE ?
+                """,
+                bindings: [
+                    .text(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + "%"),
+                ]
+            )
+        }
+    }
+
     public func invocationContext(
         for owner: ProjectBindingOwner,
         clientID: ClientID? = nil,
@@ -6218,6 +6524,16 @@ public actor ProjectControlPlaneRepository {
                 binding: binding,
                 connection: connection
             )
+            if owner.kind == .mcpClient,
+               binding.leaseOwner?.hasPrefix(
+                DesktopProviderMCPAttachmentContract.attachedMarkerPrefix
+               ) == true {
+                _ = try validatedDesktopMCPBindingUnlocked(
+                    binding,
+                    expectedProviderID: nil,
+                    connection: connection
+                )
+            }
             return binding.invocationContext(clientID: clientID ?? ClientID(owner.id))
         }
     }
@@ -6689,6 +7005,22 @@ public actor ProjectControlPlaneRepository {
                 runHistoryCount = try connection.scalarInt(
                     "SELECT COUNT(*) FROM autonomous_runs WHERE project_id=? AND state IN \(terminal)",
                     bindings: [.text(project)]
+                )
+                try connection.execute(
+                    """
+                    DELETE FROM project_bindings
+                    WHERE owner_kind='mcp_client' AND lease_owner LIKE ?
+                      AND run_id IN (
+                        SELECT run_id FROM autonomous_runs
+                        WHERE project_id=? AND state IN \(terminal)
+                      )
+                    """,
+                    bindings: [
+                        .text(
+                            DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + "%"
+                        ),
+                        .text(project),
+                    ]
                 )
                 try connection.execute(
                     "DELETE FROM autonomous_runs WHERE project_id=? AND state IN \(terminal)",
@@ -8085,6 +8417,11 @@ public actor ProjectControlPlaneRepository {
                 "DELETE FROM execution_jobs WHERE run_id=?",
                 bindings: [.text(runID.description)]
             )
+            try revokeDesktopProviderMCPAttachmentsUnlocked(
+                runID: runID,
+                timestamp: ISO8601.string(from: clock.now()),
+                connection: connection
+            )
             let removed = try connection.execute(
                 "DELETE FROM autonomous_runs WHERE run_id=? AND state IN ('completed','cancelled','failed_terminal')",
                 bindings: [.text(runID.description)]
@@ -8442,6 +8779,17 @@ public actor ProjectControlPlaneRepository {
                 ]
             )
             guard changed == 1 else { throw AutonomyError.transitionConflict }
+            let desktopSessionEnded = current.specification.work.metadata[
+                "execution_strategy"
+            ] == ProviderExecutionStrategy.desktopPluginPull.rawValue
+                && specification.work.metadata["desktop_plugin_session_state"] == "ended"
+            if transition.nextState.isTerminal || desktopSessionEnded {
+                try revokeDesktopProviderMCPAttachmentsUnlocked(
+                    runID: runID,
+                    timestamp: timestamp,
+                    connection: connection
+                )
+            }
             try appendAutonomyEventUnlocked(
                 runID: runID,
                 projectID: current.projectID,
@@ -8609,6 +8957,11 @@ public actor ProjectControlPlaneRepository {
                 ]
             )
             guard changed == 1 else { throw AutonomyError.transitionConflict }
+            try revokeDesktopProviderMCPAttachmentsUnlocked(
+                runID: runID,
+                timestamp: timestamp,
+                connection: connection
+            )
             try appendAutonomyEventUnlocked(
                 runID: runID,
                 projectID: current.projectID,
@@ -11567,6 +11920,175 @@ public actor ProjectControlPlaneRepository {
         ) { row in
             try Self.decodeBinding(row)
         }
+    }
+
+    @discardableResult
+    private func revokeDesktopProviderMCPAttachmentsUnlocked(
+        runID: RunID,
+        timestamp: String,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> Int {
+        let removed = try connection.execute(
+            """
+            DELETE FROM project_bindings
+            WHERE owner_kind='mcp_client' AND run_id=? AND lease_owner LIKE ?
+            """,
+            bindings: [
+                .text(runID.description),
+                .text(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + "%"),
+            ]
+        )
+        try connection.execute(
+            """
+            UPDATE project_bindings
+            SET lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+            WHERE owner_kind='autonomous_run' AND owner_id=? AND run_id=?
+              AND lease_owner LIKE ?
+            """,
+            bindings: [
+                .text(timestamp), .text(runID.description), .text(runID.description),
+                .text(DesktopProviderMCPAttachmentContract.capabilityMarkerPrefix + "%"),
+            ]
+        )
+        return removed
+    }
+
+    private func validatedDesktopAttachmentRunUnlocked(
+        _ request: DesktopProviderMCPAttachmentRequest,
+        run: AutonomousRunRecord,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> ProjectContextBinding {
+        guard run.runID == request.runID,
+              run.projectID == request.projectID,
+              run.projectGeneration == request.projectGeneration,
+              run.providerID == request.providerID.rawValue,
+              run.adapterID == "forge.desktop-plugin.\(request.providerID.rawValue)",
+              run.modelKey == "host-selected",
+              run.state == .running,
+              run.specification.work.metadata["execution_strategy"]
+                == ProviderExecutionStrategy.desktopPluginPull.rawValue,
+              run.specification.work.metadata["provider_selection_revision"]
+                == request.selectionRevision,
+              run.specification.work.metadata["provider_deployment_id"]
+                == request.deploymentID,
+              run.specification.work.metadata["desktop_plugin_provider_id"]
+                == request.providerID.rawValue,
+              run.specification.work.metadata["desktop_plugin_session_state"] == "active",
+              let sessionID = run.specification.work.metadata["desktop_plugin_session_id"],
+              run.activeSessionID == sessionID,
+              JSONSupport.sha256Hex(sessionID) == request.sessionSHA256 else {
+            throw DesktopProviderMCPAttachmentError.staleAuthority
+        }
+        _ = try requiredActiveProjectUnlocked(
+            run.projectID,
+            generation: run.projectGeneration,
+            connection: connection
+        )
+        guard let runBinding = try bindingUnlocked(
+            owner: ProjectBindingOwner(kind: .autonomousRun, id: run.runID.description),
+            includeInactive: false,
+            connection: connection
+        ), runBinding.projectID == run.projectID,
+           runBinding.projectGeneration == run.projectGeneration,
+           runBinding.runID == run.runID else {
+            throw DesktopProviderMCPAttachmentError.staleAuthority
+        }
+        return runBinding
+    }
+
+    private func validatedDesktopMCPBindingUnlocked(
+        _ binding: ProjectContextBinding,
+        expectedProviderID: ProviderIntegrationID?,
+        connection: ControlPlaneSQLiteConnection
+    ) throws -> AutonomousRunRecord {
+        guard binding.owner.kind == .mcpClient,
+              binding.active,
+              let runID = binding.runID,
+              let marker = binding.leaseOwner,
+              marker.hasPrefix(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix),
+              marker.utf8.count
+                == DesktopProviderMCPAttachmentContract.attachedMarkerPrefix.utf8.count + 64,
+              binding.leaseExpiresAt == nil,
+              let run = try autonomousRunUnlocked(runID, connection: connection),
+              let providerRaw = run.providerID,
+              let providerID = ProviderIntegrationID(rawValue: providerRaw),
+              DesktopProviderMCPAttachmentRequest.isSelectableDesktopProvider(providerID),
+              expectedProviderID == nil || expectedProviderID == providerID,
+              let sessionID = run.specification.work.metadata["desktop_plugin_session_id"],
+              let selectionRevision = run.specification.work.metadata[
+                "provider_selection_revision"
+              ],
+              let deploymentID = run.specification.work.metadata["provider_deployment_id"] else {
+            throw DesktopProviderMCPAttachmentError.staleAuthority
+        }
+        let request = try DesktopProviderMCPAttachmentRequest(arguments: [
+            "attachment_token": String(repeating: "0", count: 64),
+            "provider_id": providerID.rawValue,
+            "run_id": run.runID.description,
+            "project_id": run.projectID.description,
+            "project_generation": Int(run.projectGeneration.rawValue),
+            "session_sha256": JSONSupport.sha256Hex(sessionID),
+            "selection_revision": selectionRevision,
+            "deployment_id": deploymentID,
+        ])
+        let runBinding = try validatedDesktopAttachmentRunUnlocked(
+            request,
+            run: run,
+            connection: connection
+        )
+        let identitySHA256 = try Self.desktopAttachmentIdentitySHA256(
+            request,
+            authorizationScope: runBinding.authorizationScope
+        )
+        guard binding.projectID == run.projectID,
+              binding.projectGeneration == run.projectGeneration,
+              binding.authorizationScope == runBinding.authorizationScope,
+              marker == DesktopProviderMCPAttachmentContract.attachedMarkerPrefix
+                + identitySHA256 else {
+            throw DesktopProviderMCPAttachmentError.staleAuthority
+        }
+        return run
+    }
+
+    private static func desktopAttachmentIdentitySHA256(
+        _ request: DesktopProviderMCPAttachmentRequest,
+        authorizationScope: ToolAuthorizationScope
+    ) throws -> String {
+        let scopeSHA256 = JSONSupport.sha256Hex(
+            Data(try scopeJSON(authorizationScope).utf8)
+        )
+        return JSONSupport.sha256Hex([
+            "desktop-mcp-attachment-v1",
+            request.providerID.rawValue,
+            request.sessionSHA256,
+            request.runID.description,
+            request.projectID.description,
+            String(request.projectGeneration.rawValue),
+            request.selectionRevision,
+            request.deploymentID,
+            scopeSHA256,
+        ].joined(separator: "\u{0}"))
+    }
+
+    private static func secureDesktopAttachmentToken() throws -> String {
+        var bytes = [UInt8](
+            repeating: 0,
+            count: DesktopProviderMCPAttachmentContract.tokenByteCount
+        )
+        let status = bytes.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else {
+            throw DesktopProviderMCPAttachmentError.rejected
+        }
+        let alphabet = Array("0123456789abcdef".utf8)
+        var encoded = [UInt8]()
+        encoded.reserveCapacity(bytes.count * 2)
+        for byte in bytes {
+            encoded.append(alphabet[Int(byte >> 4)])
+            encoded.append(alphabet[Int(byte & 0x0f)])
+        }
+        return String(decoding: encoded, as: UTF8.self)
     }
 
     private struct ContinuityRunIdentity {

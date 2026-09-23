@@ -24,6 +24,200 @@ private actor ProviderBusyService: ProviderConfigurationServicing {
     }
 }
 
+private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
+    private let operatorSnapshot: OperatorSnapshot
+    private let integrationSnapshot: ProviderIntegrationsSnapshot
+    private let preparationState: ManagerProviderPreparationState
+    private let simulateLostSelectionResponse: Bool
+    private let providerOperationFailuresBeforeSuccess: Int
+    private var acceptedSelectionOperation: ProviderIntegrationOperationSnapshot?
+    private(set) var repairRequests: [ProviderIntegrationMutationRequest] = []
+    private(set) var removeRequests: [ProviderIntegrationMutationRequest] = []
+    private(set) var selectionRequests: [ProviderSelectionRequest] = []
+    private(set) var callOrder: [String] = []
+    private(set) var providerOperationPollCount = 0
+
+    init(
+        preparationState: ManagerProviderPreparationState = .ready,
+        selectedProviderID: ProviderIntegrationID? = .lmStudio,
+        receiptProviderID: ProviderIntegrationID? = nil,
+        simulateLostSelectionResponse: Bool = false,
+        providerOperationFailuresBeforeSuccess: Int = 0
+    ) throws {
+        self.preparationState = preparationState
+        self.simulateLostSelectionResponse = simulateLostSelectionResponse
+        self.providerOperationFailuresBeforeSuccess = providerOperationFailuresBeforeSuccess
+        operatorSnapshot = try JSONDecoder().decode(
+            OperatorSnapshot.self,
+            from: Data("{}".utf8)
+        )
+        let receipt = try receiptProviderID.map { providerID in
+            try ProviderIntegrationReceipt(
+                providerID: providerID,
+                artifactVersion: "legacy-fixture-v1",
+                installedAt: "2026-09-23T12:00:00Z",
+                verifiedAt: "2026-09-23T12:00:00Z",
+                metadata: ["fixture": "legacy"]
+            )
+        }
+        integrationSnapshot = ProviderIntegrationsSnapshot(
+            selectionRevision: "legacy-lm-revision",
+            selectedProviderID: selectedProviderID,
+            providers: ProviderIntegrationDescriptor.supported.map {
+                ProviderIntegrationProviderSnapshot(
+                    descriptor: $0,
+                    receipt: $0.id == receiptProviderID ? receipt : nil
+                )
+            },
+            currentOperation: nil,
+            recentOperations: []
+        )
+    }
+
+    func snapshot(limit: Int, cursor: String?) async throws -> OperatorSnapshot {
+        _ = limit
+        _ = cursor
+        return operatorSnapshot
+    }
+
+    func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
+        ProviderIntegrationsSnapshot(
+            selectionRevision: integrationSnapshot.selectionRevision,
+            selectedProviderID: integrationSnapshot.selectedProviderID,
+            providers: integrationSnapshot.providers,
+            currentOperation: acceptedSelectionOperation,
+            recentOperations: []
+        )
+    }
+
+    func updateProviderSelection(
+        _ request: ProviderSelectionRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        callOrder.append("selection")
+        selectionRequests.append(request)
+        if simulateLostSelectionResponse {
+            acceptedSelectionOperation = operation(kind: .activate, phase: .committing)
+            throw OperatorManagerClientError.rejected(
+                status: 504,
+                message: "The response was lost after the manager accepted the operation."
+            )
+        }
+        return operation(kind: .activate, phase: .active)
+    }
+
+    func providerOperation(
+        operationID: String
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        guard operationID == acceptedSelectionOperation?.operationID else {
+            throw OperatorManagerClientError.invalidPayload("unexpected operation id")
+        }
+        providerOperationPollCount += 1
+        if providerOperationPollCount <= providerOperationFailuresBeforeSuccess {
+            throw OperatorManagerClientError.rejected(
+                status: 503,
+                message: "Temporary manager outage."
+            )
+        }
+        let completed = operation(kind: .activate, phase: .active)
+        acceptedSelectionOperation = completed
+        return completed
+    }
+
+    func repairProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        callOrder.append("repair")
+        repairRequests.append(request)
+        return operation(kind: .repair, phase: .completed)
+    }
+
+    func removeProviderIntegration(
+        _ request: ProviderIntegrationMutationRequest
+    ) async throws -> ProviderIntegrationOperationSnapshot {
+        callOrder.append("remove")
+        removeRequests.append(request)
+        return operation(kind: .remove, phase: .removed, providerID: request.providerID)
+    }
+
+    func prepareProvider() async throws -> ManagerProviderPreparationResult {
+        callOrder.append("connect_and_check")
+        return ManagerProviderPreparationResult(
+            state: preparationState,
+            recoveryAction: preparationState == .ready ? .none : .startService,
+            detail: preparationState == .ready
+                ? "LM Studio is ready."
+                : "LM Studio still needs attention.",
+            configuration: try await providerConfiguration()
+        )
+    }
+
+    func providerConfiguration() async throws -> ProviderConfigurationSnapshot {
+        ProviderConfigurationSnapshot(
+            revision: "legacy-provider-configuration",
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: nil,
+            credentialConfigured: false,
+            saved: false
+        )
+    }
+
+    private func operation(
+        kind: ProviderIntegrationOperationKind,
+        phase: ProviderIntegrationOperationPhase,
+        providerID: ProviderIntegrationID = .lmStudio
+    ) -> ProviderIntegrationOperationSnapshot {
+        ProviderIntegrationOperationSnapshot(
+            operationID: "legacy-lm-operation",
+            kind: kind,
+            providerID: providerID,
+            phase: phase,
+            expectedRevision: integrationSnapshot.selectionRevision,
+            resultingRevision: integrationSnapshot.selectionRevision,
+            idempotencyKeySHA256: String(repeating: "a", count: 64),
+            intentSHA256: String(repeating: "b", count: 64),
+            detail: "LM Studio integration verified.",
+            acceptedAt: "2026-09-23T12:00:00Z",
+            updatedAt: "2026-09-23T12:00:00Z",
+            completedAt: phase.isTerminal ? "2026-09-23T12:00:00Z" : nil
+        )
+    }
+
+    private var notInScope: OperatorManagerClientError {
+        .invalidPayload("not exercised by this test")
+    }
+
+    func autonomyStatus() async throws -> OperatorAutonomySummary { throw notInScope }
+    func settings() async throws -> ManagerSettings { throw notInScope }
+    func updateSettings(_ patch: ManagerSettingsPatch) async throws -> ManagerSettings { throw notInScope }
+    func registerProject(
+        _ request: OperatorProjectRegistrationRequest
+    ) async throws -> OperatorProjectRegistrationOutcome { throw notInScope }
+    func projectStatus(projectID: String) async throws -> OperatorProject { throw notInScope }
+    func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt {
+        throw notInScope
+    }
+    func relinkProject(
+        projectID: String,
+        generation: UInt64,
+        path: String
+    ) async throws -> OperatorRelinkReceipt { throw notInScope }
+    func startRun(_ request: OperatorRunStartRequest) async throws -> OperatorRun { throw notInScope }
+    func runStatus(runID: String) async throws -> OperatorRun { throw notInScope }
+    func controlRun(
+        runID: String,
+        action: OperatorRunControlAction
+    ) async throws -> OperatorRun { throw notInScope }
+    func cancelRuntimeJob(jobID: String) async throws -> OperatorRuntimeJob { throw notInScope }
+    func updateProviderConfiguration(
+        _ update: ProviderConfigurationUpdate
+    ) async throws -> ProviderConfigurationSnapshot { throw notInScope }
+    func providerModels() async throws -> ProviderModelInventory { throw notInScope }
+    func probeProvider(
+        adapterID: String,
+        mode: OperatorProviderProbeMode
+    ) async throws -> OperatorProvider { throw notInScope }
+}
+
 final class ProviderConfigurationAppTests: XCTestCase {
     private var directory: URL!
 
@@ -38,6 +232,250 @@ final class ProviderConfigurationAppTests: XCTestCase {
     private func request(_ revision: String = "0") -> ProviderConfigurationUpdate {
         ProviderConfigurationUpdate(expectedRevision: revision, endpoint: "http://127.0.0.1:1234",
             modelKey: "fixture/tool-model", credentialAction: .keep)
+    }
+
+    @MainActor
+    func testLegacyDefaultLMStudioOnActionRunsRepairInsteadOfNoOp() async throws {
+        let client = try LegacyLMProviderSelectionClient()
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(viewModel.selectedProviderID, .lmStudio)
+        XCTAssertNil(viewModel.integration(for: .lmStudio)?.receipt)
+
+        viewModel.setProvider(.lmStudio, enabled: true)
+        for _ in 0..<500 {
+            if await client.repairRequests.count == 1,
+               !viewModel.isProbing,
+               !viewModel.isSubmittingProviderMutation {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let repairRequests = await client.repairRequests
+        let selectionRequests = await client.selectionRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(repairRequests.count, 1)
+        XCTAssertEqual(repairRequests.first?.providerID, .lmStudio)
+        XCTAssertEqual(repairRequests.first?.expectedRevision, "legacy-lm-revision")
+        XCTAssertEqual(selectionRequests, [])
+        XCTAssertEqual(callOrder, ["connect_and_check", "repair"])
+    }
+
+    @MainActor
+    func testLMStudioPrimaryActionDoesNotDeployIntegrationBeforeReadiness() async throws {
+        let client = try LegacyLMProviderSelectionClient(preparationState: .actionRequired)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.performProviderPrimaryAction(.lmStudio)
+        for _ in 0..<500 {
+            if !viewModel.isProbing { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let repairRequests = await client.repairRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(repairRequests, [])
+        XCTAssertEqual(callOrder, ["connect_and_check"])
+        XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
+    }
+
+    @MainActor
+    func testInactiveLMStudioToggleConnectsBeforeSelecting() async throws {
+        let client = try LegacyLMProviderSelectionClient(selectedProviderID: .codexDesktop)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.setProvider(.lmStudio, enabled: true)
+        for _ in 0..<500 {
+            if await client.selectionRequests.count == 1,
+               !viewModel.isProbing,
+               !viewModel.isSubmittingProviderMutation {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let selectionRequests = await client.selectionRequests
+        let repairRequests = await client.repairRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(selectionRequests.count, 1)
+        XCTAssertEqual(selectionRequests.first?.providerID, .lmStudio)
+        XCTAssertEqual(repairRequests, [])
+        XCTAssertEqual(callOrder, ["connect_and_check", "selection"])
+    }
+
+    @MainActor
+    func testInactiveLMStudioToggleDoesNotSelectWhenReadinessNeedsAction() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            preparationState: .actionRequired,
+            selectedProviderID: .codexDesktop
+        )
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.setProvider(.lmStudio, enabled: true)
+        for _ in 0..<500 {
+            if !viewModel.isProbing { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let selectionRequests = await client.selectionRequests
+        let repairRequests = await client.repairRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(selectionRequests, [])
+        XCTAssertEqual(repairRequests, [])
+        XCTAssertEqual(callOrder, ["connect_and_check"])
+        XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
+    }
+
+    @MainActor
+    func testAlreadySelectedDesktopProviderToggleDoesNotInvokeLMStudioConnectFlow() async throws {
+        let client = try LegacyLMProviderSelectionClient(selectedProviderID: .codexDesktop)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.setProvider(.codexDesktop, enabled: true)
+        try await Task.sleep(for: .milliseconds(20))
+
+        let callOrder = await client.callOrder
+        let repairRequests = await client.repairRequests
+        let selectionRequests = await client.selectionRequests
+        XCTAssertEqual(callOrder, [])
+        XCTAssertEqual(repairRequests, [])
+        XCTAssertEqual(selectionRequests, [])
+    }
+
+    @MainActor
+    func testLegacyNonselectableGrokReceiptOffersCleanupWithoutRepairOrToggle() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            selectedProviderID: nil,
+            receiptProviderID: .grokBuild
+        )
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertTrue(viewModel.isProviderToggleDisabled(.grokBuild))
+        XCTAssertFalse(viewModel.isProviderRepairAvailable(.grokBuild))
+        XCTAssertFalse(viewModel.isProviderRemovalDisabled(.grokBuild))
+        viewModel.removeProviderIntegration(.grokBuild)
+        for _ in 0..<500 {
+            if await client.removeRequests.count == 1,
+               !viewModel.isSubmittingProviderMutation {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let removals = await client.removeRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(removals.map(\.providerID), [.grokBuild])
+        XCTAssertEqual(callOrder, ["remove"])
+    }
+
+    @MainActor
+    func testGuidedHelpRecognizesVerifiedDesktopSelectionWithoutLMSetupGuidance() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            selectedProviderID: .codexDesktop,
+            receiptProviderID: .codexDesktop
+        )
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(viewModel.guidedHelpState.status, "Desktop provider is ready")
+        XCTAssertNil(viewModel.guidedHelpState.recommendedAction)
+        XCTAssertFalse(viewModel.guidedHelpState.detail.localizedCaseInsensitiveContains("LM Studio"))
+    }
+
+    @MainActor
+    func testAcceptedProviderOperationIsObservedAfterMutationResponseIsLost() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            simulateLostSelectionResponse: true
+        )
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.setProvider(.codexDesktop, enabled: true)
+        for _ in 0..<500 {
+            if await client.providerOperationPollCount == 1,
+               viewModel.currentProviderOperation?.isTerminal == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let selectionRequestCount = await client.selectionRequests.count
+        let operationPollCount = await client.providerOperationPollCount
+        XCTAssertEqual(selectionRequestCount, 1)
+        XCTAssertEqual(operationPollCount, 1)
+        XCTAssertEqual(viewModel.currentProviderOperation?.phase, .active)
+        XCTAssertFalse(viewModel.hasPendingProviderOperation)
+    }
+
+    @MainActor
+    func testProviderOperationObservationRecoversAfterThreePollFailures() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            simulateLostSelectionResponse: true,
+            providerOperationFailuresBeforeSuccess: 3
+        )
+        let viewModel = ProviderViewModel(
+            client: client,
+            providerOperationPollIntervalNanoseconds: 1_000_000
+        )
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+
+        viewModel.setProvider(.codexDesktop, enabled: true)
+        for _ in 0..<1_000 {
+            if await client.providerOperationPollCount == 4,
+               viewModel.currentProviderOperation?.isTerminal == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+
+        let operationPollCount = await client.providerOperationPollCount
+        XCTAssertEqual(operationPollCount, 4)
+        XCTAssertEqual(viewModel.currentProviderOperation?.phase, .active)
+        XCTAssertFalse(viewModel.hasPendingProviderOperation)
+        XCTAssertNil(viewModel.errorMessage)
     }
 
     func testRunPreparationResolverUsesDefaultsAndPreservesExplicitOverrides() throws {
@@ -195,6 +633,14 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(
             durable?.specification.work.metadata["prepared_run_revision"],
             prepared.revision
+        )
+        XCTAssertEqual(
+            durable?.specification.work.metadata["execution_strategy"],
+            ProviderExecutionStrategy.managedProviderPush.rawValue
+        )
+        XCTAssertEqual(
+            durable?.specification.work.metadata["provider_selection_revision"],
+            try manager.providerIntegrations().selectionRevision
         )
     }
 

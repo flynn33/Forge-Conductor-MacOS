@@ -223,6 +223,224 @@ final class AppBootstrapAppTests: XCTestCase {
 }
 
 final class RigOperationalSnapshotAppTests: XCTestCase {
+    func testDesktopProviderReadinessDoesNotDependOnLMStudioHealth() throws {
+        let operatorSnapshot = try JSONDecoder().decode(
+            OperatorSnapshot.self,
+            from: Data("""
+            {
+              "provider":{"health":"unavailable","model_key":"stale/lm-model"},
+              "run_preparation":{
+                "state":"ready",
+                "provider_id":"codex-desktop",
+                "adapter_id":"forge.desktop-plugin.codex-desktop",
+                "model_key":"host-selected",
+                "provider_configuration_revision":"desktop-revision-1",
+                "allowed_tools":[],
+                "completion_gates":["automatic_completion_evidence"],
+                "network_allowed":false,
+                "detail":"The selected desktop provider will verify its live Forge integration before this task starts."
+              }
+            }
+            """.utf8)
+        )
+        let receipt = try ProviderIntegrationReceipt(
+            providerID: .codexDesktop,
+            artifactVersion: "desktop-deployment-1",
+            installedAt: "2026-09-23T12:00:00Z",
+            verifiedAt: "2026-09-23T12:00:01Z"
+        )
+        let integrations = ProviderIntegrationsSnapshot(
+            selectionRevision: "desktop-revision-1",
+            selectedProviderID: .codexDesktop,
+            providers: ProviderIntegrationDescriptor.supported.map {
+                ProviderIntegrationProviderSnapshot(
+                    descriptor: $0,
+                    receipt: $0.id == .codexDesktop ? receipt : nil
+                )
+            },
+            currentOperation: nil,
+            recentOperations: []
+        )
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: nil,
+            runeForge: nil,
+            providerIntegrations: integrations
+        )
+
+        XCTAssertEqual(result.providerHealth, "unavailable")
+        XCTAssertEqual(result.providerModel, "stale/lm-model")
+        XCTAssertEqual(result.selectedProvider.id, ProviderIntegrationID.codexDesktop.rawValue)
+        XCTAssertEqual(result.selectedProvider.displayName, "Codex Desktop")
+        XCTAssertEqual(result.selectedProvider.executionMode, .desktopHost)
+        XCTAssertEqual(result.selectedProvider.model, "host-selected")
+        XCTAssertTrue(result.selectedProvider.isReady)
+
+        let indicator = RigProviderIndicatorState.compose(
+            runtime: result,
+            lmStudioAlive: false,
+            lmStudioCPU: 0
+        )
+        XCTAssertEqual(indicator.title, "CODEX DESKTOP")
+        XCTAssertEqual(indicator.state, "HOST READY")
+        XCTAssertEqual(indicator.detail, "Host-managed execution · model selected in host")
+        XCTAssertEqual(indicator.tone, .healthy)
+
+        let guidedStatus = GuidedSetupProviderStatus.compose(result.selectedProvider)
+        XCTAssertTrue(guidedStatus.isReady)
+        XCTAssertEqual(guidedStatus.label, "Ready")
+        XCTAssertEqual(
+            guidedStatus.detail,
+            "Codex Desktop is ready for host-managed execution."
+        )
+
+        let staleSelection = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: nil,
+            runeForge: nil,
+            providerIntegrations: ProviderIntegrationsSnapshot(
+                selectionRevision: "desktop-revision-2",
+                selectedProviderID: integrations.selectedProviderID,
+                providers: integrations.providers,
+                currentOperation: nil,
+                recentOperations: []
+            )
+        )
+        XCTAssertFalse(staleSelection.selectedProvider.isReady)
+        XCTAssertTrue(staleSelection.selectedProvider.detail.contains("Refresh Provider"))
+    }
+
+    func testLMStudioProviderReadinessRetainsLiveAPIAndModelContract() throws {
+        let operatorSnapshot = try JSONDecoder().decode(
+            OperatorSnapshot.self,
+            from: Data("""
+            {
+              "provider":{"health":"contract_valid","model_key":"fixture/lm-model"},
+              "run_preparation":{
+                "state":"ready",
+                "provider_id":"lmstudio",
+                "adapter_id":"forge.native-session-host",
+                "model_key":"fixture/lm-model",
+                "allowed_tools":[],
+                "completion_gates":[],
+                "network_allowed":false,
+                "detail":"The saved LM Studio provider passed its contract check."
+              }
+            }
+            """.utf8)
+        )
+        let integrations = ProviderIntegrationsSnapshot(
+            selectionRevision: "lm-revision-1",
+            selectedProviderID: .lmStudio,
+            providers: ProviderIntegrationDescriptor.supported.map {
+                ProviderIntegrationProviderSnapshot(descriptor: $0, receipt: nil)
+            },
+            currentOperation: nil,
+            recentOperations: []
+        )
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: nil,
+            runeForge: nil,
+            providerIntegrations: integrations
+        )
+
+        XCTAssertEqual(result.selectedProvider.executionMode, .managedModel)
+        XCTAssertEqual(result.selectedProvider.model, "fixture/lm-model")
+        XCTAssertTrue(result.selectedProvider.isReady)
+        let indicator = RigProviderIndicatorState.compose(
+            runtime: result,
+            lmStudioAlive: false,
+            lmStudioCPU: 12
+        )
+        XCTAssertEqual(indicator.title, "LM STUDIO")
+        XCTAssertEqual(indicator.state, "HEADLESS")
+        XCTAssertEqual(indicator.detail, "fixture/lm-model · Chat separate")
+        XCTAssertEqual(indicator.fraction, 0.12, accuracy: 0.0001)
+        XCTAssertEqual(
+            GuidedSetupProviderStatus.compose(result.selectedProvider).detail,
+            "Connected to fixture/lm-model."
+        )
+    }
+
+    func testUnavailableOrNonselectableProviderCannotAppearReady() throws {
+        let operatorSnapshot = try JSONDecoder().decode(
+            OperatorSnapshot.self,
+            from: Data("""
+            {
+              "provider":{"health":"contract_valid","model_key":"fixture/lm-model"},
+              "run_preparation":{
+                "state":"ready",
+                "provider_id":"grok-build",
+                "adapter_id":"forge.desktop-plugin.grok-build",
+                "model_key":"host-selected",
+                "allowed_tools":[],
+                "completion_gates":[],
+                "network_allowed":false,
+                "detail":"Fixture reports ready."
+              }
+            }
+            """.utf8)
+        )
+        let grokDescriptor = ProviderIntegrationDescriptor(
+            id: .grokBuild,
+            displayName: "Grok Build",
+            executionStrategy: .desktopPluginPull,
+            selectable: false,
+            detail: "Status only."
+        )
+        let receipt = try ProviderIntegrationReceipt(
+            providerID: .grokBuild,
+            artifactVersion: "grok-deployment-1",
+            installedAt: "2026-09-23T12:00:00Z",
+            verifiedAt: "2026-09-23T12:00:01Z"
+        )
+        let nonselectable = ProviderIntegrationsSnapshot(
+            selectionRevision: "grok-revision-1",
+            selectedProviderID: .grokBuild,
+            providers: [ProviderIntegrationProviderSnapshot(
+                descriptor: grokDescriptor,
+                receipt: receipt
+            )],
+            currentOperation: nil,
+            recentOperations: []
+        )
+        let deferred = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: nil,
+            runeForge: nil,
+            providerIntegrations: nonselectable
+        )
+        XCTAssertFalse(deferred.selectedProvider.isReady)
+        XCTAssertTrue(deferred.selectedProvider.detail.contains("not available for automated runs"))
+        XCTAssertFalse(GuidedSetupProviderStatus.compose(deferred.selectedProvider).isReady)
+
+        let deactivated = RigOperationalSnapshot.compose(
+            operatorSnapshot: operatorSnapshot,
+            autonomy: nil,
+            runeForge: nil,
+            providerIntegrations: ProviderIntegrationsSnapshot(
+                selectionRevision: "none-revision-1",
+                selectedProviderID: nil,
+                providers: [],
+                currentOperation: nil,
+                recentOperations: []
+            )
+        )
+        XCTAssertNil(deactivated.selectedProvider.id)
+        XCTAssertFalse(deactivated.selectedProvider.isReady)
+        XCTAssertEqual(
+            RigProviderIndicatorState.compose(
+                runtime: deactivated,
+                lmStudioAlive: true,
+                lmStudioCPU: 40
+            ).state,
+            "NOT SELECTED"
+        )
+    }
+
     func testComposeProjectsProviderAutonomyContinuityAndRuneForgeEvidence() throws {
         let projectID = UUID()
         let runID = UUID()

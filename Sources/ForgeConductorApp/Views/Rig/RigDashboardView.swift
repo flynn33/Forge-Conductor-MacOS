@@ -7,6 +7,92 @@
 import SwiftUI
 import ForgeConductorCore
 
+struct RigProviderIndicatorState: Equatable {
+    let title: String
+    let state: String
+    let detail: String
+    let fraction: Double
+    let tone: TelemetryStatusTone
+
+    static func compose(
+        runtime: RigOperationalSnapshot,
+        lmStudioAlive: Bool,
+        lmStudioCPU: Double
+    ) -> Self {
+        let provider = runtime.selectedProvider
+        if provider.executionMode == .desktopHost {
+            if provider.isReady {
+                return Self(
+                    title: provider.displayName.uppercased(),
+                    state: "HOST READY",
+                    detail: "Host-managed execution · model selected in host",
+                    fraction: 1,
+                    tone: .healthy
+                )
+            }
+            let state: String
+            let tone: TelemetryStatusTone
+            switch provider.readinessState {
+            case "automatically_preparing":
+                state = "PREPARING"
+                tone = .informational
+            case "waiting_dependency", "failed":
+                state = "ATTENTION"
+                tone = .caution
+            default:
+                state = "CHECK"
+                tone = .unavailable
+            }
+            return Self(
+                title: provider.displayName.uppercased(),
+                state: state,
+                detail: provider.detail,
+                fraction: 0,
+                tone: tone
+            )
+        }
+
+        if provider.executionMode == .unavailable,
+           provider.integrationEvidenceAvailable {
+            return Self(
+                title: "PROVIDER",
+                state: "NOT SELECTED",
+                detail: provider.detail,
+                fraction: 0,
+                tone: .caution
+            )
+        }
+
+        let providerReady = ["reachable", "contract_valid"].contains(runtime.providerHealth)
+        if providerReady {
+            return Self(
+                title: "LM STUDIO",
+                state: "HEADLESS",
+                detail: runtime.providerModel.map { "\($0) · Chat separate" }
+                    ?? "Provider API · Chat separate",
+                fraction: min(max(lmStudioCPU / 100, 0), 1),
+                tone: .healthy
+            )
+        }
+        if lmStudioAlive {
+            return Self(
+                title: "LM STUDIO",
+                state: "RUNNING",
+                detail: "Process detected · API unverified",
+                fraction: min(max(lmStudioCPU / 100, 0), 1),
+                tone: .caution
+            )
+        }
+        return Self(
+            title: "LM STUDIO",
+            state: "OFFLINE",
+            detail: "Provider unavailable",
+            fraction: 0,
+            tone: .failure
+        )
+    }
+}
+
 /// Single-screen FORGE RIG board — full panel parity; **all gauges are Metal**.
 /// Display updates continuously from the realtime metrics engine (not a 2s snapshot).
 struct RigDashboardView: View {
@@ -101,7 +187,6 @@ struct RigDashboardView: View {
 
     private var operationalIndicatorCards: [OrchestrationCardState] {
         let runtime = model.rigOperationalSnapshot
-        let providerReady = ["reachable", "contract_valid"].contains(runtime.providerHealth)
         let lmStudioAlive = model.orchestration?.lmStudioAlive == true
         let lmStudioCPU = model.hotProcesses
             .filter {
@@ -109,23 +194,11 @@ struct RigDashboardView: View {
                 return name.contains("lm studio") || name.contains("llama")
             }
             .reduce(0) { $0 + $1.cpuPercent }
-        let lmStudioState: String
-        let lmStudioTone: TelemetryStatusTone
-        let lmStudioDetail: String
-        if providerReady {
-            lmStudioState = "HEADLESS"
-            lmStudioTone = .healthy
-            lmStudioDetail = runtime.providerModel.map { "\($0) · Chat separate" }
-                ?? "Provider API · Chat separate"
-        } else if lmStudioAlive {
-            lmStudioState = "RUNNING"
-            lmStudioTone = .caution
-            lmStudioDetail = "Process detected · API unverified"
-        } else {
-            lmStudioState = "OFFLINE"
-            lmStudioTone = .failure
-            lmStudioDetail = "Provider unavailable"
-        }
+        let providerIndicator = RigProviderIndicatorState.compose(
+            runtime: runtime,
+            lmStudioAlive: lmStudioAlive,
+            lmStudioCPU: lmStudioCPU
+        )
 
         let autonomyState: String
         let autonomyTone: TelemetryStatusTone
@@ -181,9 +254,11 @@ struct RigDashboardView: View {
 
         return [
             OrchestrationCardState(
-                title: "LM STUDIO", state: lmStudioState,
-                detail: lmStudioDetail,
-                fraction: min(max(lmStudioCPU / 100, 0), 1), tone: lmStudioTone
+                title: providerIndicator.title,
+                state: providerIndicator.state,
+                detail: providerIndicator.detail,
+                fraction: providerIndicator.fraction,
+                tone: providerIndicator.tone
             ),
             OrchestrationCardState(
                 title: "AUTONOMY", state: autonomyState,
@@ -527,14 +602,31 @@ struct RigDashboardView: View {
     }
 
     private var dashboardTitle: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("DASHBOARD // LM STUDIO")
+        let provider = model.rigOperationalSnapshot.selectedProvider
+        let providerName = if provider.executionMode == .unavailable,
+                              !provider.integrationEvidenceAvailable {
+            "LM STUDIO"
+        } else if provider.id == nil {
+            "PROVIDER"
+        } else {
+            provider.displayName.uppercased()
+        }
+        let subtitle = if provider.executionMode == .desktopHost {
+            "HOST-MANAGED PROVIDER · GPU · DISK · MCP · LIVE FEED · METAL"
+        } else if provider.executionMode == .unavailable,
+                  provider.integrationEvidenceAvailable {
+            "PROVIDER SELECTION · GPU · DISK · MCP · LIVE FEED · METAL"
+        } else {
+            "LOCAL MODELS · GPU · DISK · LM STUDIO MCP · LIVE FEED · METAL"
+        }
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("DASHBOARD // \(providerName)")
                 .font(.system(.title3, design: .rounded).weight(.bold))
                 .foregroundStyle(Color.cyan)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
                 .accessibilityIdentifier("detail-rig")
-            Text("LOCAL MODELS · GPU · DISK · LM STUDIO MCP · LIVE FEED · METAL")
+            Text(subtitle)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

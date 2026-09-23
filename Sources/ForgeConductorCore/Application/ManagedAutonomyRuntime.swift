@@ -318,6 +318,7 @@ public actor ManagedAutonomyRuntime {
     private let sourceContinuity: ContextContinuityService
     private let sourceCancellationManagerID: String
     private let diagnostics: DiagnosticLog
+    private let desktopProviderRuns: DesktopProviderRunLifecycleService
     private var sourceCancellationCursor: Int64?
     private var sourceCancellationCleanup: ToolCallCancellation?
     private var started = false
@@ -326,6 +327,16 @@ public actor ManagedAutonomyRuntime {
     private var startupReport: AutonomyStartupReport?
     private var tickInProgress = false
     private var controlledRuns: Set<RunID> = []
+    private struct DesktopRunSlot: Hashable {
+        let projectID: ProjectID
+        let projectGeneration: ProjectGeneration
+        let providerID: String
+    }
+    private struct DesktopRunReservation {
+        let runID: RunID
+        var count: Int
+    }
+    private var desktopRunReservations: [DesktopRunSlot: DesktopRunReservation] = [:]
     private var servicesClosing = false
 
     public init(
@@ -435,6 +446,11 @@ public actor ManagedAutonomyRuntime {
         self.sourceContinuity = app.continuity
         self.sourceCancellationManagerID = resolvedManagerID + ":source-cancel"
         self.diagnostics = app.diagnostics
+        self.desktopProviderRuns = DesktopProviderRunLifecycleService(
+            repository: repository,
+            completionValidator: resolvedCompletionValidator,
+            clock: clock
+        )
         let policyReporter = StjornarvaldCodingAgentPolicyReporter(paths: app.paths)
         self.supervisor = try AutonomySupervisor(
             repository: repository,
@@ -527,12 +543,14 @@ public actor ManagedAutonomyRuntime {
             let report = try await supervisor.recoverOnManagerStart()
             try Task.checkCancellation()
             guard !shutdownRequested else { throw AutonomyError.shutdown }
+            try await desktopProviderRuns.start()
             startupReport = report
             started = true
             return report
         } catch {
             shutdownRequested = true
             providerWorkAdmission.close()
+            await desktopProviderRuns.shutdown()
             await supervisor.shutdown()
             await closeServicesAfterProviderWorkDrains()
             throw error
@@ -545,6 +563,8 @@ public actor ManagedAutonomyRuntime {
         tickInProgress = true
         defer { tickInProgress = false }
         try await processSourceCancellations()
+        guard !shutdownRequested else { throw AutonomyError.shutdown }
+        try await desktopProviderRuns.reconcile()
         guard !shutdownRequested else { throw AutonomyError.shutdown }
         try await supervisor.tick()
     }
@@ -626,11 +646,72 @@ public actor ManagedAutonomyRuntime {
     @discardableResult
     public func createRun(_ request: AutonomousRunRequest) async throws -> AutonomousRunRecord {
         guard started else { throw AutonomyError.shutdown }
+        let desktopSlot: DesktopRunSlot?
+        if Self.usesDesktopPluginPull(request) {
+            try DesktopProviderRunLifecycleService.validateAssignmentContext(request)
+            let slot = DesktopRunSlot(
+                projectID: request.projectID,
+                projectGeneration: request.projectGeneration,
+                providerID: request.providerID
+            )
+            try reserveDesktopRun(slot: slot, runID: request.runID)
+            desktopSlot = slot
+        } else {
+            desktopSlot = nil
+        }
+        defer {
+            if let desktopSlot {
+                releaseDesktopRun(slot: desktopSlot, runID: request.runID)
+            }
+        }
+        if let desktopSlot {
+            let persisted = try await repository.nonterminalAutonomousRuns(limit: 1_024)
+            let conflicts = persisted.filter {
+                Self.usesDesktopPluginPull($0)
+                    && $0.projectID == desktopSlot.projectID
+                    && $0.projectGeneration == desktopSlot.projectGeneration
+                    && $0.providerID == desktopSlot.providerID
+                    && $0.runID != request.runID
+            }
+            guard conflicts.isEmpty, persisted.count < 1_024 else {
+                throw AutonomyError.invalidRequest(
+                    "Only one nonterminal desktop-provider task may run for this project and provider"
+                )
+            }
+        }
         let reconciliation = try await repository.reconcileAutonomousRunStart(request)
-        if reconciliation.requiresActivation, reconciliation.run.state.isExecutable {
+        if reconciliation.requiresActivation,
+           reconciliation.run.state.isExecutable,
+           !Self.usesDesktopPluginPull(reconciliation.run) {
             try await supervisor.activate(runID: reconciliation.run.runID)
         }
         return reconciliation.run
+    }
+
+    private func reserveDesktopRun(slot: DesktopRunSlot, runID: RunID) throws {
+        if var reservation = desktopRunReservations[slot] {
+            guard reservation.runID == runID else {
+                throw AutonomyError.invalidRequest(
+                    "Only one nonterminal desktop-provider task may run for this project and provider"
+                )
+            }
+            reservation.count += 1
+            desktopRunReservations[slot] = reservation
+        } else {
+            desktopRunReservations[slot] = DesktopRunReservation(runID: runID, count: 1)
+        }
+    }
+
+    private func releaseDesktopRun(slot: DesktopRunSlot, runID: RunID) {
+        guard var reservation = desktopRunReservations[slot], reservation.runID == runID else {
+            return
+        }
+        reservation.count -= 1
+        if reservation.count == 0 {
+            desktopRunReservations.removeValue(forKey: slot)
+        } else {
+            desktopRunReservations[slot] = reservation
+        }
     }
 
     public func run(_ runID: RunID) async throws -> AutonomousRunRecord {
@@ -638,6 +719,17 @@ public actor ManagedAutonomyRuntime {
             throw AutonomyError.runNotFound(runID)
         }
         return run
+    }
+
+    public func handleDesktopProviderHook(
+        _ request: DesktopProviderHookRequest,
+        selectionRevision: String
+    ) async throws -> DesktopProviderRunHookDirective {
+        guard started, !shutdownRequested else { throw AutonomyError.shutdown }
+        return try await desktopProviderRuns.handle(
+            request: request,
+            selectionRevision: selectionRevision
+        )
     }
 
     @discardableResult
@@ -656,6 +748,12 @@ public actor ManagedAutonomyRuntime {
             _ = try await repository.validateAutonomousRunExecutionAdmission(runID)
         }
         if action == .checkpoint || action == .rollover {
+            if let candidate = try await repository.autonomousRun(runID),
+               Self.usesDesktopPluginPull(candidate) {
+                throw AutonomyError.invalidRequest(
+                    "Desktop-host checkpoint and rollover requests are coordinated at a provider hook boundary"
+                )
+            }
             return try await requestOperatorContinuity(runID, action: action)
         }
         if action == .cancel {
@@ -677,6 +775,9 @@ public actor ManagedAutonomyRuntime {
 
         if action == .pause, run.state == .paused { return run }
         if action == .cancel, run.state == .cancelRequested {
+            if Self.usesDesktopPluginPull(run) {
+                return try await desktopProviderRuns.finalizeCancellation(runID: runID)
+            }
             try await supervisor.activate(runID: runID)
             return run
         }
@@ -748,10 +849,23 @@ public actor ManagedAutonomyRuntime {
             _ = try? await repository.releaseRunLease(lease)
             throw error
         }
-        if action != .pause {
+        if action == .cancel, Self.usesDesktopPluginPull(run) {
+            return try await desktopProviderRuns.finalizeCancellation(runID: runID)
+        }
+        if action != .pause, !Self.usesDesktopPluginPull(run) {
             try await supervisor.activate(runID: runID)
         }
         return run
+    }
+
+    private static func usesDesktopPluginPull(_ run: AutonomousRunRecord) -> Bool {
+        run.specification.work.metadata["execution_strategy"]
+            == ProviderExecutionStrategy.desktopPluginPull.rawValue
+    }
+
+    private static func usesDesktopPluginPull(_ request: AutonomousRunRequest) -> Bool {
+        request.specification.work.metadata["execution_strategy"]
+            == ProviderExecutionStrategy.desktopPluginPull.rawValue
     }
 
     private func requestOperatorContinuity(
@@ -942,6 +1056,7 @@ public actor ManagedAutonomyRuntime {
         providerWorkAdmission.close()
         started = false
         sourceCancellationCleanup?.cancel()
+        await desktopProviderRuns.shutdown()
         await supervisor.shutdown()
         await closeServicesAfterProviderWorkDrains()
     }
@@ -963,9 +1078,11 @@ public actor ManagedAutonomyRuntime {
     /// must retain this runtime and its stores until all of these owners settle.
     func hasRetainedWork() async -> Bool {
         let activeRuns = await supervisor.snapshot().activeRunIDs
+        let retainedDesktopCompletion = await desktopProviderRuns.hasRetainedWork()
         // Sample actor state after the await so reentrant entrypoints are visible.
         return starting || tickInProgress || !controlledRuns.isEmpty
             || sourceCancellationCleanup != nil || servicesClosing
+            || retainedDesktopCompletion
             || providerWorkAdmission.activeCount > 0 || !activeRuns.isEmpty
     }
 

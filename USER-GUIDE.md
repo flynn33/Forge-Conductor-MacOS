@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.13.0**, build **5**. This guide covers the native Forge Conductor
-application and its LM Studio integration on macOS.
+Version **0.14.0**, build **6**. This guide covers the native Forge Conductor
+application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.13.0 (5)` is the current development identity. It has not inherited the
+> `0.14.0 (6)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release gates.
@@ -14,6 +14,7 @@ application and its LM Studio integration on macOS.
 | --- | --- |
 | Build, archive, or sign the app | [Xcode guide](XCODE.md) |
 | Follow the ordered setup wizard or use contextual help | [Guided Setup and Guided Mode](docs/GUIDED-MODE.md) |
+| Select, provision, repair, or remove a provider integration | [Provider integrations](docs/PROVIDER-INTEGRATIONS.md) |
 | Connect or repair LM Studio MCP | [LM Studio connection](docs/LM-STUDIO-CONNECTION.md) |
 | Queue project instructions | [Instruction packages](docs/INSTRUCTION-PACKAGES.md) |
 | Configure protected completion | [Native completion](docs/NATIVE-COMPLETION.md) |
@@ -22,13 +23,25 @@ application and its LM Studio integration on macOS.
 
 ## 1. What this is
 
-Forge Conductor is a **local MCP tool server** plus a **native dashboard**. LM Studio is the host: it loads the model, owns the chat window, and calls Forge tools over stdio.
+Forge Conductor is a **local MCP tool server** plus a **native dashboard and
+control plane**. Exactly one provider is selected for new work. In LM Studio
+mode, Forge sends bounded turns to the saved local endpoint and owns the managed
+run lifecycle. In selectable desktop-host mode, Claude Code Desktop or Codex
+Desktop owns its model and session while a Forge-owned plugin, hook, and MCP
+registration connects that host to project-scoped orchestration.
+
+Grok Build remains visible in Provider for cleanup and forward compatibility,
+but is not selectable for automated work in this release. Its documented
+startup and prompt hook outputs do not deliver Forge's initial assignment
+context to the model, so Forge does not claim a ready state or admit a Grok run.
 
 Forge does **not**:
 
 - run the language model
-- sit inside LM Studio’s process
+- sit inside a provider’s process
 - open a new LM Studio GUI chat (the `lms chat` CLI is a different, non-GUI session)
+- create or automate a private Claude, Codex, or Grok desktop conversation
+- approve a desktop host's hook-trust or permission prompt
 - replace chat history with a compressed window inside the current chat
 
 Forge **does**:
@@ -43,7 +56,8 @@ Forge **does**:
 ## 2. Requirements
 
 - macOS 26+
-- LM Studio installed (for models and MCP)
+- LM Studio, Claude Code Desktop, or Codex Desktop installed for the provider
+  you intend to select
 - A Forge binary that understands `serve` (0.5+ app or the `forge-conductor` CLI)
 
 An older GUI-only `/Applications/Forge Conductor.app` that ignores `serve` will make LM Studio sit on the plugin until it times out (~60s). Point MCP at a binary you have verified with `serve`.
@@ -64,6 +78,7 @@ Default home (override with `FORGE_CONDUCTOR_HOME`):
 | `~/.forge-conductor/memory/NEXT-CHAT.md` | Written when a handoff fires — what to do next |
 | `~/.forge-conductor/memory/handoffs/` | JSON copies + `LATEST` pointer |
 | `~/.forge-conductor/logs/` | Diagnostic JSONL |
+| `~/.forge-conductor/managed-providers/` | Durable provider selection, bounded redacted operations, receipts, and Forge-owned staged packages |
 | `~/.lmstudio/mcp.json` | LM Studio’s MCP registry |
 | `~/.lmstudio/extensions/plugins/mcp/forge-conductor/` | Primary mcpBridge plugin |
 | `~/.lmstudio/extensions/plugins/mcp/forge-conductor-fallback/` | Fallback mcpBridge plugin |
@@ -95,14 +110,18 @@ xcodebuild -scheme ForgeConductor -configuration Debug \
 
 Run `/private/tmp/forge-conductor-user-guide/Build/Products/Debug/Forge
 Conductor.app` in Xcode or as a separate local candidate. Start **Manager**,
-authorize your project folder, register it in **Projects**, and save/probe the
-loaded model in **Provider**. For managed work, choose the registered project,
-enter the instructions, and select **Start Task** in **Autonomy**. Forge fills
-the saved model, registered capability profile, and completion check; technical
-defaults are resolved by the Manager at admission and overrides remain available
-under **Advanced**. Provider and tool-catalog revisions are checked before run
-creation; stale automatic values refresh without discarding explicit overrides.
-For an LM Studio desktop chat, deploy the
+authorize your project folder, register it in **Projects**, and activate one
+provider in **Provider**. The activation toggle verifies or transactionally
+provisions Forge-owned integration files before changing the selection. For LM
+Studio, save and probe the loaded model; for a desktop host, complete the host's
+reported reload, activation, or trust-review action. For managed work, choose
+the registered project, enter the instructions, and select **Start Task** in
+**Autonomy**. Forge fills the saved LM Studio model or records the desktop
+host-selected model, registered capability profile, and completion check;
+technical defaults are resolved by the Manager at admission and overrides
+remain available under **Advanced**. Provider and tool-catalog revisions are
+checked before run creation; stale automatic values refresh without discarding
+explicit overrides. For an LM Studio desktop chat, deploy the
 MCP roles as described below. A SwiftPM CLI build by itself is not the complete
 signed app; its Core resource bundle must be adjacent before MCP initialization.
 
@@ -116,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.13.0 binary:
+Confirm the registered command is a `serve`-capable 0.14.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.13.0
+forge-conductor version    # should print 0.14.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.13.0` and
-`CFBundleVersion` must be `5`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.0` and
+`CFBundleVersion` must be `6`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -195,6 +214,44 @@ scope, units, persistence and requested/effective behavior.
 
 LM Studio only starts the `serve` processes when a chat has those MCP servers selected. Idle “MCP not running” on the dashboard with no chat open is expected.
 
+### Select a provider for Autonomy
+
+Open **Provider** and turn on exactly one of LM Studio, Claude Code Desktop, or
+Codex Desktop. Turning on another provider replaces the durable
+selection only after its integration is usable. Turning on LM Studio runs
+**Connect and Check** first and selects it only when the saved configuration is
+ready. Turning off the selected provider leaves no provider selected; it does
+not delete verified integration files. For Claude or Codex, **Repair
+Integration** re-inspects and transactionally regenerates Forge-owned files.
+**Remove Integration** is available only while that provider
+is inactive and removes only artifacts and settings entries whose ownership
+Forge can prove. If supported host CLI or live inventory cannot verify that the
+host registration is gone, Forge reports **Awaiting User Action** and preserves
+its files and receipt. Remove the registration in the host, then retry; the
+verified retry settles idempotently.
+
+If a desktop provider has a nonterminal task, finish or cancel that task in
+**Autonomy** before selecting, deselecting, repairing, or removing its
+integration. Forge rejects the mutation instead of disconnecting the hook path
+that owns the active session.
+
+LM Studio uses `managed_provider_push`: Forge owns the managed model turns,
+requires the exact loaded model, and applies its native session and rollover
+contract. Desktop hosts use `desktop_plugin_pull`: the host owns the model and
+conversation, and Forge records `host-selected` rather than choosing a model.
+The generated MCP process starts in a provider-specific, unattached role. Each
+session-start or prompt-submit assignment tells the host to call
+`desktop_run_attach` once with a five-minute capability for that exact run.
+Until it succeeds, every project-scoped Forge tool is denied. The capability
+cannot be replayed or moved to another provider, session, run, project
+generation, selection revision, or deployment; ending the session or run
+revokes the attachment.
+The Provider operation card reports any remaining reload, activation, CLI, or
+trust action. A verified installation receipt is not evidence that the desktop
+application is currently open or that a person accepted its trust prompt.
+The Grok Build card is non-selectable. Forge-owned Grok artifacts may be
+inspected or removed, but the card cannot report ready or start a run.
+
 ### Managed project setup and ordered instruction packages
 
 The Guided Setup wizard opens on first launch and remains available through
@@ -203,10 +260,13 @@ separate. For a Forge-managed autonomous queue, follow this order:
 
 1. Confirm Manager is running. Manual lifecycle controls are recovery tools,
    not a setup ritual when it is already healthy.
-2. Load a tool-capable model in LM Studio. In **Provider**, save the loopback
-   endpoint, then choose **Connect and Check** once. Provider is the manager-
-   owned connection Forge uses to create model sessions; it is separate from
-   the MCP servers enabled in an ordinary LM Studio desktop chat.
+2. Start the intended host, then activate it in **Provider**. For LM Studio,
+   load a tool-capable model and turn on its toggle; Forge runs **Connect and
+   Check** before selecting it. The explicit button under **LM Studio Advanced**
+   rechecks saved connection details. For Claude or Codex, let the toggle provision the
+   Forge-owned package and complete any exact reload, activation, or trust step
+   reported by the host. Provider selection is separate from MCP servers enabled
+   in an ordinary LM Studio desktop chat.
 3. In **Projects**, register the exact local repository folder. Registration
    authorizes that folder; adding the repository or its parent under Manager
    Allowed Roots is not an ordinary prerequisite.
@@ -317,11 +377,13 @@ repeated rollovers and injected recovery transitions. A second live attempt hit
 the provider's bounded deadline and is retained as a nonpass, so the single
 live pass is not described as a broad provider reliability matrix.
 
-LM Studio's desktop chat remains a separate host-owned mode. Its supported APIs
-do not let Forge attach to or replace an existing GUI conversation. Use the
-new-chat recipe below for an LM Studio-owned desktop chat. Forge-managed
-Autonomy uses the native session host for automatic rollover and does not claim
-to automate LM Studio's private GUI.
+Provider-owned desktop conversations remain separate host-owned modes. Their
+supported integration boundaries do not let Forge create or replace a private
+GUI conversation. Use the new-chat recipe below for an LM Studio-owned desktop
+chat. Forge-managed LM Studio Autonomy uses the native session host for
+automatic rollover. Claude and Codex runs stay at the authenticated hook
+boundary; they do not enter the managed-provider coordinator or claim automatic
+private-conversation rollover.
 
 For a native client with an explicit read-only task approval, use
 `forge-conductor manager task prepare --request /absolute/approval.json`.
@@ -383,9 +445,10 @@ They do not require a separately installed gate policy or a special restored
 environment. Only a package that explicitly declares an unknown custom gate
 uses **Import Custom Completion Policy…** and its separately approved signed
 policy. Forge revalidates the persisted completion request without repeating the
-model turn or its tool calls. Provider failures route to **Provider → Connect
-and Check**; resource and other recoverable failures retain their specific
-recovery text.
+model turn or its tool calls. LM Studio connection failures route to
+**Provider → Connect and Check**; desktop integration failures route to that
+provider's operation card and exact repair, reload, activation, or trust action.
+Resource and other recoverable failures retain their specific recovery text.
 
 ### 6.1 Provider-response recovery boundary
 
@@ -515,7 +578,7 @@ it does not bypass any requirement or start work by itself.
 
 | Surface | What it shows |
 |---------|----------------|
-| Dashboard | Host CPU / RAM / GPU / disk plus headless LM Studio, Autonomy, Continuity, Rune Forge, project progress, and a bounded, redacted, coalesced Managed Activity projection |
+| Dashboard | Host CPU / RAM / GPU / disk plus selected-provider readiness, Autonomy, Continuity, Rune Forge, project progress, and a bounded, redacted, coalesced Managed Activity projection |
 | LM Studio MCP | Live Forge stdio servers, configured roles, LM Studio host processes |
 | Agents / Tools / Feed | Sessions and recent tool audit |
 | Manager / Settings | Start/stop the HTTP control plane; inspect and change the persisted project-shell policy |
@@ -527,6 +590,13 @@ for managed Autonomy. The managed conversation is owned by Forge's native host
 and does not appear in LM Studio's desktop Chat history. **Rune Forge —
 OBSERVING** means a selected source is indexed and observed; Rune Forge remains
 additive and does not authorize, block, or change task outcomes.
+
+When Claude or Codex is selected, the same Dashboard card can show **HOST
+READY** without requiring LM Studio to be online. That state requires a ready
+preparation for the selected provider, a verified receipt, and a preparation
+revision matching the durable selection revision. Guided Setup uses the same
+projection. Missing or stale evidence, an in-flight provider operation, and a
+non-selectable provider all fail closed and route recovery to **Provider**.
 
 The Dashboard project row reports delivered instruction documents as **steps** and
 terminally completed queue items as **packages**. Its fraction combines those
@@ -664,7 +734,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.13.0**, build **5**
+Doctor identifies the running source identity as version **0.14.0**, build **6**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally
