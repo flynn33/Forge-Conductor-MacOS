@@ -43,6 +43,17 @@ automation before the selected test began, so the click-through is retained as
 a host-automation non-pass rather than product evidence. The working
 installation was not replaced.
 
+The September 23 `0.12.0 (4)` identity alignment is published at revision
+`bd33fda1b683070dcf56c16bb4c8ac778623ae31`, tree
+`46ebbe041732f8fdd22331c031e73b7d8f7ae10f`. Both SwiftPM products, the two
+focused version-contract tests, repository hygiene, and the complete SwiftPM
+regression passed; the terminal regression executed **1,720 XCTest cases with
+13 explicit environment/live skips and zero failures**. The canonical Xcode
+Debug app built and signed, and the project-local signed smoke bundle reported
+`0.12.0` and build `4` from both its app metadata and CLI. Push, fetch, exact
+local/remote revision readback, and zero divergence passed. The working
+installation was not replaced, and no shipment artifact was created.
+
 The tested production source is owner-authored revision
 `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
 `6c03f40e2b04ae6dfd689c9347a84014f7ebe496`; its final GitHub workflow passed
@@ -54,7 +65,7 @@ documentation only and leaves the tested native graph unchanged.
 
 | Surface | Current result | Boundary |
 |---|---|---|
-| Swift/Core suite | Published implementation `2319db359f28fba9cf350694ff8f66a7ecc70491`, tree `ff12dde3fe7ab27f741dd114143bd31afd20ed98`, passed a direct `swift test` terminal run with **1,720 XCTest cases**, **13 explicit environment/live skips, and zero failures**. The implementation push/fetch readback showed exact local/remote equality and zero divergence. | Declared skips remain distinct from passes; installed-build qualification remains separate. |
+| Swift/Core suite | Published feature implementation `2319db359f28fba9cf350694ff8f66a7ecc70491`, tree `ff12dde3fe7ab27f741dd114143bd31afd20ed98`, and published `0.12.0 (4)` alignment `bd33fda1b683070dcf56c16bb4c8ac778623ae31`, tree `46ebbe041732f8fdd22331c031e73b7d8f7ae10f`, each passed a direct `swift test` terminal run with **1,720 XCTest cases**, **13 explicit environment/live skips, and zero failures**. Both push/fetch readbacks showed exact local/remote equality and zero divergence. | Declared skips remain distinct from passes; installed-build qualification remains separate. |
 | Projects and Manager | The published-tree Xcode **My Mac** product registered picker-selected and absolute-path projects, authorized and saved canonical roots, rejected filesystem root, and retained state across relaunch. | The installed protected filesystem service still requires distinct-process qualification. |
 | LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Offline save/error and invalid endpoint handling also passed. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. |
 | Revision-3 Provider preparation | Published source `01c874e17c9a26c8f3111981748ed1bd3bdc1f81` passed seven deterministic preparation cases with one explicit live-only skip plus a separately enabled 1/1 live LM Studio `openai/gpt-oss-20b` case. The live operation preserved the pin, verified the contract, wrote the revision-bound readiness receipt, and reused that exact receipt idempotently. Provider configuration passed 14/14 with one explicit disposable-Keychain skip; app provider contracts passed 11/11, operator contracts 10/10, and dashboard security 7/7. | External service start and model load remain typed operator actions when the provider offers no supported authenticated lifecycle API. A focused native UI run timed out while enabling automation before test execution and is a non-pass. |
