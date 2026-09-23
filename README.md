@@ -6,14 +6,14 @@ running project-scoped work with local models in
 
 | | |
 | --- | --- |
-| **Version** | **0.11.0** |
-| **Build** | **3** |
+| **Version** | **0.12.0** |
+| **Build** | **4** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.11.0 (3)` is the current development identity. It is
+> **Release status:** `0.12.0 (4)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
@@ -22,8 +22,9 @@ help, compact task admission, native tool selection, automatic completion,
 provider/runtime preparation, durable continuity, and large instruction
 packages. Integrated deterministic acceptance covers restart, provider
 interruption, forced rollover, corrected completion evidence, and multi-page
-instruction delivery. Native distribution and shipment qualification remain
-separate.
+instruction delivery. The Rig now adds bounded Managed Activity beside Storage,
+and Rune Forge adds a verbose Policy Feed; responsive layout qualification covers
+all primary views. Native distribution and shipment qualification remain separate.
 
 ## What Forge Conductor does
 

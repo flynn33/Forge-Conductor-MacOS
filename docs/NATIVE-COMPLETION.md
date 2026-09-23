@@ -190,8 +190,9 @@ frameworks, read-only to model project work.
 
 Tool names, structured response fields, shell default/opt-out settings,
 completion-request compatibility, and durable run/lease identities are
-preserved. Source version remains 0.9.0 build 1; these changes do not constitute
-release approval.
+preserved. The original completion checkpoint retained source identity
+`0.9.0 (1)`; the current repository identity is `0.12.0 (4)`. Neither the
+checkpoint nor the current development identity constitutes release approval.
 
 ## Regression evidence
 

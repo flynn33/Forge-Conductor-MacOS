@@ -123,6 +123,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.11.0`
+`0.12.0`
 
-Build: `3`
+Build: `4`

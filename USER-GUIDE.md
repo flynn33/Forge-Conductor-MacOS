@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.11.0**, build **3**. This guide covers the native Forge Conductor
+Version **0.12.0**, build **4**. This guide covers the native Forge Conductor
 application and its LM Studio integration on macOS.
 
-> `0.11.0 (3)` is the current development identity. It has not inherited the
+> `0.12.0 (4)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release gates.
@@ -112,15 +112,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and both mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.11.0 binary:
+Confirm the registered command is a `serve`-capable 0.12.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.11.0
+forge-conductor version    # should print 0.12.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.11.0` and
-`CFBundleVersion` must be `3`.
+For an app bundle, `CFBundleShortVersionString` must be `0.12.0` and
+`CFBundleVersion` must be `4`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped

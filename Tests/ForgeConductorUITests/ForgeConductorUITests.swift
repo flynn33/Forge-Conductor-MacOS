@@ -2874,7 +2874,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "refresh_interval_sec": 8,
             ] as [String: Any],
             "home": "/tmp/forge-operator-fixture",
-            "version": "0.11.0",
+            "version": "0.12.0",
         ]
     }
 

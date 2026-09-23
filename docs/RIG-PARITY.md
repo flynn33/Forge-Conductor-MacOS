@@ -53,8 +53,8 @@ The legacy stream remains the bounded tool/agent diagnostic audit view.
 
 ## Tests
 The [qualification status](QUALIFICATION-STATUS.md) records the exact local and
-CI counts, source bindings, and current development version **0.11.0**, build
-**3** identity. Historical `0.9.0 (1)` receipts remain explicitly historical.
+CI counts, source bindings, and current development version **0.12.0**, build
+**4** identity. Historical `0.9.0 (1)` receipts remain explicitly historical.
 The retained local app-hosted tests and four production onboarding scenarios passed;
 the installed-app qualifier remains partial because its own System Events
 Settings step was not run. The separate native Settings off/on case passed.

@@ -10,6 +10,8 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-09-23 (development)
+
 ### Added
 
 - Added a bounded, redacted, coalesced **Managed Activity** projection directly
@@ -40,6 +42,12 @@ Product versions do not by themselves claim shipment.
   activity region and a vertical fallback at constrained widths. MCP,
   agent/process, Manager, Autonomy, Continuity, and Rune Forge controls now use
   adaptive layouts to avoid clipping and make better use of available space.
+
+### Changed
+
+- Advanced the development product identity from `0.11.0 (3)` to `0.12.0 (4)`
+  for the backward-compatible Managed Activity, Policy Feed, and responsive
+  primary-view layout feature release. This is not a shipment claim.
 
 ## [0.11.0] — 2026-09-21 (development)
 
