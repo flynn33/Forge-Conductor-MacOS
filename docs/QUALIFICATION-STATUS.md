@@ -54,8 +54,10 @@ Debug app built and signed, and the project-local signed smoke bundle reported
 local/remote revision readback, and zero divergence passed. The working
 installation was not replaced, and no shipment artifact was created.
 
-The September 23 `0.14.0 (6)` provider-integration source passed both SwiftPM
-product builds and the complete SwiftPM regression: **1,849 XCTest cases with
+The September 23 `0.14.0 (6)` provider-integration source is revision
+`65af43e31aa2b818ccd2f915aa7f89c34b7c821d`, tree
+`945cdb9d6adaf17c85845fe846910ece527288fd`. It passed both SwiftPM product
+builds and the complete SwiftPM regression: **1,849 XCTest cases with
 13 explicit environment/live skips and zero failures**. The canonical Apple
 Development-signed Debug workspace build succeeded. Focused canonical Xcode
 execution then passed **83 Core tests**, **40 app-hosted tests**, and **six
@@ -69,18 +71,20 @@ a clean whole-application performance claim. The owner installation was not
 replaced. Claude Code Desktop and Codex Desktop were not exercised as live
 external hosts; Grok remains non-selectable.
 
-The tested production source is owner-authored revision
+The earlier September 17 distribution-evidence source is owner-authored revision
 `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree
 `6c03f40e2b04ae6dfd689c9347a84014f7ebe496`; its final GitHub workflow passed
 native source integrity plus Swift and Xcode Debug/Release lanes. Local and
 remote `main` were then synchronized at documentation closeout revision
 `f02abeb8c940c8d998f822fd4f1cad5c20c7765e`, tree
 `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. That closeout changes
-documentation only and leaves the tested native graph unchanged.
+documentation only and leaves that historical native graph unchanged. These
+revisions remain distribution evidence for the source they name; they are not
+the current `0.14.0 (6)` source result.
 
 | Surface | Current result | Boundary |
 |---|---|---|
-| Swift/Core suite | Published feature implementation `2319db359f28fba9cf350694ff8f66a7ecc70491`, tree `ff12dde3fe7ab27f741dd114143bd31afd20ed98`, and published `0.12.0 (4)` alignment `bd33fda1b683070dcf56c16bb4c8ac778623ae31`, tree `46ebbe041732f8fdd22331c031e73b7d8f7ae10f`, each passed a direct `swift test` terminal run with **1,720 XCTest cases**, **13 explicit environment/live skips, and zero failures**. Both push/fetch readbacks showed exact local/remote equality and zero divergence. | Declared skips remain distinct from passes; installed-build qualification remains separate. |
+| Swift/Core suite | Current `0.14.0 (6)` implementation `65af43e31aa2b818ccd2f915aa7f89c34b7c821d`, tree `945cdb9d6adaf17c85845fe846910ece527288fd`, passed both SwiftPM product builds and a direct full-suite terminal run with **1,849 XCTest cases**, **13 explicit environment/live skips, and zero failures**. The canonical Apple Development-signed Debug workspace build and the focused Xcode Core/app-hosted/UI matrices also passed. | Declared skips remain distinct from passes. Live desktop-host, installed-build, distribution-artifact, and shipment qualification remain separate. |
 | Projects and Manager | The published-tree Xcode **My Mac** product registered picker-selected and absolute-path projects, authorized and saved canonical roots, rejected filesystem root, and retained state across relaunch. | The installed protected filesystem service still requires distinct-process qualification. |
 | Provider integrations | The 0.14.0 source implements mutually exclusive LM Studio, Claude Code Desktop, and Codex Desktop selection; transactional Forge-owned desktop package installation, rollback, repair, and removal; a bounded durable operation ledger; revision-bound run admission; authenticated loopback hooks; and selected-provider readiness on Dashboard and Guided Setup. Desktop sessions receive a provider-specific MCP launch command and a five-minute, single-use capability bound to provider, session, run, project generation, selection revision, deployment, and frozen authorization scope. Project tools stay unavailable until `desktop_run_attach` atomically consumes that capability. Deterministic focused coverage passed **100/100**; canonical Xcode passed **83/83 Core**, **40/40 app-hosted**, and **6/6 native UI** cases; the full SwiftPM regression passed **1,849 cases with 13 explicit skips and zero failures**. Grok Build remains visible but non-selectable for owned-artifact cleanup and forward compatibility. | Deterministic tests and an installation receipt do not prove that a selectable desktop host is open, has reloaded the package, has accepted hook trust, or has completed a live session. Claude and Codex require separate live acceptance; neither qualifies the other. Grok's documented startup/prompt hook outputs do not deliver Forge's initial assignment context, so no ready, run, or live-support claim is made for Grok in 0.14.0. Existing Thread Performance Checker diagnostics also remain, so no clean whole-application performance claim is made. |
 | LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Offline save/error and invalid endpoint handling also passed. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. |
