@@ -509,7 +509,7 @@ Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
 destinations, all guide routes, immediate opaque-source acceptance during
 Manager outage, the native source picker, and four-format native export.
 
-The current authority is version `0.12.0`, build `4`. No release archive,
+The current authority is version `0.13.0`, build `5`. No release archive,
 installer, notarized artifact, installation replacement, or shipment candidate
 was created; those remain separate owner-directed release work. See the
 [acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) and
@@ -518,13 +518,13 @@ was created; those remain separate owner-directed release work. See the
 ## Current Policy Feed presentation
 
 After RF-SJ-10 acceptance, the current native presentation adds a verbose
-**Policy Feed** to Rune Forge and includes the newest policy events in the Rig's
+**Policy Feed** to Rune Forge and includes the newest policy events in the Dashboard's
 bounded, coalesced Managed Activity projection. Rune Forge consumes the global
-newest bounded Manager snapshot; Rig requests the exact active project and
+newest bounded Manager snapshot; Dashboard requests the exact active project and
 generation. Neither creates a second log or requests unbounded history.
 Rows distinguish violations, repeats, evidence updates, corrections,
 reopenings, and interpretation observations, with source/rule, confidence,
-suggested correction, and delivery state when present. The Rig retains at most
+suggested correction, and delivery state when present. The Dashboard retains at most
 100 combined app-local activity rows on its existing five-second view-owned
 refresh; exact project/generation rows require an exact generation, so public
 operator events lacking that generation cannot be relabeled into the active

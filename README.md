@@ -6,14 +6,14 @@ running project-scoped work with local models in
 
 | | |
 | --- | --- |
-| **Version** | **0.12.0** |
-| **Build** | **4** |
+| **Version** | **0.13.0** |
+| **Build** | **5** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.12.0 (4)` is the current development identity. It is
+> **Release status:** `0.13.0 (5)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
@@ -22,9 +22,11 @@ help, compact task admission, native tool selection, automatic completion,
 provider/runtime preparation, durable continuity, and large instruction
 packages. Integrated deterministic acceptance covers restart, provider
 interruption, forced rollover, corrected completion evidence, and multi-page
-instruction delivery. The Rig now adds bounded Managed Activity beside Storage,
-and Rune Forge adds a verbose Policy Feed; responsive layout qualification covers
-all primary views. Native distribution and shipment qualification remain separate.
+instruction delivery. **Dashboard** now launches an ordered, state-aware
+**Guided Setup** wizard; local LM Studio recovery, actionable Autonomy and
+Continuity states, current-build Doctor checks, compact Managed Activity, and
+the Rune Forge Policy Feed make setup and monitoring one connected workflow.
+Native distribution and shipment qualification remain separate.
 
 ## What Forge Conductor does
 
@@ -77,13 +79,20 @@ product set.
 
 ## First-run workflow
 
-1. Start LM Studio and load a local model.
+Open **Dashboard** and choose **Guided Setup** in the title bar for the ordered,
+state-aware version of this workflow. The wizard saves its current step and
+routes each setup or recovery action to the view that owns it.
+
+1. Start LM Studio and load a supported tool-capable local model. **Connect and
+   Check** starts or discovers its local HTTP server.
 2. Open Forge Conductor and start the Manager.
 3. In **Projects**, register the repository by picker or absolute path. Forge
    authorizes that exact selected folder and preserves existing authorized
    roots; the same path does not need to be entered in Manager first.
 4. Usually no Provider visit is required. **Start Task** runs the same
-   manager-owned **Connect and check** workflow exposed in **Provider**: it
+   manager-owned **Connect and Check** workflow exposed in **Provider**. For a
+   saved loopback configuration, it first discovers or starts the local server,
+   then it
    resolves the saved or local-default endpoint, discovers models, preserves a
    compatible pin or selects the only compatible loaded model, performs the
    managed contract probe, and saves a revision-bound readiness receipt. When
@@ -119,7 +128,7 @@ product set.
    again by the Manager. Optional task label, saved-model
    choice, and network authority remain under **Customize**; provider/adapter,
    raw capability IDs, and raw completion-gate IDs are not routine inputs.
-   **Completion Checks → Select** exposes native checkboxes for a buildable
+   Selecting **Show completion checks** exposes native checkboxes for a buildable
    project, no build errors, no build warnings, available tests, complete
    instruction delivery, and no unresolved operations. **On failure** selects
    pause-for-review, bounded automatic retry, or terminal stop; an optional
@@ -162,7 +171,7 @@ The run view leads with the task, current state/work, recent model and tool
 activity, automatic continuity, completion, and recovery. Provider, session,
 lease, project, and run identifiers remain available under **Technical details**.
 
-For at-a-glance monitoring, **FORGE RIG** places a bounded, coalesced
+For at-a-glance monitoring, **Dashboard** places a bounded, coalesced
 **Managed Activity** projection immediately below Load Trace and Orchestration
 Status. It shows the active project and instruction package, the current
 inferred step plus durable delivered count, current phase/work/next action, the
@@ -183,14 +192,17 @@ second persisted full conversation transcript.
 At normal widths, CPU shares a row with GPU and Storage shares an equalized row
 with the compact Managed Activity frame; constrained widths stack those panels
 vertically. The activity list scrolls internally so it does not lengthen the
-entire Rig board.
+entire Dashboard.
 
 The **Continuity** view leads with automatic protection for the selected task:
 its plain-language state, most recent progress save, remaining working context,
 and Forge's next automatic action. Active rollover activity keeps its event
 timeline visible while operation identifiers, exact budget accounting, and
 handoff checksums remain under **Technical details**. Routine use requires no
-manual continuity action. **Optional manual actions** contains **Save progress
+manual continuity action. An action-required state names the exact retained
+condition and routes provider faults to **Provider** or run/completion faults to
+**Autonomy**; it never asks for an unspecified environment reset. **Optional
+manual actions** contains **Save progress
 now** and **Start a fresh session and continue** for administrative recovery or
 an intentionally early rollover.
 
@@ -202,7 +214,9 @@ matching structured acknowledgement, Forge accepts one successor, fences the
 predecessor, and automatically continues the retained assignment. Restart
 recovery reuses those durable identities and does not grant a second successor.
 
-Use the **Guided Mode** toolbar toggle to show or hide concise, state-aware
+Use **Guided Setup** in the Dashboard title bar to prepare a project in order,
+start the run, learn where to monitor it, and recover from named issues. Use the
+separate **Guided Mode** toolbar toggle to show or hide concise, state-aware
 guidance in the current view. The setting persists across relaunch. The
 question-mark toolbar button opens the complete offline guide for the selected
 tab; help buttons inside Start Task, project registration, task capabilities,
@@ -237,8 +251,14 @@ shows a destructive-action confirmation before removal.
 ## LM Studio connection
 
 LM Studio is the MCP host. It launches Forge Conductor's `serve` command over
-stdio. Forge installs primary and fallback registrations that point to the same
-versioned executable with different roles.
+stdio. Forge installs primary, fallback, and CLU registrations that point to the
+same versioned executable with different roles. In **Provider**, **Connect and
+Check** uses LM Studio's supported `lms` CLI to discover or start the local
+server, adopts only its reported loopback port, discovers the loaded models,
+and runs the managed-provider contract probe. **Settings → Doctor** reports the
+current product version/build and whether every LM Studio role is bound to that
+same executable; stale deployed files are reported as present but needing
+**Deploy current build**.
 
 ```bash
 forge-conductor version
@@ -254,7 +274,7 @@ Detailed deployment and recovery behavior is documented in
 
 | Surface | Responsibility |
 | --- | --- |
-| **FORGE RIG** | Bounded CPU, GPU, memory, disk, and model-load telemetry plus color/load status, durable instruction progress, and a redacted, exact-run Managed Activity projection for current work, managed responses, tool transitions, orchestration, and project-scoped policy events |
+| **Dashboard** | Guided Setup plus bounded CPU, GPU, memory, disk, and model-load telemetry, durable instruction progress, and a compact redacted exact-run Managed Activity projection for current work, managed responses, tool transitions, orchestration, and project-scoped policy events |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
 | **Rune Forge** | Native Development Policy source selection, a verbose bounded Policy Feed, violation/history inspection, delivery state, cached degraded operation, and atomic filtered policy-log export as JSONL, JSON, Markdown, or CSV |

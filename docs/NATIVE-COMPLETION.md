@@ -9,11 +9,21 @@ It cannot supply authoritative gate results. Legacy `gate_evidence` fields are
 accepted as non-authoritative input, and historical result hashes remain useful
 only as provenance.
 
-Missing or invalid installed policy leaves the run in `blockedConfiguration`.
-A failed assertion leaves work available for correction. Completion requires a
-fresh native result under the current run, lease, generation, specification,
-source inputs, and policy. Restart discards process-local approval authority and
-requires validation again; decoding an old receipt does not restore approval.
+Completion gates have two explicit owners. The built-in package gate and every
+native `CompletionCheckPreset` are manager-owned automatic checks. Forge
+evaluates them from the compiled project-instruction completion plan; they do
+not load an installed policy and do not require a separate gate environment.
+Unknown gate identifiers declared by an instruction package are custom native
+gates. Only those identifiers enter the protected policy path described below.
+
+A missing or invalid installed policy leaves a run in `blockedConfiguration`
+only when that run explicitly contains a custom native gate. A failed automatic
+check or custom assertion leaves work available for correction and Autonomy
+shows the exact failed condition. Correct an automatic condition and choose
+**Retry Automatic Checks**. Import a policy through **Import Custom Completion
+Policy…** only for the explicitly named custom gate. Restart discards
+process-local custom approval authority and requires custom validation again;
+decoding an old receipt does not restore approval.
 The September 15 owner-host read-only LM Studio run invoked project-bound
 `fs_read` three times and emitted a completion object after explanatory prose.
 The installed manager did not parse that suffix and yielded the run in `running`
@@ -69,15 +79,15 @@ manager adjudication.
 
 ## Native operator policy import
 
-Select a persisted run in **Autonomy** and use **Advanced: Import Custom
-Validation…** in Completion checks. Choose a separately approved schema-1
+Select a persisted run in **Autonomy**, expand **Custom policy controls** under
+Completion checks, and use **Import Custom Completion Policy…**. Choose a separately approved schema-1
 JSON policy. Its signed XCTest package must already be under the exact protected
 `native-validation/packages/<package UUID>/` path. Forge's native importer does
 not compile arbitrary tests, take executable or shell selectors, or grant gate
 approval. The GUI reloads the current manager run and project generation before
 calling the actor. The actor reads at most 256 KiB without following the chosen
-file's final link and requires the
-policy's run, project, generation, and complete gate set to match. It captures
+file's final link and requires the policy's run, project, generation, and
+complete custom-native gate set to match. It captures
 the named project inputs and each approved package manifest, requires signed
 product paths to be covered by those manifests, rejects aliased protected
 directories, and rechecks the input/policy bytes before an atomic owner-only
@@ -107,6 +117,12 @@ service remain unqualified; import is not an assertion that the package's
 native cases have passed.
 
 ## Installed policy and ownership
+
+This section applies only to explicit custom native gate identifiers. It does
+not apply to Buildable project, No build errors, No build warnings, Available
+tests pass, Instruction packages complete, No unresolved operations, or the
+built-in package-completion gate. Instruction packages remain the authority for
+declaring custom gates; Forge Conductor does not invent one as a prerequisite.
 
 The manager reads one owner-only policy at:
 
@@ -191,7 +207,7 @@ frameworks, read-only to model project work.
 Tool names, structured response fields, shell default/opt-out settings,
 completion-request compatibility, and durable run/lease identities are
 preserved. The original completion checkpoint retained source identity
-`0.9.0 (1)`; the current repository identity is `0.12.0 (4)`. Neither the
+`0.9.0 (1)`; the current repository identity is `0.13.0 (5)`. Neither the
 checkpoint nor the current development identity constitutes release approval.
 
 ## Regression evidence

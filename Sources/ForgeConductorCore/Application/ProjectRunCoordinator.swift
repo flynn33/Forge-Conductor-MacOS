@@ -96,9 +96,10 @@ public struct CompletionGateValidator: Sendable {
     }
 }
 
-/// Installed native policy is the only source of gate handlers. This type is not
-/// decodable and has no model-tool registration surface. An empty registry denies
-/// every gate; missing policy must never select a provenance-only fallback.
+/// Validators are supplied by manager-owned automatic checks or an explicitly
+/// installed custom-native policy. This type is not decodable and has no
+/// model-tool registration surface. Missing validators fail closed and never
+/// select a provenance-only fallback.
 public struct GateValidatorRegistry: RunCompletionValidating, Sendable {
     private let validators: [String: CompletionGateValidator]
     private let clock: any Clock
@@ -774,14 +775,42 @@ public actor ProjectRunCoordinator {
         work.pendingIntent = nil
         work.metadata["completion_proof_sha256"] = receipt.proofSHA256
         let blocked = receipt.results.contains { $0.blocker != nil }
+        let failureSummary = Self.completionFailureSummary(receipt)
+        work.nextAction = failureSummary
         return try await transition(
             run, to: blocked ? .blockedConfiguration : .running, lease: protected.lease,
             event: "autonomous_completion_rejected",
-            summary: "One or more deterministic completion gates failed",
+            summary: failureSummary,
             work: work,
             errorCode: AutonomyError.completionValidationFailed.code,
-            errorSummary: blocked ? "Install the required native gate policy or restore its required environment" : "Completion gates did not all pass"
+            errorSummary: failureSummary
         )
+    }
+
+    static func completionFailureSummary(
+        _ receipt: CompletionValidationReceipt
+    ) -> String {
+        let failures = receipt.results.filter { !$0.passed }
+        guard !failures.isEmpty else {
+            return "Completion checks did not produce a passing receipt."
+        }
+        var seenSummaries = Set<String>()
+        let distinct = failures.filter { seenSummaries.insert($0.summary).inserted }
+        let details = distinct.prefix(4).map { result in
+            "\(result.gate): \(result.summary)"
+        }.joined(separator: "; ")
+        let remainder = distinct.count > 4
+            ? "; plus \(distinct.count - 4) more distinct failure(s)" : ""
+        let unbounded = "Completion checks need attention — \(details)\(remainder)"
+        var bounded = ""
+        var byteCount = 0
+        for character in unbounded {
+            let width = String(character).utf8.count
+            guard byteCount + width <= 2_048 else { break }
+            bounded.append(character)
+            byteCount += width
+        }
+        return bounded
     }
 
     private func withLeaseRenewal<Value: Sendable>(

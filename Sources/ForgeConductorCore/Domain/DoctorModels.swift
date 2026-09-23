@@ -29,6 +29,7 @@ public struct DoctorCheck: Sendable, Equatable {
 public struct DoctorReport: Sendable, Equatable {
     public var ok: Bool
     public var version: String
+    public var buildVersion: String
     public var home: String
     public var checks: [DoctorCheck]
     public var telemetry: TelemetryHealthReport
@@ -39,6 +40,7 @@ public struct DoctorReport: Sendable, Equatable {
     public init(
         ok: Bool,
         version: String,
+        buildVersion: String,
         home: String,
         checks: [DoctorCheck],
         telemetry: TelemetryHealthReport,
@@ -48,6 +50,7 @@ public struct DoctorReport: Sendable, Equatable {
     ) {
         self.ok = ok
         self.version = version
+        self.buildVersion = buildVersion
         self.home = home
         self.checks = checks
         self.telemetry = telemetry
@@ -57,9 +60,13 @@ public struct DoctorReport: Sendable, Equatable {
     }
 
     public func asDictionary() -> [String: Any] {
-        [
+        let hasAdvisories = checks.contains { !$0.ok }
+        return [
             "ok": ok,
             "version": version,
+            "build": buildVersion,
+            "has_advisories": hasAdvisories,
+            "state": !ok ? "issues" : (hasAdvisories ? "attention" : "healthy"),
             "home": home,
             "checks": checks.map { $0.asDictionary() },
             "telemetry": telemetry.asDictionary(),

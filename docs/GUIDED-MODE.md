@@ -1,4 +1,4 @@
-# Guided Mode
+# Guided Setup and Guided Mode
 
 Guided Mode provides optional, offline explanations for the part of Forge
 Conductor currently in use. It does not connect to the model, change project or
@@ -22,8 +22,37 @@ tab. Guides describe:
 - troubleshooting steps;
 - advanced details and related guides.
 
-The first-use setup guide remains an onboarding index. It is separate from the
-persistent question-mark action, which is contextual after first launch.
+The first-use setup experience and the persistent contextual guides have
+different jobs. **Guided Setup** is the ordered project-run wizard; question-
+mark actions explain only the current view or control.
+
+## Guided Setup wizard
+
+Open **Dashboard** and choose **Guided Setup** in its title bar. The wizard also
+opens on first use and remembers the selected step across relaunches. Its eight
+steps are the supported operating order:
+
+1. **Confirm Forge is ready** — verify Manager is running.
+2. **Connect the model provider** — load a tool-capable model in LM Studio, then
+   use Provider's single **Connect and Check** action.
+3. **Register the project** — select the exact repository; normal registration
+   authorizes that folder without a separate parent-root setup step.
+4. **Add and order instructions** — import packages, review their capabilities
+   and gates, and arrange execution order.
+5. **Review automation behavior** — confirm tools, automatic completion checks,
+   failure handling, and continuity behavior.
+6. **Start the automated run** — launch the ordered queue from Projects or one
+   direct task from Autonomy.
+7. **Monitor the run** — use Dashboard for live state, Autonomy for exact run
+   control, Continuity for rollover, Rune Forge for policy observations, and
+   Events & Evidence for durable audit detail.
+8. **Resolve issues and continue** — follow the current issue's owning-view
+   action without deleting or duplicating the durable run.
+
+Every step states its readiness condition, ordinary actions, recovery guidance,
+and links to the owning view. **Next required step** uses current Manager,
+Provider, project, package, and run state to recommend a step. It is navigation
+guidance only: it does not change configuration, start a run, or approve a gate.
 
 ## Context inside sheets and focused controls
 
@@ -52,7 +81,7 @@ the selected operation. Provider guidance distinguishes unsaved settings,
 verified readiness, and connection/setup work. Runtimes guidance reports the
 selected job state or that no runtime job needs attention.
 
-FORGE RIG guidance explains the bounded, coalesced Managed Activity projection,
+Dashboard guidance explains the bounded, coalesced Managed Activity projection,
 including its current inferred instruction step, durable delivered count,
 rolling durable managed-response/tool/orchestration/project-policy rows,
 authenticated exact run/project/generation boundary, explicit source

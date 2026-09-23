@@ -206,6 +206,58 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
 }
 
 final class OperatorProjectContractTests: XCTestCase {
+    func testInstructionArtifactOwnsToolsAndCustomGatesWhileRetainingAutomaticSelections() throws {
+        let runID = RunID()
+        let projectID = ProjectID()
+        let builtIn = ProjectInstructionQueueStore.builtInCompletionGate
+        let artifact = ProjectRunInstructionArtifact(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Follow the immutable instruction artifact.",
+            sourcePath: "/tmp/forge-authority-artifact",
+            contentSHA256: String(repeating: "c", count: 64),
+            allowedTools: ["instruction_catalog", "instruction_read", "shell_exec"],
+            completionGates: [builtIn, "owner.package-qualification"],
+            documentCount: 2,
+            instructionByteCount: 1_024,
+            unresolvedDocumentCount: 0,
+            createdAt: "2026-09-23T12:00:00Z"
+        )
+        let request = OperatorRunStartRequest(
+            runID: runID.description,
+            projectID: projectID.description,
+            projectGeneration: ProjectGeneration.initial.rawValue,
+            assignmentID: nil,
+            mission: "Temporary draft mission",
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: ["fs_read"],
+            completionGates: [
+                "owner.unrelated-draft-qualification",
+                CompletionCheckPreset.testsPass.rawValue,
+                builtIn,
+            ],
+            networkAllowed: false,
+            expectedProviderConfigurationRevision: "provider-revision",
+            expectedToolCatalogRevision: String(repeating: "d", count: 64),
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+
+        let bound = request.usingInstructionArtifact(artifact)
+
+        XCTAssertEqual(bound.mission, artifact.mission)
+        XCTAssertEqual(bound.instructionArtifactSHA256, artifact.contentSHA256)
+        XCTAssertEqual(bound.allowedTools, artifact.allowedTools)
+        XCTAssertEqual(bound.completionGates, [
+            builtIn,
+            "owner.package-qualification",
+            CompletionCheckPreset.testsPass.rawValue,
+        ])
+        XCTAssertFalse(bound.completionGates?.contains("owner.unrelated-draft-qualification") == true)
+    }
+
     @MainActor
     func testConfiguredAutonomyStartNeedsOnlyProjectAndInstructions() async throws {
         let projectID = UUID().uuidString.lowercased()

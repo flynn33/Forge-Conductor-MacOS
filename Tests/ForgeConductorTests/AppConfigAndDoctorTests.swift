@@ -493,15 +493,74 @@ final class AppConfigAndDoctorTests: XCTestCase {
         defer { app.shutdown() }
         let report = try app.doctorModel()
         XCTAssertTrue(report.ok)
+        XCTAssertEqual(report.version, ForgeApp.version)
+        XCTAssertEqual(report.buildVersion, ForgeApp.buildVersion)
         XCTAssertFalse(report.checks.isEmpty)
         XCTAssertEqual(report.telemetry.runtime, TelemetryService.runtimeIdentifier)
         XCTAssertTrue(report.shellPolicy.enabled)
         XCTAssertEqual(report.shellPolicy.policyVersion, AppConfig.currentSchemaVersion)
         let edge = try app.doctor()
         XCTAssertEqual(edge["ok"] as? Bool, true)
+        XCTAssertEqual(edge["version"] as? String, ForgeApp.version)
+        XCTAssertEqual(edge["build"] as? String, ForgeApp.buildVersion)
         let shell = edge["shell"] as? [String: Any]
         XCTAssertEqual(shell?["enabled"] as? Bool, true)
         XCTAssertNotNil(shell?["runtimes"] as? [String: Any])
+    }
+
+    func testDoctorShowsCurrentCLUPluginForCurrentBuild() throws {
+        try withLMStudioDoctorFixture { app, currentBinary in
+            let deployment = try LMStudioMCPPluginInstaller.install(
+                preferredBinary: currentBinary
+            )
+
+            let report = try app.doctorModel()
+            let clu = try XCTUnwrap(
+                report.checks.first { $0.name == "lm_studio_clu_plugin" }
+            )
+
+            XCTAssertTrue(clu.ok, clu.detail)
+            XCTAssertTrue(clu.detail.contains("Current build \(ForgeApp.version)"))
+            XCTAssertTrue(clu.detail.contains("build \(ForgeApp.buildVersion)"))
+            XCTAssertTrue(clu.detail.contains(currentBinary.path))
+            XCTAssertEqual(
+                LMStudioEnvironment.registeredDeploymentID(
+                    expectedBinary: currentBinary
+                ),
+                deployment.deploymentID
+            )
+
+            let edge = try app.doctor()
+            let checks = try XCTUnwrap(edge["checks"] as? [[String: Any]])
+            let cluEdge = try XCTUnwrap(
+                checks.first { $0["name"] as? String == "lm_studio_clu_plugin" }
+            )
+            XCTAssertEqual(cluEdge["ok"] as? Bool, true)
+        }
+    }
+
+    func testDoctorReportsInstalledStaleCLUAsPresentAndUpdateRequired() throws {
+        try withLMStudioDoctorFixture { app, currentBinary in
+            let staleBinary = app.paths.home
+                .appendingPathComponent("stale", isDirectory: true)
+                .appendingPathComponent("forge-conductor")
+            try writeExecutable(at: staleBinary)
+            _ = try LMStudioMCPPluginInstaller.install(
+                preferredBinary: staleBinary
+            )
+
+            let report = try app.doctorModel()
+            let clu = try XCTUnwrap(
+                report.checks.first { $0.name == "lm_studio_clu_plugin" }
+            )
+
+            XCTAssertFalse(clu.ok)
+            XCTAssertTrue(clu.detail.contains("Plugin files are present"), clu.detail)
+            XCTAssertTrue(clu.detail.contains(staleBinary.path), clu.detail)
+            XCTAssertTrue(clu.detail.contains(currentBinary.path), clu.detail)
+            XCTAssertTrue(clu.detail.contains("Deploy current build"), clu.detail)
+            XCTAssertFalse(clu.detail.contains("Not deployed"), clu.detail)
+        }
     }
 
     func testStatusSnapshotModel() throws {
@@ -551,6 +610,47 @@ final class AppConfigAndDoctorTests: XCTestCase {
         let n = rt.beginRestart()
         XCTAssertEqual(n, 1)
         XCTAssertEqual(rt.state, .restarting)
+    }
+
+    private func withLMStudioDoctorFixture(
+        _ body: (ForgeApp, URL) throws -> Void
+    ) throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("doctor-lmstudio-\(UUID().uuidString)", isDirectory: true)
+        let home = root.appendingPathComponent("forge-home", isDirectory: true)
+        let lmStudioHome = root.appendingPathComponent("lmstudio", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: lmStudioHome,
+            withIntermediateDirectories: true
+        )
+
+        let priorHomeOverride = LMStudioEnvironment.homeDirOverride
+        let priorInstalledOverride = LMStudioEnvironment.isAppInstalledOverride
+        LMStudioEnvironment.homeDirOverride = lmStudioHome
+        LMStudioEnvironment.isAppInstalledOverride = true
+        defer {
+            LMStudioEnvironment.homeDirOverride = priorHomeOverride
+            LMStudioEnvironment.isAppInstalledOverride = priorInstalledOverride
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let currentBinary = ManagerInstaller(app: app).appExecutableURL
+        try writeExecutable(at: currentBinary)
+        try body(app, currentBinary)
+    }
+
+    private func writeExecutable(at url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: url.path
+        )
     }
 }
 

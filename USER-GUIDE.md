@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.12.0**, build **4**. This guide covers the native Forge Conductor
+Version **0.13.0**, build **5**. This guide covers the native Forge Conductor
 application and its LM Studio integration on macOS.
 
-> `0.12.0 (4)` is the current development identity. It has not inherited the
+> `0.13.0 (5)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release gates.
@@ -13,6 +13,7 @@ application and its LM Studio integration on macOS.
 | Need | Guide |
 | --- | --- |
 | Build, archive, or sign the app | [Xcode guide](XCODE.md) |
+| Follow the ordered setup wizard or use contextual help | [Guided Setup and Guided Mode](docs/GUIDED-MODE.md) |
 | Connect or repair LM Studio MCP | [LM Studio connection](docs/LM-STUDIO-CONNECTION.md) |
 | Queue project instructions | [Instruction packages](docs/INSTRUCTION-PACKAGES.md) |
 | Configure protected completion | [Native completion](docs/NATIVE-COMPLETION.md) |
@@ -66,8 +67,11 @@ Default home (override with `FORGE_CONDUCTOR_HOME`):
 | `~/.lmstudio/mcp.json` | LM Studio’s MCP registry |
 | `~/.lmstudio/extensions/plugins/mcp/forge-conductor/` | Primary mcpBridge plugin |
 | `~/.lmstudio/extensions/plugins/mcp/forge-conductor-fallback/` | Fallback mcpBridge plugin |
+| `~/.lmstudio/extensions/plugins/mcp/forge-conductor-clu/` | Restricted continuity-control mcpBridge plugin |
 
 Primary and fallback are two registrations of the **same** binary with `FORGE_MCP_ROLE=primary` or `fallback`. They are independent processes. Fallback is redundancy, not a second product.
+The CLU registration uses that same build with `FORGE_MCP_ROLE=clu` and exposes
+only its four continuity controls.
 
 ---
 
@@ -109,18 +113,18 @@ per-user Forge home; it does not replace `/Applications/Forge Conductor.app`.
 
 In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 `forge-conductor install-lmstudio-plugin` command from the same-build installed
-CLI transactionally writes `mcp.json` and both mcpBridge roles. Do not hand-edit
+CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.12.0 binary:
+Confirm the registered command is a `serve`-capable 0.13.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.12.0
+forge-conductor version    # should print 0.13.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.12.0` and
-`CFBundleVersion` must be `4`.
+For an app bundle, `CFBundleShortVersionString` must be `0.13.0` and
+`CFBundleVersion` must be `5`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -193,20 +197,24 @@ LM Studio only starts the `serve` processes when a chat has those MCP servers se
 
 ### Managed project setup and ordered instruction packages
 
-The built-in setup guide opens on first launch and remains available from the
-question-mark toolbar button. For a Forge-managed autonomous queue:
+The Guided Setup wizard opens on first launch and remains available through
+**Guided Setup** in the Dashboard title bar. Contextual question-mark help is
+separate. For a Forge-managed autonomous queue, follow this order:
 
-1. Start LM Studio's local server with a loaded tool-capable model.
-2. In **Provider**, save the loopback endpoint and loaded model, then run the
-   connection and contract checks. Provider is the manager-owned connection
-   Forge uses to create model sessions; it is separate from the MCP servers
-   enabled in an ordinary LM Studio desktop chat.
-3. In **Manager**, add the repository or its parent directory to **Allowed
-   Roots**, apply the settings, and start the manager if it is stopped.
-4. In **Projects**, register the local repository folder.
-5. Under **Instruction packages**, add a Markdown/text file, a folder of
+1. Confirm Manager is running. Manual lifecycle controls are recovery tools,
+   not a setup ritual when it is already healthy.
+2. Load a tool-capable model in LM Studio. In **Provider**, save the loopback
+   endpoint, then choose **Connect and Check** once. Provider is the manager-
+   owned connection Forge uses to create model sessions; it is separate from
+   the MCP servers enabled in an ordinary LM Studio desktop chat.
+3. In **Projects**, register the exact local repository folder. Registration
+   authorizes that folder; adding the repository or its parent under Manager
+   Allowed Roots is not an ordinary prerequisite.
+4. Under **Instruction packages**, add a Markdown/text file, a folder of
    instructions, or a `.forgepackage`/`forge-package.json` manifest. Drag rows
    up or down to establish the execution order.
+5. Review the package capabilities, gates, failure behavior, and automatic
+   continuity. Package-declared capabilities and gates remain authoritative.
 6. Choose **Start Ordered Autonomy**. Forge starts one managed run at a time for
    that project and advances only when the prior package completes. A failed,
    cancelled, paused, or configuration-blocked run stops advancement.
@@ -217,14 +225,16 @@ is the registered repository, even when the imported instruction file lives
 elsewhere. **Stop Queue** prevents the next package from starting while leaving
 an already admitted run visible in **Autonomy**.
 
-For a new task, select **Completion Checks → Select…** to choose the premade
-checks that fit the work: Buildable project, No build errors, No build warnings,
-Available tests pass, Instruction packages complete, and No unresolved
-operations. A warning-free check requires complete build output; truncated
-output cannot prove an absence of warnings. Select **On failure** to pause for
-review, retry automatically up to the chosen bounded limit, or stop the task.
-Optional custom failure instructions are persisted with the task and shown to
-the managed model. Exhausted automatic retries pause for operator review.
+For a direct task, open **Autonomy → Start Task**, select **Show completion
+checks**, and check or clear the premade evidence that fits the work: Buildable
+project, No build errors, No build warnings, Available tests pass, Instruction
+packages complete, and No unresolved operations. The native checkboxes are
+selectable before launch. A warning-free check requires complete
+build output; truncated output cannot prove an absence of warnings. Select **On
+failure** to pause for review, retry automatically up to the chosen bounded
+limit, or stop the task. Optional custom failure instructions are persisted
+with the task and shown to the managed model. Exhausted automatic retries pause
+for operator review.
 
 In **Autonomy**, select a completed, cancelled, or terminally failed task and
 choose **Delete Task…** to remove that one settled run from Forge history.
@@ -331,12 +341,23 @@ Choose **Keep existing credential**, **Replace credential**, or **Clear credenti
 Replacement tokens are stored in Keychain and are never returned in snapshots.
 
 Select **Save**. Saving persists settings even when LM Studio is offline; it
-does not load a model or test the connection. **Refresh Models** queries the saved
-endpoint and shows available models and their loaded state. Select a model and
-save again to use that selection. Unsaved edits disable discovery and probes
-until they are saved. **Test Connection** checks the saved endpoint
-and loaded model. **Run Contract Probe** also checks the provider capabilities
-required for managed execution. Load models in LM Studio itself.
+does not load a model or test the connection. After saving, choose **Connect and
+Check**. For a saved loopback LM Studio endpoint, this single action:
+
+1. queries LM Studio's supported `lms server status` interface;
+2. starts the local server through `lms server start` when it is not running;
+3. adopts only the port reported by `lms` after the ordinary model-inventory
+   transport verifies it;
+4. selects the sole compatible loaded model when no model is pinned; and
+5. runs the managed-provider contract probe and saves its readiness receipt.
+
+Forge does not scan local ports and does not load a model. Keep LM Studio
+installed and load a tool-capable model there. If `lms` is unavailable, the
+server cannot start, more than one compatible model requires a choice, or the
+selected model is not loaded, Provider displays the exact next action. Unsaved
+edits disable Connect and Check until they are saved. **Refresh Models** remains
+available for inspecting inventory, and the separate contract probe remains an
+advanced diagnostic action.
 
 Forge uses LM Studio's native v1 inventory for model metadata. Some desktop
 versions can briefly return no `loaded_instances` there even though the native
@@ -354,11 +375,17 @@ settings were saved but Keychain cleanup needs a retry after Keychain is unlocke
 These controls configure Forge-managed sessions; LM Studio MCP deployment remains
 in **LM Studio MCP**.
 
-If a run reaches **Blocked configuration** because its native completion policy
-is missing or its required environment is unavailable, repair or import the
-policy for that exact run and select **Retry**. Forge revalidates the persisted
-completion request without repeating the model turn or its tool calls. Provider,
-resource, and other recoverable failures continue through normal recovery.
+If a run reaches **Blocked configuration**, Autonomy shows the named failed
+condition and the owning recovery action. Built-in and selectable Completion
+checks are manager-owned: correct the named build, warning, test, instruction-
+delivery, or reconciliation condition and choose **Retry Automatic Checks**.
+They do not require a separately installed gate policy or a special restored
+environment. Only a package that explicitly declares an unknown custom gate
+uses **Import Custom Completion Policy…** and its separately approved signed
+policy. Forge revalidates the persisted completion request without repeating the
+model turn or its tool calls. Provider failures route to **Provider → Connect
+and Check**; resource and other recoverable failures retain their specific
+recovery text.
 
 ### 6.1 Provider-response recovery boundary
 
@@ -468,22 +495,40 @@ agent_recommend → agent_run_start(agent_id, goal, cwd) → tools → agent_run
 
 Default bind: `http://127.0.0.1:7788/` (loopback).
 
+The native sidebar now names its main monitoring view **Dashboard**. Choose
+**Guided Setup** in that view's title bar to open the state-aware setup wizard.
+The wizard saves the selected step and walks through the operating order:
+
+1. confirm Manager is running;
+2. connect and check the model provider;
+3. register the project;
+4. add and order instruction packages;
+5. review tools, completion checks, failure behavior, and continuity;
+6. start ordered Autonomy or one direct task;
+7. monitor Dashboard, Autonomy, Continuity, Rune Forge, and Events & Evidence;
+8. resolve the named issue in its owning view and continue the durable run.
+
+Each step states what readiness looks like, gives the ordinary actions and
+recovery path, and links to the relevant view. **Next required step** derives a
+recommendation from current Manager, Provider, project, package, and run state;
+it does not bypass any requirement or start work by itself.
+
 | Surface | What it shows |
 |---------|----------------|
-| Rig | Host CPU / RAM / GPU / disk plus headless LM Studio, Autonomy, Continuity, Rune Forge, project progress, and a bounded, redacted, coalesced Managed Activity projection |
+| Dashboard | Host CPU / RAM / GPU / disk plus headless LM Studio, Autonomy, Continuity, Rune Forge, project progress, and a bounded, redacted, coalesced Managed Activity projection |
 | LM Studio MCP | Live Forge stdio servers, configured roles, LM Studio host processes |
 | Agents / Tools / Feed | Sessions and recent tool audit |
 | Manager / Settings | Start/stop the HTTP control plane; inspect and change the persisted project-shell policy |
 
 `primary_alive` / `fallback_alive` are true only when a **stdio `serve` process** for that role is running. That happens when a chat has MCP enabled, not merely because the GUI is open.
 
-The Rig's **LM Studio — HEADLESS** state means Forge's provider API is reachable
+The Dashboard's **LM Studio — HEADLESS** state means Forge's provider API is reachable
 for managed Autonomy. The managed conversation is owned by Forge's native host
 and does not appear in LM Studio's desktop Chat history. **Rune Forge —
 OBSERVING** means a selected source is indexed and observed; Rune Forge remains
 additive and does not authorize, block, or change task outcomes.
 
-The Rig project row reports delivered instruction documents as **steps** and
+The Dashboard project row reports delivered instruction documents as **steps** and
 terminally completed queue items as **packages**. Its fraction combines those
 two bounded counts; failed or blocked packages report **ATTENTION** rather than
 inflating progress.
@@ -509,10 +554,12 @@ the panel labels Manager, instruction, and policy source availability rather
 than presenting retained rows as fresh evidence.
 
 Storage and Managed Activity share one aligned row at normal window widths; the
-activity list uses a compact internal scroller. At constrained widths the Rig
+activity list uses a compact internal scroller. At constrained widths the Dashboard
 stacks the frames, preserving readable content instead of clipping it.
 
-The MCP list shows Forge stdio roles (`mcp-stdio`, `mcp-stdio-fallback`) and configured-but-not-started roles. LM Studio helper and model-backend processes are not listed as MCP servers.
+The MCP list shows Forge stdio roles (`mcp-stdio`, `mcp-stdio-fallback`, and
+`mcp-stdio-clu`) and configured-but-not-started roles. LM Studio helper and
+model-backend processes are not listed as MCP servers.
 
 Host metrics run at ~30 Hz in the native UI. That is intentional and uses CPU even when MCP is idle.
 
@@ -534,11 +581,17 @@ Host metrics run at ~30 Hz in the native UI. That is intentional and uses CPU ev
 
 ---
 
-## 11. Two MCP servers
+## 11. Three MCP roles
 
-You will see **forge-conductor** (primary) and **forge-conductor-fallback**. They expose the same versioned tool surface. Both should stay registered.
+You will see **forge-conductor** (primary), **forge-conductor-fallback**, and
+**forge-conductor-clu**. Primary and fallback expose the same versioned general
+tool surface. CLU exposes only the four native continuity controls. All three
+should remain registered to the same Forge build and deployment revision.
 
-LM Studio may send all `tools/call` traffic to one of them (often fallback). That is a host routing choice. As long as one role is serving, work proceeds. Do not delete fallback because primary looks idle.
+LM Studio may send general `tools/call` traffic to primary or fallback (often
+fallback). That is a host routing choice. As long as one general role is
+serving, ordinary MCP work proceeds. CLU does not substitute for that general
+surface. Do not delete fallback because primary looks idle.
 
 ---
 
@@ -609,6 +662,15 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 
 **Doctor complains about `~/.forge-conductor/bin/forge-conductor`**
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
+
+**Doctor shows LM Studio plugin issues**
+Doctor identifies the running source identity as version **0.13.0**, build **5**
+and reports primary, fallback, and CLU registrations separately. Plugin files
+that still target an older app are reported as stale rather than missing. Choose
+**Deploy current build to LM Studio** in the Doctor result to transactionally
+replace all three roles with the current executable, then rerun Doctor. A soft
+plugin advisory makes the visible Doctor state **ISSUES** even when required
+local storage and runtime checks passed; it is never presented as a clean OK.
 
 ---
 

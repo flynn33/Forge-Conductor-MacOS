@@ -661,6 +661,89 @@ final class ProjectInstructionQueueTests: XCTestCase {
         ))
     }
 
+    func testRunArtifactPreservesAndPersistsOrderedPackageAuthority() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let builtIn = ProjectInstructionQueueStore.builtInCompletionGate
+        let firstSource = try makeManifestPackage(
+            root: fixture.external.appendingPathComponent("authority-one", isDirectory: true),
+            packageID: "authority-one",
+            projectID: fixture.projectID,
+            mission: "Apply the first authority package.",
+            allowedTools: ["fs_read", "shell_exec"],
+            completionGates: [builtIn, "owner.first-qualification"]
+        )
+        let secondSource = try makeManifestPackage(
+            root: fixture.external.appendingPathComponent("authority-two", isDirectory: true),
+            packageID: "authority-two",
+            projectID: fixture.projectID,
+            mission: "Apply the second authority package.",
+            allowedTools: ["shell_exec", "fs_write"],
+            completionGates: [
+                builtIn,
+                CompletionCheckPreset.noWarnings.rawValue,
+                "owner.second-qualification",
+            ]
+        )
+        var snapshot = try fixture.store.importPackage(
+            sourceURL: firstSource,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        snapshot = try fixture.store.importPackage(
+            sourceURL: secondSource,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let first = try XCTUnwrap(snapshot.packages.first { $0.packageID == "authority-one" })
+        let second = try XCTUnwrap(snapshot.packages.first { $0.packageID == "authority-two" })
+
+        let single = try fixture.store.assembleRunArtifact(
+            sourceURL: nil,
+            packageIDs: [first.id],
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: RunID()
+        )
+        XCTAssertEqual(single.allowedTools, first.allowedTools)
+        XCTAssertEqual(single.completionGates, first.completionGates)
+
+        let orderedRunID = RunID()
+        let ordered = try fixture.store.assembleRunArtifact(
+            sourceURL: nil,
+            packageIDs: [second.id, first.id],
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: orderedRunID
+        )
+        var seenTools = Set<String>()
+        let expectedTools = (second.allowedTools + first.allowedTools).filter {
+            seenTools.insert($0).inserted
+        }
+        var seenGates = Set<String>()
+        let expectedGates = (second.completionGates + first.completionGates).filter {
+            seenGates.insert($0).inserted
+        }
+        XCTAssertEqual(ordered.allowedTools, expectedTools)
+        XCTAssertEqual(ordered.completionGates, expectedGates)
+        XCTAssertTrue(ordered.completionGates.contains(CompletionCheckPreset.noWarnings.rawValue))
+        XCTAssertTrue(ordered.completionGates.contains("owner.second-qualification"))
+        XCTAssertTrue(ordered.completionGates.contains("owner.first-qualification"))
+        XCTAssertEqual(ordered.asDictionary()["allowed_tools"] as? [String], ordered.allowedTools)
+        XCTAssertEqual(ordered.asDictionary()["completion_gates"] as? [String], ordered.completionGates)
+
+        let reopened = try ProjectInstructionQueueStore(paths: fixture.paths, clock: fixture.clock)
+        let persisted = try reopened.runArtifact(
+            contentSHA256: ordered.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: orderedRunID
+        )
+        XCTAssertEqual(persisted, ordered)
+        XCTAssertEqual(persisted.allowedTools, ordered.allowedTools)
+        XCTAssertEqual(persisted.completionGates, ordered.completionGates)
+    }
+
     func testHiddenAndLargeDirectoryInventoryExceedsOldLimits() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -1356,7 +1439,9 @@ final class ProjectInstructionQueueTests: XCTestCase {
         root: URL,
         packageID: String,
         projectID: ProjectID,
-        mission: String
+        mission: String,
+        allowedTools: [String] = ["fs_read", "fs_edit", "shell_exec"],
+        completionGates: [String] = [ProjectInstructionQueueStore.builtInCompletionGate]
     ) throws -> URL {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try "Follow these package details.".write(
@@ -1371,8 +1456,8 @@ final class ProjectInstructionQueueTests: XCTestCase {
             "mission": mission,
             "project_id": projectID.description,
             "entry_documents": ["instructions.md"],
-            "requested_capabilities": ["fs_read", "fs_edit", "shell_exec"],
-            "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+            "requested_capabilities": allowedTools,
+            "completion_gates": completionGates,
             "resource_policy": ["profile": "project-default"],
         ]
         try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])

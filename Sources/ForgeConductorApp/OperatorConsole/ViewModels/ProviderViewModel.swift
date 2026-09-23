@@ -55,7 +55,7 @@ final class ProviderViewModel: ObservableObject {
                 apply(saved)
                 if loadedProvider == nil {
                     noticeMessage = saved.saved
-                        ? "Settings are saved. Use Connect and check to verify the loaded model."
+                        ? "Settings are saved. Use Connect and Check to verify the loaded model."
                         : "No provider settings are saved. Enter the LM Studio endpoint and model, then Save."
                 }
             } catch is CancellationError {
@@ -93,8 +93,8 @@ final class ProviderViewModel: ObservableObject {
                 availableModels = []
                 provider = nil
                 noticeMessage = saved.credentialCleanupPending
-                    ? "Settings saved. Previous credential cleanup is pending; unlock Keychain and refresh. Use Connect and check to verify usability."
-                    : "Settings saved. Use Connect and check to verify the server and loaded model."
+                    ? "Settings saved. Previous credential cleanup is pending; unlock Keychain and refresh. Use Connect and Check to verify usability."
+                    : "Settings saved. Use Connect and Check to verify the server and loaded model."
             } catch is CancellationError {
                 errorMessage = "Save was cancelled. Refresh to reconcile the saved revision before retrying."
             } catch {

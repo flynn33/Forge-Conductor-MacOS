@@ -497,6 +497,46 @@ the activity frame has a compact 130-point internal scroller. Constrained widths
 stack those frames. MCP, agent/process, Manager, Autonomy, Continuity, and Rune
 Forge layouts use the same adaptive sizing discipline.
 
+## 0.13.0 guided operations and recovery closeout
+
+The visible FORGE RIG label is now **Dashboard** while its stable route and
+accessibility identifiers remain compatible. A **Guided Setup** button in the
+Dashboard title bar opens one state-aware, resumable eight-step wizard: Manager,
+Provider, project, instructions, automation behavior, run start, monitoring,
+and recovery. It names the ordered-queue and direct-task launch paths, the views
+that own monitoring detail, and the correct response to provider, completion,
+continuity, and policy conditions.
+
+Provider's ordinary path is now **Connect and Check**. After an offline
+transport result for a saved loopback LM Studio origin, the manager uses the
+supported `lms` CLI to discover or start the local server, considers only the
+CLI-reported port and loopback host variants, verifies inventory before saving
+an endpoint correction, resolves a compatible loaded model, and runs the
+contract probe. The bounded recovery does not scan ports or load models.
+
+Completion ownership is explicit. The built-in package gate and every native
+Completion Check preset are evaluated by the manager's compiled automatic plan.
+Only unknown identifiers explicitly declared by an instruction package are
+custom native gates that can require an imported signed policy. Autonomy keeps
+the completion checklist inline and selectable, explains blocked states, and
+routes automatic-check, custom-gate, provider, and generic recovery separately.
+It no longer tells ordinary runs to install a native policy or restore an
+undefined environment.
+
+Continuity no longer nests another navigation split inside the app shell. Its
+header and Refresh control occupy the accessible content region, the empty
+operation-list column disappears when there is no operation, and protected
+states expose exact detail plus **Open Provider** or **Open Autonomy** when
+operator action is required. Settings Doctor reports the current version and
+build, checks primary, fallback, and CLU plugin roles separately, distinguishes
+stale registration from missing files, and offers **Deploy current build to LM
+Studio** when any role is not bound to the executing build.
+
+This section records current implementation and operating behavior only. Its
+source-bound build, regression, native-layout, publication, and synchronization
+evidence belongs in the roadmap, changelog, and qualification status after the
+corresponding commands finish; no earlier result is promoted to this slice.
+
 ## Verification
 
 - The current Managed Activity and Policy Feed change passed the complete

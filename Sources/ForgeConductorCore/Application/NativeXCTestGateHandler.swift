@@ -380,7 +380,7 @@ public struct NativeXCTestGateHandler: Sendable {
         guard before.policyRevision == policyRevision, before.environmentIdentity == environmentIdentity else {
             return CompletionGateResult(
                 gate: gate, passed: false,
-                summary: "Required installed policy or native environment is unavailable",
+                summary: "Custom gate \(gate) cannot run because its signed policy revision or captured validation runtime changed. Re-import that gate's policy and retry.",
                 blocker: .unavailableEnvironment
             )
         }

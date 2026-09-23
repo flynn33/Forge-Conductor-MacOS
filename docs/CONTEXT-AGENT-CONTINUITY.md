@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.12.0)
+# Context & Agent Continuity (v0.13.0)
 
 ## Summary
 
@@ -91,9 +91,36 @@ The native **Provider** screen creates and updates validated, revisioned
 endpoint/model settings through authenticated manager routes. Credentials can
 be kept, replaced, or cleared; replacement tokens are stored in Keychain and
 are not returned in snapshots. **Save** persists settings even while LM Studio
-is offline. **Refresh Models**, **Test Connection**, and **Run Contract Probe**
-use the saved configuration; load models in LM Studio itself. See the
+is offline. **Connect and Check** uses the saved configuration, performs
+bounded supported-CLI recovery for a local LM Studio server after an offline
+transport result, resolves a compatible loaded model, and runs the contract
+probe. It does not scan ports or load a model. See the
 [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
+
+## Native Continuity view and recovery
+
+The Continuity header, status, and Refresh control remain above the content
+panes so they are reachable below the app title bar. When no operation exists,
+the view uses the full detail width instead of reserving an empty list column.
+When operations exist, the bounded operation list and detail pane share the
+available width.
+
+**Protection** is an operator-facing state, not a generic alarm. The detail and
+next-action text explain the exact transition:
+
+- provider or LM Studio failures retain the saved task and offer **Open
+  Provider**, where **Connect and Check** repairs readiness;
+- automatic completion failures offer **Open Autonomy**, where the named check
+  is corrected and retried without a gate policy or restored environment;
+- an explicitly declared custom native gate is handled in Autonomy with its
+  matching signed policy; and
+- other recoverable states route to the exact recorded run condition in
+  Autonomy while continuity preserves durable task state.
+
+Queued, saving, quiescing, successor-creation, restoration, acknowledgment, and
+automatic retry states explain what Forge is doing next. **Action required**
+therefore always accompanies concrete detail and an owning-view recovery path;
+it is not the former unexplained “Needs attention” label.
 
 Separate native onboarding tests passed offline save/rejection/manager
 replacement and real-provider discovery/connection. These configure and probe

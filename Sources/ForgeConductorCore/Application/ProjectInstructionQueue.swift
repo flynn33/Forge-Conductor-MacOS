@@ -154,6 +154,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
     public let mission: String
     public let sourcePath: String
     public let contentSHA256: String
+    public let allowedTools: [String]
+    public let completionGates: [String]
     public let documentCount: Int
     public let instructionByteCount: Int
     public let unresolvedDocumentCount: Int
@@ -166,6 +168,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
         mission: String,
         sourcePath: String,
         contentSHA256: String,
+        allowedTools: [String] = [],
+        completionGates: [String] = [],
         documentCount: Int,
         instructionByteCount: Int,
         unresolvedDocumentCount: Int,
@@ -177,6 +181,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
         self.mission = mission
         self.sourcePath = sourcePath
         self.contentSHA256 = contentSHA256
+        self.allowedTools = allowedTools
+        self.completionGates = completionGates
         self.documentCount = documentCount
         self.instructionByteCount = instructionByteCount
         self.unresolvedDocumentCount = unresolvedDocumentCount
@@ -190,6 +196,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
         case mission
         case sourcePath = "source_path"
         case contentSHA256 = "content_sha256"
+        case allowedTools = "allowed_tools"
+        case completionGates = "completion_gates"
         case documentCount = "document_count"
         case instructionByteCount = "instruction_byte_count"
         case unresolvedDocumentCount = "unresolved_document_count"
@@ -217,6 +225,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
         mission = try values.decode(String.self, forKey: .mission)
         sourcePath = try values.decode(String.self, forKey: .sourcePath)
         contentSHA256 = try values.decode(String.self, forKey: .contentSHA256)
+        allowedTools = try values.decodeIfPresent([String].self, forKey: .allowedTools) ?? []
+        completionGates = try values.decodeIfPresent([String].self, forKey: .completionGates) ?? []
         documentCount = try values.decode(Int.self, forKey: .documentCount)
         instructionByteCount = try values.decode(Int.self, forKey: .instructionByteCount)
         unresolvedDocumentCount = try values.decode(Int.self, forKey: .unresolvedDocumentCount)
@@ -231,6 +241,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
         try values.encode(mission, forKey: .mission)
         try values.encode(sourcePath, forKey: .sourcePath)
         try values.encode(contentSHA256, forKey: .contentSHA256)
+        try values.encode(allowedTools, forKey: .allowedTools)
+        try values.encode(completionGates, forKey: .completionGates)
         try values.encode(documentCount, forKey: .documentCount)
         try values.encode(instructionByteCount, forKey: .instructionByteCount)
         try values.encode(unresolvedDocumentCount, forKey: .unresolvedDocumentCount)
@@ -246,6 +258,8 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
             "mission": mission,
             "source_path": sourcePath,
             "content_sha256": contentSHA256,
+            "allowed_tools": allowedTools,
+            "completion_gates": completionGates,
             "document_count": documentCount,
             "instruction_byte_count": instructionByteCount,
             "unresolved_document_count": unresolvedDocumentCount,
@@ -1192,6 +1206,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let mission: String
         let sourcePath: String
         let contentSHA256: String
+        let allowedTools: [String]
+        let completionGates: [String]
         let documentCount: Int
         let instructionByteCount: Int
         let unresolvedDocumentCount: Int
@@ -1200,6 +1216,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             mission = package.mission
             sourcePath = package.sourcePath
             contentSHA256 = package.contentSHA256
+            allowedTools = package.allowedTools
+            completionGates = package.completionGates
             documentCount = package.documentCount ?? 0
             instructionByteCount = package.instructionByteCount ?? 0
             unresolvedDocumentCount = package.unresolvedDocumentCount ?? 0
@@ -1208,6 +1226,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             mission = imported.mission
             sourcePath = imported.sourcePath
             contentSHA256 = imported.digest
+            allowedTools = imported.allowedTools
+            completionGates = imported.completionGates
             documentCount = imported.documents.count
             instructionByteCount = imported.instructionByteCount
             unresolvedDocumentCount = imported.unresolvedDocumentCount
@@ -1222,6 +1242,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             sourcePath = paths.instructionPackageStoreDir
                 .appendingPathComponent(composite.digest, isDirectory: true).path
             contentSHA256 = composite.digest
+            allowedTools = composite.allowedTools
+            completionGates = composite.completionGates
             documentCount = composite.documents.count
             instructionByteCount = composite.instructionByteCount
             unresolvedDocumentCount = composite.unresolvedDocumentCount
@@ -1252,6 +1274,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                     mission: mission,
                     sourcePath: sourcePath,
                     contentSHA256: contentSHA256,
+                    allowedTools: allowedTools,
+                    completionGates: completionGates,
                     documentCount: documentCount,
                     instructionByteCount: instructionByteCount,
                     unresolvedDocumentCount: unresolvedDocumentCount,
@@ -1279,6 +1303,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             mission: mission,
             sourcePath: sourcePath,
             contentSHA256: contentSHA256,
+            allowedTools: allowedTools,
+            completionGates: completionGates,
             documentCount: documentCount,
             instructionByteCount: instructionByteCount,
             unresolvedDocumentCount: unresolvedDocumentCount,
@@ -1957,6 +1983,14 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             && !artifact.sourcePath.isEmpty
             && artifact.sourcePath.utf8.count <= 4_096
             && (artifact.sourcePath as NSString).isAbsolutePath
+            && artifact.allowedTools.count <= 256
+            && Set(artifact.allowedTools).count == artifact.allowedTools.count
+            && artifact.allowedTools.allSatisfy({
+                validIdentifier($0, maximum: 128) || $0 == "*"
+            })
+            && artifact.completionGates.count <= 128
+            && Set(artifact.completionGates).count == artifact.completionGates.count
+            && artifact.completionGates.allSatisfy({ validLabel($0, maximum: 512) })
             && (1...maximumSourceFiles).contains(artifact.documentCount)
             && artifact.instructionByteCount >= 0
             && artifact.instructionByteCount <= maximumAggregateBytes
@@ -2015,16 +2049,27 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let goal = try Self.boundedBootstrapGoal(
             "Follow these selected instruction artifacts in order:\n\(orderedSummary)"
         )
+        let allowedTools = Self.orderedUnique(
+            packages.flatMap(\.allowedTools) + (imported?.allowedTools ?? [])
+        )
+        let completionGates = Self.orderedUnique(
+            packages.flatMap(\.completionGates) + (imported?.completionGates ?? [])
+        )
         return try Self.makePackage(
             packageID: "run-instructions",
             version: "1",
             displayName: "Task Instructions",
             sourcePath: paths.instructionPackageStoreDir.path,
             bootstrapGoal: goal,
-            allowedTools: Self.ordinaryDefaultAllowedTools,
-            completionGates: [Self.builtInCompletionGate],
+            allowedTools: allowedTools,
+            completionGates: completionGates,
             documents: documents
         )
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 
     private func storedDocuments(

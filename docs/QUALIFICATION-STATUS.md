@@ -1,6 +1,6 @@
 # Version and qualification status
 
-Product identity: **0.12.0, build 4**, supporting **macOS 26+**. The owner is
+Product identity: **0.13.0, build 5**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -11,7 +11,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.12.0, build 4**. The root [`VERSION`](../VERSION)
+documentation use version **0.13.0, build 5**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

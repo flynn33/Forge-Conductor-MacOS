@@ -158,6 +158,26 @@ public enum CompletionCheckPreset: String, Codable, Sendable, CaseIterable, Iden
     ]
 }
 
+/// Classifies durable completion-gate identifiers by their actual execution
+/// owner. The built-in package gate and every native UI preset are evaluated by
+/// Forge's compiled automatic completion plan. Only an explicit, unknown gate
+/// identifier opts a run into the separately installed custom-native policy
+/// path.
+public enum CompletionGateOwnership {
+    public static func isManagerOwnedAutomatic(_ gate: String) -> Bool {
+        gate == ProjectInstructionQueueStore.builtInCompletionGate
+            || CompletionCheckPreset(rawValue: gate) != nil
+    }
+
+    public static func automaticGates(in gates: [String]) -> [String] {
+        gates.filter(isManagerOwnedAutomatic)
+    }
+
+    public static func customNativeGates(in gates: [String]) -> [String] {
+        gates.filter { !isManagerOwnedAutomatic($0) }
+    }
+}
+
 public enum CompletionEvidenceRequirement: String, Codable, Sendable, CaseIterable {
     case preparedSource = "prepared_source"
     case successfulBuild = "successful_build"

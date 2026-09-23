@@ -9,83 +9,115 @@ struct ContinuityOperatorView: View {
     @StateObject private var viewModel: ContinuityViewModel
     @State private var showingAdvancedControls = false
     @State private var showingTechnicalDetails = false
+    private let onOpenAutonomy: () -> Void
+    private let onOpenProvider: () -> Void
 
-    init(client: any OperatorManagerClientProtocol) {
+    init(
+        client: any OperatorManagerClientProtocol,
+        onOpenAutonomy: @escaping () -> Void = {},
+        onOpenProvider: @escaping () -> Void = {}
+    ) {
         _viewModel = StateObject(wrappedValue: ContinuityViewModel(client: client))
+        self.onOpenAutonomy = onOpenAutonomy
+        self.onOpenProvider = onOpenProvider
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $viewModel.selectedOperationID) {
-                ForEach(viewModel.operations) { operation in
-                    HStack(spacing: 10) {
-                        Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 16)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(activityTitle(operation))
-                                .lineLimit(1)
-                            Text(mission(for: operation))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    .tag(operation.operationID)
+        VStack(spacing: 0) {
+            OperatorHeader(
+                title: "Continuity",
+                subtitle: "Automatic progress protection and fresh-session continuation",
+                isLoading: viewModel.isLoading,
+                titleAccessibilityIdentifier: "detail-continuity",
+                subtitleAccessibilityIdentifier: "continuity-operator-view",
+                onRefresh: viewModel.load
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+
+            Divider()
+
+            if viewModel.operations.isEmpty {
+                detailPane
+            } else {
+                HSplitView {
+                    operationList
+                        .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                    detailPane
+                        .frame(minWidth: 520, maxWidth: .infinity)
                 }
-            }
-            .listStyle(.sidebar)
-        } detail: {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    OperatorHeader(
-                        title: "Continuity",
-                        subtitle: "Automatic progress protection and fresh-session continuation",
-                        isLoading: viewModel.isLoading,
-                        titleAccessibilityIdentifier: "detail-continuity",
-                        subtitleAccessibilityIdentifier: "continuity-operator-view",
-                        onRefresh: viewModel.load
-                    )
-                    continuityStatus
-                    if let error = viewModel.errorMessage {
-                        OperatorErrorBanner(message: error, retry: viewModel.load)
-                    }
-                    if let error = viewModel.commandErrorMessage {
-                        Label {
-                            Text(error)
-                                .font(.caption)
-                                .textSelection(.enabled)
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-                        .accessibilityIdentifier("continuity-command-error")
-                    }
-                    if let notice = viewModel.notice {
-                        OperatorNoticeBanner(message: notice)
-                    }
-                    advancedControls
-                    if let operation = viewModel.selectedOperation {
-                        operationDetail(operation)
-                    } else if viewModel.errorMessage == nil, !viewModel.isLoading {
-                        Text("No rollover is active. Automatic continuity is ready and requires no setup.")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-                            .accessibilityIdentifier("continuity-no-operation-ready")
-                    }
-                }
-                .padding(20)
             }
         }
-        .navigationSplitViewStyle(.balanced)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: viewModel.selectedOperationID) { _, operationID in
             viewModel.selectRun(forOperationID: operationID)
         }
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .continuity)
+    }
+
+    private var operationList: some View {
+        List(selection: $viewModel.selectedOperationID) {
+            ForEach(viewModel.operations) { operation in
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activityTitle(operation))
+                            .lineLimit(1)
+                        Text(mission(for: operation))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .tag(operation.operationID)
+            }
+        }
+        .listStyle(.sidebar)
+        .accessibilityIdentifier("continuity-operation-list")
+    }
+
+    private var detailPane: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                continuityStatus
+                if let error = viewModel.errorMessage {
+                    OperatorErrorBanner(message: error, retry: viewModel.load)
+                }
+                if let error = viewModel.commandErrorMessage {
+                    Label {
+                        Text(error)
+                            .font(.caption)
+                            .textSelection(.enabled)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityIdentifier("continuity-command-error")
+                }
+                if let notice = viewModel.notice {
+                    OperatorNoticeBanner(message: notice)
+                }
+                advancedControls
+                if let operation = viewModel.selectedOperation {
+                    operationDetail(operation)
+                } else if viewModel.errorMessage == nil, !viewModel.isLoading {
+                    Text("No rollover is active. Automatic continuity is ready and requires no setup.")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+                        .accessibilityIdentifier("continuity-no-operation-ready")
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .accessibilityIdentifier("continuity-detail-pane")
     }
 
     private var continuityStatus: some View {
@@ -115,6 +147,14 @@ struct ContinuityOperatorView: View {
                         Label(next, systemImage: "arrow.forward.circle")
                             .font(.callout)
                             .accessibilityIdentifier("continuity-next-action")
+                    }
+                    if let recovery = readiness.recoveryAction,
+                       recovery != .none {
+                        Button(recoveryTitle(recovery)) {
+                            performRecovery(recovery)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("continuity-recovery-action")
                     }
                 }
             } else {
@@ -379,7 +419,7 @@ struct ContinuityOperatorView: View {
         case .restoring: "Restoring task"
         case .continuing: "Continuing"
         case .waitingForProvider: "Waiting for model"
-        case .blocked: "Needs attention"
+        case .blocked: "Action required"
         case .externalCompatibilityOnly: "External host limited"
         case .unavailable: "Unavailable"
         }
@@ -403,7 +443,7 @@ struct ContinuityOperatorView: View {
         case "retry_wait": "Waiting to retry"
         case "predecessor_sealed", "completed", "sealed": "Task continued"
         case "awaiting_durable_acknowledgement": "Confirming fresh session"
-        case "failed": "Needs attention"
+        case "failed": "Action required"
         default: "Continuity activity"
         }
     }
@@ -421,7 +461,7 @@ struct ContinuityOperatorView: View {
         case "awaiting_durable_acknowledgement":
             "Forge is waiting for exact successor acknowledgment before sealing the predecessor."
         case "failed":
-            "The durable operation needs attention before automatic continuation can advance."
+            "The last continuity operation failed. Review its recorded error below, then use the protection action to open the owning recovery view."
         default:
             "Forge is protecting the current task through a durable continuity operation."
         }
@@ -440,5 +480,27 @@ struct ContinuityOperatorView: View {
 
     private func tokens(_ value: Int?) -> String {
         value.map { "\($0) tokens" } ?? "Unavailable"
+    }
+
+    private func recoveryTitle(_ action: ContinuityRecoveryAction) -> String {
+        switch action {
+        case .none: "No action required"
+        case .retryAutomatically: "Refresh continuity status"
+        case .reviewProvider: "Open Provider"
+        case .reviewRun: "Open Autonomy"
+        }
+    }
+
+    private func performRecovery(_ action: ContinuityRecoveryAction) {
+        switch action {
+        case .none:
+            break
+        case .retryAutomatically:
+            viewModel.load()
+        case .reviewProvider:
+            onOpenProvider()
+        case .reviewRun:
+            onOpenAutonomy()
+        }
     }
 }

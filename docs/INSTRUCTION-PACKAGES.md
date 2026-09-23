@@ -4,7 +4,8 @@ Instruction packages turn a registered local repository into an ordered work que
 
 ## Setup
 
-1. In LM Studio, load a tool-capable model and start the local server from the Developer screen.
+1. In LM Studio, load a tool-capable model. Forge can discover or start the
+   local server when **Connect and Check** runs.
 2. In Forge Conductor **Manager**, start the manager if it is stopped.
 3. In **Projects**, register the local repository folder and select it. The
    registration authorizes that exact canonical root without widening access to
@@ -12,7 +13,7 @@ Instruction packages turn a registered local repository into an ordered work que
 4. Under **Instruction packages**, choose **Add Instructions…** and arrange
    packages by dragging rows.
 5. For an ordinary task, open **Autonomy**, select one or more imported packages,
-   and choose **Start Task**. Forge runs the manager-owned **Connect and check**
+   and choose **Start Task**. Forge runs the manager-owned **Connect and Check**
    preparation and returns one exact Provider action if it cannot choose safely.
 6. To run the whole project queue, first save the Provider model, then choose
    **Start Ordered Autonomy** in Projects. Endpoint, credential, exact-model,
@@ -100,7 +101,7 @@ automatic advancement so the operator can review it in **Autonomy**.
 
 **Stop Queue** prevents the next package from starting. It does not discard or silently cancel an already admitted autonomous run; that run remains visible in **Autonomy**.
 
-**FORGE RIG** monitors the active queue without changing it. Its project status
+**Dashboard** monitors the active queue without changing it. Its project status
 shows delivered document steps and completed packages; the Managed Activity
 frame names a current package only when its `run_id` exactly links it to the
 nonterminal active run. Failed, cancelled, terminal, and unrelated packages are
@@ -108,7 +109,7 @@ never combined with that run. The first queued package is shown separately as
 **Next Package**. For an exact active package the frame shows the next inferred
 current step and durable delivered count together with the run's current phase,
 work item, and next action. The display refreshes every five seconds only while
-Rig is visible and does not treat a missing Manager snapshot as completed work.
+Dashboard is visible and does not treat a missing Manager snapshot as completed work.
 
 ## Storage and project linkage
 

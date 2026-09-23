@@ -1010,7 +1010,7 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     }
 
     func expectingPreparedRevision(_ revision: String) -> Self {
-        Self(
+        return Self(
             runID: runID,
             projectID: projectID,
             projectGeneration: projectGeneration,
@@ -1110,7 +1110,13 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
     }
 
     func usingInstructionArtifact(_ artifact: ProjectRunInstructionArtifact) -> Self {
-        Self(
+        var seenGates = Set<String>()
+        let selectedAutomaticGates = CompletionGateOwnership.automaticGates(
+            in: completionGates ?? []
+        )
+        let mergedGates = (artifact.completionGates + selectedAutomaticGates)
+            .filter { seenGates.insert($0).inserted }
+        return Self(
             runID: runID,
             projectID: projectID,
             projectGeneration: projectGeneration,
@@ -1123,8 +1129,8 @@ struct OperatorRunStartRequest: Encodable, Sendable, Equatable {
             providerID: providerID,
             adapterID: adapterID,
             modelKey: modelKey,
-            allowedTools: allowedTools,
-            completionGates: completionGates,
+            allowedTools: artifact.allowedTools.isEmpty ? allowedTools : artifact.allowedTools,
+            completionGates: mergedGates.isEmpty ? completionGates : mergedGates,
             failurePolicy: failurePolicy,
             networkAllowed: networkAllowed,
             expectedProviderConfigurationRevision: expectedProviderConfigurationRevision,

@@ -16,7 +16,7 @@ Telemetry is a **continuous native stream**, not a multi-second snapshot poll.
 
 | Endpoint | Role |
 |----------|------|
-| `GET /` | FORGE RIG static UI |
+| `GET /` | Dashboard telemetry UI |
 | `GET /static/*` | `app.js`, `style.css`, … |
 | `GET /api/health` | Continuous mode + measured Hz |
 | `GET /api/stream?hz=20` | **Continuous SSE** of live frames (keep-alive) |
@@ -43,7 +43,7 @@ service listener frames, multi-event SSE).
 
 ## Orchestration status
 
-The native Rig places a shortened Load Trace beside four compact status/load
+The native Dashboard places a shortened Load Trace beside four compact status/load
 cards and one full-width project-progress row. They combine the existing bounded
 telemetry frame with a separate
 five-second, view-owned Manager refresh:
@@ -59,21 +59,21 @@ five-second, view-owned Manager refresh:
   instruction packages for the active project. Failed or blocked packages
   surface an attention state.
 
-The Manager refresh starts only while Rig is visible, owns one cancellable
+The Manager refresh starts only while Dashboard is visible, owns one cancellable
 task, coalesces each response into one value snapshot, and stops on detach. The
-Metal gauges reuse the Rig's existing bounded renderer and add no independent
+Metal gauges reuse the Dashboard's existing bounded renderer and add no independent
 render clock.
 
 ## Managed activity feed
 
-Directly below Load Trace and Orchestration Status, the native Rig presents one
+In the compact Storage/Managed Activity row, the native Dashboard presents one
 bounded, coalesced **Managed Activity** projection. The five-second operational
 refresh composes the active project and instruction package, current inferred
 document step, durable delivered count, current run phase/work item/next
 action, Manager orchestration events, durable managed-provider responses and
 tool transitions, and the newest policy events for the active project
 generation. The public snapshot retains bounded, redacted mission and work-item
-text plus non-sensitive state, identity, and event metadata. The Rig uses
+text plus non-sensitive state, identity, and event metadata. The Dashboard uses
 authenticated `GET /api/manager/operator/activity` with exact run, project, and
 generation identity for current phase/next action,
 assistant/model-error/tool summaries, and managed activity rows. Its durable
@@ -83,7 +83,7 @@ through an 8 KiB UTF-8 cap.
 
 The app retains at most 100 rolling presentation rows and merges them by stable
 identity rather than enqueueing an unbounded task per update. The frame stops
-refreshing with the Rig view. It does not add a render clock, persist a second
+refreshing with the Dashboard view. It does not add a render clock, persist a second
 event log, stream provider tokens, or create a full LM Studio conversation
 transcript. Durable Manager events, instruction coverage, and the Stjornarvald
 policy log remain the authoritative sources; Manager, instruction, and policy
@@ -91,7 +91,7 @@ availability is labeled so retained rows are not presented as fresh evidence.
 
 Rune Forge presents the newest policy events again in its verbose **Policy
 Feed** so policy-specific review does not require selecting every violation.
-That global newest feed and Rig's exact project/generation feed are bounded by a 100-event,
+That global newest feed and Dashboard's exact project/generation feed are bounded by a 100-event,
 1 MiB serialized-event Manager window; both native clients stream ordinary
 responses through a strict 4 MiB ceiling and cancel on overflow. Both preserve
 Stjornarvald's non-interference boundary.
@@ -100,6 +100,12 @@ At normal widths, intrinsic Grid rows align CPU/GPU, Storage/Managed Activity,
 MCP servers/tools, and agents/processes. Managed Activity scrolls within a
 compact 130-point region, and constrained widths stack the instrumentation
 panels instead of clipping them.
+
+The title bar exposes **Guided Setup**, an eight-step state-aware wizard for
+Manager readiness, provider connection, project registration, instruction
+ordering, automation review, run start, monitoring, and recovery. It reads the
+same bounded operational snapshot to recommend the next required step; it does
+not introduce another telemetry or render loop.
 
 ## Qualification boundary
 
@@ -123,6 +129,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.12.0`
+`0.13.0`
 
-Build: `4`
+Build: `5`

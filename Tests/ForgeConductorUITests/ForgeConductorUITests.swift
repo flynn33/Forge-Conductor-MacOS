@@ -69,7 +69,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     func testSidebarTabsNavigate() throws {
         // Prefer accessibility identifiers; fall back to visible labels.
         let tabs: [(id: String, label: String, detail: String)] = [
-            ("tab-rig", "FORGE RIG", "detail-rig"),
+            ("tab-rig", "Dashboard", "detail-rig"),
             ("tab-mcp", "LM Studio MCP", "detail-mcp"),
             ("tab-agents", "Agents", "detail-agents"),
             ("tab-tools", "Tools", "detail-tools"),
@@ -266,7 +266,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(guidedMode.waitForExistence(timeout: 8))
 
         let tabs: [(id: String, title: String)] = [
-            ("tab-rig", "FORGE RIG guide"),
+            ("tab-rig", "Dashboard guide"),
             ("tab-mcp", "LM Studio MCP guide"),
             ("tab-agents", "Agents guide"),
             ("tab-tools", "Tools guide"),
@@ -327,7 +327,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let help = app.buttons["toolbar-setup-guide"]
         XCTAssertTrue(help.waitForExistence(timeout: 3))
         help.click()
-        XCTAssertTrue(app.staticTexts["FORGE RIG guide"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Dashboard guide"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["What Forge handles automatically"].exists)
         XCTAssertTrue(app.staticTexts["Controls"].exists)
         XCTAssertTrue(app.staticTexts["Status meanings"].exists)
@@ -345,6 +345,66 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             return number.boolValue
         }
         return (element.value as? String) == "1"
+    }
+
+    func testDashboardTitleButtonOpensOrderedGuidedSetupWizard() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let dashboard = app.buttons["tab-rig"]
+        XCTAssertTrue(dashboard.waitForExistence(timeout: 8))
+        dashboard.click()
+        XCTAssertTrue(app.staticTexts["DASHBOARD // LM STUDIO"].waitForExistence(timeout: 5))
+
+        let guidedSetup = app.buttons["dashboard-guided-setup"]
+        XCTAssertTrue(
+            guidedSetup.waitForExistence(timeout: 5),
+            "Dashboard title area must expose Guided Setup"
+        )
+        guidedSetup.click()
+
+        let wizard = app.descendants(matching: .any)["setup-guide"]
+        XCTAssertTrue(wizard.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Guided Setup"].exists)
+        XCTAssertTrue(
+            app.staticTexts["Set up, start, monitor, and recover an automated project run"].exists
+        )
+
+        let expectedSteps = [
+            "Confirm Forge is ready",
+            "Connect the model provider",
+            "Register the project",
+            "Add and order instructions",
+            "Review automation behavior",
+            "Start the automated run",
+            "Monitor the run",
+            "Resolve issues and continue",
+        ]
+        for (offset, title) in expectedSteps.enumerated() {
+            let step = app.buttons["guided-setup-step-\(offset + 1)"]
+            XCTAssertTrue(step.waitForExistence(timeout: 3), "Missing guided setup step \(offset + 1)")
+            makeHittable(step)
+            step.click()
+            let activeTitle = app.staticTexts["guided-setup-step-title"]
+            XCTAssertTrue(
+                waitUntil(timeout: 3) { self.element(activeTitle, contains: title) },
+                "Guided setup step \(offset + 1) should be \(title)"
+            )
+        }
+
+        XCTAssertTrue(
+            app.buttons["setup-guide-finish"].exists
+                || app.buttons["Finish Guided Setup"].exists,
+            "The final wizard step must expose Finish Guided Setup:\n\(app.debugDescription)"
+        )
+        if wizard.exists {
+            let closeByIdentifier = app.buttons["guided-setup-close"]
+            let close = closeByIdentifier.exists ? closeByIdentifier : app.buttons["Close"]
+            XCTAssertTrue(close.waitForExistence(timeout: 3))
+            close.click()
+        }
+        XCTAssertTrue(waitUntil(timeout: 3) { !wizard.exists })
+        XCTAssertTrue(app.descendants(matching: .any)["detail-rig"].exists)
     }
 
     func testStartTaskGuidePreservesEnteredInstructions() throws {
@@ -687,7 +747,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
         let rootScroll = try XCTUnwrap(
             largestScrollView(),
-            "Forge Rig must remain hosted in its primary vertical scroll surface"
+            "Dashboard must remain hosted in its primary vertical scroll surface"
         )
         let storage = app.descendants(matching: .any)["rig-storage-panel"]
         let activity = app.descendants(matching: .any)["rig-managed-activity-feed"]
@@ -738,8 +798,68 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(window.waitForExistence(timeout: 8))
         resizeMainWindowToMinimum(window)
 
+        try assertEveryPrimaryViewContainedAndAligned(in: window)
+    }
+
+    func testNormalWindowKeepsEveryPrimaryViewContainedAndAligned() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowForWideGrid(window)
+
+        try assertEveryPrimaryViewContainedAndAligned(in: window)
+    }
+
+    func testContinuityHeaderAndContentAvoidTitleBarAndUnusedSplitAtMinimumWidth() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowToMinimum(window)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 5))
+        continuity.click()
+
+        let detail = try XCTUnwrap(
+            selectedDetailContainer(named: "Continuity"),
+            "Missing selected-detail container for Continuity"
+        )
+        let title = app.staticTexts["detail-continuity"]
+        let subtitle = app.staticTexts["continuity-operator-view"]
+        let refresh = app.buttons["operator-refresh"]
+        let detailPane = app.descendants(matching: .any)["continuity-detail-pane"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(subtitle.waitForExistence(timeout: 5))
+        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+        XCTAssertTrue(detailPane.waitForExistence(timeout: 5))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["continuity-operation-list"].exists,
+            "An empty continuity history must not reserve an unused list column"
+        )
+
+        for element in [title, subtitle, refresh, detailPane] {
+            XCTAssertTrue(
+                frameIsContained(element.frame, in: detail.frame, tolerance: 2),
+                "\(element.identifier) escaped the Continuity content area"
+            )
+        }
+        XCTAssertTrue(refresh.isHittable, "Continuity refresh must remain accessible below the title bar")
+        XCTAssertGreaterThanOrEqual(detailPane.frame.minY, subtitle.frame.maxY - 2)
+        XCTAssertLessThanOrEqual(
+            detailPane.frame.minY - subtitle.frame.maxY,
+            36,
+            "Continuity content must follow the header without an unexplained vertical gap"
+        )
+        XCTAssertEqual(detailPane.frame.minX, detail.frame.minX, accuracy: 4)
+        XCTAssertEqual(detailPane.frame.maxX, detail.frame.maxX, accuracy: 4)
+    }
+
+    private func assertEveryPrimaryViewContainedAndAligned(in window: XCUIElement) throws {
+
         let tabs: [(id: String, detail: String, title: String)] = [
-            ("tab-rig", "detail-rig", "FORGE RIG"),
+            ("tab-rig", "detail-rig", "Dashboard"),
             ("tab-mcp", "detail-mcp", "LM Studio MCP"),
             ("tab-agents", "detail-agents", "Agents"),
             ("tab-tools", "detail-tools", "Tools"),
@@ -762,12 +882,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             let marker = app.descendants(matching: .any)[tab.detail]
             XCTAssertTrue(marker.waitForExistence(timeout: 5), "Missing \(tab.detail)")
             let detail = try XCTUnwrap(
-                app.descendants(matching: .any)
-                    .matching(NSPredicate(format: "label == %@", "\(tab.title) content"))
-                    .allElementsBoundByIndex
-                    .max { lhs, rhs in
-                        lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
-                    },
+                selectedDetailContainer(named: tab.title),
                 "Missing selected-detail container for \(tab.title)"
             )
             let frame = detail.frame
@@ -790,6 +905,15 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                 referenceFrame = frame
             }
         }
+    }
+
+    private func selectedDetailContainer(named title: String) -> XCUIElement? {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "\(title) content"))
+            .allElementsBoundByIndex
+            .max { lhs, rhs in
+                lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+            }
     }
 
     func testTerminalTaskRequiresConfirmationAndCanBeDeleted() throws {
@@ -1416,16 +1540,50 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.checkBoxes["run-tools-allow-all"].waitForExistence(timeout: 5))
         app.buttons["run-tools-done"].click()
 
-        app.buttons["run-completion-view"].click()
+        let completionChecks = app.checkBoxes["run-completion-view"]
+        XCTAssertTrue(completionChecks.waitForExistence(timeout: 5))
+        makeHittable(completionChecks)
+        XCTAssertTrue(waitForCheckboxState(.off, on: completionChecks))
+        completionChecks.click()
         XCTAssertTrue(
-            app.descendants(matching: .any)["run-completion-automatic"].waitForExistence(timeout: 5)
-                || app.buttons["run-completion-done"].waitForExistence(timeout: 5)
+            waitForCheckboxState(.on, on: completionChecks),
+            "Show completion checks must expand from the whole native control"
+        )
+        let buildableProject = app.checkBoxes[
+            "run-completion-check-forge.completion.buildable-project"
+        ]
+        let completionScroll = app.scrollViews
+            .containing(.any, identifier: completionChecks.identifier)
+            .allElementsBoundByIndex
+            .last ?? app.scrollViews.firstMatch
+        for _ in 0..<6 where !buildableProject.exists {
+            completionScroll.swipeUp()
+        }
+        XCTAssertTrue(
+            buildableProject.waitForExistence(timeout: 5),
+            "Opening Completion checks must expose selectable checkboxes:\n\(app.debugDescription)"
+        )
+        makeHittable(buildableProject)
+        XCTAssertTrue(waitForCheckboxState(.on, on: buildableProject))
+        buildableProject.click()
+        XCTAssertTrue(
+            waitForCheckboxState(.off, on: buildableProject),
+            "Completion checks must be selectable, not presentation-only"
         )
         XCTAssertTrue(
-            app.checkBoxes["run-completion-check-forge.completion.buildable-project"].exists
+            waitUntil(timeout: 3) {
+                completionChecks.label.localizedCaseInsensitiveContains("4 selected")
+            },
+            "Completion summary must update after deselecting a check"
         )
+        buildableProject.click()
+        XCTAssertTrue(waitForCheckboxState(.on, on: buildableProject))
         XCTAssertTrue(app.staticTexts["Instruction artifact is registered"].exists)
         app.buttons["run-completion-done"].click()
+        XCTAssertTrue(
+            waitForCheckboxState(.off, on: completionChecks),
+            "Done must collapse the inline completion-check editor"
+        )
         app.buttons["run-start-cancel"].click()
 
         XCTAssertEqual(fixture.startRequestCount, 0)
@@ -1466,7 +1624,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         toggle.click() // restore
 
         let rigByID = app.buttons["tab-rig"]
-        let rigByLabel = app.staticTexts["FORGE RIG"]
+        let rigByLabel = app.staticTexts["Dashboard"]
         XCTAssertTrue(
             rigByID.waitForExistence(timeout: 3) || rigByLabel.waitForExistence(timeout: 3),
             "Navigation should reappear after using the toolbar toggle"
@@ -1524,7 +1682,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         zoom.click()
         XCTAssertTrue(
             waitUntil(timeout: 3) { window.frame.width >= 1_350 },
-            "Forge Rig could not enter the normal-width two-column layout"
+            "Dashboard could not enter the normal-width two-column layout"
         )
     }
 
@@ -2874,7 +3032,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "refresh_interval_sec": 8,
             ] as [String: Any],
             "home": "/tmp/forge-operator-fixture",
-            "version": "0.12.0",
+            "version": "0.13.0",
         ]
     }
 

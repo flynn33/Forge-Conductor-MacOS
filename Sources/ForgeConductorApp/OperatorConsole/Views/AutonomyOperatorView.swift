@@ -200,18 +200,25 @@ struct AutonomyOperatorView: View {
                             .foregroundStyle(run.passedGates.contains(gate) ? .green : .secondary)
                         }
                     }
-                    Button {
-                        showingAdvancedCompletionControls.toggle()
-                    } label: {
-                        Label(
-                            "Advanced controls",
-                            systemImage: showingAdvancedCompletionControls
-                                ? "chevron.down" : "chevron.right"
-                        )
+                    if hasCustomNativeGates(run) {
+                        Button {
+                            showingAdvancedCompletionControls.toggle()
+                        } label: {
+                            Label(
+                                "Custom policy controls",
+                                systemImage: showingAdvancedCompletionControls
+                                    ? "chevron.down" : "chevron.right"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("run-completion-advanced-toggle")
+                    } else {
+                        Text("These checks are evaluated automatically from the task's durable evidence. No separate gate policy or environment is required.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("run-completion-automatic-explanation")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("run-completion-advanced-toggle")
-                    if showingAdvancedCompletionControls {
+                    if showingAdvancedCompletionControls, hasCustomNativeGates(run) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Custom completion policy")
                                 .font(.headline)
@@ -248,7 +255,47 @@ struct AutonomyOperatorView: View {
                         Text(error).textSelection(.enabled)
                         LabeledContent("Classification", value: run.lastErrorCode ?? "Unavailable")
                         LabeledContent("Next retry", value: run.retryAt ?? "No retry scheduled")
+                        Divider()
+                        Text("How to continue")
+                            .font(.headline)
+                        if isProviderFailure(run) {
+                            Text("Reconnect the saved model provider, then return here and retry the task. Forge keeps the durable run state while the provider is repaired.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("Open Provider", action: onOpenProvider)
+                                .accessibilityIdentifier("run-failure-open-provider")
+                        } else if run.lastErrorCode == AutonomyError.completionValidationFailed.code {
+                            if failedCustomNativeGate(run) {
+                                Text("The named custom native check needs its matching signed policy. Import that policy, then retry the retained task.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Button(
+                                    "Import Custom Completion Policy…",
+                                    action: viewModel.chooseNativePolicy
+                                )
+                                .disabled(viewModel.policyImportInFlight)
+                                .accessibilityIdentifier("run-failure-import-native-policy")
+                            } else {
+                                Text("Correct the named automatic check in the project or instruction results. Package and preset checks do not require a separately installed native policy.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                if viewModel.canControl(.retry, run: run) {
+                                    Button("Retry Automatic Checks") { viewModel.control(.retry) }
+                                        .accessibilityIdentifier("run-failure-retry-checks")
+                                } else {
+                                    Text("Forge will evaluate the checks again when the running task next requests completion.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .accessibilityIdentifier("run-failure-automatic-recheck")
+                                }
+                            }
+                        } else {
+                            Text("Correct the condition named above, then choose Retry. No Forge-wide environment reset is required.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .accessibilityIdentifier("run-failure-guidance")
                 }
             }
 
@@ -444,11 +491,27 @@ struct AutonomyOperatorView: View {
                                 .accessibilityIdentifier("run-tools-customize")
                         }
                     }
-                    LabeledContent("Completion checks") {
-                        HStack(spacing: 8) {
-                            Text(viewModel.completionSelectionSummary)
-                            Button("Select…") { showingCompletionChecks = true }
-                                .accessibilityIdentifier("run-completion-view")
+                    HStack(alignment: .top, spacing: 8) {
+                        Toggle(isOn: $showingCompletionChecks) {
+                            HStack {
+                                Text("Show completion checks")
+                                Spacer()
+                                Text(viewModel.completionSelectionSummary)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("run-completion-summary")
+                            }
+                        }
+                        .toggleStyle(.checkbox)
+                        .accessibilityIdentifier("run-completion-view")
+                        GuidedHelpButton(context: .autonomyCompletionChecks)
+                    }
+                    if showingCompletionChecks {
+                        completionCheckSelector
+                            .padding(.top, 8)
+                        HStack {
+                            Spacer()
+                            Button("Done") { showingCompletionChecks = false }
+                                .accessibilityIdentifier("run-completion-done")
                         }
                     }
                     Picker("On failure", selection: $viewModel.failureBehavior) {
@@ -559,72 +622,47 @@ struct AutonomyOperatorView: View {
             .frame(width: 680, height: 620)
             .guidedHelpContext(.autonomyToolSelection)
         }
-        .sheet(isPresented: $showingCompletionChecks) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Completion Checks").font(.title2.bold())
-                    Spacer()
-                    GuidedHelpButton(context: .autonomyCompletionChecks)
-                }
-                Text("Choose the deterministic checks Forge must satisfy before this task can complete. Forge may also derive relevant checks from the project and instructions.")
-                    .foregroundStyle(.secondary)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(CompletionCheckPreset.allCases) { check in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { viewModel.selectedCompletionChecks.contains(check) },
-                                    set: { viewModel.setCompletionCheck(check, selected: $0) }
-                                )
-                            ) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(check.title)
-                                    Text(check.detail)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-                            .accessibilityIdentifier("run-completion-check-\(check.rawValue)")
-                        }
-                        Divider()
-                        if let plan = viewModel.preparedCompletionPlan,
-                           !plan.obligations.isEmpty {
-                            Text("Prepared validation plan").font(.caption.weight(.semibold))
-                            ForEach(plan.obligations) { obligation in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Label(obligation.title, systemImage: "checkmark.seal")
-                                    Text(obligation.reason)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .accessibilityIdentifier("run-completion-automatic")
-                        } else if viewModel.completionGates.isEmpty {
-                            Text("Checks will be derived during task preparation.")
-                                .accessibilityIdentifier("run-completion-automatic")
-                        } else {
-                            ForEach(
-                                viewModel.completionGates.split(separator: "\n"),
-                                id: \.self
-                            ) { gate in
-                                Label(String(gate), systemImage: "checkmark.seal")
-                            }
-                        }
+    }
+
+    private var completionCheckSelector: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Select the evidence Forge must verify before it marks this task complete. These checks are built in and need no separate gate policy.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(CompletionCheckPreset.allCases) { check in
+                Toggle(
+                    isOn: Binding(
+                        get: { viewModel.selectedCompletionChecks.contains(check) },
+                        set: { viewModel.setCompletionCheck(check, selected: $0) }
+                    )
+                ) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(check.title)
+                        Text(check.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                Divider()
-                HStack {
-                    Spacer()
-                    Button("Done") { showingCompletionChecks = false }
-                        .keyboardShortcut(.defaultAction)
-                        .accessibilityIdentifier("run-completion-done")
-                }
+                .toggleStyle(.checkbox)
+                .accessibilityIdentifier("run-completion-check-\(check.rawValue)")
             }
-            .padding(22)
-            .frame(width: 620, height: 640)
-            .guidedHelpContext(.autonomyCompletionChecks)
+            if let plan = viewModel.preparedCompletionPlan,
+               !plan.obligations.isEmpty {
+                Divider()
+                Text("Prepared validation plan")
+                    .font(.caption.weight(.semibold))
+                ForEach(plan.obligations) { obligation in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label(obligation.title, systemImage: "checkmark.seal")
+                        Text(obligation.reason)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityIdentifier("run-completion-automatic")
+            }
         }
+        .guidedHelpContext(.autonomyCompletionChecks)
     }
 
     private var toolSelectionSummary: String {
@@ -637,6 +675,30 @@ struct AutonomyOperatorView: View {
         case .explicit:
             return "Custom · \(permissions.effectiveCount) tools"
         }
+    }
+
+    private func hasCustomNativeGates(_ run: OperatorRun) -> Bool {
+        !CompletionGateOwnership.customNativeGates(in: run.completionGates).isEmpty
+    }
+
+    /// Completion failure summaries carry the exact failed gate identifier.
+    /// A mixed run must not be routed to policy import merely because it owns a
+    /// custom gate when the actual failed evidence belongs to an automatic one.
+    private func failedCustomNativeGate(_ run: OperatorRun) -> Bool {
+        guard run.lastErrorCode == AutonomyError.completionValidationFailed.code,
+              let summary = run.lastErrorSummary else { return false }
+        return CompletionGateOwnership.customNativeGates(in: run.completionGates)
+            .contains { summary.contains("\($0):") }
+    }
+
+    private func isProviderFailure(_ run: OperatorRun) -> Bool {
+        let context = [run.lastErrorCode, run.lastErrorSummary]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+        return context.contains("provider")
+            || context.contains("lm studio")
+            || context.contains("model connection")
     }
 
     private func modeLabel(_ raw: String) -> String {

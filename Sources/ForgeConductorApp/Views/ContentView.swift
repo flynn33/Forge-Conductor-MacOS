@@ -13,8 +13,9 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @AppStorage("forge.setupTutorial.completed.v1") private var setupTutorialCompleted = false
+    @AppStorage("forge.guidedSetup.step.v2") private var guidedSetupStep = 0
     @StateObject private var guidedMode = GuidedModeCoordinator()
-    @State private var showingSetupTutorial = false
+    @State private var showingGuidedSetup = false
 
     private var rootPresentedGuide: Binding<GuidedHelpContext?> {
         Binding<GuidedHelpContext?>(
@@ -70,7 +71,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("\(model.selectedTab.rawValue) content")
+            .accessibilityLabel("\(model.selectedTab.displayName) content")
             .accessibilityIdentifier("detail-\(model.selectedTab.accessibilityID)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -80,22 +81,25 @@ struct ContentView: View {
             guidedMode.select(model.selectedTab.guidedHelpContext)
             if !setupTutorialCompleted,
                !CommandLine.arguments.contains("--uitesting") {
-                showingSetupTutorial = true
+                showingGuidedSetup = true
             }
         }
         .onChange(of: model.selectedTab) { _, tab in
             guidedMode.select(tab.guidedHelpContext)
         }
         .environmentObject(guidedMode)
-        .sheet(isPresented: $showingSetupTutorial) {
-            SetupTutorialView(
+        .sheet(isPresented: $showingGuidedSetup) {
+            GuidedSetupWizardView(
+                selectedStep: $guidedSetupStep,
+                managerReady: model.serviceActive,
+                snapshot: model.rigOperationalSnapshot,
                 onOpen: { tab in
                     model.selectTab(tab)
-                    showingSetupTutorial = false
+                    showingGuidedSetup = false
                 },
                 onComplete: {
                     setupTutorialCompleted = true
-                    showingSetupTutorial = false
+                    showingGuidedSetup = false
                 }
             )
         }
@@ -193,7 +197,9 @@ struct ContentView: View {
     private var selectedDetail: some View {
         switch model.selectedTab {
         case .rig:
-            RigDashboardView()
+            RigDashboardView(onOpenGuidedSetup: {
+                showingGuidedSetup = true
+            })
         case .mcp:
             MCPServersView()
         case .agents:
@@ -215,7 +221,13 @@ struct ContentView: View {
                 )
             }
         case .continuity:
-            operatorContent { ContinuityOperatorView(client: model.operatorManagerClient) }
+            operatorContent {
+                ContinuityOperatorView(
+                    client: model.operatorManagerClient,
+                    onOpenAutonomy: { model.selectTab(.autonomy) },
+                    onOpenProvider: { model.selectTab(.provider) }
+                )
+            }
         case .runtimes:
             operatorContent { RuntimesOperatorView(client: model.operatorManagerClient) }
         case .provider:
@@ -240,147 +252,456 @@ struct ContentView: View {
     }
 }
 
-private struct SetupTutorialView: View {
+private struct GuidedSetupWizardView: View {
+    private enum Kind {
+        case manager
+        case provider
+        case project
+        case instructions
+        case configure
+        case start
+        case monitor
+        case recover
+    }
+
     private struct Step {
+        let kind: Kind
         let title: String
         let symbol: String
-        let summary: String
-        let details: [String]
-        let destination: AppModel.AppTab?
-        let destinationLabel: String?
+        let purpose: String
+        let readyWhen: String
+        let actions: [String]
+        let recovery: [String]
+        let destinations: [(tab: AppModel.AppTab, label: String)]
     }
 
     private let steps: [Step] = [
         Step(
-            title: "Start LM Studio",
-            symbol: "server.rack",
-            summary: "Forge Conductor uses LM Studio as its local model provider.",
-            details: [
-                "In LM Studio, download and load a model that supports tool use.",
-                "Open LM Studio's Developer screen and start the local server.",
-                "The common local endpoint is http://127.0.0.1:1234.",
+            kind: .manager,
+            title: "Confirm Forge is ready",
+            symbol: "gearshape.2",
+            purpose: "The manager owns projects, provider configuration, automation, continuity, and durable recovery.",
+            readyWhen: "Manager reports Running. It normally starts with Forge Conductor; manual lifecycle controls are only for recovery.",
+            actions: [
+                "Check the live status shown below.",
+                "If Manager is stopped, open Manager and choose Start.",
             ],
-            destination: nil,
-            destinationLabel: nil
+            recovery: [
+                "Use Restart only when the Manager view reports a concrete service error.",
+                "Doctor is diagnostic evidence; it is not required before every run.",
+            ],
+            destinations: [(.manager, "Open Manager")]
         ),
         Step(
-            title: "Configure Provider",
+            kind: .provider,
+            title: "Connect the model provider",
             symbol: "network",
-            summary: "Provider tells Forge which LM Studio server and loaded model to use.",
-            details: [
-                "Open Provider and enter the LM Studio endpoint.",
-                "Load Models, choose the model you loaded in LM Studio, then save.",
-                "Run the connection and contract checks. Both should pass before autonomy starts.",
+            purpose: "Forge needs one reachable, tool-capable model before it can prepare autonomous work.",
+            readyWhen: "Provider reports Reachable or Contract valid and names the selected model.",
+            actions: [
+                "For LM Studio, install/load a tool-capable model, then choose Connect and Check once.",
+                "Forge discovers the local server, starts it when possible, selects a loaded compatible model, and validates the contract.",
+                "For another supported provider, select and connect it in Provider.",
             ],
-            destination: .provider,
-            destinationLabel: "Open Provider"
+            recovery: [
+                "If connection fails, keep LM Studio open with a model loaded and run Connect and Check again.",
+                "The Provider view shows the exact next action; no port guessing should be necessary for local LM Studio.",
+            ],
+            destinations: [(.provider, "Open Provider")]
         ),
         Step(
-            title: "Authorize and Register",
+            kind: .project,
+            title: "Register the project",
             symbol: "folder.badge.gearshape",
-            summary: "Forge limits model tools to project folders you explicitly authorize.",
-            details: [
-                "In Manager, add the parent folder that contains your repositories to Allowed Roots and apply the setting.",
-                "Start the manager if it is stopped.",
-                "In Projects, choose Register Project and select the local repository folder.",
+            purpose: "A registered project gives the run a stable identity and an exact authorized working folder.",
+            readyWhen: "Projects shows the repository as Active with its current generation.",
+            actions: [
+                "Open Projects and choose Register Project.",
+                "Select the repository itself. Registration authorizes that exact folder; adding its parent in Manager is not a normal prerequisite.",
+                "Wait for the durable registration result before importing instructions.",
             ],
-            destination: .manager,
-            destinationLabel: "Open Manager"
+            recovery: [
+                "If the folder moved, use Relink in Projects instead of registering a duplicate.",
+                "If registration reports an identity conflict, follow the exact Projects recovery message.",
+            ],
+            destinations: [(.projects, "Open Projects")]
         ),
         Step(
-            title: "Add Instruction Packages",
-            symbol: "list.number",
-            summary: "Instruction packages are durable, ordered work assignments linked to one registered repository.",
-            details: [
-                "In Projects, select the repository and choose Add Instructions.",
-                "You can select one Markdown/text file, a folder of instruction documents, or a .forgepackage manifest.",
-                "Forge copies accepted content into protected storage. Drag package rows up or down to set execution order.",
+            kind: .instructions,
+            title: "Add and order instructions",
+            symbol: "text.badge.plus",
+            purpose: "Instruction packages define the work, allowed capabilities, completion gates, and execution order.",
+            readyWhen: "The selected project has at least one import-ready package and no unresolved documents.",
+            actions: [
+                "In Projects, choose Add Instructions and select a file, folder, ZIP, or .forgepackage.",
+                "Review the package name, document count, capabilities, and package-defined gates.",
+                "Arrange multiple packages in the order they must run.",
             ],
-            destination: .projects,
-            destinationLabel: "Open Projects"
+            recovery: [
+                "A package with unresolved or unsupported documents is not start-ready; correct the named source and import it again.",
+                "Package gates belong to the instruction package. Ordinary automatic checks do not require a separate native gate policy.",
+            ],
+            destinations: [(.projects, "Open Instruction Packages")]
         ),
         Step(
-            title: "Run in Order",
-            symbol: "play.circle",
-            summary: "Ordered autonomy runs one package at a time for the selected project.",
-            details: [
-                "Choose Start Ordered Autonomy in the project's Instruction Packages section.",
-                "Forge starts the first queued package with the saved provider and repository scope.",
-                "The next package starts only after the prior run completes its required gate. A failure or block stops advancement for review.",
+            kind: .configure,
+            title: "Review automation behavior",
+            symbol: "slider.horizontal.3",
+            purpose: "Before launch, confirm the model, tools, automatic completion evidence, retry behavior, and continuity defaults.",
+            readyWhen: "Provider, project, and instructions are ready and the intended failure behavior is understood.",
+            actions: [
+                "For ordered packages, the package supplies its capabilities and gates.",
+                "For a direct task, open Autonomy → Start Task, select instructions, and check or clear the inline Completion checks.",
+                "Choose whether failures pause, retry within the displayed limit, or stop the task. Continuity remains automatic.",
             ],
-            destination: .projects,
-            destinationLabel: "Open Package Queue"
+            recovery: [
+                "A blocked preparation card names the missing project, permission, or provider condition and provides the owning-view action.",
+                "Do not install a native policy unless the run explicitly declares a custom native gate.",
+            ],
+            destinations: [(.autonomy, "Open Autonomy")]
+        ),
+        Step(
+            kind: .start,
+            title: "Start the automated run",
+            symbol: "play.circle.fill",
+            purpose: "Choose the launch path that matches the instruction source; both paths create manager-owned durable runs.",
+            readyWhen: "Projects shows Ordered Autonomy running, or Autonomy shows the accepted managed task.",
+            actions: [
+                "For an ordered queue, open Projects and choose Start Ordered Autonomy. Forge runs one package at a time in the displayed order.",
+                "For one direct task, open Autonomy, choose Start Task, review the summary, and choose Start Task again.",
+                "A package advances only after its current run satisfies completion checks; failure stops advancement for review.",
+            ],
+            recovery: [
+                "If Start remains disabled, the same screen identifies the missing project, instructions, or provider readiness.",
+                "If a start response is interrupted, use Reconcile with Manager; do not create a second task.",
+            ],
+            destinations: [
+                (.projects, "Open Package Queue"),
+                (.autonomy, "Start a Direct Task"),
+            ]
+        ),
+        Step(
+            kind: .monitor,
+            title: "Monitor the run",
+            symbol: "gauge.with.dots.needle.67percent",
+            purpose: "Use Dashboard for live progress and activity, then open the owning view when more detail or control is needed.",
+            readyWhen: "Dashboard shows the current package, step, phase, work item, next action, model/tool activity, and policy events.",
+            actions: [
+                "Dashboard: overall health, current package and step, Managed Activity, orchestration, and resource load.",
+                "Autonomy: exact run state, completion checks, pause/resume/retry, and failure detail.",
+                "Continuity: saved progress, context protection, rollover, and successor status.",
+                "Rune Forge: policy observations and violation feed. Events & Evidence: durable audit detail.",
+            ],
+            recovery: [
+                "A stale or unavailable Dashboard source is not a zero value; refresh and open the owning view.",
+                "Use the latest named failure, policy violation, or next action—not an older activity row—as recovery authority.",
+            ],
+            destinations: [
+                (.autonomy, "Open Run Details"),
+                (.runeForge, "Open Policy Feed"),
+            ]
+        ),
+        Step(
+            kind: .recover,
+            title: "Resolve issues and continue",
+            symbol: "cross.case",
+            purpose: "Forge preserves durable state and routes each issue to the view that owns the corrective action.",
+            readyWhen: "No active run or continuity item reports a blocked/failed condition requiring operator action.",
+            actions: [
+                "Provider issue: open Provider, choose Connect and Check, then retry the run.",
+                "Automatic completion issue: correct the named check and choose Retry in Autonomy; no separate gate environment is required.",
+                "Custom native gate: import its matching signed policy only when the run explicitly names that custom gate.",
+                "Continuity issue: read the exact detail and use its Open Provider or Open Autonomy action.",
+                "Policy violation: inspect Rune Forge and Events & Evidence, correct the named policy condition, then retry when allowed.",
+            ],
+            recovery: [
+                "Do not delete or duplicate an unsettled run to clear a warning. Retry or reconcile the existing durable identity.",
+                "If the same issue remains, export Diagnostics and preserve the displayed run/event identifiers.",
+            ],
+            destinations: [
+                (.autonomy, "Open Autonomy"),
+                (.evidence, "Open Events & Evidence"),
+            ]
         ),
     ]
 
+    @Binding var selectedStep: Int
+    let managerReady: Bool
+    let snapshot: RigOperationalSnapshot
     let onOpen: (AppModel.AppTab) -> Void
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var index = 0
 
     var body: some View {
+        let index = min(max(selectedStep, 0), steps.count - 1)
         let step = steps[index]
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: step.symbol)
-                    .font(.system(size: 32))
-                    .foregroundStyle(.tint)
-                    .frame(width: 44)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Forge Conductor Setup")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(step.title)
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Guided Setup")
                         .font(.title2.bold())
-                    Text(step.summary)
+                    Text("Set up, start, monitor, and recover an automated project run")
                         .foregroundStyle(.secondary)
                 }
+                Spacer()
+                Button("Next required step") {
+                    selectedStep = recommendedStep
+                }
+                .disabled(recommendedStep == index)
+                .accessibilityIdentifier("guided-setup-next-required")
+                Button("Close") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("guided-setup-close")
+            }
+            .padding(20)
+
+            Divider()
+
+            HSplitView {
+                ScrollView {
+                    VStack(spacing: 6) {
+                        ForEach(Array(steps.enumerated()), id: \.offset) { offset, item in
+                            stepButton(item, index: offset)
+                        }
+                    }
+                    .padding(12)
+                }
+                .frame(minWidth: 230, idealWidth: 250, maxWidth: 280)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        stepHeader(step, index: index)
+                        statusCard(for: step)
+                        guideSection("Ready when", symbol: "checkmark.seal", items: [step.readyWhen])
+                        guideSection("What to do", symbol: "list.number", items: step.actions, numbered: true)
+                        guideSection("If it needs attention", symbol: "wrench.and.screwdriver", items: step.recovery)
+                        HStack(spacing: 10) {
+                            ForEach(Array(step.destinations.enumerated()), id: \.offset) { _, destination in
+                                Button(destination.label) {
+                                    onOpen(destination.tab)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .accessibilityIdentifier(
+                                    "setup-guide-open-\(destination.tab.accessibilityID)"
+                                )
+                            }
+                        }
+                    }
+                    .padding(22)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .frame(minWidth: 500, maxWidth: .infinity)
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(step.details.enumerated()), id: \.offset) { offset, detail in
-                    HStack(alignment: .top, spacing: 10) {
+            Divider()
+            HStack {
+                Text("Step \(index + 1) of \(steps.count) · Progress is saved when you leave the wizard")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Back") { selectedStep = max(0, index - 1) }
+                    .disabled(index == 0)
+                if index == steps.count - 1 {
+                    Button("Finish Guided Setup", action: onComplete)
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("setup-guide-finish")
+                } else {
+                    Button("Next") { selectedStep = min(steps.count - 1, index + 1) }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("setup-guide-next")
+                }
+            }
+            .padding(16)
+        }
+        .frame(minWidth: 780, idealWidth: 900, minHeight: 600, idealHeight: 680)
+        .accessibilityIdentifier("setup-guide")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Guided Setup wizard")
+        .onAppear {
+            selectedStep = min(max(selectedStep, 0), steps.count - 1)
+        }
+    }
+
+    private var recommendedStep: Int {
+        if !managerReady { return 0 }
+        if !providerReady { return 1 }
+        if snapshot.projectName == nil { return 2 }
+        if snapshot.projectTotalPackages == 0 { return 3 }
+        if snapshot.activeRunState == nil { return 4 }
+        if needsAttention { return 7 }
+        return 6
+    }
+
+    private var providerReady: Bool {
+        ["reachable", "contract_valid"].contains(snapshot.providerHealth)
+    }
+
+    private var needsAttention: Bool {
+        snapshot.continuityBlockedCount > 0
+            || snapshot.projectProgressState == "ATTENTION"
+            || ["blocked_configuration", "failed_recoverable", "failed_terminal"]
+                .contains(snapshot.activeRunState)
+    }
+
+    private func stepButton(_ step: Step, index: Int) -> some View {
+        let status = readiness(for: step)
+        return Button {
+            selectedStep = index
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(selectedStep == index ? Color.accentColor : Color.secondary.opacity(0.15))
+                        .frame(width: 28, height: 28)
+                    Text("\(index + 1)")
+                        .font(.caption.bold())
+                        .foregroundStyle(selectedStep == index ? .white : .primary)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(step.title)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(2)
+                    Text(status.label)
+                        .font(.caption2)
+                        .foregroundStyle(status.color)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: status.symbol)
+                    .foregroundStyle(status.color)
+            }
+            .padding(8)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(selectedStep == index ? Color.accentColor.opacity(0.12) : .clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("guided-setup-step-\(index + 1)")
+    }
+
+    private func stepHeader(_ step: Step, index: Int) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: step.symbol)
+                .font(.system(size: 32))
+                .foregroundStyle(.tint)
+                .frame(width: 44)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("STEP \(index + 1) OF \(steps.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(step.title)
+                    .font(.title2.bold())
+                    .accessibilityIdentifier("guided-setup-step-title")
+                Text(step.purpose)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func statusCard(for step: Step) -> some View {
+        let status = readiness(for: step)
+        return GroupBox("Current status") {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: status.symbol)
+                    .foregroundStyle(status.color)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(status.label).font(.headline)
+                    Text(status.detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("guided-setup-status")
+    }
+
+    private func guideSection(
+        _ title: String,
+        symbol: String,
+        items: [String],
+        numbered: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: symbol).font(.headline)
+            ForEach(Array(items.enumerated()), id: \.offset) { offset, item in
+                HStack(alignment: .top, spacing: 9) {
+                    if numbered {
                         Text("\(offset + 1)")
                             .font(.caption.bold())
                             .foregroundStyle(.white)
                             .frame(width: 22, height: 22)
                             .background(Circle().fill(Color.accentColor))
-                        Text(detail)
-                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 5))
+                            .padding(.top, 7)
                     }
-                }
-            }
-
-            if let destination = step.destination,
-               let label = step.destinationLabel {
-                Button(label) { onOpen(destination) }
-                    .accessibilityIdentifier("setup-guide-open-\(destination.accessibilityID)")
-            }
-
-            Spacer(minLength: 0)
-
-            HStack {
-                Text("Step \(index + 1) of \(steps.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Close") { dismiss() }
-                Button("Back") { index -= 1 }
-                    .disabled(index == 0)
-                if index == steps.count - 1 {
-                    Button("Finish Setup Guide", action: onComplete)
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("setup-guide-finish")
-                } else {
-                    Button("Next") { index += 1 }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("setup-guide-next")
+                    Text(item).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
-        .padding(24)
-        .frame(width: 620, height: 470)
-        .accessibilityIdentifier("setup-guide")
+    }
+
+    private func readiness(for step: Step) -> (
+        label: String,
+        detail: String,
+        symbol: String,
+        color: Color
+    ) {
+        switch step.kind {
+        case .manager:
+            return managerReady
+                ? ("Ready", "Manager is running.", "checkmark.circle.fill", .green)
+                : ("Action required", "Manager is not running.", "exclamationmark.triangle.fill", .orange)
+        case .provider:
+            if providerReady {
+                return ("Ready", snapshot.providerModel.map { "Connected to \($0)." }
+                    ?? "The configured provider is reachable.", "checkmark.circle.fill", .green)
+            }
+            return ("Next", "Connect and validate a model provider.", "arrow.right.circle.fill", .accentColor)
+        case .project:
+            if let project = snapshot.projectName {
+                return ("Ready", "\(project) is the current registered project.", "checkmark.circle.fill", .green)
+            }
+            return ("Next", "Register the repository you want Forge to operate on.", "arrow.right.circle.fill", .accentColor)
+        case .instructions:
+            if snapshot.projectTotalPackages > 0 {
+                return ("Ready", "\(snapshot.projectTotalPackages) instruction package(s) are available.", "checkmark.circle.fill", .green)
+            }
+            return snapshot.projectName == nil
+                ? ("Waiting", "Register a project first.", "clock", .secondary)
+                : ("Next", "Add at least one instruction package.", "arrow.right.circle.fill", .accentColor)
+        case .configure:
+            let ready = managerReady && providerReady
+                && snapshot.projectName != nil && snapshot.projectTotalPackages > 0
+            return ready
+                ? ("Ready to review", "The setup prerequisites are present.", "checkmark.circle.fill", .green)
+                : ("Waiting", "Complete the earlier setup steps first.", "clock", .secondary)
+        case .start:
+            if let state = snapshot.activeRunState {
+                return ("Started", "The current managed task reports \(state.replacingOccurrences(of: "_", with: " ")).", "play.circle.fill", .green)
+            }
+            if snapshot.projectTotalPackages > 0 && providerReady {
+                return ("Ready to start", "Choose ordered or direct launch.", "play.circle", .accentColor)
+            }
+            return ("Waiting", "Provider, project, and instructions must be ready.", "clock", .secondary)
+        case .monitor:
+            if let state = snapshot.activeRunState {
+                return (needsAttention ? "Action required" : "Monitoring",
+                        "The current task reports \(state.replacingOccurrences(of: "_", with: " ")).",
+                        needsAttention ? "exclamationmark.triangle.fill" : "waveform.path.ecg",
+                        needsAttention ? .orange : .green)
+            }
+            return ("Ready", "Dashboard will populate when a managed task starts.", "gauge.with.dots.needle.67percent", .secondary)
+        case .recover:
+            if needsAttention {
+                return ("Action required", "A run, package, or continuity item needs attention.", "exclamationmark.triangle.fill", .orange)
+            }
+            return ("No current issue", "Forge has not reported an active blocking condition.", "checkmark.circle.fill", .green)
+        }
     }
 }
 

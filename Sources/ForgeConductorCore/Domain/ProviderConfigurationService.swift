@@ -55,6 +55,21 @@ public struct ProviderModelInventory: Codable, Sendable, Equatable {
     }
 }
 
+/// Result of a provider-owned, bounded connection recovery attempt.
+///
+/// The provider validates the returned endpoint before exposing it. The Manager
+/// remains the sole owner of configuration persistence and applies a changed
+/// endpoint through the existing revision compare-and-swap transaction.
+public struct ProviderConnectionRecovery: Sendable, Equatable {
+    public let endpoint: String
+    public let inventory: ProviderModelInventory
+
+    public init(endpoint: String, inventory: ProviderModelInventory) {
+        self.endpoint = endpoint
+        self.inventory = inventory
+    }
+}
+
 public enum ProviderPreparationRecoveryAction: String, Codable, Sendable, CaseIterable {
     case none
     case startService = "start_service"
@@ -109,7 +124,7 @@ public enum ProviderModelSelectionResolver {
                 return ProviderModelSelection(
                     modelKey: nil,
                     recoveryAction: .loadModel,
-                    detail: "Load the pinned model in LM Studio, then run Connect and check again."
+                    detail: "Load the pinned model in LM Studio, then choose Connect and Check again."
                 )
             }
             return ProviderModelSelection(
@@ -144,7 +159,7 @@ public enum ProviderModelSelectionResolver {
         return ProviderModelSelection(
             modelKey: nil,
             recoveryAction: .installCompatibleModel,
-            detail: "Install a tool-capable model in LM Studio, then run Connect and check again."
+            detail: "Install a tool-capable model in LM Studio, then choose Connect and Check again."
         )
     }
 }
@@ -173,4 +188,13 @@ public protocol ProviderConfigurationServicing: Sendable {
     func read() async throws -> ProviderConfigurationSnapshot
     func update(_ request: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
     func models() async throws -> ProviderModelInventory
+    func recoverConnection() async throws -> ProviderConnectionRecovery
+}
+
+public extension ProviderConfigurationServicing {
+    /// Providers without a safe native recovery mechanism retain the existing
+    /// explicit-offline behavior.
+    func recoverConnection() async throws -> ProviderConnectionRecovery {
+        throw ProviderConfigurationError.offline
+    }
 }

@@ -13,8 +13,8 @@
   "contexts": [
     {
       "id": "rig",
-      "title": "FORGE RIG guide",
-      "purpose": "Understand live system, managed-model, instruction-progress, policy, tool, and orchestration telemetry without treating it as setup.",
+      "title": "Dashboard guide",
+      "purpose": "Monitor live system, managed-model, instruction-progress, policy, tool, and orchestration telemetry after using Guided Setup to prepare a project.",
       "forge_handles_automatically": [
         "Collect and coalesce supported telemetry",
         "Mark unavailable or stale measurements",
@@ -37,7 +37,8 @@
         "Managed Activity is latest bounded state, not a persisted full conversation transcript"
       ],
       "normal_workflow": [
-        "Use the Rig to observe health and load",
+        "Use Guided Setup in the Dashboard title bar when preparing a project or reviewing the correct launch order",
+        "Use the Dashboard to observe health and load",
         "Use Managed Activity to follow the current package, step, model output, orchestration, and policy events",
         "Open the relevant feature tab to change behavior"
       ],
@@ -959,7 +960,7 @@
         "Probe required contract"
       ],
       "controls": [
-        "Connect and check",
+        "Connect and Check",
         "Choose model when necessary",
         "Credential action",
         "Advanced connection settings"
@@ -975,7 +976,7 @@
       ],
       "normal_workflow": [
         "Usually do nothing; Start Task invokes preparation",
-        "Use Connect and check to prepare manually or diagnose"
+        "Use Connect and Check to prepare manually or diagnose"
       ],
       "troubleshooting": [
         "LM Studio stopped",
@@ -1019,7 +1020,7 @@
       "normal_workflow": [
         "Choose action",
         "Enter credential only when replacing",
-        "Save and Connect and check"
+        "Save and Connect and Check"
       ],
       "troubleshooting": [
         "Credential rejected: verify provider configuration",

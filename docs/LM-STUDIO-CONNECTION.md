@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.12.0**, build **4**. This connection document does
+Product identity: version **0.13.0**, build **5**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -10,7 +10,7 @@ not authorize release; the qualification boundary below remains controlling.
 | Component | Role |
 |-----------|------|
 | **LM Studio** | MCP **host** (spawns stdio servers, routes tool calls from local models) |
-| **Forge Conductor Swift app (GUI)** | Rig / manager / installer UI. With no argv → SwiftUI. |
+| **Forge Conductor Swift app (GUI)** | Dashboard / manager / installer UI. With no argv → SwiftUI. |
 | **App binary `…/Forge Conductor serve`** | Same MCP server over stdin/stdout (`ForgeProcessEntry` → `MCPServer.swift`) |
 | **CLI `forge-conductor serve`** | Same MCP server (default registration target) |
 
@@ -30,7 +30,33 @@ owned LM Studio chats.
 
 ## Native managed-run setup
 
-The native Provider screen saves the LM Studio server origin and an exact model key. Saving is durable and does not prove the server is reachable. Run **Refresh Models** and **Test Connection** after starting the local server and loading a model. Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory as authoritative model metadata. When that native response omits `loaded_instances`, Forge may reconcile loaded state only from a bounded `GET /api/v0/models` response whose exact model identifier reports `state: loaded` and a valid context length. Missing, malformed, mismatched, or unloaded compatibility data remains unavailable. LM Studio's OpenAI-compatible `/v1/models` lists downloaded models when just-in-time loading is enabled, so that list alone does not prove readiness.
+The native Provider screen saves the LM Studio server origin and an exact model
+key. Saving is durable and does not prove the server is reachable. With a saved
+loopback endpoint, **Connect and Check** is the ordinary one-button path. Forge
+first attempts normal inventory. After a transport-level offline result, it
+locates LM Studio's supported `lms` CLI, reads `lms server status --json
+--quiet`, starts the server with `lms server start` when needed, and retries only
+the configured endpoint and loopback variants on the exact CLI-reported port.
+Each candidate must pass the ordinary model-inventory transport before Forge
+may persist the corrected endpoint. Forge does not scan ports.
+
+The same action then chooses the sole compatible loaded model when no model is
+pinned, runs the complete managed-provider contract probe, and durably records
+readiness. Forge never loads a model; when zero or multiple compatible models
+are loaded, Provider gives the required load or selection action. A missing or
+failing `lms` CLI, non-loopback endpoint, authentication failure, timeout, or
+invalid inventory remains a typed failure instead of triggering broad host
+discovery. **Refresh Models** and the separate contract probe remain available
+for advanced diagnosis.
+
+Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory as
+authoritative model metadata. When that native response omits
+`loaded_instances`, Forge may reconcile loaded state only from a bounded
+`GET /api/v0/models` response whose exact model identifier reports
+`state: loaded` and a valid context length. Missing, malformed, mismatched, or
+unloaded compatibility data remains unavailable. LM Studio's OpenAI-compatible
+`/v1/models` lists downloaded models when just-in-time loading is enabled, so
+that list alone does not prove readiness.
 
 On September 17, 2026, this host's `lms ps` and native v0 inventory reported `qwen/qwen3.8-27b` loaded with a 262144-token context while the native v1 response returned the same model metadata with an empty `loaded_instances` array. The current Xcode **My Mac** Debug candidate reconciled that exact observation, reported the model loaded, and passed the manager connection probe. A disposable run then used one project-bound `fs_read`, persisted its completion request, and stopped at the expected missing native-policy blocker. After an exact signed policy import, Retry returned to completion validation without another provider/tool step; one required XCTest case passed with zero failures/skips and the run reached `completed` with `tests` passed.
 
@@ -40,7 +66,8 @@ Register the repository in **Projects** using the native picker or **Enter Proje
 
 **Primary (official LM Studio mechanism):** `~/.lmstudio/mcp.json`
 
-**Operational registration (both roles use the same selected, smoke-tested binary):**
+**Operational registration (all roles use the same selected, smoke-tested
+binary; CLU exposes its restricted surface):**
 
 ```json
 {
@@ -62,12 +89,26 @@ Register the repository in **Projects** using the native picker or **Enter Proje
         "FORGE_CONDUCTOR_HOME": "/Users/<you>/.forge-conductor",
         "PATH": "…"
       }
+    },
+    "forge-conductor-clu": {
+      "command": "/path/to/the/selected/forge-conductor-or-app-binary",
+      "args": ["serve"],
+      "env": {
+        "FORGE_MCP_ROLE": "clu",
+        "FORGE_CONDUCTOR_HOME": "/Users/<you>/.forge-conductor",
+        "PATH": "…"
+      }
     }
   }
 }
 ```
 
-The CLI normally resolves the installed CLI executable. The GUI deliberately supplies its own app executable. Primary and fallback never mix versions within one deployment.
+Current deployment also registers the restricted CLU role with the same
+executable and `FORGE_MCP_ROLE=clu`. Its four continuity controls are a
+deliberately smaller tool surface; do not replace that registration with either
+general-tool entry. The CLI normally resolves the installed CLI executable. The
+GUI deliberately supplies its own app executable. Primary, fallback, and CLU
+never mix versions within one deployment.
 
 SwiftPM builds place `ForgeConductor_ForgeConductorCore.bundle` beside the CLI
 product. `forge-conductor install` stages that bundle in the same artifact
@@ -92,8 +133,8 @@ LaunchAgent already uses the app as: `manager run --home …` (unrelated to MCP 
 
 **Secondary (lockstep mirror on this Mac):**
 `~/.lmstudio/extensions/plugins/mcp/<name>/` with `runner: "mcpBridge"`.
-The Forge primary and fallback mirrors use the same command, arguments, and
-environment as `mcp.json`, and LM Studio reports them through
+The Forge primary, fallback, and CLU mirrors use the same executable and their
+role-specific arguments and environment from `mcp.json`, and LM Studio reports them through
 `PluginProcess(mcp/…)` logs.
 
 Source of truth in code:
@@ -142,14 +183,18 @@ Source of truth in code:
 
 Deployment performs these gates before reporting success:
 
-1. The selected executable must pass independent primary and fallback MCP handshakes.
+1. The selected executable must pass independent primary, fallback, and
+   restricted CLU MCP handshakes.
 2. Existing `mcp.json` must parse; foreign servers are preserved.
-3. Both plugins are staged and validated before live paths change.
-4. Fallback commits first, followed by primary and an atomic configuration write.
-5. Both committed roles are smoked again. A commit failure rolls back all live paths.
-6. Every deploy writes a new shared revision to both role environments, even when the binary path is unchanged.
+3. All three plugins are staged and validated before live paths change.
+4. Fallback commits first, followed by CLU, primary, and an atomic configuration write.
+5. All three committed roles are smoked again. A commit failure rolls back all live paths.
+6. Every deploy writes a new shared revision to all three role environments,
+   even when the binary path is unchanged.
 7. LM Studio is launched if necessary and given a bounded hot-reload window; if stale processes remain, only LM Studio is gracefully relaunched.
-8. Success is withheld until LM Studio's own synchronized MCP state contains both roles with that exact revision. When the current chat activates them, host-originated `tools/list` evidence is also recorded for each role.
+8. Success is withheld until LM Studio's own synchronized MCP state contains all
+   three roles with that exact revision. When the current chat activates them,
+   host-originated `tools/list` evidence is also recorded for each role.
 
 LM Studio then spawns the selected executable as:
 
@@ -217,7 +262,8 @@ The two registrations are separate LM Studio-hosted processes with distinct `ser
 1. Build an app whose executable enters MCP stdio mode when run with `serve`; normal startup must remain silent on stderr.
 2. Smoke that app path with the same initialize/`tools/list` protocol.
 3. `forge-conductor install-lmstudio-plugin --binary "<app executable>"`.
-4. Confirm the command reports host acknowledgement for primary and fallback; restart is automated only if hot reload is insufficient.
+4. Confirm the command reports host acknowledgement for primary, fallback, and
+   CLU; restart is automated only if hot reload is insufficient.
 
 Completing this connector checklist proves only the LM Studio registration and
 stdio path. The retained Apple Development-signed installed-app qualifier
@@ -238,9 +284,9 @@ passes do not replace those release-blocking runs.
 Managed Autonomy uses a separate typed LM Studio provider configuration from
 the MCP plugin registration described above. In **Provider**, enter the endpoint
 and model identifier, choose to keep/replace/clear the Keychain credential, and
-select **Save**. Saving works offline. **Refresh Models** lists available models;
-**Test Connection** and **Run Contract Probe** use the saved settings. Save edits
-before discovery/probes, and load models in LM Studio itself. Active runs and
+select **Save**. Saving works offline. Choose **Connect and Check** for automatic
+local-server recovery, model resolution, and contract verification. Save edits
+before connection work, and load models in LM Studio itself. Active runs and
 in-flight operations block conflicting configuration changes. The native screen
 uses authenticated, revisioned manager controls and follows manager replacement.
 See the [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
@@ -249,3 +295,19 @@ See the [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
 
 On GUI bootstrap, registration is **not** auto-written (operator must Install Plugin).
 `LMStudioMCPPluginInstaller.ensureConnection` exists for explicit heal paths when registration is incomplete or drifted. Repairs use the same typed, transactional installation boundary rather than modifying only one role.
+
+## Doctor and stale registrations
+
+Settings → **Run doctor** reports the executing Forge version and build, the
+resolved current-build executable, and separate status rows for the primary,
+fallback, and CLU mcpBridge plugins. A role is current only when its deployed
+files and LM Studio registration resolve to that executable and matching
+deployment state. Existing plugin files whose registration still names an old
+app or CLI path are reported as **stale**, not as absent.
+
+Any non-current LM Studio role makes the visible Doctor result **ISSUES**, even
+though plugin checks are advisory rather than failures of the local database or
+runtime. Choose **Deploy current build to LM Studio** from the Doctor result to
+run the normal transactional three-role deployment, then rerun Doctor. Do not
+repair only the CLU directory or hand-edit one registration: all roles must stay
+bound to the same build and deployment revision.

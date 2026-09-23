@@ -91,7 +91,7 @@ struct ProviderOperatorView: View {
                     LabeledContent("Next action", value: recoveryActionLabel(action))
                 }
                 HStack {
-                    Button("Connect and check", action: viewModel.connectAndCheck)
+                    Button("Connect and Check", action: viewModel.connectAndCheck)
                         .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
                         .accessibilityIdentifier("provider-test-connection")
                     if viewModel.isProbing {
@@ -236,7 +236,7 @@ struct ProviderOperatorView: View {
                 }
             }
 
-            Text("Connect and check performs model discovery and the full managed-provider contract probe. The separate probe remains available here for advanced diagnosis.")
+            Text("Connect and Check performs model discovery, local LM Studio recovery when needed, and the full managed-provider contract probe. The separate probe remains available here for advanced diagnosis.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -266,12 +266,12 @@ struct ProviderOperatorView: View {
     private func recoveryActionLabel(_ action: ProviderPreparationRecoveryAction) -> String {
         switch action {
         case .none: "No action required"
-        case .startService: "Start LM Studio, then connect and check again"
+        case .startService: "Start LM Studio, then choose Connect and Check again"
         case .selectModel: "Select one compatible loaded model"
         case .loadModel: "Load the selected model in LM Studio"
         case .installCompatibleModel: "Install a tool-capable model in LM Studio"
         case .supplyCredential: "Supply the required provider credential"
-        case .retry: "Retry Connect and check"
+        case .retry: "Retry Connect and Check"
         }
     }
 }

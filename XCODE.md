@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.12.0**, build **4**. `VERSION` and
+Product identity: marketing version **0.13.0**, build **5**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -457,6 +457,17 @@ shipping manually after the hard gates pass.
 The Core target includes the provider configuration contract and native LM Studio
 configuration service. Service/store tests run in `ForgeConductorTests`; native
 HTTP-client and manager-route tests run in `ForgeConductorAppTests`.
+
+The 0.13.0 operator workflow changes remain in existing canonical target
+members: the Dashboard title-bar wizard is owned by the app's `ContentView` and
+`RigDashboardView`; Provider local-server recovery is in the native session-host
+plugin and manager path; completion ownership and retry behavior are in Core
+plus the existing Autonomy views; Continuity layout is in its existing operator
+view; and Doctor role inspection is in Core plus Manager Settings. No parallel
+project, generated UI target, or replacement app shell is introduced. Build and
+test evidence for this source revision must be recorded after running the
+canonical commands; older 0.12.0 receipts do not qualify it.
+
 `ProductionOnboardingUITests` is in the native UI target and uses the actual
 folder panel and normal app bootstrap. The UI target now links the existing
 Core framework only to calculate the approved package manifest in its positive

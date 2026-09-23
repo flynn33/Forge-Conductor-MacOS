@@ -73,7 +73,7 @@ Markdown, or CSV without database or file work on the main actor. The Manager
 response reports the event count, byte count, digest, destination, and retry
 identity.
 
-The Rig's view-owned five-second operational monitor also composes a bounded,
+The Dashboard's view-owned five-second operational monitor also composes a bounded,
 coalesced, app-local Managed Activity projection. The public Manager operator
 DTO retains bounded, redacted mission and work-item text plus non-sensitive
 state, identity, and event metadata. Authenticated
@@ -93,7 +93,7 @@ provider transcript. Rune Forge separately renders the global newest bounded
 policy snapshot as a verbose Policy Feed without changing evaluation or
 execution.
 
-The Rig uses intrinsic `Grid` rows for CPU/GPU, Storage/Managed Activity,
+The Dashboard uses intrinsic `Grid` rows for CPU/GPU, Storage/Managed Activity,
 MCP servers/tools, and agents/processes. The compact activity region scrolls
 internally, while `ViewThatFits` supplies a vertical fallback at constrained
 widths. Settings, Autonomy, Continuity, and Rune Forge controls use adaptive
@@ -202,7 +202,7 @@ and generation; the autonomous run receives the registered repository root as
 its tool scope rather than authority over the instruction source location.
 
 The queue projection augments each linked run with bounded, journal-derived
-instruction-delivery counts. Rig treats fully delivered instruction documents
+instruction-delivery counts. Dashboard treats fully delivered instruction documents
 as steps and completed queue records as packages. Completion presets use stable
 identifiers that the manager compiles into typed native obligations; unknown
 identifiers remain advanced signed native gates. Each prepared descriptor also
@@ -339,5 +339,5 @@ The staged bundle contains `Contents/Helpers/forge-conductor`,
 `Contents/MacOS/forge-filesystem-daemon`. Nested code is signed before the app
 seal and each artifact is strictly verified.
 
-Version: `0.12.0`
-Build: `4`
+Version: `0.13.0`
+Build: `5`

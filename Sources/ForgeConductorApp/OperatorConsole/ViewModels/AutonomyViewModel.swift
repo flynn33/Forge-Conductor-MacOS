@@ -430,10 +430,9 @@ final class AutonomyViewModel: ObservableObject {
         let modelKey = modelKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let modelOverrideKey = modelOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let allowedTools = parsedList(allowedTools)
-        let customCompletionGates = parsedList(completionGates).filter {
-            $0 != ProjectInstructionQueueStore.builtInCompletionGate
-                && CompletionCheckPreset(rawValue: $0) == nil
-        }
+        let customCompletionGates = CompletionGateOwnership.customNativeGates(
+            in: parsedList(completionGates)
+        )
         let completionGates = [ProjectInstructionQueueStore.builtInCompletionGate]
             + selectedCompletionChecks.map(\.rawValue).sorted()
             + customCompletionGates
@@ -787,10 +786,18 @@ final class AutonomyViewModel: ObservableObject {
                       let projectUUID = UUID(uuidString: run.projectID) else {
                     throw AutonomyError.invalidRequest("managed run or project generation changed before policy import")
                 }
+                let customNativeGates = CompletionGateOwnership.customNativeGates(
+                    in: run.completionGates
+                )
+                guard !customNativeGates.isEmpty else {
+                    throw AutonomyError.invalidRequest(
+                        "This task uses Forge-managed automatic checks and does not need a custom native policy."
+                    )
+                }
                 let binding = NativeValidationPolicyInstaller.RunBinding(
                     runID: RunID(runUUID), projectID: ProjectID(projectUUID),
                     projectGeneration: ProjectGeneration(run.projectGeneration),
-                    completionGates: run.completionGates,
+                    completionGates: customNativeGates,
                     projectRoot: URL(fileURLWithPath: project.canonicalRoot, isDirectory: true)
                 )
                 let receipt = try await policyInstaller.importPolicy(from: file, for: binding)

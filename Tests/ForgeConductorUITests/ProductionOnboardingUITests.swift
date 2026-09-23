@@ -253,12 +253,12 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(saved.credentialConfigured)
         XCTAssertFalse(saved.credentialCleanupPending)
         XCTAssertNotEqual(saved.revision, initial.revision)
-        XCTAssertTrue(contains(element("provider-probe-notice"), "Connect and check"))
+        XCTAssertTrue(contains(element("provider-probe-notice"), "Connect and Check"))
 
         try click(app.buttons["provider-test-connection"])
         XCTAssertTrue(element("operator-unavailable").waitForExistence(timeout: 40))
         XCTAssertFalse(contains(element("provider-probe-notice"), "are reachable"))
-        XCTAssertTrue(app.staticTexts["Start LM Studio, then connect and check again"]
+        XCTAssertTrue(app.staticTexts["Start LM Studio, then choose Connect and Check again"]
             .waitForExistence(timeout: 5))
         let afterOfflineProbe: OnboardingProviderConfiguration = try await read("/api/manager/provider/configuration")
         XCTAssertEqual(afterOfflineProbe, saved)
@@ -437,7 +437,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(authorized.shell.enabled)
         XCTAssertFalse(authorized.shell.userDisabled)
 
-        // Enter the real macOS Settings scene with the main window on FORGE RIG,
+        // Enter the real macOS Settings scene with the main window on Dashboard,
         // so its independent form is the only shell-policy control in the UI.
         try click(app.buttons["tab-rig"])
         app.typeKey(",", modifierFlags: .command)

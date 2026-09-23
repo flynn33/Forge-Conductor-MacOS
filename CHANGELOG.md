@@ -10,6 +10,48 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-09-23 (development)
+
+### Added
+
+- Added an eight-step, state-aware **Guided Setup** wizard launched from the
+  Dashboard title bar. It gives the setup order, current readiness, success
+  criteria, launch choices, monitoring map, and issue-specific recovery routes
+  for Manager, Provider, Projects, Autonomy, Continuity, Rune Forge, and
+  Events & Evidence.
+- Added bounded local LM Studio recovery to **Connect and Check**. For saved
+  loopback configurations, Forge uses LM Studio's supported `lms` CLI to read
+  or start the server, validates only the CLI-reported port through the normal
+  authenticated inventory path, preserves explicit model and credential
+  choices, and then runs the existing contract probe.
+- Added current-build Doctor reporting for version/build and each LM Studio
+  primary, fallback, and CLU plugin role. Stale plugin files remain visible as
+  installed artifacts while Doctor offers **Deploy current build** to repair
+  their executable binding.
+
+### Changed
+
+- Renamed the visible **Forge Rig** navigation and title surface to
+  **Dashboard**, preserving its existing internal tab and accessibility
+  identifiers for compatibility.
+- Made Autonomy completion checks inline, selectable checkboxes. Built-in and
+  preset checks now run through the manager's compiled automatic completion
+  plan without an installed native policy; only instruction packages that
+  explicitly declare a custom native gate use the signed-policy path.
+- Preserved instruction-package tools and completion gates through single,
+  imported, and ordered composite run artifacts, while merging only explicitly
+  selected manager-owned automatic checks for direct runs.
+- Reworked Autonomy failure guidance and Continuity protection states to show
+  the exact retained condition and route recovery to Provider or Autonomy. The
+  UI no longer asks users to install an unspecified gate policy or restore an
+  unspecified environment.
+- Removed Continuity's nested navigation container so its heading and refresh
+  control stay below the toolbar and the empty operation state no longer leaves
+  an unused middle frame.
+- Advanced the development identity from `0.12.0 (4)` to `0.13.0 (5)` for this
+  backward-compatible setup and operability feature release. This is not a
+  shipment claim.
+
 ## [0.12.0] — 2026-09-23 (development)
 
 ### Added

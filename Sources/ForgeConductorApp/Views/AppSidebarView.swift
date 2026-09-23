@@ -65,7 +65,7 @@ struct AppSidebarView: View, Equatable {
             HStack(spacing: 10) {
                 Image(systemName: tab.systemImage)
                     .frame(width: 18)
-                Text(tab.rawValue)
+                Text(tab.displayName)
                     .lineLimit(1)
                 Spacer(minLength: 8)
             }

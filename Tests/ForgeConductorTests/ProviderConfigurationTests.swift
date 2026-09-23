@@ -83,6 +83,28 @@ private final class DisposableKeychainRecorder: LMStudioCredentialStoring, @unch
     }
 }
 
+private final class ProviderRecoveryRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recoveryCount = 0
+    private var endpoints: [URL] = []
+
+    func recordRecovery() {
+        lock.lock(); recoveryCount += 1; lock.unlock()
+    }
+
+    func recordEndpoint(_ endpoint: URL) {
+        lock.lock(); endpoints.append(endpoint); lock.unlock()
+    }
+
+    var recoveries: Int {
+        lock.lock(); defer { lock.unlock() }; return recoveryCount
+    }
+
+    var observedEndpoints: [URL] {
+        lock.lock(); defer { lock.unlock() }; return endpoints
+    }
+}
+
 final class ProviderConfigurationTests: XCTestCase {
     private var directory: URL!
     private var credentials: ProviderCredentialFixture!
@@ -364,6 +386,119 @@ final class ProviderConfigurationTests: XCTestCase {
                 XCTAssertFalse(error.localizedDescription.contains("fixture-value"))
             }
         }
+    }
+
+    func testOfflineLocalRecoveryValidatesOnlyReportedPortBeforeManagerPersistence() async throws {
+        let recorder = ProviderRecoveryRecorder()
+        let service = LMStudioConfigurationService(
+            storageDirectory: directory,
+            credentials: credentials,
+            inventory: { configuration in
+                recorder.recordEndpoint(configuration.baseURL)
+                guard configuration.baseURL.port == 4_321 else {
+                    throw LMStudioProviderError.providerUnavailable
+                }
+                return try Self.loadedToolModel()
+            },
+            localServerRecovery: {
+                recorder.recordRecovery()
+                return 4_321
+            }
+        )
+        let saved = try await service.update(request(model: "fixture/tool-model"))
+
+        do {
+            _ = try await service.models()
+            XCTFail("The stale endpoint unexpectedly succeeded")
+        } catch {
+            XCTAssertEqual(error as? ProviderConfigurationError, .offline)
+        }
+
+        let recovery = try await service.recoverConnection()
+        XCTAssertEqual(recorder.recoveries, 1)
+        XCTAssertEqual(recovery.endpoint, "http://127.0.0.1:4321")
+        XCTAssertEqual(recovery.inventory.revision, saved.revision)
+        XCTAssertEqual(recovery.inventory.models, [
+            ProviderAvailableModel(key: "fixture/tool-model", loaded: true, toolUseCapable: true),
+        ])
+        XCTAssertEqual(Set(recorder.observedEndpoints.map { $0.port ?? 80 }), [1_234, 4_321])
+
+        let unchanged = try await service.read()
+        XCTAssertEqual(unchanged, saved, "Only the Manager CAS path may persist a discovered endpoint")
+    }
+
+    func testRemoteHTTPSRecoveryNeverInvokesLocalServerAutomation() async throws {
+        let recorder = ProviderRecoveryRecorder()
+        let service = LMStudioConfigurationService(
+            storageDirectory: directory,
+            credentials: credentials,
+            inventory: { _ in throw LMStudioProviderError.providerUnavailable },
+            localServerRecovery: {
+                recorder.recordRecovery()
+                return 4_321
+            }
+        )
+        let saved = try await service.update(request(endpoint: "https://remote.provider.fixture"))
+
+        do {
+            _ = try await service.recoverConnection()
+            XCTFail("Remote HTTPS recovery invoked local automation")
+        } catch {
+            XCTAssertEqual(error as? ProviderConfigurationError, .offline)
+        }
+        XCTAssertEqual(recorder.recoveries, 0)
+        let unchanged = try await service.read()
+        XCTAssertEqual(unchanged, saved)
+    }
+
+    func testFailedLocalRecoveryDoesNotMutateEndpointPinOrCredentialReference() async throws {
+        let recorder = ProviderRecoveryRecorder()
+        let service = LMStudioConfigurationService(
+            storageDirectory: directory,
+            credentials: credentials,
+            inventory: { configuration in
+                recorder.recordEndpoint(configuration.baseURL)
+                throw LMStudioProviderError.providerUnavailable
+            },
+            localServerRecovery: {
+                recorder.recordRecovery()
+                return 5_678
+            }
+        )
+        let saved = try await service.update(request(
+            model: "fixture/pinned",
+            action: .replace,
+            token: "transient-fixture-value"
+        ))
+
+        do {
+            _ = try await service.recoverConnection()
+            XCTFail("Unreachable CLI-reported endpoint was accepted")
+        } catch {
+            XCTAssertEqual(error as? ProviderConfigurationError, .offline)
+        }
+        XCTAssertEqual(recorder.recoveries, 1)
+        XCTAssertTrue(recorder.observedEndpoints.allSatisfy { ($0.port ?? 80) == 5_678 })
+        let unchanged = try await service.read()
+        XCTAssertEqual(unchanged, saved)
+        XCTAssertTrue(saved.credentialConfigured)
+        XCTAssertEqual(saved.modelKey, "fixture/pinned")
+    }
+
+    private static func loadedToolModel() throws -> [LMStudioModel] {
+        let data = Data(#"""
+        {
+          "key":"fixture/tool-model",
+          "display_name":"Fixture",
+          "loaded_instances":[{
+            "id":"fixture-instance",
+            "config":{"context_length":8192,"parallel":1,"flash_attention":true}
+          }],
+          "max_context_length":8192,
+          "capabilities":{"trained_for_tool_use":true}
+        }
+        """#.utf8)
+        return [try JSONDecoder().decode(LMStudioModel.self, from: data)]
     }
 
     func testNonterminalDurableRunFencesConfigurationWithoutChangingRun() async throws {

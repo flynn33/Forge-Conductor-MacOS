@@ -963,7 +963,9 @@ final class ProviderConfigurationAppTests: XCTestCase {
         let timestamp = "2027-01-15T08:00:00Z"
         func run(
             _ state: AutonomousRunState = .running,
-            mode: ContinuityMode = .managedAutonomous
+            mode: ContinuityMode = .managedAutonomous,
+            errorCode: String? = nil,
+            errorSummary: String? = nil
         ) -> AutonomousRunRecord {
             AutonomousRunRecord(
                 runID: runID,
@@ -985,9 +987,11 @@ final class ProviderConfigurationAppTests: XCTestCase {
                     ])
                 ),
                 completionRequestJSON: nil,
-                lastErrorCode: state == .blockedConfiguration ? "fixture_blocked" : nil,
-                lastErrorSummary: state == .blockedConfiguration
-                    ? "Fixture continuity dependency is unavailable." : nil,
+                lastErrorCode: errorCode
+                    ?? (state == .blockedConfiguration ? "fixture_blocked" : nil),
+                lastErrorSummary: errorSummary
+                    ?? (state == .blockedConfiguration
+                        ? "Fixture continuity dependency is unavailable." : nil),
                 retryAt: nil,
                 continuationPending: false,
                 revision: 4,
@@ -1069,13 +1073,35 @@ final class ProviderConfigurationAppTests: XCTestCase {
             ManagerNode.continuityPresentation(run: run(.waitingProvider), continuity: nil).state,
             .waitingForProvider
         )
+        let blockedPresentation = ManagerNode.continuityPresentation(
+            run: run(.blockedConfiguration),
+            continuity: nil
+        )
+        XCTAssertEqual(blockedPresentation.state, .blocked)
+        XCTAssertEqual(blockedPresentation.recoveryAction, .reviewRun)
+        XCTAssertFalse(blockedPresentation.nextAction.localizedCaseInsensitiveContains("environment"))
+        XCTAssertFalse(blockedPresentation.nextAction.localizedCaseInsensitiveContains("install"))
         XCTAssertEqual(
             ManagerNode.continuityPresentation(
-                run: run(.blockedConfiguration),
+                run: run(
+                    .blockedConfiguration,
+                    errorCode: "provider_unavailable",
+                    errorSummary: "LM Studio is unavailable."
+                ),
                 continuity: nil
-            ).state,
-            .blocked
+            ).recoveryAction,
+            .reviewProvider
         )
+        let completionPresentation = ManagerNode.continuityPresentation(
+            run: run(
+                .blockedConfiguration,
+                errorCode: AutonomyError.completionValidationFailed.code,
+                errorSummary: "forge.completion.tests: The selected tests did not pass."
+            ),
+            continuity: nil
+        )
+        XCTAssertEqual(completionPresentation.recoveryAction, .reviewRun)
+        XCTAssertTrue(completionPresentation.nextAction.contains("named completion check"))
         XCTAssertEqual(
             ManagerNode.continuityPresentation(
                 run: run(),

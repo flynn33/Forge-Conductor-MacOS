@@ -400,18 +400,73 @@ public final class ForgeApp: @unchecked Sendable {
                 : "remove leftovers: \(leftovers.joined(separator: ", "))"
         )
 
-        let mcpBinary = FileManager.default.isExecutableFile(atPath: installer.appExecutableURL.path)
-            ? installer.appExecutableURL
-            : installer.installedBinaryURL
+        let mcpBinary = lmStudioDeploy.resolveServeBinary()
+        check(
+            "current_build_executable",
+            FileManager.default.isExecutableFile(atPath: mcpBinary.path),
+            "Forge Conductor \(Self.version) (build \(Self.buildVersion)) at \(mcpBinary.path)",
+            hard: false
+        )
         let lm = LMStudioEnvironment.registrationHealth(expectedBinary: mcpBinary)
         check("lm_studio_swift_stdio", lm.ok, lm.detail, hard: false)
 
         let plug = LMStudioMCPPluginInstaller.status(preferredBinary: mcpBinary)
+        let registrations = LMStudioEnvironment.configuredMCPServers()
+        func pluginRoleDetail(
+            id: String,
+            path: URL,
+            current: Bool
+        ) -> String {
+            if current {
+                return "Current build \(Self.version) (build \(Self.buildVersion)) → \(mcpBinary.path)"
+            }
+            if let registration = registrations.first(where: { $0.id == id }) {
+                let artifactState = FileManager.default.fileExists(atPath: path.path)
+                    ? "Plugin files are present" : "Plugin files are missing"
+                return "\(artifactState), but the registration targets \(registration.command) instead of the current build at \(mcpBinary.path). Choose Deploy current build."
+            }
+            if FileManager.default.fileExists(atPath: path.path) {
+                return "Plugin files are present at \(path.path), but LM Studio registration is missing or invalid. Choose Deploy current build."
+            }
+            return "Not deployed at \(path.path). Deploy current build installs this role."
+        }
+        check(
+            "lm_studio_primary_plugin",
+            plug.primaryPluginInstalled,
+            pluginRoleDetail(
+                id: LMStudioEnvironment.primaryServerID,
+                path: LMStudioMCPPluginInstaller.primaryPluginDirectory,
+                current: plug.primaryPluginInstalled
+            ),
+            hard: false
+        )
+        check(
+            "lm_studio_fallback_plugin",
+            plug.fallbackPluginInstalled,
+            pluginRoleDetail(
+                id: LMStudioEnvironment.fallbackServerID,
+                path: LMStudioMCPPluginInstaller.fallbackPluginDirectory,
+                current: plug.fallbackPluginInstalled
+            ),
+            hard: false
+        )
+        let cluCurrent = plug.continuityPluginInstalled == true
+        check(
+            "lm_studio_clu_plugin",
+            cluCurrent,
+            pluginRoleDetail(
+                id: LMStudioEnvironment.continuityServerID,
+                path: LMStudioMCPPluginInstaller.continuityPluginDirectory,
+                current: cluCurrent
+            ),
+            hard: false
+        )
         check("lm_studio_mcp_plugin", plug.isFullyInstalled, plug.detail, hard: false)
 
         return DoctorReport(
             ok: ok,
             version: Self.version,
+            buildVersion: Self.buildVersion,
             home: paths.home.path,
             checks: checks,
             telemetry: tel,

@@ -12,6 +12,7 @@ struct ManagerSettingsView: View {
     @EnvironmentObject private var model: AppModel
     @State private var doctorJSON = ""
     @State private var doctorOK: Bool?
+    @State private var doctorNeedsPluginRepair = false
 
     var body: some View {
         Form {
@@ -311,12 +312,16 @@ struct ManagerSettingsView: View {
                 Button("Prune idle sessions") { model.pruneSessions() }
                 Button("Run doctor") {
                     if let d = model.runDoctor() {
-                        doctorOK = d.ok
+                        let healthy = d.ok && d.checks.allSatisfy(\.ok)
+                        doctorOK = healthy
+                        doctorNeedsPluginRepair = d.checks.contains {
+                            $0.name.hasPrefix("lm_studio_") && !$0.ok
+                        }
                         let lines = d.checks.map { c in
                             "\(c.ok ? "OK" : "FAIL")  \(c.name): \(c.detail)"
                         }
                         doctorJSON = ([
-                            "ok=\(d.ok)  version=\(d.version)",
+                            "state=\(healthy ? "healthy" : "attention")  version=\(d.version)  build=\(d.buildVersion)",
                             "home=\(d.home)",
                             "binary=\(d.binaryInstalled ? "yes" : "no")  \(d.binaryPath)",
                             "telemetry=\(d.telemetry.runtime)",
@@ -325,6 +330,7 @@ struct ManagerSettingsView: View {
                     } else {
                         doctorJSON = "doctor failed"
                         doctorOK = false
+                        doctorNeedsPluginRepair = false
                     }
                 }
             }
@@ -338,6 +344,13 @@ struct ManagerSettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(minHeight: 160)
+                    if doctorNeedsPluginRepair {
+                        Button("Deploy current build to LM Studio") {
+                            model.deployToLMStudio()
+                        }
+                        .disabled(model.isInstallingPlugin)
+                        .accessibilityIdentifier("doctor-deploy-current-build")
+                    }
                 }
             }
 

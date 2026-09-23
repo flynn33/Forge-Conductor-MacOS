@@ -11,6 +11,11 @@ import ForgeConductorCore
 /// Display updates continuously from the realtime metrics engine (not a 2s snapshot).
 struct RigDashboardView: View {
     @EnvironmentObject private var model: AppModel
+    private let onOpenGuidedSetup: () -> Void
+
+    init(onOpenGuidedSetup: @escaping () -> Void = {}) {
+        self.onOpenGuidedSetup = onOpenGuidedSetup
+    }
 
     var body: some View {
         // Telemetry publication is the only display clock; static values stay quiescent.
@@ -504,49 +509,79 @@ struct RigDashboardView: View {
     // MARK: Header
 
     private var headerPills: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("FORGE RIG // LM STUDIO")
-                    .font(.system(.title3, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color.cyan)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                    .accessibilityIdentifier("detail-rig")
-                Text("LOCAL MODELS · GPU · DISK · LM STUDIO MCP · LIVE FEED · METAL")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                dashboardTitle
+                guidedSetupButton
+                statusPills
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
-
-            // Fixed-width chip strip: 4×80 + 3×6 spacing = 338pt — never grows with MTKView.
-            HStack(spacing: 6) {
-                MetalStatusPill(
-                    text: "LINK",
-                    tone: model.lastError == nil ? .healthy : .failure,
-                    fraction: 1
-                )
-                MetalStatusPill(
-                    text: "ORCH \(model.orchestration?.healthLabel ?? "—")",
-                    tone: TelemetryHealth.tone(for: model.orchestration?.health),
-                    fraction: model.orchestration?.health == "ok" ? 1 : 0.25
-                )
-                MetalStatusPill(
-                    text: "MCP \(model.mcpServerCards.filter(\.live).count)/\(model.mcpServerCards.count)",
-                    tone: mcpHeaderTone,
-                    fraction: model.mcpServerCards.isEmpty ? 0 : Double(model.mcpServerCards.filter(\.live).count) / Double(model.mcpServerCards.count)
-                )
-                MetalStatusPill(
-                    text: String(format: "LOAD %.0f", model.cpuPercent),
-                    tone: model.cpuPercent < 90 ? .healthy : .caution,
-                    fraction: min(model.cpuPercent / 100, 1)
-                )
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    dashboardTitle
+                    guidedSetupButton
+                }
+                statusPills
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .fixedSize(horizontal: true, vertical: true)
-            .layoutPriority(0)
         }
+    }
+
+    private var dashboardTitle: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("DASHBOARD // LM STUDIO")
+                .font(.system(.title3, design: .rounded).weight(.bold))
+                .foregroundStyle(Color.cyan)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .accessibilityIdentifier("detail-rig")
+            Text("LOCAL MODELS · GPU · DISK · LM STUDIO MCP · LIVE FEED · METAL")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(1)
+    }
+
+    private var guidedSetupButton: some View {
+        Button(action: onOpenGuidedSetup) {
+            Label("Guided Setup", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.cyan.opacity(0.82))
+        .controlSize(.small)
+        .fixedSize()
+        .help("Walk through project setup, launch, monitoring, and recovery")
+        .accessibilityIdentifier("dashboard-guided-setup")
+    }
+
+    private var statusPills: some View {
+        // Fixed-width chip strip: 4×80 + 3×6 spacing = 338pt — never grows with MTKView.
+        HStack(spacing: 6) {
+            MetalStatusPill(
+                text: "LINK",
+                tone: model.lastError == nil ? .healthy : .failure,
+                fraction: 1
+            )
+            MetalStatusPill(
+                text: "ORCH \(model.orchestration?.healthLabel ?? "—")",
+                tone: TelemetryHealth.tone(for: model.orchestration?.health),
+                fraction: model.orchestration?.health == "ok" ? 1 : 0.25
+            )
+            MetalStatusPill(
+                text: "MCP \(model.mcpServerCards.filter(\.live).count)/\(model.mcpServerCards.count)",
+                tone: mcpHeaderTone,
+                fraction: model.mcpServerCards.isEmpty ? 0 : Double(model.mcpServerCards.filter(\.live).count) / Double(model.mcpServerCards.count)
+            )
+            MetalStatusPill(
+                text: String(format: "LOAD %.0f", model.cpuPercent),
+                tone: model.cpuPercent < 90 ? .healthy : .caution,
+                fraction: min(model.cpuPercent / 100, 1)
+            )
+        }
+        .fixedSize(horizontal: true, vertical: true)
+        .layoutPriority(0)
     }
 
     // MARK: Sys strip — Metal bars only

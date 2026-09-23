@@ -94,7 +94,7 @@ public enum LMStudioMCPPluginInstaller {
     /// Product path (v0.5+): prefer the **running app** or installed home app
     /// (`ForgeProcessEntry` → stdio MCP). CLI is fallback when no app is present.
     public static func resolveBinaryURL(preferred: URL? = nil) -> URL {
-        if let preferred, FileManager.default.isExecutableFile(atPath: preferred.path) {
+        if let preferred {
             return preferred.resolvingSymlinksInPath()
         }
         // Prefer running product executable first (Deploy from GUI).
@@ -164,9 +164,9 @@ public enum LMStudioMCPPluginInstaller {
         if !binOK {
             parts.append("Swift binary missing at \(binary.path) — run forge-conductor install")
         }
-        if !primaryOK { parts.append("primary mcpBridge plugin not installed") }
-        if !fallbackOK { parts.append("fallback mcpBridge plugin not installed") }
-        if !continuityOK { parts.append("CLU mcpBridge plugin not installed") }
+        if !primaryOK { parts.append("primary mcpBridge plugin is missing or not bound to this build") }
+        if !fallbackOK { parts.append("fallback mcpBridge plugin is missing or not bound to this build") }
+        if !continuityOK { parts.append("CLU mcpBridge plugin is missing or not bound to this build") }
         if !mcp.ok { parts.append("mcp.json: \(mcp.detail)") }
         if !continuityRegistrationOK { parts.append("CLU registration lacks the matching deployment revision") }
         if parts.isEmpty {

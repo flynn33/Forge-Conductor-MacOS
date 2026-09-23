@@ -199,11 +199,16 @@ public actor NativeValidationPolicyInstaller {
     }
 }
 
-/// The manager's production completion dependency. Each validation loads a
-/// bounded, no-follow policy from its protected namespace; workspace JSON and
-/// model result hashes never register a handler. Definitions are immutable for
+/// The manager's production completion dependency. Automatic gates use compiled
+/// manager-owned validators; explicit custom-native gates load a bounded,
+/// no-follow policy from the protected namespace. Workspace JSON and model
+/// result hashes never register a handler. Custom definitions are immutable for
 /// the activation and rechecked around every native job. Restart revalidates.
 public actor InstalledNativeGateRegistry: RunCompletionValidating {
+    private enum PolicyResolutionError: Error {
+        case gateSetMismatch
+    }
+
     private let repository: ProjectControlPlaneRepository
     private let root: URL
     private let clock: any Clock
@@ -229,41 +234,106 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
               Set(run.specification.completionGates).count == run.specification.completionGates.count else {
             throw AutonomyError.completionValidationFailed
         }
-        guard !stopped, active.count < 4 else {
-            return try blocked(run, summary: "Native validation is stopped or at its concurrency limit")
+        let allGates = run.specification.completionGates
+        guard !stopped else {
+            return try receipt(
+                for: run,
+                orderedResults: blockedResults(
+                    gates: allGates,
+                    summary: "Completion validation is stopped"
+                )
+            )
         }
-        if run.specification.completionGates == [ProjectInstructionQueueStore.builtInCompletionGate] {
-            let result = try await ProjectInstructionCompletionGate.result(
-                run: run,
-                repository: repository
+        let automaticGates = CompletionGateOwnership.automaticGates(in: allGates)
+        let customNativeGates = CompletionGateOwnership.customNativeGates(in: allGates)
+        let automaticResults = try await automaticResults(
+            for: run,
+            gates: automaticGates
+        )
+        guard !customNativeGates.isEmpty else {
+            return try receipt(
+                for: run,
+                orderedResults: automaticResults
             )
-            let validator = CompletionGateValidator(
-                gate: ProjectInstructionQueueStore.builtInCompletionGate,
-                version: 1,
-                operation: { current in
-                    guard current == run else { throw AutonomyError.transitionConflict }
-                    return result
-                }
+        }
+        guard active.count < 4 else {
+            return try receipt(
+                for: run,
+                orderedResults: automaticResults + blockedResults(
+                    gates: customNativeGates,
+                    summary: "Custom native validation is stopped or at its concurrency limit"
+                )
             )
-            return try await GateValidatorRegistry(
-                validators: [validator],
-                clock: clock
-            ).validate(run)
         }
         let activation = UUID()
         active[activation] = []
         do {
-            let registry = try await makeRegistry(for: run, activation: activation)
-            let result = try await registry.validate(run)
+            let registry = try await makeRegistry(
+                for: run,
+                customNativeGates: customNativeGates,
+                activation: activation
+            )
+            let customReceipt = try await registry.validate(run)
+            let customResults = customReceipt.results.filter {
+                customNativeGates.contains($0.gate)
+            }
+            let result = try receipt(
+                for: run,
+                orderedResults: automaticResults + customResults
+            )
             await finish(activation)
             return result
         } catch is CancellationError {
             await finish(activation)
             throw CancellationError()
+        } catch PolicyResolutionError.gateSetMismatch {
+            await finish(activation)
+            return try receipt(
+                for: run,
+                orderedResults: automaticResults + blockedResults(
+                    gates: customNativeGates,
+                    summary: "No matching deterministic validator is registered for the run's custom completion checks",
+                    blocker: .unregisteredValidator
+                )
+            )
         } catch {
             await finish(activation)
-            return try blocked(run, summary: "Installed native validation is unavailable or invalid: \(error.localizedDescription.prefix(1_500))")
+            return try receipt(
+                for: run,
+                orderedResults: automaticResults + blockedResults(
+                    gates: customNativeGates,
+                    summary: "Custom native validation is unavailable or invalid: \(error.localizedDescription.prefix(1_500))"
+                )
+            )
         }
+    }
+
+    private func automaticResults(
+        for run: AutonomousRunRecord,
+        gates: [String]
+    ) async throws -> [CompletionGateResult] {
+        guard !gates.isEmpty else { return [] }
+        let aggregate = try await ProjectInstructionCompletionGate.result(
+            run: run,
+            repository: repository
+        )
+        let validators = gates.map { gate in
+            CompletionGateValidator(gate: gate, version: 1) { current in
+                guard current == run else { throw AutonomyError.transitionConflict }
+                return CompletionGateResult(
+                    gate: gate,
+                    passed: aggregate.passed,
+                    summary: aggregate.summary,
+                    evidenceReferences: aggregate.evidenceReferences,
+                    blocker: aggregate.blocker
+                )
+            }
+        }
+        let evaluated = try await GateValidatorRegistry(
+            validators: validators,
+            clock: clock
+        ).validate(run)
+        return evaluated.results.filter { gates.contains($0.gate) }
     }
 
     private func finish(_ activation: UUID) async {
@@ -271,16 +341,45 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
         for executor in executors { await executor.shutdown() }
     }
 
-    private func blocked(_ run: AutonomousRunRecord, summary: String) throws -> CompletionValidationReceipt {
-        try CompletionValidationReceipt.make(
-            runID: run.runID, expectedRevision: run.revision,
-            results: run.specification.completionGates.map {
-                CompletionGateResult(gate: $0, passed: false, summary: summary, blocker: .unavailableEnvironment)
-            }, validatedAt: ISO8601.string(from: clock.now())
+    private func blockedResults(
+        gates: [String],
+        summary: String,
+        blocker: CompletionGateBlocker = .unavailableEnvironment
+    ) -> [CompletionGateResult] {
+        gates.map {
+            CompletionGateResult(
+                gate: $0,
+                passed: false,
+                summary: summary,
+                blocker: blocker
+            )
+        }
+    }
+
+    private func receipt(
+        for run: AutonomousRunRecord,
+        orderedResults results: [CompletionGateResult]
+    ) throws -> CompletionValidationReceipt {
+        let byGate = Dictionary(uniqueKeysWithValues: results.map { ($0.gate, $0) })
+        let ordered = try run.specification.completionGates.map { gate in
+            guard let result = byGate[gate] else {
+                throw AutonomyError.completionValidationFailed
+            }
+            return result
+        }
+        return try CompletionValidationReceipt.make(
+            runID: run.runID,
+            expectedRevision: run.revision,
+            results: ordered,
+            validatedAt: ISO8601.string(from: clock.now())
         )
     }
 
-    private func makeRegistry(for run: AutonomousRunRecord, activation: UUID) async throws -> GateValidatorRegistry {
+    private func makeRegistry(
+        for run: AutonomousRunRecord,
+        customNativeGates: [String],
+        activation: UUID
+    ) async throws -> GateValidatorRegistry {
         let relativePolicy = "policies/\(run.runID.description).json"
         let policySnapshotter = try QualificationInputSnapshotter(root: root, inputs: [relativePolicy],
                                                                  maximumBytes: 256 * 1_024, maximumFiles: 1,
@@ -297,6 +396,12 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
         }
         let policy = try JSONDecoder().decode(InstalledNativeGatePolicy.self, from: data)
         try policy.validate(for: run)
+        let policyGateIDs = Set(policy.gates.map(\.id))
+        let customGateIDs = Set(customNativeGates)
+        let legacyFullGateIDs = Set(run.specification.completionGates)
+        guard policyGateIDs == customGateIDs || policyGateIDs == legacyFullGateIDs else {
+            throw PolicyResolutionError.gateSetMismatch
+        }
         guard let project = try await repository.project(run.projectID),
               project.generation == run.projectGeneration,
               try await repository.autonomousRun(run.runID) == run else {
@@ -305,7 +410,7 @@ public actor InstalledNativeGateRegistry: RunCompletionValidating {
         let source = try QualificationInputSnapshotter(root: project.canonicalRoot, inputs: policy.sourceInputs)
         let policyDigest = file.sha256
         var validators: [CompletionGateValidator] = []
-        for definition in policy.gates {
+        for definition in policy.gates where customGateIDs.contains(definition.id) {
             try Task.checkCancellation()
             guard !stopped else { throw AutonomyError.shutdown }
             let capture: NativeXCTestGateHandler.InputCapture = { current in

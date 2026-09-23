@@ -1,7 +1,9 @@
 # Documentation guide
 
 Start with the shortest document that answers the question. Historical evidence
-is retained for auditability, but it is not current operating guidance.
+is retained for auditability, but it is not current operating guidance. Current
+operating documents describe repository identity **0.13.0, build 5** unless a
+source-bound historical receipt says otherwise.
 
 ## Use and setup
 
@@ -9,10 +11,10 @@ is retained for auditability, but it is not current operating guidance.
 | --- | --- |
 | [User guide](../USER-GUIDE.md) | Install, configure, and operate Forge Conductor |
 | [Xcode guide](../XCODE.md) | Build, test, archive, sign, and inspect the native app |
-| [Guided Mode](GUIDED-MODE.md) | Use contextual offline help for views, sheets, and current state |
-| [LM Studio connection](LM-STUDIO-CONNECTION.md) | Deploy and diagnose the LM Studio MCP connection |
+| [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow the ordered project-run wizard or open contextual offline help |
+| [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect the managed provider; deploy, inspect, and repair LM Studio MCP roles |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Queue ordered project work |
-| [Native completion](NATIVE-COMPLETION.md) | Configure protected completion gates |
+| [Native completion](NATIVE-COMPLETION.md) | Distinguish automatic checks from explicit custom native gates |
 | [Automation and usability remediation](AUTOMATION-USABILITY-REMEDIATION.md) | Track the revision-2 minimal-input remediation and its evidence |
 
 ## Architecture and contracts
@@ -20,6 +22,7 @@ is retained for auditability, but it is not current operating guidance.
 | Document | Purpose |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | Product boundaries, ownership, persistence, and trust |
+| [Dashboard parity and layout](RIG-PARITY.md) | Current Dashboard monitoring, compact Managed Activity, and responsive layout contract |
 | [Rune Forge and Stjornarvald](STJORNARVALD.md) | Pinned policy binding, durable log, all-format catalog, Raven rules, manager lifecycle/API, managed/MCP notice delivery, non-interference boundary, realization map, and delivered state |
 | [Rune Forge acceptance](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) | Every issued acceptance row, integrated evidence, and the remaining physical VoiceOver limit |
 | [Rune Forge handoff](RUNE-FORGE-STJORNARVALD-HANDOFF.md) | Repository, policy, behavior, verification, version, candidate, and open-matter handoff |
@@ -44,6 +47,6 @@ is retained for auditability, but it is not current operating guidance.
 ## Historical records
 
 Files whose names begin with `AUDIT-`, `BUILD-BASELINE`, `COHERENT-RESUME`,
-`EDIT-BUILD-TOOL-PATH`, `G1-`, `RELEASE-`, or `RIG-PARITY` are retained as
+`EDIT-BUILD-TOOL-PATH`, `G1-`, or `RELEASE-` are retained as
 evidence for the version and date named in the file. They do not override the
 README, roadmap, qualification status, or current implementation.

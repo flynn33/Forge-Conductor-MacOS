@@ -131,10 +131,9 @@ public enum AutomaticCompletionPlanResolver {
                      evidence: .preparedSource,
                      reason: CompletionCheckPreset.instructionPackagesComplete.detail)
 
-        let customGates = input.completionGates.filter {
-            $0 != ProjectInstructionQueueStore.builtInCompletionGate
-                && CompletionCheckPreset(rawValue: $0) == nil
-        }
+        let customGates = CompletionGateOwnership.customNativeGates(
+            in: input.completionGates
+        )
         for gate in customGates {
             let suffix = String(JSONSupport.sha256Hex(gate).prefix(16))
             obligations.append(CompletionObligation(

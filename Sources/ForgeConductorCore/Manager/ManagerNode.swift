@@ -2406,7 +2406,32 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     )
                 )
             }
-            let inventory = try providerModels()
+            var inventory: ProviderModelInventory
+            do {
+                inventory = try providerModels()
+            } catch ProviderConfigurationError.offline {
+                let recovery = try performProviderConfiguration(timeoutSeconds: 30) { service in
+                    try await service.recoverConnection()
+                }
+                let observed = try readProviderConfiguration()
+                guard recovery.inventory.revision == observed.revision else {
+                    throw ProviderConfigurationError.revisionConflict
+                }
+                configuration = observed
+                if recovery.endpoint != configuration.endpoint {
+                    configuration = try updateProviderConfiguration(
+                        ProviderConfigurationUpdate(
+                            expectedRevision: configuration.revision,
+                            endpoint: recovery.endpoint,
+                            modelKey: configuration.modelKey
+                        )
+                    )
+                }
+                inventory = ProviderModelInventory(
+                    revision: configuration.revision,
+                    models: recovery.inventory.models
+                )
+            }
             guard inventory.revision == configuration.revision else {
                 throw ProviderConfigurationError.revisionConflict
             }
@@ -2440,7 +2465,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 return ManagerProviderPreparationResult(
                     state: .actionRequired,
                     recoveryAction: .retry,
-                    detail: "Provider settings changed during preparation. Run Connect and check again.",
+                    detail: "Provider settings changed during preparation. Choose Connect and Check again.",
                     configuration: current
                 )
             }
@@ -2456,7 +2481,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 return ManagerProviderPreparationResult(
                     state: .actionRequired,
                     recoveryAction: .retry,
-                    detail: "Provider readiness was verified but its durable receipt could not be saved. Retry Connect and check.",
+                    detail: "Provider readiness was verified but its durable receipt could not be saved. Retry Connect and Check.",
                     configuration: current,
                     provider: provider
                 )
@@ -2530,6 +2555,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func performProviderConfiguration<Value: Sendable>(
+        timeoutSeconds: TimeInterval = 20,
         _ operation: @escaping @Sendable (any ProviderConfigurationServicing) async throws -> Value
     ) throws -> Value {
         lock.lock()
@@ -2554,7 +2580,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         lock.lock(); providerConfigurationService = service; lock.unlock()
         // Admission is released by actual task completion, even after a deadline.
         // A cancelled request can never overlap a subsequent settings transaction.
-        return try Self.waitForAsync(timeoutSeconds: 20) {
+        return try Self.waitForAsync(timeoutSeconds: timeoutSeconds) {
             defer { self.finishProviderConfiguration() }
             return try await operation(service)
         }
@@ -4289,13 +4315,23 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     .retryAutomatically
                 )
             case .failed:
+                let failureDetail = operatorSummary(
+                    continuity.command.lastErrorSummary,
+                    maximumCharacters: 512
+                ) ?? "The last continuity operation failed before Forge could confirm protected progress."
+                let failureContext = failureDetail.lowercased()
+                if failureContext.contains("provider") || failureContext.contains("lm studio") {
+                    return (
+                        .blocked,
+                        failureDetail,
+                        "Open Provider and choose Connect and Check, then return to Continuity. The saved task state is retained.",
+                        .reviewProvider
+                    )
+                }
                 return (
                     .blocked,
-                    operatorSummary(
-                        continuity.command.lastErrorSummary,
-                        maximumCharacters: 512
-                    ) ?? "Automatic continuity needs attention.",
-                    "Review the current task and provider before retrying continuity.",
+                    failureDetail,
+                    "Open Autonomy to review the task's recorded failure and retry or resume it. Continuity retains the saved task state.",
                     .reviewRun
                 )
             case .completed:
@@ -4347,11 +4383,32 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 .reviewProvider
             )
         case .blockedConfiguration, .failedRecoverable, .waitingResource, .retryWait:
+            let detail = operatorSummary(run.lastErrorSummary, maximumCharacters: 512)
+                ?? "The task is protected, but its current requirement has not been satisfied."
+            let errorContext = [run.lastErrorCode, run.lastErrorSummary]
+                .compactMap { $0 }
+                .joined(separator: " ")
+                .lowercased()
+            if run.lastErrorCode == AutonomyError.completionValidationFailed.code {
+                return (
+                    .blocked,
+                    detail,
+                    "Open Autonomy and follow the named completion check's recovery action, then retry.",
+                    .reviewRun
+                )
+            }
+            if errorContext.contains("provider") || errorContext.contains("lm studio") {
+                return (
+                    .blocked,
+                    detail,
+                    "Open Provider and choose Connect and Check; Forge will retain this task while the connection is repaired.",
+                    .reviewProvider
+                )
+            }
             return (
                 .blocked,
-                operatorSummary(run.lastErrorSummary, maximumCharacters: 512)
-                    ?? "The task is protected, but automatic continuity cannot advance yet.",
-                "Resolve the task's reported dependency; Forge retains its durable state.",
+                detail,
+                "Open Autonomy for the exact run condition and available recovery action; Forge retains durable task state.",
                 .reviewRun
             )
         case .created, .validating, .ready, .starting, .running, .paused,

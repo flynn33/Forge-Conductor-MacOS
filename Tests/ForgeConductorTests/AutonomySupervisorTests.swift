@@ -1426,6 +1426,75 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testManagerOwnedCompletionGatesValidateWithoutInstalledNativePolicy() async throws {
+        try await withRepository { repository, root in
+            let gates = [
+                ProjectInstructionQueueStore.builtInCompletionGate,
+                CompletionCheckPreset.noUnresolvedOperations.rawValue,
+            ]
+            let fixture = try await makeAutomaticCompletionRun(
+                repository: repository,
+                root: root,
+                completionGates: gates
+            )
+            XCTAssertFalse(FileManager.default.fileExists(
+                atPath: fixture.paths.nativeValidationDir
+                    .appendingPathComponent("policies/\(fixture.run.runID.description).json")
+                    .path
+            ))
+
+            let registry = InstalledNativeGateRegistry(
+                repository: repository,
+                paths: fixture.paths
+            )
+            let receipt = try await registry.validate(fixture.run)
+
+            XCTAssertTrue(receipt.passed)
+            XCTAssertTrue(receipt.hasValidProof())
+            XCTAssertEqual(receipt.results.map(\.gate), gates)
+            XCTAssertTrue(receipt.results.allSatisfy(\.passed))
+            XCTAssertTrue(receipt.results.allSatisfy { $0.blocker == nil })
+            XCTAssertTrue(receipt.results.allSatisfy {
+                !$0.summary.localizedCaseInsensitiveContains("native policy")
+            })
+            await registry.shutdown()
+        }
+    }
+
+    func testOnlyExplicitCustomGateRequiresInstalledNativePolicy() async throws {
+        try await withRepository { repository, root in
+            let automaticGates = [
+                ProjectInstructionQueueStore.builtInCompletionGate,
+                CompletionCheckPreset.noUnresolvedOperations.rawValue,
+            ]
+            let customGate = "owner.release-qualification"
+            let gates = automaticGates + [customGate]
+            let fixture = try await makeAutomaticCompletionRun(
+                repository: repository,
+                root: root,
+                completionGates: gates
+            )
+            let registry = InstalledNativeGateRegistry(
+                repository: repository,
+                paths: fixture.paths
+            )
+
+            let receipt = try await registry.validate(fixture.run)
+
+            XCTAssertFalse(receipt.passed)
+            XCTAssertEqual(receipt.results.map(\.gate), gates)
+            XCTAssertTrue(receipt.results.prefix(automaticGates.count).allSatisfy(\.passed))
+            let custom = try XCTUnwrap(receipt.results.last)
+            XCTAssertEqual(custom.gate, customGate)
+            XCTAssertFalse(custom.passed)
+            XCTAssertEqual(custom.blocker, .unavailableEnvironment)
+            XCTAssertTrue(custom.summary.contains("Custom native validation"))
+            XCTAssertEqual(CompletionGateOwnership.automaticGates(in: gates), automaticGates)
+            XCTAssertEqual(CompletionGateOwnership.customNativeGates(in: gates), [customGate])
+            await registry.shutdown()
+        }
+    }
+
     func testNativeGateHandlerRequiresCurrentJobInputsAndSemanticResults() async throws {
         try await withRepository { repository, root in
             let fixture = try await makeRun(repository: repository, root: root)
@@ -1487,6 +1556,12 @@ final class AutonomySupervisorTests: XCTestCase {
                     XCTAssertEqual(receipt.results.first?.invocation?.gateVersion, 3)
                     XCTAssertEqual(receipt.results.first?.nativeEvidence?.testReport.cases.count, 1)
                 } else {
+                    if scenario == "policy" || scenario == "environment" {
+                        let summary = try XCTUnwrap(receipt.results.first?.summary)
+                        XCTAssertTrue(summary.contains("Custom gate tests"), scenario)
+                        XCTAssertTrue(summary.contains("Re-import"), scenario)
+                        XCTAssertFalse(summary.contains("restore"), scenario)
+                    }
                     await assertAutonomyError(code: "completion_validation_failed") {
                         try await repository.recordTrustedCompletionValidation(receipt, for: run, lease: lease)
                     }
@@ -2389,6 +2464,72 @@ final class AutonomySupervisorTests: XCTestCase {
             renewalInterval: 5,
             maximumDuration: 300
         ))
+    }
+
+    private func makeAutomaticCompletionRun(
+        repository: ProjectControlPlaneRepository,
+        root: URL,
+        completionGates: [String]
+    ) async throws -> (run: AutonomousRunRecord, paths: AppPaths) {
+        let projectID = ProjectID()
+        let projectRoot = root.appendingPathComponent("automatic-completion-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try await repository.registerProjectUnchecked(
+            projectID: projectID,
+            displayName: "Automatic Completion Fixture",
+            canonicalRoot: projectRoot
+        )
+        let sourceSHA256 = String(repeating: "a", count: 64)
+        let plan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: projectID,
+            projectGeneration: .initial,
+            projectRoot: projectRoot,
+            instructionArtifactSHA256: [sourceSHA256],
+            instructionText: "Update the selected project according to its instructions.",
+            documentCount: 1,
+            completionGates: completionGates
+        ))
+        let work = AutonomousRunWork(metadata: [
+            "source_snapshot_sha256": sourceSHA256,
+            "completion_plan_id": plan.planID.uuidString.lowercased(),
+            "completion_plan_revision": String(plan.revision),
+        ])
+        let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Complete the automatic validation fixture",
+            providerID: "lmstudio",
+            modelKey: "fixture-model",
+            specification: AutonomousRunSpecification(
+                allowedTools: ["fixture.read"],
+                completionGates: completionGates,
+                completionPlan: plan,
+                work: work
+            ),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [projectRoot],
+                allowedTools: ["fixture.read"],
+                networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+        ))
+        let leasePolicy = RunLeasePolicy(duration: 30, renewalInterval: 5, maximumDuration: 300)
+        let lease = try await repository.acquireRunLease(
+            runID: run.runID,
+            ownerID: "automatic-completion-fixture",
+            policy: leasePolicy
+        )
+        var validating = run
+        for state in [AutonomousRunState.validating, .ready, .starting, .running, .validatingCompletion] {
+            validating = try await repository.transitionAutonomousRun(
+                runID: validating.runID,
+                lease: lease,
+                transition: transition(validating, to: state)
+            )
+        }
+        let paths = AppPaths(home: root.appendingPathComponent("automatic-completion-home"))
+        try paths.ensureLayout()
+        return (validating, paths)
     }
 
     private func transition(

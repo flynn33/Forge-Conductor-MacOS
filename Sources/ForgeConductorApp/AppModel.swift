@@ -902,6 +902,13 @@ public final class AppModel: ObservableObject {
 
         public var id: String { rawValue }
 
+        /// User-facing navigation title. `rawValue` remains unchanged so saved
+        /// state and automation that identify the historical rig tab stay
+        /// compatible while the product presents it as the Dashboard.
+        public var displayName: String {
+            self == .rig ? "Dashboard" : rawValue
+        }
+
         public var accessibilityID: String {
             switch self {
             case .rig: return "rig"
