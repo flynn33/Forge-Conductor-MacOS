@@ -507,7 +507,11 @@ Forge layouts use the same adaptive sizing discipline.
   compact and equal-height, and the populated Rune Forge Policy Feed rendered
   its exact scoped content. Both SwiftPM products, the canonical Apple
   Development-signed Debug app build, and project-local signed smoke-bundle
-  staging passed. Publication remains separate.
+  staging passed. Implementation `2319db359f28fba9cf350694ff8f66a7ecc70491`,
+  tree `ff12dde3fe7ab27f741dd114143bd31afd20ed98`, was pushed directly to `main`;
+  fetch and exact local/remote readback showed zero divergence. The working
+  installation was not replaced, and installed/shipment qualification remains
+  separate.
 - Phase 7 combined verification passed the full SwiftPM suite with 1,623 tests,
   12 explicit environment/runtime skips, and zero failures. Focused provider
   resolution, managed autonomy, budget policy, runtime discovery, forced
