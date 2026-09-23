@@ -17,6 +17,12 @@ Product versions do not by themselves claim shipment.
   changes are recorded in the development section below; no distribution or
   shipment is claimed.
 
+### Fixed
+
+- Fixed Swift 6 strict-concurrency diagnostics in desktop MCP tool-description
+  construction and the Provider activation binding without changing the MCP
+  schema, provider-selection behavior, or Xcode target membership.
+
 ## [0.14.0] — 2026-09-23 (development)
 
 ### Added

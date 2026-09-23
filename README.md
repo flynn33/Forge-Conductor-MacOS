@@ -18,6 +18,11 @@ supported desktop coding hosts.
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
+Current source also removes the two Swift 6 strict-concurrency diagnostics
+formerly emitted by the desktop MCP descriptor and Provider activation
+binding. Provider schema and toggle behavior, canonical Xcode target
+membership, and the `0.14.0 (6)` identity are unchanged.
+
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
 provider/runtime preparation, durable continuity, and large instruction

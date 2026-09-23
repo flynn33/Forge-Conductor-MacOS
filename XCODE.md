@@ -74,6 +74,13 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
+The `0.14.0 (6)` warning repair keeps the canonical graph unchanged. The
+existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
+descriptor per catalog request, and the existing `ProviderOperatorView.swift`
+member declares the toggle callback `@MainActor @Sendable`. A fresh Debug
+workspace build must compile both without the prior shared `[String: Any]`
+static-state and non-Sendable callback diagnostics.
+
 Both commands above are headless. `ForgeConductorAppTests` is a dedicated,
 nonparallel app-hosted scheme with an isolated Forge home; it validates app/core
 contracts without changing the main scheme. The `ForgeConductorUITests` target launches and
