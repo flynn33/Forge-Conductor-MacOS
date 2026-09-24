@@ -12,6 +12,18 @@ Every direct update records its affected row with evidence and limitation. Histo
 
 ## Phases and milestones
 
+September 24 publication checkpoint for N-OPERABILITY-PATCH-0141: the 0.14.2 (8)
+repair is published at `29f17f57a1fd70deaaf98a645512658bcd8da440`, tested source tree
+`11439d8623a4511e652932eec811030de73129d1`. The wiki is published at
+`487fe04566afe282f9246c5a1e55af8e72cbc450`. Both were authored using the owner's
+configured identity. GitHub accepted the source update through the authorized
+admin bypass; no repository protections were changed. Canonical local `main`
+and remote `main` matched at that checkpoint, as did local/remote wiki `master`.
+The former Downloads copy was absent and was not recreated. This documentation
+closeout changes no tested build inputs or Xcode graph. The working installation
+and owner project data remain untouched; live-run and distribution limits above
+remain open.
+
 | Phase | Milestone / assigned slice | Audit status | Acceptance and current evidence |
 |---|---|---|---|
 | NATIVE | N-OPERABILITY-PATCH-0141 / reported-run follow-up | 0.14.2 (8) source update; live-run acceptance open | E0: installed 0.14.1 showed 44 completion-request/rejection pairs in approximately ten minutes, no completed-tool activity in that interval, and zero instruction totals. The policy store had 107 evaluations and no violation events. A prompt regression reproduced four missing retrieval assertions. Repairs identify snapshot retrieval, preserve unread totals, bound identical-evidence completion retries across activations, honor pause/stop policies, expose new-task checkboxes, and show actual policy evaluation activity. Versioned Core regression: 125 cases, 123 passed, two explicit native-job environment skips, zero failures (`/tmp/forge-0.14.2-core.log`). Five distinct native UI cases passed across the second/third passes: Dashboard geometry and checkbox interaction, then all-view minimum/normal containment and populated policy rows. The minimum-size run first exposed title-bar clipping, corrected using `contentMinSize`. GPU is below CPU; Storage/Orchestration form a compact column beside wider Managed Activity. Continuity changes were withdrawn by the owner. All changed sources/tests remain canonical Xcode target members; no graph regeneration. Detector coverage is not universal policy enforcement, active task requirements remain read-only, and actual live-model completion is not yet verified. The versioned canonical Xcode build passed without compiler warnings (`/tmp/forge-0.14.2-xcode.log`). Version constants, current guides, wiki, and all Xcode settings align to 0.14.2 (8). Installed app and project data remain untouched; distribution is not claimed. |
