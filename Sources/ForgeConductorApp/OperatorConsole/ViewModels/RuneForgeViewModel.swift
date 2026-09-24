@@ -158,6 +158,7 @@ final class RuneForgeViewModel: ObservableObject {
     @Published private(set) var sources: [RuneForgeSourceItem] = []
     @Published private(set) var violations: [StjornarvaldViolationPageItem] = []
     @Published private(set) var events: [PolicyViolationEvent] = []
+    @Published private(set) var evaluationActivity: [PolicyEvaluationActivity] = []
     @Published private(set) var governingPolicy: GoverningPolicyIdentity?
     @Published private(set) var health: StjornarvaldManagerHealth?
     @Published private(set) var limitations: [String] = []
@@ -239,6 +240,7 @@ final class RuneForgeViewModel: ObservableObject {
                     .prefix(Self.maximumEvents)
             )
             governingPolicy = snapshot.governingPolicy
+            evaluationActivity = Array((snapshot.evaluationActivity ?? []).prefix(Self.maximumEvents))
             health = snapshot.health
             limitations = snapshot.limitations
             errorMessage = snapshot.health.lastError

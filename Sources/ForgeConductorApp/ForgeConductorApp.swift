@@ -138,9 +138,11 @@ private final class ForgeMainWindowController: NSWindowController {
         )
         window.title = "Forge Conductor"
         window.identifier = NSUserInterfaceItemIdentifier("forge-main-window")
-        window.minSize = NSSize(width: 1100, height: 720)
         window.tabbingMode = .disallowed
         window.contentViewController = hostingController
+        // The SwiftUI minimum applies to content, not the outer frame including
+        // title bar and toolbar. Keep AppKit's resize boundary consistent.
+        window.contentMinSize = NSSize(width: 1100, height: 720)
         window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)

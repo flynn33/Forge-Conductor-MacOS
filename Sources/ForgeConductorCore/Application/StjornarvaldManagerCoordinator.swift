@@ -33,6 +33,7 @@ public struct StjornarvaldManagerSnapshot: Codable, Sendable, Equatable {
     public let violationEvents: [PolicyViolationEvent]
     public let nextEventCursor: Int64?
     public let limitations: [String]
+    public var evaluationActivity: [PolicyEvaluationActivity]? = nil
 }
 
 public enum StjornarvaldObservationReceiptState: String, Codable, Sendable {
@@ -437,7 +438,11 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
             limitations: [
                 "Presented notices prove transport, not model comprehension or correction.",
                 "Source bodies and unbounded history are excluded from this snapshot.",
-            ]
+                "Automatic detection currently covers native-stack evidence. Cataloging imported policy text does not mean every rule has an executable detector.",
+            ],
+            evaluationActivity: try observationRepository?.recentEvaluationActivity(
+                limit: limit, projectID: projectID, projectGeneration: projectGeneration
+            )
         )
     }
 

@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.14.1**, build **7**. `VERSION` and
+Product identity: marketing version **0.14.2**, build **8**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -74,7 +74,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.14.1 (7)` build retains the warning repair with the canonical
+The current `0.14.2 (8)` build retains the warning repair with the canonical
 graph unchanged. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
 descriptor per catalog request, and the existing `ProviderOperatorView.swift`
@@ -516,6 +516,15 @@ native-session-host, and test members. No source or resource membership is
 added or removed. The only project-graph edit aligns all 12
 `MARKETING_VERSION` settings to `0.14.1` and all 16
 `CURRENT_PROJECT_VERSION` settings to `7`; the project must not be regenerated.
+
+The September 24 operability follow-up, 0.14.2 (8), also uses existing target members.
+All 12 marketing-version and 16 build-number settings match this identity.
+Its candidate and UI-test products are built in separate temporary DerivedData
+directories, without replacing the installed application. The minimum-window
+repair uses AppKit `contentMinSize` to match SwiftUI's content minimum, so title
+bar/toolbar space cannot shrink the usable view below that minimum. Native UI
+checks cover minimum/normal all-view containment, completion checkbox interaction,
+policy-feed rows, and the widened Dashboard activity layout.
 
 `ProductionOnboardingUITests` is in the native UI target and uses the actual
 folder panel and normal app bootstrap. Current Autonomy coverage verifies the

@@ -256,6 +256,10 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         XCTAssertGreaterThanOrEqual(fixture.policySnapshotRequestCount, 1)
         XCTAssertGreaterThanOrEqual(fixture.policyViolationRequestCount, 1)
+        feed.swipeUp()
+        let evaluation = app.descendants(matching: .any)["rune-policy-evaluation-fixture-evaluation"]
+        XCTAssertTrue(evaluation.waitForExistence(timeout: 5))
+        XCTAssertTrue(evaluation.staticTexts["Fixture observation evaluated without a finding."].exists)
     }
 
     func testRefreshToolbarExists() throws {
@@ -847,6 +851,13 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(waitUntil(timeout: 5) {
             fixture.activityRequestCount > 0 && fixture.scopedPolicySnapshotRequestCount > 0
         })
+        let cpu = app.descendants(matching: .any)["rig-cpu-cores-panel"]
+        let gpu = app.descendants(matching: .any)["rig-gpu-cores-panel"]
+        XCTAssertTrue(cpu.exists)
+        XCTAssertTrue(gpu.exists)
+        XCTAssertGreaterThan(gpu.frame.minY, cpu.frame.maxY)
+        XCTAssertEqual(gpu.frame.minX, cpu.frame.minX, accuracy: 2)
+        XCTAssertEqual(gpu.frame.width, cpu.frame.width, accuracy: 2)
 
         let rootScroll = try XCTUnwrap(
             largestScrollView(),
@@ -867,13 +878,17 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Managed Activity must be visible beside Storage"
         )
         XCTAssertEqual(storage.frame.minY, activity.frame.minY, accuracy: 2)
-        XCTAssertEqual(storage.frame.height, activity.frame.height, accuracy: 2)
         XCTAssertLessThan(storage.frame.maxX, activity.frame.minX)
-        XCTAssertLessThanOrEqual(
+        XCTAssertGreaterThan(
             activity.frame.width,
-            storage.frame.width * 1.10,
-            "Managed Activity must remain a compact peer of Storage"
+            storage.frame.width * 1.30,
+            "Managed Activity must use the width recovered from compact Storage and Orchestration"
         )
+        let orchestration = app.descendants(matching: .any)["rig-orchestration-panel"]
+        XCTAssertTrue(orchestration.exists)
+        XCTAssertEqual(orchestration.frame.width, storage.frame.width, accuracy: 2)
+        XCTAssertEqual(orchestration.frame.minX, storage.frame.minX, accuracy: 2)
+        XCTAssertGreaterThan(orchestration.frame.minY, storage.frame.maxY)
 
         XCTAssertTrue(app.staticTexts["CURRENT PACKAGE · No active instruction package"].exists)
         XCTAssertTrue(app.staticTexts["ACTIVE MANAGED RUN · RUNNING"].exists)
@@ -1827,6 +1842,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let completionChecks = app.checkBoxes["run-completion-view"]
         XCTAssertTrue(completionChecks.waitForExistence(timeout: 5))
         makeHittable(completionChecks)
+        XCTAssertTrue(waitForCheckboxState(.on, on: completionChecks),
+                      "Completion options must be visible when setup opens")
+        completionChecks.click()
         XCTAssertTrue(waitForCheckboxState(.off, on: completionChecks))
         completionChecks.click()
         XCTAssertTrue(
@@ -3327,6 +3345,13 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "noticeState": "pending",
                 "eventSHA256": String(repeating: "e", count: 64),
                 "developmentContinues": true,
+            ]],
+            "evaluationActivity": [[
+                "id": "fixture-evaluation",
+                "summary": "Fixture observation evaluated without a finding.",
+                "evaluatedAt": "2026-09-24T11:00:00Z",
+                "findingCount": 0,
+                "detectorFaultCount": 0,
             ]],
             "limitations": ["Fixture history is intentionally bounded."],
         ]

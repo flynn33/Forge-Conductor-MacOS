@@ -103,7 +103,8 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
             modelKey: "fixture-model",
             specification: AutonomousRunSpecification(
                 allowedTools: ["fixture.read"],
-                completionGates: ["tests"]
+                completionGates: ["tests"],
+                work: .init(metadata: ["source_snapshot_sha256": String(repeating: "a", count: 64)])
             ),
             authorizationScope: ToolAuthorizationScope(
                 canonicalRoots: [projectRoot],
@@ -112,6 +113,11 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
                 maximumInlineOutputBytes: 64 * 1_024
             )
         ))
+        let prompt = ManagedProjectRunStepExecutor.rootOrContinuationPrompt(for: run)
+        XCTAssertTrue(prompt.contains("instruction_catalog"))
+        XCTAssertTrue(prompt.contains("instruction_read"))
+        XCTAssertTrue(prompt.contains(String(repeating: "a", count: 64)))
+        XCTAssertTrue(prompt.contains("next_byte_offset"))
         let provider = ManagedStepFixtureProvider()
         let toolExecutor = ManagedStepToolExecutor()
         let observationRecorder = ManagedStepObservationRecorder()

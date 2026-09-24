@@ -3,6 +3,28 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class StjornarvaldManagerCoordinatorTests: XCTestCase {
+    func testEvaluationFeedShowsActivityWithoutInventingViolations() async throws {
+        let fixture = try CoordinatorFixture()
+        defer { fixture.cleanup() }
+        let repository = try StjornarvaldObservationRepository(paths: fixture.paths)
+        let observation = StjornarvaldProductObservationFactory.managerStarted(observedAt: Date())
+        _ = try repository.submit(observation)
+        let coordinator = StjornarvaldManagerCoordinator(paths: fixture.paths)
+        coordinator.start()
+        defer { coordinator.stop() }
+        try await waitUntil { coordinator.health().lastCommittedCursor == 1 }
+        let snapshot = try coordinator.snapshot()
+        XCTAssertTrue(snapshot.violationEvents.isEmpty)
+        XCTAssertEqual(snapshot.evaluationActivity?.first?.id, observation.id.uuidString.lowercased())
+        XCTAssertEqual(snapshot.evaluationActivity?.first?.findingCount, 0)
+        XCTAssertEqual(snapshot.evaluationActivity?.first?.detectorFaultCount, 0)
+        XCTAssertEqual(snapshot.evaluationActivity?.first?.summary, observation.summary)
+        let decoded = try JSONDecoder().decode(StjornarvaldManagerSnapshot.self,
+                                               from: JSONEncoder().encode(snapshot))
+        XCTAssertEqual(decoded.evaluationActivity, snapshot.evaluationActivity)
+        await coordinator.shutdown()
+    }
+
     func testCoordinatorProcessesDurableObservationStopsAndResumesAfterRestart() async throws {
         let fixture = try CoordinatorFixture()
         defer { fixture.cleanup() }
@@ -17,6 +39,12 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
         coordinator.start()
         try await waitUntil { coordinator.health().lastCommittedCursor == 1 }
         XCTAssertEqual(coordinator.health().processedObservationCount, 1)
+        let activity = try coordinator.snapshot().evaluationActivity
+        XCTAssertEqual(activity?.count, 1)
+        XCTAssertEqual(activity?.first?.summary, fixture.observation(key: "coordinator-first").summary)
+        XCTAssertEqual(activity?.first?.findingCount, 1)
+        XCTAssertEqual(try coordinator.snapshot(newestFirst: true,
+            projectID: "unrelated-project", projectGeneration: 1).evaluationActivity, [])
         coordinator.stop()
         try await waitUntil { coordinator.health().state == .stopped }
 
@@ -515,6 +543,8 @@ final class StjornarvaldManagerCoordinatorTests: XCTestCase {
             projectGeneration: 1
         )
         XCTAssertEqual(scopedSnapshot.violationEvents.map(\.sequence), [3, 2])
+        XCTAssertEqual(scopedSnapshot.evaluationActivity?.count, 2)
+        XCTAssertEqual(scopedSnapshot.evaluationActivity?.map(\.id), newestSnapshot.evaluationActivity?.map(\.id))
         do {
             _ = try await client.stjornarvaldSnapshot(
                 eventCursor: 1,

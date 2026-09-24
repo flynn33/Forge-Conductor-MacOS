@@ -730,6 +730,10 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertTrue(ordered.completionGates.contains("owner.first-qualification"))
         XCTAssertEqual(ordered.asDictionary()["allowed_tools"] as? [String], ordered.allowedTools)
         XCTAssertEqual(ordered.asDictionary()["completion_gates"] as? [String], ordered.completionGates)
+        XCTAssertGreaterThan(try XCTUnwrap(first.documentCount), 0)
+        XCTAssertEqual(first.asDictionary(completedStepCount: 0, totalStepCount: 0)["total_step_count"] as? Int,
+                       first.documentCount,
+                       "An unread artifact must retain its known document count")
 
         let reopened = try ProjectInstructionQueueStore(paths: fixture.paths, clock: fixture.clock)
         let persisted = try reopened.runArtifact(

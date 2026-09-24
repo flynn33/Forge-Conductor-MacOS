@@ -10,9 +10,25 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### 0.14.2 (8) operability repair
+
+- Managed model task prompts now identify instruction snapshots and explicitly
+  direct catalog/document paging before execution. Unread instruction packages
+  retain their known progress totals instead of reporting zero documents.
+- Repeated completion requests with identical validation evidence now obey the
+  saved failure/retry policy. The no-progress count survives activation/restart;
+  exhausted retries preserve the run in a paused state instead of looping.
+- Autonomy opens new-task completion checkboxes expanded and links to that
+  setup from the existing task's read-only evidence record. This does not permit
+  manually marking unproven evidence as passed or changing an active contract.
+- Rune Forge shows bounded durable policy evaluation activity separately from
+  violation events and states the current detector coverage limitation.
+- GPU Cores is below CPU Cores. Compact Storage and Orchestration frames leave
+  additional horizontal space for Managed Activity.
+
 ### Current development line
 
-- Version `0.14.1 (7)` is the current unreleased development identity. Its
+- Version `0.14.2 (8)` is the current unreleased development identity. Its
   guided setup, Autonomy, Continuity, provider-recovery, desktop-integration,
   native UI, and qualification changes are recorded in the development section
   below; no distribution or shipment is claimed.

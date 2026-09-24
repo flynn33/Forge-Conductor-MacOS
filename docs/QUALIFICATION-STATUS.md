@@ -1,6 +1,15 @@
 # Version and qualification status
 
-Product identity: **0.14.1, build 7**, supporting **macOS 26+**. The owner is
+## 0.14.2 reported-run repair
+
+The focused Core pass executed 125 cases: 123 passed, two explicit native-job
+environment skips, zero failures (`/tmp/forge-0.14.2-core.log`). Five distinct
+native UI cases passed before the version-only update: checkbox interaction,
+Dashboard geometry, minimum/normal containment of every primary view, and
+populated policy evaluation rows. Live completion of the reported owner run,
+universal policy enforcement, and distribution qualification remain open.
+
+Product identity: **0.14.2, build 8**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -11,7 +20,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.14.1, build 7**. The root [`VERSION`](../VERSION)
+documentation use version **0.14.2, build 8**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are
@@ -124,7 +133,7 @@ remote `main` were then synchronized at documentation closeout revision
 `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. That closeout changes
 documentation only and leaves that historical native graph unchanged. These
 revisions remain distribution evidence for the source they name; they are not
-the current `0.14.1 (7)` source result.
+the current `0.14.2 (8)` source result.
 
 | Surface | Current result | Boundary |
 |---|---|---|

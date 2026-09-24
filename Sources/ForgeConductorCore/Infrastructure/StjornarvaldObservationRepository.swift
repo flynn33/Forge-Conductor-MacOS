@@ -79,6 +79,15 @@ public struct StjornarvaldEvaluationReceipt: Sendable, Equatable {
     public let controlsExecution: Bool
 }
 
+/// Bounded presentation of actual evaluation activity, distinct from violations.
+public struct PolicyEvaluationActivity: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let summary: String
+    public let evaluatedAt: String
+    public let findingCount: Int
+    public let detectorFaultCount: Int
+}
+
 public enum DevelopmentObservationSubmissionDisposition: Sendable, Equatable {
     case persisted(DevelopmentObservationReceipt)
     case deferred(observationID: UUID)
@@ -376,6 +385,44 @@ public final class StjornarvaldObservationRepository: @unchecked Sendable {
             let step = sqlite3_step(statement)
             if step == SQLITE_DONE { break }
             result.append(try decodeEvaluationReceipt(statement))
+        }
+        return result
+    }
+
+    public func recentEvaluationActivity(
+        limit: Int = 50, projectID: String? = nil, projectGeneration: UInt64? = nil
+    ) throws -> [PolicyEvaluationActivity] {
+        lock.lock()
+        defer { lock.unlock() }
+        let scoped = projectID != nil
+        let statement = try prepareUnlocked(
+            "SELECT e.observation_id,substr(json_extract(o.observation_json,'$.summary'),1,2048)," +
+                "e.evaluated_at,e.finding_count,e.detector_fault_count " +
+                "FROM stj_observation_evaluations e JOIN stj_observations o " +
+                "ON o.sequence=e.observation_sequence " +
+                (scoped ? "WHERE json_extract(o.observation_json,'$.scope.projectID')=? AND json_extract(o.observation_json,'$.scope.projectGeneration')=? " : "") +
+                "ORDER BY e.observation_sequence DESC LIMIT ?;"
+        )
+        defer { sqlite3_finalize(statement) }
+        var values: [SQLiteValue] = []
+        if let projectID {
+            guard let projectGeneration, projectGeneration <= UInt64(Int64.max) else { return [] }
+            values = [.text(projectID), .integer(Int64(projectGeneration))]
+        }
+        values.append(.integer(Int64(min(max(limit, 1), 100))))
+        try bind(values, to: statement)
+        var result: [PolicyEvaluationActivity] = []
+        while true {
+            let step = sqlite3_step(statement)
+            if step == SQLITE_DONE { break }
+            guard step == SQLITE_ROW else {
+                throw StjornarvaldObservationError.sqlite("Unable to read policy evaluation activity")
+            }
+            result.append(PolicyEvaluationActivity(
+                id: text(statement, 0), summary: text(statement, 1), evaluatedAt: text(statement, 2),
+                findingCount: Int(sqlite3_column_int64(statement, 3)),
+                detectorFaultCount: Int(sqlite3_column_int64(statement, 4))
+            ))
         }
         return result
     }

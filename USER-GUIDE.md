@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.14.1**, build **7**. This guide covers the native Forge Conductor
+Version **0.14.2**, build **8**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.1 (7)` is the current development identity. It has not inherited the
+> `0.14.2 (8)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release checks.
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.1 binary:
+Confirm the registered command is a `serve`-capable 0.14.2 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.1
+forge-conductor version    # should print 0.14.2
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.1` and
-`CFBundleVersion` must be `7`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.2` and
+`CFBundleVersion` must be `8`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -289,8 +289,8 @@ is the registered repository, even when the imported instruction file lives
 elsewhere. **Stop Queue** prevents the next package from starting while leaving
 an already admitted run visible in **Autonomy**.
 
-For a direct task, open **Autonomy → Start Task**, select **Show completion
-checks**, and check or clear the premade evidence that fits the work: Buildable
+For a direct task, open **Autonomy → Start Task**. **Show completion checks**
+is expanded initially; check or clear the premade evidence that fits the work: Buildable
 project, No build errors, No build warnings, Available tests pass, Instruction
 packages complete, and No unresolved operations. The native checkboxes are
 selectable before launch. A warning-free check requires complete
@@ -299,6 +299,12 @@ failure** to pause for review, retry automatically up to the chosen bounded
 limit, or stop the task. Optional custom failure instructions are persisted
 with the task and shown to the managed model. Exhausted automatic retries pause
 for operator review.
+
+Repeated completion claims do not count as progress. If validation keeps seeing
+identical evidence, Forge applies the task's failure/retry policy and preserves
+the task when the retry allowance is exhausted. A new evidence result resets
+that consecutive no-progress count. Resume after correcting instruction
+delivery or the named unmet evidence; do not manually mark missing evidence passed.
 
 In **Autonomy**, select a completed, cancelled, or terminally failed task and
 choose **Delete Task…** to remove that one settled run from Forge history.
@@ -328,6 +334,13 @@ updates, corrections, reopenings, and interpretation observations in event
 order, including rule, summary, suggested correction, confidence, delivery
 state, and source locator when available. The feed is a presentation of the
 authoritative policy log, not a second policy store.
+
+The feed also shows recent durable evaluation records: observation summary,
+evaluation time, finding count, and detector-fault count. Zero findings is not
+proof of universal compliance. The current automatic detector covers native-stack
+evidence; importing a policy does not create an executable detector for every rule.
+Older managers without evaluation records remain compatible and show only their
+available violation events.
 
 Use **Add Development Policy…** to choose any one local file or folder. Forge
 does not restrict the picker by file extension or content type. The selection
@@ -628,7 +641,8 @@ persist a second full LM Studio transcript. When Manager data is unavailable,
 the panel labels Manager, instruction, and policy source availability rather
 than presenting retained rows as fresh evidence.
 
-Storage and Managed Activity share one aligned row at normal window widths; the
+GPU Cores appears beneath CPU Cores. Storage and Orchestration use a compact
+left column beside the wider Managed Activity frame at normal window widths; the
 activity list uses a compact internal scroller. At constrained widths the Dashboard
 stacks the frames, preserving readable content instead of clipping it.
 
@@ -737,7 +751,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.1**, build **7**
+Doctor identifies the running source identity as version **0.14.2**, build **8**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally

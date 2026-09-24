@@ -101,7 +101,7 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
             "unresolved_document_count": unresolvedDocumentCount as Any,
             "import_ready": unresolvedDocumentCount.map { $0 == 0 } as Any,
             "completed_step_count": completedStepCount as Any,
-            "total_step_count": totalStepCount ?? documentCount as Any,
+            "total_step_count": totalStepCount.map { max($0, documentCount ?? 0) } ?? documentCount as Any,
             "position": position,
             "state": state.rawValue,
             "run_id": runID?.description as Any,

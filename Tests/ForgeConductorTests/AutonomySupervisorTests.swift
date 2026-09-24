@@ -5,6 +5,53 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class AutonomySupervisorTests: XCTestCase {
+    func testRejectedCompletionHonorsPauseAndStopPolicies() async throws {
+        for behavior in [AutonomousFailureBehavior.pauseForReview, .stopTask] {
+            try await withRepository { repository, root in
+                let fixture = try await makeRun(repository: repository, root: root,
+                    failurePolicy: .init(behavior: behavior))
+                let validator = try GateValidatorRegistry(validators: [
+                    CompletionGateValidator(gate: "tests") { _ in
+                        CompletionGateResult(gate: "tests", passed: false, summary: "Missing evidence")
+                    },
+                ])
+                let coordinator = try ProjectRunCoordinator(
+                    runID: fixture.run.runID, repository: repository, managerID: "completion-policy",
+                    stepExecutor: CompletionRequestStepper(), completionValidator: validator)
+                let result = try await coordinator.runActivation()
+                XCTAssertEqual(result.finalState, behavior == .stopTask ? .failedTerminal : .paused)
+                let retained = try await repository.autonomousRun(fixture.run.runID)
+                XCTAssertEqual(retained?.specification.work.metadata["completion_no_progress_count"], "1")
+                XCTAssertEqual(retained?.specification.work.nextAction?.contains("Resume"), behavior != .stopTask)
+            }
+        }
+    }
+
+    func testRepeatedCompletionWithoutNewEvidenceStopsAcrossActivations() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root,
+                failurePolicy: .init(behavior: .retryAutomatically, maximumRetries: 2))
+            let validator = try GateValidatorRegistry(validators: [
+                CompletionGateValidator(gate: "tests") { _ in
+                    CompletionGateResult(gate: "tests", passed: false,
+                                         summary: "No test execution evidence")
+                },
+            ])
+            for attempt in 1...3 {
+                let coordinator = try ProjectRunCoordinator(
+                    runID: fixture.run.runID, repository: repository, managerID: "no-progress-\(attempt)",
+                    stepExecutor: CompletionRequestStepper(), completionValidator: validator)
+                let result = try await coordinator.runActivation()
+                XCTAssertEqual(result.finalState, attempt < 3 ? .running : .paused)
+            }
+            let retained = try await repository.autonomousRun(fixture.run.runID)
+            XCTAssertEqual(retained?.specification.work.metadata["completion_no_progress_count"], "3")
+            XCTAssertNotNil(retained?.completionRequestJSON)
+            let events = try await repository.autonomyEvents(runID: fixture.run.runID)
+            XCTAssertEqual(events.filter { $0.eventType == "autonomous_completion_no_progress" }.count, 1)
+        }
+    }
+
     func testSourcePermitDefersOrdinaryActivationUntilTheSameCapacityIsReleased() async throws {
         try await withRepository { repository, root in
             let ordinary = try await makeRun(repository: repository, root: root)

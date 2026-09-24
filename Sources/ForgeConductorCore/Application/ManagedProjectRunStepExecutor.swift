@@ -1289,7 +1289,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         ]])
     }
 
-    private static func rootOrContinuationPrompt(for run: AutonomousRunRecord) -> String {
+    static func rootOrContinuationPrompt(for run: AutonomousRunRecord) -> String {
         var lines = [
             "You are executing a Forge Conductor managed autonomous run.",
             "Run: \(run.runID.description)",
@@ -1297,6 +1297,17 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             "Mission: \(run.mission)",
             "Use only the supplied project-bound tools. Do not claim completion without evidence.",
         ]
+        let snapshots = run.specification.completionPlan?.instructionArtifactSHA256
+            ?? run.specification.work.metadata["source_snapshot_sha256"].map { [$0] }
+            ?? []
+        for digest in snapshots.prefix(AutomaticCompletionPlanResolver.maximumInstructionSnapshots) {
+            guard digest.utf8.count == 64,
+                  digest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
+                continue
+            }
+            lines.append("Instruction snapshot: \(digest). Call instruction_catalog with snapshot_sha256=\(digest), cursor=0. Follow next_cursor until every document is listed.")
+            lines.append("Read each document with instruction_read using the same snapshot_sha256 and its document_id. Start at byte_offset=0 and follow next_byte_offset until the complete document is read. These documents contain the actual task; the mission above is only its label. Execute their instructions in order, rather than reporting that no task was supplied.")
+        }
         if let phase = run.specification.work.currentPhase { lines.append("Current phase: \(phase)") }
         if let item = run.specification.work.workItem { lines.append("Work item: \(item)") }
         if let next = run.specification.work.nextAction { lines.append("Next action: \(next)") }

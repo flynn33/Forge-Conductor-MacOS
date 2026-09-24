@@ -11,7 +11,7 @@ struct AutonomyOperatorView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingAdvancedOverrides = false
     @State private var showingToolSelection = false
-    @State private var showingCompletionChecks = false
+    @State private var showingCompletionChecks = true
     private let onOpenProjects: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -205,6 +205,12 @@ struct AutonomyOperatorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("run-completion-requirements-read-only")
+                    Button("Select completion checks for a new task…") {
+                        showingCompletionChecks = true
+                        showingStartSheet = true
+                    }
+                    .disabled(!viewModel.autonomyStarted || viewModel.projects.isEmpty)
+                    .accessibilityIdentifier("run-completion-configure")
                 }
             } label: {
                 HStack {

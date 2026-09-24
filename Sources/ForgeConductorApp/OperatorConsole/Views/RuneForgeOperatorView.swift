@@ -216,10 +216,10 @@ struct RuneForgeOperatorView: View {
 
                 if viewModel.events.isEmpty {
                     ContentUnavailableView(
-                        "No Policy Events",
+                        "No Recorded Violations",
                         systemImage: "checkmark.shield",
                         description: Text(
-                            "Detected violations, corrections, and interpretation observations appear here."
+                            "No violation events are present in the newest snapshot. This is not proof that all policy requirements have passed. Evaluation activity appears below."
                         )
                     )
                     .frame(maxWidth: .infinity, minHeight: 220)
@@ -229,6 +229,23 @@ struct RuneForgeOperatorView: View {
                             policyEventCard(event)
                         }
                     }
+                }
+
+                Text("Policy evaluation activity").font(.headline)
+                ForEach(viewModel.evaluationActivity) { activity in
+                    GroupBox {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(activity.summary).textSelection(.enabled)
+                            Text("\(activity.evaluatedAt) · \(activity.findingCount) findings · \(activity.detectorFaultCount) detector faults")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("rune-policy-evaluation-\(activity.id)")
+                }
+                ForEach(viewModel.limitations, id: \.self) { limitation in
+                    Text(limitation).font(.caption).foregroundStyle(.secondary)
                 }
 
                 Text(

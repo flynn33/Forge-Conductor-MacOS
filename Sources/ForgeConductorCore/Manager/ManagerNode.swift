@@ -2022,7 +2022,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 }
                 let delivery = try await self.app.projectContexts.repository
                     .instructionDeliveryProgress(run: run)
-                let total = delivery.artifacts.compactMap(\.totalDocuments).reduce(0, +)
+                let total = max(
+                    delivery.artifacts.compactMap(\.totalDocuments).reduce(0, +),
+                    package.documentCount ?? 0
+                )
                 let completed = delivery.artifacts.reduce(0) { partial, artifact in
                     partial + artifact.completedDocumentBitmap.reduce(0) {
                         $0 + $1.nonzeroBitCount

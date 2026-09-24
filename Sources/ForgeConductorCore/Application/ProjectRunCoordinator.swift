@@ -836,6 +836,40 @@ public actor ProjectRunCoordinator {
         work.metadata["completion_proof_sha256"] = receipt.proofSHA256
         let failureSummary = Self.completionFailureSummary(receipt)
         work.nextAction = failureSummary
+        // A new model completion claim is not new evidence. Persist the identity
+        // of the actual validation results so restarts cannot reset a spin loop.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let evidenceResults = receipt.results.map {
+            [$0.gate, $0.passed ? "passed" : "failed", $0.summary, $0.blocker?.rawValue ?? ""]
+                + $0.evidenceReferences.sorted()
+        }
+        let evidenceIdentity = JSONSupport.sha256Hex(String(
+            decoding: try encoder.encode(evidenceResults), as: UTF8.self
+        ))
+        let priorCount = min(max(Int(work.metadata["completion_no_progress_count"] ?? "0") ?? 0, 0),
+                             AutonomousFailurePolicy.maximumRetryLimit + 1)
+        let attempts = work.metadata["completion_evidence_identity"] == evidenceIdentity
+            ? priorCount + 1 : 1
+        work.metadata["completion_evidence_identity"] = evidenceIdentity
+        work.metadata["completion_no_progress_count"] = String(attempts)
+        let policy = try run.specification.failurePolicy.validated()
+        let retryLimit = policy.behavior == .retryAutomatically ? policy.maximumRetries : 0
+        if attempts > retryLimit {
+            let recovery = policy.behavior == .stopTask
+                ? "The task stopped according to its failure policy. Start a new task after correcting instruction delivery or the named evidence."
+                : "Resume after correcting instruction delivery or the named evidence; the saved task is preserved."
+            work.nextAction = "No new completion evidence was produced after \(attempts) attempts. \(failureSummary) \(recovery)"
+            return try await transition(
+                run, to: policy.behavior == .stopTask ? .failedTerminal : .paused,
+                lease: protected.lease,
+                event: "autonomous_completion_no_progress",
+                summary: "Stopped repeated completion requests without new evidence",
+                work: work,
+                errorCode: AutonomyError.completionValidationFailed.code,
+                errorSummary: work.nextAction
+            )
+        }
         return try await transition(
             run, to: .running, lease: protected.lease,
             event: "autonomous_completion_rejected",

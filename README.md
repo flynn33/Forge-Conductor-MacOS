@@ -7,14 +7,14 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.1** |
-| **Build** | **7** |
+| **Version** | **0.14.2** |
+| **Build** | **8** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.1 (7)` is the current development identity. It is
+> **Release status:** `0.14.2 (8)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
@@ -22,7 +22,7 @@ Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
 binding. Those warning repairs preserve provider request schemas and canonical
 Xcode target membership; the intentional provider workflow changes are
-described below. The current patch identity is `0.14.1 (7)`.
+described below. The current patch identity is `0.14.2 (8)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
@@ -161,7 +161,7 @@ routes each setup or recovery action to the view that owns it.
    Manager. Optional task label, LM Studio saved-model choice, and network
    authority remain under **Customize**; provider/adapter, raw capability IDs,
    and raw completion-requirement IDs are not configuration inputs.
-   Selecting **Show completion checks** exposes native checkboxes for a buildable
+   **Show completion checks** starts expanded, exposing native checkboxes for a buildable
    project, no build errors, no build warnings, available tests, complete
    instruction delivery, and no unresolved operations. **On failure** selects
    pause-for-review, bounded automatic retry, or terminal stop; an optional
@@ -238,10 +238,16 @@ their preparation is ready and the matching selection revision and verified
 receipt agree. Missing, stale, or non-selectable provider evidence fails closed
 and routes the operator back to **Provider**.
 
-At normal widths, CPU shares a row with GPU and Storage shares an equalized row
-with the compact Managed Activity frame; constrained widths stack those panels
+GPU Cores sits below CPU Cores. At normal widths, Storage and Orchestration
+occupy a compact left column beside the wider Managed Activity frame; constrained widths stack those panels
 vertically. The activity list scrolls internally so it does not lengthen the
 entire Dashboard.
+
+Managed model prompts identify each immutable instruction snapshot and explain
+catalog/document paging, so a package title is not mistaken for the complete task.
+Unread packages retain their known document totals. Rune Forge also displays
+recent evaluation activity when no violation was recorded; this is evidence of
+evaluation, not a claim that every imported policy rule has an executable detector.
 
 The **Continuity** view leads with automatic protection for the selected task:
 its plain-language state, most recent progress save, remaining working context,

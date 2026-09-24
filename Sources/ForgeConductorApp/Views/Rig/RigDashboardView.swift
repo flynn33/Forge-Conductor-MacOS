@@ -128,8 +128,6 @@ struct RigDashboardView: View {
 
                 instrumentationPanels
 
-                orchestrationPanel
-
                 Grid(alignment: .topLeading, horizontalSpacing: 14) {
                     GridRow {
                         mcpServersPanel
@@ -313,8 +311,8 @@ struct RigDashboardView: View {
 
     private var instrumentationPanels: some View {
         ViewThatFits(in: .horizontal) {
-            Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 14) {
-                GridRow {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 14) {
                     coreBarsPanel
                         .frame(
                             minWidth: 340,
@@ -330,17 +328,15 @@ struct RigDashboardView: View {
                             alignment: .topLeading
                         )
                 }
-                GridRow {
-                    storagePanel
-                        .frame(
-                            minWidth: 340,
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .topLeading
-                        )
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        storagePanel
+                        orchestrationPanel
+                    }
+                    .frame(width: 300)
                     managedActivityFeedPanel
                         .frame(
-                            minWidth: 340,
+                            minWidth: 430,
                             maxWidth: .infinity,
                             maxHeight: .infinity,
                             alignment: .topLeading
@@ -352,6 +348,7 @@ struct RigDashboardView: View {
                 coreBarsPanel.frame(minHeight: 170)
                 gpuCoresPanel.frame(minHeight: 190)
                 storagePanel.frame(minHeight: 220)
+                orchestrationPanel
                 managedActivityFeedPanel
             }
         }
@@ -744,6 +741,8 @@ struct RigDashboardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-cpu-cores-panel")
     }
 
     private var gpuCoresPanel: some View {
@@ -795,6 +794,8 @@ struct RigDashboardView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-gpu-cores-panel")
     }
 
     private func gpuEngineStat(_ label: String, _ percent: Double?) -> some View {
@@ -931,6 +932,8 @@ struct RigDashboardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-orchestration-panel")
     }
 
     private func orchestrationCard(
