@@ -21,8 +21,12 @@ The final full regression executed 1,851 tests with 13 explicit
 environment/helper skips and zero failures. Both SwiftPM products and the
 canonical Apple Development-signed Debug workspace app built; strict deep
 signature verification and `0.14.4 (10)` bundle/CLI identity checks passed.
-Repository checks passed. The wiki and exact local/remote publication receipt
-are recorded at closeout. Notarization, public download, second-hardware
+Repository checks passed. Product source
+`cdc539ec35d0f19493d6169ddd827e130870b02f`, tree
+`e1291f80f2a2dd87b7cb7df112358706cf89ae61`, and wiki revision
+`96199f79899e02e133652771a022dd6c7ae84599`, tree
+`aa6dfa40949b424821b89f1694c0811e6ab182e8`, are published. Exact local/remote
+parity is verified after the documentation closeout. Notarization, public download, second-hardware
 qualification, Claude, Grok, and a physical VoiceOver listening session are
 outside this owner-defined local LM Studio/Codex acceptance scope.
 
