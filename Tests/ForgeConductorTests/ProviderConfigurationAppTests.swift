@@ -167,7 +167,7 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
             state: preparationState,
             recoveryAction: preparationState == .ready ? .none : .startService,
             detail: preparationState == .ready
-                ? "LM Studio is ready."
+                ? "LM Studio and the selected tool-capable model are ready for managed tasks."
                 : "LM Studio still needs attention.",
             configuration: ProviderConfigurationSnapshot(
                 revision: "legacy-provider-configuration",
@@ -295,6 +295,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(
             callOrder,
             ["connect_without_resume", "repair", "connect_and_check"]
+        )
+        XCTAssertTrue(
+            viewModel.noticeMessage?.contains("ready for managed tasks") == true,
+            "the completed setup message must preserve the provider-ready result after integration activation"
         )
     }
 

@@ -74,7 +74,10 @@ public enum AutomaticCompletionPlanResolver {
                 title: "Requested report is delivered",
                 reason: "The instructions ask for analysis or reporting without a project mutation.",
                 evidenceRequirements: [.deliveredReport],
-                relevantToolNames: ["fs_read", "fs_list", "fs_glob", "search_text", "git_diff", "git_log", "git_status"]
+                relevantToolNames: [
+                    "forge_status", "fs_read", "fs_list", "fs_glob", "search_text",
+                    "git_diff", "git_log", "git_status",
+                ]
             ))
         } else {
             if project.hasBuildDefinition {

@@ -133,6 +133,19 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertTrue(paged.result().passed)
         XCTAssertTrue(paged.result().summary.contains("300 paged evidence records"))
 
+        let desktopRun = completionRun(
+            runID: RunID(),
+            projectID: projectID,
+            digest: digest,
+            plan: plan,
+            successfulDesktopTools: ["fs_read"]
+        )
+        let desktopEvidence = ProjectInstructionCompletionGate.EvidenceAccumulator(
+            run: desktopRun
+        ).result()
+        XCTAssertTrue(desktopEvidence.passed)
+        XCTAssertTrue(desktopEvidence.evidenceReferences.first?.hasPrefix("desktop-hook:") == true)
+
         var wrongScope = ProjectInstructionCompletionGate.EvidenceAccumulator(run: run)
         try wrongScope.consume([
             toolInvocation(
@@ -213,6 +226,9 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
         XCTAssertFalse(first.obligations.contains { $0.kind == .projectBuild })
         XCTAssertFalse(first.obligations.contains { $0.kind == .projectTests })
+        XCTAssertTrue(first.obligations.first(where: {
+            $0.kind == .readOnlyReportDelivered
+        })?.relevantToolNames.contains("forge_status") == true)
 
         let repair = try AutomaticCompletionPlanResolver.resolve(.init(
             projectID: projectID,
@@ -1706,9 +1722,21 @@ final class ProjectInstructionQueueTests: XCTestCase {
         runID: RunID,
         projectID: ProjectID,
         digest: String,
-        plan: AutomaticCompletionPlan
+        plan: AutomaticCompletionPlan,
+        successfulDesktopTools: [String] = []
     ) -> AutonomousRunRecord {
-        AutonomousRunRecord(
+        var metadata = [
+            "source_snapshot_sha256": digest,
+            "completion_plan_id": plan.planID.uuidString.lowercased(),
+            "completion_plan_revision": String(plan.revision),
+        ]
+        if !successfulDesktopTools.isEmpty {
+            metadata[DesktopProviderEvidenceMetadata.successfulToolNames] = String(
+                decoding: try! JSONEncoder().encode(successfulDesktopTools),
+                as: UTF8.self
+            )
+        }
+        return AutonomousRunRecord(
             runID: runID,
             projectID: projectID,
             projectGeneration: .initial,
@@ -1721,14 +1749,10 @@ final class ProjectInstructionQueueTests: XCTestCase {
             activeSessionID: nil,
             activeOperationID: nil,
             specification: AutonomousRunSpecification(
-                allowedTools: ["fs_read", "shell_exec"],
+                allowedTools: ["forge_status", "fs_read", "shell_exec"],
                 completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
                 completionPlan: plan,
-                work: AutonomousRunWork(metadata: [
-                    "source_snapshot_sha256": digest,
-                    "completion_plan_id": plan.planID.uuidString.lowercased(),
-                    "completion_plan_revision": String(plan.revision),
-                ])
+                work: AutonomousRunWork(metadata: metadata)
             ),
             completionRequestJSON: "{}",
             lastErrorCode: nil,

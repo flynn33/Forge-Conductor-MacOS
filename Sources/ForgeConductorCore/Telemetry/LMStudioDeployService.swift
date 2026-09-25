@@ -291,6 +291,7 @@ public final class NativeLMStudioHostActivator: LMStudioHostActivating, @uncheck
     private let diagnosticURL: URL
     private let syncedConfigurationURL: URL
     private let applicationURL: URL
+    private let runningProbe: (@Sendable () -> Bool)?
 
     public init(
         paths: AppPaths,
@@ -300,6 +301,19 @@ public final class NativeLMStudioHostActivator: LMStudioHostActivating, @uncheck
         self.syncedConfigurationURL = LMStudioEnvironment.homeDir
             .appendingPathComponent(".internal/last-synced-mcp-state.json")
         self.applicationURL = applicationURL
+        self.runningProbe = nil
+    }
+
+    init(
+        paths: AppPaths,
+        applicationURL: URL,
+        runningProbe: @escaping @Sendable () -> Bool
+    ) {
+        self.diagnosticURL = paths.masterDiagnostics
+        self.syncedConfigurationURL = LMStudioEnvironment.homeDir
+            .appendingPathComponent(".internal/last-synced-mcp-state.json")
+        self.applicationURL = applicationURL
+        self.runningProbe = runningProbe
     }
 
     public func activate(
@@ -322,8 +336,28 @@ public final class NativeLMStudioHostActivator: LMStudioHostActivating, @uncheck
             launched = true
         }
 
-        // LM Studio watches mcp.json. Give the versioned config a short window
-        // to hot-reload before taking the more disruptive relaunch path.
+        // LM Studio starts MCP processes lazily when a chat selects them. The
+        // synchronized copy of the exact versioned configuration is therefore
+        // sufficient whether the host was already running or just launched.
+        // Check it before waiting for role processes so routine deployment does
+        // not relaunch the host and discard its loaded model state.
+        if waitForConfigurationSync(deploymentID: deploymentID, timeoutSec: 6) {
+            let roles = readyRoles(deploymentID: deploymentID)
+            return result(
+                deploymentID: deploymentID,
+                runningBefore: runningBefore,
+                launched: launched,
+                restarted: restarted,
+                roles: roles,
+                configurationSynced: true,
+                detail: roles.count == LMStudioConnectorRole.allCases.count
+                    ? "LM Studio synchronized the versioned MCP configuration and connected all roles"
+                    : "LM Studio synchronized all MCP registrations; connections are ready for lazy chat activation"
+            )
+        }
+
+        // If the synchronized state file is delayed, give live roles a short
+        // opportunity to prove that the exact revision is already active.
         let hotReloadBudget = min(8, max(3, timeoutSec * 0.35))
         var roles = waitForReadyRoles(deploymentID: deploymentID, timeoutSec: hotReloadBudget)
         if roles.count == LMStudioConnectorRole.allCases.count {
@@ -338,11 +372,7 @@ public final class NativeLMStudioHostActivator: LMStudioHostActivating, @uncheck
             )
         }
 
-        // A newly launched host has no stale Forge child to replace. LM Studio
-        // starts MCP processes lazily when a chat selects them, so synchronized
-        // configuration is sufficient even when no tool provider starts yet.
-        if !runningBefore,
-           waitForConfigurationSync(deploymentID: deploymentID, timeoutSec: 6) {
+        if waitForConfigurationSync(deploymentID: deploymentID, timeoutSec: 6) {
             return result(
                 deploymentID: deploymentID,
                 runningBefore: runningBefore,
@@ -350,7 +380,7 @@ public final class NativeLMStudioHostActivator: LMStudioHostActivating, @uncheck
                 restarted: restarted,
                 roles: roles,
                 configurationSynced: true,
-                detail: "LM Studio launched and synchronized both MCP registrations; connections are ready for lazy chat activation"
+                detail: "LM Studio synchronized all MCP registrations; connections are ready for lazy chat activation"
             )
         }
 
@@ -427,6 +457,9 @@ public final class NativeLMStudioHostActivator: LMStudioHostActivating, @uncheck
     }
 
     private func isLMStudioRunning() -> Bool {
+        if let runningProbe {
+            return runningProbe()
+        }
         // This AppleScript predicate queries Launch Services without launching
         // the app and remains available when process enumeration is restricted.
         if let result = try? ProcessRunner().run(

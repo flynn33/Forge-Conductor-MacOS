@@ -193,6 +193,47 @@ final class LMStudioConnectorReliabilityTests: XCTestCase {
         XCTAssertTrue(connected.allRolesConnected)
     }
 
+    func testRunningHostKeepsLoadedStateWhenExactConfigurationIsSynchronized() throws {
+        let lmHome = scratch.appendingPathComponent("lmstudio", isDirectory: true)
+        let internalDirectory = lmHome.appendingPathComponent(".internal", isDirectory: true)
+        try FileManager.default.createDirectory(at: internalDirectory, withIntermediateDirectories: true)
+        LMStudioEnvironment.homeDirOverride = lmHome
+
+        let deploymentID = "revision-preserves-loaded-model"
+        let servers = Dictionary(uniqueKeysWithValues: LMStudioConnectorRole.allCases.map { role in
+            (
+                role.serverID,
+                ["env": [
+                    "FORGE_MCP_ROLE": role.rawValue,
+                    "FORGE_DEPLOYMENT_ID": deploymentID,
+                ]]
+            )
+        })
+        let synchronized = try JSONSerialization.data(withJSONObject: ["mcpServers": servers])
+        try synchronized.write(
+            to: internalDirectory.appendingPathComponent("last-synced-mcp-state.json"),
+            options: .atomic
+        )
+
+        let fakeApplication = scratch.appendingPathComponent("LM Studio.app")
+        try FileManager.default.createDirectory(at: fakeApplication, withIntermediateDirectories: true)
+        let paths = AppPaths(home: scratch.appendingPathComponent("forge-home", isDirectory: true))
+        try paths.ensureLayout()
+        let activator = NativeLMStudioHostActivator(
+            paths: paths,
+            applicationURL: fakeApplication,
+            runningProbe: { true }
+        )
+
+        let result = try activator.activate(deploymentID: deploymentID, timeoutSec: 1)
+
+        XCTAssertTrue(result.isReady)
+        XCTAssertTrue(result.runningBeforeDeploy)
+        XCTAssertFalse(result.launched)
+        XCTAssertFalse(result.restarted, "synchronized configuration must not unload the host's active model")
+        XCTAssertTrue(result.detail.contains("lazy chat activation"))
+    }
+
     private func makeExecutable() throws -> URL {
         let binary = scratch.appendingPathComponent("forge-conductor")
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: binary)

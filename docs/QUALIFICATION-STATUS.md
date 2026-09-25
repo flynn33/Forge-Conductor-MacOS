@@ -1,5 +1,31 @@
 # Version and qualification status
 
+## 0.14.4 local LM Studio and Codex shippability
+
+The owner's acceptance boundary for this build is local: Forge Conductor must
+build and run on this Mac, and its complete project workflow must work with the
+two providers the owner uses, LM Studio and Codex. Version `0.14.4 (10)` closes
+the observed setup failures within that boundary.
+
+**E0:** the signed Debug app discovered and prepared loaded
+`qwen/qwen3-coder-30b`, selected LM Studio, registered the repository, admitted
+an immutable instruction artifact, and created a managed task. Repeated MCP
+deployment and app restart left the model loaded. A fresh Codex
+`0.155.0-alpha.16.4` task loaded the installed Forge package through Codex's
+normal trust review, attached to the exact project run, successfully called
+`forge_status`, and completed all three compiled automatic obligations with a
+durable `desktop-hook` evidence reference. All seven configured Codex hooks and
+the Forge MCP server were visible to the host.
+
+The final full regression executed 1,851 tests with 13 explicit
+environment/helper skips and zero failures. Both SwiftPM products and the
+canonical Apple Development-signed Debug workspace app built; strict deep
+signature verification and `0.14.4 (10)` bundle/CLI identity checks passed.
+Repository checks passed. The wiki and exact local/remote publication receipt
+are recorded at closeout. Notarization, public download, second-hardware
+qualification, Claude, Grok, and a physical VoiceOver listening session are
+outside this owner-defined local LM Studio/Codex acceptance scope.
+
 ## 0.14.3 project-setup transaction repair
 
 The downloaded `0.14.2 (8)` build reproduced a real setup race: **Connect and
@@ -32,7 +58,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.14.3, build 9**, supporting **macOS 26+**. The owner is
+Product identity: **0.14.4, build 10**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -43,7 +69,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.14.3, build 9**. The root [`VERSION`](../VERSION)
+documentation use version **0.14.4, build 10**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are
@@ -156,7 +182,7 @@ remote `main` were then synchronized at documentation closeout revision
 `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. That closeout changes
 documentation only and leaves that historical native graph unchanged. These
 revisions remain distribution evidence for the source they name; they are not
-the current `0.14.3 (9)` source result.
+the current `0.14.4 (10)` source result.
 
 | Surface | Current result | Boundary |
 |---|---|---|
@@ -205,7 +231,10 @@ rejects the app and Installer as `source=Unnotarized Developer ID`. Earlier
 notarized app receipts remain valid for their recorded source, but they do not
 replace notarization of these exact artifacts.
 
-## Remaining release checks
+## Distribution checks outside the local shippability scope
+
+These checks are not part of the owner's definition of shippable for this
+version. They remain documented only for a later public distribution workflow.
 
 The following results are still required before declaring the owner target
 complete:

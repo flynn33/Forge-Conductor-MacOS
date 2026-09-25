@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.14.3**, build **9**. This connection document does
+Product identity: version **0.14.4**, build **10**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -63,10 +63,14 @@ discovery. **Refresh Models** and the separate contract probe remain available
 for advanced diagnosis.
 
 The readiness probe does not resume retained provider-wait tasks before the
-Forge-owned MCP deployment finishes. Deployment may restart LM Studio, so Forge
-keeps those tasks quiescent, re-probes the restarted host, and only then resumes
-the exact durable run identities. If the Provider view closes mid-operation,
-the Manager performs the same bounded post-operation recovery.
+Forge-owned MCP deployment finishes. If LM Studio has already synchronized the
+exact versioned MCP configuration, deployment preserves the running host and
+its loaded model while its MCP child processes remain available for lazy chat
+activation. A relaunch is reserved for a genuinely stale unsynchronized state.
+Forge keeps retained tasks quiescent throughout deployment, performs a fresh
+readiness check, and only then resumes the exact durable run identities. If the
+Provider view closes mid-operation, the Manager performs the same bounded
+post-operation recovery.
 
 Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory as
 authoritative model metadata. When that native response omits
@@ -197,7 +201,7 @@ Source of truth in code:
 | Exactly one compact JSON-RPC message plus `\n` per stdout frame; no `Content-Length` | `MCPStdioTransport` in `MCPServer.swift` |
 | Deployment smoke accepts only newline-delimited responses | `MCPServeVerifier` |
 | Unique `FORGE_DEPLOYMENT_ID` in both role entries forces every `mcp.json` deploy to be observable | `LMStudioEnvironment` / installer |
-| Hot reload, scoped LM Studio relaunch fallback, exact-revision synchronization check, and runtime evidence | `NativeLMStudioHostActivator` |
+| Exact-revision synchronization, loaded-model-preserving hot reload, scoped stale-state relaunch fallback, and runtime evidence | `NativeLMStudioHostActivator` |
 | `PRAGMA busy_timeout=3000` | `SQLiteStore` |
 | Transactional SwiftPM Core resource-bundle staging and bare-binary rejection | `ManagerInstaller` |
 | Registration never writes `forge-serve` | `LMStudioEnvironment` / installer |
@@ -215,7 +219,7 @@ Deployment performs these checks before reporting success:
 5. All three committed roles are smoked again. A commit failure rolls back all live paths.
 6. Every deploy writes a new shared revision to all three role environments,
    even when the binary path is unchanged.
-7. LM Studio is launched if necessary and given a bounded hot-reload window; if stale processes remain, only LM Studio is gracefully relaunched.
+7. LM Studio is launched if necessary; an already running host with the exact synchronized revision is preserved, and only a genuinely stale unsynchronized host is gracefully relaunched.
 8. Success is withheld until LM Studio's own synchronized MCP state contains all
    three roles with that exact revision. When the current chat activates them,
    host-originated `tools/list` evidence is also recorded for each role.

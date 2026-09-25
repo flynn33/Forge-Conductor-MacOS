@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.14.3**, build **9**. This guide covers the native Forge Conductor
+Version **0.14.4**, build **10**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.3 (9)` is the current development identity. It has not inherited the
+> `0.14.4 (10)` is the current locally qualified identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release checks.
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.3 binary:
+Confirm the registered command is a `serve`-capable 0.14.4 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.3
+forge-conductor version    # should print 0.14.4
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.3` and
-`CFBundleVersion` must be `9`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.4` and
+`CFBundleVersion` must be `10`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -764,7 +764,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.3**, build **9**
+Doctor identifies the running source identity as version **0.14.4**, build **10**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally

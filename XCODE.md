@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.14.3**, build **9**. `VERSION` and
+Product identity: marketing version **0.14.4**, build **10**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -74,7 +74,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.14.3 (9)` build retains the warning repair with the canonical
+The current `0.14.4 (10)` build retains the warning repair with the canonical
 graph unchanged. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
 descriptor per catalog request, and the existing `ProviderOperatorView.swift`

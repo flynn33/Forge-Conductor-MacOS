@@ -276,7 +276,7 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
         XCTAssertTrue(runner.invocations.allSatisfy { $0.timeoutSeconds == 15 && $0.maximumOutputBytes == 32 * 1_024 })
     }
 
-    func testCodexPortablePackageMCPOnAndOffPreservesForeignMarketplaceEntry() throws {
+    func testCodexCompatibilityPackageMCPOnAndOffPreservesForeignMarketplaceEntry() throws {
         let marketplaceURL = userHome.appendingPathComponent(".agents/plugins/marketplace.json")
         try writeJSON([
             "name": "personal",
@@ -301,29 +301,30 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
             [
                 ".codex-plugin/plugin.json",
                 ".forge-conductor-owner.json",
+                ".mcp.json",
+                "bin/forge-conductor",
                 "hooks/hooks.json",
-                "mcp.json",
-                "plugin.json",
                 "skills/forge-run/SKILL.md",
             ]
         )
-        let portable = try json(at: pluginRoot.appendingPathComponent("plugin.json"))
-        XCTAssertEqual(portable["$schema"] as? String, "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json")
-        XCTAssertNil(portable["hooks"])
         let compatibility = try json(at: pluginRoot.appendingPathComponent(".codex-plugin/plugin.json"))
-        XCTAssertEqual(compatibility["mcpServers"] as? String, "./mcp.json")
+        XCTAssertEqual(compatibility["mcpServers"] as? String, "./.mcp.json")
         XCTAssertEqual(compatibility["hooks"] as? String, "./hooks/hooks.json")
-        let mcp = try json(at: pluginRoot.appendingPathComponent("mcp.json"))
-        XCTAssertEqual(
-            mcp["$schema"] as? String,
-            "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
-        )
+        let mcp = try json(at: pluginRoot.appendingPathComponent(".mcp.json"))
+        XCTAssertNil(mcp["$schema"])
         let servers = try XCTUnwrap(mcp["mcpServers"] as? [String: [String: Any]])
-        XCTAssertEqual(servers["forge-conductor"]?["type"] as? String, "stdio")
+        XCTAssertNil(servers["forge-conductor"]?["type"])
+        XCTAssertEqual(
+            servers["forge-conductor"]?["command"] as? String,
+            executable.path
+        )
         XCTAssertEqual(
             servers["forge-conductor"]?["args"] as? [String],
             ["serve", "--home", forgeHome.path, "--desktop-provider", "codex-desktop"]
         )
+        let embeddedBridge = pluginRoot.appendingPathComponent("bin/forge-conductor")
+        XCTAssertEqual(try Data(contentsOf: embeddedBridge), try Data(contentsOf: executable))
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: embeddedBridge.path))
         try assertHooks(
             at: pluginRoot,
             providerID: "codex-desktop",
@@ -344,7 +345,7 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
 
         let disabled = try installer.install(request(.codexDesktop, mcp: false))
         XCTAssertEqual(disabled.disposition, .installed)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: pluginRoot.appendingPathComponent("mcp.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: pluginRoot.appendingPathComponent(".mcp.json").path))
         let disabledCompatibility = try json(at: pluginRoot.appendingPathComponent(".codex-plugin/plugin.json"))
         XCTAssertNil(disabledCompatibility["mcpServers"])
         XCTAssertEqual(disabledCompatibility["hooks"] as? String, "./hooks/hooks.json")
@@ -358,7 +359,7 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
         ])
     }
 
-    func testCodexPortableMCPManifestDeclaresMatchingAgentPluginsSchema() throws {
+    func testCodexCompatibilityMCPManifestUsesSignedExecutableWithoutPortableSchema() throws {
         let installer = makeInstaller(
             runner: DesktopPluginCommandFixture(available: ["codex"])
         )
@@ -366,17 +367,97 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
         let status = try installer.install(request(.codexDesktop, mcp: true))
 
         let pluginRoot = URL(fileURLWithPath: status.packagePath, isDirectory: true)
-        let plugin = try json(at: pluginRoot.appendingPathComponent("plugin.json"))
-        let mcp = try json(at: pluginRoot.appendingPathComponent("mcp.json"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: pluginRoot.appendingPathComponent("plugin.json").path))
+        let mcp = try json(at: pluginRoot.appendingPathComponent(".mcp.json"))
+        XCTAssertEqual(Set(mcp.keys), ["mcpServers"])
+        let servers = try XCTUnwrap(mcp["mcpServers"] as? [String: [String: Any]])
         XCTAssertEqual(
-            plugin["$schema"] as? String,
-            "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+            servers["forge-conductor"]?["command"] as? String,
+            executable.path
+        )
+    }
+
+    func testCodexPackageFromXcodeAppEmbedsLaunchableFrameworkRuntimeClosure() throws {
+        let app = root.appendingPathComponent("Forge Conductor.app", isDirectory: true)
+        let appExecutable = app.appendingPathComponent("Contents/MacOS/Forge Conductor")
+        let helper = app.appendingPathComponent("Contents/Helpers/forge-conductor")
+        let runtimeLauncher = app.appendingPathComponent("Contents/Helpers/forge-runtime-launcher")
+        let frameworkVersion = app.appendingPathComponent(
+            "Contents/Frameworks/ForgeConductorCore.framework/Versions/A",
+            isDirectory: true
+        )
+        let frameworkBinary = frameworkVersion.appendingPathComponent("ForgeConductorCore")
+        let frameworkInfo = frameworkVersion.appendingPathComponent("Resources/Info.plist")
+        let frameworkSignature = frameworkVersion.appendingPathComponent("_CodeSignature/CodeResources")
+        for (url, contents) in [
+            (appExecutable, "app-main"),
+            (helper, "cli-helper"),
+            (runtimeLauncher, "runtime-launcher"),
+            (frameworkBinary, "core-binary"),
+            (frameworkInfo, "core-info"),
+            (frameworkSignature, "core-signature"),
+        ] {
+            try OwnerOnlyAtomicFile.write(Data(contents.utf8), to: url)
+        }
+        for url in [appExecutable, helper, runtimeLauncher, frameworkBinary] {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: url.path
+            )
+        }
+        let installer = makeInstaller(
+            runner: DesktopPluginCommandFixture(available: ["codex"])
+        )
+        let appRequest = DesktopProviderPluginRequest(
+            host: .codexDesktop,
+            forgeExecutable: appExecutable,
+            includeMCP: true,
+            pluginVersion: "1.2.3"
+        )
+
+        let status = try installer.install(appRequest)
+
+        let pluginRoot = URL(fileURLWithPath: status.packagePath, isDirectory: true)
+        XCTAssertEqual(
+            try Data(contentsOf: pluginRoot.appendingPathComponent("bin/forge-conductor")),
+            Data("cli-helper".utf8)
         )
         XCTAssertEqual(
-            mcp["$schema"] as? String,
-            "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
+            try Data(contentsOf: pluginRoot.appendingPathComponent("bin/forge-runtime-launcher")),
+            Data("runtime-launcher".utf8)
         )
-        XCTAssertEqual(Set(mcp.keys), ["$schema", "mcpServers"])
+        XCTAssertEqual(
+            try Data(contentsOf: pluginRoot.appendingPathComponent(
+                "Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore"
+            )),
+            Data("core-binary".utf8)
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: pluginRoot.appendingPathComponent(
+                "Frameworks/ForgeConductorCore.framework/Versions/A/Resources/Info.plist"
+            )),
+            Data("core-info".utf8)
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: pluginRoot.appendingPathComponent(
+                "Frameworks/ForgeConductorCore.framework/Versions/A/_CodeSignature/CodeResources"
+            )),
+            Data("core-signature".utf8)
+        )
+        XCTAssertTrue(FileManager.default.isExecutableFile(
+            atPath: pluginRoot.appendingPathComponent("bin/forge-conductor").path
+        ))
+        XCTAssertTrue(FileManager.default.isExecutableFile(
+            atPath: pluginRoot.appendingPathComponent("bin/forge-runtime-launcher").path
+        ))
+        XCTAssertTrue(FileManager.default.isExecutableFile(
+            atPath: pluginRoot.appendingPathComponent(
+                "Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore"
+            ).path
+        ))
+        let mcp = try json(at: pluginRoot.appendingPathComponent(".mcp.json"))
+        let servers = try XCTUnwrap(mcp["mcpServers"] as? [String: [String: Any]])
+        XCTAssertEqual(servers["forge-conductor"]?["command"] as? String, helper.path)
     }
 
     func testGrokDirectPluginUsesDocumentedPackageAndEnableCommands() throws {
@@ -717,7 +798,7 @@ final class DesktopProviderPluginInstallerTests: XCTestCase {
         let runner = DesktopPluginCommandFixture(available: ["codex"])
         let firstInstaller = makeInstaller(runner: runner)
         _ = try firstInstaller.install(request(.codexDesktop, mcp: true, version: "1.0.0"))
-        let pluginManifest = userHome.appendingPathComponent("plugins/forge-conductor/plugin.json")
+        let pluginManifest = userHome.appendingPathComponent("plugins/forge-conductor/.codex-plugin/plugin.json")
         let marketplace = userHome.appendingPathComponent(".agents/plugins/marketplace.json")
         let receipt = forgeOwnedRoot.appendingPathComponent("receipts/codex-desktop.json")
         let originalManifest = try Data(contentsOf: pluginManifest)

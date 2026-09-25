@@ -7,6 +7,10 @@
 import Darwin
 import Foundation
 
+enum DesktopProviderEvidenceMetadata {
+    static let successfulToolNames = "desktop_plugin_successful_tool_names"
+}
+
 /// Owns the durable pull side of desktop-provider runs. Hook calls are short
 /// control-plane transactions; potentially long completion checks run in
 /// one tracked task per run and are recovered after manager restart.
@@ -18,6 +22,7 @@ actor DesktopProviderRunLifecycleService {
         static let sessionState = "desktop_plugin_session_state"
         static let lastEvent = "desktop_plugin_last_event"
         static let lastTool = "desktop_plugin_last_tool"
+        static let successfulToolNames = DesktopProviderEvidenceMetadata.successfulToolNames
         static let completionSummary = "desktop_plugin_completion_summary"
     }
 
@@ -397,6 +402,19 @@ actor DesktopProviderRunLifecycleService {
         var work = run.specification.work
         work.metadata[Metadata.lastEvent] = request.event.rawValue
         if let toolName = request.toolName { work.metadata[Metadata.lastTool] = toolName }
+        if request.event == .postToolUse,
+           let toolName = request.toolName,
+           let allowedName = Self.allowedToolName(
+               for: toolName,
+               allowedTools: run.specification.allowedTools
+           ) {
+            var successfulNames = Self.successfulToolNames(from: work.metadata[Metadata.successfulToolNames])
+            successfulNames.insert(allowedName)
+            work.metadata[Metadata.successfulToolNames] = String(
+                decoding: try JSONEncoder().encode(successfulNames.sorted()),
+                as: UTF8.self
+            )
+        }
         // Tool boundaries are high-frequency operator projections. Keeping them
         // in the managed tool family applies the repository's per-run rolling
         // cap without pruning sparse claim, recovery, or completion audit events.
@@ -425,6 +443,33 @@ actor DesktopProviderRunLifecycleService {
             summary: summary,
             work: work
         )
+    }
+
+    private static func allowedToolName(
+        for hostToolName: String,
+        allowedTools: [String]
+    ) -> String? {
+        if allowedTools.contains(hostToolName) { return hostToolName }
+        for prefix in ["mcp__forge-conductor__", "mcp__forge_conductor__"] {
+            if hostToolName.hasPrefix(prefix) {
+                let candidate = String(hostToolName.dropFirst(prefix.count))
+                guard allowedTools.contains(candidate) else { continue }
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    private static func successfulToolNames(from value: String?) -> Set<String> {
+        guard let value,
+              value.utf8.count <= 16_384,
+              let data = value.data(using: .utf8),
+              let names = try? JSONDecoder().decode([String].self, from: data),
+              names.count <= 256,
+              names.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 1_024 }) else {
+            return []
+        }
+        return Set(names)
     }
 
     private func handleStop(

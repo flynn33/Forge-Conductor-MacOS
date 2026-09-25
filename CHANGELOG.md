@@ -10,6 +10,39 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### 0.14.4 (10) local shippable candidate — 2026-09-25
+
+#### Fixed
+
+- Preserved an already loaded LM Studio model while deploying an unchanged,
+  synchronized Forge MCP configuration. Routine setup no longer relaunches LM
+  Studio merely because its MCP child processes are waiting for lazy chat
+  activation.
+- Restored a current provider-readiness projection from the durable exact-model
+  receipt after app and Manager relaunch, so setup status does not regress to an
+  unverified placeholder before the next explicit probe.
+- Made the Codex package executable from the installed desktop host by including
+  the bounded signed runtime closure, retaining the host-compatible manifest,
+  and registering the MCP command through the app's signed helper path.
+- Made successful trusted Codex `PostToolUse` events durable, bounded completion
+  evidence. Read-only automatic tasks can now satisfy their compiled completion
+  plan after a successful allowed Forge tool call and an exact completion marker.
+- Updated the production onboarding fixture for immutable artifact bootstrap and
+  canonical completion gates without weakening production validation.
+
+#### Verification
+
+- Passed live LM Studio provider discovery, contract preparation, selection,
+  project registration, instruction admission, and autonomous task creation
+  against loaded `qwen/qwen3-coder-30b`; repeated integration repair left the
+  model loaded.
+- Installed the Forge Codex plugin through the normal trust path and verified all
+  seven hooks plus MCP discovery in Codex `0.155.0-alpha.16.4`. A fresh Codex
+  project task attached to its exact run, called `forge_status`, and completed
+  all three automatic obligations with durable hook evidence.
+- Advanced the aligned source, CLI, filesystem protocol, Xcode target, test, and
+  documentation identity to `0.14.4 (10)`.
+
 ## [0.14.3] — 2026-09-25 (development)
 
 ### Fixed
@@ -55,9 +88,9 @@ Product versions do not by themselves claim shipment.
 - GPU Cores is below CPU Cores. Compact Storage and Orchestration frames leave
   additional horizontal space for Managed Activity.
 
-### Current development line
+### Prior development line
 
-- Version `0.14.3 (9)` is the current unreleased development identity. Its
+- Version `0.14.3 (9)` was the preceding unreleased development identity. Its
   guided setup, Autonomy, Continuity, provider-recovery, desktop-integration,
   native UI, and qualification changes are recorded in the development section
   below; no distribution or shipment is claimed.

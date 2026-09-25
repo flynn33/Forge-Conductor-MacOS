@@ -91,9 +91,33 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                     .removePersistentDomain(forName: guidedSetupDefaultsSuite)
             }
             guidedSetupDefaultsSuite = nil
-            if let fixture { try FileManager.default.removeItem(at: fixture) }
+            if let fixture {
+                Self.makeFixtureRemovable(fixture)
+                try FileManager.default.removeItem(at: fixture)
+            }
             fixture = nil
         }
+    }
+
+    private nonisolated static func makeFixtureRemovable(_ root: URL) {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        ) else { return }
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(
+                forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+            ), values.isSymbolicLink != true else { continue }
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: values.isDirectory == true ? 0o700 : 0o600],
+                ofItemAtPath: url.path
+            )
+        }
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: root.path
+        )
     }
 
     func testNativeFolderAuthorizationCancellationAndInvalidRootPreserveSavedSettings() async throws {
@@ -389,11 +413,31 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(waitUntil(timeout: 20) { !self.app.buttons["run-start-confirm"].exists })
 
         let snapshot: OnboardingManagedRunSnapshot = try await read("/api/manager/operator/snapshot?limit=5")
-        let run = try XCTUnwrap(snapshot.runs.first { $0.mission == mission })
+        let run = try XCTUnwrap(
+            snapshot.runs.first { candidate in
+                candidate.projectID == project.projectID
+                    && candidate.mission.contains("immutable project-scoped artifact")
+            }
+        )
         XCTAssertEqual(run.projectID, project.projectID)
         XCTAssertEqual(run.projectGeneration, project.projectGeneration)
         XCTAssertEqual(run.modelKey, model)
-        XCTAssertEqual(run.completionGates, ["tests"])
+        XCTAssertEqual(
+            Set(run.completionGates),
+            Set([ProjectInstructionQueueStore.builtInCompletionGate]
+                + CompletionCheckPreset.defaults.map(\.rawValue))
+        )
+        let artifactSHA256 = try XCTUnwrap(run.completionPlan?.instructionArtifactSHA256.first)
+        XCTAssertEqual(artifactSHA256.count, 64)
+        let storedInstructions = forgeHome
+            .appendingPathComponent("instruction-packages/Store", isDirectory: true)
+            .appendingPathComponent(artifactSHA256, isDirectory: true)
+            .appendingPathComponent(".forge/canonical/document-000001.txt")
+        XCTAssertEqual(
+            try String(contentsOf: storedInstructions, encoding: .utf8),
+            mission,
+            "The immutable run artifact must retain the exact quick instructions entered by the operator"
+        )
         XCTAssertTrue(element("autonomy-run-row-\(run.runID)").waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["run-import-native-policy"].exists)
         XCTAssertFalse(element("run-completion-advanced-toggle").exists)
@@ -856,6 +900,14 @@ private struct OnboardingProjectSnapshot: Codable, Sendable, Equatable {
 }
 
 private struct OnboardingManagedRunSnapshot: Codable, Sendable {
+    struct CompletionPlan: Codable, Sendable {
+        let instructionArtifactSHA256: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case instructionArtifactSHA256 = "instruction_artifact_sha256"
+        }
+    }
+
     struct Run: Codable, Sendable {
         let runID: String
         let projectID: String
@@ -864,6 +916,7 @@ private struct OnboardingManagedRunSnapshot: Codable, Sendable {
         let state: String?
         let modelKey: String?
         let completionGates: [String]
+        let completionPlan: CompletionPlan?
         enum CodingKeys: String, CodingKey {
             case runID = "run_id"
             case projectID = "project_id"
@@ -872,6 +925,7 @@ private struct OnboardingManagedRunSnapshot: Codable, Sendable {
             case state
             case modelKey = "model_key"
             case completionGates = "completion_gates"
+            case completionPlan = "completion_plan"
         }
     }
     let runs: [Run]

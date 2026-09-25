@@ -356,9 +356,26 @@ enum ProjectInstructionCompletionGate {
         private var latestBuildWarningFree: LatestEvidence?
         private var latestTests: LatestEvidence?
         private var latestLegacyEvidence: LatestEvidence?
+        private let successfulDesktopTools: Set<String>
+        private let desktopToolReference: String?
 
         init(run: AutonomousRunRecord) {
             self.run = run
+            let encoded = run.specification.work.metadata[
+                DesktopProviderEvidenceMetadata.successfulToolNames
+            ]
+            if let encoded,
+               encoded.utf8.count <= 16_384,
+               let data = encoded.data(using: .utf8),
+               let names = try? JSONDecoder().decode([String].self, from: data),
+               names.count <= 256,
+               Set(names).isSubset(of: Set(run.specification.allowedTools)) {
+                successfulDesktopTools = Set(names)
+                desktopToolReference = "desktop-hook:" + JSONSupport.sha256Hex(encoded)
+            } else {
+                successfulDesktopTools = []
+                desktopToolReference = nil
+            }
         }
 
         mutating func consume(_ records: [ToolInvocationRecord]) throws {
@@ -458,9 +475,14 @@ enum ProjectInstructionCompletionGate {
                     evidence = nil
                     satisfied = Self.deliveryIsComplete(instructionDelivery)
                 case .readOnlyReportDelivered:
-                    evidence = latestRelevantRead
+                    let desktopRead = obligation.relevantToolNames.contains {
+                        successfulDesktopTools.contains($0)
+                    }
+                    evidence = latestRelevantRead ?? (desktopRead
+                        ? LatestEvidence(successful: true, reference: desktopToolReference)
+                        : nil)
                     satisfied = run.completionRequestJSON != nil
-                        && latestRelevantRead?.successful == true
+                        && evidence?.successful == true
                 case .noRelevantUnresolvedSideEffect:
                     evidence = nil
                     satisfied = true

@@ -88,7 +88,7 @@ public struct DesktopProviderPluginCommandReceipt: Codable, Sendable, Equatable 
 
 public struct DesktopProviderPluginReceipt: Codable, Sendable, Equatable {
     public static let schemaVersion = 1
-    public static let maximumFiles = 24
+    public static let maximumFiles = 64
     public static let maximumCommandAttempts = 8
 
     public var schemaVersion: Int
@@ -319,6 +319,7 @@ public final class DesktopProviderPluginInstaller: @unchecked Sendable {
     private static let installerID = "forge-conductor"
     private static let maximumConfigurationBytes = 512 * 1_024
     private static let maximumReceiptBytes = 64 * 1_024
+    private static let maximumEmbeddedExecutableBytes = 64 * 1_024 * 1_024
     private static let commandTimeoutSeconds: TimeInterval = 15
     private static let maximumCommandOutputBytes = 32 * 1_024
     private static let maximumDetailCharacters = 512
@@ -733,6 +734,7 @@ private extension DesktopProviderPluginInstaller {
     }
 
     func codexPluginFiles(request: DesktopProviderPluginRequest) throws -> [String: Data] {
+        let embeddedBridgePath = "bin/forge-conductor"
         var compatibility: [String: Any] = [
             "name": Self.pluginName,
             "version": request.pluginVersion,
@@ -742,22 +744,82 @@ private extension DesktopProviderPluginInstaller {
             "hooks": "./hooks/hooks.json",
             "interface": codexInterface,
         ]
-        if request.includeMCP { compatibility["mcpServers"] = "./mcp.json" }
+        if request.includeMCP { compatibility["mcpServers"] = "./.mcp.json" }
         var files: [String: Data] = [
             ".forge-conductor-owner.json": try jsonData(ownershipObject(host: request.host)),
-            "plugin.json": try jsonData([
-                "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-                "name": Self.pluginName,
-                "version": request.pluginVersion,
-                "description": pluginDescription,
-                "author": ["name": "Forge Conductor"],
-            ]),
             ".codex-plugin/plugin.json": try jsonData(compatibility),
             "hooks/hooks.json": try jsonData(hooksObject(request: request)),
             "skills/forge-run/SKILL.md": skillData,
         ]
         if request.includeMCP {
-            files["mcp.json"] = try jsonData(mcpObject(request: request, portable: true))
+            for (path, data) in try codexRuntimeFiles(
+                executable: request.forgeExecutable,
+                embeddedBridgePath: embeddedBridgePath
+            ) {
+                files[path] = data
+            }
+            files[".mcp.json"] = try jsonData(codexCompatibilityMCPObject(request: request))
+        }
+        return files
+    }
+
+    /// Codex requires an MCP command contained by the plugin package. SwiftPM's
+    /// CLI is self-contained, but the Xcode app helper dynamically links the
+    /// signed ForgeConductorCore framework. Preserve that runtime closure when
+    /// provisioning from an app bundle so the copied bridge remains launchable.
+    func codexRuntimeFiles(
+        executable: URL,
+        embeddedBridgePath: String
+    ) throws -> [String: Data] {
+        let standardized = executable.standardizedFileURL
+        let macOSDirectory = standardized.deletingLastPathComponent()
+        let contentsDirectory = macOSDirectory.deletingLastPathComponent()
+        let appBundle = contentsDirectory.deletingLastPathComponent()
+        let helper = contentsDirectory
+            .appendingPathComponent("Helpers", isDirectory: true)
+            .appendingPathComponent("forge-conductor")
+        let runtimeLauncher = contentsDirectory
+            .appendingPathComponent("Helpers", isDirectory: true)
+            .appendingPathComponent("forge-runtime-launcher")
+        let frameworkVersion = contentsDirectory
+            .appendingPathComponent("Frameworks", isDirectory: true)
+            .appendingPathComponent("ForgeConductorCore.framework", isDirectory: true)
+            .appendingPathComponent("Versions/A", isDirectory: true)
+
+        guard macOSDirectory.lastPathComponent == "MacOS",
+              contentsDirectory.lastPathComponent == "Contents",
+              appBundle.pathExtension == "app",
+              fileManager.isExecutableFile(atPath: helper.path),
+              isRegularFileWithoutFollowingSymlink(helper),
+              fileManager.isExecutableFile(atPath: runtimeLauncher.path),
+              isRegularFileWithoutFollowingSymlink(runtimeLauncher),
+              fileManager.fileExists(atPath: frameworkVersion.path) else {
+            return [
+                embeddedBridgePath: try OwnerOnlyAtomicFile.read(
+                    from: standardized,
+                    maximumBytes: Self.maximumEmbeddedExecutableBytes
+                ),
+            ]
+        }
+
+        var files: [String: Data] = [
+            embeddedBridgePath: try OwnerOnlyAtomicFile.read(
+                from: helper,
+                maximumBytes: Self.maximumEmbeddedExecutableBytes
+            ),
+            "bin/forge-runtime-launcher": try OwnerOnlyAtomicFile.read(
+                from: runtimeLauncher,
+                maximumBytes: Self.maximumEmbeddedExecutableBytes
+            ),
+        ]
+        let relativeFrameworkPaths = try regularRelativeFiles(at: frameworkVersion)
+        for relativePath in relativeFrameworkPaths.sorted() {
+            let source = frameworkVersion.appendingPathComponent(relativePath)
+            files["Frameworks/ForgeConductorCore.framework/Versions/A/\(relativePath)"] =
+                try OwnerOnlyAtomicFile.read(
+                    from: source,
+                    maximumBytes: Self.maximumEmbeddedExecutableBytes
+                )
         }
         return files
     }
@@ -858,9 +920,14 @@ private extension DesktopProviderPluginInstaller {
         return ["hooks": hooks]
     }
 
-    func mcpObject(request: DesktopProviderPluginRequest, portable: Bool) -> [String: Any] {
+    func mcpObject(
+        request: DesktopProviderPluginRequest,
+        portable: Bool
+    ) -> [String: Any] {
         var server: [String: Any] = [
-            "command": request.forgeExecutable.standardizedFileURL.path,
+            "command": portable
+                ? "./bin/forge-conductor"
+                : request.forgeExecutable.standardizedFileURL.path,
             "args": [
                 "serve", "--home", roots.forgeHome.path,
                 "--desktop-provider", request.host.providerID,
@@ -872,6 +939,33 @@ private extension DesktopProviderPluginInstaller {
             object["$schema"] = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
         }
         return object
+    }
+
+    /// Codex 0.155 loads lifecycle hooks only from its compatibility manifest,
+    /// while its legacy MCP parser does not resolve a contained `./` command
+    /// against the plugin root. Point that manifest at the signed app helper
+    /// (or the standalone CLI) until the host can load both portable MCP and
+    /// lifecycle hooks from the same manifest format.
+    func codexCompatibilityMCPObject(request: DesktopProviderPluginRequest) -> [String: Any] {
+        let executable = request.forgeExecutable.standardizedFileURL
+        let contents = executable.deletingLastPathComponent().deletingLastPathComponent()
+        let helper = contents
+            .appendingPathComponent("Helpers", isDirectory: true)
+            .appendingPathComponent("forge-conductor")
+        let command = contents.lastPathComponent == "Contents"
+            && fileManager.isExecutableFile(atPath: helper.path)
+            && isRegularFileWithoutFollowingSymlink(helper)
+                ? helper.path
+                : executable.path
+        return [
+            "mcpServers": [Self.pluginName: [
+                "command": command,
+                "args": [
+                    "serve", "--home", roots.forgeHome.path,
+                    "--desktop-provider", request.host.providerID,
+                ],
+            ]],
+        ]
     }
 
     var skillData: Data {
@@ -1295,7 +1389,16 @@ private extension DesktopProviderPluginInstaller {
             guard safeRelativePath(path) else {
                 throw DesktopProviderPluginInstallerError.invalidStagedPackage(path)
             }
-            try OwnerOnlyAtomicFile.write(files[path]!, to: root.appendingPathComponent(path))
+            let destination = root.appendingPathComponent(path)
+            try OwnerOnlyAtomicFile.write(files[path]!, to: destination)
+            if path == "bin/forge-conductor"
+                || path == "bin/forge-runtime-launcher"
+                || path == "Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore" {
+                try fileManager.setAttributes(
+                    [.posixPermissions: 0o700],
+                    ofItemAtPath: destination.path
+                )
+            }
         }
     }
 
@@ -1312,6 +1415,14 @@ private extension DesktopProviderPluginInstaller {
             )
             guard actual == expected else {
                 throw DesktopProviderPluginInstallerError.invalidStagedPackage("hash mismatch for \(path)")
+            }
+            if (path == "bin/forge-conductor"
+                || path == "bin/forge-runtime-launcher"
+                || path == "Frameworks/ForgeConductorCore.framework/Versions/A/ForgeConductorCore"),
+               !fileManager.isExecutableFile(atPath: root.appendingPathComponent(path).path) {
+                throw DesktopProviderPluginInstallerError.invalidStagedPackage(
+                    "embedded runtime is not executable"
+                )
             }
             if path.hasSuffix(".json") {
                 do { _ = try JSONSerialization.jsonObject(with: actual) }

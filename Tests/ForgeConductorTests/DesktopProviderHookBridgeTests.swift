@@ -560,6 +560,12 @@ final class DesktopProviderHookBridgeTests: XCTestCase {
                 advanced.specification.work.metadata["desktop_plugin_last_tool"],
                 "mcp__forge-conductor__fs_read"
             )
+            XCTAssertEqual(
+                advanced.specification.work.metadata[
+                    DesktopProviderEvidenceMetadata.successfulToolNames
+                ],
+                #"["fs_read"]"#
+            )
 
             let marker = try JSONSupport.canonicalJSON([
                 "forge_run_status": "completion_requested",

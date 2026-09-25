@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.14.3**, build **9**. This document describes the
+Product identity: version **0.14.4**, build **10**. This document describes the
 implemented integration contract; qualification remains evidence-bound per
 host.
 
@@ -10,7 +10,7 @@ selectable provider's toggle provisions or verifies its Forge-owned integration
 before changing the durable selection. Turning on a different provider replaces
 the selection; turning off the selected provider leaves no provider selected.
 An installed integration may remain configured while inactive. The selectable
-providers in 0.14.3 are LM Studio, Claude Code Desktop, and Codex Desktop. Grok
+providers in 0.14.4 are LM Studio, Claude Code Desktop, and Codex Desktop. Grok
 Build remains visible but non-selectable.
 
 A desktop provider with a nonterminal task cannot be selected, deselected,
@@ -25,7 +25,7 @@ hook path of an active desktop session.
 | LM Studio | `lmstudio` | `managed_provider_push` | Forge sends bounded managed-model turns to the saved LM Studio endpoint and owns the managed run lifecycle. |
 | Claude Code Desktop | `claude-desktop` | `desktop_plugin_pull` | Claude owns the model and desktop session; its Forge plugin, hooks, and MCP registration connect that session to Forge orchestration. |
 | Codex Desktop | `codex-desktop` | `desktop_plugin_pull` | Codex owns the model and desktop task; its Forge plugin, hooks, and MCP registration connect that task to Forge orchestration. |
-| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.3. |
+| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.4. |
 
 The selectable desktop providers are not alternate model APIs inside Forge. Forge does not
 send their prompts, select their model, create a private desktop conversation,
@@ -147,11 +147,14 @@ conflicts, and preserves unrelated settings entries.
 
 ### Codex Desktop
 
-- Forge writes the portable plugin to `~/plugins/forge-conductor/` with
-  `plugin.json`, the `.codex-plugin/plugin.json` compatibility manifest,
-  `hooks/hooks.json`, the `forge-run` skill, and `mcp.json`.
-- The portable `mcp.json` includes the Agent Plugins 1.0 MCP schema declaration
-  as well as the Forge stdio registration.
+- Forge writes the Codex-compatible plugin to `~/plugins/forge-conductor/` with
+  `.codex-plugin/plugin.json`, `hooks/hooks.json`, the `forge-run` skill,
+  `.mcp.json`, and a bounded executable runtime closure.
+- When provisioning from the signed Xcode app, that closure contains the signed
+  manager helper, runtime launcher, and Core framework files needed by the
+  copied bridge. The active compatibility registration names the signed app
+  helper by absolute path because Codex `0.155` does not resolve a contained
+  relative MCP command from its legacy manifest.
 - Forge merges the local source `./plugins/forge-conductor` into the personal
   marketplace at `~/.agents/plugins/marketplace.json`.
 - When the `codex` CLI is available, Forge uses the supported plugin add and
@@ -199,6 +202,12 @@ rejects redirects and non-loopback configuration, and returns bounded
 host-compatible JSON. Supported Claude/Codex session-start and prompt-submit
 hooks add a short orchestration/MCP context message. Forge never
 returns an automatic allow decision for tool use or a permission request.
+
+Successful trusted Codex `PostToolUse` events for tools already present in the
+run's frozen allowlist are retained as a bounded deduplicated set. That evidence
+can satisfy the corresponding compiled read-only completion obligation after
+the host submits the exact completion marker; unknown or disallowed host tool
+names are ignored.
 
 When a desktop provider is inactive, its hook denies only a Forge MCP tool call
 at `PreToolUse`; unrelated host tools remain under the host's own policy. If the

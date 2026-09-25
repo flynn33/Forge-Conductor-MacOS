@@ -32,6 +32,7 @@ public final class ManagerRuntime: @unchecked Sendable {
     var autonomyTickTask: Task<Void, Never>?
     var providerProbeInProgress = false
     var providerProbeState: ManagerProviderProbeState?
+    var providerReadinessProjection: ManagerOperatorProvider?
     public var lastPresencePruneAt: Date?
     public var shutdownRequested = false
     public var signalSources: [any DispatchSourceSignal] = []

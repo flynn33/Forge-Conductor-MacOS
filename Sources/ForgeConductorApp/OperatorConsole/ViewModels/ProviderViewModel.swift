@@ -369,7 +369,7 @@ final class ProviderViewModel: ObservableObject {
                     apply(result.configuration)
                     provider = result.provider.map(OperatorProvider.init)
                     if result.state == .ready {
-                        noticeMessage = "\(operation.detail ?? "LM Studio integration updated.") Retained tasks resumed after host activation completed."
+                        noticeMessage = "LM Studio and the selected tool-capable model are ready for managed tasks. \(result.detail) \(operation.detail ?? "LM Studio integration updated.") Retained tasks resumed after host activation completed."
                     } else {
                         errorMessage = result.detail
                     }

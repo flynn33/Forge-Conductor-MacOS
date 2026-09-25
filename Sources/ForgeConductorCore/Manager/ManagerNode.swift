@@ -898,12 +898,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let shell = app.config.shellPolicyStatus
         lock.lock()
         let providerProbe = runtime.providerProbeState
+        let providerReadinessProjection = runtime.providerReadinessProjection
         lock.unlock()
         let providerConfiguration = try? readProviderConfiguration()
         let provider = Self.operatorProvider(
             from: persisted.runs,
             probe: providerProbe,
-            configuration: providerConfiguration
+            configuration: providerConfiguration,
+            persistedReadiness: providerReadinessProjection
         )
         let registeredToolNames = app.tools.toolNames
         let registeredTools = Set(registeredToolNames)
@@ -2700,6 +2702,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
            receipt.provider.health == "contract_valid",
            let checkedAt = ISO8601.date(from: receipt.checkedAt),
            (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
+            lock.lock()
+            runtime.providerReadinessProjection = receipt.provider
+            lock.unlock()
             try coordinateProviderConfigurationWaits(
                 resumeWaitingRuns: resumeWaitingRuns
             )
@@ -2978,7 +2983,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     }
 
     private func clearProviderProbeState() {
-        lock.lock(); runtime.providerProbeState = nil; lock.unlock()
+        lock.lock()
+        runtime.providerProbeState = nil
+        runtime.providerReadinessProjection = nil
+        lock.unlock()
     }
 
     private func beginProviderRunOperation() throws {
@@ -5185,12 +5193,16 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private static func operatorProvider(
         from runs: [ManagerOperatorRunReadModel],
         probe: ManagerProviderProbeState?,
-        configuration: ProviderConfigurationSnapshot?
+        configuration: ProviderConfigurationSnapshot?,
+        persistedReadiness: ManagerOperatorProvider? = nil
     ) -> ManagerOperatorProvider {
         let probeCapabilities = probe?.capabilities
         guard let detail = runs.first(where: {
             $0.budgetState != nil || $0.activeSession != nil
         }) ?? runs.first else {
+            if probe == nil, let persistedReadiness {
+                return persistedReadiness
+            }
             return ManagerOperatorProvider(
                 adapterID: probe.map {
                     operatorIdentifier($0.adapterID, maximumCharacters: 128)

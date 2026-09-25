@@ -5,6 +5,70 @@ import XCTest
 #endif
 
 final class ProviderRuntimePreparationTests: XCTestCase {
+    func testDurableReadinessRestoresOperatorHealthAfterManagerRelaunch() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("provider-readiness-relaunch-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let clean = try manager.readProviderConfiguration()
+        let configured = try manager.updateProviderConfiguration(
+            ProviderConfigurationUpdate(
+                expectedRevision: clean.revision,
+                endpoint: "http://127.0.0.1:1234",
+                modelKey: "fixture/tool-model"
+            )
+        )
+        let checkedAt = ISO8601.string(from: Date())
+        let provider: [String: Any] = [
+            "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+            "provider_id": ProviderIntegrationID.lmStudio.rawValue,
+            "health": "contract_valid",
+            "endpoint": configured.endpoint,
+            "credential_configured": false,
+            "api_mode": "managed_provider",
+            "model_key": "fixture/tool-model",
+            "instance_id": "fixture-instance",
+            "active_context_length": 32_768,
+            "maximum_context_length": 32_768,
+            "tool_use_capable": true,
+            "lifecycle_management_enabled": true,
+            "contract_fingerprint": String(repeating: "a", count: 64),
+            "last_probe_mode": ManagerProviderProbeMode.contract.rawValue,
+            "probe_result_storage": "durable_receipt",
+            "last_probe_at": checkedAt,
+        ]
+        let receipt: [String: Any] = [
+            "schemaVersion": 1,
+            "configurationRevision": configured.revision,
+            "checkedAt": checkedAt,
+            "provider": provider,
+        ]
+        let readinessURL = home.appendingPathComponent(
+            "managed-providers/forge.native-session-host/provider-readiness.json"
+        )
+        try FileManager.default.createDirectory(
+            at: readinessURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try JSONSerialization.data(withJSONObject: receipt).write(to: readinessURL, options: .atomic)
+
+        let relaunchedRegistry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: relaunchedRegistry)
+        let relaunchedManager = ManagerNode(app: app, hostAdapterRegistry: relaunchedRegistry)
+        let preparation = try relaunchedManager.connectAndCheckProvider()
+        let snapshot = try relaunchedManager.operatorSnapshot(limit: 1)
+
+        XCTAssertEqual(preparation.state, .ready)
+        XCTAssertEqual(preparation.provider?.health, "contract_valid")
+        XCTAssertEqual(snapshot.provider.health, "contract_valid")
+        XCTAssertEqual(snapshot.provider.modelKey, configured.modelKey)
+        XCTAssertEqual(snapshot.provider.lastProbeAt, checkedAt)
+    }
+
     func testLiveConnectAndCheckPersistsAndReusesExactReadiness() throws {
         let environment = ProcessInfo.processInfo.environment
         guard let modelKey = environment["FORGE_LIVE_LMSTUDIO_MODEL"], !modelKey.isEmpty else {
