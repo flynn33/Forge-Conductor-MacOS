@@ -360,6 +360,25 @@ final class ProviderViewModel: ObservableObject {
         switch operation.phase {
         case .active, .completed, .removed:
             noticeMessage = operation.detail ?? "Provider integration updated."
+            if operation.providerID == .lmStudio,
+               operation.phase != .removed {
+                do {
+                    let result = try await client.prepareProvider()
+                    try Task.checkCancellation()
+                    preparation = result
+                    apply(result.configuration)
+                    provider = result.provider.map(OperatorProvider.init)
+                    if result.state == .ready {
+                        noticeMessage = "\(operation.detail ?? "LM Studio integration updated.") Retained tasks resumed after host activation completed."
+                    } else {
+                        errorMessage = result.detail
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    errorMessage = "LM Studio was deployed, but retained tasks could not be resumed: \(error.localizedDescription)"
+                }
+            }
         case .awaitingUserAction:
             noticeMessage = operation.detail ?? "Provider setup needs a user action in the provider application."
         case .failedRecoverable:
@@ -494,7 +513,9 @@ final class ProviderViewModel: ObservableObject {
             guard let self else { return }
             defer { isProbing = false }
             do {
-                let result = try await client.prepareProvider()
+                // Provider integration deployment may relaunch LM Studio. Keep
+                // retained runs quiescent until that host transaction finishes.
+                let result = try await client.prepareProviderWithoutResumingRuns()
                 try Task.checkCancellation()
                 preparation = result
                 apply(result.configuration)

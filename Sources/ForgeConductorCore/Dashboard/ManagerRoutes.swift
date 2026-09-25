@@ -2478,10 +2478,19 @@ public final class ManagerRoutes: @unchecked Sendable {
             do {
                 let data: Data
                 if path.hasSuffix("/prepare") {
-                    guard body.isEmpty || body == Data("{}".utf8) else {
+                    let resumeWaitingRuns: Bool
+                    if body.isEmpty || body == Data("{}".utf8) {
+                        resumeWaitingRuns = true
+                    } else if let object = try? JSONSupport.object(from: body),
+                              Set(object.keys) == ["resume_waiting_runs"],
+                              let requested = object["resume_waiting_runs"] as? Bool {
+                        resumeWaitingRuns = requested
+                    } else {
                         throw ProviderConfigurationError.invalidRequest
                     }
-                    data = try JSONEncoder().encode(manager.connectAndCheckProvider())
+                    data = try JSONEncoder().encode(manager.connectAndCheckProvider(
+                        resumeWaitingRuns: resumeWaitingRuns
+                    ))
                 } else if method == "PUT" {
                     guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
                           Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction", "token"]),

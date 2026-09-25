@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.14.2**, build **8**. This document describes the
+Product identity: version **0.14.3**, build **9**. This document describes the
 implemented integration contract; qualification remains evidence-bound per
 host.
 
@@ -10,7 +10,7 @@ selectable provider's toggle provisions or verifies its Forge-owned integration
 before changing the durable selection. Turning on a different provider replaces
 the selection; turning off the selected provider leaves no provider selected.
 An installed integration may remain configured while inactive. The selectable
-providers in 0.14.2 are LM Studio, Claude Code Desktop, and Codex Desktop. Grok
+providers in 0.14.3 are LM Studio, Claude Code Desktop, and Codex Desktop. Grok
 Build remains visible but non-selectable.
 
 A desktop provider with a nonterminal task cannot be selected, deselected,
@@ -25,7 +25,7 @@ hook path of an active desktop session.
 | LM Studio | `lmstudio` | `managed_provider_push` | Forge sends bounded managed-model turns to the saved LM Studio endpoint and owns the managed run lifecycle. |
 | Claude Code Desktop | `claude-desktop` | `desktop_plugin_pull` | Claude owns the model and desktop session; its Forge plugin, hooks, and MCP registration connect that session to Forge orchestration. |
 | Codex Desktop | `codex-desktop` | `desktop_plugin_pull` | Codex owns the model and desktop task; its Forge plugin, hooks, and MCP registration connect that task to Forge orchestration. |
-| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.2. |
+| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.3. |
 
 The selectable desktop providers are not alternate model APIs inside Forge. Forge does not
 send their prompts, select their model, create a private desktop conversation,
@@ -86,6 +86,12 @@ after a lost mutation response, and supports cancellation while the operation
 is cancellable. Selection state, recent operations, and redacted receipts are stored under
 `~/.forge-conductor/managed-providers/`; credentials and raw CLI arguments are
 not written to those receipts.
+
+For LM Studio, retained provider-wait runs are not resumed by the initial
+readiness probe. Forge first completes the integration deployment—which may
+restart LM Studio—then performs a fresh readiness check and resumes those exact
+runs. The Manager also owns a bounded fallback so closing the Provider view
+cannot leave a successful deployment permanently suspended.
 
 LM Studio has the same activation toggle as the selectable desktop hosts. Turning it on
 runs the manager-owned **Connect and Check** workflow first and selects

@@ -22,6 +22,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private var projectRoot: URL!
     private var managerPort: UInt16 = 0
     private var session: URLSession!
+    private var guidedSetupDefaultsSuite: String!
 
     nonisolated override func setUpWithError() throws {
         try MainActor.assumeIsolated {
@@ -61,6 +62,12 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
             session = URLSession(configuration: configuration)
             app = XCUIApplication()
             app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = forgeHome.path
+            guidedSetupDefaultsSuite = "com.forge-conductor.production-onboarding.\(fixture.lastPathComponent)"
+            UserDefaults(suiteName: guidedSetupDefaultsSuite)?.set(
+                true,
+                forKey: "forge.guidedSetup.completed.v2"
+            )
+            app.launchEnvironment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"] = guidedSetupDefaultsSuite
             reservation.close()
         }
     }
@@ -79,6 +86,11 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                 return
             }
             app = nil
+            if let guidedSetupDefaultsSuite {
+                UserDefaults(suiteName: guidedSetupDefaultsSuite)?
+                    .removePersistentDomain(forName: guidedSetupDefaultsSuite)
+            }
+            guidedSetupDefaultsSuite = nil
             if let fixture { try FileManager.default.removeItem(at: fixture) }
             fixture = nil
         }

@@ -85,6 +85,7 @@ protocol OperatorManagerClientProtocol: Sendable {
     func updateProviderConfiguration(_ update: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot
     func providerModels() async throws -> ProviderModelInventory
     func prepareProvider() async throws -> ManagerProviderPreparationResult
+    func prepareProviderWithoutResumingRuns() async throws -> ManagerProviderPreparationResult
     func providerIntegrations() async throws -> ProviderIntegrationsSnapshot
     func updateProviderSelection(
         _ request: ProviderSelectionRequest
@@ -133,6 +134,10 @@ extension OperatorManagerClientProtocol {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Automatic provider preparation is unavailable from this manager client."
         )
+    }
+
+    func prepareProviderWithoutResumingRuns() async throws -> ManagerProviderPreparationResult {
+        try await prepareProvider()
     }
 
     func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
@@ -376,10 +381,20 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
     }
 
     func prepareProvider() async throws -> ManagerProviderPreparationResult {
+        try await prepareProvider(resumeWaitingRuns: true)
+    }
+
+    func prepareProviderWithoutResumingRuns() async throws -> ManagerProviderPreparationResult {
+        try await prepareProvider(resumeWaitingRuns: false)
+    }
+
+    private func prepareProvider(
+        resumeWaitingRuns: Bool
+    ) async throws -> ManagerProviderPreparationResult {
         try await request(
             method: "POST",
             path: "/api/manager/provider/prepare",
-            body: EmptyProviderPreparationBody(),
+            body: ProviderPreparationBody(resumeWaitingRuns: resumeWaitingRuns),
             unavailableMessage: "Automatic provider preparation is unavailable. Update or restart the manager from this build.",
             timeoutInterval: 45
         )
@@ -1290,13 +1305,14 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             if http.statusCode == 404, let unavailableMessage {
                 throw OperatorManagerClientError.capabilityUnavailable(unavailableMessage)
             }
-            if http.statusCode == 422,
+            if path == "/api/manager/runs/start",
+               (http.statusCode == 409 || http.statusCode == 422),
                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               object["code"] as? String == "autonomy_tool_configuration_invalid",
+               let code = object["code"] as? String,
                object["retryable"] as? Bool == false {
                 throw OperatorManagerClientError.configurationRejected(
-                    code: "autonomy_tool_configuration_invalid",
-                    message: (object["message"] as? String) ?? "Allowed tools are invalid"
+                    code: code,
+                    message: (object["message"] as? String) ?? "Run configuration was rejected"
                 )
             }
             if http.statusCode == 409,
@@ -1885,6 +1901,14 @@ private struct ProjectIdentityBody: Encodable {
 }
 
 private struct EmptyProviderPreparationBody: Encodable {}
+
+private struct ProviderPreparationBody: Encodable {
+    let resumeWaitingRuns: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case resumeWaitingRuns = "resume_waiting_runs"
+    }
+}
 
 private struct ProjectGenerationBody: Encodable {
     let projectID: String

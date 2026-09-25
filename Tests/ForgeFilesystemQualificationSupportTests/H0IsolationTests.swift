@@ -149,11 +149,11 @@ final class H0IsolationTests: XCTestCase {
     func testQualificationSettingsPreserveVersionContract() throws {
         let project = try text("ForgeConductor.xcodeproj/project.pbxproj")
         XCTAssertEqual(
-            project.components(separatedBy: "MARKETING_VERSION = 0.14.1;").count - 1,
+            project.components(separatedBy: "MARKETING_VERSION = 0.14.3;").count - 1,
             12
         )
         XCTAssertEqual(
-            project.components(separatedBy: "CURRENT_PROJECT_VERSION = 7;").count - 1,
+            project.components(separatedBy: "CURRENT_PROJECT_VERSION = 9;").count - 1,
             16
         )
         for identifier in [

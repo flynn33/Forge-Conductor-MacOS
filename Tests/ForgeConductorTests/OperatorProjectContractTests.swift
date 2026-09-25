@@ -206,6 +206,84 @@ private final class OperatorProjectContractClient: OperatorManagerClientProtocol
 }
 
 final class OperatorProjectContractTests: XCTestCase {
+    func testProviderPreparationControlsRunResumptionAndDeterministicStartRejection() async throws {
+        let preparation = ManagerProviderPreparationResult(
+            state: .ready,
+            recoveryAction: .none,
+            detail: "LM Studio is ready.",
+            configuration: ProviderConfigurationSnapshot(
+                revision: "fixture-provider-revision",
+                endpoint: "http://127.0.0.1:1234",
+                modelKey: "fixture/tool-model",
+                credentialConfigured: false,
+                saved: true
+            )
+        )
+        OperatorProjectContractURLProtocol.configure(
+            responses: [
+                "/api/manager/provider/prepare": try JSONEncoder().encode(preparation),
+                "/api/manager/runs/start": try JSONSupport.data(from: [
+                    "ok": false,
+                    "code": "autonomy_invalid_request",
+                    "message": "The run cannot be admitted.",
+                    "retryable": false,
+                ]),
+            ],
+            statuses: ["/api/manager/runs/start": 409]
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        )
+
+        _ = try await client.prepareProviderWithoutResumingRuns()
+        _ = try await client.prepareProvider()
+        let preparationBodies = OperatorProjectContractURLProtocol.requestedBodies(
+            path: "/api/manager/provider/prepare"
+        )
+        XCTAssertEqual(preparationBodies.count, 2)
+        XCTAssertEqual(
+            try JSONSupport.object(from: preparationBodies[0])["resume_waiting_runs"] as? Bool,
+            false
+        )
+        XCTAssertEqual(
+            try JSONSupport.object(from: preparationBodies[1])["resume_waiting_runs"] as? Bool,
+            true
+        )
+
+        let request = OperatorRunStartRequest(
+            runID: UUID().uuidString.lowercased(),
+            projectID: UUID().uuidString.lowercased(),
+            projectGeneration: 1,
+            assignmentID: nil,
+            mission: "Reject this deterministic fixture.",
+            providerID: nil,
+            adapterID: nil,
+            modelKey: nil,
+            allowedTools: nil,
+            completionGates: nil,
+            networkAllowed: nil,
+            expectedProviderConfigurationRevision: nil,
+            expectedToolCatalogRevision: nil,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        do {
+            _ = try await client.startRun(request)
+            XCTFail("Expected deterministic start rejection")
+        } catch let OperatorManagerClientError.configurationRejected(code, message) {
+            XCTAssertEqual(code, "autonomy_invalid_request")
+            XCTAssertEqual(message, "The run cannot be admitted.")
+        } catch {
+            XCTFail("Unexpected start error: \(error)")
+        }
+    }
+
     func testInstructionArtifactOwnsToolsAndPackageRequirementsWhileRetainingAutomaticSelections() throws {
         let runID = RunID()
         let projectID = ProjectID()
@@ -722,9 +800,11 @@ final class OperatorProjectContractTests: XCTestCase {
 
         XCTAssertNil(viewModel.errorMessage)
         let paths = OperatorProjectContractURLProtocol.requestedPaths()
+        let providerIndex = try XCTUnwrap(paths.firstIndex(of: "/api/manager/provider/prepare"))
         let importIndex = try XCTUnwrap(paths.firstIndex(of: "/api/manager/runs/instruction-artifacts/import"))
         let prepareIndex = try XCTUnwrap(paths.firstIndex(of: "/api/manager/runs/prepare"))
         let startIndex = try XCTUnwrap(paths.firstIndex(of: "/api/manager/runs/start"))
+        XCTAssertLessThan(providerIndex, importIndex)
         XCTAssertLessThan(importIndex, prepareIndex)
         XCTAssertLessThan(prepareIndex, startIndex)
         let importData = try XCTUnwrap(OperatorProjectContractURLProtocol.requestedBodies(
@@ -955,6 +1035,20 @@ final class OperatorProjectContractTests: XCTestCase {
                 "active_run_ids": [],
                 "deferred_run_ids": [],
             ]),
+            "/api/manager/provider/prepare": try JSONEncoder().encode(
+                ManagerProviderPreparationResult(
+                    state: .actionRequired,
+                    recoveryAction: .selectModel,
+                    detail: detail,
+                    configuration: ProviderConfigurationSnapshot(
+                        revision: "fixture-waiting-provider",
+                        endpoint: "http://127.0.0.1:1234",
+                        modelKey: nil,
+                        credentialConfigured: false,
+                        saved: true
+                    )
+                )
+            ),
             "/api/manager/runs/instruction-artifacts/import": try JSONSupport.data(from: [
                 "ok": true,
                 "run_id": "__REQUEST_RUN_ID__",
@@ -994,6 +1088,18 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(viewModel.notice, detail)
         XCTAssertNil(viewModel.errorMessage)
         XCTAssertFalse(viewModel.startRequiresReconciliation)
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/instruction-artifacts/import"
+            ).count,
+            0
+        )
+        XCTAssertEqual(
+            OperatorProjectContractURLProtocol.requestedBodies(
+                path: "/api/manager/runs/prepare"
+            ).count,
+            0
+        )
         XCTAssertEqual(
             OperatorProjectContractURLProtocol.requestedBodies(
                 path: "/api/manager/runs/start"

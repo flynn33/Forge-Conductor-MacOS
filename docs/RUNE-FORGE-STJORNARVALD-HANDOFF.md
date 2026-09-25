@@ -79,7 +79,7 @@ The accepted and limited rows are recorded individually in
 
 README, User Guide, Unreleased changelog, roadmap, architecture, documentation
 index, Guided Mode, qualification status, product record, acceptance, and this
-handoff describe the current behavior. `VERSION` is now `0.14.2` and
+handoff describe the current behavior. `VERSION` is now `0.14.3` and
 `BUILD_NUMBER` is `8`, matching the current authority. No release archive,
 installer, notarized artifact, installation replacement, or shipment candidate
 was created because the owner workflow reserves release qualification and

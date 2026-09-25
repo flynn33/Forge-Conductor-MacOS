@@ -73,7 +73,7 @@ desktop provider with unfinished tasks cannot be selected, deselected,
 repaired, or removed until those tasks are finished or cancelled through
 Autonomy.
 
-Grok Build remains visible in Provider but is non-selectable in 0.14.2. Its
+Grok Build remains visible in Provider but is non-selectable in 0.14.3. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.

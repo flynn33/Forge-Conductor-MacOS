@@ -95,14 +95,19 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     ) async throws -> ProviderIntegrationOperationSnapshot {
         callOrder.append("selection")
         selectionRequests.append(request)
+        let providerID = request.providerID ?? .lmStudio
         if simulateLostSelectionResponse {
-            acceptedSelectionOperation = operation(kind: .activate, phase: .committing)
+            acceptedSelectionOperation = operation(
+                kind: .activate,
+                phase: .committing,
+                providerID: providerID
+            )
             throw OperatorManagerClientError.rejected(
                 status: 504,
                 message: "The response was lost after the manager accepted the operation."
             )
         }
-        return operation(kind: .activate, phase: .active)
+        return operation(kind: .activate, phase: .active, providerID: providerID)
     }
 
     func providerOperation(
@@ -118,7 +123,11 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
                 message: "Temporary manager outage."
             )
         }
-        let completed = operation(kind: .activate, phase: .active)
+        let completed = operation(
+            kind: .activate,
+            phase: .active,
+            providerID: acceptedSelectionOperation?.providerID ?? .lmStudio
+        )
         acceptedSelectionOperation = completed
         return completed
     }
@@ -128,7 +137,11 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     ) async throws -> ProviderIntegrationOperationSnapshot {
         callOrder.append("repair")
         repairRequests.append(request)
-        return operation(kind: .repair, phase: .completed)
+        return operation(
+            kind: .repair,
+            phase: .completed,
+            providerID: request.providerID
+        )
     }
 
     func removeProviderIntegration(
@@ -141,13 +154,28 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
 
     func prepareProvider() async throws -> ManagerProviderPreparationResult {
         callOrder.append("connect_and_check")
+        return preparationResult()
+    }
+
+    func prepareProviderWithoutResumingRuns() async throws -> ManagerProviderPreparationResult {
+        callOrder.append("connect_without_resume")
+        return preparationResult()
+    }
+
+    private func preparationResult() -> ManagerProviderPreparationResult {
         return ManagerProviderPreparationResult(
             state: preparationState,
             recoveryAction: preparationState == .ready ? .none : .startService,
             detail: preparationState == .ready
                 ? "LM Studio is ready."
                 : "LM Studio still needs attention.",
-            configuration: try await providerConfiguration()
+            configuration: ProviderConfigurationSnapshot(
+                revision: "legacy-provider-configuration",
+                endpoint: "http://127.0.0.1:1234",
+                modelKey: nil,
+                credentialConfigured: false,
+                saved: false
+            )
         )
     }
 
@@ -264,7 +292,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(repairRequests.first?.providerID, .lmStudio)
         XCTAssertEqual(repairRequests.first?.expectedRevision, "legacy-lm-revision")
         XCTAssertEqual(selectionRequests, [])
-        XCTAssertEqual(callOrder, ["connect_and_check", "repair"])
+        XCTAssertEqual(
+            callOrder,
+            ["connect_without_resume", "repair", "connect_and_check"]
+        )
     }
 
     @MainActor
@@ -286,7 +317,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         let repairRequests = await client.repairRequests
         let callOrder = await client.callOrder
         XCTAssertEqual(repairRequests, [])
-        XCTAssertEqual(callOrder, ["connect_and_check"])
+        XCTAssertEqual(callOrder, ["connect_without_resume"])
         XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
     }
 
@@ -316,7 +347,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(selectionRequests.count, 1)
         XCTAssertEqual(selectionRequests.first?.providerID, .lmStudio)
         XCTAssertEqual(repairRequests, [])
-        XCTAssertEqual(callOrder, ["connect_and_check", "selection"])
+        XCTAssertEqual(
+            callOrder,
+            ["connect_without_resume", "selection", "connect_and_check"]
+        )
     }
 
     @MainActor
@@ -343,7 +377,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         let callOrder = await client.callOrder
         XCTAssertEqual(selectionRequests, [])
         XCTAssertEqual(repairRequests, [])
-        XCTAssertEqual(callOrder, ["connect_and_check"])
+        XCTAssertEqual(callOrder, ["connect_without_resume"])
         XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
     }
 

@@ -1,5 +1,28 @@
 # Version and qualification status
 
+## 0.14.3 project-setup transaction repair
+
+The downloaded `0.14.2 (8)` build reproduced a real setup race: **Connect and
+Check** resumed two retained LM Studio runs and then its integration deployment
+restarted the provider while both requests were processing. Both streams ended
+without a completed response. Three new-task attempts also imported immutable
+instruction artifacts before provider preparation rejected the missing model,
+leaving artifacts without durable runs. Version `0.14.3 (9)` orders these
+boundaries so provider readiness precedes artifact admission, retained runs
+remain quiescent across integration deployment, and only a successful
+post-deployment probe resumes them. Current-source qualification evidence is
+recorded below: both SwiftPM products built; the terminal full suite executed
+1,848 tests with 12 explicit environment/helper skips and zero failures; the
+live provider preparation and live fresh-root/continuation cases each passed in
+separate zero-skip runs against loaded `qwen/qwen3-coder-30b`; two focused
+app-hosted tests passed; and the canonical signed Debug app built without
+compiler warning/error lines and passed strict deep-signature plus `0.14.3 (9)`
+bundle-identity checks. Two signed production-onboarding UI tests passed direct
+path and native-picker project registration, allowed-root persistence, Manager
+readback, and relaunch. The 12 aggregate skips are not passes and retain their
+separate environment-specific qualification boundaries. This remains a
+development identity, not a shipment claim.
+
 ## 0.14.2 reported-run repair
 
 The focused Core pass executed 125 cases: 123 passed, two explicit native-job
@@ -9,7 +32,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.14.2, build 8**, supporting **macOS 26+**. The owner is
+Product identity: **0.14.3, build 9**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -20,7 +43,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.14.2, build 8**. The root [`VERSION`](../VERSION)
+documentation use version **0.14.3, build 9**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are
@@ -133,7 +156,7 @@ remote `main` were then synchronized at documentation closeout revision
 `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. That closeout changes
 documentation only and leaves that historical native graph unchanged. These
 revisions remain distribution evidence for the source they name; they are not
-the current `0.14.2 (8)` source result.
+the current `0.14.3 (9)` source result.
 
 | Surface | Current result | Boundary |
 |---|---|---|

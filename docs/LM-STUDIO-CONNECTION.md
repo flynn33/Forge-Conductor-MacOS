@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.14.2**, build **8**. This connection document does
+Product identity: version **0.14.3**, build **9**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -62,6 +62,12 @@ invalid inventory remains a typed failure instead of triggering broad host
 discovery. **Refresh Models** and the separate contract probe remain available
 for advanced diagnosis.
 
+The readiness probe does not resume retained provider-wait tasks before the
+Forge-owned MCP deployment finishes. Deployment may restart LM Studio, so Forge
+keeps those tasks quiescent, re-probes the restarted host, and only then resumes
+the exact durable run identities. If the Provider view closes mid-operation,
+the Manager performs the same bounded post-operation recovery.
+
 Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory as
 authoritative model metadata. When that native response omits
 `loaded_instances`, Forge may reconcile loaded state only from a bounded
@@ -78,7 +84,7 @@ array. The Xcode **My Mac** Debug candidate reconciled that exact observation,
 reported the model loaded, and passed the manager connection probe. That is
 historical connection evidence bound to that source and host.
 
-Register the repository in **Projects** using the native picker or **Enter Project Path…**. Forge records the selected canonical folder through that project workflow; no separate Manager authorization step is required. The manager runs independently of the Autonomy tab, and **Autonomy** starts runs after the project is registered and **Connect and Check** has prepared the selected Provider.
+Register the repository in **Projects** using the native picker or **Enter Project Path…**. Forge records the selected canonical folder through that project workflow; no separate Manager authorization step is required. The manager runs independently of the Autonomy tab, and **Autonomy** starts runs after the project is registered and **Connect and Check** has prepared the selected Provider. For a new direct task, Forge confirms provider readiness before importing its immutable instruction artifact.
 
 ## Authoritative connection path (stable)
 

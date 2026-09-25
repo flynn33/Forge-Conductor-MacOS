@@ -1,7 +1,7 @@
 # Rune Forge and Stjornarvald acceptance
 
 This record closes RF-SJ-10 against all 40 rows in the issued acceptance
-matrix. It is implementation acceptance retained by the current `0.14.2 (8)` source;
+matrix. It is implementation acceptance retained by the current `0.14.3 (9)` source;
 it is not release, notarization, installation, or shipment acceptance.
 
 Status meanings:

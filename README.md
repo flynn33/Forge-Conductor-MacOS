@@ -7,14 +7,14 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.2** |
-| **Build** | **8** |
+| **Version** | **0.14.3** |
+| **Build** | **9** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.2 (8)` is the current development identity. It is
+> **Release status:** `0.14.3 (9)` is the current development identity. It is
 > not a shipment claim. Open qualification work remains in the
 > [roadmap](ROADMAP.md) and [qualification status](docs/QUALIFICATION-STATUS.md).
 
@@ -22,7 +22,7 @@ Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
 binding. Those warning repairs preserve provider request schemas and canonical
 Xcode target membership; the intentional provider workflow changes are
-described below. The current patch identity is `0.14.2 (8)`.
+described below. The current patch identity is `0.14.3 (9)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
@@ -120,7 +120,9 @@ routes each setup or recovery action to the view that owns it.
    Claude and Codex still require their normal user review of hook trust. Forge
    never auto-approves a host permission prompt. For LM Studio, the activation
    toggle and the explicit **Connect and Check** button use the same manager-owned
-   workflow. It resolves the
+   workflow. Retained runs remain quiescent while integration deployment may
+   restart LM Studio, then resume only after the completed deployment is
+   re-probed. It resolves the
    saved or local-default endpoint, discovers models, preserves a compatible
    pin or selects the only compatible loaded model, performs the managed
    contract probe, and saves a revision-bound readiness receipt. Endpoint,
@@ -149,7 +151,9 @@ routes each setup or recovery action to the view that owns it.
    Large queue refreshes are also loaded in stable revision-bound pages.
 5. In **Autonomy**, configure the task: select the project and one or more existing instruction
    packages in their displayed order, or type, paste, drop, or add a file,
-   folder, or ZIP, then select **Start Task**. A single existing package keeps
+   folder, or ZIP, then select **Start Task**. Forge confirms provider readiness
+   before importing a new immutable task artifact, so an unavailable model
+   cannot leave an orphan setup artifact. A single existing package keeps
    its exact stored content hash even if the original import path is gone;
    multiple packages and an optional new source become one deterministic,
    ordered run artifact. Every quick-text input, regardless of size, is also

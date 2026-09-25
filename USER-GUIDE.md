@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.14.2**, build **8**. This guide covers the native Forge Conductor
+Version **0.14.3**, build **9**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.2 (8)` is the current development identity. It has not inherited the
+> `0.14.3 (9)` is the current development identity. It has not inherited the
 > artifact qualification of earlier `0.9.0 (1)` candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release checks.
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.2 binary:
+Confirm the registered command is a `serve`-capable 0.14.3 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.2
+forge-conductor version    # should print 0.14.3
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.2` and
-`CFBundleVersion` must be `8`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.3` and
+`CFBundleVersion` must be `9`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -225,6 +225,11 @@ not delete verified integration files. Every selectable provider card also has
 one **Connect and Check** action: on an inactive card it performs the complete
 provision, inspection, readiness, and selection workflow; on an active desktop
 card it verifies or repairs the Forge-owned integration.
+For LM Studio, Forge keeps retained provider-wait tasks quiescent while the
+integration deployment may restart the host. It rechecks readiness and resumes
+those exact tasks only after the deployment reaches a successful terminal
+state; a bounded Manager fallback owns that recovery if the Provider view is
+closed.
 **Remove Integration** is available only while that provider
 is inactive and removes only artifacts and settings entries whose ownership
 Forge can prove. If supported host CLI or live inventory cannot verify that the
@@ -299,6 +304,10 @@ failure** to pause for review, retry automatically up to the chosen bounded
 limit, or stop the task. Optional custom failure instructions are persisted
 with the task and shown to the managed model. Exhausted automatic retries pause
 for operator review.
+
+Forge confirms provider readiness before it imports a new direct-task
+instruction artifact. If the model is missing or the provider is unavailable,
+the task remains a draft and no orphan immutable artifact or run is admitted.
 
 Repeated completion claims do not count as progress. If validation keeps seeing
 identical evidence, Forge applies the task's failure/retry policy and preserves
@@ -429,6 +438,10 @@ Check**. For a saved loopback LM Studio endpoint, this single action:
    transport verifies it;
 4. selects the sole compatible loaded model when no model is pinned; and
 5. runs the managed-provider contract probe and saves its readiness receipt.
+
+After readiness, Forge completes the transactional MCP deployment before it
+allows retained provider-wait runs to resume. Because deployment can restart LM
+Studio, the post-deployment probe—not the earlier probe—is the resume boundary.
 
 Forge does not scan local ports and does not load a model. Keep LM Studio
 installed and load a tool-capable model there. If `lms` is unavailable, the
@@ -751,7 +764,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.2**, build **8**
+Doctor identifies the running source identity as version **0.14.3**, build **9**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally

@@ -275,6 +275,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     ) throws -> Void
     private var providerConfigurationInProgress = false
     private var providerRunOperations = 0
+    private var providerWaitResumeSuspendedAt: Date?
     private var providerConfigurationService: (any ProviderConfigurationServicing)?
     private var activeProviderProbeID: UUID?
     private var managedAutonomy: ManagedAutonomyRuntime?
@@ -2666,7 +2667,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     /// Reconciles the ordinary local-provider path as one idempotent operation.
     /// It never replaces an explicit model pin and returns exactly one typed
     /// external action when local state cannot be resolved automatically.
-    public func connectAndCheckProvider() throws -> ManagerProviderPreparationResult {
+    public func connectAndCheckProvider(
+        resumeWaitingRuns: Bool = true
+    ) throws -> ManagerProviderPreparationResult {
         var configuration = try readProviderConfiguration()
         lock.lock()
         let cachedProbe = runtime.providerProbeState
@@ -2678,7 +2681,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
            let completedAt = cachedProbe.completedAt,
            let checkedAt = ISO8601.date(from: completedAt),
            (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
-            try resumeProviderConfigurationWaits(providerID: .lmStudio)
+            try coordinateProviderConfigurationWaits(
+                resumeWaitingRuns: resumeWaitingRuns
+            )
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
@@ -2695,7 +2700,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
            receipt.provider.health == "contract_valid",
            let checkedAt = ISO8601.date(from: receipt.checkedAt),
            (0...300).contains(app.clock.now().timeIntervalSince(checkedAt)) {
-            try resumeProviderConfigurationWaits(providerID: .lmStudio)
+            try coordinateProviderConfigurationWaits(
+                resumeWaitingRuns: resumeWaitingRuns
+            )
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
@@ -2795,7 +2802,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     provider: provider
                 )
             }
-            try resumeProviderConfigurationWaits(providerID: .lmStudio)
+            try coordinateProviderConfigurationWaits(
+                resumeWaitingRuns: resumeWaitingRuns
+            )
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
@@ -2830,6 +2839,23 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             try await autonomy.resumeProviderConfigurationWaits(
                 providerID: providerID.rawValue
             )
+        }
+    }
+
+    private func coordinateProviderConfigurationWaits(
+        resumeWaitingRuns: Bool
+    ) throws {
+        if resumeWaitingRuns {
+            try resumeProviderConfigurationWaits(providerID: .lmStudio)
+            lock.lock()
+            providerWaitResumeSuspendedAt = nil
+            lock.unlock()
+        } else {
+            let now = app.clock.now()
+            let durablePrecision = ISO8601.date(from: ISO8601.string(from: now)) ?? now
+            lock.lock()
+            providerWaitResumeSuspendedAt = durablePrecision
+            lock.unlock()
         }
     }
 
@@ -5915,6 +5941,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         if shutting { return }
 
         pruneStalePresenceIfDue()
+        resumeProviderWaitsAfterCompletedIntegrationIfNeeded()
         scheduleAutonomyTick()
 
         if !httpUp {
@@ -5968,6 +5995,45 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
 
         persistState()
+    }
+
+    private func resumeProviderWaitsAfterCompletedIntegrationIfNeeded() {
+        lock.lock()
+        let suspendedAt = providerWaitResumeSuspendedAt
+        lock.unlock()
+        guard let suspendedAt else { return }
+
+        let snapshot: ProviderIntegrationsSnapshot
+        do {
+            snapshot = try providerIntegrations()
+        } catch {
+            return
+        }
+        guard snapshot.currentOperation == nil else { return }
+        let operation = snapshot.recentOperations.first(where: {
+            $0.providerID == .lmStudio
+                && ($0.kind == .activate || $0.kind == .repair)
+                && $0.completedAt.flatMap(ISO8601.date(from:)).map {
+                    $0 >= suspendedAt
+                } == true
+        })
+        let suspensionExpired = app.clock.now().timeIntervalSince(suspendedAt) >= 60
+        guard operation?.phase.succeeded == true || suspensionExpired else { return }
+
+        do {
+            _ = try connectAndCheckProvider(resumeWaitingRuns: true)
+            app.diagnostics.info(
+                "manager_provider_waits_resumed_after_integration",
+                ["operation_id": operation?.operationID ?? "bounded-timeout"],
+                category: .manager
+            )
+        } catch {
+            app.diagnostics.warn(
+                "manager_provider_wait_resume_deferred",
+                ["operation_id": operation?.operationID ?? "bounded-timeout"],
+                category: .manager
+            )
+        }
     }
 
     // MARK: - Managed autonomy

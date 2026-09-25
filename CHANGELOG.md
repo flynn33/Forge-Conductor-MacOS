@@ -10,6 +10,35 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+## [0.14.3] — 2026-09-25 (development)
+
+### Fixed
+
+- Made project setup transactional around LM Studio integration deployment.
+  **Connect and Check** now keeps retained provider waits quiescent until the
+  integration operation finishes, then re-probes the provider and resumes the
+  exact retained runs. A bounded Manager fallback performs the same recovery if
+  the Provider view closes before observing the terminal operation.
+- Moved provider readiness ahead of instruction-artifact import during
+  **Start Task**, so a missing model or unavailable provider no longer leaves
+  an orphan immutable setup artifact. Deterministic non-retryable Manager
+  conflicts now surface as configuration errors instead of triggering an
+  inapplicable lost-response reconciliation.
+- Corrected release-contract tests that still asserted `0.14.1 (7)` after the
+  prior version advance, and advanced this backward-compatible repair to
+  `0.14.3 (9)`.
+
+### Verification
+
+- Built both SwiftPM products and the signed canonical Debug app; the full
+  SwiftPM suite completed 1,848 tests with 12 explicit environment/helper skips
+  and zero failures. Separate zero-skip live LM Studio checks passed provider
+  preparation plus fresh-root acknowledgement and automatic continuation.
+- Passed signed native UI registration through both an absolute path and the
+  macOS folder picker, including Manager readback, allowed-root persistence,
+  and relaunch. The onboarding harness now isolates completed Guided Setup
+  state so the intentional first-run sheet cannot mask unrelated controls.
+
 ### 0.14.2 (8) operability repair
 
 - Managed model task prompts now identify instruction snapshots and explicitly
@@ -28,7 +57,7 @@ Product versions do not by themselves claim shipment.
 
 ### Current development line
 
-- Version `0.14.2 (8)` is the current unreleased development identity. Its
+- Version `0.14.3 (9)` is the current unreleased development identity. Its
   guided setup, Autonomy, Continuity, provider-recovery, desktop-integration,
   native UI, and qualification changes are recorded in the development section
   below; no distribution or shipment is claimed.
