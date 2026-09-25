@@ -18,9 +18,14 @@ source `03d3f6e5c2b4cda1ca44106cf9a3a17791418b1f`, tree
 under the owner's configured identity. GitHub accepted the update through the
 authorized admin bypass; repository protections were not changed. Local and
 remote `main` matched that product revision before this documentation-only
-closeout. The canonical workspace membership is unchanged, and the working
-installation, owner project data, and external provider registration remain
-untouched.
+closeout. The 0.14.3 wiki is published at
+`e8d9a827ee58fb717e873fa7d5c331bf059d2d4f`, tree
+`4690f3c08b99d621aa49b8845ce8f1f577753dbd`; local and remote wiki `master`
+matched at publication. README, the Unreleased changelog, affected current
+documents, wiki, runtime constants, and every Xcode build setting align to
+`0.14.3 (9)`. This closeout changes no tested product input or Xcode graph. The
+canonical workspace membership is unchanged, and the working installation,
+owner project data, and external provider registration remain untouched.
 
 September 24 publication checkpoint for N-OPERABILITY-PATCH-0141: the 0.14.2 (8)
 repair is published at `29f17f57a1fd70deaaf98a645512658bcd8da440`, tested source tree
