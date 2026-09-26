@@ -2583,7 +2583,11 @@ private struct LMStudioManagedProviderReceiptLedger: Codable {
 /// not be described as eliminating the provider-response crash race.
 private struct LMStudioManagedProviderReceiptStore: Sendable {
     static let fileName = "managed-provider-receipts.json"
-    static let maximumRecords = 32
+    // The executor can retain 32 completed turns for each of up to 16
+    // concurrently admitted runs. Keep two full concurrency windows so a new
+    // window can displace terminal history without evicting a receipt that an
+    // active run still needs to replay from round zero after a durable yield.
+    static let maximumRecords = 1_024
     static let maximumLedgerBytes = 32 * 1_024 * 1_024
     static let intentLeaseSeconds: TimeInterval = 660
 

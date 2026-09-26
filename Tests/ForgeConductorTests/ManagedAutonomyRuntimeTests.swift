@@ -472,55 +472,81 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         let root = home.appendingPathComponent("provider-auto-resume-project", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         _ = try app.config.update(["allowed_roots": [root.path]], save: true)
-        let project = try await app.projectContexts.repository.registerProjectUnchecked(
+        var project = try await app.projectContexts.repository.registerProjectUnchecked(
             projectID: ProjectID(),
             displayName: "Provider Auto Resume Fixture",
             canonicalRoot: root
         )
-        var retained = try await app.projectContexts.repository.createAutonomousRun(
-            managedRuntimeRunRequest(
-                projectID: project.projectID,
-                generation: project.generation,
-                projectRoot: root
+        func retainedProviderWait(
+            generation: ProjectGeneration,
+            eventPrefix: String
+        ) async throws -> AutonomousRunRecord {
+            var retained = try await app.projectContexts.repository.createAutonomousRun(
+                managedRuntimeRunRequest(
+                    projectID: project.projectID,
+                    generation: generation,
+                    projectRoot: root
+                )
             )
-        )
-        let lease = try await app.projectContexts.repository.acquireRunLease(
-            runID: retained.runID,
-            ownerID: "provider-auto-resume-fixture"
-        )
-        for nextState in [
-            AutonomousRunState.validating, .ready, .starting, .running,
-        ] {
+            let lease = try await app.projectContexts.repository.acquireRunLease(
+                runID: retained.runID,
+                ownerID: "provider-auto-resume-fixture-\(eventPrefix)"
+            )
+            for nextState in [
+                AutonomousRunState.validating, .ready, .starting, .running,
+            ] {
+                retained = try await app.projectContexts.repository.transitionAutonomousRun(
+                    runID: retained.runID,
+                    lease: lease,
+                    transition: AutonomousRunTransition(
+                        expectedState: retained.state,
+                        expectedRevision: retained.revision,
+                        nextState: nextState,
+                        eventType: "\(eventPrefix)_\(nextState.rawValue)",
+                        eventSummary: "Prepare a retained provider wait fixture"
+                    )
+                )
+            }
+            var work = retained.specification.work
+            work.metadata["provider_configuration_auto_resume"] = "pending"
+            work.metadata["provider_configuration_wait_count"] = "3"
             retained = try await app.projectContexts.repository.transitionAutonomousRun(
                 runID: retained.runID,
                 lease: lease,
                 transition: AutonomousRunTransition(
                     expectedState: retained.state,
                     expectedRevision: retained.revision,
-                    nextState: nextState,
-                    eventType: "provider_auto_resume_fixture_\(nextState.rawValue)",
-                    eventSummary: "Prepare a retained provider wait fixture"
+                    nextState: .paused,
+                    eventType: "\(eventPrefix)_paused",
+                    eventSummary: "Bounded automatic provider repair reached its deadline",
+                    work: work,
+                    errorCode: "fixture_provider_unauthorized",
+                    errorSummary: "Provider connection requires repair"
                 )
             )
+            _ = try await app.projectContexts.repository.releaseRunLease(lease)
+            return retained
         }
-        var work = retained.specification.work
-        work.metadata["provider_configuration_auto_resume"] = "pending"
-        work.metadata["provider_configuration_wait_count"] = "3"
-        retained = try await app.projectContexts.repository.transitionAutonomousRun(
-            runID: retained.runID,
-            lease: lease,
-            transition: AutonomousRunTransition(
-                expectedState: retained.state,
-                expectedRevision: retained.revision,
-                nextState: .paused,
-                eventType: "provider_auto_resume_fixture_paused",
-                eventSummary: "Bounded automatic provider repair reached its deadline",
-                work: work,
-                errorCode: "fixture_provider_unauthorized",
-                errorSummary: "Provider connection requires repair"
-            )
+
+        let stale = try await retainedProviderWait(
+            generation: project.generation,
+            eventPrefix: "provider_auto_resume_stale_fixture"
         )
-        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+        _ = try await app.projectContexts.repository.beginReset(
+            projectID: project.projectID,
+            expectedGeneration: project.generation
+        )
+        let reset = try await app.projectContexts.repository.completeReset(
+            projectID: project.projectID,
+            expectedGeneration: project.generation
+        )
+        let resetProject = try await app.projectContexts.repository.project(project.projectID)
+        project = try XCTUnwrap(resetProject)
+        XCTAssertEqual(project.generation, reset.newGeneration)
+        let retained = try await retainedProviderWait(
+            generation: project.generation,
+            eventPrefix: "provider_auto_resume_current_fixture"
+        )
 
         let runtime = try ManagedAutonomyRuntime(
             app: app,
@@ -548,6 +574,13 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         )
         XCTAssertNil(
             current.specification.work.metadata["provider_configuration_wait_count"]
+        )
+        let staleValue = try await app.projectContexts.repository.autonomousRun(stale.runID)
+        let unchangedStale = try XCTUnwrap(staleValue)
+        XCTAssertEqual(unchangedStale.state, .paused)
+        XCTAssertEqual(
+            unchangedStale.specification.work.metadata["provider_configuration_auto_resume"],
+            "pending"
         )
         let duplicateResume = try await runtime.resumeProviderConfigurationWaits(
             providerID: "fixture-provider"

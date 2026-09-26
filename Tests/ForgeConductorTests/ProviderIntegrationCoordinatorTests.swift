@@ -7,6 +7,15 @@ private enum FixtureProviderFailure: Error {
 
 private struct FixtureProviderConfigurationService: ProviderConfigurationServicing {
     let snapshot: ProviderConfigurationSnapshot
+    let availableModels: [ProviderAvailableModel]
+
+    init(
+        snapshot: ProviderConfigurationSnapshot,
+        availableModels: [ProviderAvailableModel] = []
+    ) {
+        self.snapshot = snapshot
+        self.availableModels = availableModels
+    }
 
     func read() async throws -> ProviderConfigurationSnapshot { snapshot }
     func update(_ request: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
@@ -14,7 +23,7 @@ private struct FixtureProviderConfigurationService: ProviderConfigurationServici
         throw FixtureProviderFailure.rejected
     }
     func models() async throws -> ProviderModelInventory {
-        ProviderModelInventory(revision: snapshot.revision, models: [])
+        ProviderModelInventory(revision: snapshot.revision, models: availableModels)
     }
 }
 
@@ -1207,6 +1216,124 @@ final class ProviderIntegrationCoordinatorTests: XCTestCase {
         let selected = await coordinator.snapshot()
         XCTAssertEqual(selected.selectedProviderID, .lmStudio)
         XCTAssertNotEqual(selected.selectionRevision, initial.selectionRevision)
+    }
+
+    func testInstructionQueueRejectsUnloadedPinnedLMStudioModelBeforeQueueOrRunMutation() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        defer {
+            Self.makeInstructionSnapshotsRemovable(app.paths.instructionPackageStoreDir)
+            app.shutdown()
+        }
+        let projectRoot = directory.appendingPathComponent(
+            "lmstudio-unloaded-queue",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
+
+        let lmStudio = FixtureProviderAdapter(providerID: .lmStudio, behavior: .ready)
+        let coordinator = try ProviderIntegrationCoordinator(
+            paths: app.paths,
+            adapters: [lmStudio]
+        )
+        let configuration = ProviderConfigurationSnapshot(
+            revision: "lm-unloaded-queue-v1",
+            endpoint: "http://127.0.0.1:1234",
+            modelKey: "fixture/pinned-unloaded",
+            credentialConfigured: false,
+            saved: true
+        )
+        let configurationService = FixtureProviderConfigurationService(
+            snapshot: configuration,
+            availableModels: [
+                ProviderAvailableModel(
+                    key: "fixture/pinned-unloaded",
+                    loaded: false,
+                    toolUseCapable: true
+                ),
+                ProviderAvailableModel(
+                    key: "fixture/other-loaded",
+                    loaded: true,
+                    toolUseCapable: true
+                ),
+            ]
+        )
+        let registry = HostAdapterRegistry()
+        registry.register(
+            manifest: HostPluginManifest(
+                identifier: ManagerNode.nativeSessionHostAdapterID,
+                version: "fixture",
+                minimumContractVersion: 2,
+                hostType: "fixture",
+                capabilities: HostCapabilities(
+                    create: true,
+                    bootstrap: true,
+                    usageReporting: true,
+                    resume: true,
+                    idempotency: true,
+                    queryByIdempotencyKey: true
+                ),
+                configurationKeys: [],
+                privacyRequirements: [],
+                migrationVersion: 1
+            ),
+            configurationFactory: { _ in configurationService },
+            factory: { _ -> any SessionHostAdapter in
+                throw FixtureProviderFailure.rejected
+            }
+        )
+        let manager = ManagerNode(
+            app: app,
+            providerIntegrationCoordinator: coordinator,
+            hostAdapterRegistry: registry
+        )
+        defer { _ = manager.shutdownManagedAutonomy() }
+
+        let registered = try manager.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            (registered["project_generation"] as? NSNumber)?.uint64Value
+        ))
+        let instruction = directory.appendingPathComponent("unloaded-model-queue.md")
+        try Data("Do not create a run until LM Studio is ready.".utf8).write(
+            to: instruction,
+            options: .atomic
+        )
+        _ = try manager.importInstructionPackage(
+            sourcePath: instruction.path,
+            projectID: projectID,
+            expectedGeneration: generation
+        )
+        _ = try manager.recoverManagedAutonomy()
+
+        XCTAssertThrowsError(try manager.startInstructionQueue(
+            projectID: projectID,
+            expectedGeneration: generation
+        )) { error in
+            guard case .queueBlocked(let detail) = error as? ProjectInstructionQueueError else {
+                return XCTFail("Unexpected admission error: \(error)")
+            }
+            XCTAssertEqual(
+                detail,
+                "Load the pinned model in LM Studio, then choose Connect and Check again."
+            )
+        }
+        let queue = try manager.instructionQueue(
+            projectID: projectID,
+            expectedGeneration: generation
+        )
+        XCTAssertEqual(queue["running"] as? Bool, false)
+        let package = try XCTUnwrap((queue["packages"] as? [[String: Any]])?.first)
+        XCTAssertEqual(package["state"] as? String, "queued")
+        XCTAssertNil(package["run_id"] as? String)
+        let nonterminalRuns = try await app.projectContexts.repository
+            .nonterminalAutonomousRuns(limit: 1)
+        XCTAssertTrue(nonterminalRuns.isEmpty)
     }
 
     func testInstructionQueueAdmissionFencesProviderSwitchUntilDesktopRunIsDurable() async throws {

@@ -1477,11 +1477,37 @@ final class ProviderConfigurationAppTests: XCTestCase {
             app.shutdown()
         }
         let current = try manager.readProviderConfiguration()
-        _ = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
+        let saved = try manager.updateProviderConfiguration(ProviderConfigurationUpdate(
             expectedRevision: current.revision,
             endpoint: "http://127.0.0.1:1234",
             modelKey: "fixture/queue-model"
         ))
+        let checkedAt = ISO8601.string(from: app.clock.now())
+        let receiptDirectory = app.paths.managedProvidersDir.appendingPathComponent(
+            ManagerNode.nativeSessionHostAdapterID,
+            isDirectory: true
+        )
+        try OwnerOnlyAtomicFile.write(
+            try JSONSupport.data(from: [
+                "schemaVersion": 1,
+                "configurationRevision": saved.revision,
+                "checkedAt": checkedAt,
+                "provider": [
+                    "adapter_id": ManagerNode.nativeSessionHostAdapterID,
+                    "provider_id": ProviderIntegrationID.lmStudio.rawValue,
+                    "health": "contract_valid",
+                    "endpoint": saved.endpoint,
+                    "credential_configured": false,
+                    "api_mode": "managed_provider",
+                    "model_key": "fixture/queue-model",
+                    "tool_use_capable": true,
+                    "contract_fingerprint": String(repeating: "a", count: 64),
+                    "last_probe_mode": ManagerProviderProbeMode.contract.rawValue,
+                    "last_probe_at": checkedAt,
+                ],
+            ]),
+            to: receiptDirectory.appendingPathComponent("provider-readiness.json")
+        )
         let registered = try manager.registerProject(path: projectRoot.path)
         let projectID = try ProjectID(XCTUnwrap(UUID(
             uuidString: try XCTUnwrap(registered["project_id"] as? String)

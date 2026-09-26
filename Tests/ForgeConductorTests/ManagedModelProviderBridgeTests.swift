@@ -432,7 +432,7 @@ final class ManagedModelProviderBridgeTests: XCTestCase {
             storageDirectory: root,
             transport: ScriptedProviderBridgeTransport()
         )
-        for index in 0..<40 {
+        for index in 0..<1_040 {
             _ = try await provider.createRoot(ProviderRootRequest(
                 operationID: UUID(),
                 idempotencyKey: "durable-compaction-key-\(index)",
@@ -447,7 +447,33 @@ final class ManagedModelProviderBridgeTests: XCTestCase {
         let object = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any]
         )
-        XCTAssertEqual((object["records"] as? [[String: Any]])?.count, 32)
+        XCTAssertEqual((object["records"] as? [[String: Any]])?.count, 1_024)
+    }
+
+    func testDurableProviderReceiptRetainsFirstTurnAcrossMaximumManagedToolRounds() async throws {
+        let root = providerBridgeTemporaryRoot("durable-active-round-window")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let provider = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: ScriptedProviderBridgeTransport()
+        )
+        let firstKey = "durable-active-round-window-0"
+        for index in 0...ManagedProjectRunStepExecutor.maximumToolRounds {
+            _ = try await provider.createRoot(ProviderRootRequest(
+                operationID: UUID(),
+                idempotencyKey: "durable-active-round-window-\(index)",
+                modelKey: "fixture/tool-model",
+                input: "Retain active round \(index).",
+                tools: []
+            ))
+        }
+
+        let restarted = try LMStudioManagedModelProvider(
+            storageDirectory: root,
+            transport: ScriptedProviderBridgeTransport()
+        )
+        let retained = try await restarted.lookup(idempotencyKey: firstKey)
+        XCTAssertNotNil(retained)
     }
 
     func testBridgeRejectsIncompleteTerminalResponseAndUnsupportedStructuredOutput() async throws {

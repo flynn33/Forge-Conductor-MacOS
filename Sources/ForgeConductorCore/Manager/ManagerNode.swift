@@ -2225,10 +2225,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             requestedModelKey: nil
         )
         if binding?.executionStrategy == .managedProviderPush {
-            let provider = try readProviderConfiguration()
-            guard provider.saved, provider.modelKey?.isEmpty == false else {
+            // Ordered work must cross the same live provider-readiness boundary
+            // as an ordinary managed run before the queue is made durable. A
+            // merely saved model key is insufficient: the pinned model may be
+            // unloaded, the endpoint may be offline, or the tool contract may
+            // have changed since the last run.
+            let preparation = try connectAndCheckProvider(
+                resumeWaitingRuns: false
+            )
+            guard preparation.state == .ready else {
                 throw ProjectInstructionQueueError.queueBlocked(
-                    "Configure the selected provider before starting the instruction queue."
+                    preparation.detail
                 )
             }
         }

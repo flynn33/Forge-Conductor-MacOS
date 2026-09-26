@@ -844,6 +844,15 @@ public actor ManagedAutonomyRuntime {
         var resumed = 0
         for candidate in candidates where candidate.providerID == providerID {
             try Task.checkCancellation()
+            // A generation reset intentionally leaves the prior run as durable
+            // history while revoking its execution authority. Provider repair
+            // must not let that stale run abort recovery of an otherwise valid
+            // current-generation run for the same project.
+            guard let project = try await repository.project(candidate.projectID),
+                  project.lifecycleState == .active,
+                  project.generation == candidate.projectGeneration else {
+                continue
+            }
             let waitCount = Int(
                 candidate.specification.work.metadata[
                     "provider_configuration_wait_count"
