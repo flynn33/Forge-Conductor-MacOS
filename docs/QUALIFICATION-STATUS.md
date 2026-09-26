@@ -1,20 +1,41 @@
 # Version and qualification status
 
-## 0.14.6 Provider-selection and launch-modal repair — deterministic qualification complete
+## 0.14.6 Provider and ordered-run repair — installed development build verified
 
-Version `0.14.6 (12)` prevents the native Provider selectors from deactivating
-the only active provider, lets LM Studio activation supersede a replaceable
-background snapshot load, preserves the no-resume readiness request through the
-manager-client router, and keeps Guided Setup closed until explicitly opened
-from Dashboard or the title bar. The complete SwiftPM regression passed 1,875
-tests with 12 explicit environment/helper skips and zero failures. Focused
-verification passed 27 Provider configuration cases and four Guided Setup
-progress cases; four exact signed app-hosted Xcode cases passed. Signed native
-UI passed launch-without-wizard and the Provider selection/LM Studio transaction,
-including the exact false/true retained-run resumption boundary. Both SwiftPM
-products and the canonical signed Debug workspace app built; identity and
-repository checks passed. No live-provider, installed-build, distribution, or
-shipment result is inherited.
+Product repairs `675d267fdd2f45cd412e5398a04a2321bfe51def`,
+`f39c79ad0e60259d7a02ba0361825e5b6940c136`, and
+`101c3d44f80c689c428e255f4578d88c54f40c16` add the missing
+live LM Studio readiness boundary to ordered-work admission, ignore stale
+project generations during provider-repair resume, expand the bounded managed-
+provider receipt window so a maximum-round run retains its first turn, preserve
+continuity identity through budget escalation, and release project-local
+continuity authority when its owning run is cancelled.
+The existing Provider repair prevents deactivating the sole selected provider,
+lets LM Studio activation supersede a replaceable background snapshot load,
+preserves no-resume preparation through the manager-client router, and keeps
+Guided Setup closed until explicitly opened.
+
+**E0, installed build:** the owner-state pin `qwen/qwen3-coder-30b` was installed
+but unloaded when the original queue rejection was recorded. Loading that exact
+pin and running **Connect and Check** produced a current `contract_valid`
+readiness receipt. The installed `/Applications/Forge Conductor.app` then
+returned HTTP 200 for the same project/package **Start Ordered Work** request.
+The final live run `6573026b-35f1-47b8-a0c6-6b4df226eed7` completed 50 LM Studio
+turns, 41 tools, and 18 automatic rollovers. It then paused at the separate
+package completion gate because project-build and project-tests evidence was
+absent. It did not reproduce the LM Studio configuration, receipt-reconciliation,
+continuity identity-drift, or stranded-operation failures. The prior terminal
+run's exact operation is retained as `run_cancelled` quarantine history. The
+provider ledger still selected `lmstudio`, reported it configured/selectable,
+and had no current operation. Exact native UI passed launch without an automatic
+setup sheet and the Provider selection/LM Studio transaction.
+
+The complete SwiftPM regression passed 1,879 tests with 12 explicit skips and
+zero failures. Both SwiftPM products and the canonical Apple Development-signed
+Debug workspace app built; strict deep signing, repository hygiene, and Xcode
+membership checks passed. Gatekeeper rejects this development-signed app as a
+distribution artifact. Developer ID signing/notarization and shipment remain
+open; this section does not call the build publicly shippable.
 
 ## 0.14.5 project-workflow repair — qualification incomplete
 

@@ -10,6 +10,49 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Fixed
+
+- Made **Start Ordered Work** perform a live, no-resume readiness check for the
+  selected LM Studio endpoint, pinned model, loaded inventory, and tool contract
+  before mutating the instruction queue or creating a run. An unloaded pin now
+  returns the exact corrective action while leaving the package queued.
+- Limited provider-repair auto-resume to the active project generation, so a
+  durable historical run cannot abort recovery of current-generation work.
+- Retained 1,024 bounded managed-provider receipts—two complete windows for the
+  maximum 16 concurrent runs and 32 tool rounds—so a current run can reconcile
+  its first turn after a durable yield without unbounded storage.
+- Preserved the original checkpoint observation when a context-budget request
+  escalates to rollover or emergency, while still applying the request's newer
+  severity. A valid escalation no longer appears as V2 identity drift.
+- Quarantined the exact project-local continuity operation when its owning run
+  is cancelled. Recovery also removes a legacy stranded operation only after
+  proving that its owning control-plane run is terminal.
+
+### Verification
+
+- Published ordered-readiness/receipt repair
+  `675d267fdd2f45cd412e5398a04a2321bfe51def`, budget-escalation repair
+  `f39c79ad0e60259d7a02ba0361825e5b6940c136`, and cancellation-authority
+  repair `101c3d44f80c689c428e255f4578d88c54f40c16`. The final complete
+  SwiftPM regression passed 1,879 tests with 12 explicit skips and zero
+  failures; both SwiftPM products and the canonical Debug workspace app built.
+  Focused regressions cover unloaded-pin admission before mutation,
+  current-generation-only resume, 33-turn restart replay, 1,024-record
+  compaction, checkpoint escalation, and cancellation quarantine.
+- Installed the repaired Apple Development-signed app at
+  `/Applications/Forge Conductor.app`. Its exact native UI passed two cases:
+  launch without automatic Guided Setup and selectable Provider cards with the
+  LM Studio no-resume/repair/resume transaction. The installed manager returned
+  HTTP 200 for the owner's same project/package **Start Ordered Work** request.
+  Final live run `6573026b-35f1-47b8-a0c6-6b4df226eed7` completed 50 LM Studio
+  turns, 41 tools, and 18 automatic rollovers without the LM Studio
+  configuration, receipt-reconciliation, identity-drift, or stranded-operation
+  failures found during repair. It then paused at its separate package
+  completion gate because project-build and project-tests evidence was absent.
+- Strict deep signing passes for the installed development build. Gatekeeper
+  distribution assessment rejects it because it is not a notarized Developer
+  ID artifact; no public-distribution or shipment claim is made.
+
 ## [0.14.6] — 2026-09-26 (build 12 development repair candidate)
 
 ### Fixed

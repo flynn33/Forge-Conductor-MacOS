@@ -14,11 +14,14 @@ supported desktop coding hosts.
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.6 (12)` is a development repair candidate. It repairs
-> the reported Provider-selection lockout and removes launch-time Guided Setup
-> presentation. Deterministic source, signed Debug, and native UI qualification
-> pass; live-provider, installed-build, and distribution qualification remain
-> required before shipment.
+> **Release status:** `0.14.6 (12)` is installed locally as an Apple
+> Development-signed repair build. The installed app admitted the owner's same
+> project and instruction package through **Start Ordered Work**, selected the
+> pinned LM Studio model, and executed managed model/tool turns without the
+> reported configuration error. Provider selection/reconnection and
+> launch-without-Guided-Setup are covered by native UI and installed-state
+> evidence. Developer ID distribution, notarization, and shipment qualification
+> remain required before shipment.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation

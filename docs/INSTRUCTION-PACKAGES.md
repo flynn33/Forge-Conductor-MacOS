@@ -28,9 +28,12 @@ Instruction packages turn a registered local repository into an ordered work que
    must complete the instructed one-time `desktop_run_attach` before any
    project-scoped Forge tool is available.
 7. To run the whole project queue, choose **Start Ordered Work** in Projects.
-   LM Studio endpoint, credential, exact-model, inventory, and probe controls
-   remain under **LM Studio Advanced**; they are not prerequisites for a
-   desktop-host run.
+   For LM Studio, Forge rechecks the endpoint, exact pinned model, loaded
+   inventory, and tool contract before changing queue state or creating a run.
+   An unloaded pin remains queued and reports **Load the pinned model in LM
+   Studio, then choose Connect and Check again.** LM Studio controls remain
+   under **LM Studio Advanced**; they are not prerequisites for a desktop-host
+   run.
 
 The question-mark toolbar button opens the same setup sequence inside the app.
 
@@ -118,8 +121,9 @@ order change carries a queue revision so concurrent or stale edits fail instead
 of silently overwriting a newer order.
 
 **Start Ordered Work** requires one selected, verified provider and a
-running managed autonomy service. LM Studio requires its exact saved model;
-desktop providers use the model chosen by their host. Forge creates a managed run scoped to the registered
+running managed autonomy service. LM Studio requires a live no-resume readiness
+check of its exact saved and loaded model before any queue/run mutation; desktop
+providers use the model chosen by their host. Forge creates a managed run scoped to the registered
 repository root, package project UUID, and current project generation. It
 advances to the next queued package only after the current package reaches
 `completed`. A failed, cancelled, paused, or terminally failed run stops

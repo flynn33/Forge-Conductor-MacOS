@@ -53,6 +53,14 @@ or deployment revision makes the preparation stale before a run is admitted.
 An absent or unverified desktop receipt routes recovery back to Provider rather
 than silently falling back to LM Studio.
 
+For LM Studio ordered work, admission performs a fresh no-resume preparation
+before changing queue state or creating a run. A saved model key alone is not
+readiness: the endpoint must be reachable, the exact pinned model must be loaded,
+and its current tool contract must pass. A failed check returns its exact
+corrective action and leaves the package queued. Provider repair resumes only
+waiting runs from each project's active generation; durable prior-generation
+runs remain history and cannot interrupt current recovery.
+
 LM Studio runs enter Forge's managed provider-push coordinator and native
 session-host rollover flow. Desktop-bound runs never enter that coordinator,
 including after Manager restart or an operator resume. The desktop host owns
@@ -93,6 +101,21 @@ readiness probe. Forge first completes the integration deployment—which may
 restart LM Studio—then performs a fresh readiness check and resumes those exact
 runs. The Manager also owns a bounded fallback so closing the Provider view
 cannot leave a successful deployment permanently suspended.
+
+Managed LM Studio response receipts are bounded to 1,024 records. This retains
+two complete receipt windows for the supported maximum of 16 concurrent runs
+and 32 managed tool rounds while allowing terminal history to compact. The byte
+ceiling remains 32 MiB. Restart replay therefore retains round zero for an
+active maximum-round run without creating an unbounded ledger.
+
+One context-budget request keeps the same continuity operation identity if its
+severity escalates from checkpoint to rollover or emergency. The durable
+operation remains bound to its original checkpoint observation, while the newer
+request severity controls the next action. Cancelling a managed run quarantines
+that exact operation and handoff as `run_cancelled` history before the run
+becomes terminal. Recovery may clear an older stranded operation only after the
+control-plane repository proves its exact owning run is terminal; otherwise the
+project-wide continuity fence remains closed.
 
 LM Studio has the same activation toggle as the selectable desktop hosts. Turning it on
 runs the manager-owned **Connect and Check** workflow first and selects
