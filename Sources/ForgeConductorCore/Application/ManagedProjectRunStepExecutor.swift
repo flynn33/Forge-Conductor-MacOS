@@ -124,6 +124,11 @@ public protocol ManagedRunContinuityExecuting: Sendable {
         context: ToolInvocationContext,
         lease: RunLease
     ) async throws -> ProjectRunStepOutcome
+    func finalizeRunCancellation(run: AutonomousRunRecord) async throws
+}
+
+public extension ManagedRunContinuityExecuting {
+    func finalizeRunCancellation(run _: AutonomousRunRecord) async throws {}
 }
 
 public struct UnavailableManagedRunContinuityExecutor: ManagedRunContinuityExecuting, Sendable {
@@ -322,6 +327,10 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         if let active = activeRequests.removeValue(forKey: runID) {
             await active.provider.cancel(requestID: active.requestID)
         }
+    }
+
+    public func finalizeCancellation(run: AutonomousRunRecord) async throws {
+        try await continuity.finalizeRunCancellation(run: run)
     }
 
     private func executeProviderStep(

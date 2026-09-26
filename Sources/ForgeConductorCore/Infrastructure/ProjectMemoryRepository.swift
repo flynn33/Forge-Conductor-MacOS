@@ -2228,6 +2228,108 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         }
     }
 
+    /// Quarantines the exact nonterminal V2 operation owned by a terminal or
+    /// cancelling run. History remains queryable in SQLite, but the operation
+    /// no longer occupies the project's unique active-continuity slot.
+    @discardableResult
+    public func continuityCancelOperationV2(
+        operationID: String,
+        runID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                guard let current = try continuityOperationV2Unlocked(operationID) else {
+                    return false
+                }
+                guard current.runID == runID else {
+                    throw ProjectMemoryError.projectScopeMismatch
+                }
+                guard !current.state.isTerminal else { return false }
+                let timestamp = ISO8601.string(from: clock.now())
+                let evidence = "run_cancelled:\(runID)"
+                let checksum = JSONSupport.sha256Hex(evidence)
+                try withStatementUnlocked(
+                    """
+                    UPDATE rollover_operations
+                    SET quarantine_state='run_cancelled',last_error=?,retry_at=NULL,updated_at=?
+                    WHERE operation_id=? AND project_id=? AND schema_version=2
+                      AND quarantine_state IS NULL AND run_id=?
+                    """
+                ) { statement in
+                    bind(statement, 1, "Owning run was cancelled")
+                    bind(statement, 2, timestamp)
+                    bind(statement, 3, operationID)
+                    bind(statement, 4, projectID)
+                    bind(statement, 5, runID)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.conflict(
+                        "V2 cancellation compare-and-set failed"
+                    )
+                }
+                try withStatementUnlocked(
+                    """
+                    UPDATE continuity_handoffs SET quarantine_state='run_cancelled'
+                    WHERE handoff_id=? AND project_id=? AND operation_id=?
+                      AND schema_version='2.0' AND quarantine_state IS NULL
+                    """
+                ) { statement in
+                    bind(statement, 1, current.handoffID)
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, operationID)
+                    try stepDone(statement)
+                }
+                guard sqlite3_changes(db) == 1 else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "V2 cancellation handoff was not quarantined"
+                    )
+                }
+                try withStatementUnlocked(
+                    """
+                    INSERT INTO rollover_transitions(
+                        operation_id,project_id,from_state,to_state,attempt,created_at,
+                        adapter_id,evidence,state_checksum,schema_version,
+                        project_generation,run_id,successor_provider_response_id
+                    ) VALUES(?,?,?,'cancelled',?,?,?,?,?,2,?,?,?)
+                    """
+                ) { statement in
+                    bind(statement, 1, operationID)
+                    bind(statement, 2, projectID)
+                    bind(statement, 3, current.state.rawValue)
+                    sqlite3_bind_int(statement, 4, Int32(current.attempt))
+                    bind(statement, 5, timestamp)
+                    bind(statement, 6, current.adapterID)
+                    bind(statement, 7, evidence)
+                    bind(statement, 8, checksum)
+                    sqlite3_bind_int64(statement, 9, Int64(current.projectGeneration))
+                    bind(statement, 10, runID)
+                    bind(statement, 11, current.successorProviderResponseID)
+                    try stepDone(statement)
+                }
+                try withStatementUnlocked(
+                    """
+                    DELETE FROM continuity_projection_repairs
+                    WHERE project_id=? AND (
+                        (projection_kind='operation' AND record_id=?) OR
+                        (projection_kind='handoff' AND record_id=?)
+                    )
+                    """
+                ) { statement in
+                    bind(statement, 1, projectID)
+                    bind(statement, 2, operationID)
+                    bind(statement, 3, current.handoffID)
+                    try stepDone(statement)
+                }
+                return true
+            }
+        }
+    }
+
     public func continuityTransitionV2(
         operationID: String,
         expected: ContinuityState,

@@ -448,6 +448,79 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         )
     }
 
+    func testRunCancellationQuarantinesDurableContinuityOperation() async throws {
+        let fixture = try await makeFixture(
+            label: "cancel-durable-operation",
+            initialUsedTokens: 48_000,
+            continuityState: .checkpointing
+        )
+        defer { fixture.destroy() }
+        let adapter = ContinuityWorkerAdapter()
+        let intent = continuityIntent(fixture.run)
+        let persisted = try await fixture.repository.persistRunSideEffectIntent(
+            runID: fixture.run.runID,
+            lease: fixture.lease,
+            expectedRevision: fixture.run.revision,
+            intent: intent
+        )
+        let context = try await fixture.repository.invocationContext(
+            for: ProjectBindingOwner(kind: .autonomousRun, id: persisted.runID.description)
+        )
+        let worker = ManagedContinuityWorker(
+            repository: fixture.repository,
+            memory: fixture.memory,
+            adapterResolver: { _ in adapter },
+            crashAfter: .handoffPersistence
+        )
+        do {
+            _ = try await worker.executeContinuityStep(
+                intent: intent,
+                run: persisted,
+                context: context,
+                lease: fixture.lease
+            )
+            XCTFail("Expected a crash after durable handoff persistence")
+        } catch ManagedContinuityWorkerError.injectedCrash(let point) {
+            XCTAssertEqual(point, .handoffPersistence)
+        }
+        let currentValue = try await fixture.repository.autonomousRun(persisted.runID)
+        let current = try XCTUnwrap(currentValue)
+        let requestValue = try await fixture.repository.contextBudgetActionRequest(
+            identity: fixture.budgetIdentity
+        )
+        let operationID = try XCTUnwrap(requestValue).continuityOperationID
+        let projectMemory = try fixture.memory.repositoryForProject(
+            current.projectID.description
+        )
+        XCTAssertEqual(
+            try projectMemory.continuityActiveOperationV2()?.operationID,
+            operationID.uuidString.lowercased()
+        )
+        let cancelRequested = try await fixture.repository.transitionAutonomousRun(
+            runID: current.runID,
+            lease: fixture.lease,
+            transition: AutonomousRunTransition(
+                expectedState: .checkpointing,
+                expectedRevision: current.revision,
+                nextState: .cancelRequested,
+                eventType: "fixture_cancel_requested",
+                eventSummary: "Cancel durable continuity fixture",
+                activeOperationID: operationID
+            )
+        )
+
+        try await worker.finalizeRunCancellation(run: cancelRequested)
+
+        XCTAssertNil(try projectMemory.continuityActiveOperationV2())
+        XCTAssertEqual(
+            try projectMemory.continuityOperationV2(
+                id: operationID.uuidString.lowercased()
+            )?.quarantineState,
+            "run_cancelled"
+        )
+        XCTAssertEqual(adapter.cancelCount, 1)
+    }
+
     func testMismatchedBootstrapNonceNeverAcceptsCandidate() async throws {
         let fixture = try await makeFixture(label: "bad-receipt")
         defer { fixture.destroy() }
@@ -1425,6 +1498,7 @@ private final class ContinuityWorkerAdapter: SessionHostAdapterV2, @unchecked Se
     private let mismatchedNonce: Bool
     private var receipts: [String: BootstrapReceipt] = [:]
     private var creates = 0
+    private var cancels = 0
 
     init(mismatchedNonce: Bool = false) {
         self.mismatchedNonce = mismatchedNonce
@@ -1432,6 +1506,10 @@ private final class ContinuityWorkerAdapter: SessionHostAdapterV2, @unchecked Se
 
     var createCount: Int {
         lock.withLock { creates }
+    }
+
+    var cancelCount: Int {
+        lock.withLock { cancels }
     }
 
     func capabilitiesV2() async throws -> HostCapabilitiesV2 {
@@ -1495,7 +1573,9 @@ private final class ContinuityWorkerAdapter: SessionHostAdapterV2, @unchecked Se
         lock.withLock { receipts[key] }
     }
 
-    func cancel(operationID: UUID) async {}
+    func cancel(operationID: UUID) async {
+        lock.withLock { cancels += 1 }
+    }
 
 }
 

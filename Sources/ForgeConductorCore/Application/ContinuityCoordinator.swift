@@ -431,6 +431,26 @@ public final class ContinuityStateEngine: @unchecked Sendable {
         return value
     }
 
+    @discardableResult
+    public func cancelV2(
+        projectID: String,
+        operationID: String,
+        runID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> Bool {
+        try cancellation?.checkCancellation()
+        let changed = try memory.repositoryForProject(
+            projectID,
+            cancellation: cancellation
+        ).continuityCancelOperationV2(
+            operationID: operationID,
+            runID: runID,
+            cancellation: cancellation
+        )
+        try cancellation?.checkCancellation()
+        return changed
+    }
+
     public func handoffV2(
         projectID: String,
         handoffID: String,

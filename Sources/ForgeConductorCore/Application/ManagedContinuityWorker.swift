@@ -418,6 +418,29 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
         await adapter.cancel(operationID: operationID)
     }
 
+    /// A cancelled managed run must release its project-wide continuity slot.
+    /// The canonical operation and handoff remain durable quarantine history,
+    /// while active-operation lookup can admit later work for the project.
+    public func finalizeRunCancellation(run: AutonomousRunRecord) async throws {
+        guard let operationID = run.activeOperationID,
+              let operation = try engine.operationV2(
+                projectID: run.projectID.description,
+                operationID: operationID.uuidString.lowercased()
+              ),
+              operation.runID == run.runID.description,
+              !operation.state.isTerminal else {
+            return
+        }
+        if let adapter = try? adapterResolver(operation.adapterID) {
+            await adapter.cancel(operationID: operationID)
+        }
+        _ = try engine.cancelV2(
+            projectID: run.projectID.description,
+            operationID: operation.operationID,
+            runID: run.runID.description
+        )
+    }
+
     /// Durable control-plane authority surrounds both independent store writes.
     /// A partial cleanup leaves the request fenced and can replay either marker.
     func completeSourceCancellation(claim: ContinuityOperationCancellationClaim, lease: RunLease,
@@ -896,7 +919,20 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
         }
         if let active = try engine.activeOperationV2(projectID: projectID),
            active.operationID.caseInsensitiveCompare(operationID) != .orderedSame {
-            throw ProjectMemoryError.conflict("another V2 rollover operation is active")
+            // Older cancellation paths could leave a project-local operation
+            // active after its control-plane run became terminal. Verify that
+            // exact terminal owner before quarantining the stale operation;
+            // nonterminal or unresolvable ownership still fails closed.
+            guard let staleRunUUID = UUID(uuidString: active.runID),
+                  let staleRun = try await repository.autonomousRun(RunID(staleRunUUID)),
+                  staleRun.state.isTerminal else {
+                throw ProjectMemoryError.conflict("another V2 rollover operation is active")
+            }
+            _ = try engine.cancelV2(
+                projectID: projectID,
+                operationID: active.operationID,
+                runID: staleRun.runID.description
+            )
         }
         let predecessor = try await requiredProviderSession(request.identity.sessionID)
         let handoffID = Self.stableUUID("handoff:\(operationID)")

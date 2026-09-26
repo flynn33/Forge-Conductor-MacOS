@@ -30,6 +30,11 @@ public protocol ProjectRunStepExecuting: Sendable {
     ) async throws -> ProjectRunStepOutcome
 
     func cancel(runID: RunID) async
+    func finalizeCancellation(run: AutonomousRunRecord) async throws
+}
+
+public extension ProjectRunStepExecuting {
+    func finalizeCancellation(run _: AutonomousRunRecord) async throws {}
 }
 
 public protocol RunCompletionValidating: Sendable {
@@ -366,6 +371,7 @@ public actor ProjectRunCoordinator {
             }
             if run.state == .cancelRequested {
                 await stepExecutor.cancel(runID: runID)
+                try await stepExecutor.finalizeCancellation(run: run)
                 run = try await transition(
                     run,
                     to: .cancelled,
