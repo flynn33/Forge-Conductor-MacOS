@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.14.6)
+# Context & Agent Continuity (v0.14.7)
 
 ## Summary
 

@@ -7,14 +7,14 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.6** |
-| **Build** | **12** |
+| **Version** | **0.14.7** |
+| **Build** | **13** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.6 (12)` is installed locally as an Apple
+> **Release status:** `0.14.7 (13)` is installed locally as an Apple
 > Development-signed repair build. The installed app admitted the owner's same
 > project and instruction package through **Start Ordered Work**, selected the
 > pinned LM Studio model, and executed managed model/tool turns without the
@@ -27,7 +27,7 @@ Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
 binding. Those warning repairs preserve provider request schemas and canonical
 Xcode target membership; the intentional provider workflow changes are
-described below. The current patch identity is `0.14.6 (12)`.
+described below. The current patch identity is `0.14.7 (13)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,

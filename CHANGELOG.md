@@ -53,6 +53,13 @@ Product versions do not by themselves claim shipment.
   distribution assessment rejects it because it is not a notarized Developer
   ID artifact; no public-distribution or shipment claim is made.
 
+## [0.14.7] — 2026-09-26 (build 13 identity correction)
+
+### Changed
+
+- Corrected the product version and build identity for the product commits that
+  landed after `0.14.6 (12)`. This identity change makes no shipment claim.
+
 ## [0.14.6] — 2026-09-26 (build 12 development repair candidate)
 
 ### Fixed
