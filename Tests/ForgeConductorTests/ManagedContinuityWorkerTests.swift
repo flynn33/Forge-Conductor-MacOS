@@ -336,6 +336,118 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         await restartedRepository.close()
     }
 
+    func testCheckpointOperationSurvivesBudgetObservationEscalation() async throws {
+        let fixture = try await makeFixture(
+            label: "checkpoint-escalation",
+            initialUsedTokens: 48_000,
+            continuityState: .checkpointing
+        )
+        defer { fixture.destroy() }
+        let adapter = ContinuityWorkerAdapter()
+        let intent = continuityIntent(fixture.run)
+        let persisted = try await fixture.repository.persistRunSideEffectIntent(
+            runID: fixture.run.runID,
+            lease: fixture.lease,
+            expectedRevision: fixture.run.revision,
+            intent: intent
+        )
+        let context = try await fixture.repository.invocationContext(
+            for: ProjectBindingOwner(kind: .autonomousRun, id: persisted.runID.description)
+        )
+        let crashing = ManagedContinuityWorker(
+            repository: fixture.repository,
+            memory: fixture.memory,
+            adapterResolver: { _ in adapter },
+            crashAfter: .handoffPersistence
+        )
+        do {
+            _ = try await crashing.executeContinuityStep(
+                intent: intent,
+                run: persisted,
+                context: context,
+                lease: fixture.lease
+            )
+            XCTFail("Expected a crash after durable handoff persistence")
+        } catch ManagedContinuityWorkerError.injectedCrash(let point) {
+            XCTAssertEqual(point, .handoffPersistence)
+        }
+
+        let originalRequestValue = try await fixture.repository.contextBudgetActionRequest(
+            identity: fixture.budgetIdentity
+        )
+        let originalRequest = try XCTUnwrap(originalRequestValue)
+        XCTAssertEqual(originalRequest.requestedAction, .checkpoint)
+        let operationID = originalRequest.continuityOperationID
+        let projectMemory = try fixture.memory.repositoryForProject(
+            persisted.projectID.description
+        )
+        let operationBeforeEscalation = try XCTUnwrap(
+            try projectMemory.continuityOperationV2(
+                id: operationID.uuidString.lowercased()
+            )
+        )
+        XCTAssertEqual(operationBeforeEscalation.state, .checkpointPersisted)
+        XCTAssertEqual(
+            operationBeforeEscalation.budgetObservationID,
+            originalRequest.observationID.uuidString.lowercased()
+        )
+
+        let supervisor = try await ContextBudgetSupervisor.open(
+            repository: fixture.repository,
+            identity: fixture.budgetIdentity,
+            configuration: fixture.budgetConfiguration
+        )
+        let escalated = try await supervisor.evaluate(ContextBudgetEvaluationRequest(
+            triggerPoint: .providerOverflow,
+            providerResponseID: "response-checkpoint-overflow",
+            measurement: .providerOverflow(lastKnownUsedTokens: 64_000)
+        ))
+        let escalatedRequest = try XCTUnwrap(escalated.actionRequest)
+        XCTAssertEqual(escalatedRequest.requestID, originalRequest.requestID)
+        XCTAssertEqual(escalatedRequest.continuityOperationID, operationID)
+        XCTAssertEqual(escalatedRequest.requestedAction, .emergency)
+        XCTAssertNotEqual(escalatedRequest.observationID, originalRequest.observationID)
+
+        let currentValue = try await fixture.repository.autonomousRun(persisted.runID)
+        let current = try XCTUnwrap(currentValue)
+        let rollingOver = try await fixture.repository.transitionAutonomousRun(
+            runID: current.runID,
+            lease: fixture.lease,
+            transition: AutonomousRunTransition(
+                expectedState: .checkpointing,
+                expectedRevision: current.revision,
+                nextState: .rollingOver,
+                eventType: "fixture_escalated_rollover",
+                eventSummary: "Checkpoint escalated to emergency rollover"
+            )
+        )
+        let worker = ManagedContinuityWorker(
+            repository: fixture.repository,
+            memory: fixture.memory,
+            adapterResolver: { _ in adapter }
+        )
+        let outcome = try await worker.executeContinuityStep(
+            intent: intent,
+            run: rollingOver,
+            context: context,
+            lease: fixture.lease
+        )
+        guard case .continued = outcome else {
+            return XCTFail("Escalated continuity did not complete")
+        }
+        XCTAssertEqual(adapter.createCount, 1)
+        let completed = try XCTUnwrap(
+            try projectMemory.continuityOperationV2(
+                id: operationID.uuidString.lowercased()
+            )
+        )
+        XCTAssertEqual(completed.state, .predecessorSealed)
+        XCTAssertEqual(
+            completed.budgetObservationID,
+            originalRequest.observationID.uuidString.lowercased()
+        )
+    }
+
     func testMismatchedBootstrapNonceNeverAcceptsCandidate() async throws {
         let fixture = try await makeFixture(label: "bad-receipt")
         defer { fixture.destroy() }
@@ -748,7 +860,11 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         } catch {}
     }
 
-    private func makeFixture(label: String) async throws -> WorkerFixture {
+    private func makeFixture(
+        label: String,
+        initialUsedTokens: Int? = nil,
+        continuityState: AutonomousRunState = .rollingOver
+    ) async throws -> WorkerFixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "forge-managed-continuity-\(label)-\(UUID().uuidString)",
             isDirectory: true
@@ -881,35 +997,39 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             projectGeneration: .initial,
             sessionID: predecessor
         )
+        let budgetConfiguration = ContextBudgetConfiguration(
+            capacity: ContextCapacityResolution(
+                providerID: "fixture-provider",
+                providerVersionFingerprint: "fixture-v1",
+                modelKey: "fixture/model",
+                activeInstanceID: "fixture-instance",
+                capacity: 65_536,
+                maximumContextLength: 65_536,
+                requiresModelLoad: false
+            ),
+            reserves: ContextBudgetReserves(
+                outputTokens: 1_024,
+                schemaTokens: 512,
+                handoffTokens: 1_024,
+                recoveryTokens: 512
+            ),
+            policy: ContextBudgetPolicy(initialProjectedNextTurnTokens: 512)
+        )
         let supervisor = try await ContextBudgetSupervisor.open(
             repository: repository,
             identity: identity,
-            configuration: ContextBudgetConfiguration(
-                capacity: ContextCapacityResolution(
-                    providerID: "fixture-provider",
-                    providerVersionFingerprint: "fixture-v1",
-                    modelKey: "fixture/model",
-                    activeInstanceID: "fixture-instance",
-                    capacity: 65_536,
-                    maximumContextLength: 65_536,
-                    requiresModelLoad: false
-                ),
-                reserves: ContextBudgetReserves(
-                    outputTokens: 1_024,
-                    schemaTokens: 512,
-                    handoffTokens: 1_024,
-                    recoveryTokens: 512
-                ),
-                policy: ContextBudgetPolicy(initialProjectedNextTurnTokens: 512)
-            )
+            configuration: budgetConfiguration
         )
-        _ = try await supervisor.evaluate(
-            ContextBudgetEvaluationRequest(
-                triggerPoint: .providerOverflow,
-                providerResponseID: "response-predecessor",
-                measurement: .providerOverflow(lastKnownUsedTokens: 64_000)
-            )
-        )
+        let measurement: ContextBudgetMeasurement = if let initialUsedTokens {
+            .providerExact(usedTokens: initialUsedTokens)
+        } else {
+            .providerOverflow(lastKnownUsedTokens: 64_000)
+        }
+        _ = try await supervisor.evaluate(ContextBudgetEvaluationRequest(
+            triggerPoint: initialUsedTokens == nil ? .providerOverflow : .afterProviderTurn,
+            providerResponseID: "response-predecessor",
+            measurement: measurement
+        ))
         let observedRun = try await repository.autonomousRun(run.runID)
         run = try XCTUnwrap(observedRun)
         run = try await repository.transitionAutonomousRun(
@@ -918,9 +1038,9 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             transition: AutonomousRunTransition(
                 expectedState: .running,
                 expectedRevision: run.revision,
-                nextState: .rollingOver,
+                nextState: continuityState,
                 eventType: "fixture_rollover_required",
-                eventSummary: "Fixture requested emergency rollover"
+                eventSummary: "Fixture requested managed continuity"
             )
         )
         lease = try await repository.renewRunLease(
@@ -936,7 +1056,9 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             run: run,
             lease: lease,
             predecessorSessionID: predecessor,
-            instructionArtifactSHA256: instructionArtifact.contentSHA256
+            instructionArtifactSHA256: instructionArtifact.contentSHA256,
+            budgetIdentity: identity,
+            budgetConfiguration: budgetConfiguration
         )
     }
 
@@ -1136,6 +1258,8 @@ private struct WorkerFixture {
     let lease: RunLease
     let predecessorSessionID: String
     let instructionArtifactSHA256: String
+    let budgetIdentity: ContextBudgetIdentity
+    let budgetConfiguration: ContextBudgetConfiguration
 
     func destroy() {
         memory.closeAll()

@@ -821,10 +821,29 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
         if let existing = try engine.operationV2(projectID: projectID, operationID: operationID) {
             guard existing.projectGeneration == run.projectGeneration.rawValue,
                   existing.runID == run.runID.description,
-                  existing.predecessorSessionID == request.identity.sessionID,
-                  existing.budgetObservationID == observation.observationID.uuidString.lowercased()
-                    || existing.budgetObservationID == nil else {
+                  existing.predecessorSessionID == request.identity.sessionID else {
                 throw ProjectMemoryError.conflict("V2 operation identity changed")
+            }
+            // One context-budget request and continuity operation deliberately
+            // survive severity escalation. The request's observation advances,
+            // but an already durable operation remains bound to the observation
+            // that created its checkpoint. Recover that exact observation for
+            // any pre-checkpoint handoff rebuild instead of treating a valid
+            // checkpoint -> rollover/emergency escalation as identity drift.
+            let operationObservation: ContextBudgetObservation
+            if let boundID = existing.budgetObservationID {
+                guard let observationID = UUID(uuidString: boundID),
+                      let bound = try await repository.contextBudgetObservation(
+                        observationID: observationID
+                      ),
+                      bound.identity == request.identity else {
+                    throw ProjectMemoryError.integrityFailure(
+                        "V2 operation budget observation is unavailable or out of scope"
+                    )
+                }
+                operationObservation = bound
+            } else {
+                operationObservation = observation
             }
             let handoff: ContinuityHandoffV2
             if let durable = try engine.handoffV2(
@@ -852,7 +871,7 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
                     project: project,
                     predecessor: predecessor,
                     actionRequest: request,
-                    observation: observation,
+                    observation: operationObservation,
                     instructionDelivery: instructionDelivery
                 )
             }
