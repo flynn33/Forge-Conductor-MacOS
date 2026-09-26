@@ -85,6 +85,11 @@ struct ProviderOperatorView: View {
                 }
             }
 
+            Text("Select another provider to switch execution. Forge keeps one provider active.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("provider-selection-guidance")
+
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 300), spacing: 12)],
                 alignment: .leading,
@@ -514,7 +519,12 @@ private struct ProviderSelectionCard: View {
                     "Activate \(descriptor.displayName)",
                     isOn: Binding(
                         get: { selected },
-                        set: onToggle
+                        set: { enabled in
+                            // These are mutually exclusive selectors. Turning
+                            // one on changes the selection; turning the active
+                            // choice off cannot leave run admission providerless.
+                            onToggle(enabled)
+                        }
                     )
                 )
                 .labelsHidden()

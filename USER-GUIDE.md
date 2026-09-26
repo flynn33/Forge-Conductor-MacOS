@@ -1,10 +1,10 @@
 # Forge Conductor user guide
 
-Version **0.14.5**, build **11**. This guide covers the native Forge Conductor
+Version **0.14.6**, build **12**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.5 (11)` is the current development repair identity. It has not inherited
-> the live or artifact qualification of `0.14.4 (10)` or earlier candidates. See
+> `0.14.6 (12)` is the current development repair identity. It has not inherited
+> the live or artifact qualification of earlier candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release checks.
 
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.5 binary:
+Confirm the registered command is a `serve`-capable 0.14.6 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.5
+forge-conductor version    # should print 0.14.6
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.5` and
-`CFBundleVersion` must be `11`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.6` and
+`CFBundleVersion` must be `12`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -220,8 +220,9 @@ Open **Provider** and turn on exactly one of LM Studio, Claude Code Desktop, or
 Codex Desktop. Turning on another provider replaces the durable
 selection only after its integration is usable. Turning on LM Studio runs
 **Connect and Check** first and selects it only when the saved configuration is
-ready. Turning off the selected provider leaves no provider selected; it does
-not delete verified integration files. Every selectable provider card also has
+ready. The selected provider remains active until another provider is chosen;
+this prevents an accidental empty selection and does not delete verified
+integration files. Every selectable provider card also has
 one **Connect and Check** action: on an inactive card it performs the complete
 provision, inspection, readiness, and selection workflow; on an active desktop
 card it verifies or repairs the Forge-owned integration.
@@ -238,7 +239,7 @@ its files and receipt. Remove the registration in the host, then retry; the
 verified retry settles idempotently.
 
 If a desktop provider has a nonterminal task, finish or cancel that task in
-**Projects → Run Details** before selecting, deselecting, repairing, or removing its
+**Projects → Run Details** before replacing, repairing, or removing its
 integration. Forge rejects the mutation instead of disconnecting the hook path
 that owns the active session.
 
@@ -261,9 +262,10 @@ inspected or removed, but the card cannot report ready or start a run.
 
 ### Managed project setup and ordered instruction packages
 
-The Guided Setup wizard opens on first launch and remains available through
-**Guided Setup** in the Dashboard title bar. Contextual question-mark help is
-separate. For a Forge-managed autonomous queue, follow this order:
+The Guided Setup wizard stays closed when the app launches. Open it explicitly
+through **Guided Setup** in the Dashboard title bar; it retains its saved step
+between uses. Contextual question-mark help is separate. For a Forge-managed
+autonomous queue, follow this order:
 
 1. Confirm Manager is running. Manual lifecycle controls are recovery tools,
    not a setup ritual when it is already healthy.
@@ -767,7 +769,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.5**, build **11**
+Doctor identifies the running source identity as version **0.14.6**, build **12**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally

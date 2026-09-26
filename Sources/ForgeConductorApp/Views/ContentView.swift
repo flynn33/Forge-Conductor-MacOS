@@ -22,8 +22,12 @@ enum GuidedSetupStorage {
         return UserDefaults(suiteName: suiteName) ?? .standard
     }
 
-    static func shouldPresent(in defaults: UserDefaults) -> Bool {
-        !defaults.bool(forKey: currentCompletionKey)
+    static func shouldPresentAutomatically(in defaults: UserDefaults) -> Bool {
+        // Guided Setup is an explicit operator tool, not a launch-time modal.
+        // Retain completion metadata so reopening the wizard can resume the
+        // saved step, but never use an absent or migrated flag to cover the app.
+        _ = defaults
+        return false
     }
 }
 
@@ -182,10 +186,9 @@ struct ContentView: View {
         .accessibilityIdentifier("root-split")
         .onAppear {
             guidedMode.select(model.selectedTab.guidedHelpContext)
-            let arguments = CommandLine.arguments
-            let allowAutomaticPresentation = !arguments.contains("--uitesting")
-                || arguments.contains("--uitesting-show-guided-setup")
-            if !guidedSetupCompleted, allowAutomaticPresentation {
+            if GuidedSetupStorage.shouldPresentAutomatically(
+                in: GuidedSetupStorage.defaults()
+            ) {
                 showingGuidedSetup = true
             }
         }

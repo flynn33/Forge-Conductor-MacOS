@@ -10,6 +10,37 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+## [0.14.6] — 2026-09-26 (build 12 development repair candidate)
+
+### Fixed
+
+- Kept exactly one execution provider active in the native Provider UI. Clicking
+  the active selector no longer submits a second deactivation that can leave
+  ordered-run admission without a provider; selecting another provider performs
+  the existing readiness-fenced switch.
+- Made LM Studio activation supersede a replaceable background Provider snapshot
+  load. An enabled LM Studio selector can no longer silently ignore the user's
+  **Connect and Check** action during view startup.
+- Preserved the no-resume preparation request through the app's manager-client
+  router. Retained provider-wait runs now stay quiescent until integration
+  repair completes and the required post-repair preparation succeeds.
+- Stopped presenting Guided Setup automatically when Forge Conductor launches.
+  The wizard remains available from Dashboard and the title bar and retains its
+  saved step between explicit uses.
+
+### Verification
+
+- The complete SwiftPM regression passed 1,875 tests with 12 explicit
+  environment/helper skips and zero failures. The focused Provider suite passed
+  27/27 and Guided Setup progress passed 4/4.
+- Four exact app-hosted Xcode regressions passed. Signed native UI passed the
+  launch-without-wizard case and the Provider selection/LM Studio transaction,
+  including the exact no-resume/repair/resume request order.
+- Both SwiftPM products and the canonical Apple Development-signed Debug
+  workspace app built. Repository hygiene and exact `0.14.6 (12)` identity
+  checks passed. Prior live-provider, installed-build, and distribution evidence
+  is not inherited.
+
 ## [0.14.5] — 2026-09-26 (build 11 development repair candidate)
 
 ### Added

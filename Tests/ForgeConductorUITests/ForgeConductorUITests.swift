@@ -385,7 +385,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(waitUntil(timeout: 3) { !wizard.exists })
     }
 
-    func testLegacyFiveCardCompletionDoesNotSuppressCurrentGuidedSetupWizard() throws {
+    func testAppLaunchDoesNotPresentGuidedSetupAutomatically() throws {
         app.terminate()
         let suiteName = try XCTUnwrap(guidedSetupDefaultsSuite)
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -393,15 +393,13 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         defaults.set(false, forKey: "forge.guidedSetup.completed.v2")
         _ = defaults.synchronize()
 
-        app.launchArguments += ["--uitesting-show-guided-setup"]
         app.launch()
 
         let wizard = app.descendants(matching: .any)["setup-guide"]
-        XCTAssertTrue(
-            wizard.waitForExistence(timeout: 8),
-            "Completing the legacy five-card guide must not suppress the current ordered wizard"
+        XCTAssertFalse(
+            wizard.waitForExistence(timeout: 2),
+            "Guided Setup must remain closed until the operator explicitly opens it"
         )
-        XCTAssertTrue(app.buttons["guided-setup-step-8"].exists)
     }
 
     func testGuidedSetupReviewConfirmationAdvancesToStartAndPersists() throws {
@@ -1306,17 +1304,26 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(grokAvailability.exists)
         XCTAssertTrue(element(grokAvailability, contains: "Not selectable"))
 
+        let selectionGuidance = app.staticTexts["provider-selection-guidance"]
+        XCTAssertTrue(selectionGuidance.exists)
+        XCTAssertTrue(element(selectionGuidance, contains: "Select another provider"))
+
         let connectAndCheck = app.buttons["provider-repair-lmstudio"]
         XCTAssertTrue(waitForEnabled(connectAndCheck, timeout: 5))
         XCTAssertEqual(connectAndCheck.label, "Connect and Check")
         makeHittable(connectAndCheck)
         connectAndCheck.click()
 
-        XCTAssertTrue(waitUntil(timeout: 8) {
-            fixture.providerPreparationCount == 1
+        let completedConnectAndCheck = waitUntil(timeout: 8) {
+            fixture.providerPreparationCount == 2
                 && fixture.providerIntegrationMutationRecords.count == 1
-        })
-        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 1)
+        }
+        XCTAssertTrue(
+            completedConnectAndCheck,
+            "Expected two preparations and one repair; observed \(fixture.providerPreparationCount) preparation(s) and \(fixture.providerIntegrationMutationRecords.count) repair(s)"
+        )
+        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 2)
+        XCTAssertEqual(fixture.providerPreparationResumeWaitingRuns, [false, true])
         let repair = try XCTUnwrap(fixture.providerIntegrationMutationRecords.first)
         XCTAssertEqual(repair.kind, "repair")
         XCTAssertEqual(repair.providerID, "lmstudio")
@@ -1347,6 +1354,20 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                 "Receipt evidence \(key) should be visible"
             )
         }
+
+        let activeLMStudio = app.descendants(matching: .any)["provider-toggle-lmstudio"]
+        XCTAssertTrue(waitForEnabled(activeLMStudio, timeout: 5))
+        makeHittable(activeLMStudio)
+        activeLMStudio.click()
+        XCTAssertTrue(
+            waitForToggleState(true, on: activeLMStudio),
+            "Turning off the active choice must not leave run admission without a provider"
+        )
+        XCTAssertEqual(
+            fixture.providerIntegrationMutationRecords.count,
+            1,
+            "Turning off the active provider must not submit another provider mutation"
+        )
     }
 
     func testProviderControlsSendExactProtectedRequestsAndSurfaceSuccessAndFailure() throws {
@@ -2210,6 +2231,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableProviderLastProbeAt: String?
     private var mutableProviderPreparationCount = 0
     private var mutableProviderPreparationAuthorizationCount = 0
+    private var mutableProviderPreparationResumeWaitingRuns: [Bool] = []
     private var mutableProviderIntegrationRevision = 1
     private var mutableConfiguredProviderIntegrationIDs: Set<String> = []
     private var mutableProviderIntegrationMutationRecords: [ProviderIntegrationMutationRecord] = []
@@ -2265,6 +2287,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     }
     var providerPreparationAuthorizationCount: Int {
         locked { mutableProviderPreparationAuthorizationCount }
+    }
+    var providerPreparationResumeWaitingRuns: [Bool] {
+        locked { mutableProviderPreparationResumeWaitingRuns }
     }
     var providerIntegrationMutationRecords: [ProviderIntegrationMutationRecord] {
         locked { mutableProviderIntegrationMutationRecords }
@@ -2713,7 +2738,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             guard request.method == "POST",
                   request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
-                  object.isEmpty else {
+                  Set(object.keys) == ["resume_waiting_runs"],
+                  let resumeWaitingRuns = object["resume_waiting_runs"] as? Bool else {
                 respond(
                     status: 401,
                     object: ["message": "missing provider preparation authority or invalid payload"],
@@ -2724,6 +2750,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             let configuration = locked { () -> [String: Any] in
                 mutableProviderPreparationCount += 1
                 mutableProviderPreparationAuthorizationCount += 1
+                mutableProviderPreparationResumeWaitingRuns.append(resumeWaitingRuns)
                 mutableMutationAuthorizationCount += 1
                 return [
                     "revision": mutableProviderConfigurationRevision,

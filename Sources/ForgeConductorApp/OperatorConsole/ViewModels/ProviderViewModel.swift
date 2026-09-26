@@ -190,16 +190,16 @@ final class ProviderViewModel: ObservableObject {
     }
 
     func setProvider(_ providerID: ProviderIntegrationID, enabled: Bool) {
+        guard enabled else {
+            if selectedProviderID == providerID {
+                noticeMessage = "Choose another provider to switch execution. Forge keeps one provider active."
+            }
+            return
+        }
         guard !isProviderToggleDisabled(providerID),
               let snapshot = integrations else { return }
 
-        let requestedProviderID: ProviderIntegrationID?
-        if enabled {
-            requestedProviderID = providerID
-        } else {
-            guard snapshot.selectedProviderID == providerID else { return }
-            requestedProviderID = nil
-        }
+        let requestedProviderID: ProviderIntegrationID? = providerID
         if enabled, providerID == .lmStudio,
            requestedProviderID != snapshot.selectedProviderID {
             connectAndCheck(activateLMStudioIfReady: true)
@@ -510,13 +510,27 @@ final class ProviderViewModel: ObservableObject {
     }
 
     private func connectAndCheck(activateLMStudioIfReady: Bool) {
-        guard !isBusy, !hasUnsavedChanges else { return }
+        // A registry or legacy snapshot load must not make an enabled LM Studio
+        // selector silently ignore the user's activation. The operation below
+        // cancels the replaceable legacy load and owns its own bounded state.
+        guard !isProbing, !isSaving, !isFetchingModels else {
+            noticeMessage = "An LM Studio connection operation is already in progress."
+            return
+        }
+        guard !isSubmittingProviderMutation, !hasPendingProviderOperation else {
+            noticeMessage = "Forge is finishing the current provider operation."
+            return
+        }
+        guard !hasUnsavedChanges else {
+            noticeMessage = "Save or discard the LM Studio Advanced changes before reconnecting."
+            return
+        }
         loadTask?.cancel()
         probeTask?.cancel()
         isLoading = false
         isProbing = true
         errorMessage = nil
-        noticeMessage = nil
+        noticeMessage = "Checking the LM Studio connection…"
         probeTask = Task { [weak self] in
             guard let self else { return }
             defer { isProbing = false }

@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.14.5**, build **11**. This connection document does
+Product identity: version **0.14.6**, build **12**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -54,6 +54,11 @@ readiness succeeds. Selecting a desktop host instead does not reuse this HTTP
 model path; see
 [Provider integrations](PROVIDER-INTEGRATIONS.md).
 
+Forge keeps the active selection until another provider is ready, so clicking
+the active selector cannot leave run admission providerless. If a replaceable
+background snapshot is still loading when LM Studio is selected, the explicit
+activation supersedes that load instead of silently ignoring the click.
+
 The native Provider screen saves the LM Studio server origin and an exact model
 key. Saving is durable and does not prove the server is reachable. With a saved
 loopback endpoint, **Connect and Check** is the ordinary one-button path. Forge
@@ -86,6 +91,11 @@ Forge keeps retained tasks quiescent throughout deployment, performs a fresh
 readiness check, and only then resumes the exact durable run identities. If the
 Provider view closes mid-operation, the Manager performs the same bounded
 post-operation recovery.
+
+The native app's manager-client router preserves the initial
+`resume_waiting_runs: false` request. Only the post-repair preparation sends
+`resume_waiting_runs: true`, so the view/router boundary cannot resume retained
+work before the integration transaction is verified.
 
 Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory as
 authoritative model metadata. When that native response omits

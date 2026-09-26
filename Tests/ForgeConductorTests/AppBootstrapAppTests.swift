@@ -63,16 +63,20 @@ final class OperatorStartupContentAppTests: XCTestCase {
 }
 
 final class GuidedSetupProgressAppTests: XCTestCase {
-    func testLegacyCompletionDoesNotSuppressCurrentGuidedSetupExperience() throws {
+    func testGuidedSetupNeverPresentsAutomaticallyAtLaunch() throws {
         let suiteName = "forge-guided-setup-test-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         defaults.set(true, forKey: GuidedSetupStorage.legacyCompletionKey)
-        XCTAssertTrue(GuidedSetupStorage.shouldPresent(in: defaults))
+        XCTAssertFalse(GuidedSetupStorage.shouldPresentAutomatically(in: defaults))
 
         defaults.set(true, forKey: GuidedSetupStorage.currentCompletionKey)
-        XCTAssertFalse(GuidedSetupStorage.shouldPresent(in: defaults))
+        XCTAssertFalse(GuidedSetupStorage.shouldPresentAutomatically(in: defaults))
+
+        defaults.removeObject(forKey: GuidedSetupStorage.legacyCompletionKey)
+        defaults.removeObject(forKey: GuidedSetupStorage.currentCompletionKey)
+        XCTAssertFalse(GuidedSetupStorage.shouldPresentAutomatically(in: defaults))
     }
 
     func testExactConfigurationReviewAdvancesRecommendationFromReviewToStart() {

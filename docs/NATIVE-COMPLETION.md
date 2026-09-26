@@ -1,6 +1,6 @@
 # Completion evidence and instruction-package requirements
 
-Product identity: **0.14.5, build 11**.
+Product identity: **0.14.6, build 12**.
 
 Completion is owned by two explicit sources:
 
@@ -79,6 +79,6 @@ Connect and Check** and resume the retained task when the provider is ready.
 - Completion history and evidence references remain project/run scoped.
 
 The root `VERSION`, `BUILD_NUMBER`, Xcode build settings, protocol constants,
-and version assertions use `0.14.5 (11)`. Source and deterministic test evidence
+and version assertions use `0.14.6 (12)`. Source and deterministic test evidence
 do not by themselves qualify an installed app, Developer ID artifact,
 notarization, Gatekeeper acceptance, or shipment.

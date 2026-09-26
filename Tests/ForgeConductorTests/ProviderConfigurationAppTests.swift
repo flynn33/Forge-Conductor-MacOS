@@ -31,6 +31,7 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     private let simulateLostSelectionResponse: Bool
     private let providerOperationFailuresBeforeSuccess: Int
     private let providerRegistryDelayNanoseconds: UInt64
+    private let legacySnapshotDelayNanoseconds: UInt64
     private let configurationSaved: Bool
     private var acceptedSelectionOperation: ProviderIntegrationOperationSnapshot?
     private(set) var repairRequests: [ProviderIntegrationMutationRequest] = []
@@ -46,12 +47,14 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         simulateLostSelectionResponse: Bool = false,
         providerOperationFailuresBeforeSuccess: Int = 0,
         providerRegistryDelayNanoseconds: UInt64 = 0,
+        legacySnapshotDelayNanoseconds: UInt64 = 0,
         configurationSaved: Bool = false
     ) throws {
         self.preparationState = preparationState
         self.simulateLostSelectionResponse = simulateLostSelectionResponse
         self.providerOperationFailuresBeforeSuccess = providerOperationFailuresBeforeSuccess
         self.providerRegistryDelayNanoseconds = providerRegistryDelayNanoseconds
+        self.legacySnapshotDelayNanoseconds = legacySnapshotDelayNanoseconds
         self.configurationSaved = configurationSaved
         operatorSnapshot = try JSONDecoder().decode(
             OperatorSnapshot.self,
@@ -83,6 +86,9 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     func snapshot(limit: Int, cursor: String?) async throws -> OperatorSnapshot {
         _ = limit
         _ = cursor
+        if legacySnapshotDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: legacySnapshotDelayNanoseconds)
+        }
         return operatorSnapshot
     }
 
@@ -281,6 +287,16 @@ final class ProviderConfigurationAppTests: XCTestCase {
             modelKey: "fixture/tool-model", credentialAction: .keep)
     }
 
+    func testClientRouterPreservesPreparationWithoutRunResumption() async throws {
+        let client = try LegacyLMProviderSelectionClient()
+        let router = OperatorManagerClientRouter(client: client)
+
+        _ = try await router.prepareProviderWithoutResumingRuns()
+
+        let callOrder = await client.callOrder
+        XCTAssertEqual(callOrder, ["connect_without_resume"])
+    }
+
     @MainActor
     func testModelRefreshRunsWhileProviderRegistryRefreshIsStillInFlight() async throws {
         let client = try LegacyLMProviderSelectionClient(
@@ -436,6 +452,61 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(repairRequests, [])
         XCTAssertEqual(callOrder, ["connect_without_resume"])
         XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
+    }
+
+    @MainActor
+    func testActiveProviderCannotBeDeselectedWithoutChoosingReplacement() async throws {
+        let client = try LegacyLMProviderSelectionClient(selectedProviderID: .codexDesktop)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.setProvider(.codexDesktop, enabled: false)
+        try await Task.sleep(for: .milliseconds(20))
+
+        let selectionRequests = await client.selectionRequests
+        XCTAssertEqual(selectionRequests, [])
+        XCTAssertEqual(viewModel.selectedProviderID, .codexDesktop)
+        XCTAssertEqual(
+            viewModel.noticeMessage,
+            "Choose another provider to switch execution. Forge keeps one provider active."
+        )
+    }
+
+    @MainActor
+    func testLMStudioActivationSupersedesReplaceableBackgroundLoad() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            selectedProviderID: .codexDesktop,
+            legacySnapshotDelayNanoseconds: 5_000_000_000
+        )
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if viewModel.integrations != nil, viewModel.isLoading { break }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+
+        XCTAssertTrue(viewModel.isLoading)
+        viewModel.setProvider(.lmStudio, enabled: true)
+        for _ in 0..<500 {
+            if await client.selectionRequests.count == 1,
+               !viewModel.isProbing,
+               !viewModel.isSubmittingProviderMutation {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let selectionRequests = await client.selectionRequests
+        let callOrder = await client.callOrder
+        XCTAssertEqual(selectionRequests.map(\.providerID), [.lmStudio])
+        XCTAssertEqual(
+            callOrder,
+            ["connect_without_resume", "selection", "connect_and_check"]
+        )
     }
 
     @MainActor

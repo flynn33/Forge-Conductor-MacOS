@@ -7,24 +7,24 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.5** |
-| **Build** | **11** |
+| **Version** | **0.14.6** |
+| **Build** | **12** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.5 (11)` is a development repair candidate. Autonomy
-> removal passed operator review and the combined telemetry frame is accepted.
-> Mixed-folder packages, Projects-owned ordered LM Studio work, and automatic
-> Continuity handoff are implemented pending owner live review. This identity is
-> not called shippable.
+> **Release status:** `0.14.6 (12)` is a development repair candidate. It repairs
+> the reported Provider-selection lockout and removes launch-time Guided Setup
+> presentation. Deterministic source, signed Debug, and native UI qualification
+> pass; live-provider, installed-build, and distribution qualification remain
+> required before shipment.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
 binding. Those warning repairs preserve provider request schemas and canonical
 Xcode target membership; the intentional provider workflow changes are
-described below. The current patch identity is `0.14.5 (11)`.
+described below. The current patch identity is `0.14.6 (12)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
@@ -51,8 +51,8 @@ Native distribution and shipment qualification remain separate.
   allow it to be selected for automated work: Grok's current documented
   startup/prompt hooks cannot deliver Forge's initial assignment context to the
   model.
-- Keeps one provider selected at a time through a single activation toggle per
-  selectable provider, including LM Studio.
+- Keeps one provider active at a time through a single activation selector per
+  selectable provider, including LM Studio; choose another provider to switch.
 - Keeps durable state isolated by project identity and generation.
 - Runs ordered instruction packages with bounded execution and package-owned
   completion requirements.
@@ -103,7 +103,8 @@ product set.
 
 Open **Dashboard** and choose **Guided Setup** in the title bar for the ordered,
 state-aware version of this workflow. The wizard saves its current step and
-routes each setup or recovery action to the view that owns it.
+routes each setup or recovery action to the view that owns it. It stays closed
+when the app launches and opens only when explicitly requested.
 
 1. Open Forge Conductor and start the **Manager**.
 2. In **Provider**, prepare and select LM Studio, Claude Code Desktop, or Codex
@@ -116,8 +117,8 @@ routes each setup or recovery action to the view that owns it.
    for LM Studio it runs **Connect and Check** first and selects only after the
    saved configuration is ready;
    switching away leaves an installed integration available for later use.
-   A desktop provider with a nonterminal task cannot be selected, deselected,
-   repaired, or removed until that task is finished or cancelled, preventing
+   A desktop provider with a nonterminal task cannot be replaced, repaired, or
+   removed until that task is finished or cancelled, preventing
    mutation of an active host session's hook path.
    Claude and Codex still require their normal user review of hook trust. Forge
    never auto-approves a host permission prompt. For LM Studio, the activation
@@ -331,6 +332,12 @@ settings. The
 startup/prompt hook outputs do not supply Forge's initial assignment context to
 the model. Forge may clean up artifacts it owns, but does not report Grok as
 ready or admit a Grok run.
+
+The selected provider cannot be turned off into an empty selection from the
+native UI. Select another provider to switch atomically after its readiness
+workflow succeeds. LM Studio activation may cancel a replaceable background
+snapshot load so an enabled selector never silently ignores **Connect and
+Check**.
 
 Desktop removal is also fail-closed: when supported host CLI or live inventory
 cannot verify that registration is gone, Forge reports **Awaiting User Action**

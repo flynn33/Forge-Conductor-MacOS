@@ -1796,6 +1796,10 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.prepareProvider()
     }
 
+    func prepareProviderWithoutResumingRuns() async throws -> ManagerProviderPreparationResult {
+        try await current.prepareProviderWithoutResumingRuns()
+    }
+
     func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
         try await current.providerIntegrations()
     }

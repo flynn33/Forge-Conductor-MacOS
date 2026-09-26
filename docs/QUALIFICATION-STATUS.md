@@ -1,5 +1,21 @@
 # Version and qualification status
 
+## 0.14.6 Provider-selection and launch-modal repair — deterministic qualification complete
+
+Version `0.14.6 (12)` prevents the native Provider selectors from deactivating
+the only active provider, lets LM Studio activation supersede a replaceable
+background snapshot load, preserves the no-resume readiness request through the
+manager-client router, and keeps Guided Setup closed until explicitly opened
+from Dashboard or the title bar. The complete SwiftPM regression passed 1,875
+tests with 12 explicit environment/helper skips and zero failures. Focused
+verification passed 27 Provider configuration cases and four Guided Setup
+progress cases; four exact signed app-hosted Xcode cases passed. Signed native
+UI passed launch-without-wizard and the Provider selection/LM Studio transaction,
+including the exact false/true retained-run resumption boundary. Both SwiftPM
+products and the canonical signed Debug workspace app built; identity and
+repository checks passed. No live-provider, installed-build, distribution, or
+shipment result is inherited.
+
 ## 0.14.5 project-workflow repair — qualification incomplete
 
 Version `0.14.5 (11)` fixes mixed-folder instruction admission, keeps package
@@ -88,7 +104,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.14.5, build 11**, supporting **macOS 26+**. The owner is
+Product identity: **0.14.6, build 12**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -99,7 +115,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.14.5, build 11**. The root [`VERSION`](../VERSION)
+documentation use version **0.14.6, build 12**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

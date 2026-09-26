@@ -110,7 +110,8 @@ The title bar exposes **Guided Setup**, an eight-step state-aware wizard for
 Manager readiness, provider connection, project registration, instruction
 ordering, automation review, run start, monitoring, and recovery. It reads the
 same bounded operational snapshot to recommend the next required step; it does
-not introduce another telemetry or render loop.
+not introduce another telemetry or render loop. The wizard opens only from its
+explicit Dashboard/title-bar controls and never covers the app at launch.
 
 ## Qualification boundary
 
@@ -134,6 +135,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.14.5`
+`0.14.6`
 
-Build: `11`
+Build: `12`

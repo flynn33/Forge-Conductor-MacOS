@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.14.5**, build **11**. `VERSION` and
+Product identity: marketing version **0.14.6**, build **12**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -74,14 +74,16 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.14.5 (11)` build retains the warning repair with the canonical
-graph unchanged. The
+The current `0.14.6 (12)` build keeps the Provider and Guided Setup repair in
+the canonical graph. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
 descriptor per catalog request, and the existing `ProviderOperatorView.swift`
 member declares the toggle callback `@MainActor @Sendable`. A fresh canonical
 arm64 Debug workspace build completed successfully for this source and reported
 no compiler warnings, including neither the prior shared `[String: Any]`
 static-state diagnostic nor the non-Sendable callback diagnostic.
+Four focused app-hosted regressions and two focused signed native UI cases pass;
+the Provider UI case verifies the exact no-resume/repair/resume transaction.
 
 Xcode 27 schedules its AppIntents metadata processor even though extraction is
 disabled. Both project configurations set `LM_FORCE_LINK_GENERATION = YES` so

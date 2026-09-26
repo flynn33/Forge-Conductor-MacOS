@@ -3,7 +3,7 @@
 The manager persists version 1 budget preferences inside the existing
 `config.json` as `budget_policy`. Global defaults and overrides for an exact
 project ID and generation share one configuration transaction. Existing shell
-opt-outs and unrelated settings are preserved. Product identity is `0.14.5 (11)`.
+opt-outs and unrelated settings are preserved. Product identity is `0.14.6 (12)`.
 
 ## Settings contract
 

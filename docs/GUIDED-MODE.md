@@ -28,9 +28,10 @@ mark actions explain only the current view or control.
 
 ## Guided Setup wizard
 
-Open **Dashboard** and choose **Guided Setup** in its title bar. The wizard also
-opens on first use and remembers the selected step across relaunches. Its eight
-steps are the supported operating order:
+Open **Dashboard** and choose **Guided Setup** in its title bar. The wizard does
+not cover the app at launch; it opens only on explicit request and remembers the
+selected step across relaunches. Its eight steps are the supported operating
+order:
 
 1. **Confirm Forge is ready** — verify Manager is running.
 2. **Select and verify the provider** — start LM Studio, Claude Code Desktop,
@@ -69,11 +70,11 @@ does not approve host permissions. Claude and Codex can require a user trust
 review; any remaining host action stays visible in Provider. LM Studio uses a
 Forge-managed session, while desktop providers retain their model and
 conversation and exchange orchestration context at the hook boundary. A
-desktop provider with unfinished tasks cannot be selected, deselected,
-repaired, or removed until those tasks are finished or cancelled through
+desktop provider with unfinished tasks cannot be replaced, repaired, or removed
+until those tasks are finished or cancelled through
 Projects → Run Details.
 
-Grok Build remains visible in Provider but is non-selectable in 0.14.5. Its
+Grok Build remains visible in Provider but is non-selectable in 0.14.6. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.
