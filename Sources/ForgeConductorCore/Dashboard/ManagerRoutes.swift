@@ -1105,6 +1105,7 @@ public final class ManagerRoutes: @unchecked Sendable {
         case ("POST", "/api/manager/projects/remove"):
             dispatchProjectRemoval(body: body, connection: connection)
         case ("POST", "/api/manager/projects/instruction-packages"),
+             ("POST", "/api/manager/projects/instruction-packages/catalog"),
              ("POST", "/api/manager/projects/instruction-packages/import"),
              ("POST", "/api/manager/projects/instruction-packages/reorder"),
              ("POST", "/api/manager/projects/instruction-packages/remove"),
@@ -2263,6 +2264,28 @@ public final class ManagerRoutes: @unchecked Sendable {
                     expectedGeneration: generation,
                     cursor: cursor,
                     limit: limit
+                )
+            case "/api/manager/projects/instruction-packages/catalog":
+                let acceptedKeys: Set<String> = [
+                    "project_id", "project_generation", "content_sha256", "cursor", "limit",
+                ]
+                guard Set(object.keys).isSubset(of: acceptedKeys),
+                      Set(object.keys).isSuperset(of: [
+                          "project_id", "project_generation", "content_sha256",
+                      ]),
+                      let contentSHA256 = object["content_sha256"] as? String,
+                      object["cursor"] == nil || integer(object["cursor"]) != nil,
+                      object["limit"] == nil || integer(object["limit"]) != nil else {
+                    throw ProjectInstructionQueueError.invalidRequest(
+                        "Catalog refresh accepts a project identity, package digest, and optional cursor and limit."
+                    )
+                }
+                result = try manager.instructionPackageCatalog(
+                    projectID: selectedProject,
+                    expectedGeneration: generation,
+                    contentSHA256: contentSHA256,
+                    cursor: integer(object["cursor"]) ?? 0,
+                    limit: integer(object["limit"]) ?? 128
                 )
             case "/api/manager/projects/instruction-packages/import":
                 guard Set(object.keys) == ["project_id", "project_generation", "source_path"],

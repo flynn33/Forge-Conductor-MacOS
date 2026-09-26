@@ -7,13 +7,6 @@ struct GuidedHelpState: Equatable, Sendable {
 
     static func overview(for context: GuidedHelpContext) -> Self {
         switch context {
-        case .autonomy, .autonomyStartTask, .autonomyToolSelection,
-             .autonomyCompletionChecks:
-            Self(
-                status: "Manager-owned task preparation",
-                detail: "Choose a project and instructions. Forge resolves the technical preparation.",
-                recommendedAction: "Open Start Task to review readiness."
-            )
         case .continuity, .continuitySaveProgress, .continuityFreshSession:
             Self(
                 status: "Automatic continuity",
@@ -80,7 +73,7 @@ extension AutonomyViewModel {
             detail: runs.isEmpty
                 ? "Forge has the project and provider prerequisites needed to prepare a task."
                 : "Forge is tracking \(runs.count) managed task\(runs.count == 1 ? "" : "s").",
-            recommendedAction: runs.isEmpty ? "Choose Start Task and provide instructions." : nil
+            recommendedAction: runs.isEmpty ? "Start ordered work from Projects." : nil
         )
     }
 }

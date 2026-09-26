@@ -122,14 +122,22 @@ public enum AutomaticCompletionPlanResolver {
                     ? ["instruction_catalog", "instruction_read"] : ["shell_exec"]
             ))
         }
-        appendPreset(.buildableProject, kind: .projectBuild, evidence: .successfulBuild,
-                     reason: CompletionCheckPreset.buildableProject.detail)
-        appendPreset(.noErrors, kind: .projectBuild, evidence: .successfulBuild,
-                     reason: CompletionCheckPreset.noErrors.detail)
-        appendPreset(.noWarnings, kind: .projectBuildNoWarnings, evidence: .successfulBuild,
-                     reason: CompletionCheckPreset.noWarnings.detail)
-        appendPreset(.testsPass, kind: .projectTests, evidence: .successfulTests,
-                     reason: CompletionCheckPreset.testsPass.detail)
+        // These presets qualify an applicable native build surface; they do not
+        // manufacture a build requirement for an ordinary document folder.
+        // Without this applicability check, the default UI selection made a
+        // read/report task in a non-code project impossible to complete.
+        if project.hasBuildDefinition {
+            appendPreset(.buildableProject, kind: .projectBuild, evidence: .successfulBuild,
+                         reason: CompletionCheckPreset.buildableProject.detail)
+            appendPreset(.noErrors, kind: .projectBuild, evidence: .successfulBuild,
+                         reason: CompletionCheckPreset.noErrors.detail)
+            appendPreset(.noWarnings, kind: .projectBuildNoWarnings, evidence: .successfulBuild,
+                         reason: CompletionCheckPreset.noWarnings.detail)
+        }
+        if project.hasTests {
+            appendPreset(.testsPass, kind: .projectTests, evidence: .successfulTests,
+                         reason: CompletionCheckPreset.testsPass.detail)
+        }
         appendPreset(.instructionPackagesComplete, kind: .instructionDeliveryComplete,
                      evidence: .preparedSource,
                      reason: CompletionCheckPreset.instructionPackagesComplete.detail)
@@ -212,6 +220,7 @@ public enum AutomaticCompletionPlanResolver {
         let hasXcodeProject = names.contains { name in
             name.hasSuffix(".xcodeproj") || name.hasSuffix(".xcworkspace")
         }
+        let hasBuildDefinition = hasSwiftPackage || hasXcodeProject
         let hasTests = names.contains("tests") || names.contains { $0.hasSuffix("tests") }
         let buildReason: String
         if hasSwiftPackage && hasXcodeProject {
@@ -224,7 +233,7 @@ public enum AutomaticCompletionPlanResolver {
             buildReason = "No supported native build definition was detected at the project root."
         }
         return ProjectInspection(
-            hasBuildDefinition: hasSwiftPackage || hasXcodeProject,
+            hasBuildDefinition: hasBuildDefinition,
             hasTests: hasTests,
             buildReason: buildReason
         )
@@ -248,9 +257,16 @@ public enum AutomaticCompletionPlanResolver {
         ]
         let hasReadOnlyPhrase = normalized.contains("read-only")
             || normalized.contains("read only")
+        let prohibitedMutationWords = Set(mutationWords.filter { word in
+            normalized.range(
+                of: #"\b(?:do\s+not|don't|never|without)\s+(?:\w+\s+){0,2}"# + word + #"\b"#,
+                options: .regularExpression
+            ) != nil
+        })
+        let requestedMutationWords = mutationWords.subtracting(prohibitedMutationWords)
         return TaskClassification(
             isReadOnly: (hasReadOnlyPhrase || !words.isDisjoint(with: readOnlyWords))
-                && words.isDisjoint(with: mutationWords)
+                && words.isDisjoint(with: requestedMutationWords)
         )
     }
 

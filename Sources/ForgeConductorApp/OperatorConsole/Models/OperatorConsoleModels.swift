@@ -322,6 +322,69 @@ struct OperatorInstructionQueue: Decodable, Sendable, Equatable {
     }
 }
 
+struct OperatorInstructionDocument: Decodable, Sendable, Equatable, Identifiable {
+    let id: String
+    let sourcePath: String
+    let status: String
+    let detail: String
+    let converter: String
+    let originalBytes: Int
+    let originalSHA256: String
+    let canonicalSHA256: String
+    let canonicalBytes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case sourcePath = "source_path"
+        case status, detail, converter
+        case originalBytes = "original_bytes"
+        case originalSHA256 = "original_sha256"
+        case canonicalSHA256 = "canonical_sha256"
+        case canonicalBytes = "canonical_bytes"
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        sourcePath = try values.decode(String.self, forKey: .sourcePath)
+        status = try values.decode(String.self, forKey: .status)
+        detail = try values.decode(String.self, forKey: .detail)
+        converter = try values.decode(String.self, forKey: .converter)
+        originalSHA256 = try values.decode(String.self, forKey: .originalSHA256)
+        canonicalSHA256 = try values.decode(String.self, forKey: .canonicalSHA256)
+        originalBytes = Int(try values.decode(String.self, forKey: .originalBytes)) ?? 0
+        canonicalBytes = Int(try values.decode(String.self, forKey: .canonicalBytes)) ?? 0
+    }
+
+    var catalogStatus: String {
+        switch status {
+        case "converted_instruction": "Converted"
+        case "retained_attachment": "Retained attachment"
+        default: "Unresolved"
+        }
+    }
+}
+
+struct OperatorInstructionDocumentCatalog: Decodable, Sendable, Equatable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let contentSHA256: String
+    let totalDocuments: Int
+    let cursor: Int
+    let nextCursor: Int?
+    let documents: [OperatorInstructionDocument]
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case contentSHA256 = "content_sha256"
+        case totalDocuments = "total_documents"
+        case cursor
+        case nextCursor = "next_cursor"
+        case documents
+    }
+}
+
 enum OperatorProjectContentClearMode: String, Codable, Sendable, CaseIterable, Identifiable {
     case memory
     case continuity

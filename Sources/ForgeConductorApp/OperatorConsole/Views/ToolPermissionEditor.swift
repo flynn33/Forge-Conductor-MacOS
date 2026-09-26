@@ -118,7 +118,7 @@ struct ToolPermissionEditor: View {
             HStack {
                 Text("Task capabilities")
                 Spacer()
-                GuidedHelpButton(context: .autonomyToolSelection)
+                GuidedHelpButton(context: .instructionQueue)
             }
         }
     }

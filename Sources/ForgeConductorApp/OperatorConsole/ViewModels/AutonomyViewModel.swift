@@ -673,11 +673,6 @@ final class AutonomyViewModel: ObservableObject {
             packageIDs: request.localInstructionPackageIDs,
             sourcePath: sourcePath
         )
-        guard artifact.unresolvedDocumentCount == 0 else {
-            throw OperatorManagerClientError.invalidPayload(
-                "The instructions contain \(artifact.unresolvedDocumentCount) unresolved document(s)."
-            )
-        }
         let admitted = request.usingInstructionArtifact(artifact)
         pendingStartRequest = admitted
         return admitted

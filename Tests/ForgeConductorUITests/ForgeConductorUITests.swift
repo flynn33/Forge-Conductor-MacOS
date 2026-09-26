@@ -84,7 +84,6 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             ("tab-feed", "Live Feed", "detail-feed"),
             ("tab-projects", "Projects", "detail-projects"),
             ("tab-rune-forge", "Rune Forge", "detail-rune-forge"),
-            ("tab-autonomy", "Autonomy", "detail-autonomy"),
             ("tab-continuity", "Continuity", "detail-continuity"),
             ("tab-runtimes", "Runtimes", "detail-runtimes"),
             ("tab-provider", "Provider", "detail-provider"),
@@ -285,7 +284,6 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             ("tab-feed", "Live Feed guide"),
             ("tab-projects", "Projects guide"),
             ("tab-rune-forge", "Rune Forge guide"),
-            ("tab-autonomy", "Autonomy guide"),
             ("tab-continuity", "Continuity guide"),
             ("tab-runtimes", "Runtimes guide"),
             ("tab-provider", "Model connection guide"),
@@ -518,9 +516,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(start, timeout: 5))
         start.click()
@@ -809,7 +805,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testOperatorSurfacesReportUnavailableManagerHonestly() throws {
-        for tabID in ["tab-projects", "tab-autonomy", "tab-continuity", "tab-runtimes", "tab-provider", "tab-evidence"] {
+        for tabID in ["tab-projects", "tab-continuity", "tab-runtimes", "tab-provider", "tab-evidence"] {
             let tab = app.buttons[tabID]
             XCTAssertTrue(tab.waitForExistence(timeout: 8), "Missing operator tab \(tabID)")
             tab.click()
@@ -821,13 +817,15 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testUnavailableManagerCannotStartDuplicateRun() throws {
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
-
-        let start = app.buttons["autonomy-start"]
-        XCTAssertTrue(start.waitForExistence(timeout: 5))
-        XCTAssertFalse(start.isEnabled, "A run cannot start without a recovered manager, project, and provider")
+        XCTAssertFalse(
+            app.buttons["tab-autonomy"].exists,
+            "Project execution must not be presented as a separate top-level workflow"
+        )
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 8))
+        projects.click()
+        XCTAssertTrue(app.descendants(matching: .any)["operator-unavailable"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["autonomy-start"].exists)
     }
 
     func testRigShowsBoundedOperationalIndicatorCluster() throws {
@@ -853,11 +851,14 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         })
         let cpu = app.descendants(matching: .any)["rig-cpu-cores-panel"]
         let gpu = app.descendants(matching: .any)["rig-gpu-cores-panel"]
+        let compute = app.descendants(matching: .any)["rig-compute-cores-panel"]
         XCTAssertTrue(cpu.exists)
         XCTAssertTrue(gpu.exists)
-        XCTAssertGreaterThan(gpu.frame.minY, cpu.frame.maxY)
-        XCTAssertEqual(gpu.frame.minX, cpu.frame.minX, accuracy: 2)
-        XCTAssertEqual(gpu.frame.width, cpu.frame.width, accuracy: 2)
+        XCTAssertTrue(compute.exists)
+        XCTAssertTrue(compute.frame.contains(cpu.frame))
+        XCTAssertTrue(compute.frame.contains(gpu.frame))
+        XCTAssertGreaterThan(cpu.frame.intersection(gpu.frame).height, 0)
+        XCTAssertLessThan(cpu.frame.height, 120)
 
         let rootScroll = try XCTUnwrap(
             largestScrollView(),
@@ -974,6 +975,36 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(detailPane.frame.maxX, detail.frame.maxX, accuracy: 4)
     }
 
+    func testPrimaryContentStartsBelowToolbarAtMinimumWindowSize() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowToMinimum(window)
+
+        let toolbar = app.toolbars.firstMatch
+        XCTAssertTrue(toolbar.waitForExistence(timeout: 5))
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 5))
+        projects.click()
+        let detail = try XCTUnwrap(
+            selectedDetailContainer(named: "Projects"),
+            "Missing selected-detail container for Projects"
+        )
+        let title = app.staticTexts["detail-projects"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(
+            detail.frame.minY,
+            toolbar.frame.maxY - 2,
+            "Project content must begin below the window toolbar"
+        )
+        XCTAssertGreaterThanOrEqual(
+            title.frame.minY,
+            toolbar.frame.maxY - 2,
+            "The first readable project heading must not run under titlebar controls"
+        )
+    }
+
     private func assertEveryPrimaryViewContainedAndAligned(in window: XCUIElement) throws {
 
         let tabs: [(id: String, detail: String, title: String)] = [
@@ -984,7 +1015,6 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             ("tab-feed", "detail-feed", "Live Feed"),
             ("tab-projects", "detail-projects", "Projects"),
             ("tab-rune-forge", "detail-rune-forge", "Rune Forge"),
-            ("tab-autonomy", "detail-autonomy", "Autonomy"),
             ("tab-continuity", "detail-continuity", "Continuity"),
             ("tab-runtimes", "detail-runtimes", "Runtimes"),
             ("tab-provider", "detail-provider", "Provider"),
@@ -1038,9 +1068,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture(initialRunState: "completed")
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
         let row = app.descendants(matching: .any)["autonomy-run-row-\(fixture.runID)"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         let delete = app.buttons["run-delete"]
@@ -1059,9 +1087,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
 
         let state = app.descendants(matching: .any)["autonomy-state"]
         XCTAssertTrue(state.waitForExistence(timeout: 5))
@@ -1077,9 +1103,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         app.terminate()
         app.launch()
 
-        let relaunchedAutonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(relaunchedAutonomy.waitForExistence(timeout: 8))
-        relaunchedAutonomy.click()
+        openProjectRuns()
         let restoredState = app.descendants(matching: .any)["autonomy-state"]
         XCTAssertTrue(
             restoredState.waitForExistence(timeout: 5) && waitForValue("paused", on: restoredState),
@@ -1621,9 +1645,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(start, timeout: 5))
         start.click()
@@ -1684,7 +1706,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         app.buttons["run-start-cancel"].click()
         app.terminate()
         app.launch()
-        app.buttons["tab-autonomy"].click()
+        openProjectRuns()
         let reopenedStart = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(reopenedStart, timeout: 5))
         reopenedStart.click()
@@ -1698,9 +1720,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture(failStartResponse: true)
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
 
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(start, timeout: 5))
@@ -1770,9 +1790,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         relaunch(with: blockedFixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
 
         XCTAssertTrue(
             app.descendants(matching: .any)["run-recovery-summary"]
@@ -1790,8 +1808,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             initialRunState: "waiting_provider"
         )
         relaunch(with: providerFixture)
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
 
         XCTAssertTrue(
             app.descendants(matching: .any)["run-recovery-summary"]
@@ -1810,9 +1827,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
 
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(start, timeout: 5))
@@ -1896,9 +1911,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
-        let autonomy = app.buttons["tab-autonomy"]
-        XCTAssertTrue(autonomy.waitForExistence(timeout: 8))
-        autonomy.click()
+        openProjectRuns()
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(waitForEnabled(start, timeout: 5))
         start.click()
@@ -1953,7 +1966,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
     private func resizeMainWindowToMinimum(_ window: XCUIElement) {
         let initialFrame = window.frame
-        if initialFrame.width <= 1_120, initialFrame.height <= 780 {
+        if initialFrame.width <= 1_120, initialFrame.height <= 840 {
             return
         }
         let handle = window.coordinate(
@@ -1965,13 +1978,13 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         XCTAssertTrue(
             waitUntil(timeout: 3) {
-                window.frame.width < initialFrame.width - 100
-                    && window.frame.height < initialFrame.height - 100
+                window.frame.width <= 1_120
+                    && window.frame.height <= 840
             },
             "The resizable main window did not reach its minimum-size boundary"
         )
         XCTAssertLessThanOrEqual(window.frame.width, 1_120)
-        XCTAssertLessThanOrEqual(window.frame.height, 780)
+        XCTAssertLessThanOrEqual(window.frame.height, 840)
     }
 
     private func resizeMainWindowForWideGrid(_ window: XCUIElement) {
@@ -2020,6 +2033,20 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
         makeHittable(refresh)
         refresh.click()
+    }
+
+    private func openProjectRuns() {
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 8))
+        projects.click()
+        let runDetails = app.buttons["project-run-details"]
+        XCTAssertTrue(runDetails.waitForExistence(timeout: 5))
+        makeHittable(runDetails)
+        runDetails.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["detail-autonomy"].waitForExistence(timeout: 5),
+            "Project Runs must open from the selected project's instruction controls"
+        )
     }
 
     private func waitForValue(_ value: String, on element: XCUIElement, timeout: TimeInterval = 5) -> Bool {

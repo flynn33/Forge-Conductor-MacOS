@@ -30,6 +30,8 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     private let preparationState: ManagerProviderPreparationState
     private let simulateLostSelectionResponse: Bool
     private let providerOperationFailuresBeforeSuccess: Int
+    private let providerRegistryDelayNanoseconds: UInt64
+    private let configurationSaved: Bool
     private var acceptedSelectionOperation: ProviderIntegrationOperationSnapshot?
     private(set) var repairRequests: [ProviderIntegrationMutationRequest] = []
     private(set) var removeRequests: [ProviderIntegrationMutationRequest] = []
@@ -42,11 +44,15 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         selectedProviderID: ProviderIntegrationID? = .lmStudio,
         receiptProviderID: ProviderIntegrationID? = nil,
         simulateLostSelectionResponse: Bool = false,
-        providerOperationFailuresBeforeSuccess: Int = 0
+        providerOperationFailuresBeforeSuccess: Int = 0,
+        providerRegistryDelayNanoseconds: UInt64 = 0,
+        configurationSaved: Bool = false
     ) throws {
         self.preparationState = preparationState
         self.simulateLostSelectionResponse = simulateLostSelectionResponse
         self.providerOperationFailuresBeforeSuccess = providerOperationFailuresBeforeSuccess
+        self.providerRegistryDelayNanoseconds = providerRegistryDelayNanoseconds
+        self.configurationSaved = configurationSaved
         operatorSnapshot = try JSONDecoder().decode(
             OperatorSnapshot.self,
             from: Data("{}".utf8)
@@ -81,7 +87,10 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     }
 
     func providerIntegrations() async throws -> ProviderIntegrationsSnapshot {
-        ProviderIntegrationsSnapshot(
+        if providerRegistryDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: providerRegistryDelayNanoseconds)
+        }
+        return ProviderIntegrationsSnapshot(
             selectionRevision: integrationSnapshot.selectionRevision,
             selectedProviderID: integrationSnapshot.selectedProviderID,
             providers: integrationSnapshot.providers,
@@ -183,9 +192,9 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         ProviderConfigurationSnapshot(
             revision: "legacy-provider-configuration",
             endpoint: "http://127.0.0.1:1234",
-            modelKey: nil,
+            modelKey: configurationSaved ? "fixture/tool-model" : nil,
             credentialConfigured: false,
-            saved: false
+            saved: configurationSaved
         )
     }
 
@@ -239,7 +248,17 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     func updateProviderConfiguration(
         _ update: ProviderConfigurationUpdate
     ) async throws -> ProviderConfigurationSnapshot { throw notInScope }
-    func providerModels() async throws -> ProviderModelInventory { throw notInScope }
+    func providerModels() async throws -> ProviderModelInventory {
+        guard configurationSaved else { throw notInScope }
+        return ProviderModelInventory(
+            revision: "legacy-provider-configuration",
+            models: [ProviderAvailableModel(
+                key: "fixture/tool-model",
+                loaded: true,
+                toolUseCapable: true
+            )]
+        )
+    }
     func probeProvider(
         adapterID: String,
         mode: OperatorProviderProbeMode
@@ -260,6 +279,40 @@ final class ProviderConfigurationAppTests: XCTestCase {
     private func request(_ revision: String = "0") -> ProviderConfigurationUpdate {
         ProviderConfigurationUpdate(expectedRevision: revision, endpoint: "http://127.0.0.1:1234",
             modelKey: "fixture/tool-model", credentialAction: .keep)
+    }
+
+    @MainActor
+    func testModelRefreshRunsWhileProviderRegistryRefreshIsStillInFlight() async throws {
+        let client = try LegacyLMProviderSelectionClient(
+            providerRegistryDelayNanoseconds: 500_000_000,
+            configurationSaved: true
+        )
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<200 {
+            if viewModel.configuration?.saved == true,
+               viewModel.isLoadingProviderRegistry {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+
+        XCTAssertTrue(viewModel.isLoadingProviderRegistry)
+        XCTAssertTrue(viewModel.configuration?.saved == true)
+        viewModel.refreshModels()
+        for _ in 0..<200 {
+            if !viewModel.availableModels.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+
+        XCTAssertEqual(
+            viewModel.availableModels,
+            [ProviderAvailableModel(
+                key: "fixture/tool-model",
+                loaded: true,
+                toolUseCapable: true
+            )]
+        )
     }
 
     @MainActor

@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.14.4)
+# Context & Agent Continuity (v0.14.5)
 
 ## Summary
 
@@ -71,7 +71,8 @@ The established external MCP handoff path remains available: Forge returns a
 session creation through the native session-host adapter, persisted successor
 and fencing state, automatic-continuation records, and provider receipt
 recovery. Those implemented surfaces are not, by themselves, proof of a
-qualified autonomous rollover.
+qualified autonomous rollover. The intended operator experience is automatic
+session handoff; end-to-end owner live review of this candidate remains pending.
 
 Accepted provider receipts survive manager restart. When a provider response is
 unresolved after a crash, the request is fenced for **660 seconds** before a
@@ -115,10 +116,10 @@ next-action text explain the exact transition:
   readiness and desktop integration verification/repair use that provider
   card's **Connect and Check** action; any host reload, activation, or trust
   action remains explicit;
-- automatic completion failures offer **Open Autonomy**, where the named check
+- automatic completion failures offer **Open Project Runs**, where the named check
   or package-owned requirement is corrected and retried;
 - other recoverable states route to the exact recorded run condition in
-  Autonomy while continuity preserves durable task state.
+  Project Runs while continuity preserves durable task state.
 
 Queued, saving, quiescing, successor-creation, restoration, acknowledgment, and
 automatic retry states explain what Forge is doing next. **Action required**

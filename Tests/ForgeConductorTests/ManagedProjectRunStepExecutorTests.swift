@@ -3,6 +3,52 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ManagedProjectRunStepExecutorTests: XCTestCase {
+    func testOrderedToolCursorAdvancesOnlyForExactExpectedEffectAndBlocksEarlyCompletion() {
+        let context = """
+        1. Call fs_write to write exactly `one.txt` with content exactly `one`.
+        2. Call fs_read to read exactly `one.txt`.
+        3. Call fs_write to write exactly `two.txt` with content exactly `two`.
+        """
+        let directives = ManagedProjectRunStepExecutor.orderedToolDirectives(in: context)
+        XCTAssertEqual(directives.map(\.toolName), ["fs_write", "fs_read", "fs_write"])
+        var work = AutonomousRunWork(metadata: ["managed_instruction_context": context])
+
+        XCTAssertTrue(ManagedProjectRunStepExecutor.advanceOrderedToolProgress(
+            callName: "fs_write",
+            arguments: ["path": "wrong.txt", "content": "one"],
+            instructionContext: context,
+            work: &work
+        ))
+        XCTAssertEqual(work.metadata["managed_ordered_tool_cursor"], nil)
+        XCTAssertEqual(
+            ManagedProjectRunStepExecutor.pendingOrderedToolInstruction(work),
+            directives[0].instruction
+        )
+
+        XCTAssertTrue(ManagedProjectRunStepExecutor.advanceOrderedToolProgress(
+            callName: "fs_write",
+            arguments: ["path": "one.txt", "content": "one"],
+            instructionContext: context,
+            work: &work
+        ))
+        XCTAssertEqual(work.metadata["managed_ordered_tool_cursor"], "1")
+        XCTAssertEqual(
+            ManagedProjectRunStepExecutor.pendingOrderedToolInstruction(work),
+            directives[1].instruction
+        )
+
+        _ = ManagedProjectRunStepExecutor.advanceOrderedToolProgress(
+            callName: "fs_read", arguments: ["path": "one.txt"],
+            instructionContext: context, work: &work
+        )
+        _ = ManagedProjectRunStepExecutor.advanceOrderedToolProgress(
+            callName: "fs_write", arguments: ["path": "two.txt", "content": "two"],
+            instructionContext: context, work: &work
+        )
+        XCTAssertEqual(work.metadata["managed_ordered_tool_cursor"], "3")
+        XCTAssertNil(ManagedProjectRunStepExecutor.pendingOrderedToolInstruction(work))
+    }
+
     func testDurableBootstrapHoldRejectsDirectCoordinatorAndStaleExecutorSnapshot() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("managed-bootstrap-hold-\(UUID().uuidString)")
         let repository = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control.sqlite3"))
@@ -184,6 +230,13 @@ final class ManagedProjectRunStepExecutorTests: XCTestCase {
         XCTAssertEqual(stored.state, .completed)
         XCTAssertNotNil(stored.activeSessionID)
         XCTAssertEqual(stored.specification.work.metadata["provider_response_id"], "resp-final")
+        XCTAssertEqual(stored.specification.work.metadata["managed_last_tool_name"], "fixture.read")
+        XCTAssertEqual(stored.specification.work.metadata["managed_last_tool_call_id"], "call-read")
+        XCTAssertNotNil(stored.specification.work.metadata["managed_last_tool_output"])
+        XCTAssertTrue(
+            try XCTUnwrap(stored.specification.work.nextAction)
+                .contains("Do not repeat that tool call")
+        )
         let observations = observationRecorder.snapshot()
         XCTAssertEqual(
             observations.filter { $0.kind == .toolInvocationCompleted }.count,

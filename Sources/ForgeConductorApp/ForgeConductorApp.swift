@@ -48,8 +48,6 @@ struct ForgeConductorGUIApp: App {
             CommandMenu("Operator") {
                 Button("Projects") { model.selectTab(.projects) }
                     .keyboardShortcut("1", modifiers: [.command, .shift])
-                Button("Autonomy") { model.selectTab(.autonomy) }
-                    .keyboardShortcut("2", modifiers: [.command, .shift])
                 Button("Continuity") { model.selectTab(.continuity) }
                     .keyboardShortcut("3", modifiers: [.command, .shift])
                 Button("Runtimes") { model.selectTab(.runtimes) }
@@ -137,6 +135,12 @@ private final class ForgeMainWindowController: NSWindowController {
             defer: false
         )
         window.title = "Forge Conductor"
+        // Keep the title and toolbar in dedicated AppKit chrome. A unified
+        // titlebar can place SwiftUI content beneath toolbar controls at the
+        // minimum window size, making the first rows unreadable or unhittable.
+        window.toolbarStyle = .expanded
+        window.titleVisibility = .visible
+        window.titlebarAppearsTransparent = false
         window.identifier = NSUserInterfaceItemIdentifier("forge-main-window")
         window.tabbingMode = .disallowed
         window.contentViewController = hostingController

@@ -80,6 +80,10 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
             && (0...documentCount).contains(unresolvedDocumentCount)
     }
 
+    fileprivate var hasRunnableInstructionContent: Bool {
+        importReadyMetadataAvailable && (instructionByteCount ?? 0) > 0
+    }
+
     public func asDictionary(
         completedStepCount: Int? = nil,
         totalStepCount: Int? = nil
@@ -99,7 +103,7 @@ public struct ProjectInstructionPackage: Codable, Sendable, Equatable, Identifia
             "document_count": documentCount as Any,
             "instruction_byte_count": instructionByteCount as Any,
             "unresolved_document_count": unresolvedDocumentCount as Any,
-            "import_ready": unresolvedDocumentCount.map { $0 == 0 } as Any,
+            "import_ready": hasRunnableInstructionContent,
             "completed_step_count": completedStepCount as Any,
             "total_step_count": totalStepCount.map { max($0, documentCount ?? 0) } ?? documentCount as Any,
             "position": position,
@@ -263,7 +267,7 @@ public struct ProjectRunInstructionArtifact: Codable, Sendable, Equatable {
             "document_count": documentCount,
             "instruction_byte_count": instructionByteCount,
             "unresolved_document_count": unresolvedDocumentCount,
-            "import_ready": unresolvedDocumentCount == 0,
+            "import_ready": instructionByteCount > 0,
             "created_at": createdAt,
         ]
     }
@@ -1193,10 +1197,9 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             guard let package = packageByID[packageID] else {
                 throw ProjectInstructionQueueError.packageNotFound(packageID)
             }
-            guard package.unresolvedDocumentCount == 0,
-                  package.importReadyMetadataAvailable else {
+            guard package.hasRunnableInstructionContent else {
                 throw ProjectInstructionQueueError.invalidRequest(
-                    "Re-import \(package.displayName) after resolving its unsupported documents before using it in a task."
+                    "Re-import \(package.displayName) after adding at least one readable instruction document before using it in a task."
                 )
             }
             return package
@@ -1247,6 +1250,11 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             documentCount = composite.documents.count
             instructionByteCount = composite.instructionByteCount
             unresolvedDocumentCount = composite.unresolvedDocumentCount
+        }
+        guard instructionByteCount > 0 else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "The selected source has only unconverted attachments and no readable instruction text."
+            )
         }
 
         let snapshotURL = paths.instructionPackageStoreDir.appendingPathComponent(
@@ -1445,7 +1453,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             .appendingPathComponent(contentSHA256, isDirectory: true)
             .standardizedFileURL
         if let catalog = try Self.storedCatalog(root: root) {
-            return catalog.documents.compactMap { document in
+            let references: [ManagerPreparedRunDocumentReference] = catalog.documents.compactMap { document in
                 guard let canonicalReference = document.canonicalReference,
                       let byteCount = document.canonicalByteCount,
                       let sha256 = document.canonicalSHA256 else { return nil }
@@ -1455,6 +1463,12 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                     sha256: sha256
                 )
             }
+            guard !references.isEmpty else {
+                throw ProjectInstructionQueueError.invalidRequest(
+                    "The selected source has only unconverted attachments and no readable instruction text."
+                )
+            }
+            return references
         }
         guard let enumerator = FileManager.default.enumerator(
             at: root,
@@ -1544,6 +1558,8 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 "source_path": document.sourcePath,
                 "status": document.status.rawValue,
                 "detail": document.detail,
+                "converter": document.converter,
+                "original_bytes": String(document.originalByteCount),
                 "original_sha256": document.originalSHA256,
                 "canonical_sha256": document.canonicalSHA256 ?? "",
                 "canonical_bytes": document.canonicalByteCount.map(String.init) ?? "0",
@@ -1653,7 +1669,6 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let prior = state
         for (position, packageID) in packageIDs.enumerated() {
             guard var package = byID[packageID] else { throw ProjectInstructionQueueError.packageNotFound(packageID) }
-            if package.state == .running { throw ProjectInstructionQueueError.activePackage(packageID) }
             package.position = position
             package.updatedAt = timestamp
             state.packages[indices[position]] = package
@@ -1702,16 +1717,16 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         }
         guard !packages.isEmpty else {
             throw ProjectInstructionQueueError.queueBlocked(
-                "Add at least one instruction package before starting autonomy."
+                "Add at least one instruction package before starting ordered work."
             )
         }
         guard packages.contains(where: { $0.state == .queued }) else {
             throw ProjectInstructionQueueError.queueBlocked("No queued instruction packages remain.")
         }
         if let next = packages.filter({ $0.state == .queued }).sorted(by: Self.packageOrder).first,
-           let unresolved = next.unresolvedDocumentCount, unresolved > 0 {
+           !next.hasRunnableInstructionContent {
             throw ProjectInstructionQueueError.queueBlocked(
-                "Resolve or remove the \(unresolved) unconverted instruction document(s) in \(next.displayName) before starting this queue."
+                "\(next.displayName) has only unconverted attachments and no readable instruction text. Add a readable instruction document before starting this queue."
             )
         }
         let prior = state
@@ -1757,7 +1772,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             if let package = state.packages
                 .filter({ $0.projectID == ProjectID(projectUUID) && $0.state == .queued })
                 .sorted(by: Self.packageOrder)
-                .first, package.unresolvedDocumentCount ?? 0 == 0 {
+                .first, package.hasRunnableInstructionContent {
                 return package
             }
         }
@@ -1784,7 +1799,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         }
         guard state.runningProjects.contains(state.packages[index].projectID.description),
               state.packages[index].state == .queued,
-              state.packages[index].unresolvedDocumentCount ?? 0 == 0 else {
+              state.packages[index].hasRunnableInstructionContent else {
             throw ProjectInstructionQueueError.activePackage(packageID)
         }
         let prior = state
@@ -2636,7 +2651,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         if path.lowercased().hasSuffix(".zip"), SafeZIPArchive.isZIP(data, path: path) {
             return IngestedDocument(
                 path: path, original: data, canonicalText: nil, encoding: nil,
-                converter: "nested-zip-retention-v1", status: .unresolvedConversion,
+                converter: "nested-zip-retention-v1", status: .retainedAttachment,
                 detail: "Nested ZIP archives are retained but not recursively expanded. Import this archive separately for bounded inspection."
             )
         }
@@ -2689,7 +2704,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                 path: path, original: data, canonicalText: nil, encoding: nil,
                 converter: "forge-visual-inventory-v1",
                 status: .unrepresentedVisualStructural,
-                detail: "The visual source was retained, but no instruction text could be represented. OCR or visual review is required before this package is ready."
+                detail: "The visual source was retained, but no instruction text could be represented. OCR or visual review is required before this source can contribute instructions."
             )
         }
         return IngestedDocument(

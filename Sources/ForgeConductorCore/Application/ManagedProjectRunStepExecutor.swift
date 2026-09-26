@@ -55,6 +55,12 @@ public protocol ManagedRunBudgetEvaluating: Sendable {
         sessionID: String,
         capabilities: ProviderCapabilities
     ) async throws -> ContextBudgetAction
+
+    func requestSessionBoundaryRollover(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction
 }
 
 public extension ManagedRunBudgetEvaluating {
@@ -68,6 +74,14 @@ public extension ManagedRunBudgetEvaluating {
         }
         return try await evaluateBeforeProviderTurn(run: run, sessionID: sessionID,
                                                    capabilities: capabilities, serializedInputBytes: sum.partialValue)
+    }
+
+    func requestSessionBoundaryRollover(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction {
+        .rollover
     }
 }
 
@@ -567,6 +581,10 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             work.metadata["provider_session_id"] = sessionID
             work.metadata["provider_adapter_id"] = adapterID
             work.metadata["provider_capability_sha256"] = capabilities.capabilityFingerprintSHA256
+            if record.intent.kind == .automaticContinuation {
+                work.metadata["automatic_continuation_consumed_turn_id"] =
+                    record.intent.turnID.uuidString.lowercased()
+            }
             if let usage = turn.usage {
                 work.metadata["provider_context_used"] = String(usage.inputTokens)
                 work.metadata["provider_context_capacity"] = String(usage.capacity)
@@ -599,6 +617,10 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             guard !turn.toolCalls.isEmpty else {
                 if strongestAction == .checkpoint { return .checkpointRequired(work) }
                 if let request = Self.completionRequest(from: turn.messages) {
+                    if let pending = Self.pendingOrderedToolInstruction(work) {
+                        work.nextAction = "The first open ordered package action is exactly: \(pending) Execute it now; do not request completion."
+                        return .continued(work)
+                    }
                     // Legacy gate_evidence fields remain wire-compatible but carry
                     // no authority. Manager-owned validators decide completion.
                     return .completionRequestedWithWork(request.summary, work)
@@ -657,6 +679,29 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 work.metadata[
                     "tool_evidence.\(call.name).\(call.callID)"
                 ] = evidenceSHA256
+                let boundedOutput = Self.boundedUTF8(
+                    output,
+                    maximumBytes: 4 * 1_024
+                )
+                work.metadata["managed_last_tool_name"] = call.name
+                work.metadata["managed_last_tool_call_id"] = call.callID
+                work.metadata["managed_last_tool_output"] = boundedOutput
+                if let context = work.metadata["managed_instruction_context"],
+                   Self.advanceOrderedToolProgress(
+                        callName: call.name,
+                        arguments: arguments,
+                        instructionContext: context,
+                        work: &work
+                   ) {
+                    // The manager-owned cursor supplied the exact next action.
+                } else {
+                    work.nextAction = Self.boundedUTF8(
+                        """
+                        The predecessor successfully completed tool \(call.name) (call \(call.callID)) with result \(boundedOutput). Continue with the next instruction after that completed effect. Do not repeat that tool call or replay earlier package actions.
+                        """,
+                        maximumBytes: 8 * 1_024
+                    )
+                }
                 outputs.append([
                     "type": "function_call_output",
                     "call_id": call.callID,
@@ -698,10 +743,20 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             if strongestAction == .checkpoint { return .checkpointRequired(work) }
         }
 
-        return .failedRecoverable(
-            code: "managed_provider_tool_round_limit",
-            summary: "The provider exceeded the bounded tool-round limit"
+        let boundaryAction = try await budget.requestSessionBoundaryRollover(
+            run: run,
+            sessionID: sessionID,
+            capabilities: capabilities
         )
+        guard boundaryAction == .rollover || boundaryAction == .emergency else {
+            return .failedRecoverable(
+                code: "managed_provider_tool_round_limit",
+                summary: "The provider exceeded the bounded tool-round limit"
+            )
+        }
+        work.metadata["continuity_boundary"] = "managed_provider_tool_round_limit"
+        work.metadata["provider_response_id"] = previousResponseID
+        return .rolloverRequired(work)
     }
 
     private static func remainingContextTokens(_ usage: ProviderUsage?) -> Int? {
@@ -794,6 +849,8 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             }
             if candidate == nil,
                recorded.state == .completed,
+               work.metadata["automatic_continuation_consumed_turn_id"]
+                    != recorded.intent.turnID.uuidString.lowercased(),
                work.metadata["provider_response_id"] != recorded.providerResponseID {
                 candidate = recorded
             }
@@ -807,7 +864,12 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             }
             return nil
         }
-        let input = try ManagedContinuityWorker.automaticContinuationInput()
+        let input = try ManagedContinuityWorker.automaticContinuationInput(
+            nextAction: work.nextAction,
+            instructionContext: work.metadata["managed_instruction_context"],
+            instructionContextComplete:
+                work.metadata["managed_instruction_context_complete"] == "true"
+        )
         guard candidate.intent.kind == .automaticContinuation,
               candidate.intent.runID == run.runID,
               candidate.intent.projectID == run.projectID,
@@ -1277,6 +1339,21 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         policyContext: String?
     ) throws -> Data {
         if let continuationInput { return continuationInput }
+        if previousResponseID != nil,
+           let nextAction = run.specification.work.nextAction,
+           let instructionContext = run.specification.work.metadata[
+                "managed_instruction_context"
+           ],
+           !instructionContext.isEmpty {
+            return try ManagedContinuityWorker.managedProgressContinuationInput(
+                nextAction: nextAction,
+                instructionContext: instructionContext,
+                instructionContextComplete: run.specification.work.metadata[
+                    "managed_instruction_context_complete"
+                ] == "true",
+                policyContext: policyContext
+            )
+        }
         var prompt = Self.rootOrContinuationPrompt(for: run)
         if let policyContext, !policyContext.isEmpty {
             prompt += "\n\n" + policyContext
@@ -1420,6 +1497,108 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             output = candidate
         }
         return output
+    }
+
+    private static func boundedUTF8(_ value: String, maximumBytes: Int) -> String {
+        guard value.utf8.count > maximumBytes else { return value }
+        var output = ""
+        output.reserveCapacity(maximumBytes)
+        var byteCount = 0
+        for character in value {
+            let piece = String(character)
+            let pieceBytes = piece.utf8.count
+            guard byteCount <= maximumBytes - pieceBytes else { break }
+            output.append(character)
+            byteCount += pieceBytes
+        }
+        return output
+    }
+
+    struct OrderedToolDirective: Equatable {
+        let ordinal: Int
+        let toolName: String
+        let instruction: String
+        let requiredLiterals: [String]
+    }
+
+    static func orderedToolDirectives(in context: String) -> [OrderedToolDirective] {
+        var directives: [OrderedToolDirective] = []
+        directives.reserveCapacity(64)
+        for rawLine in context.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard let dot = line.firstIndex(of: "."),
+                  let ordinal = Int(line[..<dot]),
+                  ordinal > 0 else { continue }
+            let body = line[line.index(after: dot)...]
+                .trimmingCharacters(in: .whitespaces)
+            guard body.hasPrefix("Call ") else { continue }
+            let afterCall = body.dropFirst("Call ".count)
+            guard let toolEnd = afterCall.firstIndex(where: { $0.isWhitespace }) else {
+                continue
+            }
+            let toolName = String(afterCall[..<toolEnd])
+            guard !toolName.isEmpty, toolName.utf8.count <= 256 else { continue }
+            var literals: [String] = []
+            var remainder = body[...]
+            while let open = remainder.firstIndex(of: "`") {
+                let afterOpen = remainder.index(after: open)
+                guard let close = remainder[afterOpen...].firstIndex(of: "`") else { break }
+                let literal = String(remainder[afterOpen..<close])
+                if !literal.isEmpty { literals.append(literal) }
+                remainder = remainder[remainder.index(after: close)...]
+            }
+            directives.append(OrderedToolDirective(
+                ordinal: ordinal,
+                toolName: toolName,
+                instruction: "\(ordinal). \(body)",
+                requiredLiterals: literals
+            ))
+            if directives.count == 512 { break }
+        }
+        return directives
+    }
+
+    @discardableResult
+    static func advanceOrderedToolProgress(
+        callName: String,
+        arguments: [String: Any],
+        instructionContext: String,
+        work: inout AutonomousRunWork
+    ) -> Bool {
+        let directives = orderedToolDirectives(in: instructionContext)
+        guard !directives.isEmpty else { return false }
+        let cursor = max(0, min(
+            Int(work.metadata["managed_ordered_tool_cursor"] ?? "0") ?? 0,
+            directives.count
+        ))
+        guard cursor < directives.count else {
+            work.nextAction = "All \(directives.count) ordered tool instructions are durably complete. Request completion without executing another project tool."
+            return true
+        }
+        let expected = directives[cursor]
+        let argumentsJSON = (try? JSONSupport.canonicalJSON(arguments)) ?? ""
+        if callName == expected.toolName,
+           expected.requiredLiterals.allSatisfy({ argumentsJSON.contains($0) }) {
+            let nextCursor = cursor + 1
+            work.metadata["managed_ordered_tool_cursor"] = String(nextCursor)
+            if nextCursor < directives.count {
+                work.nextAction = "The first open ordered package action is exactly: \(directives[nextCursor].instruction) Execute it now; do not replay an earlier action and do not request completion."
+            } else {
+                work.nextAction = "All \(directives.count) ordered tool instructions are durably complete. Request completion without executing another project tool."
+            }
+        } else {
+            work.nextAction = "The first open ordered package action is exactly: \(expected.instruction) Execute it now; the previous tool did not satisfy this action."
+        }
+        return true
+    }
+
+    static func pendingOrderedToolInstruction(_ work: AutonomousRunWork) -> String? {
+        guard let context = work.metadata["managed_instruction_context"] else { return nil }
+        let directives = orderedToolDirectives(in: context)
+        guard !directives.isEmpty else { return nil }
+        let cursor = max(0, Int(work.metadata["managed_ordered_tool_cursor"] ?? "0") ?? 0)
+        guard cursor < directives.count else { return nil }
+        return directives[cursor].instruction
     }
 
     private static func stronger(

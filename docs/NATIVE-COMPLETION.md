@@ -1,10 +1,10 @@
 # Completion evidence and instruction-package requirements
 
-Product identity: **0.14.4, build 10**.
+Product identity: **0.14.5, build 11**.
 
 Completion is owned by two explicit sources:
 
-1. Forge's built-in evidence checkboxes, selected in **Autonomy → Start Task**.
+1. Forge's built-in evidence checkboxes, selected in **Projects → Run Details → Start Task**.
 2. Additional requirements declared by the exact instruction package bound to
    the run.
 
@@ -14,7 +14,7 @@ recognized built-in checks.
 
 ## Built-in completion checks
 
-The native Autonomy sheet exposes six selectable checks:
+The native Project Runs sheet exposes six selectable checks:
 
 - **Buildable project**
 - **No build errors**
@@ -58,7 +58,7 @@ latest relevant result for each typed obligation:
 
 The model cannot mark its own prose as authoritative completion evidence.
 
-## Autonomy recovery
+## Project Runs recovery
 
 The running-task view labels this section **Completion evidence**. It shows
 built-in and package-owned requirements as a read-only record, including passed
@@ -79,6 +79,6 @@ Connect and Check** and resume the retained task when the provider is ready.
 - Completion history and evidence references remain project/run scoped.
 
 The root `VERSION`, `BUILD_NUMBER`, Xcode build settings, protocol constants,
-and version assertions use `0.14.4 (10)`. Source and deterministic test evidence
+and version assertions use `0.14.5 (11)`. Source and deterministic test evidence
 do not by themselves qualify an installed app, Developer ID artifact,
 notarization, Gatekeeper acceptance, or shipment.

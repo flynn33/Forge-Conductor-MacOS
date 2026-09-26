@@ -1,10 +1,10 @@
 # Forge Conductor user guide
 
-Version **0.14.4**, build **10**. This guide covers the native Forge Conductor
+Version **0.14.5**, build **11**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.4 (10)` is the current locally qualified identity. It has not inherited the
-> artifact qualification of earlier `0.9.0 (1)` candidates. See
+> `0.14.5 (11)` is the current development repair identity. It has not inherited
+> the live or artifact qualification of `0.14.4 (10)` or earlier candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release checks.
 
@@ -115,8 +115,8 @@ provider in **Provider**. The activation toggle verifies or transactionally
 provisions Forge-owned integration files before changing the selection. For LM
 Studio, save and probe the loaded model; for a desktop host, complete the host's
 reported reload, activation, or trust-review action. For managed work, choose
-the registered project, enter the instructions, and select **Start Task** in
-**Autonomy**. Forge fills the saved LM Studio model or records the desktop
+the registered project, open **Projects → Run Details**, enter the instructions,
+and select **Start Task**. Forge fills the saved LM Studio model or records the desktop
 host-selected model, registered capability profile, and completion check;
 technical defaults are resolved by the Manager at admission and overrides
 remain available under **Advanced**. Provider and tool-catalog revisions are
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.4 binary:
+Confirm the registered command is a `serve`-capable 0.14.5 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.4
+forge-conductor version    # should print 0.14.5
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.4` and
-`CFBundleVersion` must be `10`.
+For an app bundle, `CFBundleShortVersionString` must be `0.14.5` and
+`CFBundleVersion` must be `11`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -214,7 +214,7 @@ scope, units, persistence and requested/effective behavior.
 
 LM Studio only starts the `serve` processes when a chat has those MCP servers selected. Idle “MCP not running” on the dashboard with no chat open is expected.
 
-### Select a provider for Autonomy
+### Select a provider for project runs
 
 Open **Provider** and turn on exactly one of LM Studio, Claude Code Desktop, or
 Codex Desktop. Turning on another provider replaces the durable
@@ -238,7 +238,7 @@ its files and receipt. Remove the registration in the host, then retry; the
 verified retry settles idempotently.
 
 If a desktop provider has a nonterminal task, finish or cancel that task in
-**Autonomy** before selecting, deselecting, repairing, or removing its
+**Projects → Run Details** before selecting, deselecting, repairing, or removing its
 integration. Forge rejects the mutation instead of disconnecting the hook path
 that owns the active session.
 
@@ -283,7 +283,7 @@ separate. For a Forge-managed autonomous queue, follow this order:
 5. Review the package capabilities, completion requirements, failure behavior,
    and automatic continuity. Package-declared requirements remain authoritative
    and read-only; Forge configuration exposes only the built-in checks.
-6. Choose **Start Ordered Autonomy**. Forge starts one managed run at a time for
+6. Choose **Start Ordered Work**. Forge starts one managed run at a time for
    that project and advances only when the prior package completes. A failed,
    cancelled, paused, or waiting run stops advancement until its retained state
    is ready to continue.
@@ -291,10 +291,12 @@ separate. For a Forge-managed autonomous queue, follow this order:
 Each accepted package is copied to protected, content-addressed storage and
 bound to the selected project UUID and generation. The model's filesystem scope
 is the registered repository, even when the imported instruction file lives
-elsewhere. **Stop Queue** prevents the next package from starting while leaving
-an already admitted run visible in **Autonomy**.
+elsewhere. Unsupported or unreadable sources are retained as attachments and do
+not block readable instructions in the same package. Add and rearrange pending
+packages while work runs. **Stop Ordered Work** prevents the next package from
+starting while leaving an already admitted run visible in **Projects → Run Details**.
 
-For a direct task, open **Autonomy → Start Task**. **Show completion checks**
+For a direct task, open **Projects → Run Details → Start Task**. **Show completion checks**
 is expanded initially; check or clear the premade evidence that fits the work: Buildable
 project, No build errors, No build warnings, Available tests pass, Instruction
 packages complete, and No unresolved operations. The native checkboxes are
@@ -315,7 +317,7 @@ the task when the retry allowance is exhausted. A new evidence result resets
 that consecutive no-progress count. Resume after correcting instruction
 delivery or the named unmet evidence; do not manually mark missing evidence passed.
 
-In **Autonomy**, select a completed, cancelled, or terminally failed task and
+In **Projects → Run Details**, select a completed, cancelled, or terminally failed task and
 choose **Delete Task…** to remove that one settled run from Forge history.
 Forge confirms the destructive action, rejects deletion while runtime work is
 unsettled, and fences the request to the exact project generation. Project
@@ -467,7 +469,7 @@ settings were saved but Keychain cleanup needs a retry after Keychain is unlocke
 These controls configure Forge-managed sessions; LM Studio MCP deployment remains
 in **LM Studio MCP**.
 
-If a retained run needs attention, Autonomy shows the exact state and its owning
+If a retained run needs attention, **Projects → Run Details** shows the exact state and its owning
 recovery action even when an older record has no error text. Built-in selectable
 completion checks are Manager-owned: correct the named build, warning, test,
 instruction-delivery, or reconciliation evidence and choose **Retry** when that
@@ -598,8 +600,8 @@ The wizard saves the selected step and walks through the operating order:
 4. add and order instruction packages;
 5. review tools, built-in completion checks, package requirements, failure
    behavior, and continuity;
-6. start ordered Autonomy or one direct task;
-7. monitor Dashboard, Autonomy, Continuity, Rune Forge, and Events & Evidence;
+6. start ordered work or one direct task from Projects;
+7. monitor Dashboard, Projects → Run Details, Continuity, Rune Forge, and Events & Evidence;
 8. resolve the named issue in its owning view and continue the durable run.
 
 Each step states what readiness looks like, gives the ordinary actions and
@@ -654,9 +656,10 @@ persist a second full LM Studio transcript. When Manager data is unavailable,
 the panel labels Manager, instruction, and policy source availability rather
 than presenting retained rows as fresh evidence.
 
-GPU Cores appears beneath CPU Cores. Storage and Orchestration use a compact
-left column beside the wider Managed Activity frame at normal window widths; the
-activity list uses a compact internal scroller. At constrained widths the Dashboard
+The combined **COMPUTE CORES** frame presents CPU logical-core activity beside
+GPU core/engine telemetry. Storage and Orchestration use a compact left column
+beside the wider Managed Activity frame at normal window widths; the activity
+list uses a compact internal scroller. At constrained widths the Dashboard
 stacks the frames, preserving readable content instead of clipping it.
 
 The MCP list shows Forge stdio roles (`mcp-stdio`, `mcp-stdio-fallback`, and
@@ -764,7 +767,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.4**, build **10**
+Doctor identifies the running source identity as version **0.14.5**, build **11**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally

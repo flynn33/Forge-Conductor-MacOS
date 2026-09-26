@@ -244,6 +244,70 @@ final class ContextBudgetSupervisorTests: XCTestCase {
         }
     }
 
+    func testPersistedEvaluatorQueuesAutomaticRolloverAtBoundedSessionBoundary() async throws {
+        try await withFixture(capacity: 4_096) { fixture in
+            let storedRun = try await fixture.repository.autonomousRun(
+                fixture.identity.runID
+            )
+            let run = try XCTUnwrap(storedRun)
+            let capabilities = try ProviderCapabilities(
+                providerID: "lmstudio",
+                providerVersion: "fixture-1",
+                modelKey: "fixture/model",
+                providerInstanceID: "fixture-instance",
+                contextLength: 4_096,
+                maximumContextLength: 4_096,
+                statefulResponses: true,
+                streaming: true,
+                customTools: true,
+                mcp: true,
+                structuredOutput: false,
+                usageReporting: true,
+                idempotencyLookup: true,
+                capabilityFingerprintSHA256: String(repeating: "a", count: 64)
+            )
+            let evaluator = PersistedManagedRunBudgetEvaluator(
+                repository: fixture.repository,
+                clock: fixture.clock
+            )
+            let initial = try await evaluator.evaluateBeforeProviderTurn(
+                run: run,
+                sessionID: fixture.identity.sessionID,
+                capabilities: capabilities,
+                serializedInputBytes: 100
+            )
+            XCTAssertEqual(initial, .normal)
+            let storedBeforeBoundary = try await fixture.repository
+                .latestContextBudgetObservation(identity: fixture.identity)
+            let beforeBoundary = try XCTUnwrap(storedBeforeBoundary)
+
+            let action = try await evaluator.requestSessionBoundaryRollover(
+                run: run,
+                sessionID: fixture.identity.sessionID,
+                capabilities: capabilities
+            )
+
+            XCTAssertEqual(action, .rollover)
+            let storedRequest = try await fixture.repository.contextBudgetActionRequest(
+                identity: fixture.identity
+            )
+            let request = try XCTUnwrap(storedRequest)
+            XCTAssertTrue(request.isPending)
+            XCTAssertEqual(request.requestedAction, .rollover)
+            XCTAssertEqual(
+                request.reason,
+                "Automatic rollover at bounded provider tool-round boundary"
+            )
+            let storedObservation = try await fixture.repository.contextBudgetObservation(
+                observationID: request.observationID
+            )
+            let observation = try XCTUnwrap(storedObservation)
+            XCTAssertEqual(observation.triggerPoint, .managerRecovery)
+            XCTAssertEqual(observation.action, .rollover)
+            XCTAssertEqual(observation.used, beforeBoundary.used)
+        }
+    }
+
     func testProviderOverflowImmediatelyQueuesEmergencyRollover() async throws {
         try await withFixture(capacity: 65_536) { fixture in
             let supervisor = try await ContextBudgetSupervisor.open(

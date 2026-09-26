@@ -57,6 +57,9 @@ final class ProjectsViewModel: ObservableObject {
     @Published private(set) var projects: [OperatorProject] = []
     @Published var selectedProjectID: String?
     @Published private(set) var instructionQueue: OperatorInstructionQueue?
+    @Published private(set) var instructionCatalogs: [String: OperatorInstructionDocumentCatalog] = [:]
+    @Published private(set) var loadingInstructionCatalogs: Set<String> = []
+    @Published private(set) var instructionCatalogErrors: [String: String] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var notice: String?
@@ -187,6 +190,9 @@ final class ProjectsViewModel: ObservableObject {
     func loadInstructionQueue() {
         guard !isLoading, let project = selectedProject else {
             instructionQueue = nil
+            instructionCatalogs = [:]
+            loadingInstructionCatalogs = []
+            instructionCatalogErrors = [:]
             return
         }
         let identity = project.projectID
@@ -202,12 +208,58 @@ final class ProjectsViewModel: ObservableObject {
                     return
                 }
                 instructionQueue = queue
+                let currentPackageIDs = Set(queue.packages.map(\.id))
+                instructionCatalogs = instructionCatalogs.filter {
+                    currentPackageIDs.contains($0.key)
+                }
+                instructionCatalogErrors = instructionCatalogErrors.filter {
+                    currentPackageIDs.contains($0.key)
+                }
             } catch {
                 guard selectedProjectID?.caseInsensitiveCompare(identity) == .orderedSame else {
                     return
                 }
                 instructionQueue = nil
                 errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func instructionCatalog(for packageID: String) -> OperatorInstructionDocumentCatalog? {
+        instructionCatalogs[packageID]
+    }
+
+    func instructionCatalogError(for packageID: String) -> String? {
+        instructionCatalogErrors[packageID]
+    }
+
+    func loadInstructionCatalog(for package: OperatorInstructionPackage) {
+        guard let project = selectedProject,
+              project.projectID.caseInsensitiveCompare(package.projectID) == .orderedSame,
+              project.projectGeneration == package.projectGeneration,
+              instructionCatalogs[package.id] == nil,
+              !loadingInstructionCatalogs.contains(package.id) else { return }
+        loadingInstructionCatalogs.insert(package.id)
+        instructionCatalogErrors.removeValue(forKey: package.id)
+        let projectID = project.projectID
+        let generation = project.projectGeneration
+        Task { [weak self] in
+            guard let self else { return }
+            defer { loadingInstructionCatalogs.remove(package.id) }
+            do {
+                let catalog = try await client.instructionPackageCatalog(
+                    projectID: projectID,
+                    generation: generation,
+                    contentSHA256: package.contentSHA256
+                )
+                guard selectedProjectID?.caseInsensitiveCompare(projectID) == .orderedSame,
+                      selectedProject?.projectGeneration == generation else { return }
+                instructionCatalogs[package.id] = catalog
+            } catch {
+                guard selectedProjectID?.caseInsensitiveCompare(projectID) == .orderedSame else {
+                    return
+                }
+                instructionCatalogErrors[package.id] = error.localizedDescription
             }
         }
     }
@@ -257,7 +309,7 @@ final class ProjectsViewModel: ObservableObject {
                     generation: project.projectGeneration,
                     sourcePath: path
                 )
-                notice = "Added the instruction package to \(project.displayName). Drag packages to set autonomous execution order."
+                notice = "Added the instruction package to \(project.displayName). Drag packages to set execution order."
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -321,13 +373,13 @@ final class ProjectsViewModel: ObservableObject {
                         projectID: project.projectID,
                         generation: project.projectGeneration
                     )
-                    notice = "Stopped automatic package advancement. The active run, if any, remains visible in Autonomy."
+                    notice = "Stopped automatic package advancement. The active run, if any, remains available in this project's Run Details."
                 } else {
                     instructionQueue = try await client.startInstructionQueue(
                         projectID: project.projectID,
                         generation: project.projectGeneration
                     )
-                    notice = "Started ordered autonomy for \(project.displayName)."
+                    notice = "Started ordered work for \(project.displayName)."
                 }
             } catch {
                 errorMessage = error.localizedDescription

@@ -1,0 +1,11 @@
+{
+  "schema_version": "forge-link-pairing-evidence/1",
+  "forge_instance_id": "d861a837-7162-4b1e-8b71-9ad810dbfd66",
+  "link_instance_id": "4b11b1c7-8378-4c18-a3bd-aa1e1a854a16",
+  "fingerprint_confirmed": true,
+  "challenge_id": "c5314532-41ff-43e8-aee8-440a33e58016",
+  "granted_scopes": ["proxy:models:read", "proxy:inference"],
+  "completed_at": "2026-09-25T17:05:00Z",
+  "credential_reference": "lmstudio-link-4b11b1c7-8378-4c18-a3bd-aa1e1a854a16",
+  "post_pair_health": "ready"
+}

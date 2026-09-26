@@ -2,6 +2,7 @@
 // These tests deliberately do not use the unavailable-manager or panel fixtures.
 
 import Darwin
+import AppKit
 import Foundation
 import ForgeConductorCore
 import XCTest
@@ -232,6 +233,145 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attach("direct-project-path-registration", snapshot)
     }
 
+    func testNativeProjectsImportsMixedInstructionFolderWithoutBlockingReadableWork() async throws {
+        let instructionFolder = projectRoot.appendingPathComponent(
+            "Instruction Package", isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: instructionFolder,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try Data("Read work-product.txt and report its exact content.\n".utf8).write(
+            to: instructionFolder.appendingPathComponent("01-instructions.md"),
+            options: .atomic
+        )
+        try Data("Plain-text instruction.\n".utf8).write(
+            to: instructionFolder.appendingPathComponent("02-notes.txt"),
+            options: .atomic
+        )
+        let pdfView = NSTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 200))
+        pdfView.string = "PDF instruction"
+        try pdfView.dataWithPDF(inside: pdfView.bounds).write(
+            to: instructionFolder.appendingPathComponent("03-document.pdf"), options: .atomic
+        )
+        let rich = NSAttributedString(string: "Rich instruction")
+        try rich.data(
+            from: NSRange(location: 0, length: rich.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML]
+        ).write(to: instructionFolder.appendingPathComponent("04-rich.docx"), options: .atomic)
+        try rich.data(
+            from: NSRange(location: 0, length: rich.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ).write(to: instructionFolder.appendingPathComponent("05-rich.rtf"), options: .atomic)
+        try Data("<html><body>HTML instruction</body></html>".utf8).write(
+            to: instructionFolder.appendingPathComponent("06-rich.html"), options: .atomic
+        )
+        try Data(#"{"instruction":"JSON instruction"}"#.utf8).write(
+            to: instructionFolder.appendingPathComponent("07-data.json"), options: .atomic
+        )
+        try Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )!.write(to: instructionFolder.appendingPathComponent("08-image.png"), options: .atomic)
+        let nestedSource = fixture.appendingPathComponent("nested-source", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: nestedSource, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try Data("Nested instruction".utf8).write(
+            to: nestedSource.appendingPathComponent("nested.txt"), options: .atomic
+        )
+        let archive = instructionFolder.appendingPathComponent("09-nested.zip")
+        let zipper = Process()
+        zipper.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        zipper.arguments = ["-c", "-k", "--keepParent", nestedSource.path, archive.path]
+        try zipper.run()
+        zipper.waitUntilExit()
+        XCTAssertEqual(zipper.terminationStatus, 0)
+        try Data([0x00, 0xFF, 0x00, 0xFE]).write(
+            to: instructionFolder.appendingPathComponent("10-unknown.xyzunknown"),
+            options: .atomic
+        )
+
+        _ = try await launchOrdinaryApplication()
+        try openManager()
+        try openFolderPicker()
+        try chooseFolderInNativePanel(projectRoot.path)
+        try click(app.buttons["settings-save"])
+        _ = try await waitForSettings(roots: [projectRoot.path])
+
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-register-by-path"])
+        try replace(app.textFields["project-register-path"], with: projectRoot.path)
+        try click(app.buttons["project-register-confirm"])
+        let projects: OnboardingProjectSnapshot = try await read(
+            "/api/manager/operator/snapshot?limit=1"
+        )
+        let project = try XCTUnwrap(projects.projects.first)
+
+        try click(app.buttons["instruction-package-add"])
+        XCTAssertTrue(
+            folderPanel.waitForExistence(timeout: 10),
+            "The production instruction NSOpenPanel must appear"
+        )
+        XCTAssertTrue(folderPanel.buttons["Add Instructions"].exists)
+        try chooseFolderInNativePanel(instructionFolder.path, prompt: "Add Instructions")
+
+        let request = OnboardingProjectGenerationRequest(
+            projectID: project.projectID,
+            projectGeneration: project.projectGeneration
+        )
+        let deadline = Date().addingTimeInterval(15)
+        var queue: OnboardingInstructionQueue?
+        repeat {
+            let candidate: OnboardingInstructionQueue = try await post(
+                "/api/manager/projects/instruction-packages",
+                body: request
+            )
+            if candidate.packages.count == 1 {
+                queue = candidate
+                break
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        } while Date() < deadline
+
+        let imported = try XCTUnwrap(queue)
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.documentCount, 10)
+        XCTAssertEqual(package.unresolvedDocumentCount, 2)
+        XCTAssertEqual(package.importReady, true)
+        XCTAssertEqual(package.state, "queued")
+        XCTAssertTrue(
+            element("instruction-package-row-\(package.id)").waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(app.buttons["instruction-queue-toggle"].isEnabled)
+        try click(element("instruction-package-catalog-toggle-\(package.id)"))
+        let catalog = element("instruction-document-catalog-\(package.id)")
+        XCTAssertTrue(catalog.waitForExistence(timeout: 10))
+        XCTAssertTrue(contains(catalog, "File catalog · 10 of 10 retained"))
+        let documents = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "instruction-document-document-")
+        )
+        XCTAssertEqual(documents.count, 10)
+        XCTAssertGreaterThan(
+            documents.matching(
+                NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", "Converted", "Converted")
+            ).count,
+            0
+        )
+        XCTAssertGreaterThan(
+            documents.matching(
+                NSPredicate(
+                    format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@ OR label CONTAINS[c] %@ OR value CONTAINS[c] %@",
+                    "Retained attachment", "Retained attachment", "Unresolved", "Unresolved"
+                )
+            ).count,
+            0
+        )
+        attach("native-projects-mixed-folder-readback", imported)
+        attachScreenshot("native-projects-mixed-folder")
+    }
+
     func testProjectRemovalIsAvailableFromSidebarAndPersists() async throws {
         _ = try await launchOrdinaryApplication()
         try click(app.buttons["tab-projects"])
@@ -346,9 +486,12 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         try openProvider()
         let saved = try await saveProvider(endpoint: endpoint, model: model)
         try click(app.buttons["provider-refresh-models"])
-        XCTAssertTrue(waitUntil(timeout: 40) { self.app.buttons["provider-refresh-models"].isEnabled })
+        XCTAssertTrue(
+            element("provider-model-selection").waitForExistence(timeout: 40),
+            "Native controls must expose the discovered models after the asynchronous inventory request completes"
+        )
+        XCTAssertTrue(waitUntil { self.app.buttons["provider-refresh-models"].isEnabled })
         XCTAssertFalse(element("operator-unavailable").exists, "The selected real server must return its model inventory")
-        XCTAssertTrue(element("provider-model-selection").exists, "Native controls must expose the discovered models")
         let inventory: OnboardingProviderModels = try await read("/api/manager/provider/models", timeout: 40)
         XCTAssertEqual(inventory.revision, saved.revision)
         let loaded = try XCTUnwrap(inventory.models.first { $0.key == model })
@@ -398,7 +541,8 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         _ = try await saveProvider(endpoint: endpoint, model: model)
         try await assertRealConnection(model: model)
 
-        try click(app.buttons["tab-autonomy"])
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-run-details"])
         let start = app.buttons["autonomy-start"]
         XCTAssertTrue(start.waitForExistence(timeout: 10))
         XCTAssertTrue(waitUntil { start.isEnabled })
@@ -447,6 +591,31 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         )
         attach("native-autonomy-start-readback", snapshot)
         attachScreenshot("native-autonomy-start")
+
+        let completionDeadline = Date().addingTimeInterval(300)
+        var observed = run
+        while Date() < completionDeadline, observed.state != "completed" {
+            if ["failed_terminal", "cancelled"].contains(observed.state ?? "") {
+                break
+            }
+            try await Task.sleep(for: .seconds(1))
+            let refreshed: OnboardingManagedRunSnapshot = try await read(
+                "/api/manager/operator/snapshot?limit=5"
+            )
+            observed = try XCTUnwrap(
+                refreshed.runs.first { $0.runID == run.runID },
+                "The admitted run must remain durable while it executes"
+            )
+        }
+        attach("native-autonomy-completed-readback", observed)
+        XCTAssertEqual(
+            observed.state,
+            "completed",
+            "The exact task admitted through the native UI must complete against the loaded LM Studio model. "
+                + "last_error_code=\(observed.lastErrorCode ?? "none") "
+                + "last_error_summary=\(observed.lastErrorSummary ?? "none") "
+                + "next_action=\(observed.nextAction ?? "none")"
+        )
     }
 
     func testNativeSettingsShellOptOutAndReenablePersistIntoFreshMCPProcesses() async throws {
@@ -724,6 +893,40 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         return try JSONDecoder().decode(Value.self, from: data)
     }
 
+    private func post<Value: Decodable & Sendable, Body: Encodable>(
+        _ route: String,
+        body: Body,
+        timeout: TimeInterval = 8
+    ) async throws -> Value {
+        let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(managerPort)\(route)"))
+        let credentialURL = forgeHome.appendingPathComponent("manager-control.secret")
+        let attributes = try FileManager.default.attributesOfItem(atPath: credentialURL.path)
+        guard (attributes[.size] as? NSNumber)?.intValue == 64,
+              (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
+              (attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600 else {
+            throw OnboardingFailure.invalidManagerCredential
+        }
+        let credential = try String(contentsOf: credentialURL, encoding: .utf8)
+        guard credential.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
+            throw OnboardingFailure.invalidManagerCredential
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = timeout
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+        let (data, response) = try await session.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw OnboardingFailure.managerResponseRejected(
+                route: route,
+                status: (response as? HTTPURLResponse)?.statusCode ?? 0
+            )
+        }
+        guard data.count <= 1_048_576 else { throw OnboardingFailure.responseTooLarge }
+        return try JSONDecoder().decode(Value.self, from: data)
+    }
+
     private func retainBootstrapDiagnostics(_ name: String, home: URL, lastFailure: String? = nil) {
         let credentialURL = home.appendingPathComponent("manager-control.secret")
         let attributes = try? FileManager.default.attributesOfItem(atPath: credentialURL.path)
@@ -771,8 +974,12 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         // content scroll views. Select the deepest scroll ancestor containing
         // this exact control instead of scrolling the sidebar's first match.
         let scrolls = app.scrollViews.containing(.any, identifier: target.identifier).allElementsBoundByIndex
-        if !target.isHittable, let scroll = scrolls.last {
-            for _ in 0..<12 where !target.isHittable {
+        if let scroll = scrolls.last {
+            func isFullyVisible() -> Bool {
+                target.isHittable
+                    && scroll.frame.insetBy(dx: 2, dy: 2).contains(target.frame)
+            }
+            for _ in 0..<12 where !isFullyVisible() {
                 let distance = target.frame.midY - scroll.frame.midY
                 // Pixel scrolling avoids a high-velocity swipe jumping across
                 // the entire section that contains the off-screen control.
@@ -899,6 +1106,37 @@ private struct OnboardingProjectSnapshot: Codable, Sendable, Equatable {
     let projects: [Project]
 }
 
+private struct OnboardingProjectGenerationRequest: Encodable, Sendable {
+    let projectID: String
+    let projectGeneration: UInt64
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+    }
+}
+
+private struct OnboardingInstructionQueue: Codable, Sendable {
+    struct Package: Codable, Sendable {
+        let id: String
+        let documentCount: Int?
+        let unresolvedDocumentCount: Int?
+        let importReady: Bool?
+        let state: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, state
+            case documentCount = "document_count"
+            case unresolvedDocumentCount = "unresolved_document_count"
+            case importReady = "import_ready"
+        }
+    }
+
+    let revision: UInt64
+    let running: Bool
+    let packages: [Package]
+}
+
 private struct OnboardingManagedRunSnapshot: Codable, Sendable {
     struct CompletionPlan: Codable, Sendable {
         let instructionArtifactSHA256: [String]
@@ -915,6 +1153,10 @@ private struct OnboardingManagedRunSnapshot: Codable, Sendable {
         let mission: String
         let state: String?
         let modelKey: String?
+        let nextAction: String?
+        let lastAssistantMessage: String?
+        let lastErrorCode: String?
+        let lastErrorSummary: String?
         let completionGates: [String]
         let completionPlan: CompletionPlan?
         enum CodingKeys: String, CodingKey {
@@ -924,6 +1166,10 @@ private struct OnboardingManagedRunSnapshot: Codable, Sendable {
             case mission
             case state
             case modelKey = "model_key"
+            case nextAction = "next_action"
+            case lastAssistantMessage = "last_assistant_message"
+            case lastErrorCode = "last_error_code"
+            case lastErrorSummary = "last_error_summary"
             case completionGates = "completion_gates"
             case completionPlan = "completion_plan"
         }

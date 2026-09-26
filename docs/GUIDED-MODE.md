@@ -45,9 +45,9 @@ steps are the supported operating order:
    and package-owned completion requirements, and arrange execution order.
 5. **Review automation behavior** — confirm tools, automatic completion checks,
    failure handling, and continuity behavior.
-6. **Start the automated run** — launch the ordered queue from Projects or one
-   direct task from Autonomy.
-7. **Monitor the run** — use Dashboard for live state, Autonomy for exact run
+6. **Start the automated run** — launch the ordered queue or one direct task
+   from Projects.
+7. **Monitor the run** — use Dashboard for live state, Projects → Run Details for exact run
    control, Continuity for rollover, Rune Forge for policy observations, and
    Events & Evidence for durable audit detail.
 8. **Resolve issues and continue** — follow the current issue's owning-view
@@ -71,9 +71,9 @@ Forge-managed session, while desktop providers retain their model and
 conversation and exchange orchestration context at the hook boundary. A
 desktop provider with unfinished tasks cannot be selected, deselected,
 repaired, or removed until those tasks are finished or cancelled through
-Autonomy.
+Projects → Run Details.
 
-Grok Build remains visible in Provider but is non-selectable in 0.14.4. Its
+Grok Build remains visible in Provider but is non-selectable in 0.14.5. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.
@@ -99,7 +99,7 @@ product controls rather than hidden guide side effects.
 
 ## State-aware guidance
 
-Autonomy guidance distinguishes loading, missing project, provider action, and
+Project Runs guidance distinguishes loading, missing project, provider action, and
 task-ready states. Continuity explains whether operations exist and the state of
 the selected operation. Provider guidance distinguishes the durable selection,
 provisioning operation, remaining desktop-host action, verified deployment,
@@ -139,7 +139,7 @@ validated against the app-owned identifier list and fails tests if a primary
 tab or typed guide context is omitted. Guided Mode does not intercept ordinary
 screen interaction when its inline banner is visible.
 
-Native UI acceptance covers all 14 primary-tab routes, Start Task's more-specific
+Native UI acceptance covers all 13 current primary-tab routes, Start Task's more-specific
 guide, preservation of the entered task draft while help opens and closes,
 persisted Guided Mode preference, keyboard dismissal, and the reusable native
 tool-permission checkboxes. These behaviors are also backed by app-hosted

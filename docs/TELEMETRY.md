@@ -54,7 +54,7 @@ five-second, view-owned Manager refresh:
   of LM Studio health only when ready preparation, the current selection
   revision, and a verified receipt agree. Missing, stale, in-flight, or
   non-selectable evidence fails closed.
-- **Autonomy** reports manager service state plus bounded active/deferred load.
+- **Project Runs** reports manager service state plus bounded active/deferred load.
 - **Continuity** reports automatic monitoring, active rollover, attention, and
   the greatest available context-load fraction.
 - **Rune Forge** reports selected/indexed policy-source and observation state.
@@ -100,10 +100,11 @@ That global newest feed and Dashboard's exact project/generation feed are bounde
 responses through a strict 4 MiB ceiling and cancel on overflow. Both preserve
 Stjornarvald's non-interference boundary.
 
-At normal widths, intrinsic Grid rows align CPU/GPU, Storage/Managed Activity,
-MCP servers/tools, and agents/processes. Managed Activity scrolls within a
-compact 130-point region, and constrained widths stack the instrumentation
-panels instead of clipping them.
+At normal widths, the **COMPUTE CORES** frame combines CPU logical-core bars
+with GPU core topology and engine telemetry. Intrinsic Grid rows also align
+Storage/Managed Activity, MCP servers/tools, and agents/processes. Managed
+Activity scrolls within a compact 130-point region, and constrained widths
+stack the instrumentation panels instead of clipping them.
 
 The title bar exposes **Guided Setup**, an eight-step state-aware wizard for
 Manager readiness, provider connection, project registration, instruction
@@ -133,6 +134,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.14.4`
+`0.14.5`
 
-Build: `10`
+Build: `11`

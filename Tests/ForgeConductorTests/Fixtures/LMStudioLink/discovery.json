@@ -1,0 +1,13 @@
+{
+  "schema_version": "forge-link-discovery/1",
+  "service_type": "_forge-lms-link._tcp",
+  "instance_id": "4b11b1c7-8378-4c18-a3bd-aa1e1a854a16",
+  "display_name": "Dell Pro Max GB10",
+  "host": "gb10.local",
+  "port": 57400,
+  "interface_index": 7,
+  "spki_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capabilities": ["proxy", "control", "mcp-relay"],
+  "last_seen": "2026-09-25T17:00:00Z",
+  "additive_future_field": true
+}

@@ -474,7 +474,7 @@ struct ContinuityOperatorView: View {
         case .none: "No action required"
         case .retryAutomatically: "Refresh continuity status"
         case .reviewProvider: "Open Provider"
-        case .reviewRun: "Open Autonomy"
+        case .reviewRun: "Open Project Runs"
         }
     }
 

@@ -1,0 +1,8 @@
+{
+  "schema_version": "forge-link-capabilities/1",
+  "link_protocol": "forge-link/1",
+  "proxy_paths": ["/api/v0/*", "/api/v1/*", "/v1/responses"],
+  "control_actions": ["server_start", "server_stop", "server_restart", "repair_registration"],
+  "mcp_versions": ["2025-11-25", "2026-07-28"],
+  "architecture": "aarch64"
+}

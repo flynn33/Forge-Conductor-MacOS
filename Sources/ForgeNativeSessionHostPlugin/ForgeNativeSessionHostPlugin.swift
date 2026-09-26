@@ -382,6 +382,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     public static let maximumFileBytes = 64 * 1024
 
     public var revision: String = "0"
+    public var endpointMode: LMStudioEndpointMode
     public var baseURL: URL
     public var modelKey: String?
     public var keychainTokenReference: String?
@@ -399,6 +400,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     public var maximumOutputTokens: Int
 
     public init(
+        endpointMode: LMStudioEndpointMode = .local,
         baseURL: URL = URL(string: "http://127.0.0.1:1234")!,
         modelKey: String? = nil,
         keychainTokenReference: String? = nil,
@@ -415,6 +417,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
         maximumToolArgumentBytes: Int = 256 * 1024,
         maximumOutputTokens: Int = 4_096
     ) {
+        self.endpointMode = endpointMode
         self.baseURL = baseURL
         self.modelKey = modelKey
         self.keychainTokenReference = keychainTokenReference
@@ -434,6 +437,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case revision
+        case endpointMode = "endpoint_mode"
         case baseURL = "base_url"
         case modelKey = "model_key"
         case keychainTokenReference = "keychain_token_reference"
@@ -454,6 +458,9 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
+            endpointMode: try values.decodeIfPresent(
+                LMStudioEndpointMode.self, forKey: .endpointMode
+            ) ?? .local,
             baseURL: try values.decode(URL.self, forKey: .baseURL),
             modelKey: try values.decodeIfPresent(String.self, forKey: .modelKey),
             keychainTokenReference: try values.decodeIfPresent(
@@ -513,6 +520,9 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
             || host == "::1" || host == "[::1]"
         guard scheme == "https" || loopback else {
             throw LMStudioProviderError.invalidConfiguration("non-loopback providers require HTTPS")
+        }
+        if case .linked = endpointMode, scheme != "https" {
+            throw LMStudioProviderError.invalidConfiguration("linked providers require HTTPS")
         }
         guard baseURL.port.map({ (1...65_535).contains($0) }) ?? true else {
             throw LMStudioProviderError.invalidConfiguration("base URL port is outside supported bounds")

@@ -273,6 +273,82 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         return receipt.observation.action
     }
 
+    public func requestSessionBoundaryRollover(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction {
+        let supervisor = try await supervisor(
+            run: run,
+            sessionID: sessionID,
+            capabilities: capabilities
+        )
+        let snapshot = await supervisor.snapshot()
+        if let existing = snapshot.latestActionRequest,
+           existing.isPending,
+           existing.requestedAction.severity >= ContextBudgetAction.rollover.severity {
+            return existing.requestedAction
+        }
+        var state = snapshot.state
+        guard let source = state.latestObservation,
+              state.actionEpoch < UInt64(Int64.max),
+              state.observationCount < UInt64(Int64.max),
+              state.revision < UInt64(Int64.max) else {
+            throw ContextBudgetError.currentObservationRequired
+        }
+        let timestamp = ISO8601.string(from: clock.now())
+        let epoch = state.actionEpoch + 1
+        let observationID = UUID()
+        let action = ContextBudgetAction.rollover
+        let observation = ContextBudgetObservation(
+            observationID: observationID,
+            identity: source.identity,
+            providerResponseID: source.providerResponseID,
+            capacity: source.capacity,
+            used: source.used,
+            reserves: source.reserves,
+            remaining: source.remaining,
+            projectedNextTurn: source.projectedNextTurn,
+            source: source.source,
+            confidence: source.confidence,
+            estimatorVersion: source.estimatorVersion,
+            action: action,
+            triggerPoint: .managerRecovery,
+            thresholds: source.thresholds,
+            actionEpoch: epoch,
+            createdAt: timestamp,
+            accounting: source.accounting
+        )
+        state.latestObservation = observation
+        state.action = action
+        state.lastRequestedAction = action
+        state.actionEpoch = epoch
+        state.observationCount += 1
+        state.revision += 1
+        state.updatedAt = timestamp
+        let requestID = snapshot.latestActionRequest?.requestID ?? UUID()
+        let operationID = snapshot.latestActionRequest?.continuityOperationID ?? UUID()
+        let receipt = try await repository.persistContextBudget(
+            ContextBudgetPersistenceCommit(
+                observation: observation,
+                state: state,
+                actionRequest: ContextBudgetActionRequestIntent(
+                    requestID: requestID,
+                    continuityOperationID: operationID,
+                    identity: source.identity,
+                    observationID: observationID,
+                    requestedAction: action,
+                    actionEpoch: epoch,
+                    reason: "Automatic rollover at bounded provider tool-round boundary"
+                )
+            )
+        )
+        guard receipt.actionRequest?.requestedAction == action else {
+            throw ContextBudgetError.invalidActionRequest
+        }
+        return action
+    }
+
     private func supervisor(
         run: AutonomousRunRecord,
         sessionID: String,

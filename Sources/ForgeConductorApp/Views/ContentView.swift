@@ -333,14 +333,18 @@ struct ContentView: View {
         case .feed:
             LiveFeedView()
         case .projects:
-            operatorContent { ProjectsOperatorView(client: model.operatorManagerClient) }
+            operatorContent {
+                ProjectsOperatorView(
+                    client: model.operatorManagerClient,
+                    onOpenProvider: { model.selectTab(.provider) }
+                )
+            }
         case .runeForge:
             operatorContent { RuneForgeOperatorView(client: model.operatorManagerClient) }
         case .autonomy:
             operatorContent {
-                AutonomyOperatorView(
+                ProjectsOperatorView(
                     client: model.operatorManagerClient,
-                    onOpenProjects: { model.selectTab(.projects) },
                     onOpenProvider: { model.selectTab(.provider) }
                 )
             }
@@ -348,7 +352,7 @@ struct ContentView: View {
             operatorContent {
                 ContinuityOperatorView(
                     client: model.operatorManagerClient,
-                    onOpenAutonomy: { model.selectTab(.autonomy) },
+                    onOpenAutonomy: { model.selectTab(.projects) },
                     onOpenProvider: { model.selectTab(.provider) }
                 )
             }
@@ -488,44 +492,43 @@ private struct GuidedSetupWizardView: View {
             title: "Add and order instructions",
             symbol: "text.badge.plus",
             purpose: "Instruction packages define the work, allowed capabilities, completion requirements, and execution order.",
-            readyWhen: "The selected project has at least one import-ready package and no unresolved documents.",
+            readyWhen: "The selected project has at least one package containing readable instruction text.",
             actions: [
                 "In Projects, choose Add Instructions and select a file, folder, ZIP, or .forgepackage.",
                 "Review the package name, document count, capabilities, and package-defined completion requirements.",
                 "Arrange multiple packages in the order they must run.",
             ],
             recovery: [
-                "A package with unresolved or unsupported documents is not start-ready; correct the named source and import it again.",
+                "Unsupported sources are retained as attachments and do not block readable instructions. If a package has no readable instruction text, add a supported document.",
                 "Completion requirements come from the instruction package, remain read-only in Forge, and are evaluated automatically.",
             ],
             destinations: [(.projects, "Open Instruction Packages")]
         ),
         Step(
             kind: .configure,
-            title: "Review automation behavior",
+            title: "Review ordered work behavior",
             symbol: "slider.horizontal.3",
             purpose: "Before launch, confirm the model, tools, automatic completion evidence, retry behavior, and continuity defaults.",
             readyWhen: "Provider, project, and instructions are ready and the intended failure behavior is understood.",
             actions: [
                 "For ordered packages, the package supplies its capabilities and completion requirements.",
-                "For a direct task, open Autonomy → Start Task, select instructions, and check or clear the inline Completion checks.",
-                "Choose whether failures pause, retry within the displayed limit, or stop the task. Continuity remains automatic.",
+                "Review the visible package order and each package's per-file catalog in Projects.",
+                "Use Run Details only to inspect or control historical and current runs. Continuity remains automatic.",
             ],
             recovery: [
                 "Forge repairs provider readiness automatically when possible. A preparation card appears only when a project, permission, or source choice requires your input.",
                 "If a package requirement is incorrect, correct the instruction package; Forge configuration does not create or override package requirements.",
             ],
-            destinations: [(.autonomy, "Open Autonomy")]
+            destinations: [(.projects, "Open Projects")]
         ),
         Step(
             kind: .start,
             title: "Start the automated run",
             symbol: "play.circle.fill",
             purpose: "Choose the launch path that matches the instruction source; both paths create manager-owned durable runs.",
-            readyWhen: "Projects shows Ordered Autonomy running, or Autonomy shows the accepted managed task.",
+            readyWhen: "Projects shows ordered work running, or Project Runs shows the accepted managed task.",
             actions: [
-                "For an ordered queue, open Projects and choose Start Ordered Autonomy. Forge runs one package at a time in the displayed order.",
-                "For one direct task, open Autonomy, choose Start Task, review the summary, and choose Start Task again.",
+                "For an ordered queue, open Projects and choose Start Ordered Work. Forge runs one package at a time in the displayed order.",
                 "A package advances only after its current run satisfies completion checks; failure stops advancement for review.",
             ],
             recovery: [
@@ -534,7 +537,7 @@ private struct GuidedSetupWizardView: View {
             ],
             destinations: [
                 (.projects, "Open Package Queue"),
-                (.autonomy, "Start a Direct Task"),
+                (.projects, "Open Project Runs"),
             ]
         ),
         Step(
@@ -545,7 +548,7 @@ private struct GuidedSetupWizardView: View {
             readyWhen: "Dashboard shows the current package, step, phase, work item, next action, model/tool activity, and policy events.",
             actions: [
                 "Dashboard: overall health, current package and step, Managed Activity, orchestration, and resource load.",
-                "Autonomy: exact run state, completion checks, pause/resume/retry, and failure detail.",
+                "Projects → Run Details: exact run state, completion checks, pause/resume/retry, and failure detail.",
                 "Continuity: saved progress, context protection, rollover, and successor status.",
                 "Rune Forge: policy observations and violation feed. Events & Evidence: durable audit detail.",
             ],
@@ -554,7 +557,7 @@ private struct GuidedSetupWizardView: View {
                 "Use the latest named failure, policy violation, or next action—not an older activity row—as recovery authority.",
             ],
             destinations: [
-                (.autonomy, "Open Run Details"),
+                (.projects, "Open Run Details"),
                 (.runeForge, "Open Policy Feed"),
             ]
         ),
@@ -568,7 +571,7 @@ private struct GuidedSetupWizardView: View {
                 "Provider issue: open Provider and choose Connect and Check. Forge resumes the exact retained run automatically after the contract check passes.",
                 "Automatic completion issue: Forge returns the run to work and re-evaluates it when more evidence is available.",
                 "Package completion issue: correct the named evidence or the instruction package. Forge re-evaluates the retained run automatically.",
-                "Continuity issue: read the exact detail and use its Open Provider or Open Autonomy action.",
+                "Continuity issue: read the exact detail and use its Open Provider or Open Project Runs action.",
                 "Policy violation: inspect Rune Forge and Events & Evidence, correct the named policy condition, then retry when allowed.",
             ],
             recovery: [
@@ -576,7 +579,7 @@ private struct GuidedSetupWizardView: View {
                 "If the same issue remains, export Diagnostics and preserve the displayed run/event identifiers.",
             ],
             destinations: [
-                (.autonomy, "Open Autonomy"),
+                (.projects, "Open Project Runs"),
                 (.evidence, "Open Events & Evidence"),
             ]
         ),

@@ -7,23 +7,24 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.4** |
-| **Build** | **10** |
+| **Version** | **0.14.5** |
+| **Build** | **11** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.4 (10)` is locally shippable for the owner's defined
-> LM Studio and Codex workflow on this Mac. Publication remains the owner's
-> separate action; exact evidence is in the [roadmap](ROADMAP.md) and
-> [qualification status](docs/QUALIFICATION-STATUS.md).
+> **Release status:** `0.14.5 (11)` is a development repair candidate. Autonomy
+> removal passed operator review and the combined telemetry frame is accepted.
+> Mixed-folder packages, Projects-owned ordered LM Studio work, and automatic
+> Continuity handoff are implemented pending owner live review. This identity is
+> not called shippable.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
 binding. Those warning repairs preserve provider request schemas and canonical
 Xcode target membership; the intentional provider workflow changes are
-described below. The current patch identity is `0.14.4 (10)`.
+described below. The current patch identity is `0.14.5 (11)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
@@ -31,7 +32,7 @@ provider/runtime preparation, durable continuity, and large instruction
 packages. Integrated deterministic acceptance covers restart, provider
 interruption, forced rollover, corrected completion evidence, and multi-page
 instruction delivery. **Dashboard** now launches an ordered, state-aware
-**Guided Setup** wizard; local LM Studio recovery, specific Autonomy and
+**Guided Setup** wizard; local LM Studio recovery, specific Project Runs and
 Continuity recovery states, current-build Doctor checks, compact Managed Activity, and
 the Rune Forge Policy Feed make setup and monitoring one connected workflow.
 Native distribution and shipment qualification remain separate.
@@ -150,7 +151,7 @@ routes each setup or recovery action to the view that owns it.
    bootstrap summary; managed runs page them through project/run-bound read-only
    tools sized against both the transport ceiling and current provider context.
    Large queue refreshes are also loaded in stable revision-bound pages.
-5. In **Autonomy**, configure the task: select the project and one or more existing instruction
+5. In **Projects → Run Details**, configure a direct task: select the project and one or more existing instruction
    packages in their displayed order, or type, paste, drop, or add a file,
    folder, or ZIP, then select **Start Task**. Forge confirms provider readiness
    before importing a new immutable task artifact, so an unavailable model
@@ -210,7 +211,7 @@ routes each setup or recovery action to the view that owns it.
 7. Monitor the active package, current step, model/tool activity, continuity,
    and policy events on **Dashboard**.
 8. If intervention is actually required, follow the named action in
-   **Autonomy**, **Provider**, **Continuity**, or **Rune Forge**. Retained legacy
+   **Projects → Run Details**, **Provider**, **Continuity**, or **Rune Forge**. Retained legacy
    configuration states recover automatically and do not require additional
    Forge configuration or an environment reset.
 
@@ -243,10 +244,11 @@ their preparation is ready and the matching selection revision and verified
 receipt agree. Missing, stale, or non-selectable provider evidence fails closed
 and routes the operator back to **Provider**.
 
-GPU Cores sits below CPU Cores. At normal widths, Storage and Orchestration
-occupy a compact left column beside the wider Managed Activity frame; constrained widths stack those panels
-vertically. The activity list scrolls internally so it does not lengthen the
-entire Dashboard.
+The combined **COMPUTE CORES** frame presents CPU logical-core activity and GPU
+core/engine telemetry together. At normal widths, Storage and Orchestration
+occupy a compact left column beside the wider Managed Activity frame;
+constrained widths stack those panels vertically. The activity list scrolls
+internally so it does not lengthen the entire Dashboard.
 
 Managed model prompts identify each immutable instruction snapshot and explain
 catalog/document paging, so a package title is not mistaken for the complete task.
@@ -261,7 +263,7 @@ timeline visible while operation identifiers, exact budget accounting, and
 handoff checksums remain under **Technical details**. Routine use requires no
 manual continuity action. An action-required state names the exact retained
 condition and routes provider faults to **Provider** or run/completion faults to
-**Autonomy**; it never asks for an unspecified environment reset. **Optional
+**Projects → Run Details**; it never asks for an unspecified environment reset. **Optional
 manual actions** contains **Save progress
 now** and **Start a fresh session and continue** for administrative recovery or
 an intentionally early rollover.
@@ -273,6 +275,8 @@ and provider/adapter/model revisions. After a fresh provider root returns the
 matching structured acknowledgement, Forge accepts one successor, fences the
 predecessor, and automatically continues the retained assignment. Restart
 recovery reuses those durable identities and does not grant a second successor.
+The product intent is automatic session handoff; owner live review of this
+candidate's end-to-end handoff remains pending.
 
 Use **Guided Setup** in the Dashboard title bar to prepare a project in order,
 start the run, learn where to monitor it, and recover from named issues. Use the
@@ -293,8 +297,12 @@ The **Projects** tab exposes the complete registration lifecycle:
 - **Enter Project Path…** accepts a validated absolute path.
 - **Add Instructions…** accepts a file, folder, or bounded ZIP in its current
   format, shows
-  converted document/byte counts, and prevents queue start when required source
-  content remains unresolved.
+  converted document/byte counts, retains every source, and permits the package
+  to run whenever at least one source contains readable instruction text.
+- Packages can be added and pending packages can be rearranged while ordered
+  work is running; the active run keeps its durable identity.
+- **Run Details…** opens direct-task creation, exact run state, completion,
+  recovery, and settled-task deletion for the selected project.
 - Both registration actions authorize only the selected canonical folder and
   preserve existing authorized roots before establishing project identity.
 - **Remove Selected Project…** is available below the project list and from a
@@ -360,6 +368,13 @@ current product version/build and whether every LM Studio role is bound to that
 same executable; stale deployed files are reported as present but needing
 **Deploy current build**.
 
+The source now also contains the first Forge Link foundation for selecting a
+paired remote LM Studio node: strict versioned link contracts and an owner-only,
+revision-checked node registry. Discovery, pairing transport, the Linux
+companion, and Provider UI selection are not included in this slice, so the
+shipping workflow remains local until those later milestones are implemented
+and qualified.
+
 ```bash
 forge-conductor version
 forge-conductor install-lmstudio-plugin
@@ -376,9 +391,8 @@ Detailed deployment and recovery behavior is documented in
 | --- | --- |
 | **Dashboard** | Guided Setup plus bounded CPU, GPU, memory, disk, and model-load telemetry, durable instruction progress, and a compact redacted exact-run Managed Activity projection for current work, managed responses, tool transitions, orchestration, and project-scoped policy events |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
-| **Projects** | Registration, removal, generations, memory, continuity, and instruction queues |
+| **Projects** | Registration, removal, generations, memory, instruction packages, ordered execution, and Project Runs detail/control |
 | **Rune Forge** | Native Development Policy source selection, a verbose bounded Policy Feed, violation/history inspection, delivery state, cached degraded operation, and atomic filtered policy-log export as JSONL, JSON, Markdown, or CSV |
-| **Autonomy** | Manager-owned runs, selectable native completion checks, per-task failure/retry instructions, continuity, and confirmed deletion of settled task history |
 | **Provider** | Mutually exclusive LM Studio, Claude Code Desktop, and Codex Desktop activation; visible deferred Grok Build cleanup/compatibility state; transactional provisioning, repair/removal, operation state, and advanced LM Studio connection controls |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
 | **Events & Evidence** | Bounded audit events, receipts, diagnostics, and exports |

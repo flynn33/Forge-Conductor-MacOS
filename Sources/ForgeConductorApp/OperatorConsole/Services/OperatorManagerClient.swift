@@ -22,6 +22,11 @@ protocol OperatorManagerClientProtocol: Sendable {
     func removeProject(projectID: String, generation: UInt64) async throws -> OperatorProjectArchiveReceipt
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt
     func instructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue
+    func instructionPackageCatalog(
+        projectID: String,
+        generation: UInt64,
+        contentSHA256: String
+    ) async throws -> OperatorInstructionDocumentCatalog
     func importInstructionPackage(
         projectID: String,
         generation: UInt64,
@@ -221,6 +226,16 @@ extension OperatorManagerClientProtocol {
         )
     }
 
+    func instructionPackageCatalog(
+        projectID: String,
+        generation: UInt64,
+        contentSHA256: String
+    ) async throws -> OperatorInstructionDocumentCatalog {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Instruction document catalogs are unavailable from this manager client."
+        )
+    }
+
     func importInstructionPackage(projectID: String, generation: UInt64, sourcePath: String) async throws -> OperatorInstructionQueue {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Instruction package import is unavailable from this manager client."
@@ -272,13 +287,13 @@ extension OperatorManagerClientProtocol {
 
     func startInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
         throw OperatorManagerClientError.capabilityUnavailable(
-            "Ordered autonomy is unavailable from this manager client."
+            "Ordered project execution is unavailable from this manager client."
         )
     }
 
     func stopInstructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue {
         throw OperatorManagerClientError.capabilityUnavailable(
-            "Ordered autonomy is unavailable from this manager client."
+            "Ordered project execution is unavailable from this manager client."
         )
     }
 
@@ -693,6 +708,103 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             nextCursor: nil,
             packages: packages
         )
+    }
+
+    func instructionPackageCatalog(
+        projectID: String,
+        generation: UInt64,
+        contentSHA256: String
+    ) async throws -> OperatorInstructionDocumentCatalog {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        guard contentSHA256.count == 64,
+              contentSHA256.allSatisfy({ $0.isHexDigit }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction catalog requires one SHA-256 package identity"
+            )
+        }
+        var catalog: OperatorInstructionDocumentCatalog = try await request(
+            method: "POST",
+            path: "/api/manager/projects/instruction-packages/catalog",
+            body: InstructionCatalogPageBody(
+                projectID: projectID,
+                projectGeneration: generation,
+                contentSHA256: contentSHA256,
+                cursor: 0,
+                limit: 128
+            )
+        )
+        try validateCatalog(
+            catalog, projectID: projectID, generation: generation,
+            contentSHA256: contentSHA256, expectedCursor: 0
+        )
+        var documents = catalog.documents
+        var cursor = catalog.nextCursor
+        while let pageCursor = cursor {
+            let page: OperatorInstructionDocumentCatalog = try await request(
+                method: "POST",
+                path: "/api/manager/projects/instruction-packages/catalog",
+                body: InstructionCatalogPageBody(
+                    projectID: projectID,
+                    projectGeneration: generation,
+                    contentSHA256: contentSHA256,
+                    cursor: pageCursor,
+                    limit: 128
+                )
+            )
+            try validateCatalog(
+                page, projectID: projectID, generation: generation,
+                contentSHA256: contentSHA256, expectedCursor: pageCursor
+            )
+            guard page.totalDocuments == catalog.totalDocuments else {
+                throw OperatorManagerClientError.invalidPayload(
+                    "instruction catalog changed while its pages were loading"
+                )
+            }
+            documents.append(contentsOf: page.documents)
+            cursor = page.nextCursor
+        }
+        guard documents.count == catalog.totalDocuments,
+              Set(documents.map(\.id)).count == documents.count else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction catalog did not return every unique source file"
+            )
+        }
+        catalog = OperatorInstructionDocumentCatalog(
+            projectID: catalog.projectID,
+            projectGeneration: catalog.projectGeneration,
+            contentSHA256: catalog.contentSHA256,
+            totalDocuments: catalog.totalDocuments,
+            cursor: 0,
+            nextCursor: nil,
+            documents: documents
+        )
+        return catalog
+    }
+
+    private func validateCatalog(
+        _ catalog: OperatorInstructionDocumentCatalog,
+        projectID: String,
+        generation: UInt64,
+        contentSHA256: String,
+        expectedCursor: Int
+    ) throws {
+        let expectedNext = expectedCursor + catalog.documents.count < catalog.totalDocuments
+            ? expectedCursor + catalog.documents.count
+            : nil
+        guard catalog.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              catalog.projectGeneration == generation,
+              catalog.contentSHA256.caseInsensitiveCompare(contentSHA256) == .orderedSame,
+              catalog.cursor == expectedCursor,
+              catalog.totalDocuments >= expectedCursor + catalog.documents.count,
+              catalog.nextCursor == expectedNext,
+              catalog.documents.count <= 128,
+              catalog.documents.allSatisfy({
+                  !$0.sourcePath.isEmpty && $0.originalSHA256.count == 64
+              }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "instruction catalog response did not match the selected package"
+            )
+        }
     }
 
     func importInstructionPackage(
@@ -1523,6 +1635,18 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.instructionQueue(projectID: projectID, generation: generation)
     }
 
+    func instructionPackageCatalog(
+        projectID: String,
+        generation: UInt64,
+        contentSHA256: String
+    ) async throws -> OperatorInstructionDocumentCatalog {
+        try await current.instructionPackageCatalog(
+            projectID: projectID,
+            generation: generation,
+            contentSHA256: contentSHA256
+        )
+    }
+
     func importInstructionPackage(projectID: String, generation: UInt64, sourcePath: String) async throws -> OperatorInstructionQueue {
         try await current.importInstructionPackage(projectID: projectID, generation: generation, sourcePath: sourcePath)
     }
@@ -1927,6 +2051,21 @@ private struct InstructionQueuePageBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
+        case cursor, limit
+    }
+}
+
+private struct InstructionCatalogPageBody: Encodable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let contentSHA256: String
+    let cursor: Int
+    let limit: Int
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case contentSHA256 = "content_sha256"
         case cursor, limit
     }
 }

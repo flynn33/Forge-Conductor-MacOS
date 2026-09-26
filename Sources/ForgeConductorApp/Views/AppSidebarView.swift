@@ -25,7 +25,7 @@ struct AppSidebarView: View, Equatable {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    ForEach(AppModel.AppTab.allCases) { tab in
+                    ForEach(AppModel.AppTab.primaryNavigationTabs) { tab in
                         tabButton(tab)
                     }
                 }

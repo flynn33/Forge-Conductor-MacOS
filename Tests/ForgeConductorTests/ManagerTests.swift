@@ -1625,6 +1625,22 @@ final class ManagerTests: XCTestCase {
         let importedPackages = try XCTUnwrap(secondImport["packages"] as? [[String: Any]])
         XCTAssertEqual(importedPackages.map { $0["display_name"] as? String }, ["first", "second"])
         let importedIDs = try importedPackages.map { try XCTUnwrap($0["id"] as? String) }
+        let firstDigest = try XCTUnwrap(importedPackages.first?["content_sha256"] as? String)
+        let catalog = try post(
+            "/api/manager/projects/instruction-packages/catalog",
+            projectRequest.merging([
+                "content_sha256": firstDigest,
+                "cursor": 0,
+                "limit": 128,
+            ]) { _, value in value }
+        )
+        XCTAssertEqual(catalog["content_sha256"] as? String, firstDigest)
+        XCTAssertEqual(catalog["total_documents"] as? Int, 1)
+        let catalogDocuments = try XCTUnwrap(catalog["documents"] as? [[String: Any]])
+        XCTAssertEqual(catalogDocuments.count, 1)
+        XCTAssertEqual(catalogDocuments[0]["source_path"] as? String, "first.md")
+        XCTAssertEqual(catalogDocuments[0]["status"] as? String, "converted_instruction")
+        XCTAssertNotNil(catalogDocuments[0]["original_bytes"] as? String)
         try FileManager.default.removeItem(at: firstDocument)
         try FileManager.default.removeItem(at: secondDocument)
 

@@ -32,7 +32,7 @@ names are not a second dashboard.
 ## UI
 `RigDashboardView` single board: Dashboard title bar with **Guided Setup** · sys
 strip · multi-series load · orchestration
-status · CPU/GPU aligned row · Storage/Managed Activity aligned row ·
+status · combined **COMPUTE CORES** frame · Storage/Managed Activity aligned row ·
 orchestration · MCP servers/tools aligned row · agents/hot-processes aligned
 row · audit live stream. Managed Activity uses a compact 130-point internal
 scroller; constrained widths stack the instrumentation panels.
@@ -58,8 +58,8 @@ The legacy stream remains the bounded tool/agent diagnostic audit view.
 
 ## Tests
 The [qualification status](QUALIFICATION-STATUS.md) records the exact local and
-CI counts, source bindings, and current development version **0.14.4**, build
-**10** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
+CI counts, source bindings, and current development version **0.14.5**, build
+**11** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
 explicitly historical.
 The retained local app-hosted tests and four production onboarding scenarios passed;
 the installed-app qualifier remains partial because its own System Events
@@ -76,10 +76,12 @@ navigation result remains historical supporting evidence.
 
 Source bindings and artifact IDs are retained in the
 [shipping checkpoint](../.forge-codex/state/release-handoff.md#retained-qualification).
-For the current layout/feed slice, a fresh native UI run passed 3/3 cases with
-zero skips: minimum-window containment and alignment across all 14 primary
-views, the populated compact equal-height Storage/Managed Activity row, and the
-populated Rune Forge Policy Feed. The complete
+For the earlier layout/feed slice, a native UI run passed 3/3 cases with zero
+skips across the then-current 14 primary views, the populated compact
+equal-height Storage/Managed Activity row, and the populated Rune Forge Policy
+Feed. The current 0.14.5 navigation case separately passes with the redundant
+Autonomy destination absent and Project run controls reachable from Projects.
+The complete
 installed/native UI and service-lifecycle matrix, manager-owned real-provider
 rollover, filesystem E2, P10, Developer ID distribution, and representative
 physical-hardware qualification remain open.

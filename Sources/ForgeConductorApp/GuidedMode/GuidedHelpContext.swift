@@ -14,10 +14,6 @@ enum GuidedHelpContext: String, Codable, CaseIterable, Hashable, Identifiable, S
     case projectReset
     case projectContentClear
     case runeForge
-    case autonomy
-    case autonomyStartTask
-    case autonomyToolSelection
-    case autonomyCompletionChecks
     case continuity
     case continuitySaveProgress
     case continuityFreshSession
@@ -42,7 +38,7 @@ extension AppModel.AppTab {
         case .feed: .liveFeed
         case .projects: .projects
         case .runeForge: .runeForge
-        case .autonomy: .autonomy
+        case .autonomy: .projects
         case .continuity: .continuity
         case .runtimes: .runtimes
         case .provider: .provider

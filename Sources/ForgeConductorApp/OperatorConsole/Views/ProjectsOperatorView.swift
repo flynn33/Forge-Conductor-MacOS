@@ -6,46 +6,56 @@ import SwiftUI
 
 struct ProjectsOperatorView: View {
     @StateObject private var viewModel: ProjectsViewModel
+    private let client: any OperatorManagerClientProtocol
+    private let onOpenProvider: () -> Void
     @State private var registrationDraft: ProjectRegistrationDraft?
     @State private var registrationPickerErrorMessage: String?
     @State private var resetConfirmation: ProjectsViewModel.ResetConfirmation?
     @State private var removeConfirmation: ProjectsViewModel.RemoveConfirmation?
     @State private var clearConfirmation: ProjectsViewModel.ClearConfirmation?
     @State private var clearMode: OperatorProjectContentClearMode = .memory
+    @State private var showingRunDetails = false
+    @State private var expandedInstructionPackageIDs: Set<String> = []
 
-    init(client: any OperatorManagerClientProtocol) {
+    init(
+        client: any OperatorManagerClientProtocol,
+        onOpenProvider: @escaping () -> Void = {}
+    ) {
         _viewModel = StateObject(wrappedValue: ProjectsViewModel(client: client))
+        self.client = client
+        self.onOpenProvider = onOpenProvider
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $viewModel.selectedProjectID) {
-                ForEach(viewModel.projects) { project in
-                    HStack(spacing: 10) {
-                        Image(systemName: "folder")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 16)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(project.displayName).lineLimit(1)
-                            Text("Generation \(project.projectGeneration) · \(project.lifecycleState)")
-                                .font(.caption)
+        HSplitView {
+            VStack(spacing: 0) {
+                List(selection: $viewModel.selectedProjectID) {
+                    ForEach(viewModel.projects) { project in
+                        HStack(spacing: 10) {
+                            Image(systemName: "folder")
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                                .frame(width: 16)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(project.displayName).lineLimit(1)
+                                Text("Generation \(project.projectGeneration) · \(project.lifecycleState)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                         }
-                    }
-                    .tag(project.projectID)
-                    .accessibilityIdentifier("project-row-\(project.projectID)")
-                    .contextMenu {
-                        Button("Remove Project…", role: .destructive) {
-                            viewModel.selectedProjectID = project.projectID
-                            requestSelectedProjectRemoval()
+                        .tag(project.projectID)
+                        .accessibilityIdentifier("project-row-\(project.projectID)")
+                        .contextMenu {
+                            Button("Remove Project…", role: .destructive) {
+                                viewModel.selectedProjectID = project.projectID
+                                requestSelectedProjectRemoval()
+                            }
+                            .disabled(viewModel.isLoading || project.lifecycleState != "active")
                         }
-                        .disabled(viewModel.isLoading || project.lifecycleState != "active")
                     }
                 }
-            }
-            .listStyle(.sidebar)
-            .safeAreaInset(edge: .bottom) {
+                .listStyle(.sidebar)
+                Divider()
                 VStack(spacing: 8) {
                     Button("Register Project…", systemImage: "plus") {
                         chooseProjectFolder()
@@ -69,7 +79,8 @@ struct ProjectsOperatorView: View {
                 }
                 .padding(10)
             }
-        } detail: {
+            .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     OperatorHeader(
@@ -151,9 +162,19 @@ struct ProjectsOperatorView: View {
                 .padding(20)
             }
         }
-        .navigationSplitViewStyle(.balanced)
         .sheet(item: $registrationDraft) { draft in
             ProjectRegistrationSheet(draft: draft, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingRunDetails) {
+            AutonomyOperatorView(
+                client: client,
+                onOpenProjects: { showingRunDetails = false },
+                onOpenProvider: {
+                    showingRunDetails = false
+                    onOpenProvider()
+                }
+            )
+            .frame(minWidth: 1_000, minHeight: 680)
         }
         .alert(
             "Remove project from Forge Conductor?",
@@ -204,7 +225,16 @@ struct ProjectsOperatorView: View {
             Text("\(confirmation.displayName)\n\(confirmation.projectID)\nGeneration \(confirmation.generation)\n\(confirmation.mode.effectDescription) This removes content from active retrieval, not secure physical storage. Minimal recovery metadata is retained.")
         }
         .task { viewModel.load() }
-        .task(id: viewModel.selectedProjectID) { viewModel.loadInstructionQueue() }
+        .task(id: viewModel.selectedProjectID) {
+            while !Task.isCancelled {
+                viewModel.loadInstructionQueue()
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
     private func projectDetail(_ project: OperatorProject) -> some View {
@@ -427,61 +457,16 @@ struct ProjectsOperatorView: View {
                     } else {
                         List {
                             ForEach(queue.packages) { package in
-                                HStack(spacing: 10) {
-                                    Image(systemName: "line.3.horizontal")
-                                        .foregroundStyle(.tertiary)
-                                        .accessibilityHidden(true)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(package.displayName)
-                                            .fontWeight(.medium)
-                                        Text("\(package.packageID) · v\(package.version)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        if let count = package.documentCount,
-                                           let bytes = package.instructionByteCount {
-                                            Text("\(count) source document\(count == 1 ? "" : "s") · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) converted instructions")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        if let unresolved = package.unresolvedDocumentCount,
-                                           unresolved > 0 {
-                                            Label(
-                                                "\(unresolved) source document\(unresolved == 1 ? " needs" : "s need") conversion before this package can run",
-                                                systemImage: "exclamationmark.triangle.fill"
-                                            )
-                                            .font(.caption)
-                                            .foregroundStyle(.orange)
-                                        }
-                                        if let error = package.lastError {
-                                            Text(error)
-                                                .font(.caption)
-                                                .foregroundStyle(.red)
-                                                .lineLimit(2)
-                                        }
-                                    }
-                                    Spacer()
-                                    OperatorStateBadge(state: package.state)
-                                    Button(role: .destructive) {
-                                        viewModel.removeInstructionPackage(package.id)
-                                    } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.isLoading || package.state == "running")
-                                    .help("Remove this instruction package")
-                                    .accessibilityIdentifier("instruction-package-remove-\(package.id)")
-                                }
-                                .padding(.vertical, 4)
-                                .accessibilityIdentifier("instruction-package-row-\(package.id)")
+                                instructionPackageRow(package)
                             }
                             .onMove { offsets, destination in
                                 var packages = queue.packages
                                 packages.move(fromOffsets: offsets, toOffset: destination)
                                 viewModel.reorderInstructionPackages(packages.map(\.id))
                             }
-                            .moveDisabled(viewModel.isLoading || queue.running)
+                            .moveDisabled(viewModel.isLoading)
                         }
-                        .frame(height: min(max(CGFloat(queue.packages.count) * 88, 132), 360))
+                        .frame(height: min(max(CGFloat(queue.packages.count) * 112, 160), 520))
                         .accessibilityIdentifier("instruction-package-list")
                     }
 
@@ -489,14 +474,19 @@ struct ProjectsOperatorView: View {
                         Button("Add Instructions…", systemImage: "plus") {
                             chooseInstructionPackage()
                         }
-                        .disabled(viewModel.isLoading || queue.running)
+                        .disabled(viewModel.isLoading)
                         .accessibilityIdentifier("instruction-package-add")
                         GuidedHelpButton(context: .instructionImport)
                         Spacer()
+                        if let current = queue.packages.first(where: { $0.state == "running" }) {
+                            Text("Current: \(current.displayName)")
+                                .font(.caption.weight(.semibold))
+                                .accessibilityIdentifier("instruction-queue-current-package")
+                        }
                         Text(queue.running ? "Running in order" : "Queue stopped")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Button(queue.running ? "Stop Queue" : "Start Ordered Autonomy") {
+                        Button(queue.running ? "Stop Ordered Work" : "Start Ordered Work") {
                             viewModel.toggleInstructionQueue()
                         }
                         .buttonStyle(.borderedProminent)
@@ -509,6 +499,11 @@ struct ProjectsOperatorView: View {
                                     .first?.importReady == false)
                         )
                         .accessibilityIdentifier("instruction-queue-toggle")
+                        Button("Run Details…", systemImage: "list.bullet.rectangle") {
+                            showingRunDetails = true
+                        }
+                        .disabled(viewModel.isLoading)
+                        .accessibilityIdentifier("project-run-details")
                     }
                 } else {
                     HStack {
@@ -527,6 +522,141 @@ struct ProjectsOperatorView: View {
             }
         }
         .accessibilityIdentifier("project-instruction-packages")
+    }
+
+    @ViewBuilder
+    private func instructionPackageRow(_ package: OperatorInstructionPackage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "line.3.horizontal")
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(package.displayName)
+                            .fontWeight(.medium)
+                            .accessibilityIdentifier("instruction-package-row-\(package.id)")
+                        if package.state == "running" {
+                            Label("Current", systemImage: "play.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    Text("\(package.packageID) · v\(package.version)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let count = package.documentCount,
+                       let bytes = package.instructionByteCount {
+                        Text("\(count) source file\(count == 1 ? "" : "s") · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) converted instructions")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let unresolved = package.unresolvedDocumentCount,
+                       unresolved > 0 {
+                        Label(
+                            "\(unresolved) unresolved source file\(unresolved == 1 ? "" : "s") retained in the immutable snapshot",
+                            systemImage: "doc.badge.ellipsis"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(package.importReady == false ? .orange : .secondary)
+                    }
+                    if let error = package.lastError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer()
+                OperatorStateBadge(state: package.state)
+                Button(role: .destructive) {
+                    viewModel.removeInstructionPackage(package.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .disabled(viewModel.isLoading || package.state == "running")
+                .help("Remove this instruction package")
+                .accessibilityIdentifier("instruction-package-remove-\(package.id)")
+            }
+
+            Button {
+                if expandedInstructionPackageIDs.contains(package.id) {
+                    expandedInstructionPackageIDs.remove(package.id)
+                } else {
+                    expandedInstructionPackageIDs.insert(package.id)
+                    viewModel.loadInstructionCatalog(for: package)
+                }
+            } label: {
+                Label(
+                    expandedInstructionPackageIDs.contains(package.id)
+                        ? "Hide file catalog" : "Show file catalog",
+                    systemImage: expandedInstructionPackageIDs.contains(package.id)
+                        ? "chevron.down" : "chevron.right"
+                )
+            }
+            .buttonStyle(.plain)
+            .font(.caption.weight(.semibold))
+            .accessibilityIdentifier("instruction-package-catalog-toggle-\(package.id)")
+
+            if expandedInstructionPackageIDs.contains(package.id) {
+                instructionCatalog(package)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func instructionCatalog(_ package: OperatorInstructionPackage) -> some View {
+        if viewModel.loadingInstructionCatalogs.contains(package.id) {
+            HStack {
+                ProgressView().controlSize(.small)
+                Text("Loading every retained source file…")
+                    .foregroundStyle(.secondary)
+            }
+        } else if let error = viewModel.instructionCatalogError(for: package.id) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(error).foregroundStyle(.red)
+                Button("Retry catalog") {
+                    viewModel.loadInstructionCatalog(for: package)
+                }
+            }
+            .font(.caption)
+        } else if let catalog = viewModel.instructionCatalog(for: package.id) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("File catalog · \(catalog.documents.count) of \(catalog.totalDocuments) retained")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("instruction-document-catalog-\(package.id)")
+                ForEach(catalog.documents) { document in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: document.catalogStatus == "Converted"
+                            ? "doc.text.fill"
+                            : document.catalogStatus == "Retained attachment"
+                                ? "paperclip" : "questionmark.diamond")
+                            .foregroundStyle(document.catalogStatus == "Unresolved" ? .orange : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(document.sourcePath)
+                                .lineLimit(2)
+                            Text("\(document.catalogStatus) · \(ByteCountFormatter.string(fromByteCount: Int64(document.originalBytes), countStyle: .file))")
+                                .foregroundStyle(document.catalogStatus == "Unresolved" ? .orange : .secondary)
+                            if !document.detail.isEmpty {
+                                Text(document.detail)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                    .font(.caption)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("instruction-document-\(document.id)")
+                }
+            }
+            .padding(.leading, 28)
+        } else {
+            Text("Catalog unavailable")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func chooseInstructionPackage() {

@@ -527,7 +527,9 @@ private actor AutonomousRolloverAcceptanceProvider: ManagedModelProvider,
         if let existing = providerTurns[request.idempotencyKey] { return existing }
         if let projectID = projectByBootstrapResponse[request.previousResponseID],
            let fixture = fixtures[projectID] {
-            let expectedInput = try ManagedContinuityWorker.automaticContinuationInput()
+            let expectedInput = try ManagedContinuityWorker.automaticContinuationInput(
+                nextAction: "Continue without operator intervention"
+            )
             guard request.input == expectedInput else { throw AutonomyError.intentConflict }
             exactAutomaticInputCount += 1
             let suffix = String(projectID.prefix(12))

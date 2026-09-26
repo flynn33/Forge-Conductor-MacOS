@@ -37,6 +37,13 @@ final class ProviderViewModel: ObservableObject {
             || isLoadingProviderRegistry || isSubmittingProviderMutation
     }
 
+    /// LM Studio configuration requests are independent from the provider-card
+    /// registry refresh. A toolbar/automatic registry refresh must not turn a
+    /// user click on Refresh Models into a silent no-op.
+    var isConfigurationBusy: Bool {
+        isProbing || isSaving || isFetchingModels
+    }
+
     var hasUnsavedChanges: Bool {
         guard let configuration else { return false }
         return endpoint != configuration.endpoint || modelKey != (configuration.modelKey ?? "")
@@ -457,7 +464,8 @@ final class ProviderViewModel: ObservableObject {
     }
 
     func refreshModels() {
-        guard !isBusy, !hasUnsavedChanges, configuration?.saved == true else { return }
+        guard !isConfigurationBusy, !hasUnsavedChanges,
+              configuration?.saved == true else { return }
         isFetchingModels = true
         errorMessage = nil
         noticeMessage = nil

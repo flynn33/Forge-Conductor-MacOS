@@ -21,13 +21,13 @@ Instruction packages turn a registered local repository into an ordered work que
    Grok Build remains visible but cannot be selected or admit a run in 0.14.1
    because its documented hook outputs cannot deliver the initial assignment
    context to the model.
-6. For an ordinary task, open **Autonomy**, select one or more imported packages,
+6. For an ordinary task, open **Projects → Run Details**, select one or more imported packages,
    and choose **Start Task**. Forge prepares the run against that exact durable
    provider selection and returns one exact Provider action if it is not ready.
    A selectable desktop host receives the exact assignment through its hook and
    must complete the instructed one-time `desktop_run_attach` before any
    project-scoped Forge tool is available.
-7. To run the whole project queue, choose **Start Ordered Autonomy** in Projects.
+7. To run the whole project queue, choose **Start Ordered Work** in Projects.
    LM Studio endpoint, credential, exact-model, inventory, and probe controls
    remain under **LM Studio Advanced**; they are not prerequisites for a
    desktop-host run.
@@ -44,10 +44,10 @@ and uses native PDFKit/AppKit adapters for PDF, DOCX, RTF, and HTML. Every
 original is retained. Textless supported images and PDFs receive a bounded
 native Vision OCR attempt. The catalog classifies every source as converted
 instruction content, retained attachment, unrepresented visual/structural
-content, or unresolved conversion. Unrepresented, malformed, encrypted, or
-otherwise unresolved content prevents execution rather than being dropped or
-falsely marked understood; malformed and encrypted failures are named
-separately.
+content, or unresolved conversion. Unsupported or unreadable sources are
+retained and reported without blocking readable instructions from the same
+package. A source containing no readable instruction text cannot run by itself;
+malformed and encrypted failures are named separately.
 
 ### A folder of documents
 
@@ -103,7 +103,7 @@ Select a `.forgepackage` JSON file, a `forge-package.json` file, or a folder con
 when present, must match the selected registered project. Capabilities must name
 production tools exposed by the current Forge build. `completion_gates` is the
 stable schema key for package-owned completion requirements. Those values are
-bound to the immutable package and displayed read-only in Autonomy; Forge
+bound to the immutable package and displayed read-only in Project Runs; Forge
 configuration can select only its recognized built-in evidence checks. The
 built-in `forge.package.tool-success` requirement needs at least one durable
 tool result from the exact run and rejects unresolved or failed tool
@@ -111,15 +111,19 @@ invocations.
 
 ## Ordering and execution
 
-The Projects list order is authoritative. Drag rows before starting the queue. Forge persists every order change with a queue revision so concurrent or stale edits fail instead of silently overwriting a newer order.
+The Projects list order is authoritative. Drag rows before or during ordered
+execution. New packages can be added while work is running. Forge preserves the
+active run identity and applies the revised order to pending packages. Every
+order change carries a queue revision so concurrent or stale edits fail instead
+of silently overwriting a newer order.
 
-**Start Ordered Autonomy** requires one selected, verified provider and a
+**Start Ordered Work** requires one selected, verified provider and a
 running managed autonomy service. LM Studio requires its exact saved model;
 desktop providers use the model chosen by their host. Forge creates a managed run scoped to the registered
 repository root, package project UUID, and current project generation. It
 advances to the next queued package only after the current package reaches
 `completed`. A failed, cancelled, paused, or terminally failed run stops
-automatic advancement so the operator can review it in **Autonomy**. Provider
+automatic advancement so the operator can review it in **Projects → Run Details**. Provider
 readiness uses the bounded `waiting_provider` recovery path and resumes the
 retained operation automatically after **Connect and Check** succeeds. A
 persisted legacy `blocked_configuration` value is recovered automatically; it
@@ -128,7 +132,7 @@ run cannot be committed after the package receives its durable run identity,
 Forge retains that exact identity and retries it through the existing Manager
 watchdog instead of converting the package into a configuration blocker.
 
-**Stop Queue** prevents the next package from starting. It does not discard or silently cancel an already admitted autonomous run; that run remains visible in **Autonomy**.
+**Stop Ordered Work** prevents the next package from starting. It does not discard or silently cancel an already admitted run; that run remains visible in **Projects → Run Details**.
 
 **Dashboard** monitors the active queue without changing it. Its project status
 shows delivered document steps and completed packages; the Managed Activity
@@ -162,7 +166,7 @@ prepared-run descriptor. The durable run also records the descriptor revision,
 package snapshot hash, provider and tool-catalog revisions, continuity mode,
 and applicable budget-policy revisions. Direct starts use the same preparation
 contract, so queued work does not bypass ordinary grant, validation, or stale
-input checks. In **Autonomy**, large pasted text plus every selected or dropped
+input checks. In **Projects → Run Details**, large pasted text plus every selected or dropped
 file, folder, or ZIP uses the same importer. A direct artifact is durably bound
 to its exact project generation and run UUID without entering or reordering the
 package queue. Prepare and Start carry only its compact bootstrap and snapshot

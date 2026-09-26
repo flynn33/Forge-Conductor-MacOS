@@ -2058,6 +2058,40 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         ].compactNSNull()
     }
 
+    public func instructionPackageCatalog(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        contentSHA256: String,
+        cursor: Int = 0,
+        limit: Int = 128
+    ) throws -> [String: Any] {
+        try requireActiveProject(projectID, generation: expectedGeneration)
+        guard contentSHA256.count == 64,
+              contentSHA256.allSatisfy({ $0.isHexDigit }) else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction catalog requires one SHA-256 package identity."
+            )
+        }
+        let page = try instructionQueueStore().catalogPage(
+            contentSHA256: contentSHA256.lowercased(),
+            projectID: projectID,
+            generation: expectedGeneration,
+            runID: nil,
+            cursor: cursor,
+            limit: limit
+        )
+        return [
+            "ok": true,
+            "project_id": projectID.description,
+            "project_generation": expectedGeneration.rawValue,
+            "content_sha256": page.contentSHA256,
+            "total_documents": page.totalDocuments,
+            "cursor": page.cursor,
+            "next_cursor": page.nextCursor as Any,
+            "documents": page.documents,
+        ].compactNSNull()
+    }
+
     @discardableResult
     public func importInstructionPackage(
         sourcePath: String,
@@ -3303,12 +3337,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             generation: expectedGeneration,
             runID: runID
         )
-        guard artifact.unresolvedDocumentCount == 0 else {
-            throw AutonomyError.invalidRequest(
-                "Resolve or replace the \(artifact.unresolvedDocumentCount) unconverted instruction document(s) before starting this task."
-            )
-        }
         try Self.validatePreparedMission(artifact.mission)
+        let documents = try store.documentReferences(
+            contentSHA256: artifact.contentSHA256
+        )
         return PreparedInstructionInput(
             mission: artifact.mission,
             source: ManagerPreparedRunSource(
@@ -3316,7 +3348,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 reference: "instruction-artifact:\(runID.description)",
                 snapshotSHA256: artifact.contentSHA256
             ),
-            documents: try store.documentReferences(contentSHA256: artifact.contentSHA256),
+            documents: documents,
             completionPlanningText: try completionPlanningText(
                 store: store,
                 contentSHA256: artifact.contentSHA256,
@@ -4244,8 +4276,22 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         runID: RunID
     ) throws -> AutonomousRunRequest {
         try requireActiveProject(package.projectID, generation: package.projectGeneration)
-        let documents = try instructionQueueStore().documentReferences(
+        let store = try instructionQueueStore()
+        let documents = try store.documentReferences(
             contentSHA256: package.contentSHA256
+        )
+        let planningText = try completionPlanningText(
+            store: store,
+            contentSHA256: package.contentSHA256,
+            projectID: package.projectID,
+            generation: package.projectGeneration,
+            runID: nil
+        )
+        let continuationContext = try continuationInstructionContext(
+            store: store,
+            contentSHA256: package.contentSHA256,
+            projectID: package.projectID,
+            generation: package.projectGeneration
         )
         let context = try resolvedRunPreparation(
             projectID: package.projectID,
@@ -4259,13 +4305,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 packageVersion: package.version
             ),
             documents: documents,
-            completionPlanningText: try completionPlanningText(
-                store: instructionQueueStore(),
-                contentSHA256: package.contentSHA256,
-                projectID: package.projectID,
-                generation: package.projectGeneration,
-                runID: nil
-            ),
+            completionPlanningText: planningText,
             providerID: nil,
             adapterID: nil,
             modelKey: nil,
@@ -4285,6 +4325,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             "instruction_package_name": package.packageID,
             "instruction_package_version": package.version,
             "instruction_package_sha256": package.contentSHA256,
+            "managed_instruction_context": continuationContext.text,
+            "managed_instruction_context_complete": continuationContext.isComplete ? "true" : "false",
+            "managed_instruction_context_sha256": JSONSupport.sha256Hex(continuationContext.text),
         ]) { _, packageValue in packageValue }
         return AutonomousRunRequest(
             runID: runID,
@@ -4307,6 +4350,77 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 networkAllowed: context.resolved.networkAllowed,
                 maximumInlineOutputBytes: ProjectContextService.defaultInlineOutputLimit
             )
+        )
+    }
+
+    private struct ContinuationInstructionContext {
+        let text: String
+        let isComplete: Bool
+    }
+
+    /// Carries enough of the immutable converted package into a successor's first
+    /// turn to resume after the exact committed effect. The source snapshot remains
+    /// authoritative; an incomplete context is explicitly marked and never claimed
+    /// to represent the whole package.
+    private func continuationInstructionContext(
+        store: ProjectInstructionQueueStore,
+        contentSHA256: String,
+        projectID: ProjectID,
+        generation: ProjectGeneration
+    ) throws -> ContinuationInstructionContext {
+        let maximumBytes = 24 * 1_024
+        var remaining = maximumBytes
+        var cursor = 0
+        var chunks: [String] = []
+        var complete = true
+        while remaining > 0 {
+            let page = try store.catalogPage(
+                contentSHA256: contentSHA256,
+                projectID: projectID,
+                generation: generation,
+                runID: nil,
+                cursor: cursor,
+                limit: 128
+            )
+            for document in page.documents {
+                guard document["status"] == ProjectInstructionQueueStore
+                    .InstructionDocumentStatus.convertedInstruction.rawValue,
+                      let documentID = document["id"] else { continue }
+                let sourcePath = document["source_path"] ?? documentID
+                let header = "\n--- \(sourcePath) ---\n"
+                guard header.utf8.count < remaining else {
+                    complete = false
+                    remaining = 0
+                    break
+                }
+                chunks.append(header)
+                remaining -= header.utf8.count
+                var offset = 0
+                while remaining > 0 {
+                    let read = try store.readDocument(
+                        contentSHA256: contentSHA256,
+                        documentID: documentID,
+                        projectID: projectID,
+                        generation: generation,
+                        runID: nil,
+                        byteOffset: offset,
+                        maximumBytes: min(ProjectInstructionQueueStore.maximumDeliveryBytes, remaining)
+                    )
+                    chunks.append(read.content)
+                    remaining -= read.content.utf8.count
+                    guard let nextOffset = read.nextByteOffset else { break }
+                    offset = nextOffset
+                    if remaining == 0 { complete = false }
+                }
+                if !complete { break }
+            }
+            guard complete, let next = page.nextCursor else { break }
+            cursor = next
+        }
+        if remaining == 0 { complete = false }
+        return ContinuationInstructionContext(
+            text: chunks.joined(),
+            isComplete: complete
         )
     }
 
@@ -4954,7 +5068,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 return (
                     .blocked,
                     failureDetail,
-                    "Open Autonomy to review the task's recorded failure and retry or resume it. Continuity retains the saved task state.",
+                    "Open Projects, then Run Details, to review the task's recorded failure and retry or resume it. Continuity retains the saved task state.",
                     .reviewRun
                 )
             case .completed:
@@ -5027,7 +5141,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 return (
                     .blocked,
                     detail,
-                    "Open Autonomy and follow the named completion check's recovery action, then retry.",
+                    "Open Projects, then Run Details, and follow the named completion check's recovery action, then retry.",
                     .reviewRun
                 )
             }
@@ -5042,7 +5156,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             return (
                 .blocked,
                 detail,
-                "Open Autonomy for the exact run condition and available recovery action; Forge retains durable task state.",
+                "Open Projects, then Run Details, for the exact run condition and available recovery action; Forge retains durable task state.",
                 .reviewRun
             )
         case .created, .validating, .ready, .starting, .running, .paused,

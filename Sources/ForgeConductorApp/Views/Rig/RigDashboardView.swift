@@ -259,7 +259,7 @@ struct RigDashboardView: View {
                 tone: providerIndicator.tone
             ),
             OrchestrationCardState(
-                title: "AUTONOMY", state: autonomyState,
+                title: "PROJECT RUNS", state: autonomyState,
                 detail: "\(runtime.autonomyActiveCount) active · \(runtime.autonomyDeferredCount) queued",
                 fraction: min(Double(runtime.autonomyActiveCount) / 4, 1), tone: autonomyTone
             ),
@@ -312,22 +312,13 @@ struct RigDashboardView: View {
     private var instrumentationPanels: some View {
         ViewThatFits(in: .horizontal) {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 14) {
-                    coreBarsPanel
-                        .frame(
-                            minWidth: 340,
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .topLeading
-                        )
-                    gpuCoresPanel
-                        .frame(
-                            minWidth: 340,
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .topLeading
-                        )
-                }
+                computeCoresPanel
+                    .frame(
+                        minWidth: 680,
+                        maxWidth: .infinity,
+                        minHeight: 164,
+                        alignment: .topLeading
+                    )
                 HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 14) {
                         storagePanel
@@ -345,8 +336,7 @@ struct RigDashboardView: View {
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                coreBarsPanel.frame(minHeight: 170)
-                gpuCoresPanel.frame(minHeight: 190)
+                computeCoresPanel.frame(minHeight: 238)
                 storagePanel.frame(minHeight: 220)
                 orchestrationPanel
                 managedActivityFeedPanel
@@ -730,14 +720,48 @@ struct RigDashboardView: View {
 
     // MARK: CPU cores — Metal
 
-    private var coreBarsPanel: some View {
+    private var computeCoresPanel: some View {
         let cores = model.perCPU
-        return panel("CPU CORES", meta: "\(cores.count) logical · Metal") {
+        let gpu = model.system?.gpu.first
+        let gpuCoreCount = max(gpu?.cores ?? 0, 0)
+        return panel(
+            "COMPUTE CORES",
+            meta: "CPU \(cores.count) logical · GPU \(gpuCoreCount) cores"
+        ) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 14) {
+                    cpuCoreContent(cores)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    Divider().overlay(Color.cyan.opacity(0.16))
+                    gpuCoreContent(gpu, coreCount: gpuCoreCount)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    cpuCoreContent(cores)
+                    Divider().overlay(Color.cyan.opacity(0.16))
+                    gpuCoreContent(gpu, coreCount: gpuCoreCount)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-compute-cores-panel")
+    }
+
+    private func cpuCoreContent(_ cores: [Double]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("CPU CORES · \(cores.count) LOGICAL")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
             if cores.isEmpty {
-                Text("NO PER-CORE DATA").font(.caption).foregroundStyle(.secondary)
+                Text("NO PER-CORE DATA")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
+                // The core renderer is an activity strip, not a hero chart. Keep
+                // its animation compact so topology and GPU telemetry remain in
+                // one glanceable compute frame.
                 MetalCoreBarsView(cores: cores)
-                    .frame(height: 100)
+                    .frame(height: 52)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
@@ -745,13 +769,11 @@ struct RigDashboardView: View {
         .accessibilityIdentifier("rig-cpu-cores-panel")
     }
 
-    private var gpuCoresPanel: some View {
-        let gpu = model.system?.gpu.first
-        let coreCount = max(gpu?.cores ?? 0, 0)
-        return panel(
-            "GPU CORES",
-            meta: coreCount > 0 ? "\(coreCount) cores · aggregate engines" : "count unavailable"
-        ) {
+    private func gpuCoreContent(_ gpu: GPUMetrics?, coreCount: Int) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("GPU CORES · \(coreCount > 0 ? "\(coreCount)" : "COUNT UNAVAILABLE")")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
             if let gpu {
                 if coreCount > 0 {
                     LazyVGrid(

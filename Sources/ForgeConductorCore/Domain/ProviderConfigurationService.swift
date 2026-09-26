@@ -5,16 +5,46 @@ import Foundation
 public struct ProviderConfigurationSnapshot: Codable, Sendable, Equatable {
     public let revision: String
     public let endpoint: String
+    public let endpointMode: LMStudioEndpointMode
     public let modelKey: String?
     public let credentialConfigured: Bool
     public let saved: Bool
     public let credentialCleanupPending: Bool
 
-    public init(revision: String, endpoint: String, modelKey: String?, credentialConfigured: Bool,
-                saved: Bool, credentialCleanupPending: Bool = false) {
+    public init(revision: String, endpoint: String,
+                endpointMode: LMStudioEndpointMode = .local, modelKey: String?,
+                credentialConfigured: Bool, saved: Bool, credentialCleanupPending: Bool = false) {
         self.revision = revision; self.endpoint = endpoint; self.modelKey = modelKey
+        self.endpointMode = endpointMode
         self.credentialConfigured = credentialConfigured; self.saved = saved
         self.credentialCleanupPending = credentialCleanupPending
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case revision
+        case endpoint
+        case endpointMode = "endpoint_mode"
+        case modelKey
+        case credentialConfigured
+        case saved
+        case credentialCleanupPending
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            revision: try values.decode(String.self, forKey: .revision),
+            endpoint: try values.decode(String.self, forKey: .endpoint),
+            endpointMode: try values.decodeIfPresent(
+                LMStudioEndpointMode.self, forKey: .endpointMode
+            ) ?? .local,
+            modelKey: try values.decodeIfPresent(String.self, forKey: .modelKey),
+            credentialConfigured: try values.decode(Bool.self, forKey: .credentialConfigured),
+            saved: try values.decode(Bool.self, forKey: .saved),
+            credentialCleanupPending: try values.decodeIfPresent(
+                Bool.self, forKey: .credentialCleanupPending
+            ) ?? false
+        )
     }
 }
 
@@ -27,13 +57,16 @@ public enum ProviderCredentialAction: String, Codable, Sendable, CaseIterable {
 public struct ProviderConfigurationUpdate: Codable, Sendable {
     public let expectedRevision: String
     public let endpoint: String
+    public let endpointMode: LMStudioEndpointMode?
     public let modelKey: String?
     public let credentialAction: ProviderCredentialAction
     public let token: String?
 
-    public init(expectedRevision: String, endpoint: String, modelKey: String?,
+    public init(expectedRevision: String, endpoint: String,
+                endpointMode: LMStudioEndpointMode? = nil, modelKey: String?,
                 credentialAction: ProviderCredentialAction = .keep, token: String? = nil) {
         self.expectedRevision = expectedRevision; self.endpoint = endpoint; self.modelKey = modelKey
+        self.endpointMode = endpointMode
         self.credentialAction = credentialAction; self.token = token
     }
 }

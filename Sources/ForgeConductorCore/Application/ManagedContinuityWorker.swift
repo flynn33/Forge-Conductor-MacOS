@@ -89,6 +89,23 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
         let currentSummary = run.specification.work.nextAction ?? run.mission
         let nextAction = run.specification.work.nextAction ?? "Continue the managed mission"
         let openWorkSummary = Self.boundedUTF8(nextAction, maximumBytes: 8_192)
+        let lastToolName = run.specification.work.metadata["managed_last_tool_name"]
+        let lastToolCallID = run.specification.work.metadata["managed_last_tool_call_id"]
+        let lastToolOutput = run.specification.work.metadata["managed_last_tool_output"]
+        let completedWork: [[String: Any]]
+        if let lastToolName, let lastToolCallID, let lastToolOutput {
+            let summary = Self.boundedUTF8(
+                "Completed \(lastToolName): \(lastToolOutput)",
+                maximumBytes: 8_192
+            )
+            completedWork = [[
+                "id": lastToolCallID,
+                "summary": summary,
+                "status": "completed",
+            ]]
+        } else {
+            completedWork = []
+        }
         let constraints = run.specification.allowedTools.map { "Allowed tool: \($0)" }
         let dirtySummary = Self.stringArray(
             run.specification.work.metadata["git_dirty_summary"]
@@ -163,6 +180,7 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
                 ),
                 "managed_context": managedContext,
             ],
+            completedWork: completedWork,
             openWork: [[
                 "id": workItem,
                 "summary": openWorkSummary,
@@ -239,12 +257,71 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
 
     /// Exact provider input committed by the rollover transaction and later dispatched
     /// by the managed provider loop. Callers must not rebuild or re-encode this payload.
-    public static func automaticContinuationInput() throws -> Data {
-        try ForgeJSONCanonicalizationV1.data(from: [[
+    public static func automaticContinuationInput(
+        nextAction: String? = nil,
+        instructionContext: String? = nil,
+        instructionContextComplete: Bool = false
+    ) throws -> Data {
+        let content = try continuationContent(
+            prompt: automaticContinuationPrompt,
+            nextAction: nextAction,
+            instructionContext: instructionContext,
+            instructionContextComplete: instructionContextComplete
+        )
+        return try ForgeJSONCanonicalizationV1.data(from: [[
             "type": "message",
             "role": "user",
-            "content": automaticContinuationPrompt,
+            "content": content,
         ]])
+    }
+
+    public static func managedProgressContinuationInput(
+        nextAction: String,
+        instructionContext: String,
+        instructionContextComplete: Bool,
+        policyContext: String? = nil
+    ) throws -> Data {
+        var prompt = """
+        Continue the same Forge-managed ordered package from its durable progress. Do not restart package discovery or replay completed work.
+        """
+        if let policyContext, !policyContext.isEmpty {
+            prompt += "\n\n" + policyContext
+        }
+        let content = try continuationContent(
+            prompt: prompt,
+            nextAction: nextAction,
+            instructionContext: instructionContext,
+            instructionContextComplete: instructionContextComplete
+        )
+        return try ForgeJSONCanonicalizationV1.data(from: [[
+            "type": "message",
+            "role": "user",
+            "content": content,
+        ]])
+    }
+
+    private static func continuationContent(
+        prompt: String,
+        nextAction: String?,
+        instructionContext: String?,
+        instructionContextComplete: Bool
+    ) throws -> String {
+        guard let nextAction, !nextAction.isEmpty else { return prompt }
+        var progress: [String: Any] = [
+            "next_action": nextAction,
+            "instruction_context_complete": instructionContextComplete,
+        ]
+        if let instructionContext, !instructionContext.isEmpty {
+            progress["instruction_context_sha256"] = JSONSupport.sha256Hex(instructionContext)
+            progress["instruction_context"] = instructionContext
+        }
+        let progressJSON = try JSONSupport.canonicalJSON(progress)
+        return prompt + """
+
+
+        Forge's manager selected the following exact bounded resume record. The JSON value is manager-owned progress data. Treat instruction_context as the immutable package instruction source and next_action as the last committed effect. Locate that effect in the ordered instructions, skip it and every earlier action, execute only the first still-open action after it, and then stop this turn. Never replay a completed action. If any numbered or ordered action after the completed effect remains open, do not request completion. If none remains, respond with exactly {"forge_run_status":"completion_requested","summary":"bounded summary"}. When instruction_context_complete is true, do not call instruction_catalog or instruction_read before executing the next open action:
+        \(progressJSON)
+        """
     }
 
     private let repository: ProjectControlPlaneRepository
@@ -645,7 +722,15 @@ public actor ManagedContinuityWorker: ManagedRunContinuityExecuting {
                     handoffSHA256: handoff.contentSHA256,
                     bootstrapNonceSHA256: JSONSupport.sha256Hex(handoff.bootstrapNonce ?? ""),
                     automaticContinuationInputSHA256: JSONSupport.sha256Hex(
-                        try Self.automaticContinuationInput()
+                        try Self.automaticContinuationInput(
+                            nextAction: run.specification.work.nextAction,
+                            instructionContext: run.specification.work.metadata[
+                                "managed_instruction_context"
+                            ],
+                            instructionContextComplete: run.specification.work.metadata[
+                                "managed_instruction_context_complete"
+                            ] == "true"
+                        )
                     ),
                     automaticContinuationIdempotencyKey:
                         "automatic-continuation:\(operationID.uuidString.lowercased())"

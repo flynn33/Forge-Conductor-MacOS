@@ -1,5 +1,31 @@
 # Version and qualification status
 
+## 0.14.5 project-workflow repair — qualification incomplete
+
+Version `0.14.5 (11)` fixes mixed-folder instruction admission, keeps package
+addition and pending-order changes available during active ordered work,
+consolidates direct-task and run controls under Projects, and separates native
+content from the macOS title/toolbar chrome. The complete SwiftPM regression
+executed 1,872 tests with 13 explicit environment/helper skips and zero
+failures. All 36 instruction-queue tests, all 15 operator-project contract
+tests, and three signed native UI cases passed. Both SwiftPM products and the
+canonical Apple Development-signed Debug app built; exact `0.14.5 (11)`
+bundle/CLI identity and strict deep-signature checks passed. Live LM Studio and
+Codex execution has not yet been repeated for this identity, so its shipment
+verdict remains inconclusive and it is not called shippable.
+
+Current operator board:
+
+- Autonomy removal — PASS
+- Telemetry frame — ACCEPTED
+- Mixed-folder packages — PENDING operator review
+- Projects/LM Studio ordered work — PENDING operator review
+- Automated Continuity handoff — PENDING operator review
+
+The three pending items are implemented pending owner live review. Their source
+and deterministic evidence are recorded, but they are not implemented-and-
+qualified, accepted, or shippable claims.
+
 ## 0.14.4 local LM Studio and Codex shippability
 
 The owner's acceptance boundary for this build is local: Forge Conductor must
@@ -62,7 +88,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.14.4, build 10**, supporting **macOS 26+**. The owner is
+Product identity: **0.14.5, build 11**, supporting **macOS 26+**. The owner is
 preparing a shippable build and will perform shipment separately. The version
 advance and repository changes require fresh product qualification; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -73,7 +99,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.14.4, build 10**. The root [`VERSION`](../VERSION)
+documentation use version **0.14.5, build 11**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

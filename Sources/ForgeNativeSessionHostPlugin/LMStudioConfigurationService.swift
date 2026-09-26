@@ -399,6 +399,7 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
             throw ProviderConfigurationError.revisionConflict
         }
         var next = previous ?? LMStudioProviderConfiguration()
+        if let endpointMode = request.endpointMode { next.endpointMode = endpointMode }
         next.baseURL = endpoint
         next.modelKey = request.modelKey
         next.revision = UUID().uuidString.lowercased()
@@ -611,6 +612,7 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
     private func snapshot(_ configuration: LMStudioProviderConfiguration?, cleanupPending: Bool) -> ProviderConfigurationSnapshot {
         ProviderConfigurationSnapshot(revision: configuration?.revision ?? "0",
             endpoint: configuration?.baseURL.absoluteString ?? "http://127.0.0.1:1234",
+            endpointMode: configuration?.endpointMode ?? .local,
             modelKey: configuration?.modelKey,
             credentialConfigured: configuration?.keychainTokenReference != nil,
             saved: configuration != nil, credentialCleanupPending: cleanupPending)

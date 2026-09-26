@@ -2,7 +2,6 @@ import Foundation
 
 enum GuidedControlAnchor {
     static let knownIdentifiers: Set<String> = [
-        "autonomy-start",
         "checkpoint-command",
         "context-gauge",
         "project-clear-content",

@@ -46,7 +46,7 @@
         "No data: check Manager and provider status",
         "Stale data: refresh and inspect source age",
         "A missing metric is not evidence of zero usage",
-        "No managed activity: confirm that Manager and Autonomy are running and a task is active"
+        "No managed activity: confirm that Manager is running and ordered project work is active"
       ],
       "advanced_details": [
         "Sampling cadence",
@@ -83,7 +83,7 @@
       "normal_workflow": [
         "Start LM Studio if needed",
         "Use the repair action only when status requires it",
-        "Return to the task; normal Autonomy preparation rechecks readiness"
+        "Return to Projects; starting ordered work rechecks readiness"
       ],
       "troubleshooting": [
         "LM Studio closed",
@@ -381,12 +381,12 @@
       ],
       "normal_workflow": [
         "Arrange packages",
-        "Start ordered autonomy",
+        "Start ordered work",
         "Review current item and blockers"
       ],
       "troubleshooting": [
-        "Blocked import: inspect unresolved documents",
-        "Failed run: open Autonomy and Evidence",
+        "No readable instructions: add a supported instruction document",
+        "Failed run: open Projects → Run Details and Evidence",
         "Stale generation: refresh project"
       ],
       "advanced_details": [
@@ -522,203 +522,6 @@
         "project-clear-mode",
         "project-clear-reconcile"
       ]
-    },
-    {
-      "id": "autonomy",
-      "title": "Autonomy guide",
-      "purpose": "Start and monitor manager-owned tasks with automatic provider preparation, tool selection, completion checks, and continuity.",
-      "forge_handles_automatically": [
-        "Prepare provider/model",
-        "Resolve project tool grant",
-        "Select runtimes",
-        "Create completion plan",
-        "Enable managed continuity",
-        "Persist and recover the run"
-      ],
-      "controls": [
-        "Start Task",
-        "Customize tools",
-        "View completion checks",
-        "Pause",
-        "Resume",
-        "Cancel",
-        "Retry",
-        "Refresh"
-      ],
-      "status_meanings": [
-        "preparing",
-        "ready",
-        "starting",
-        "running",
-        "saving progress",
-        "switching session",
-        "checking",
-        "completed",
-        "needs attention",
-        "waiting"
-      ],
-      "normal_workflow": [
-        "Choose project",
-        "Choose/add instructions",
-        "Review Ready summary",
-        "Start",
-        "Monitor progress"
-      ],
-      "troubleshooting": [
-        "Start disabled: open preparation explanation",
-        "Provider missing: use the one offered recovery action",
-        "Task needs attention: follow the named recovery action; Forge preserves progress and resumes automatically where possible"
-      ],
-      "advanced_details": [
-        "Run UUID",
-        "provider/adapter/model revision",
-        "lease",
-        "session/operation IDs"
-      ],
-      "control_anchors": [
-        "autonomy-start",
-        "run-pause",
-        "run-resume",
-        "run-cancel",
-        "run-retry"
-      ]
-    },
-    {
-      "id": "autonomyStartTask",
-      "title": "Start Task guide",
-      "purpose": "Create a task using only a project and instruction artifact; all technical defaults are manager-owned.",
-      "forge_handles_automatically": [
-        "Resolve saved/default model",
-        "Load project permissions",
-        "Derive checks",
-        "Establish continuity",
-        "Fence stale preparation"
-      ],
-      "controls": [
-        "Project selector",
-        "Instructions selector/Add Instructions",
-        "Customize tools",
-        "Optional model override",
-        "Network override",
-        "Start Task"
-      ],
-      "status_meanings": [
-        "checking",
-        "preparing automatically",
-        "ready",
-        "one action required",
-        "blocked external dependency",
-        "failed"
-      ],
-      "normal_workflow": [
-        "Select project",
-        "Select/add instructions",
-        "Wait for Ready",
-        "Start"
-      ],
-      "troubleshooting": [
-        "Unresolved package: open import report",
-        "Multiple equally suitable models: choose one",
-        "Lost start response: Forge reconciles same run identity"
-      ],
-      "advanced_details": [
-        "Prepared descriptor revision",
-        "catalog revision",
-        "provider configuration revision"
-      ],
-      "control_anchors": [
-        "run-start-project",
-        "run-start-confirm",
-        "run-preparation-recovery"
-      ]
-    },
-    {
-      "id": "autonomyToolSelection",
-      "title": "Task capabilities guide",
-      "purpose": "Choose tools through checkboxes; never type tool identifiers.",
-      "forge_handles_automatically": [
-        "Load authoritative catalog",
-        "Apply project preference",
-        "Explain exclusions",
-        "Freeze exact run grant"
-      ],
-      "controls": [
-        "Allow all tools",
-        "Category checkboxes",
-        "Individual checkboxes",
-        "Search",
-        "Select none",
-        "Restore recommended"
-      ],
-      "status_meanings": [
-        "checked",
-        "unchecked",
-        "mixed",
-        "unavailable",
-        "denied",
-        "selected but now unavailable"
-      ],
-      "normal_workflow": [
-        "Use recommended by default",
-        "Choose Allow all for all eligible tools",
-        "Deselect exceptions",
-        "Return to Start Task"
-      ],
-      "troubleshooting": [
-        "Cannot select: read the eligibility reason",
-        "Catalog changed: refresh preparation"
-      ],
-      "advanced_details": [
-        "Tool IDs",
-        "catalog revision",
-        "authorization scope"
-      ],
-      "control_anchors": [
-        "run-tools-allow-all",
-        "run-tools-select-none",
-        "run-tools-restore-recommended",
-        "run-tools-search"
-      ]
-    },
-    {
-      "id": "autonomyCompletionChecks",
-      "title": "Completion checks guide",
-      "purpose": "Explain the task-specific checks Forge will run and the evidence needed for completion.",
-      "forge_handles_automatically": [
-        "Derive obligations",
-        "Execute built-in checks",
-        "Bind evidence to final work",
-        "Retain failed attempts as history"
-      ],
-      "controls": [
-        "Select built-in checks",
-        "View package requirements",
-        "Open evidence"
-      ],
-      "status_meanings": [
-        "pending",
-        "running",
-        "passed",
-        "failed recoverable",
-        "waiting for evidence",
-        "review required"
-      ],
-      "normal_workflow": [
-        "Review automatic plan",
-        "Let Forge execute task",
-        "Inspect only when a check needs attention"
-      ],
-      "troubleshooting": [
-        "Earlier passing evidence stale after changes",
-        "Package requirement needs corrected evidence",
-        "Subjective requirement needs review"
-      ],
-      "advanced_details": [
-        "Obligation IDs",
-        "validator versions",
-        "evidence hashes"
-      ],
-      "control_anchors": []
     },
     {
       "id": "continuity",
@@ -974,7 +777,7 @@
         "busy"
       ],
       "normal_workflow": [
-        "Usually do nothing; Start Task invokes preparation",
+        "Usually do nothing; Start Ordered Work in Projects invokes preparation",
         "Use Connect and Check to prepare manually or diagnose"
       ],
       "troubleshooting": [

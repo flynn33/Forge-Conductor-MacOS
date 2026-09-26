@@ -1,0 +1,8 @@
+{
+  "challenge_id": "c5314532-41ff-43e8-aee8-440a33e58016",
+  "node_id": "4b11b1c7-8378-4c18-a3bd-aa1e1a854a16",
+  "peer_id": "3d243144-179a-4380-9c92-180b612c865c",
+  "granted_scopes": ["proxy:models:read", "proxy:inference"],
+  "generation": 1,
+  "completed_at": "2026-09-25T17:05:00Z"
+}

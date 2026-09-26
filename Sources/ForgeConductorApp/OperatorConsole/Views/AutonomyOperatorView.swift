@@ -1,17 +1,13 @@
 // AutonomyOperatorView.swift
-// Native managed-run source list, detail inspector, and duplicate-safe start sheet.
+// Native managed-run source list and detail inspector.
 
 import SwiftUI
 import ForgeConductorCore
 
 struct AutonomyOperatorView: View {
     @StateObject private var viewModel: AutonomyViewModel
-    @State private var showingStartSheet = false
     @State private var showingCancelConfirmation = false
     @State private var showingDeleteConfirmation = false
-    @State private var showingAdvancedOverrides = false
-    @State private var showingToolSelection = false
-    @State private var showingCompletionChecks = true
     private let onOpenProjects: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -46,27 +42,19 @@ struct AutonomyOperatorView: View {
                 }
             }
             .listStyle(.sidebar)
-            .safeAreaInset(edge: .bottom) {
-                Button("Start Task…", systemImage: "plus") {
-                    showingStartSheet = true
-                }
-                .disabled(!viewModel.autonomyStarted || viewModel.projects.isEmpty)
-                .padding(10)
-                .accessibilityIdentifier("autonomy-start")
-            }
         } detail: {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     OperatorHeader(
-                        title: "Autonomy",
-                        subtitle: "Manager-owned provider sessions, durable work, completion evidence, and automatic recovery",
+                        title: "Project Runs",
+                        subtitle: "Runs for project instructions, durable completion evidence, and automatic recovery",
                         isLoading: viewModel.isLoading,
                         titleAccessibilityIdentifier: "detail-autonomy",
                         subtitleAccessibilityIdentifier: "autonomy-operator-view",
                         onRefresh: viewModel.load
                     )
                     HStack {
-                        Text("Managed autonomy")
+                        Text("Automatic execution")
                         Spacer()
                         OperatorStateBadge(state: viewModel.autonomyStarted ? "running" : "unavailable")
                     }
@@ -97,7 +85,7 @@ struct AutonomyOperatorView: View {
                         ContentUnavailableView(
                             "No Managed Runs",
                             systemImage: "bolt.horizontal.circle",
-                            description: Text("Start a run after selecting a registered project and validated provider configuration.")
+                            description: Text("Start ordered work from this project's instruction package queue.")
                         )
                         .frame(maxWidth: .infinity, minHeight: 300)
                     }
@@ -106,10 +94,6 @@ struct AutonomyOperatorView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $showingStartSheet) { startSheet }
-        .onChange(of: viewModel.lastStartedRunID) { _, runID in
-            if runID != nil { showingStartSheet = false }
-        }
         .alert(
             "Cancel managed run?",
             isPresented: $showingCancelConfirmation,
@@ -135,7 +119,7 @@ struct AutonomyOperatorView: View {
             Text("\(run.mission)\n\nThis permanently removes the settled task and its manager-owned run, session, tool, event, and runtime-job history. Project files are not changed.")
         }
         .task { viewModel.load() }
-        .guidedHelpState(viewModel.guidedHelpState, for: .autonomy)
+        .guidedHelpState(viewModel.guidedHelpState, for: .projects)
     }
 
     private func runDetail(_ run: OperatorRun) -> some View {
@@ -205,18 +189,12 @@ struct AutonomyOperatorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("run-completion-requirements-read-only")
-                    Button("Select completion checks for a new task…") {
-                        showingCompletionChecks = true
-                        showingStartSheet = true
-                    }
-                    .disabled(!viewModel.autonomyStarted || viewModel.projects.isEmpty)
-                    .accessibilityIdentifier("run-completion-configure")
                 }
             } label: {
                 HStack {
                     Text("Completion evidence")
                     Spacer()
-                    GuidedHelpButton(context: .autonomyCompletionChecks)
+                    GuidedHelpButton(context: .instructionQueue)
                 }
             }
 
@@ -350,320 +328,6 @@ struct AutonomyOperatorView: View {
         }
     }
 
-    private var startSheet: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Start Task").font(.title2.bold())
-                Spacer()
-                GuidedHelpButton(context: .autonomyStartTask)
-            }
-            Text("Choose the project, then type, paste, drop, or select the instructions and start. Forge supplies the saved model, task capabilities, completion checks, and continuity defaults.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Picker("Project", selection: $viewModel.selectedProjectID) {
-                Text("Choose a project").tag(String?.none)
-                ForEach(viewModel.projects) { project in
-                    Text("\(project.displayName) · generation \(project.projectGeneration)")
-                        .tag(String?.some(project.projectID))
-                }
-            }
-            .accessibilityIdentifier("run-start-project")
-            .onChange(of: viewModel.selectedProjectID) { _, _ in
-                viewModel.refreshToolPermissionsForSelection()
-                viewModel.refreshInstructionArtifactsForSelection()
-            }
-            GroupBox("Instructions") {
-                VStack(alignment: .leading, spacing: 9) {
-                    if viewModel.availableInstructionPackages.isEmpty {
-                        Text("No imported project packages are available. Add a file, folder, ZIP, or quick instructions below.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("run-start-no-project-packages")
-                    } else {
-                        Text("Selected project packages")
-                            .font(.caption.weight(.semibold))
-                        ForEach(viewModel.availableInstructionPackages) { package in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { viewModel.selectedInstructionPackageIDs.contains(package.id) },
-                                    set: { viewModel.setInstructionPackage(package.id, selected: $0) }
-                                )
-                            ) {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(package.displayName)
-                                        Text("\(package.documentCount ?? 0) documents · \(package.state)")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-                            .disabled(package.importReady == false)
-                            .accessibilityIdentifier("run-start-package-\(package.id)")
-                        }
-                        Text("\(viewModel.selectedInstructionPackageIDs.count) selected")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("run-start-package-selection-count")
-                    }
-
-                    Divider()
-                    TextField("Optional quick instructions", text: $viewModel.mission, axis: .vertical)
-                    .lineLimit(2...5)
-                    .disabled(viewModel.instructionSourcePath != nil)
-                    .accessibilityIdentifier("run-start-mission")
-                    HStack {
-                        Button("Add Instructions…") {
-                            viewModel.chooseInstructionSource()
-                        }
-                        .accessibilityIdentifier("run-start-choose-instructions")
-                        if let sourceName = viewModel.instructionSourceName {
-                            Label(sourceName, systemImage: "doc.badge.checkmark")
-                                .lineLimit(1)
-                            Button("Remove") {
-                                viewModel.clearInstructionSource()
-                            }
-                            .accessibilityIdentifier("run-start-remove-instructions")
-                        } else {
-                            Text("or drop a file, folder, or ZIP here")
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("run-start-instruction-drop-target")
-                        }
-                    }
-                    .font(.caption)
-                    Text("Forge publishes quick text and added sources as immutable artifacts. Selected packages retain their stored content identity and displayed order.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-            .dropDestination(for: URL.self) { urls, _ in
-                guard let source = urls.first else { return false }
-                return viewModel.setInstructionSource(source)
-            }
-
-            GroupBox("Forge preparation") {
-                VStack(alignment: .leading, spacing: 7) {
-                    LabeledContent(
-                        "Status",
-                        value: (viewModel.projectRunPreparation?.readiness.rawValue
-                            ?? viewModel.runPreparation?.state
-                            ?? "checking").replacingOccurrences(of: "_", with: " ")
-                    )
-                    Text(viewModel.projectRunPreparation?.detail
-                        ?? viewModel.runPreparation?.detail
-                        ?? "Forge is loading manager-owned defaults.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let recovery = viewModel.preparationRecoveryAction {
-                        Button(recoveryTitle(recovery)) {
-                            performRecovery(recovery)
-                        }
-                        .accessibilityIdentifier("run-preparation-recovery")
-                    }
-                }
-            }
-
-            GroupBox("Task setup") {
-                VStack(alignment: .leading, spacing: 10) {
-                    LabeledContent("Model", value: viewModel.modelKey.isEmpty ? "Automatic" : viewModel.modelKey)
-                    LabeledContent("Tools") {
-                        HStack(spacing: 8) {
-                            Text(toolSelectionSummary)
-                            Button("Customize…") { showingToolSelection = true }
-                                .accessibilityIdentifier("run-tools-customize")
-                        }
-                    }
-                    HStack(alignment: .top, spacing: 8) {
-                        Toggle(isOn: $showingCompletionChecks) {
-                            HStack {
-                                Text("Show completion checks")
-                                Spacer()
-                                Text(viewModel.completionSelectionSummary)
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityIdentifier("run-completion-summary")
-                            }
-                        }
-                        .toggleStyle(.checkbox)
-                        .accessibilityIdentifier("run-completion-view")
-                        GuidedHelpButton(context: .autonomyCompletionChecks)
-                    }
-                    if showingCompletionChecks {
-                        completionCheckSelector
-                            .padding(.top, 8)
-                        HStack {
-                            Spacer()
-                            Button("Done") { showingCompletionChecks = false }
-                                .accessibilityIdentifier("run-completion-done")
-                        }
-                    }
-                    Picker("On failure", selection: $viewModel.failureBehavior) {
-                        Text("Pause for review").tag(AutonomousFailureBehavior.pauseForReview)
-                        Text("Retry automatically").tag(AutonomousFailureBehavior.retryAutomatically)
-                        Text("Stop task").tag(AutonomousFailureBehavior.stopTask)
-                    }
-                    .accessibilityIdentifier("run-failure-behavior")
-                    if viewModel.failureBehavior == .retryAutomatically {
-                        Stepper(
-                            "Retry limit: \(viewModel.maximumRetries)",
-                            value: $viewModel.maximumRetries,
-                            in: 0...AutonomousFailurePolicy.maximumRetryLimit
-                        )
-                        .accessibilityIdentifier("run-retry-limit")
-                    }
-                    TextField(
-                        "Custom failure instructions (optional)",
-                        text: $viewModel.failureInstructions,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...4)
-                    .accessibilityIdentifier("run-failure-instructions")
-                    LabeledContent("Continuity", value: "Automatic")
-                }
-            }
-
-            Button {
-                showingAdvancedOverrides.toggle()
-            } label: {
-                Label(
-                    "Customize",
-                    systemImage: showingAdvancedOverrides ? "chevron.down" : "chevron.right"
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("run-start-customize")
-
-            if showingAdvancedOverrides {
-                VStack(alignment: .leading, spacing: 10) {
-                    TextField("Task label (optional)", text: $viewModel.assignmentID)
-                        .accessibilityIdentifier("run-start-task-label")
-                    Picker("Model", selection: $viewModel.modelOverrideKey) {
-                        Text("Automatic — use the saved compatible model").tag("")
-                        if let savedModel = viewModel.runPreparation?.modelKey,
-                           !savedModel.isEmpty {
-                            Text(savedModel).tag(savedModel)
-                        }
-                    }
-                    .accessibilityIdentifier("run-start-model-picker")
-                    Toggle("Allow network tools for this run", isOn: $viewModel.networkAllowed)
-                        .accessibilityIdentifier("run-start-network")
-                }
-                .padding(.top, 8)
-            }
-
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .accessibilityIdentifier("run-start-error")
-            }
-            if viewModel.startRequiresReconciliation, !viewModel.isStarting {
-                Button("Reconcile with Manager", action: viewModel.reconcileStart)
-                    .accessibilityIdentifier("run-start-reconcile")
-                Text("Forge resubmits the exact client-generated run identity. The manager returns the one durable run or creates it once.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack {
-                Button("Cancel", role: .cancel) { showingStartSheet = false }
-                    .accessibilityIdentifier("run-start-cancel")
-                Spacer()
-                if viewModel.isStarting { ProgressView().controlSize(.small) }
-                Button("Start Task") {
-                    viewModel.startRun()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!viewModel.canStart)
-                .accessibilityIdentifier("run-start-confirm")
-            }
-            }
-            .padding(22)
-        }
-        .frame(width: 620)
-        .frame(minHeight: 520, idealHeight: 680, maxHeight: 720)
-        .guidedHelpContext(.autonomyStartTask)
-        .sheet(isPresented: $showingToolSelection) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Customize Task Capabilities").font(.title2.bold())
-                    Spacer()
-                    GuidedHelpButton(context: .autonomyToolSelection)
-                }
-                Text("These project defaults are the sole source of tool permission truth for new tasks. Unavailable or forbidden tools cannot be granted.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ToolPermissionEditor(viewModel: viewModel)
-                HStack {
-                    Spacer()
-                    Button("Done") { showingToolSelection = false }
-                        .keyboardShortcut(.defaultAction)
-                        .accessibilityIdentifier("run-tools-done")
-                }
-            }
-            .padding(22)
-            .frame(width: 680, height: 620)
-            .guidedHelpContext(.autonomyToolSelection)
-        }
-    }
-
-    private var completionCheckSelector: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Select the built-in evidence checks Forge should verify before it marks this task complete. Additional requirements come only from the instruction package and are read-only during the run.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            ForEach(CompletionCheckPreset.allCases) { check in
-                Toggle(
-                    isOn: Binding(
-                        get: { viewModel.selectedCompletionChecks.contains(check) },
-                        set: { viewModel.setCompletionCheck(check, selected: $0) }
-                    )
-                ) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(check.title)
-                        Text(check.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
-                .accessibilityIdentifier("run-completion-check-\(check.rawValue)")
-            }
-            if let plan = viewModel.preparedCompletionPlan,
-               !plan.obligations.isEmpty {
-                Divider()
-                Text("Prepared requirements · read only")
-                    .font(.caption.weight(.semibold))
-                ForEach(plan.obligations) { obligation in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Label(obligation.title, systemImage: "checkmark.seal")
-                        Text(obligation.reason)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityIdentifier("run-completion-automatic")
-            }
-        }
-        .guidedHelpContext(.autonomyCompletionChecks)
-    }
-
-    private var toolSelectionSummary: String {
-        guard let permissions = viewModel.toolPermissions else { return "Preparing…" }
-        switch permissions.selectionMode {
-        case .recommended:
-            return "Recommended · \(permissions.effectiveCount) tools"
-        case .allEligible:
-            return "All eligible · \(permissions.effectiveCount) tools"
-        case .explicit:
-            return "Custom · \(permissions.effectiveCount) tools"
-        }
-    }
-
     private func needsRecoveryGuidance(_ run: OperatorRun) -> Bool {
         if nonBlank(run.lastErrorSummary) != nil || nonBlank(run.lastErrorCode) != nil {
             return true
@@ -740,30 +404,4 @@ struct AutonomyOperatorView: View {
         return run.passedGates.contains(ProjectInstructionQueueStore.builtInCompletionGate)
     }
 
-    private func recoveryTitle(_ action: ManagerRunRecoveryAction) -> String {
-        switch action {
-        case .none: "No action required"
-        case .selectProject: "Refresh Projects"
-        case .authorizeProject: "Open Projects"
-        case .configureProvider: "Open Model connection"
-        case .reviewPermissions: "Review permissions"
-        case .retryPreparation: "Refresh preparation"
-        }
-    }
-
-    private func performRecovery(_ action: ManagerRunRecoveryAction) {
-        switch action {
-        case .none:
-            break
-        case .selectProject, .retryPreparation:
-            viewModel.refreshPreparationRecovery()
-        case .authorizeProject:
-            onOpenProjects()
-        case .configureProvider:
-            onOpenProvider()
-        case .reviewPermissions:
-            showingToolSelection = true
-            viewModel.refreshPreparationRecovery()
-        }
-    }
 }

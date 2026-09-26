@@ -10,10 +10,35 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-### 0.14.4 (10) local shippable candidate — 2026-09-25
+## [0.14.5] — 2026-09-26 (build 11 development repair candidate)
 
-#### Fixed
+### Added
 
+- Added the first Forge Link foundation for a future remote LM Studio endpoint:
+  a versioned local-or-linked provider mode, strict transport-neutral discovery,
+  pairing, health, capability, control, and role contracts, plus an owner-only
+  revision-checked paired-node registry. Existing provider data migrates to
+  local mode. This slice does not expose discovery, pairing, a network listener,
+  or a remote endpoint in the UI and does not claim live GB10 qualification.
+
+### Fixed
+
+- Made a folder package runnable whenever it contains at least one readable
+  instruction document. Every source is still retained and catalogued, but an
+  unsupported attachment such as `.DS_Store` or an opaque binary no longer
+  blocks the readable instructions beside it.
+- Kept package intake and ordering available while ordered work is running;
+  adding or rearranging pending packages does not replace the active run.
+- Consolidated instruction selection, ordered execution, direct task creation,
+  and run controls under **Projects**. The redundant top-level Autonomy tab is
+  removed; **Run Details…** opens the retained run inspector and controls.
+- Moved the macOS toolbar into dedicated AppKit chrome so project headings and
+  controls remain below the title bar at minimum window size.
+- Combined CPU logical-core and GPU core/engine presentation in one
+  **COMPUTE CORES** telemetry frame. The operator has accepted this frame.
+- Kept Continuity's managed-run contract directed at automatic session handoff:
+  durable save, fresh successor creation, exact acknowledgment, predecessor
+  fencing, and automatic continuation remain one recoverable flow.
 - Preserved an already loaded LM Studio model while deploying an unchanged,
   synchronized Forge MCP configuration. Routine setup no longer relaunches LM
   Studio merely because its MCP child processes are waiting for lazy chat
@@ -30,18 +55,24 @@ Product versions do not by themselves claim shipment.
 - Updated the production onboarding fixture for immutable artifact bootstrap and
   canonical completion gates without weakening production validation.
 
-#### Verification
+### Verification
 
-- Passed live LM Studio provider discovery, contract preparation, selection,
-  project registration, instruction admission, and autonomous task creation
-  against loaded `qwen/qwen3-coder-30b`; repeated integration repair left the
-  model loaded.
-- Installed the Forge Codex plugin through the normal trust path and verified all
-  seven hooks plus MCP discovery in Codex `0.155.0-alpha.16.4`. A fresh Codex
-  project task attached to its exact run, called `forge_status`, and completed
-  all three automatic obligations with durable hook evidence.
-- Advanced the aligned source, CLI, filesystem protocol, Xcode target, test, and
-  documentation identity to `0.14.4 (10)`.
+- Passed the complete SwiftPM regression: 1,872 tests executed, 13 explicit
+  environment/helper skips, and zero failures. The skips are not counted as
+  passes.
+- Passed all 36 instruction-queue tests, all 15 operator-project contract tests,
+  and three signed native UI cases covering primary navigation,
+  Projects-to-Run-Details task entry, and minimum-window toolbar clearance.
+- Built both SwiftPM products and the canonical Apple Development-signed Debug
+  workspace app. Strict deep-signature verification and exact bundle/CLI
+  identity checks passed for `0.14.5 (11)`.
+- Live LM Studio and Codex execution has not yet been repeated for this exact
+  identity. The live receipts recorded under `0.14.4 (10)` remain historical and
+  are not used to call `0.14.5 (11)` shippable.
+- Autonomy removal passed operator review. Mixed-folder package import,
+  Projects-owned ordered LM Studio execution, and automatic Continuity handoff
+  are implemented pending owner live review; no acceptance or shipment claim is
+  made for those three items.
 
 ## [0.14.3] — 2026-09-25 (development)
 

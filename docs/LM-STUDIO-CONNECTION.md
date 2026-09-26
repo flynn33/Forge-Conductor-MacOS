@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.14.4**, build **10**. This connection document does
+Product identity: version **0.14.5**, build **11**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -19,6 +19,21 @@ There is **no** LM Studio SDK client inside Core for chat/completions.
 Forge-managed sessions use a separate Foundation-native HTTP transport in the
 native session-host plugin; the stdio registration below serves externally
 owned LM Studio chats.
+
+## Forge Link implementation boundary
+
+The first network-link foundation is present in source. It defines a versioned
+`local` or `linked` provider endpoint mode, strict discovery/pairing/health/
+capability/control/role data contracts, and an owner-only paired-node registry
+with bounded files, cross-process locking, atomic replacement, and revision
+compare-and-swap. Existing provider configuration that predates the field
+decodes as `local`; a linked endpoint is required to use HTTPS.
+
+This is a contract and persistence milestone, not an operational network path.
+The product does not yet advertise or browse Linux nodes, perform pairing,
+issue credentials, run a Forge Link listener, install the GB10 companion, or
+offer linked-node selection in Provider. The local workflows documented below
+remain the only qualified behavior until those later milestones close.
 
 ### Process entry (one binary, four modes)
 
@@ -88,7 +103,7 @@ array. The Xcode **My Mac** Debug candidate reconciled that exact observation,
 reported the model loaded, and passed the manager connection probe. That is
 historical connection evidence bound to that source and host.
 
-Register the repository in **Projects** using the native picker or **Enter Project Path…**. Forge records the selected canonical folder through that project workflow; no separate Manager authorization step is required. The manager runs independently of the Autonomy tab, and **Autonomy** starts runs after the project is registered and **Connect and Check** has prepared the selected Provider. For a new direct task, Forge confirms provider readiness before importing its immutable instruction artifact.
+Register the repository in **Projects** using the native picker or **Enter Project Path…**. Forge records the selected canonical folder through that project workflow; no separate Manager authorization step is required. Ordered work and direct **Run Details** both live in Projects. Runs start after the project is registered and **Connect and Check** has prepared the selected Provider. For a new direct task, Forge confirms provider readiness before importing its immutable instruction artifact.
 
 ## Authoritative connection path (stable)
 

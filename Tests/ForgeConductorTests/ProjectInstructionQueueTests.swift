@@ -253,6 +253,10 @@ final class ProjectInstructionQueueTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Tests", isDirectory: true),
+            withIntermediateDirectories: true
+        )
         try Data("// swift-tools-version: 6.2\n".utf8).write(
             to: root.appendingPathComponent("Package.swift"), options: .atomic
         )
@@ -271,6 +275,34 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertTrue(kinds.contains(.noRelevantUnresolvedSideEffect))
         XCTAssertFalse(kinds.contains(.customNativeGate))
         XCTAssertEqual(plan.source, .automatic)
+    }
+
+    func testDefaultCompletionPresetsDoNotRequireBuildEvidenceForDocumentFolder() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-document-folder-plan-\(UUID().uuidString)", isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("required native effect\n".utf8).write(
+            to: root.appendingPathComponent("work-product.txt"), options: .atomic
+        )
+
+        let plan = try AutomaticCompletionPlanResolver.resolve(.init(
+            projectID: ProjectID(), projectGeneration: .initial, projectRoot: root,
+            instructionArtifactSHA256: [String(repeating: "b", count: 64)],
+            instructionText: "Read work-product.txt once, report its exact content, and request completion. Do not edit files.",
+            documentCount: 1,
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+                + CompletionCheckPreset.defaults.map(\.rawValue)
+        ))
+
+        let kinds = Set(plan.obligations.map(\.kind))
+        XCTAssertTrue(kinds.contains(.readOnlyReportDelivered))
+        XCTAssertTrue(kinds.contains(.instructionDeliveryComplete))
+        XCTAssertTrue(kinds.contains(.noRelevantUnresolvedSideEffect))
+        XCTAssertFalse(kinds.contains(.projectBuild))
+        XCTAssertFalse(kinds.contains(.projectBuildNoWarnings))
+        XCTAssertFalse(kinds.contains(.projectTests))
     }
 
     func testNoWarningsPresetRequiresCompleteWarningFreeBuildOutput() throws {
@@ -897,6 +929,76 @@ final class ProjectInstructionQueueTests: XCTestCase {
         }
     }
 
+    func testMixedFolderRetainsEverySourceAndRunsConvertedInstructions() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let directory = fixture.external.appendingPathComponent("whole-folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try "Read every instruction and complete the project.".write(
+            to: directory.appendingPathComponent("instructions.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let opaqueBytes = Data([0x00, 0xFF, 0x01, 0x80])
+        try opaqueBytes.write(to: directory.appendingPathComponent("reference.bin"))
+
+        let imported = try fixture.store.importPackage(
+            sourceURL: directory,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.documentCount, 2)
+        XCTAssertEqual(package.unresolvedDocumentCount, 1)
+        XCTAssertEqual(package.asDictionary()["import_ready"] as? Bool, true)
+
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: package.contentSHA256,
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: nil,
+            cursor: 0,
+            limit: 10
+        )
+        XCTAssertEqual(Set(catalog.documents.compactMap { $0["source_path"] }), [
+            "instructions.md", "reference.bin",
+        ])
+        XCTAssertEqual(
+            catalog.documents.first { $0["source_path"] == "reference.bin" }?["status"],
+            "unresolved_conversion"
+        )
+        let retained = fixture.paths.instructionPackageStoreDir
+            .appendingPathComponent(package.contentSHA256)
+            .appendingPathComponent("originals/reference.bin")
+        XCTAssertEqual(try Data(contentsOf: retained), opaqueBytes)
+
+        let runID = RunID()
+        let artifact = try fixture.store.assembleRunArtifact(
+            sourceURL: nil,
+            packageIDs: [package.id],
+            projectID: fixture.projectID,
+            generation: .initial,
+            runID: runID
+        )
+        XCTAssertEqual(artifact.unresolvedDocumentCount, 1)
+        XCTAssertEqual(artifact.asDictionary()["import_ready"] as? Bool, true)
+        let readableDocuments = try fixture.store.documentReferences(
+            contentSHA256: artifact.contentSHA256
+        )
+        XCTAssertEqual(readableDocuments.count, 1)
+
+        let running = try fixture.store.start(
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        XCTAssertTrue(running.running)
+        XCTAssertEqual(fixture.store.nextRunnable()?.id, package.id)
+        XCTAssertEqual(
+            try fixture.store.markStarted(packageID: package.id, runID: runID).state,
+            .running
+        )
+    }
+
     func testNativeRichDocumentAdaptersPreserveOriginalsAndConvertText() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -1178,7 +1280,7 @@ final class ProjectInstructionQueueTests: XCTestCase {
             generation: .initial
         )
         let package = try XCTUnwrap(imported.packages.first)
-        XCTAssertEqual(package.unresolvedDocumentCount, 1)
+        XCTAssertEqual(package.unresolvedDocumentCount, 0)
         let catalog = try fixture.store.catalogPage(
             contentSHA256: package.contentSHA256,
             projectID: fixture.projectID,
@@ -1190,6 +1292,10 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertTrue(catalog.documents.contains {
             $0["detail"]?.contains("not recursively expanded") == true
         })
+        XCTAssertEqual(
+            catalog.documents.first { $0["source_path"]?.hasSuffix("inner.zip") == true }?["status"],
+            "retained_attachment"
+        )
     }
 
     func testEmptyAndWhitespaceSourcesReportNoInstructions() throws {
@@ -1287,6 +1393,51 @@ final class ProjectInstructionQueueTests: XCTestCase {
         let persisted = try reopened.snapshot(projectID: fixture.projectID, generation: .initial)
         XCTAssertEqual(persisted.packages.map(\.packageID), ["two", "one"])
         XCTAssertEqual(persisted.revision, snapshot.revision)
+    }
+
+    func testRunningQueueAcceptsNewPackagesAndReordersPendingWork() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        for name in ["one", "two"] {
+            let source = fixture.external.appendingPathComponent("\(name).md")
+            try "Complete \(name).".write(to: source, atomically: true, encoding: .utf8)
+            _ = try fixture.store.importPackage(
+                sourceURL: source,
+                projectID: fixture.projectID,
+                generation: .initial
+            )
+        }
+
+        _ = try fixture.store.start(projectID: fixture.projectID, generation: .initial)
+        let running = try XCTUnwrap(fixture.store.nextRunnable())
+        let runID = RunID()
+        _ = try fixture.store.markStarted(packageID: running.id, runID: runID)
+
+        let addedSource = fixture.external.appendingPathComponent("three.md")
+        try "Complete three.".write(to: addedSource, atomically: true, encoding: .utf8)
+        var snapshot = try fixture.store.importPackage(
+            sourceURL: addedSource,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let second = try XCTUnwrap(snapshot.packages.first { $0.packageID == "two" })
+        let third = try XCTUnwrap(snapshot.packages.first { $0.packageID == "three" })
+
+        snapshot = try fixture.store.reorder(
+            projectID: fixture.projectID,
+            generation: .initial,
+            packageIDs: [running.id, third.id, second.id],
+            expectedRevision: snapshot.revision
+        )
+        XCTAssertEqual(snapshot.packages.map(\.packageID), ["one", "three", "two"])
+        XCTAssertEqual(snapshot.packages.first?.state, .running)
+
+        _ = try fixture.store.reconcile(
+            packageID: running.id,
+            runID: runID,
+            runState: .completed
+        )
+        XCTAssertEqual(fixture.store.nextRunnable()?.id, third.id)
     }
 
     func testLegacyQueueMetadataMigratesWithoutLosingPackageIdentity() throws {

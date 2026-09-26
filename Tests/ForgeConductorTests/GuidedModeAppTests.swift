@@ -8,9 +8,9 @@ import XCTest
 @MainActor
 final class GuidedModeAppTests: XCTestCase {
     func testEveryApplicationTabMapsToOneDistinctPrimaryGuide() {
-        let contexts = AppModel.AppTab.allCases.map(\.guidedHelpContext)
+        let contexts = AppModel.AppTab.primaryNavigationTabs.map(\.guidedHelpContext)
 
-        XCTAssertEqual(contexts.count, 14)
+        XCTAssertEqual(contexts.count, 13)
         XCTAssertEqual(Set(contexts).count, contexts.count)
         XCTAssertTrue(Set(contexts).isSubset(of: Set(GuidedHelpContext.allCases)))
     }
@@ -41,15 +41,15 @@ final class GuidedModeAppTests: XCTestCase {
 
         XCTAssertFalse(coordinator.isEnabled)
         coordinator.isEnabled = true
-        coordinator.select(.autonomy)
-        let startToken = coordinator.push(.autonomyStartTask)
-        let toolsToken = coordinator.push(.autonomyToolSelection)
+        coordinator.select(.projects)
+        let startToken = coordinator.push(.instructionQueue)
+        let toolsToken = coordinator.push(.instructionImport)
 
-        XCTAssertEqual(coordinator.currentContext, .autonomyToolSelection)
+        XCTAssertEqual(coordinator.currentContext, .instructionImport)
         coordinator.pop(toolsToken)
-        XCTAssertEqual(coordinator.currentContext, .autonomyStartTask)
+        XCTAssertEqual(coordinator.currentContext, .instructionQueue)
         coordinator.pop(startToken)
-        XCTAssertEqual(coordinator.currentContext, .autonomy)
+        XCTAssertEqual(coordinator.currentContext, .projects)
         XCTAssertTrue(GuidedModeCoordinator(defaults: defaults).isEnabled)
     }
 }

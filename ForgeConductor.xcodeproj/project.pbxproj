@@ -264,6 +264,10 @@
 		B09B00000000000000000051 /* Domain/ProviderConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */; };
 		B09B00000000000000000052 /* Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000052 /* Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift */; };
 		B09B00000000000000000053 /* ProviderConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000053 /* ProviderConfigurationTests.swift */; };
+		B10000000000000000000101 /* LMStudioLink/LMStudioLinkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000101 /* LMStudioLink/LMStudioLinkModels.swift */; };
+		B10000000000000000000102 /* LMStudioLink/LMStudioLinkRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000102 /* LMStudioLink/LMStudioLinkRegistry.swift */; };
+		B10000000000000000000103 /* LMStudioLinkModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000103 /* LMStudioLinkModelsTests.swift */; };
+		B10000000000000000000104 /* LMStudioLinkRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000104 /* LMStudioLinkRegistryTests.swift */; };
 		D52B00000000000000000001 /* ProviderRuntimePreparationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D52F00000000000000000001 /* ProviderRuntimePreparationTests.swift */; };
 		B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */; };
 		B09B00000000000000000055 /* ProductionOnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09F00000000000000000055 /* ProductionOnboardingUITests.swift */; };
@@ -819,6 +823,10 @@
 		B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Domain/ProviderConfigurationService.swift; sourceTree = "<group>"; };
 		B09F00000000000000000052 /* Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ForgeNativeSessionHostPlugin/LMStudioConfigurationService.swift; sourceTree = SOURCE_ROOT; };
 		B09F00000000000000000053 /* ProviderConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationTests.swift; sourceTree = "<group>"; };
+		F10000000000000000000101 /* LMStudioLink/LMStudioLinkModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioLink/LMStudioLinkModels.swift; sourceTree = "<group>"; };
+		F10000000000000000000102 /* LMStudioLink/LMStudioLinkRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioLink/LMStudioLinkRegistry.swift; sourceTree = "<group>"; };
+		F10000000000000000000103 /* LMStudioLinkModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioLinkModelsTests.swift; sourceTree = "<group>"; };
+		F10000000000000000000104 /* LMStudioLinkRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LMStudioLinkRegistryTests.swift; sourceTree = "<group>"; };
 		D52F00000000000000000001 /* ProviderRuntimePreparationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRuntimePreparationTests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigurationAppTests.swift; sourceTree = "<group>"; };
 		B09F00000000000000000055 /* ProductionOnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionOnboardingUITests.swift; sourceTree = "<group>"; };
@@ -1171,6 +1179,8 @@
 				F09F00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift */,
 				F09F00000000000000000004 /* LMStudioContractFixtureServer.swift */,
 				F09F00000000000000000005 /* LMStudioContractFixtureTests.swift */,
+				F10000000000000000000103 /* LMStudioLinkModelsTests.swift */,
+				F10000000000000000000104 /* LMStudioLinkRegistryTests.swift */,
 				A26F00000000000000000033 /* ManagedAutonomyRuntimeTests.swift */,
 				A26F00000000000000000034 /* ManagedContinuityWorkerTests.swift */,
 				A26F00000000000000000026 /* ManagedModelProviderBridgeTests.swift */,
@@ -1515,6 +1525,8 @@
 				A26F00000000000000000016 /* Domain/ContinuityV2Models.swift */,
 				A26F00000000000000000017 /* Domain/ManagedModelProvider.swift */,
 				B09F00000000000000000051 /* Domain/ProviderConfigurationService.swift */,
+				F10000000000000000000101 /* LMStudioLink/LMStudioLinkModels.swift */,
+				F10000000000000000000102 /* LMStudioLink/LMStudioLinkRegistry.swift */,
 				A26F00000000000000000018 /* Domain/ProjectContextModels.swift */,
 				A26F00000000000000000019 /* Domain/RuntimeJobModels.swift */,
 				A26F00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift */,
@@ -2032,6 +2044,8 @@
 				F09B00000000000000000002 /* LiveLMStudioManagedAutonomyTests.swift in Sources */,
 				F09B00000000000000000004 /* LMStudioContractFixtureServer.swift in Sources */,
 				F09B00000000000000000005 /* LMStudioContractFixtureTests.swift in Sources */,
+				B10000000000000000000103 /* LMStudioLinkModelsTests.swift in Sources */,
+				B10000000000000000000104 /* LMStudioLinkRegistryTests.swift in Sources */,
 				A26B00000000000000000033 /* ManagedAutonomyRuntimeTests.swift in Sources */,
 				A26B00000000000000000034 /* ManagedContinuityWorkerTests.swift in Sources */,
 				A26B00000000000000000026 /* ManagedModelProviderBridgeTests.swift in Sources */,
@@ -2358,6 +2372,8 @@
 				A26B00000000000000000016 /* Domain/ContinuityV2Models.swift in Sources */,
 				A26B00000000000000000017 /* Domain/ManagedModelProvider.swift in Sources */,
 				B09B00000000000000000051 /* Domain/ProviderConfigurationService.swift in Sources */,
+				B10000000000000000000101 /* LMStudioLink/LMStudioLinkModels.swift in Sources */,
+				B10000000000000000000102 /* LMStudioLink/LMStudioLinkRegistry.swift in Sources */,
 				A26B00000000000000000018 /* Domain/ProjectContextModels.swift in Sources */,
 				A26B00000000000000000019 /* Domain/RuntimeJobModels.swift in Sources */,
 				A26B00000000000000000020 /* Infrastructure/ProjectControlPlaneRepository.swift in Sources */,
@@ -2647,7 +2663,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2663,7 +2679,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SKIP_INSTALL = YES;
@@ -2732,13 +2748,13 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -2759,7 +2775,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2778,7 +2794,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2798,7 +2814,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2816,7 +2832,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2832,7 +2848,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2843,7 +2859,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2943,7 +2959,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2959,7 +2975,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -2973,7 +2989,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2986,7 +3002,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -3036,7 +3052,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3061,7 +3077,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3085,7 +3101,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3110,7 +3126,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3166,7 +3182,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3175,7 +3191,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3191,7 +3207,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3200,7 +3216,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3215,7 +3231,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3223,7 +3239,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3239,7 +3255,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3247,7 +3263,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3262,13 +3278,13 @@
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.4;
+				MARKETING_VERSION = 0.14.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

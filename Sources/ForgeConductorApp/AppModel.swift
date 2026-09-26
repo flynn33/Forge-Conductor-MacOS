@@ -1076,11 +1076,21 @@ public final class AppModel: ObservableObject {
 
         public var id: String { rawValue }
 
+        /// Autonomy is retained as an internal compatibility route for saved
+        /// state and automation. Run controls now live under Projects.
+        public static var primaryNavigationTabs: [AppTab] {
+            allCases.filter { $0 != .autonomy }
+        }
+
         /// User-facing navigation title. `rawValue` remains unchanged so saved
         /// state and automation that identify the historical rig tab stay
         /// compatible while the product presents it as the Dashboard.
         public var displayName: String {
-            self == .rig ? "Dashboard" : rawValue
+            switch self {
+            case .rig: "Dashboard"
+            case .autonomy: "Projects"
+            default: rawValue
+            }
         }
 
         public var accessibilityID: String {
@@ -2410,10 +2420,11 @@ public final class AppModel: ObservableObject {
     }
 
     public func selectTab(_ tab: AppTab) {
-        guard selectedTab != tab else { return }
-        selectedTab = tab
+        let destination: AppTab = tab == .autonomy ? .projects : tab
+        guard selectedTab != destination else { return }
+        selectedTab = destination
         app?.diagnostics.info("ui_navigation_selected", [
-            "tab": tab.accessibilityID,
+            "tab": destination.accessibilityID,
         ], category: .ui)
     }
 

@@ -266,7 +266,7 @@ struct ProviderOperatorView: View {
                         .accessibilityIdentifier("provider-unsaved-changes")
                 }
             }
-            .disabled(viewModel.isBusy)
+            .disabled(viewModel.isConfigurationBusy)
             if viewModel.isSaving || viewModel.isFetchingModels {
                 Button("Cancel request", action: viewModel.cancelConfigurationRequest)
                     .accessibilityIdentifier("provider-cancel-configuration")

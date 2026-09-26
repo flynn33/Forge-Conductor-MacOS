@@ -2,6 +2,45 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ManagedContinuityWorkerTests: XCTestCase {
+    func testAutomaticContinuationCarriesExactInstructionContextAndResumeFence() throws {
+        let context = """
+        1. Write alpha.txt.
+        2. Read alpha.txt.
+        3. Write beta.txt.
+        """
+        let input = try ManagedContinuityWorker.automaticContinuationInput(
+            nextAction: "Completed fs_read: alpha",
+            instructionContext: context,
+            instructionContextComplete: true
+        )
+        let messages = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: input) as? [[String: String]]
+        )
+        let content = try XCTUnwrap(messages.first?["content"])
+        XCTAssertTrue(content.contains("Never replay a completed action"))
+        XCTAssertTrue(content.contains("do not call instruction_catalog or instruction_read"))
+        XCTAssertTrue(content.contains("1. Write alpha.txt."))
+        XCTAssertTrue(content.contains("3. Write beta.txt."))
+        XCTAssertTrue(content.contains(JSONSupport.sha256Hex(context)))
+        XCTAssertTrue(content.contains("Completed fs_read: alpha"))
+    }
+
+    func testManagedProgressContinuationRejectsEarlyCompletionAndRediscovery() throws {
+        let input = try ManagedContinuityWorker.managedProgressContinuationInput(
+            nextAction: "Completed action 2",
+            instructionContext: "1. First\n2. Second\n3. Third",
+            instructionContextComplete: true
+        )
+        let messages = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: input) as? [[String: String]]
+        )
+        let content = try XCTUnwrap(messages.first?["content"])
+        XCTAssertTrue(content.contains("do not request completion"))
+        XCTAssertTrue(content.contains("forge_run_status"))
+        XCTAssertTrue(content.contains("do not call instruction_catalog or instruction_read"))
+        XCTAssertTrue(content.contains("3. Third"))
+    }
+
     func testExecutorCancellationStopsActiveContinuityWithoutDiscardingDurableIntent() async throws {
         let fixture = try await makeFixture(label: "cancel-owner")
         defer { fixture.destroy() }
@@ -204,7 +243,9 @@ final class ManagedContinuityWorkerTests: XCTestCase {
             runID: persisted.runID
         )
         let automatic = try XCTUnwrap(pendingAutomatic)
-        let exactInput = try ManagedContinuityWorker.automaticContinuationInput()
+        let exactInput = try ManagedContinuityWorker.automaticContinuationInput(
+            nextAction: resumedRun?.specification.work.nextAction
+        )
         XCTAssertEqual(automatic.intent.inputSHA256, JSONSupport.sha256Hex(exactInput))
         let provider = AutomaticContinuationFixtureProvider()
         let toolExecutor = ContinuityNoopToolExecutor()
@@ -249,6 +290,10 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         XCTAssertEqual(
             firstWork.metadata["provider_response_id"],
             "automatic-response-\(automatic.intent.idempotencyKey)"
+        )
+        XCTAssertEqual(
+            firstWork.metadata["automatic_continuation_consumed_turn_id"],
+            automatic.intent.turnID.uuidString.lowercased()
         )
         // Model a process death after the provider-turn transaction committed but
         // before the coordinator copied the response into run work. Re-executing the
@@ -767,6 +812,9 @@ final class ManagedContinuityWorkerTests: XCTestCase {
                             "source_snapshot_sha256": instructionArtifact.contentSHA256,
                             "provider_configuration_revision": "provider-config-r7",
                             "tool_catalog_revision": "tool-catalog-r11",
+                            "managed_last_tool_name": "fs_write",
+                            "managed_last_tool_call_id": "call-write-step-15",
+                            "managed_last_tool_output": "{\"path\":\"continuity-step-15.txt\"}",
                         ]
                     )
                 ),
@@ -1058,6 +1106,13 @@ final class ManagedContinuityWorkerTests: XCTestCase {
         XCTAssertEqual(artifact.completedDocumentBitmap, Data([1]), point)
         XCTAssertEqual(handoff.openWork.first?["id"] as? String, "restart-recovery", point)
         XCTAssertEqual(handoff.nextActions.first?["action"] as? String, "Continue after bootstrap", point)
+        XCTAssertEqual(handoff.completedWork.first?["id"] as? String, "call-write-step-15", point)
+        XCTAssertEqual(handoff.completedWork.first?["status"] as? String, "completed", point)
+        XCTAssertTrue(
+            try XCTUnwrap(handoff.completedWork.first?["summary"] as? String, point)
+                .contains("continuity-step-15.txt"),
+            point
+        )
     }
 
     private func continuityIntent(_ run: AutonomousRunRecord) -> RunSideEffectIntent {
@@ -1164,7 +1219,12 @@ private actor AutomaticContinuationFixtureProvider: ManagedModelProvider {
 
     func continueSession(_ request: ProviderContinuationRequest) async throws -> ProviderTurn {
         if let existing = receipts[request.idempotencyKey] { return existing }
-        guard request.input == (try ManagedContinuityWorker.automaticContinuationInput()) else {
+        let messages = try JSONSerialization.jsonObject(with: request.input) as? [[String: Any]]
+        guard let messages, messages.count == 1,
+              messages[0]["type"] as? String == "message",
+              messages[0]["role"] as? String == "user",
+              let content = messages[0]["content"] as? String,
+              content.hasPrefix(ManagedContinuityWorker.automaticContinuationPrompt) else {
             throw AutonomyError.intentConflict
         }
         continuationCalls += 1
