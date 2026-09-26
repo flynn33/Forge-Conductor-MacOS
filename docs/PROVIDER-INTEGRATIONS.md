@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.14.6**, build **12**. This document describes the
+Product identity: version **0.14.7**, build **13**. This document describes the
 implemented integration contract; qualification remains evidence-bound per
 host.
 
@@ -10,7 +10,7 @@ selectable provider's toggle provisions or verifies its Forge-owned integration
 before changing the durable selection. Turning on a different provider replaces
 the selection. Turning off the active selector does not create an empty
 selection; choose another provider to switch. An installed integration may
-remain configured while inactive. The selectable providers in 0.14.6 are LM
+remain configured while inactive. The selectable providers in 0.14.7 are LM
 Studio, Claude Code Desktop, and Codex Desktop. Grok
 Build remains visible but non-selectable.
 
@@ -26,7 +26,7 @@ hook path of an active desktop session.
 | LM Studio | `lmstudio` | `managed_provider_push` | Forge sends bounded managed-model turns to the saved LM Studio endpoint and owns the managed run lifecycle. |
 | Claude Code Desktop | `claude-desktop` | `desktop_plugin_pull` | Claude owns the model and desktop session; its Forge plugin, hooks, and MCP registration connect that session to Forge orchestration. |
 | Codex Desktop | `codex-desktop` | `desktop_plugin_pull` | Codex owns the model and desktop task; its Forge plugin, hooks, and MCP registration connect that task to Forge orchestration. |
-| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.6. |
+| Grok Build | `grok-build` | Deferred; non-selectable | Visible for Forge-owned artifact cleanup and forward compatibility. Forge does not admit Grok runs or report Grok ready in 0.14.7. |
 
 The selectable desktop providers are not alternate model APIs inside Forge. Forge does not
 send their prompts, select their model, create a private desktop conversation,

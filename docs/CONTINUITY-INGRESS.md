@@ -7,7 +7,7 @@ CLU controls are implemented, and one complete production-adapter managed
 rollover is verified. Authenticated attachment to an existing desktop
 conversation remains unsupported without a host API. The original checkpoint
 kept product identity at `0.9.0 (1)`; the current repository identity is
-`0.14.6 (12)`.
+`0.14.7 (13)`.
 
 ## Source commit and delivery
 
@@ -506,7 +506,7 @@ Integration tests exercise real source/outbox commits, untouched reads, failed
 writes, interrupted receipts, expiry and shutdown with a fixture provider. Real
 provider pressure rollover and complete G04 qualification remain open. At that
 checkpoint, product identity remained `0.9.0 (1)`; the current repository
-identity is `0.14.6 (12)`.
+identity is `0.14.7 (13)`.
 
 At the September 8 component checkpoint, signed native and selected Release
 suites each passed 293 tests, and the separate packet suite passed 13 tests,

@@ -74,7 +74,7 @@ desktop provider with unfinished tasks cannot be replaced, repaired, or removed
 until those tasks are finished or cancelled through
 Projects → Run Details.
 
-Grok Build remains visible in Provider but is non-selectable in 0.14.6. Its
+Grok Build remains visible in Provider but is non-selectable in 0.14.7. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.

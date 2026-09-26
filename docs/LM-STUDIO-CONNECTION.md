@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.14.6**, build **12**. This connection document does
+Product identity: version **0.14.7**, build **13**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
