@@ -24,6 +24,38 @@ private actor ProviderBusyService: ProviderConfigurationServicing {
     }
 }
 
+private final class ThreadRecordingCredentialProvider:
+    ManagerMutationCredentialProviding,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var observations: [Bool] = []
+
+    func bearerToken() throws -> String {
+        lock.lock()
+        observations.append(Thread.isMainThread)
+        lock.unlock()
+        return String(repeating: "a", count: ManagerControlCredentialStore.tokenCharacterCount)
+    }
+
+    var mainThreadObservations: [Bool] {
+        lock.lock()
+        defer { lock.unlock() }
+        return observations
+    }
+}
+
+private final class CredentialTestURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost))
+    }
+
+    override func stopLoading() {}
+}
+
 private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     private let operatorSnapshot: OperatorSnapshot
     private let integrationSnapshot: ProviderIntegrationsSnapshot
@@ -280,6 +312,46 @@ final class ProviderConfigurationAppTests: XCTestCase {
 
     override func tearDownWithError() throws {
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
+    }
+
+    func testOperatorCredentialIOLeavesMainActorBeforeAuthenticatedRequests() async {
+        let credentials = ThreadRecordingCredentialProvider()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CredentialTestURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 29_991,
+            session: session,
+            credentials: credentials
+        )
+
+        do {
+            _ = try await Task { @MainActor in
+                try await client.providerConfiguration()
+            }.value
+            XCTFail("A closed loopback endpoint unexpectedly accepted the request")
+        } catch {
+            // The connection failure is expected; credential acquisition precedes transport.
+        }
+
+        let dashboardClient = ManagerDashboardClient(
+            host: "127.0.0.1",
+            port: 29_991,
+            session: session,
+            credentials: credentials
+        )
+        do {
+            _ = try await Task { @MainActor in
+                try await dashboardClient.startService()
+            }.value
+            XCTFail("A closed loopback endpoint unexpectedly accepted the request")
+        } catch {
+            // The connection failure is expected; credential acquisition precedes transport.
+        }
+
+        XCTAssertEqual(credentials.mainThreadObservations, [false, false])
     }
 
     private func request(_ revision: String = "0") -> ProviderConfigurationUpdate {
@@ -1173,8 +1245,11 @@ final class ProviderConfigurationAppTests: XCTestCase {
         }
     }
 
-    func testProjectBoundPreparationPublishesEveryTypedReadinessAndRecoveryState() throws {
-        let app = try ForgeApp.bootstrap(home: directory)
+    func testProjectBoundPreparationPublishesEveryTypedReadinessAndRecoveryState() async throws {
+        let bootstrapDirectory = directory
+        let app = try await Task.detached(priority: .userInitiated) {
+            try ForgeApp.bootstrap(home: bootstrapDirectory)
+        }.value
         let projectRoot = directory.appendingPathComponent("readiness-project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         try app.config.update(["allowed_roots": [projectRoot.path]], save: true)

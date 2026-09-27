@@ -35,6 +35,11 @@ private struct ManagerOperatorProjectPersistenceSnapshot: Sendable {
     let continuity: ManagerOperatorContinuityReadModel?
 }
 
+private struct ManagerContinuityHistoryProjectScope: Hashable {
+    let projectID: String
+    let projectGeneration: UInt64
+}
+
 struct ManagerResolvedRunPreparation: Sendable, Equatable {
     let providerID: String
     let adapterID: String
@@ -2473,6 +2478,114 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         } catch SecureFilesystemRecoveryLedgerError.retainedAuthority {
             throw ProjectContextError.retainedFilesystemRecovery(request.projectID)
         }
+    }
+
+    /// Clears settled continuity payload/history without resetting projects,
+    /// advancing generations, or disturbing active/recoverable operations.
+    public func clearContinuityHistory(
+        _ request: ContinuityHistoryClearRequest
+    ) throws -> ContinuityHistoryClearReceipt {
+        switch request.scope {
+        case .operation:
+            guard let operationID = request.operationID,
+                  request.projectID != nil,
+                  request.projectGeneration != nil else {
+                throw AutonomyError.invalidRequest(
+                    "selected continuity deletion requires operation, project, and generation"
+                )
+            }
+            _ = operationID
+        case .allSettled:
+            guard request.operationID == nil,
+                  request.projectID == nil,
+                  request.projectGeneration == nil else {
+                throw AutonomyError.invalidRequest(
+                    "all-settled continuity deletion does not accept a narrower identity"
+                )
+            }
+        }
+
+        let candidates = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.app.projectContexts.repository
+                .settledContinuityHistoryCommands(operationID: request.operationID)
+        }
+        if request.scope == .operation, let command = candidates.first {
+            guard command.operationID == request.operationID,
+                  command.projectID == request.projectID,
+                  command.projectGeneration == request.projectGeneration else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+        }
+
+        let grouped = Dictionary(grouping: candidates) { command in
+            ManagerContinuityHistoryProjectScope(
+                projectID: command.projectID.description,
+                projectGeneration: command.projectGeneration.rawValue
+            )
+        }
+        var clearedOperationCount = 0
+        var clearedProjectCount = 0
+        var deletedRecordCount = 0
+        var retainedOperationCount = 0
+
+        for (scope, commands) in grouped.sorted(by: {
+            ($0.key.projectID, $0.key.projectGeneration)
+                < ($1.key.projectID, $1.key.projectGeneration)
+        }) {
+            let operationIDs = commands.map { $0.operationID.uuidString.lowercased() }
+            let purge: ProjectContinuityHistoryPurgeResult
+            do {
+                purge = try app.projectMemory.repositoryForProject(scope.projectID)
+                    .purgeSettledContinuityHistory(
+                        operationIDs: operationIDs,
+                        requireEveryOperationSettled: request.scope == .operation
+                    )
+            } catch ProjectMemoryError.projectNotFound {
+                // A removed project has no remaining project-local payload/cache;
+                // its stale settled control-plane rows may still be tombstoned.
+                purge = ProjectContinuityHistoryPurgeResult(
+                    clearedOperationIDs: operationIDs,
+                    retainedOperationIDs: [],
+                    deletedRecordCount: 0
+                )
+            }
+            let cleared = Set(purge.clearedOperationIDs)
+            let authorizedCommands = commands.filter {
+                cleared.contains($0.operationID.uuidString.lowercased())
+            }
+            if !authorizedCommands.isEmpty {
+                let deletedCommands = try Self.waitForAsync(timeoutSeconds: 10) {
+                    try await self.app.projectContexts.repository
+                        .deleteSettledContinuityHistoryCommands(authorizedCommands)
+                }
+                clearedOperationCount += deletedCommands
+                clearedProjectCount += 1
+                deletedRecordCount += purge.deletedRecordCount + deletedCommands
+            }
+            retainedOperationCount += purge.retainedOperationIDs.count
+        }
+
+        let receipt = ContinuityHistoryClearReceipt(
+            scope: request.scope,
+            requestedOperationID: request.operationID,
+            clearedOperationCount: clearedOperationCount,
+            clearedProjectCount: clearedProjectCount,
+            deletedRecordCount: deletedRecordCount,
+            retainedOperationCount: retainedOperationCount,
+            completedAt: ISO8601.string(from: app.clock.now())
+        )
+        app.diagnostics.info(
+            "manager_continuity_history_cleared",
+            [
+                "scope": request.scope.rawValue,
+                "cleared_operations": "\(receipt.clearedOperationCount)",
+                "cleared_projects": "\(receipt.clearedProjectCount)",
+                "deleted_records": "\(receipt.deletedRecordCount)",
+                "retained_operations": "\(receipt.retainedOperationCount)",
+            ],
+            category: .manager
+        )
+        return receipt
     }
 
     private static func projectDictionary(_ project: ProjectControlRecord) -> [String: Any] {

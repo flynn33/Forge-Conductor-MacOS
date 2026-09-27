@@ -243,7 +243,7 @@ public final class ForgeApp: @unchecked Sendable {
         _ = stjornarvaldObservations.shutdown(timeoutSeconds: 3)
         let runtimeStopped = DispatchSemaphore(value: 0)
         let reportBox = RuntimeShutdownReportBox()
-        Task.detached { [runtimeJobs] in
+        Task.detached(priority: .high) { [runtimeJobs] in
             reportBox.store(await runtimeJobs.shutdown())
             runtimeStopped.signal()
         }

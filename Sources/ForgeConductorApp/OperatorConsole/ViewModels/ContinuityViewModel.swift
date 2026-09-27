@@ -14,6 +14,7 @@ final class ContinuityViewModel: ObservableObject {
     @Published var selectedRunID: String?
     @Published private(set) var isLoading = false
     @Published private(set) var controlInFlight: OperatorRunControlAction?
+    @Published private(set) var historyClearInFlight: ContinuityHistoryClearScope?
     @Published private(set) var errorMessage: String?
     @Published private(set) var commandErrorMessage: String?
     @Published private(set) var notice: String?
@@ -51,6 +52,15 @@ final class ContinuityViewModel: ObservableObject {
 
     var canRequestCheckpoint: Bool { canRequest(.checkpoint) }
     var canRequestRollover: Bool { canRequest(.rollover) }
+    var canClearSelectedHistory: Bool {
+        guard let selectedOperation else { return false }
+        return !isLoading && controlInFlight == nil && historyClearInFlight == nil
+            && Self.isSettledHistory(selectedOperation)
+    }
+    var canClearAllSettledHistory: Bool {
+        !isLoading && controlInFlight == nil && historyClearInFlight == nil
+            && operations.contains(where: Self.isSettledHistory)
+    }
 
     var eligibilityMessage: String {
         if let action = controlInFlight {
@@ -124,6 +134,30 @@ final class ContinuityViewModel: ObservableObject {
         request(.rollover)
     }
 
+    func clearSelectedHistory() {
+        guard canClearSelectedHistory,
+              let operation = selectedOperation,
+              let operationID = UUID(uuidString: operation.operationID),
+              let projectID = UUID(uuidString: operation.projectID),
+              operation.projectGeneration > 0 else {
+            commandErrorMessage = "Selected continuity history has an invalid stored identity."
+            return
+        }
+        clearHistory(
+            ContinuityHistoryClearRequest(
+                scope: .operation,
+                operationID: operationID,
+                projectID: ProjectID(projectID),
+                projectGeneration: ProjectGeneration(operation.projectGeneration)
+            )
+        )
+    }
+
+    func clearAllSettledHistory() {
+        guard canClearAllSettledHistory else { return }
+        clearHistory(ContinuityHistoryClearRequest(scope: .allSettled))
+    }
+
     private func canRequest(_ action: OperatorRunControlAction) -> Bool {
         guard action == .checkpoint || action == .rollover else { return false }
         return !isLoading && controlInFlight == nil && selectedRunEligibilityIssue == nil
@@ -180,6 +214,47 @@ final class ContinuityViewModel: ObservableObject {
                 commandErrorMessage = error.localizedDescription
             }
             controlInFlight = nil
+            if commandErrorMessage == nil {
+                load()
+            }
+        }
+    }
+
+    private static func isSettledHistory(_ operation: OperatorContinuity) -> Bool {
+        ["completed", "failed", "cancelled", "sealed", "predecessor_sealed"]
+            .contains(operation.state)
+    }
+
+    private func clearHistory(_ request: ContinuityHistoryClearRequest) {
+        historyClearInFlight = request.scope
+        commandErrorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let receipt = try await client.clearContinuityHistory(request)
+                if request.scope == .operation, let operationID = request.operationID {
+                    operations.removeAll {
+                        $0.operationID.caseInsensitiveCompare(
+                            operationID.uuidString
+                        ) == .orderedSame
+                    }
+                } else {
+                    operations.removeAll(where: Self.isSettledHistory)
+                }
+                if receipt.retainedOperationCount > 0 {
+                    notice = "Cleared \(receipt.clearedOperationCount) settled continuity entries. \(receipt.retainedOperationCount) active or recoverable entries were retained."
+                } else if receipt.clearedOperationCount == 0 {
+                    notice = "The selected continuity history was already clear."
+                } else {
+                    notice = receipt.scope == .operation
+                        ? "Cleared the selected continuity history and derived cache."
+                        : "Cleared all settled continuity history and derived caches."
+                }
+            } catch {
+                commandErrorMessage = error.localizedDescription
+            }
+            historyClearInFlight = nil
             if commandErrorMessage == nil {
                 load()
             }

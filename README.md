@@ -7,32 +7,27 @@ supported desktop coding hosts.
 
 | | |
 | --- | --- |
-| **Version** | **0.14.7** |
-| **Build** | **13** |
+| **Version** | **0.15.0** |
+| **Build** | **14** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.7 (13)` is a source/build candidate. The owner
+> **Release status:** `0.15.0 (14)` is a source/build candidate. The owner
 > will ship separately; the working installation is not replaced by this
-> update. Candidate source `74ead97e0b4d2116e80e8482d5736afc94e16372`
-> keeps **Stop Active Work**, earlier/later reorder, and Remove independently
-> identifiable and hittable in the minimum Projects window, cancels an exact
-> active package run and its owned runtime job before that package becomes
-> removable, and keeps the queue visible while those actions are in flight.
-> A signed native acceptance test attached to the named Desktop candidate,
-> started two real LM Studio-backed ordered runs, clicked **Stop Active Work**,
-> observed both runs and packages become `cancelled`, and verified Remove was
-> enabled. It also persisted reorder and removal through Refresh at normal and
-> minimum window sizes. Developer ID distribution, notarization, owner testing,
-> and shipment qualification remain separate; this is not a shipment claim.
+> update. The Continuity view can delete one selected settled operation or all
+> settled operation history and its rebuildable cache without removing project
+> memory or live/recoverable continuity work. Developer ID distribution,
+> notarization, owner testing, and shipment qualification remain separate; this
+> is not a shipment claim.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
 binding. Those warning repairs preserve provider request schemas and canonical
-Xcode target membership; the intentional provider workflow changes are
-described below. The current patch identity is `0.14.7 (13)`.
+Xcode target membership. It also removes the documented app-hosted QoS
+inversions and performs authenticated operator credential I/O outside the main
+actor. The current feature identity is `0.15.0 (14)`.
 
 The revision-3 guided-autonomy remediation is implemented across contextual
 help, compact task admission, native tool selection, automatic completion,
@@ -281,6 +276,12 @@ condition and routes provider faults to **Provider** or run/completion faults to
 manual actions** contains **Save progress
 now** and **Start a fresh session and continue** for administrative recovery or
 an intentionally early rollover.
+
+**Stored continuity data** adds confirmed **Clear Selected…** and **Clear All
+Settled…** actions. They delete terminal operation history and rebuildable
+handoff/projection cache only; active or recoverable operations are retained,
+and project memory, tasks, runs, credentials, and unrelated project data are
+unchanged.
 
 Managed rollover handoffs retain the exact project generation, immutable
 instruction-artifact hashes, bounded document catalog/read coverage, frozen

@@ -6,6 +6,12 @@
 import Foundation
 import SQLite3
 
+struct ProjectContinuityHistoryPurgeResult: Sendable, Equatable {
+    let clearedOperationIDs: [String]
+    let retainedOperationIDs: [String]
+    let deletedRecordCount: Int
+}
+
 struct LegacyContinuityCandidateIdentity: Sendable {
     var pathSHA256: String
     var contentState: String
@@ -829,6 +835,93 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             try removeContinuityProjectionFiles()
         }
         return committed
+    }
+
+    /// Removes only settled V2 continuity history selected by the manager.
+    /// Active operations remain canonical and keep their projection files.
+    func purgeSettledContinuityHistory(
+        operationIDs: [String],
+        requireEveryOperationSettled: Bool,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectContinuityHistoryPurgeResult {
+        let requested = Array(Set(operationIDs.map { $0.lowercased() })).sorted()
+        guard !requested.isEmpty, requested.count <= 4_096,
+              requested.allSatisfy({ UUID(uuidString: $0) != nil }) else {
+            throw ProjectMemoryError.invalidRequest(
+                "continuity history purge requires 1...4096 operation UUIDs"
+            )
+        }
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            let result = try transactionUnlocked(
+                cancellation: cancellation,
+                didCommit: didMutationCommitObserver
+            ) {
+                var cleared: [String] = []
+                var retained: [String] = []
+                var handoffByOperation: [String: String] = [:]
+                var deletedRecordCount = 0
+
+                for operationID in requested {
+                    try cancellation?.checkCancellation()
+                    let stored = try withStatementUnlocked(
+                        """
+                        SELECT handoff_id,state,quarantine_state
+                        FROM rollover_operations
+                        WHERE operation_id=? AND project_id=? AND schema_version=2 LIMIT 1
+                        """
+                    ) { statement -> (handoffID: String, state: String, quarantined: Bool)? in
+                        bind(statement, 1, operationID)
+                        bind(statement, 2, projectID)
+                        guard try stepRow(statement),
+                              let handoffID = text(statement, 0),
+                              let state = text(statement, 1) else {
+                            return nil
+                        }
+                        return (
+                            handoffID,
+                            state,
+                            sqlite3_column_type(statement, 2) != SQLITE_NULL
+                        )
+                    }
+                    guard let stored else {
+                        // A prior interrupted attempt may already have removed the
+                        // canonical rows while leaving the control-plane command.
+                        cleared.append(operationID)
+                        continue
+                    }
+                    guard stored.state == ContinuityState.predecessorSealed.rawValue
+                            || stored.quarantined else {
+                        retained.append(operationID)
+                        continue
+                    }
+                    handoffByOperation[operationID] = stored.handoffID
+                    deletedRecordCount += try deleteContinuityHistoryRowsUnlocked(
+                        operationID: operationID,
+                        handoffID: stored.handoffID
+                    )
+                    cleared.append(operationID)
+                }
+
+                if requireEveryOperationSettled, !retained.isEmpty {
+                    throw ProjectMemoryError.conflict(
+                        "selected continuity history is still active or recoverable"
+                    )
+                }
+                return (
+                    ProjectContinuityHistoryPurgeResult(
+                        clearedOperationIDs: cleared,
+                        retainedOperationIDs: retained,
+                        deletedRecordCount: deletedRecordCount
+                    ),
+                    handoffByOperation
+                )
+            }
+            try refreshContinuityProjectionsAfterHistoryPurgeUnlocked(
+                operationIDs: result.0.clearedOperationIDs,
+                knownHandoffs: result.1
+            )
+            return result.0
+        }
     }
 
     public func exportRecords(
@@ -5056,6 +5149,89 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         try withStatementUnlocked("DELETE FROM \(table) WHERE project_id=?") { statement in
             bind(statement, 1, projectID)
             try stepDone(statement)
+        }
+    }
+
+    private func deleteContinuityHistoryRowsUnlocked(
+        operationID: String,
+        handoffID: String
+    ) throws -> Int {
+        var deleted = 0
+        func remove(_ sql: String, _ values: [String]) throws {
+            try withStatementUnlocked(sql) { statement in
+                for (offset, value) in values.enumerated() {
+                    bind(statement, Int32(offset + 1), value)
+                }
+                try stepDone(statement)
+                deleted += Int(sqlite3_changes(db))
+            }
+        }
+        try remove(
+            "DELETE FROM continuity_projection_repairs WHERE project_id=? AND record_id IN (?,?)",
+            [projectID, operationID, handoffID]
+        )
+        try remove(
+            "DELETE FROM rollover_transitions WHERE project_id=? AND operation_id=?",
+            [projectID, operationID]
+        )
+        try remove(
+            "DELETE FROM rollover_operations WHERE project_id=? AND operation_id=? AND schema_version=2",
+            [projectID, operationID]
+        )
+        try remove(
+            "DELETE FROM continuity_handoffs WHERE project_id=? AND operation_id=? AND handoff_id=? AND schema_version='2.0'",
+            [projectID, operationID, handoffID]
+        )
+        return deleted
+    }
+
+    private func refreshContinuityProjectionsAfterHistoryPurgeUnlocked(
+        operationIDs: [String],
+        knownHandoffs: [String: String]
+    ) throws {
+        let fileManager = FileManager.default
+        let operations = continuityDirectory.appendingPathComponent(
+            "operations",
+            isDirectory: true
+        )
+        let handoffs = continuityDirectory.appendingPathComponent(
+            "handoffs",
+            isDirectory: true
+        )
+        for operationID in operationIDs {
+            let operationURL = operations.appendingPathComponent("\(operationID).json")
+            var handoffID = knownHandoffs[operationID]
+            if handoffID == nil,
+               let attributes = try? fileManager.attributesOfItem(atPath: operationURL.path),
+               let size = attributes[.size] as? NSNumber,
+               size.intValue <= ContinuityHandoffV2.maximumEncodedBytes,
+               let data = try? Data(contentsOf: operationURL),
+               let object = try? JSONSupport.object(from: data),
+               let projectedHandoffID = object["handoff_id"] as? String,
+               UUID(uuidString: projectedHandoffID) != nil {
+                handoffID = projectedHandoffID.lowercased()
+            }
+            if fileManager.fileExists(atPath: operationURL.path) {
+                try fileManager.removeItem(at: operationURL)
+            }
+            if let handoffID {
+                let handoffURL = handoffs.appendingPathComponent("\(handoffID).json")
+                if fileManager.fileExists(atPath: handoffURL.path) {
+                    try fileManager.removeItem(at: handoffURL)
+                }
+            }
+        }
+
+        for name in ["CURRENT.json", "LATEST"] {
+            let pointer = continuityDirectory.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: pointer.path) {
+                try fileManager.removeItem(at: pointer)
+            }
+        }
+        if let current = try continuityCurrentOperationV2Unlocked(),
+           let handoff = try continuityHandoffV2Unlocked(current.handoffID) {
+            try writeHandoffProjection(handoff, latestHandoffID: current.handoffID)
+            try writeOperationProjection(current, current: current)
         }
     }
 

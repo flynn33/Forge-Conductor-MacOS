@@ -352,6 +352,175 @@ final class ContinuityV2Tests: XCTestCase {
         await restarted.close()
     }
 
+    func testSettledContinuityHistoryPurgeRemovesCanonicalPayloadAndProjectionOnly() throws {
+        let fixture = try makeMemoryFixture(label: "settled-history-purge")
+        defer {
+            fixture.memory.closeAll()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let repository = try fixture.memory.repositoryForProject(fixture.projectID)
+        let firstHandoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let first = try repository.continuityCreateOperationV2(
+            handoff: firstHandoff,
+            predecessorSessionID: "predecessor",
+            predecessorProviderResponseID: "resp-predecessor",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "history-purge-first"
+        )
+        XCTAssertTrue(
+            try repository.continuityCancelOperationV2(
+                operationID: first.operationID,
+                runID: first.runID
+            )
+        )
+
+        let secondHandoff = try makeHandoffV2(
+            projectID: fixture.projectID,
+            generation: 1,
+            runID: UUID().uuidString.lowercased(),
+            mode: .managedAutonomous
+        )
+        let second = try repository.continuityCreateOperationV2(
+            handoff: secondHandoff,
+            predecessorSessionID: "predecessor",
+            predecessorProviderResponseID: "resp-predecessor",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "history-purge-second"
+        )
+
+        XCTAssertThrowsError(
+            try repository.purgeSettledContinuityHistory(
+                operationIDs: [second.operationID],
+                requireEveryOperationSettled: true
+            )
+        ) { error in
+            XCTAssertEqual((error as? ProjectMemoryError)?.code, "conflict")
+        }
+
+        let result = try repository.purgeSettledContinuityHistory(
+            operationIDs: [first.operationID],
+            requireEveryOperationSettled: true
+        )
+        XCTAssertEqual(result.clearedOperationIDs, [first.operationID])
+        XCTAssertTrue(result.retainedOperationIDs.isEmpty)
+        XCTAssertGreaterThanOrEqual(result.deletedRecordCount, 3)
+        XCTAssertNil(try repository.continuityOperationV2(id: first.operationID))
+        XCTAssertNil(try repository.continuityHandoffV2(id: firstHandoff.handoffID))
+        XCTAssertEqual(try repository.continuityTransitionCount(operationID: first.operationID), 0)
+        XCTAssertEqual(
+            try repository.continuityOperationV2(id: second.operationID)?.operationID,
+            second.operationID
+        )
+
+        let continuity = repository.directory.appendingPathComponent(
+            "continuity",
+            isDirectory: true
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: continuity.appendingPathComponent(
+                    "operations/\(first.operationID).json"
+                ).path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: continuity.appendingPathComponent(
+                    "handoffs/\(firstHandoff.handoffID).json"
+                ).path
+            )
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: continuity.appendingPathComponent(
+                    "operations/\(second.operationID).json"
+                ).path
+            )
+        )
+        let current = try JSONSupport.object(
+            from: Data(contentsOf: continuity.appendingPathComponent("CURRENT.json"))
+        )
+        XCTAssertEqual(current["operation_id"] as? String, second.operationID)
+
+        let replay = try repository.purgeSettledContinuityHistory(
+            operationIDs: [first.operationID],
+            requireEveryOperationSettled: true
+        )
+        XCTAssertEqual(replay.clearedOperationIDs, [first.operationID])
+        XCTAssertEqual(replay.deletedRecordCount, 0)
+    }
+
+    func testControlPlaneDeletesOnlySettledContinuityHistoryAndTombstonesReplay() async throws {
+        let root = temporaryRoot("control-history-purge")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let repository = try ProjectControlPlaneRepository(
+            databaseURL: root.appendingPathComponent("control-plane.sqlite3")
+        )
+        defer { Task { await repository.close() } }
+        let projectID = ProjectID()
+        let runID = RunID()
+        let operationID = UUID()
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        _ = try await repository.registerProjectUnchecked(
+            projectID: projectID,
+            displayName: "Continuity History Purge",
+            canonicalRoot: projectRoot
+        )
+        try await repository.reserveContinuityRun(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Delete settled continuity history",
+            mode: .managedAutonomous
+        )
+        let request = ContinuityCommandRequest(
+            operationID: operationID,
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            type: .rollover,
+            requestedBy: "operator-test",
+            reason: "settled history cleanup",
+            idempotencyKey: "control-history-purge",
+            payloadSHA256: String(repeating: "c", count: 64)
+        )
+        let queued = try await repository.enqueueContinuityCommand(request)
+        await XCTAssertThrowsContinuityErrorAsync {
+            _ = try await repository.deleteSettledContinuityHistoryCommands([queued])
+        }
+        let claimedValue = try await repository.claimNextContinuityCommand()
+        let claimed = try XCTUnwrap(claimedValue)
+        _ = try await repository.transitionContinuityCommand(
+            commandID: claimed.commandID,
+            expected: .claimed,
+            to: .running
+        )
+        let completed = try await repository.transitionContinuityCommand(
+            commandID: claimed.commandID,
+            expected: .running,
+            to: .completed
+        )
+
+        let candidates = try await repository.settledContinuityHistoryCommands(
+            operationID: operationID
+        )
+        XCTAssertEqual(candidates, [completed])
+        let deleted = try await repository.deleteSettledContinuityHistoryCommands(candidates)
+        XCTAssertEqual(deleted, 1)
+        let deletedCommand = try await repository.continuityCommand(operationID: operationID)
+        XCTAssertNil(deletedCommand)
+        await XCTAssertThrowsContinuityErrorAsync {
+            _ = try await repository.enqueueContinuityCommand(request)
+        }
+    }
+
     func testOperatorContinuityReadModelBindsBoundedCheckpointAndAcknowledgementEvidence() async throws {
         let root = temporaryRoot("operator-continuity-evidence")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -3211,4 +3380,17 @@ private func legacyJSONFiles(in directory: URL) throws -> [URL] {
 
 private func jsonFileCount(in directory: URL) throws -> Int {
     try legacyJSONFiles(in: directory).count
+}
+
+private func XCTAssertThrowsContinuityErrorAsync(
+    _ expression: () async throws -> Void,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    do {
+        try await expression()
+        XCTFail("Expected error", file: file, line: line)
+    } catch {
+        // Expected.
+    }
 }

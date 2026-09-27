@@ -1500,6 +1500,89 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(request["project_generation"] as? UInt64, 3)
     }
 
+    func testContinuityHistoryClearUsesTypedSelectedAndAllSettledScopes() async throws {
+        let operationID = UUID()
+        let projectID = ProjectID()
+        let completedAt = "2026-09-27T12:00:00Z"
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/continuity/history/clear": try JSONEncoder().encode(
+                ContinuityHistoryClearReceipt(
+                    scope: .operation,
+                    requestedOperationID: operationID,
+                    clearedOperationCount: 1,
+                    clearedProjectCount: 1,
+                    deletedRecordCount: 5,
+                    retainedOperationCount: 0,
+                    completedAt: completedAt
+                )
+            ),
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OperatorProjectContractURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = OperatorManagerHTTPClient(
+            host: "127.0.0.1",
+            port: 8_899,
+            session: session,
+            credentials: OperatorProjectContractCredential()
+        )
+
+        let selected = try await client.clearContinuityHistory(
+            ContinuityHistoryClearRequest(
+                scope: .operation,
+                operationID: operationID,
+                projectID: projectID,
+                projectGeneration: .initial
+            )
+        )
+        XCTAssertEqual(selected.clearedOperationCount, 1)
+        XCTAssertEqual(selected.deletedRecordCount, 5)
+        let selectedBody = try JSONSupport.object(
+            from: try XCTUnwrap(
+                OperatorProjectContractURLProtocol.requestedBodies(
+                    path: "/api/manager/continuity/history/clear"
+                ).first
+            )
+        )
+        XCTAssertEqual(
+            Set(selectedBody.keys),
+            ["scope", "operation_id", "project_id", "project_generation"]
+        )
+        XCTAssertEqual(selectedBody["scope"] as? String, "operation")
+        XCTAssertEqual(selectedBody["operation_id"] as? String, operationID.uuidString.lowercased())
+        XCTAssertEqual(selectedBody["project_id"] as? String, projectID.description)
+        XCTAssertEqual(selectedBody["project_generation"] as? UInt64, 1)
+
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/continuity/history/clear": try JSONEncoder().encode(
+                ContinuityHistoryClearReceipt(
+                    scope: .allSettled,
+                    requestedOperationID: nil,
+                    clearedOperationCount: 4,
+                    clearedProjectCount: 2,
+                    deletedRecordCount: 18,
+                    retainedOperationCount: 1,
+                    completedAt: completedAt
+                )
+            ),
+        ])
+        let all = try await client.clearContinuityHistory(
+            ContinuityHistoryClearRequest(scope: .allSettled)
+        )
+        XCTAssertEqual(all.clearedOperationCount, 4)
+        XCTAssertEqual(all.retainedOperationCount, 1)
+        let allBody = try JSONSupport.object(
+            from: try XCTUnwrap(
+                OperatorProjectContractURLProtocol.requestedBodies(
+                    path: "/api/manager/continuity/history/clear"
+                ).first
+            )
+        )
+        XCTAssertEqual(Set(allBody.keys), ["scope"])
+        XCTAssertEqual(allBody["scope"] as? String, "all_settled")
+    }
+
     func testInstructionQueueClientLoadsStableBoundedPages() async throws {
         let projectID = UUID().uuidString.lowercased()
         func package(_ position: Int) -> [String: Any] {

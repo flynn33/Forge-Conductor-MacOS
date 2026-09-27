@@ -10,8 +10,23 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Added
+
+- Added confirmed Continuity cleanup controls for deleting one selected settled
+  operation or every settled operation across registered project generations.
+  Cleanup removes the operation's canonical handoff/history rows and rebuildable
+  projection cache, tombstones replay of the cleared operation, retains active
+  or recoverable work, and does not clear project memory, tasks, runs,
+  credentials, or unrelated project data.
+- Advanced the product identity to `0.15.0 (14)` across repository authorities,
+  runtime constants, tests, and every Xcode build configuration.
+
 ### Fixed
 
+- Removed the documented app-hosted Thread Performance Checker inversions by
+  matching diagnostic delivery, shutdown, and project-context waiter QoS to
+  their bounded callers. Authenticated operator credential file work also now
+  leaves the main actor before request construction.
 - Made **Stop Active Work** fence automatic queue advancement, quiesce and
   durably cancel the exact active run, and reconcile its package to a terminal
   state before returning it to the removable/reorderable UI. A transient
@@ -44,6 +59,14 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- The final tree passed 1,889 Swift tests with 12 explicit skips and zero
+  failures, 111/111 app-hosted tests with an empty runtime-warning list, and
+  both signed native Continuity cleanup UI flows. Both SwiftPM products and the
+  canonical Apple Development-signed Debug app built. Bundle/CLI identity,
+  strict deep signing, repository hygiene, and whitespace checks passed. The
+  UI runner's Security trust diagnostic reproduces in its unrelated minimal
+  launch case at the first accessibility snapshot and did not enter either
+  Forge signature validator; it is retained as test-harness evidence.
 - Candidate source `74ead97e0b4d2116e80e8482d5736afc94e16372`
   passed all 37 instruction-queue tests and all 18 Projects view-model tests.
   A new integration case started a real run-owned `sleep 30` runtime job,
@@ -88,6 +111,38 @@ Product versions do not by themselves claim shipment.
 - Strict deep signing passes for the installed development build. Gatekeeper
   distribution assessment rejects it because it is not a notarized Developer
   ID artifact; no public-distribution or shipment claim is made.
+
+## [0.15.0] — 2026-09-27 (build 14 continuity retention controls)
+
+### Added
+
+- Added confirmed Continuity cleanup controls for deleting one selected settled
+  operation or every settled operation across registered project generations.
+  Cleanup removes the operation's canonical handoff/history rows and rebuildable
+  projection cache, tombstones replay of the cleared operation, retains active
+  or recoverable work, and does not clear project memory, tasks, runs,
+  credentials, or unrelated project data.
+
+### Changed
+
+- Advanced the development product identity to `0.15.0 (14)` across repository
+  authorities, runtime constants, tests, and every Xcode build configuration.
+  This identity change makes no shipment claim.
+
+### Fixed
+
+- Removed app-hosted priority inversions in diagnostic delivery, shutdown, and
+  project-context waiting, and moved authenticated operator credential I/O off
+  the main actor before constructing loopback requests.
+
+### Verification
+
+- The complete Swift regression passed 1,889 tests with 12 explicit skips and
+  zero failures. The complete app-hosted suite passed 111/111 with zero skips
+  and no structured runtime warnings. Both native Continuity cleanup UI flows,
+  both SwiftPM products, the canonical signed Debug app, strict deep signature
+  validation, repository hygiene, version identity, and whitespace checks
+  passed. Distribution and shipment remain owner actions.
 
 ## [0.14.7] — 2026-09-26 (build 13 identity correction)
 

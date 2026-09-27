@@ -470,10 +470,235 @@ final class ProjectContentClearTests: XCTestCase {
         XCTAssertNotNil(activeRunAfterRejection)
     }
 
+    func testManagerClearsSelectedSettledContinuityWithoutDeletingTaskOrMemory() async throws {
+        let app = try configuredApp()
+        defer { app.shutdown() }
+        let manager = ManagerNode(app: app)
+        let projectID = try register(projectA, named: "Continuity History", using: manager)
+        let runID = RunID()
+        try await app.projectContexts.repository.reserveContinuityRun(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Preserve the task while clearing settled continuity history",
+            mode: .managedAutonomous
+        )
+        let handoff = try continuityHandoff(projectID: projectID, runID: runID)
+        let memory = try app.projectMemory.repositoryForProject(projectID.description)
+        let operation = try memory.continuityCreateOperationV2(
+            handoff: handoff,
+            predecessorSessionID: "history-predecessor",
+            predecessorProviderResponseID: "history-response",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "history-clear-\(handoff.operationID)"
+        )
+        XCTAssertTrue(
+            try memory.continuityCancelOperationV2(
+                operationID: operation.operationID,
+                runID: operation.runID
+            )
+        )
+        let operationUUID = try XCTUnwrap(UUID(uuidString: operation.operationID))
+        let command = try await app.projectContexts.repository.enqueueContinuityCommand(
+            ContinuityCommandRequest(
+                operationID: operationUUID,
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                type: .rollover,
+                requestedBy: "operator-test",
+                reason: "settled fixture",
+                idempotencyKey: "history-command-\(operation.operationID)",
+                payloadSHA256: String(repeating: "d", count: 64)
+            )
+        )
+        let claimedValue = try await app.projectContexts.repository
+            .claimNextContinuityCommand()
+        let claimed = try XCTUnwrap(claimedValue)
+        XCTAssertEqual(claimed.commandID, command.commandID)
+        _ = try await app.projectContexts.repository.transitionContinuityCommand(
+            commandID: claimed.commandID,
+            expected: .claimed,
+            to: .running
+        )
+        _ = try await app.projectContexts.repository.transitionContinuityCommand(
+            commandID: claimed.commandID,
+            expected: .running,
+            to: .completed
+        )
+        let remembered = try memory.remember(
+            ProjectMemoryWrite(
+                kind: "decision",
+                title: "Preserved memory",
+                summary: "Continuity history clearing must preserve ordinary memory"
+            )
+        ).0
+
+        let receipt = try manager.clearContinuityHistory(
+            ContinuityHistoryClearRequest(
+                scope: .operation,
+                operationID: operationUUID,
+                projectID: projectID,
+                projectGeneration: .initial
+            )
+        )
+
+        XCTAssertEqual(receipt.clearedOperationCount, 1)
+        XCTAssertEqual(receipt.clearedProjectCount, 1)
+        XCTAssertEqual(receipt.retainedOperationCount, 0)
+        XCTAssertNil(try memory.continuityOperationV2(id: operation.operationID))
+        XCTAssertNil(try memory.continuityHandoffV2(id: handoff.handoffID))
+        XCTAssertNotNil(try memory.get(id: remembered.id))
+        let preservedRun = try await app.projectContexts.repository.autonomousRun(runID)
+        XCTAssertNotNil(preservedRun)
+        let removedCommand = try await app.projectContexts.repository.continuityCommand(
+            operationID: operationUUID
+        )
+        XCTAssertNil(removedCommand)
+
+        let secondHandoff = try continuityHandoff(projectID: projectID, runID: runID)
+        let secondOperation = try memory.continuityCreateOperationV2(
+            handoff: secondHandoff,
+            predecessorSessionID: "history-predecessor",
+            predecessorProviderResponseID: "history-response",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "history-clear-\(secondHandoff.operationID)"
+        )
+        XCTAssertTrue(
+            try memory.continuityCancelOperationV2(
+                operationID: secondOperation.operationID,
+                runID: secondOperation.runID
+            )
+        )
+        let secondOperationUUID = try XCTUnwrap(
+            UUID(uuidString: secondOperation.operationID)
+        )
+        let secondCommand = try await app.projectContexts.repository
+            .enqueueContinuityCommand(
+                ContinuityCommandRequest(
+                    operationID: secondOperationUUID,
+                    runID: runID,
+                    projectID: projectID,
+                    projectGeneration: .initial,
+                    type: .checkpoint,
+                    requestedBy: "operator-test",
+                    reason: "all-settled fixture",
+                    idempotencyKey: "history-command-\(secondOperation.operationID)",
+                    payloadSHA256: String(repeating: "e", count: 64)
+                )
+            )
+        let secondClaimedValue = try await app.projectContexts.repository
+            .claimNextContinuityCommand()
+        let secondClaimed = try XCTUnwrap(secondClaimedValue)
+        XCTAssertEqual(secondClaimed.commandID, secondCommand.commandID)
+        _ = try await app.projectContexts.repository.transitionContinuityCommand(
+            commandID: secondClaimed.commandID,
+            expected: .claimed,
+            to: .running
+        )
+        _ = try await app.projectContexts.repository.transitionContinuityCommand(
+            commandID: secondClaimed.commandID,
+            expected: .running,
+            to: .completed
+        )
+
+        let allReceipt = try manager.clearContinuityHistory(
+            ContinuityHistoryClearRequest(scope: .allSettled)
+        )
+        XCTAssertEqual(allReceipt.clearedOperationCount, 1)
+        XCTAssertEqual(allReceipt.clearedProjectCount, 1)
+        let secondRemovedCommand = try await app.projectContexts.repository
+            .continuityCommand(operationID: secondOperationUUID)
+        XCTAssertNil(secondRemovedCommand)
+        XCTAssertNil(
+            try memory.continuityOperationV2(id: secondOperation.operationID)
+        )
+    }
+
     private func configuredApp() throws -> ForgeApp {
         let app = try ForgeApp.bootstrap(home: home)
         _ = try app.config.update(["allowed_roots": [root.path]], save: true)
         return app
+    }
+
+    private func continuityHandoff(
+        projectID: ProjectID,
+        runID: RunID
+    ) throws -> ContinuityHandoffV2 {
+        try ContinuityHandoffV2(
+            operationID: UUID().uuidString.lowercased(),
+            project: [
+                "project_id": projectID.description,
+                "generation": 1,
+                "display_name": "Continuity History",
+                "repository_root": projectA.path,
+                "branch": "main",
+                "commit": "fixture",
+                "dirty_summary": [] as [String],
+            ],
+            run: [
+                "run_id": runID.description,
+                "continuity_mode": ContinuityMode.managedAutonomous.rawValue,
+                "assignment_id": "continuity-history-fixture",
+            ],
+            predecessorSession: [
+                "session_id": "history-predecessor",
+                "provider_id": "lmstudio-local",
+                "provider_response_id": "history-response",
+                "adapter_id": "forge.native-session-host",
+                "model": "fixture/model",
+            ],
+            mission: "Clear settled continuity history",
+            constraints: ["Preserve the task and ordinary memory"],
+            currentWork: [
+                "phase_id": "continuity-history",
+                "work_item_id": "selected-clear",
+                "summary": "Verify selected continuity deletion",
+                "active_files": [] as [String],
+            ],
+            completedWork: [[
+                "id": "fixture-ready",
+                "summary": "The continuity fixture was prepared",
+                "status": "verified",
+            ]],
+            openWork: [[
+                "id": "fixture-clear",
+                "summary": "Clear the settled continuity entry",
+                "status": "open",
+            ]],
+            decisions: [[
+                "decision": "Preserve the task and ordinary memory",
+                "evidence": ["continuity-history-fixture"],
+            ]],
+            validation: [
+                "passed_gates": [] as [String],
+                "open_gates": [] as [String],
+                "commands": [] as [[String: Any]],
+            ],
+            memoryReferences: [],
+            evidenceReferences: [],
+            nextActions: [[
+                "order": 0,
+                "action": "Clear the settled entry",
+                "command": "",
+                "success_condition": "The entry is absent and the task remains",
+                "replay_class": "idempotent",
+            ]],
+            contextBudget: [
+                "capacity": 32_768,
+                "used": 28_000,
+                "reserved": 4_096,
+                "remaining": 672,
+                "source": "provider_exact",
+                "confidence": 1.0,
+                "action": "rollover",
+                "trigger": "fixture",
+            ],
+            bootstrap: [
+                "nonce": String(repeating: "a", count: 64),
+                "acknowledgement_contract_version": 2,
+            ]
+        ).validated()
     }
 
     private func register(

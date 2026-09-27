@@ -701,7 +701,10 @@ public final class ProjectContextService: @unchecked Sendable {
         let box = BlockingProjectContextResult<Value>()
         // The synchronous caller may own the main actor. Run independently, retain
         // the handle, and reconcile it before returning on cancellation or timeout.
-        let task = Task.detached {
+        // The synchronous edge is commonly entered from a user-initiated tool
+        // request. Match that priority so the bounded wait cannot invert QoS
+        // while the actor-owned commit completes.
+        let task = Task.detached(priority: .high) {
             defer { self.operationAdmission.signal() }
             do {
                 box.store(.success(try await operation(operationControl)))

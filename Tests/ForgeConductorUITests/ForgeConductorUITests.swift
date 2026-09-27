@@ -1295,6 +1295,60 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(element(eventMetadata, contains: "continuity_successor_created"))
     }
 
+    func testContinuityHistoryCanBeClearedIndividuallyWithConfirmation() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            includeContinuityOperation: true,
+            continuityOperationState: "completed"
+        )
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+        let row = app.descendants(matching: .any)[
+            "continuity-operation-row-\(fixture.continuityOperationID)"
+        ]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        let clear = app.buttons["continuity-clear-selected"]
+        XCTAssertTrue(waitForEnabled(clear, timeout: 5))
+        makeHittable(clear)
+        clear.click()
+        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 3))
+        let confirmAction = app.sheets.buttons["Clear Selected"]
+        XCTAssertTrue(confirmAction.waitForExistence(timeout: 3))
+        confirmAction.click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) { !row.exists })
+        XCTAssertEqual(fixture.continuityHistoryClearScopes, ["operation"])
+        XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
+    }
+
+    func testContinuityHistoryCanClearAllSettledEntriesWithConfirmation() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            includeContinuityOperation: true,
+            continuityOperationState: "completed"
+        )
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+        let clear = app.buttons["continuity-clear-all-settled"]
+        XCTAssertTrue(waitForEnabled(clear, timeout: 5))
+        makeHittable(clear)
+        clear.click()
+        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 3))
+        let confirmAction = app.sheets.buttons["Clear All Settled"]
+        XCTAssertTrue(confirmAction.waitForExistence(timeout: 3))
+        confirmAction.click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            !app.descendants(matching: .any)["continuity-operation-list"].exists
+        })
+        XCTAssertEqual(fixture.continuityHistoryClearScopes, ["all_settled"])
+        XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
+    }
+
     func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
@@ -2279,6 +2333,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private let dropRelinkResponseCount: Int
     private let rejectFirstRelinkResponse: Bool
     private let includeContinuityOperation: Bool
+    private let continuityOperationState: String
     private var mutableRunState: String
     private var mutableDeletedRun = false
     private var mutableDeletionRequestCount = 0
@@ -2289,6 +2344,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableStartRequestBodies: [Data] = []
     private var mutableControlActions: [String] = []
     private var mutableRejectNextContinuityCommand = false
+    private var mutableContinuityOperationCleared = false
+    private var mutableContinuityHistoryClearScopes: [String] = []
     private var mutableAcceptedStart = false
     private var mutableAcceptedStartRunID: String?
     private var mutableShellEnabled = true
@@ -2355,6 +2412,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var startRequestRunIDs: [String] { locked { mutableStartRequestRunIDs } }
     var startRequestBodies: [Data] { locked { mutableStartRequestBodies } }
     var controlActions: [String] { locked { mutableControlActions } }
+    var continuityHistoryClearScopes: [String] {
+        locked { mutableContinuityHistoryClearScopes }
+    }
     var acceptedStartRunID: String { locked { mutableAcceptedStartRunID ?? "" } }
     var shellEnabled: Bool { locked { mutableShellEnabled } }
     var allowedRoots: [String] { locked { mutableAllowedRoots } }
@@ -2424,6 +2484,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         rejectFirstRelinkResponse: Bool = false,
         initialRunState: String = "running",
         includeContinuityOperation: Bool = false,
+        continuityOperationState: String = "awaiting_durable_acknowledgement",
         activeInstructionQueue: Bool = false
     ) throws {
         self.failStartResponse = failStartResponse
@@ -2434,6 +2495,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         )
         self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
         self.includeContinuityOperation = includeContinuityOperation
+        self.continuityOperationState = continuityOperationState
         mutableRunState = initialRunState
         mutableInstructionQueueRevision = 1
         mutableInstructionQueueRunning = activeInstructionQueue
@@ -2620,6 +2682,39 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             respond(status: 200, object: managerSettings(), to: connection)
         case "/api/manager/operator/snapshot":
             respond(status: 200, object: snapshot(), to: connection)
+        case "/api/manager/continuity/history/clear":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body)
+                    as? [String: Any],
+                  let scope = object["scope"] as? String,
+                  ["operation", "all_settled"].contains(scope),
+                  (scope == "all_settled" || (
+                    object["operation_id"] as? String == continuityOperationID
+                        && object["project_id"] as? String == projectID
+                        && (object["project_generation"] as? NSNumber)?.uint64Value == 4
+                  )) else {
+                respond(
+                    status: 401,
+                    object: ["message": "missing exact continuity clear authority"],
+                    to: connection
+                )
+                return
+            }
+            locked {
+                mutableContinuityOperationCleared = true
+                mutableContinuityHistoryClearScopes.append(scope)
+                mutableMutationAuthorizationCount += 1
+            }
+            respond(status: 200, object: [
+                "scope": scope,
+                "requested_operation_id": scope == "operation"
+                    ? continuityOperationID : NSNull(),
+                "cleared_operation_count": 1,
+                "cleared_project_count": 1,
+                "deleted_record_count": 5,
+                "retained_operation_count": 0,
+                "completed_at": "2026-09-27T12:00:00Z",
+            ], to: connection)
         case "/api/manager/operator/activity":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   exactQuery(
@@ -3424,7 +3519,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 at: 0
             )
         }
-        let continuityOperations = includeContinuityOperation ? [continuityOperation()] : []
+        let continuityOperations = includeContinuityOperation
+            && !locked({ mutableContinuityOperationCleared })
+            ? [continuityOperation()] : []
         let events: [[String: Any]]
         if includeActivity {
             events = managedActivityEvents()
@@ -3466,7 +3563,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "project_generation": 4,
             "run_id": runID,
             "mode": "managed_autonomous",
-            "state": "awaiting_durable_acknowledgement",
+            "state": continuityOperationState,
             "control_state": "successor_bootstrapping",
             "checkpoint_id": "fixture-checkpoint",
             "handoff_id": "fixture-handoff",

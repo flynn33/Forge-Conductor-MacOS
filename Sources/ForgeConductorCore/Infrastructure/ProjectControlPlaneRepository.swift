@@ -7966,6 +7966,141 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Returns only operator-visible history that is no longer claimable or
+    /// retryable. Canonical project memory performs the final settled-state check.
+    public func settledContinuityHistoryCommands(
+        operationID: UUID? = nil,
+        limit: Int = 4_096
+    ) throws -> [ContinuityCommand] {
+        guard (1...4_096).contains(limit) else {
+            throw AutonomyError.invalidRequest(
+                "continuity history deletion limit must be between 1 and 4096"
+            )
+        }
+        let connection = try requiredConnection()
+        let terminal = "('completed','failed','cancelled')"
+        if let operationID {
+            guard let command = try continuityCommandByOperationUnlocked(
+                operationID: operationID,
+                connection: connection
+            ) else {
+                return []
+            }
+            guard [.completed, .failed, .cancelled].contains(command.state) else {
+                throw AutonomyError.invalidRequest(
+                    "Active or retryable continuity cannot be cleared"
+                )
+            }
+            return [command]
+        }
+        let commands = try connection.all(
+            Self.continuityCommandSelect
+                + " WHERE state IN \(terminal) ORDER BY updated_at,command_id LIMIT ?",
+            bindings: [.int64(Int64(limit + 1))],
+            map: Self.decodeContinuityCommand
+        )
+        guard commands.count <= limit else {
+            throw AutonomyError.invalidRequest(
+                "Continuity history exceeds the bounded one-action deletion limit"
+            )
+        }
+        return commands
+    }
+
+    /// Removes exact settled command rows after project memory has removed the
+    /// corresponding canonical payloads. Payload-free tombstones prevent replay.
+    @discardableResult
+    public func deleteSettledContinuityHistoryCommands(
+        _ commands: [ContinuityCommand]
+    ) throws -> Int {
+        guard !commands.isEmpty, commands.count <= 4_096,
+              Set(commands.map(\.operationID)).count == commands.count else {
+            throw AutonomyError.invalidRequest(
+                "continuity history deletion requires unique settled commands"
+            )
+        }
+        let connection = try requiredConnection()
+        return try connection.transaction {
+            let retainedTombstones = try connection.scalarInt(
+                "SELECT COUNT(*) FROM continuity_authority_tombstones"
+            )
+            var newTombstones = 0
+            for requested in commands {
+                guard [.completed, .failed, .cancelled].contains(requested.state),
+                      let current = try continuityCommandByOperationUnlocked(
+                        operationID: requested.operationID,
+                        connection: connection
+                      ),
+                      current == requested else {
+                    throw AutonomyError.invalidRequest(
+                        "Continuity history changed before it could be cleared"
+                    )
+                }
+                guard let run = try autonomousRunUnlocked(
+                    requested.runID,
+                    connection: connection
+                ), run.projectID == requested.projectID,
+                   run.projectGeneration == requested.projectGeneration else {
+                    throw ProjectContextError.projectScopeMismatch
+                }
+                let exists = try connection.scalarInt(
+                    "SELECT COUNT(*) FROM continuity_authority_tombstones WHERE kind='operation' AND identity=?",
+                    bindings: [.text(requested.operationID.uuidString.lowercased())]
+                )
+                if exists == 0 { newTombstones += 1 }
+            }
+            guard retainedTombstones
+                    <= Self.maximumContinuityAuthorityTombstones - newTombstones else {
+                throw ProjectContextError.databaseFailure(
+                    "continuity authority tombstone capacity is exhausted"
+                )
+            }
+
+            let timestamp = ISO8601.string(from: clock.now())
+            var deleted = 0
+            for command in commands {
+                if let run = try autonomousRunUnlocked(
+                    command.runID,
+                    connection: connection
+                ), run.activeOperationID == command.operationID {
+                    try connection.execute(
+                        "UPDATE autonomous_runs SET active_operation_id=NULL,updated_at=? WHERE run_id=? AND active_operation_id=?",
+                        bindings: [
+                            .text(timestamp), .text(command.runID.description),
+                            .text(command.operationID.uuidString.lowercased()),
+                        ]
+                    )
+                }
+                try connection.execute(
+                    """
+                    INSERT OR IGNORE INTO continuity_authority_tombstones(
+                        kind,identity,project_id,project_generation,retained_at
+                    ) VALUES('operation',?,?,?,?)
+                    """,
+                    bindings: [
+                        .text(command.operationID.uuidString.lowercased()),
+                        .text(command.projectID.description),
+                        .int64(try Self.sqliteGeneration(command.projectGeneration)),
+                        .text(timestamp),
+                    ]
+                )
+                deleted += try connection.execute(
+                    "DELETE FROM continuity_commands WHERE command_id=? AND operation_id=? AND state IN ('completed','failed','cancelled')",
+                    bindings: [
+                        .text(command.commandID.uuidString.lowercased()),
+                        .text(command.operationID.uuidString.lowercased()),
+                    ]
+                )
+            }
+            guard deleted == commands.count else {
+                throw ProjectContextError.databaseFailure(
+                    "continuity history deletion did not remove every authorized command"
+                )
+            }
+            return deleted
+        }
+    }
+
     /// Resolves the newest continuity command for one exact project without
     /// depending on the globally limited operator feed. The single-row bound
     /// prevents a busy project or another project's newer commands from
@@ -12552,6 +12687,14 @@ public actor ProjectControlPlaneRepository {
         connection: ControlPlaneSQLiteConnection
     ) throws -> ContinuityCommand {
         try validateContinuityCommandRequest(request)
+        guard try connection.scalarInt(
+            "SELECT COUNT(*) FROM continuity_authority_tombstones WHERE kind='operation' AND identity=?",
+            bindings: [.text(request.operationID.uuidString.lowercased())]
+        ) == 0 else {
+            throw ContinuityCommandQueueError.invalidCommand(
+                "operation identity was explicitly cleared"
+            )
+        }
         try requireNoContinuityIngressHoldUnlocked(request.runID, connection: connection)
         _ = try requiredActiveProjectUnlocked(
             request.projectID,

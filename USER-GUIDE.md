@@ -1,9 +1,9 @@
 # Forge Conductor user guide
 
-Version **0.14.7**, build **13**. This guide covers the native Forge Conductor
+Version **0.15.0**, build **14**. This guide covers the native Forge Conductor
 application and its LM Studio and desktop-host integrations on macOS.
 
-> `0.14.7 (13)` is the current development repair identity. It has not inherited
+> `0.15.0 (14)` is the current development candidate identity. It has not inherited
 > the live or artifact qualification of earlier candidates. See
 > [qualification status](docs/QUALIFICATION-STATUS.md) for current evidence and
 > open release checks.
@@ -135,15 +135,15 @@ In **LM Studio MCP**, select **Deploy to LM Studio**. The equivalent
 CLI transactionally writes `mcp.json` and all three mcpBridge roles. Do not hand-edit
 those files unless deploy failed and you are diagnosing.
 
-Confirm the registered command is a `serve`-capable 0.14.7 binary:
+Confirm the registered command is a `serve`-capable 0.15.0 binary:
 
 ```bash
-forge-conductor version    # should print 0.14.7
+forge-conductor version    # should print 0.15.0
 plutil -p ~/.lmstudio/mcp.json
 ```
 
-For an app bundle, `CFBundleShortVersionString` must be `0.14.7` and
-`CFBundleVersion` must be `13`.
+For an app bundle, `CFBundleShortVersionString` must be `0.15.0` and
+`CFBundleVersion` must be `14`.
 
 On a clean install, project shell tools are enabled by default. Schema-v1
 configurations persisted no provenance capable of distinguishing the shipped
@@ -407,6 +407,13 @@ fenced and sealed, and restart replay remained stable. Deterministic tests cover
 repeated rollovers and injected recovery transitions. A second live attempt hit
 the provider's bounded deadline and is retained as a nonpass, so the single
 live pass is not described as a broad provider reliability matrix.
+
+The Continuity view's **Stored continuity data** section can remove the
+selected settled operation with **Clear Selected…**, or all settled operations
+with **Clear All Settled…**. Each action asks for confirmation. Active or
+recoverable operations are retained. Cleanup removes only continuity
+operation/history and rebuildable handoff cache; it does not remove project
+memory, tasks, runs, credentials, or other project content.
 
 Provider-owned desktop conversations remain separate host-owned modes. Their
 supported integration boundaries do not let Forge create or replace a private
@@ -770,7 +777,7 @@ Read `memory/current-task.md` and `context_get`. Auto-checkpoint keeps existing 
 Install the CLI, or treat an app-bundle `serve` path as valid. A missing home shim is not a failed MCP deploy if `mcp.json` points at a working binary.
 
 **Doctor shows LM Studio plugin issues**
-Doctor identifies the running source identity as version **0.14.7**, build **13**
+Doctor identifies the running source identity as version **0.15.0**, build **14**
 and reports primary, fallback, and CLU registrations separately. Plugin files
 that still target an older app are reported as stale rather than missing. Choose
 **Deploy current build to LM Studio** in the Doctor result to transactionally

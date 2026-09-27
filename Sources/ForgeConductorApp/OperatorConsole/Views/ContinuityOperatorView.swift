@@ -7,6 +7,7 @@ import ForgeConductorCore
 
 struct ContinuityOperatorView: View {
     @StateObject private var viewModel: ContinuityViewModel
+    @State private var historyClearConfirmation: HistoryClearConfirmation?
     private let onOpenAutonomy: () -> Void
     private let onOpenProvider: () -> Void
 
@@ -53,6 +54,27 @@ struct ContinuityOperatorView: View {
         }
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .continuity)
+        .alert(
+            "Clear continuity history?",
+            isPresented: Binding(
+                get: { historyClearConfirmation != nil },
+                set: { if !$0 { historyClearConfirmation = nil } }
+            ),
+            presenting: historyClearConfirmation
+        ) { confirmation in
+            Button("Cancel", role: .cancel) {}
+            Button(confirmation.actionTitle, role: .destructive) {
+                historyClearConfirmation = nil
+                switch confirmation {
+                case .selected:
+                    viewModel.clearSelectedHistory()
+                case .allSettled:
+                    viewModel.clearAllSettledHistory()
+                }
+            }
+        } message: { confirmation in
+            Text(confirmation.message)
+        }
     }
 
     private var operationList: some View {
@@ -109,6 +131,9 @@ struct ContinuityOperatorView: View {
                     OperatorNoticeBanner(message: notice)
                 }
                 manualActions
+                if !viewModel.operations.isEmpty {
+                    historyActions
+                }
                 if let operation = viewModel.selectedOperation {
                     operationDetail(operation)
                 } else if viewModel.errorMessage == nil, !viewModel.isLoading {
@@ -238,6 +263,42 @@ struct ContinuityOperatorView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("continuity-controls-authority")
+            }
+        }
+    }
+
+    private var historyActions: some View {
+        GroupBox("Stored continuity data") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Remove settled checkpoint and handoff payloads when they are no longer needed. Active or recoverable continuity cannot be cleared.")
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Button("Clear Selected…", role: .destructive) {
+                        historyClearConfirmation = .selected
+                    }
+                    .disabled(!viewModel.canClearSelectedHistory)
+                    .accessibilityIdentifier("continuity-clear-selected")
+
+                    Button("Clear All Settled…", role: .destructive) {
+                        historyClearConfirmation = .allSettled
+                    }
+                    .disabled(!viewModel.canClearAllSettledHistory)
+                    .accessibilityIdentifier("continuity-clear-all-settled")
+
+                    if let scope = viewModel.historyClearInFlight {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel(
+                                scope == .operation
+                                    ? "Clearing selected continuity history"
+                                    : "Clearing settled continuity history"
+                            )
+                    }
+                }
+                Text("Clearing continuity history does not delete tasks, run history, or user-created project memory.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("continuity-clear-scope")
             }
         }
     }
@@ -488,6 +549,29 @@ struct ContinuityOperatorView: View {
             onOpenProvider()
         case .reviewRun:
             onOpenAutonomy()
+        }
+    }
+}
+
+private enum HistoryClearConfirmation: String, Identifiable {
+    case selected
+    case allSettled
+
+    var id: String { rawValue }
+
+    var actionTitle: String {
+        switch self {
+        case .selected: "Clear Selected"
+        case .allSettled: "Clear All Settled"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .selected:
+            "This removes the selected settled checkpoint, handoff payload, transition history, and derived cache. The task and ordinary project memory remain."
+        case .allSettled:
+            "This removes settled continuity payloads and derived caches across projects. Active or recoverable continuity, tasks, and ordinary project memory remain."
         }
     }
 }

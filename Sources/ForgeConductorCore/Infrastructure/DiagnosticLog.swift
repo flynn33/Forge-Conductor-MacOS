@@ -19,9 +19,13 @@ final class BoundedAsyncWorkQueue: @unchecked Sendable {
     private let dropped = Atomic<Int>(0)
     private var accepting = true
 
-    init(label: String, capacity: Int) {
+    init(
+        label: String,
+        capacity: Int,
+        qos: DispatchQoS = .utility
+    ) {
         self.capacity = max(1, min(capacity, 4_096))
-        self.queue = DispatchQueue(label: label, qos: .utility)
+        self.queue = DispatchQueue(label: label, qos: qos)
         self.slots = DispatchSemaphore(value: self.capacity)
     }
 
@@ -151,7 +155,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         )
         self.persistenceQueue = BoundedAsyncWorkQueue(
             label: "forge.diagnostics.persistence",
-            capacity: Self.persistenceQueueCapacity
+            capacity: Self.persistenceQueueCapacity,
+            qos: .userInitiated
         )
     }
 
@@ -178,7 +183,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         )
         self.persistenceQueue = BoundedAsyncWorkQueue(
             label: "forge.diagnostics.persistence.\(UUID().uuidString)",
-            capacity: persistenceQueueCapacity
+            capacity: persistenceQueueCapacity,
+            qos: .userInitiated
         )
     }
 

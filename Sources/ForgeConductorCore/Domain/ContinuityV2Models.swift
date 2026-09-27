@@ -955,6 +955,164 @@ public struct ContinuityCommand: Codable, Sendable, Equatable {
     }
 }
 
+public enum ContinuityHistoryClearScope: String, Codable, Sendable, CaseIterable {
+    case operation
+    case allSettled = "all_settled"
+}
+
+public struct ContinuityHistoryClearRequest: Codable, Sendable, Equatable {
+    public let scope: ContinuityHistoryClearScope
+    public let operationID: UUID?
+    public let projectID: ProjectID?
+    public let projectGeneration: ProjectGeneration?
+
+    public init(
+        scope: ContinuityHistoryClearScope,
+        operationID: UUID? = nil,
+        projectID: ProjectID? = nil,
+        projectGeneration: ProjectGeneration? = nil
+    ) {
+        self.scope = scope
+        self.operationID = operationID
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case scope
+        case operationID = "operation_id"
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        scope = try values.decode(ContinuityHistoryClearScope.self, forKey: .scope)
+        if let value = try values.decodeIfPresent(String.self, forKey: .operationID) {
+            guard let identifier = UUID(uuidString: value) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .operationID,
+                    in: values,
+                    debugDescription: "operation_id must be a UUID"
+                )
+            }
+            operationID = identifier
+        } else {
+            operationID = nil
+        }
+        if let value = try values.decodeIfPresent(String.self, forKey: .projectID) {
+            guard let identifier = UUID(uuidString: value) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .projectID,
+                    in: values,
+                    debugDescription: "project_id must be a UUID"
+                )
+            }
+            projectID = ProjectID(identifier)
+        } else {
+            projectID = nil
+        }
+        if let generation = try values.decodeIfPresent(UInt64.self, forKey: .projectGeneration) {
+            guard generation > 0 else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .projectGeneration,
+                    in: values,
+                    debugDescription: "project_generation must be positive"
+                )
+            }
+            projectGeneration = ProjectGeneration(generation)
+        } else {
+            projectGeneration = nil
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(scope, forKey: .scope)
+        try values.encodeIfPresent(
+            operationID?.uuidString.lowercased(),
+            forKey: .operationID
+        )
+        try values.encodeIfPresent(projectID?.description, forKey: .projectID)
+        try values.encodeIfPresent(projectGeneration?.rawValue, forKey: .projectGeneration)
+    }
+}
+
+public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
+    public let scope: ContinuityHistoryClearScope
+    public let requestedOperationID: UUID?
+    public let clearedOperationCount: Int
+    public let clearedProjectCount: Int
+    public let deletedRecordCount: Int
+    public let retainedOperationCount: Int
+    public let completedAt: String
+
+    public init(
+        scope: ContinuityHistoryClearScope,
+        requestedOperationID: UUID?,
+        clearedOperationCount: Int,
+        clearedProjectCount: Int,
+        deletedRecordCount: Int,
+        retainedOperationCount: Int,
+        completedAt: String
+    ) {
+        self.scope = scope
+        self.requestedOperationID = requestedOperationID
+        self.clearedOperationCount = clearedOperationCount
+        self.clearedProjectCount = clearedProjectCount
+        self.deletedRecordCount = deletedRecordCount
+        self.retainedOperationCount = retainedOperationCount
+        self.completedAt = completedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case scope
+        case requestedOperationID = "requested_operation_id"
+        case clearedOperationCount = "cleared_operation_count"
+        case clearedProjectCount = "cleared_project_count"
+        case deletedRecordCount = "deleted_record_count"
+        case retainedOperationCount = "retained_operation_count"
+        case completedAt = "completed_at"
+    }
+
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        scope = try values.decode(ContinuityHistoryClearScope.self, forKey: .scope)
+        if let value = try values.decodeIfPresent(String.self, forKey: .requestedOperationID) {
+            guard let identifier = UUID(uuidString: value) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .requestedOperationID,
+                    in: values,
+                    debugDescription: "requested_operation_id must be a UUID"
+                )
+            }
+            requestedOperationID = identifier
+        } else {
+            requestedOperationID = nil
+        }
+        clearedOperationCount = try values.decode(Int.self, forKey: .clearedOperationCount)
+        clearedProjectCount = try values.decode(Int.self, forKey: .clearedProjectCount)
+        deletedRecordCount = try values.decode(Int.self, forKey: .deletedRecordCount)
+        retainedOperationCount = try values.decode(Int.self, forKey: .retainedOperationCount)
+        completedAt = try values.decode(String.self, forKey: .completedAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(scope, forKey: .scope)
+        try values.encodeIfPresent(
+            requestedOperationID?.uuidString.lowercased(),
+            forKey: .requestedOperationID
+        )
+        try values.encode(clearedOperationCount, forKey: .clearedOperationCount)
+        try values.encode(clearedProjectCount, forKey: .clearedProjectCount)
+        try values.encode(deletedRecordCount, forKey: .deletedRecordCount)
+        try values.encode(retainedOperationCount, forKey: .retainedOperationCount)
+        try values.encode(completedAt, forKey: .completedAt)
+    }
+}
+
 public struct ContinuityCommandRequest: Sendable, Equatable {
     public let operationID: UUID
     public let runID: RunID

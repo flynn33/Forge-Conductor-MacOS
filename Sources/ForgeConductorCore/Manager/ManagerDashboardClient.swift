@@ -232,7 +232,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         if let repositoryIdentity { body["repository_identity"] = repositoryIdentity }
         if authorizeProjectRoot { body["authorize_project_root"] = true }
         let encodedBody = try JSONSupport.data(from: body)
-        let authorizationHeader = "Bearer \(try credentials.bearerToken())"
+        let authorizationHeader = try await authorizationHeader()
 
         for attempt in 0..<2 {
             do {
@@ -701,7 +701,7 @@ public final class ManagerDashboardClient: @unchecked Sendable {
             if let authorizationHeader {
                 header = authorizationHeader
             } else {
-                header = "Bearer \(try credentials.bearerToken())"
+                header = try await self.authorizationHeader()
             }
             request.setValue(
                 header,
@@ -781,6 +781,13 @@ public final class ManagerDashboardClient: @unchecked Sendable {
             .resourceUnavailable,
         ].contains(code)
     }
+
+    private func authorizationHeader() async throws -> String {
+        let credentials = self.credentials
+        return try await Task.detached(priority: .userInitiated) {
+            "Bearer \(try credentials.bearerToken())"
+        }.value
+    }
 }
 
 extension ManagerDashboardClient: NativeTaskOperatorTransport {
@@ -794,7 +801,7 @@ extension ManagerDashboardClient: NativeTaskOperatorTransport {
         try NativeTaskOperatorEndpoint.validate(endpoint)
         components.path = "/api/manager/continuity/tasks/" + command.action
         guard let url = components.url else { throw NativeTaskOperatorError.invalidRequest("manager_endpoint") }
-        let authorization = "Bearer \(try credentials.bearerToken())"
+        let authorization = try await authorizationHeader()
         let configuration = session.configuration
         configuration.urlCache = nil; configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -879,7 +886,7 @@ extension ManagerDashboardClient: NativeSourceOperatorTransport {
         try NativeTaskOperatorEndpoint.validate(endpoint)
         components.path = "/api/manager/continuity/source/" + action
         guard let url = components.url else { throw NativeSourceOperatorError.unavailable }
-        let authorization = "Bearer \(try credentials.bearerToken())"
+        let authorization = try await authorizationHeader()
         let configuration = session.configuration
         configuration.urlCache = nil; configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData

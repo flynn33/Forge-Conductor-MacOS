@@ -279,7 +279,9 @@ test syntax, a NUL-delimited SQLite binding that truncated target identity, and
 invalid fixture transitions. The delivered design hashes composite identities
 before SQLite binding and uses valid lifecycle fixtures. Xcode also reported a
 non-failing priority-inversion runtime warning in the existing
-`ProjectContextService` path; it is not treated as a clean performance proof.
+`ProjectContextService` path; it is not treated as a clean performance proof
+for that historical run. The `0.15.0 (14)` source repairs that product path and
+passes 111/111 app-hosted tests with no structured runtime warnings.
 
 This phase does not yet claim continuous manager evaluator scheduling, complete
 product observation hooks, manager routes, Rune Forge UI, export, integrated
@@ -509,7 +511,7 @@ Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
 destinations, all guide routes, immediate opaque-source acceptance during
 Manager outage, the native source picker, and four-format native export.
 
-The current authority is version `0.14.7`, build `13`. No release archive,
+The current authority is version `0.15.0`, build `14`. No release archive,
 installer, notarized artifact, installation replacement, or shipment candidate
 was created; those remain separate owner-directed release work. See the
 [acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) and

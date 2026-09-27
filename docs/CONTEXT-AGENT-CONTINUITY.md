@@ -1,4 +1,4 @@
-# Context & Agent Continuity (v0.14.7)
+# Context & Agent Continuity (v0.15.0)
 
 ## Summary
 
@@ -108,6 +108,15 @@ When operations exist, the bounded operation list and detail pane share the
 available width. Optional checkpoint/rollover actions, exact operation identity,
 context budget, handoff/successor fields, and event history remain present; the
 layout correction does not remove those capabilities.
+
+The **Stored continuity data** section supports two confirmed retention actions:
+**Clear Selected…** removes the selected operation only, and **Clear All
+Settled…** removes every terminal operation the Manager can prove safe to
+delete. Both remove canonical operation/transition/handoff rows and rebuildable
+JSON/current/latest projections, then tombstone each cleared operation so a
+stale command cannot recreate it. Active or recoverable operations remain
+visible. These actions do not remove project memory, tasks, runs, credentials,
+or unrelated project data.
 
 **Protection** is an operator-facing state, not a generic alarm. The detail and
 next-action text explain the exact transition:

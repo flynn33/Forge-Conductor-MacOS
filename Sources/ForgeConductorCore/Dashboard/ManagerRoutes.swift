@@ -379,6 +379,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     static let maximumProviderIntegrationBodyBytes = 16_384
     static let maximumRunControlBodyBytes = 256
     static let maximumRunDeletionBodyBytes = 256
+    static let maximumContinuityHistoryClearBodyBytes = 512
     static let maximumToolPermissionBodyBytes = 128 * 1_024
     static let maximumRunAdmissionBodyBytes = 128 * 1_024
     static let maximumStjornarvaldMutationBodyBytes = 16 * 1_024
@@ -1751,6 +1752,84 @@ public final class ManagerRoutes: @unchecked Sendable {
                 ])
             } catch let error as ProjectContextError {
                 http.respondJSON(connection, status: 400, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/continuity/history/clear"):
+            guard target.queryItems.isEmpty,
+                  body.count <= Self.maximumContinuityHistoryClearBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false,
+                    "code": "continuity_history_clear_body_too_large",
+                    "message": "Continuity history clearing accepts one bounded typed request",
+                ])
+                return
+            }
+            do {
+                let object = try JSONSupport.object(from: body)
+                guard let scopeValue = object["scope"] as? String,
+                      let scope = ContinuityHistoryClearScope(rawValue: scopeValue) else {
+                    throw AutonomyError.invalidRequest(
+                        "Continuity history clearing requires a supported scope"
+                    )
+                }
+                let request: ContinuityHistoryClearRequest
+                switch scope {
+                case .operation:
+                    guard object.count == 4,
+                          Set(object.keys) == [
+                            "scope", "operation_id", "project_id", "project_generation",
+                          ],
+                          let operationValue = object["operation_id"] as? String,
+                          operationValue.utf8.count <= 36,
+                          let operationID = UUID(uuidString: operationValue),
+                          let projectValue = object["project_id"] as? String,
+                          projectValue.utf8.count <= 36,
+                          let projectID = UUID(uuidString: projectValue),
+                          let generation = integer(object["project_generation"]),
+                          generation > 0 else {
+                        throw AutonomyError.invalidRequest(
+                            "Selected continuity deletion requires exact operation, project, and generation identities"
+                        )
+                    }
+                    request = ContinuityHistoryClearRequest(
+                        scope: .operation,
+                        operationID: operationID,
+                        projectID: ProjectID(projectID),
+                        projectGeneration: ProjectGeneration(UInt64(generation))
+                    )
+                case .allSettled:
+                    guard object.count == 1, Set(object.keys) == ["scope"] else {
+                        throw AutonomyError.invalidRequest(
+                            "All-settled continuity deletion accepts only its scope"
+                        )
+                    }
+                    request = ContinuityHistoryClearRequest(scope: .allSettled)
+                }
+                let receipt = try manager.clearContinuityHistory(request)
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try JSONSupport.object(from: JSONEncoder().encode(receipt))
+                )
+            } catch let error as AutonomyError {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectMemoryError {
+                let status = error == .databaseBusy ? 503 : 409
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false,
+                    "code": error.code,
+                    "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectContextError {
+                let status = error == .databaseBusy ? 503 : 409
+                http.respondJSON(connection, status: status, object: [
                     "ok": false,
                     "code": error.code,
                     "message": error.localizedDescription,

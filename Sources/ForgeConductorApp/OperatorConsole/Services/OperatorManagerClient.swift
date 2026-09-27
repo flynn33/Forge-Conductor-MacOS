@@ -64,6 +64,9 @@ protocol OperatorManagerClientProtocol: Sendable {
         generation: UInt64,
         mode: OperatorProjectContentClearMode
     ) async throws -> OperatorProjectContentClearReceipt
+    func clearContinuityHistory(
+        _ request: ContinuityHistoryClearRequest
+    ) async throws -> ContinuityHistoryClearReceipt
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -305,6 +308,14 @@ extension OperatorManagerClientProtocol {
     ) async throws -> OperatorProjectContentClearReceipt {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Project content clearing is unavailable from this manager client."
+        )
+    }
+
+    func clearContinuityHistory(
+        _ request: ContinuityHistoryClearRequest
+    ) async throws -> ContinuityHistoryClearReceipt {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Continuity history clearing is unavailable from this manager client."
         )
     }
 
@@ -1120,6 +1131,48 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         return receipt
     }
 
+    func clearContinuityHistory(
+        _ mutation: ContinuityHistoryClearRequest
+    ) async throws -> ContinuityHistoryClearReceipt {
+        switch mutation.scope {
+        case .operation:
+            guard mutation.operationID != nil,
+                  mutation.projectID != nil,
+                  mutation.projectGeneration?.rawValue ?? 0 > 0 else {
+                throw OperatorManagerClientError.invalidPayload(
+                    "selected continuity clearing requires exact operation, project, and generation identities"
+                )
+            }
+        case .allSettled:
+            guard mutation.operationID == nil,
+                  mutation.projectID == nil,
+                  mutation.projectGeneration == nil else {
+                throw OperatorManagerClientError.invalidPayload(
+                    "all-settled continuity clearing cannot include a narrower identity"
+                )
+            }
+        }
+        let receipt: ContinuityHistoryClearReceipt = try await request(
+            method: "POST",
+            path: "/api/manager/continuity/history/clear",
+            body: mutation,
+            unavailableMessage: "Continuity history clearing is unavailable. Update or restart the manager from this build, then retry.",
+            timeoutInterval: 18
+        )
+        guard receipt.scope == mutation.scope,
+              receipt.requestedOperationID == mutation.operationID,
+              receipt.clearedOperationCount >= 0,
+              receipt.clearedProjectCount >= 0,
+              receipt.deletedRecordCount >= 0,
+              receipt.retainedOperationCount >= 0,
+              ISO8601.date(from: receipt.completedAt) != nil else {
+            throw OperatorManagerClientError.invalidPayload(
+                "continuity history clear receipt did not match the requested scope"
+            )
+        }
+        return receipt
+    }
+
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -1383,8 +1436,12 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         request.timeoutInterval = timeoutInterval
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if ManagerMutationAuthorizer.requiresAuthorization(method: method, path: path) {
+            let credentials = self.credentials
+            let bearerToken = try await Task.detached(priority: .userInitiated) {
+                try credentials.bearerToken()
+            }.value
             request.setValue(
-                "Bearer \(try credentials.bearerToken())",
+                "Bearer \(bearerToken)",
                 forHTTPHeaderField: "Authorization"
             )
         }
@@ -1718,6 +1775,12 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
             generation: generation,
             mode: mode
         )
+    }
+
+    func clearContinuityHistory(
+        _ request: ContinuityHistoryClearRequest
+    ) async throws -> ContinuityHistoryClearReceipt {
+        try await current.clearContinuityHistory(request)
     }
 
     func relinkProject(
