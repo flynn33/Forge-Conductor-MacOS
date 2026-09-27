@@ -227,100 +227,67 @@ public struct HandoffPacket: Sendable, Equatable {
     }
 
     public static func fromDictionary(_ root: [String: Any]) -> HandoffPacket? {
-        for key in ["meta", "task", "working_set", "resume"] {
-            if root[key] != nil, !(root[key] is [String: Any]) { return nil }
+        let wire: HandoffPacketWire
+        do {
+            let data = try JSONSupport.data(from: root)
+            wire = try JSONDecoder().decode(HandoffPacketWire.self, from: data)
+        } catch {
+            return nil
         }
-        let meta = root["meta"] as? [String: Any] ?? [:]
-        let task = root["task"] as? [String: Any] ?? [:]
-        let working = root["working_set"] as? [String: Any] ?? [:]
-        let resume = root["resume"] as? [String: Any] ?? [:]
-        let rootVersion: Int?
-        if let raw = root["schema_version"] {
-            guard let value = strictInteger(raw) else { return nil }
-            rootVersion = value
-        } else {
-            rootVersion = nil
-        }
-        let metaVersion: Int?
-        if let raw = meta["schema_version"] {
-            guard let value = strictInteger(raw) else { return nil }
-            metaVersion = value
-        } else {
-            metaVersion = nil
-        }
+        let rootVersion = wire.schemaVersion
+        let metaVersion = wire.meta?.schemaVersion
         guard rootVersion == nil || rootVersion == schemaVersion,
               metaVersion == nil || metaVersion == schemaVersion,
               rootVersion == nil || metaVersion == nil || rootVersion == metaVersion else {
             return nil
         }
-        if meta["id"] != nil, !(meta["id"] is String) { return nil }
-        if root["id"] != nil, !(root["id"] is String) { return nil }
-        guard let id = (meta["id"] as? String) ?? (root["id"] as? String),
+        guard let id = wire.meta?.id ?? wire.id,
               isSafeID(id) else {
             return nil
         }
-
-        for key in ["created_at", "updated_at", "source", "chat_label", "client_id"] {
-            if meta[key] != nil, !(meta[key] is String) { return nil }
-        }
-        for key in ["goal", "status", "project_slug", "cwd"] {
-            if task[key] != nil, !(task[key] is String) { return nil }
-        }
-        for key in ["blockers", "next_actions"] {
-            if task[key] != nil, !(task[key] is [String]) { return nil }
-        }
-        for key in ["key_files", "decisions"] {
-            if working[key] != nil, !(working[key] is [String]) { return nil }
-        }
-        if root["narrative"] != nil, !(root["narrative"] is String) { return nil }
-        if resume["seed"] != nil, !(resume["seed"] is String) { return nil }
-        if resume["instructions"] != nil, !(resume["instructions"] is [String]) { return nil }
-
-        let resumeReady: Bool
-        if let raw = meta["resume_ready"] {
-            guard let value = strictBoolean(raw) else { return nil }
-            resumeReady = value
-        } else {
-            resumeReady = false
-        }
-        let customMarker: Bool?
-        if let raw = resume["custom"] {
-            guard let value = strictBoolean(raw) else { return nil }
-            customMarker = value
-        } else {
-            customMarker = nil
-        }
-
-        let sourceRaw = meta["source"] as? String ?? HandoffSource.model.rawValue
+        let sourceRaw = wire.meta?.source ?? HandoffSource.model.rawValue
         guard let source = HandoffSource(rawValue: sourceRaw) else { return nil }
-        if root["agents"] != nil, !(root["agents"] is [[String: Any]]) { return nil }
-        let rawAgents = root["agents"] as? [[String: Any]] ?? []
         var agentList: [AgentContinuitySnapshot] = []
-        for rawAgent in rawAgents {
-            guard let agent = AgentContinuitySnapshot.fromDictionary(rawAgent) else { return nil }
-            agentList.append(agent)
+        for agent in wire.agents ?? [] {
+            guard !agent.sessionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !agent.agentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            agentList.append(AgentContinuitySnapshot(
+                sessionID: agent.sessionID,
+                agentID: agent.agentID,
+                goal: agent.goal ?? "",
+                cwd: agent.cwd,
+                status: agent.status ?? "open",
+                updatedAt: agent.updatedAt,
+                resumeHint: agent.resumeHint ?? ""
+            ))
         }
 
-        let resumeSeed = resume["seed"] as? String ?? ""
+        let resumeSeed = wire.resume?.seed ?? ""
+        let customMarker = wire.resume?.custom
+        let task = wire.task
+        let working = wire.workingSet
+        let meta = wire.meta
         var packet = HandoffPacket(
             id: id,
             schemaVersion: rootVersion ?? metaVersion ?? schemaVersion,
-            createdAt: meta["created_at"] as? String ?? ISO8601.string(from: Date()),
-            updatedAt: meta["updated_at"] as? String ?? ISO8601.string(from: Date()),
+            createdAt: meta?.createdAt ?? ISO8601.string(from: Date()),
+            updatedAt: meta?.updatedAt ?? ISO8601.string(from: Date()),
             source: source,
-            resumeReady: resumeReady,
-            chatLabel: meta["chat_label"] as? String,
-            clientID: meta["client_id"] as? String,
-            goal: task["goal"] as? String ?? "",
-            status: task["status"] as? String ?? "in_progress",
-            projectSlug: task["project_slug"] as? String,
-            cwd: task["cwd"] as? String,
-            blockers: task["blockers"] as? [String] ?? [],
-            nextActions: task["next_actions"] as? [String] ?? [],
-            keyFiles: working["key_files"] as? [String] ?? [],
-            decisions: working["decisions"] as? [String] ?? [],
+            resumeReady: meta?.resumeReady ?? false,
+            chatLabel: meta?.chatLabel,
+            clientID: meta?.clientID,
+            goal: task?.goal ?? "",
+            status: task?.status ?? "in_progress",
+            projectSlug: task?.projectSlug,
+            cwd: task?.cwd,
+            blockers: task?.blockers ?? [],
+            nextActions: task?.nextActions ?? [],
+            keyFiles: working?.keyFiles ?? [],
+            decisions: working?.decisions ?? [],
             agents: agentList,
-            narrative: root["narrative"] as? String ?? "",
+            narrative: wire.narrative ?? "",
             resumeSeed: resumeSeed,
             resumeSeedIsCustom: customMarker ?? false
         )
@@ -331,25 +298,100 @@ public struct HandoffPacket: Sendable, Equatable {
         return packet
     }
 
-    private static func strictInteger(_ value: Any) -> Int? {
-        guard let number = value as? NSNumber,
-              CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
-        let type = String(cString: number.objCType)
-        guard !["f", "d"].contains(type) else { return nil }
-        return number.intValue
-    }
-
-    private static func strictBoolean(_ value: Any) -> Bool? {
-        guard let number = value as? NSNumber,
-              CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
-        return number.boolValue
-    }
-
     private static func isSafeID(_ id: String) -> Bool {
         guard !id.isEmpty, id.utf8.count <= 128, id != ".", id != ".." else { return false }
-        let allowed = CharacterSet(
-            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
-        )
-        return id.unicodeScalars.allSatisfy(allowed.contains)
+        return id.utf8.allSatisfy { byte in
+            (byte >= 0x61 && byte <= 0x7a)
+                || (byte >= 0x41 && byte <= 0x5a)
+                || (byte >= 0x30 && byte <= 0x39)
+                || byte == 0x2d || byte == 0x5f || byte == 0x2e
+        }
+    }
+}
+
+private struct HandoffPacketWire: Decodable {
+    struct Meta: Decodable {
+        let id: String?
+        let schemaVersion: Int?
+        let createdAt: String?
+        let updatedAt: String?
+        let source: String?
+        let resumeReady: Bool?
+        let chatLabel: String?
+        let clientID: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, source
+            case schemaVersion = "schema_version"
+            case createdAt = "created_at"
+            case updatedAt = "updated_at"
+            case resumeReady = "resume_ready"
+            case chatLabel = "chat_label"
+            case clientID = "client_id"
+        }
+    }
+
+    struct Task: Decodable {
+        let goal: String?
+        let status: String?
+        let projectSlug: String?
+        let cwd: String?
+        let blockers: [String]?
+        let nextActions: [String]?
+
+        enum CodingKeys: String, CodingKey {
+            case goal, status, cwd, blockers
+            case projectSlug = "project_slug"
+            case nextActions = "next_actions"
+        }
+    }
+
+    struct WorkingSet: Decodable {
+        let keyFiles: [String]?
+        let decisions: [String]?
+
+        enum CodingKeys: String, CodingKey {
+            case keyFiles = "key_files"
+            case decisions
+        }
+    }
+
+    struct Resume: Decodable {
+        let seed: String?
+        let custom: Bool?
+        let instructions: [String]?
+    }
+
+    struct Agent: Decodable {
+        let sessionID: String
+        let agentID: String
+        let goal: String?
+        let cwd: String?
+        let status: String?
+        let updatedAt: String?
+        let resumeHint: String?
+
+        enum CodingKeys: String, CodingKey {
+            case goal, cwd, status
+            case sessionID = "session_id"
+            case agentID = "agent_id"
+            case updatedAt = "updated_at"
+            case resumeHint = "resume_hint"
+        }
+    }
+
+    let id: String?
+    let schemaVersion: Int?
+    let meta: Meta?
+    let task: Task?
+    let workingSet: WorkingSet?
+    let agents: [Agent]?
+    let narrative: String?
+    let resume: Resume?
+
+    enum CodingKeys: String, CodingKey {
+        case id, meta, task, agents, narrative, resume
+        case schemaVersion = "schema_version"
+        case workingSet = "working_set"
     }
 }

@@ -2,7 +2,7 @@
 
 ## 0.16.0 packet management and tokenless-local correction
 
-The current source identity is **0.16.0, build 17**. Continuity now lists the
+The current source identity is **0.16.0, build 18**. Continuity now lists the
 actual durable checkpoint/handoff packets under each project ID and deletes
 only the exact single or multi-selection after confirmation. Reset and Clear
 Cache remain on Continuity; instruction-package controls are confined to
@@ -10,14 +10,17 @@ Projects. Focused packet store/wire and native UI tests execute with zero
 failures.
 
 Same-host LM Studio configuration no longer exposes or accepts an operator
-credential. The build-17 migration removed the obsolete local Forge Keychain
+credential. The build-18 correction removes the obsolete local Forge Keychain
 reference on this host; the persisted local configuration reports no reference
 and the credential journal is a tombstone. Live source-path **Connect and
 Check** returned `ready`, and the advanced contract probe returned
 `contract_valid` for `qwen/qwen3.8-27b`, with
 `credential_configured=false`.
 
-The build-17 Desktop archive, exact-candidate UI/runtime reruns, disposable live
+The optimized Release packet decoder now passes its strict scalar/container
+test and the repaired Release helper reads the live durable packet inventory;
+build 17 had returned an empty list for the same valid rows. The build-18
+Desktop archive, exact-candidate UI/runtime reruns, disposable live
 packet deletion, ordinary LM Studio `get_forge_status`, CLU delivery, and the
 complete automatic rollover sequence remain open. This is not shipment
 acceptance, and `/Applications/Forge Conductor.app` has not been replaced.
@@ -262,7 +265,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.0, build 17**, supporting **macOS 26+**. The owner will
+Product identity: **0.16.0, build 18**, supporting **macOS 26+**. The owner will
 test the staged Desktop candidate and perform shipment separately. The version
 advance and repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -273,7 +276,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.0, build 17**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.0, build 18**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are
