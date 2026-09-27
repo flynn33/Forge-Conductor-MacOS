@@ -22,11 +22,28 @@ Both SwiftPM products built. A universal Debug app and `.xcarchive` were built
 outside `/Applications`; strict deep signature verification passes and the
 built Info.plist reports `0.14.7 (13)`.
 
-The working installation was not replaced. The native Stop test uses an
-authenticated local fixture and the runtime test uses an isolated provider;
-neither is a live LM Studio Stop on the Desktop candidate. That owner check,
-Developer ID signing, notarization, Gatekeeper distribution acceptance, and
-shipment remain open.
+**E0 live candidate acceptance:** a signed native test attached to PID `15318`
+only after asserting its bundle URL was
+`/Users/flynn/Desktop/Forge Conductor 0.14.7 (13)-74ead97.app`. At normal size,
+Projects started ordered package `d275cbbf-3c54-43af-858f-bd43fec39d4b` as
+LM Studio run `450f1a7f-8f49-4d78-bd7d-1e97c94f6273`; the run was observed
+`running` with model `qwen/qwen3-coder-30b` and a non-null managed session.
+Clicking **Stop Active Work** produced terminal run/package state `cancelled`,
+queue `running=false`, and an enabled Remove control. Move earlier persisted
+the exact two-package order after Refresh, and removing the other package
+persisted after Refresh. At the 1100×788 minimum window, package
+`2c1c98e3-bf1c-4eca-a481-03b1fe5448e6` started as live LM Studio run
+`850f0576-225f-4b04-a4ff-a5d43471494d`; Stop was hittable and produced the
+same terminal/unlocked state. Move later and Remove were both hittable, and
+their resulting order/absence persisted after Refresh. Post-test Manager
+readback retained both runs as `cancelled`, the queue as stopped, and LM Studio
+reported the pinned model `IDLE`. The focused `.xcresult` executed 1 test with
+zero skips and zero failures.
+
+The working installation was not replaced. Developer ID signing, notarization,
+Gatekeeper distribution acceptance, owner final testing, and shipment remain
+open. The live evidence closes only the reported Projects Stop/reorder/remove
+acceptance gap and is not a shippable-build declaration.
 
 ## 0.14.7 Projects instruction controls — prior incomplete baseline
 

@@ -54,8 +54,18 @@ Product versions do not by themselves claim shipment.
   later two-second poll, and passed. The separate signed real-Manager UI case
   imported two packages, persisted reorder, removed one, and passed. Both
   SwiftPM products built, and a strict-signature-verified universal Debug app
-  plus `.xcarchive` were created outside `/Applications`. Live LM Studio Stop
-  on that bundle remains an owner check; no shipment claim is made.
+  plus `.xcarchive` were created outside `/Applications`.
+- A signed owner-machine acceptance test attached to Desktop candidate
+  `/Users/flynn/Desktop/Forge Conductor 0.14.7 (13)-74ead97.app`. At normal
+  size it started LM Studio run `450f1a7f-8f49-4d78-bd7d-1e97c94f6273`,
+  clicked **Stop Active Work**, observed the run/package `cancelled` and Remove
+  enabled, persisted an earlier move through Refresh, and persisted removal.
+  At the 1100×788 minimum window it repeated the live flow with run
+  `850f0576-225f-4b04-a4ff-a5d43471494d`, clicked the hittable Stop, Move
+  later, and Remove controls, and verified reorder/removal after Refresh. The
+  pinned `qwen/qwen3-coder-30b` model was `IDLE` after Stop. The retained
+  `.xcresult` executed 1 test with zero skips and zero failures. No shipment
+  claim is made.
 - Published ordered-readiness/receipt repair
   `675d267fdd2f45cd412e5398a04a2321bfe51def`, budget-escalation repair
   `f39c79ad0e60259d7a02ba0361825e5b6940c136`, and cancellation-authority

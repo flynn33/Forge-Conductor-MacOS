@@ -1520,3 +1520,388 @@ private final class OnboardingPortReservation {
 
     deinit { close() }
 }
+
+/// Attaches to an already-running, owner-named Desktop candidate and exercises
+/// the real Projects controls against the owner's live loopback Manager and LM
+/// Studio provider. The explicit environment gate prevents this destructive
+/// acceptance flow from entering ordinary CI.
+@MainActor
+final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable {
+    private let projectID = "d2610542-b616-7e8f-ee36-ef902d6060e1"
+    private let projectGeneration: UInt64 = 5
+    private let managerBaseURL = URL(string: "http://127.0.0.1:7788")!
+    private var app: XCUIApplication!
+    private var candidatePath = ""
+
+    func testLiveLMStudioStopReorderRemoveAndMinimumWindowControls() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"]
+            ?? "/Users/flynn/Desktop/Forge Conductor 0.14.7 (13)-74ead97.app"
+        candidatePath = URL(fileURLWithPath: requestedPath).standardizedFileURL.path
+        guard FileManager.default.fileExists(atPath: candidatePath),
+              let running = NSWorkspace.shared.runningApplications.first(where: {
+                  $0.bundleURL?.standardizedFileURL.path == candidatePath
+              }) else {
+            throw XCTSkip("The explicit owner Desktop candidate is not running")
+        }
+        let requestedPID = running.processIdentifier
+        XCTAssertEqual(running.bundleURL?.standardizedFileURL.path, candidatePath)
+        XCTAssertFalse(candidatePath.hasPrefix("/Applications/"))
+
+        app = XCUIApplication(bundleIdentifier: "com.forge-conductor.app")
+        app.activate()
+        XCTAssertTrue(app.windows["forge-main-window"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.windows.firstMatch.title, "Forge Conductor")
+        print("EVIDENCE candidate_path=\(candidatePath) pid=\(requestedPID) window_title=\(app.windows.firstMatch.title)")
+
+        var queue = try await instructionQueue()
+        if queue.packages.contains(where: { $0.state == "running" }) {
+            queue = try await postQueue("/api/manager/projects/instruction-packages/stop", body: projectBody())
+            print("EVIDENCE cleanup_stop order=\(queue.packageIDs) states=\(queue.packageStates)")
+        }
+        XCTAssertEqual(queue.packages.filter { $0.state == "queued" }.count, 1)
+        let normalQueuedID = try XCTUnwrap(queue.packages.first(where: { $0.state == "queued" })?.id)
+        let normalOtherID = try XCTUnwrap(queue.packages.first(where: { $0.id != normalQueuedID })?.id)
+        print("EVIDENCE normal_before_order=\(queue.packageIDs) queued_package=\(normalQueuedID)")
+
+        try openProjects()
+        try clickControl("instruction-queue-toggle", expectedLabel: "Start Ordered Work")
+        let normalActive = try await waitForActivePackage(normalQueuedID, timeout: 90)
+        let normalRunID = try XCTUnwrap(normalActive.packages.first(where: { $0.id == normalQueuedID })?.runID)
+        let normalRun = try await waitForLiveLMStudioRun(normalRunID, timeout: 90)
+        print("EVIDENCE normal_live run_id=\(normalRun.runID) state=\(normalRun.state) provider=\(normalRun.providerID) model=\(normalRun.modelKey) session_id=\(normalRun.activeSessionID ?? "nil") package=\(normalQueuedID)")
+        attachScreenshot("desktop-candidate-normal-live-before-stop")
+
+        try clickControl("instruction-queue-toggle", expectedLabel: "Stop Active Work")
+        let normalStopped = try await waitForPackage(normalQueuedID, state: "cancelled", timeout: 30)
+        let normalTerminalRun = try await waitForRun(normalRunID, state: "cancelled", timeout: 30)
+        let normalRemove = app.buttons["instruction-package-remove-\(normalQueuedID)"]
+        XCTAssertTrue(normalRemove.waitForExistence(timeout: 10))
+        try makeHittable(normalRemove)
+        XCTAssertTrue(normalRemove.isEnabled)
+        print("EVIDENCE normal_stop run_id=\(normalTerminalRun.runID) run_state=\(normalTerminalRun.state) queue_running=\(normalStopped.running) package_state=\(normalStopped.state(of: normalQueuedID) ?? "missing") remove_enabled=\(normalRemove.isEnabled)")
+        attachScreenshot("desktop-candidate-normal-after-stop")
+
+        try clickControl("instruction-package-move-up-\(normalQueuedID)")
+        let normalReordered = try await waitForOrder([normalQueuedID, normalOtherID], timeout: 20)
+        print("EVIDENCE normal_reordered_before_refresh=\(normalReordered.packageIDs)")
+        try refreshProjects()
+        let normalRefreshed = try await waitForOrder([normalQueuedID, normalOtherID], timeout: 20)
+        print("EVIDENCE normal_reordered_after_refresh=\(normalRefreshed.packageIDs)")
+
+        try clickControl("instruction-package-remove-\(normalOtherID)")
+        _ = try await waitForOrder([normalQueuedID], timeout: 20)
+        try refreshProjects()
+        let normalRemoved = try await waitForOrder([normalQueuedID], timeout: 20)
+        XCTAssertFalse(app.buttons["instruction-package-remove-\(normalOtherID)"].exists)
+        print("EVIDENCE normal_removed package_id=\(normalOtherID) after_refresh_order=\(normalRemoved.packageIDs)")
+        attachScreenshot("desktop-candidate-normal-reorder-remove")
+
+        let sourcePath = try XCTUnwrap(normalRemoved.packages.first?.sourcePath)
+        let firstImport = try await postQueue(
+            "/api/manager/projects/instruction-packages/import",
+            body: projectBody(extra: ["source_path": sourcePath])
+        )
+        let minimumFirstID = try XCTUnwrap(firstImport.packages.last?.id)
+        let secondImport = try await postQueue(
+            "/api/manager/projects/instruction-packages/import",
+            body: projectBody(extra: ["source_path": sourcePath])
+        )
+        let minimumSecondID = try XCTUnwrap(secondImport.packages.last?.id)
+        XCTAssertNotEqual(minimumFirstID, minimumSecondID)
+        try refreshProjects()
+
+        let window = app.windows["forge-main-window"]
+        resizeMainWindowToMinimum(window)
+        print("EVIDENCE minimum_window width=\(Int(window.frame.width)) height=\(Int(window.frame.height)) order=\(secondImport.packageIDs)")
+
+        try clickControl("instruction-queue-toggle", expectedLabel: "Start Ordered Work")
+        let minimumActive = try await waitForActivePackage(minimumFirstID, timeout: 90)
+        let minimumRunID = try XCTUnwrap(minimumActive.packages.first(where: { $0.id == minimumFirstID })?.runID)
+        let minimumRun = try await waitForLiveLMStudioRun(minimumRunID, timeout: 90)
+        print("EVIDENCE minimum_live run_id=\(minimumRun.runID) state=\(minimumRun.state) provider=\(minimumRun.providerID) model=\(minimumRun.modelKey) session_id=\(minimumRun.activeSessionID ?? "nil") package=\(minimumFirstID)")
+
+        try clickControl("instruction-queue-toggle", expectedLabel: "Stop Active Work")
+        let minimumStopped = try await waitForPackage(minimumFirstID, state: "cancelled", timeout: 30)
+        let minimumTerminalRun = try await waitForRun(minimumRunID, state: "cancelled", timeout: 30)
+        let minimumRemove = app.buttons["instruction-package-remove-\(minimumFirstID)"]
+        try makeHittable(minimumRemove)
+        XCTAssertTrue(minimumRemove.isEnabled)
+        print("EVIDENCE minimum_stop run_id=\(minimumTerminalRun.runID) run_state=\(minimumTerminalRun.state) queue_running=\(minimumStopped.running) package_state=\(minimumStopped.state(of: minimumFirstID) ?? "missing") remove_hittable=\(minimumRemove.isHittable)")
+
+        let beforeMinimumReorder = minimumStopped.packageIDs
+        try clickControl("instruction-package-move-down-\(minimumFirstID)")
+        var expectedMinimumOrder = beforeMinimumReorder
+        let minimumFirstIndex = try XCTUnwrap(expectedMinimumOrder.firstIndex(of: minimumFirstID))
+        expectedMinimumOrder.swapAt(minimumFirstIndex, minimumFirstIndex + 1)
+        let minimumReordered = try await waitForOrder(expectedMinimumOrder, timeout: 20)
+        try refreshProjects()
+        let minimumRefreshed = try await waitForOrder(expectedMinimumOrder, timeout: 20)
+        print("EVIDENCE minimum_reorder before=\(beforeMinimumReorder) after=\(minimumReordered.packageIDs) after_refresh=\(minimumRefreshed.packageIDs)")
+
+        try clickControl("instruction-package-remove-\(minimumFirstID)")
+        let expectedAfterMinimumRemove = expectedMinimumOrder.filter { $0 != minimumFirstID }
+        _ = try await waitForOrder(expectedAfterMinimumRemove, timeout: 20)
+        try refreshProjects()
+        let minimumRemoved = try await waitForOrder(expectedAfterMinimumRemove, timeout: 20)
+        XCTAssertFalse(app.buttons["instruction-package-remove-\(minimumFirstID)"].exists)
+        print("EVIDENCE minimum_remove package_id=\(minimumFirstID) after_refresh_order=\(minimumRemoved.packageIDs) retained_package=\(minimumSecondID)")
+        attachScreenshot("desktop-candidate-minimum-stop-reorder-remove")
+    }
+
+    private func openProjects() throws {
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 10))
+        projects.click()
+        XCTAssertTrue(app.descendants(matching: .any)["detail-projects"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["project-instruction-packages"].waitForExistence(timeout: 10))
+    }
+
+    private func clickControl(_ identifier: String, expectedLabel: String? = nil) throws {
+        let control = app.buttons[identifier]
+        XCTAssertTrue(control.waitForExistence(timeout: 15), "Missing control \(identifier)")
+        try makeHittable(control)
+        XCTAssertTrue(control.isEnabled, "Disabled control \(identifier)")
+        if let expectedLabel { XCTAssertTrue(control.label.contains(expectedLabel)) }
+        print("EVIDENCE click id=\(identifier) label=\(control.label) hittable=\(control.isHittable) enabled=\(control.isEnabled)")
+        control.click()
+    }
+
+    private func makeHittable(_ target: XCUIElement) throws {
+        guard target.waitForExistence(timeout: 10) else {
+            throw LiveProjectsEvidenceError.controlUnavailable(target.identifier)
+        }
+        let scrolls = app.scrollViews.containing(.any, identifier: target.identifier).allElementsBoundByIndex
+        if let scroll = scrolls.last {
+            for _ in 0..<16 where !target.isHittable {
+                let distance = target.frame.midY - scroll.frame.midY
+                scroll.scroll(byDeltaX: 0, deltaY: -min(320, max(-320, distance)))
+            }
+        }
+        guard target.isHittable else {
+            throw LiveProjectsEvidenceError.controlNotHittable(target.identifier)
+        }
+    }
+
+    private func refreshProjects() throws {
+        let refresh = app.buttons["toolbar-refresh"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        XCTAssertTrue(refresh.isHittable)
+        refresh.click()
+    }
+
+    private func resizeMainWindowToMinimum(_ window: XCUIElement) {
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        if window.frame.width > 1_120 || window.frame.height > 840 {
+            let handle = window.coordinate(withNormalizedOffset: CGVector(dx: 0.998, dy: 0.998))
+            handle.click(
+                forDuration: 0.2,
+                thenDragTo: handle.withOffset(CGVector(dx: -800, dy: -600))
+            )
+        }
+        XCTAssertTrue(waitUntil(timeout: 5) { window.frame.width <= 1_120 && window.frame.height <= 840 })
+        XCTAssertLessThanOrEqual(window.frame.width, 1_120)
+        XCTAssertLessThanOrEqual(window.frame.height, 840)
+    }
+
+    private func instructionQueue() async throws -> LiveQueue {
+        try await postQueue("/api/manager/projects/instruction-packages", body: projectBody())
+    }
+
+    private func postQueue(_ path: String, body: [String: Any]) async throws -> LiveQueue {
+        let object = try await request(path: path, method: "POST", body: body)
+        return try LiveQueue(object)
+    }
+
+    private func operatorSnapshot() async throws -> [String: Any] {
+        try await request(path: "/api/manager/operator/snapshot?limit=100", method: "GET", body: nil)
+    }
+
+    private func request(path: String, method: String, body: [String: Any]?) async throws -> [String: Any] {
+        let url = try XCTUnwrap(URL(string: path, relativeTo: managerBaseURL))
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.timeoutInterval = 20
+        if method != "GET" {
+            let credentialURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".forge-conductor/manager-control.secret")
+            let credential = try await Task.detached(priority: .userInitiated) {
+                try String(contentsOf: credentialURL, encoding: .utf8)
+            }.value
+            request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body ?? [:], options: [.sortedKeys])
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = try XCTUnwrap(response as? HTTPURLResponse).statusCode
+        guard status == 200 else {
+            throw LiveProjectsEvidenceError.managerRejected(path, status, String(decoding: data, as: UTF8.self))
+        }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LiveProjectsEvidenceError.invalidPayload(path)
+        }
+        return object
+    }
+
+    private func projectBody(extra: [String: Any] = [:]) -> [String: Any] {
+        var body: [String: Any] = [
+            "project_id": projectID,
+            "project_generation": projectGeneration,
+        ]
+        for (key, value) in extra { body[key] = value }
+        return body
+    }
+
+    private func waitForActivePackage(_ packageID: String, timeout: TimeInterval) async throws -> LiveQueue {
+        try await waitForQueue(timeout: timeout) { queue in
+            queue.running && queue.state(of: packageID) == "running" && queue.runID(of: packageID) != nil
+        }
+    }
+
+    private func waitForPackage(_ packageID: String, state: String, timeout: TimeInterval) async throws -> LiveQueue {
+        try await waitForQueue(timeout: timeout) { $0.state(of: packageID) == state }
+    }
+
+    private func waitForOrder(_ packageIDs: [String], timeout: TimeInterval) async throws -> LiveQueue {
+        try await waitForQueue(timeout: timeout) { $0.packageIDs == packageIDs }
+    }
+
+    private func waitForQueue(
+        timeout: TimeInterval,
+        predicate: (LiveQueue) -> Bool
+    ) async throws -> LiveQueue {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latest = try await instructionQueue()
+        while Date() < deadline {
+            if predicate(latest) { return latest }
+            try await Task.sleep(for: .milliseconds(200))
+            latest = try await instructionQueue()
+        }
+        throw LiveProjectsEvidenceError.queueTimeout(latest.packageStates)
+    }
+
+    private func waitForLiveLMStudioRun(_ runID: String, timeout: TimeInterval) async throws -> LiveRun {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let run = try await liveRun(runID),
+               run.providerID == "lmstudio",
+               run.modelKey == "qwen/qwen3-coder-30b",
+               run.activeSessionID != nil,
+               !["cancelled", "completed", "failed_terminal"].contains(run.state) {
+                return run
+            }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        throw LiveProjectsEvidenceError.runTimeout(runID, "live LM Studio")
+    }
+
+    private func waitForRun(_ runID: String, state: String, timeout: TimeInterval) async throws -> LiveRun {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let run = try await liveRun(runID), run.state == state { return run }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        throw LiveProjectsEvidenceError.runTimeout(runID, state)
+    }
+
+    private func liveRun(_ runID: String) async throws -> LiveRun? {
+        let snapshot = try await operatorSnapshot()
+        let runs = snapshot["runs"] as? [[String: Any]] ?? []
+        return try runs.first(where: { ($0["run_id"] as? String) == runID }).map(LiveRun.init)
+    }
+
+    private func waitUntil(timeout: TimeInterval, _ predicate: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        return predicate()
+    }
+
+    private func attachScreenshot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}
+
+private struct LiveQueue {
+    struct Package {
+        let id: String
+        let state: String
+        let runID: String?
+        let sourcePath: String?
+    }
+
+    let running: Bool
+    let packages: [Package]
+
+    init(_ object: [String: Any]) throws {
+        guard let running = object["running"] as? Bool,
+              let rawPackages = object["packages"] as? [[String: Any]] else {
+            throw LiveProjectsEvidenceError.invalidPayload("instruction queue")
+        }
+        self.running = running
+        packages = try rawPackages.map { package in
+            guard let id = package["id"] as? String,
+                  let state = package["state"] as? String else {
+                throw LiveProjectsEvidenceError.invalidPayload("instruction package")
+            }
+            return Package(
+                id: id,
+                state: state,
+                runID: package["run_id"] as? String,
+                sourcePath: package["source_path"] as? String
+            )
+        }
+    }
+
+    var packageIDs: [String] { packages.map(\.id) }
+    var packageStates: [String] { packages.map { "\($0.id)=\($0.state)" } }
+    func state(of packageID: String) -> String? { packages.first { $0.id == packageID }?.state }
+    func runID(of packageID: String) -> String? { packages.first { $0.id == packageID }?.runID }
+}
+
+private struct LiveRun {
+    let runID: String
+    let state: String
+    let providerID: String
+    let modelKey: String
+    let activeSessionID: String?
+
+    init(_ object: [String: Any]) throws {
+        guard let runID = object["run_id"] as? String,
+              let state = object["state"] as? String,
+              let providerID = object["provider_id"] as? String,
+              let modelKey = object["model_key"] as? String else {
+            throw LiveProjectsEvidenceError.invalidPayload("operator run")
+        }
+        self.runID = runID
+        self.state = state
+        self.providerID = providerID
+        self.modelKey = modelKey
+        activeSessionID = object["active_session_id"] as? String
+    }
+}
+
+private enum LiveProjectsEvidenceError: LocalizedError {
+    case controlUnavailable(String)
+    case controlNotHittable(String)
+    case managerRejected(String, Int, String)
+    case invalidPayload(String)
+    case queueTimeout([String])
+    case runTimeout(String, String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .controlUnavailable(id): "Control \(id) was unavailable"
+        case let .controlNotHittable(id): "Control \(id) was not hittable"
+        case let .managerRejected(path, status, body): "Manager rejected \(path) with \(status): \(body)"
+        case let .invalidPayload(name): "Invalid live evidence payload: \(name)"
+        case let .queueTimeout(states): "Timed out waiting for queue state: \(states)"
+        case let .runTimeout(runID, state): "Timed out waiting for run \(runID) to reach \(state)"
+        }
+    }
+}

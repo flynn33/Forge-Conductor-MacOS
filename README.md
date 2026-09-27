@@ -21,9 +21,12 @@ supported desktop coding hosts.
 > identifiable and hittable in the minimum Projects window, cancels an exact
 > active package run and its owned runtime job before that package becomes
 > removable, and keeps the queue visible while those actions are in flight.
-> Signed native and real-Manager UI tests pass, but live LM Studio stopping on
-> the candidate bundle remains an owner check. Developer ID distribution,
-> notarization, and shipment qualification remain separate.
+> A signed native acceptance test attached to the named Desktop candidate,
+> started two real LM Studio-backed ordered runs, clicked **Stop Active Work**,
+> observed both runs and packages become `cancelled`, and verified Remove was
+> enabled. It also persisted reorder and removal through Refresh at normal and
+> minimum window sizes. Developer ID distribution, notarization, owner testing,
+> and shipment qualification remain separate; this is not a shipment claim.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation

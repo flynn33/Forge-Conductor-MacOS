@@ -154,6 +154,13 @@ the queue remains stopped, the package remains linked to its run, and the stop
 action stays available for retry; Forge does not manufacture a terminal package
 while work may still be active.
 
+The `0.14.7 (13)` Desktop-candidate acceptance exercised this exact path with
+two real LM Studio-backed ordered runs. The native Projects controls stopped
+both runs to terminal `cancelled`, unlocked Remove, persisted earlier/later
+order changes after Refresh, and persisted removal after Refresh at both normal
+and 1100×788 window sizes. This is focused Projects evidence; it does not
+replace owner final testing, Developer ID signing, notarization, or shipment.
+
 **Dashboard** monitors the active queue without changing it. Its project status
 shows delivered document steps and completed packages; the Managed Activity
 frame names a current package only when its `run_id` exactly links it to the
