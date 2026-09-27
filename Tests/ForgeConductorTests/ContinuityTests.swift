@@ -86,6 +86,54 @@ final class ContinuityTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.memoryCurrentTask.path))
     }
 
+    func testOperatorPacketListAndBatchDeleteUseExactHandoffPacketIDs() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let first = try app.continuity.checkpoint(
+            arguments: ["goal": "Disposable checkpoint", "cwd": tempHome.path],
+            clientID: ClientID("disposable-checkpoint")
+        )
+        let second = try app.continuity.handoff(
+            arguments: ["goal": "Disposable handoff", "cwd": tempHome.path],
+            clientID: ClientID("disposable-handoff")
+        )
+        let ids = [
+            try XCTUnwrap(first["handoff_id"] as? String),
+            try XCTUnwrap(second["handoff_id"] as? String),
+        ]
+        let listed = try app.continuity.operatorPackets()
+        XCTAssertEqual(Set(listed.map(\.id)), Set(ids))
+        XCTAssertEqual(listed.first(where: { $0.id == ids[0] })?.resumeReady, false)
+        XCTAssertEqual(listed.first(where: { $0.id == ids[1] })?.resumeReady, true)
+
+        let deleted = try app.continuity.deleteOperatorPackets(ids: ids)
+        XCTAssertEqual(Set(deleted), Set(ids))
+        XCTAssertTrue(try app.continuity.operatorPackets().isEmpty)
+        XCTAssertNil(try app.store.handoffGet(id: ids[0]))
+        XCTAssertNil(try app.store.handoffGet(id: ids[1]))
+
+        let projectID = ProjectID(UUID(uuidString: "11111111-1111-4111-8111-111111111111")!)
+        let wire = OperatorContinuityPacketList(
+            projectID: projectID,
+            packets: [
+                OperatorContinuityPacket(
+                    packetID: ids[0],
+                    projectID: projectID,
+                    type: "checkpoint",
+                    source: .auto,
+                    timestamp: "2026-09-27T12:00:00Z",
+                    resumeReady: false
+                ),
+            ]
+        )
+        let encoded = try JSONEncoder().encode(wire)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        XCTAssertEqual(object["project_id"] as? String, projectID.description)
+        let rows = try XCTUnwrap(object["packets"] as? [[String: Any]])
+        XCTAssertEqual(rows.first?["project_id"] as? String, projectID.description)
+        XCTAssertEqual(try JSONDecoder().decode(OperatorContinuityPacketList.self, from: encoded), wire)
+    }
+
     func testHandoffMarksResumeReadyAndSnapshotsAgents() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }

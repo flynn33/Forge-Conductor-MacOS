@@ -484,6 +484,60 @@ public final class ManagerRoutes: @unchecked Sendable {
             }
             dispatchNativeSourceCommand(action: String(target.path.split(separator: "/").last ?? ""),
                 body: body, connection: connection)
+        case ("GET", "/api/manager/continuity/packets"):
+            guard body.isEmpty,
+                  target.queryItems.count == 1,
+                  target.queryItems[0].name == "project_id",
+                  let value = target.queryItems[0].value,
+                  let identifier = UUID(uuidString: value) else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_continuity_packet_query",
+                    "message": "Continuity packet listing requires one project_id UUID.",
+                ])
+                return
+            }
+            do {
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try JSONSupport.object(from: JSONEncoder().encode(
+                        manager.continuityPackets(projectID: ProjectID(identifier))
+                    ))
+                )
+            } catch {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false, "code": "continuity_packet_list_failed",
+                    "message": error.localizedDescription,
+                ])
+            }
+        case ("POST", "/api/manager/continuity/packets/delete"):
+            guard target.queryItems.isEmpty,
+                  !body.isEmpty,
+                  body.count <= 32 * 1_024 else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_continuity_packet_delete",
+                    "message": "Continuity packet deletion requires a bounded JSON body.",
+                ])
+                return
+            }
+            do {
+                let request = try JSONDecoder().decode(
+                    OperatorContinuityPacketDeleteRequest.self,
+                    from: body
+                )
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try JSONSupport.object(from: JSONEncoder().encode(
+                        manager.deleteContinuityPackets(request)
+                    ))
+                )
+            } catch {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false, "code": "continuity_packet_delete_failed",
+                    "message": error.localizedDescription,
+                ])
+            }
         case ("GET", "/api/manager/provider/configuration"),
              ("PUT", "/api/manager/provider/configuration"),
              ("GET", "/api/manager/provider/models"),

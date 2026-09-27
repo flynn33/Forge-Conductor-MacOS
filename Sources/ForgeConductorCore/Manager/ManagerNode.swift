@@ -2558,6 +2558,62 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         return receipt
     }
 
+    /// Lists the durable context packets consumed by `context_get`, scoped by
+    /// the same registered-project matching used by automatic LM Studio
+    /// rollover. Payload contents are intentionally not exposed to the UI.
+    public func continuityPackets(projectID: ProjectID) throws -> OperatorContinuityPacketList {
+        let projects = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.app.projectContexts.repository.operatorProjects(limit: 100)
+        }
+        guard projects.contains(where: { $0.projectID == projectID }) else {
+            throw ProjectContextError.projectNotFound(projectID)
+        }
+        let packets = try app.continuity.operatorPackets().compactMap { packet -> OperatorContinuityPacket? in
+            guard Self.interactiveProject(for: packet, projects: projects)?.projectID == projectID else {
+                return nil
+            }
+            return OperatorContinuityPacket(
+                packetID: packet.id,
+                projectID: projectID,
+                type: packet.resumeReady ? "handoff" : "checkpoint",
+                source: packet.source,
+                timestamp: packet.updatedAt,
+                resumeReady: packet.resumeReady
+            )
+        }
+        return OperatorContinuityPacketList(projectID: projectID, packets: packets)
+    }
+
+    /// Deletes exact packet identities only after proving every requested row
+    /// belongs to the selected project. No project-wide continuity purge is
+    /// reachable through this operation.
+    public func deleteContinuityPackets(
+        _ request: OperatorContinuityPacketDeleteRequest
+    ) throws -> OperatorContinuityPacketDeleteReceipt {
+        let requested = request.packetIDs
+        guard !requested.isEmpty, requested.count <= 100,
+              Set(requested).count == requested.count,
+              requested.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw AutonomyError.invalidRequest("continuity packet selection is invalid")
+        }
+        let visible = try continuityPackets(projectID: request.projectID)
+        let visibleIDs = Set(visible.packets.map(\.packetID))
+        guard requested.allSatisfy(visibleIDs.contains) else {
+            throw ProjectContextError.projectScopeMismatch
+        }
+        let deleted = try app.continuity.deleteOperatorPackets(ids: requested)
+        guard Set(deleted) == Set(requested) else {
+            throw ProjectMemoryError.integrityFailure(
+                "continuity packet deletion did not remove the exact selection"
+            )
+        }
+        return OperatorContinuityPacketDeleteReceipt(
+            projectID: request.projectID,
+            deletedPacketIDs: requested,
+            completedAt: ISO8601.string(from: app.clock.now())
+        )
+    }
+
     /// Clears old continuity payload/history without resetting projects or
     /// advancing generations. Stale operations owned by terminal tasks are
     /// retired first; continuity owned by a live task fails closed.

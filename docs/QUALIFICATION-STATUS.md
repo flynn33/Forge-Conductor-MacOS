@@ -1,25 +1,30 @@
 # Version and qualification status
 
-## 0.16.0 owner-workflow visibility and Manager correction
+## 0.16.0 packet management and tokenless-local correction
 
-Product identity is **0.16.0, build 16**. Published source revision
-`f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple
-Development-signed Desktop app and `.xcarchive` named `Forge Conductor 0.16.0
-(16)-f2cc6ca`; the app reports `0.16.0 (16)` and passes strict deep-signature
-validation. An ordinary launch targeted that exact Desktop app and passed
-`testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch` with one test,
-zero skips, and zero failures, retaining screenshots and accessibility
-hierarchies for Projects, Continuity, Rune Forge, and Provider. The Continuity
-evidence directly contains its project list, Copy Project ID, Delete, Reset,
-selected-project package picker and Delete Package, and Clear Cache. The test
-used an isolated empty home and changed no live Continuity records.
+The current source identity is **0.16.0, build 17**. Continuity now lists the
+actual durable checkpoint/handoff packets under each project ID and deletes
+only the exact single or multi-selection after confirmation. Reset and Clear
+Cache remain on Continuity; instruction-package controls are confined to
+Projects. Focused packet store/wire and native UI tests execute with zero
+failures.
 
-The native live-provider test discovered loaded model
-`qwen/qwen3.8-27b` and completed **Connect and Check** before and after relaunch
-without `operator-unavailable`. Owner review of the exact Desktop candidate,
-the Advanced probe, ordinary LM Studio `get_forge_status`, CLU delivery, and
-automatic rollover sequence remain open. This is not shipment acceptance, and
-`/Applications/Forge Conductor.app` was not replaced.
+Same-host LM Studio configuration no longer exposes or accepts an operator
+credential. The build-17 migration removed the obsolete local Forge Keychain
+reference on this host; the persisted local configuration reports no reference
+and the credential journal is a tombstone. Live source-path **Connect and
+Check** returned `ready`, and the advanced contract probe returned
+`contract_valid` for `qwen/qwen3.8-27b`, with
+`credential_configured=false`.
+
+The build-17 Desktop archive, exact-candidate UI/runtime reruns, disposable live
+packet deletion, ordinary LM Studio `get_forge_status`, CLU delivery, and the
+complete automatic rollover sequence remain open. This is not shipment
+acceptance, and `/Applications/Forge Conductor.app` has not been replaced.
+
+The prior build-16 candidate at revision `f2cc6ca` remains historical evidence
+only. Its Continuity package control and project-wide delete do not satisfy the
+current packet contract.
 
 ## 0.15.0 Continuity history retention controls
 

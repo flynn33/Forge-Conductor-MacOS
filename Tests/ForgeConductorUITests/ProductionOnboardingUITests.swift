@@ -197,20 +197,19 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         try click(app.buttons["tab-continuity"])
         for identifier in [
             "continuity-project-list",
+            "continuity-packet-list",
             "continuity-copy-project-id",
-            "continuity-delete-project",
+            "continuity-delete-packets",
             "continuity-reset",
-            "continuity-delete-package",
             "continuity-clear-cache",
-            "continuity-package-picker",
             "continuity-projects-empty",
+            "continuity-packets-empty",
         ] {
             XCTAssertTrue(element(identifier).waitForExistence(timeout: 8), identifier)
         }
         XCTAssertFalse(app.buttons["continuity-copy-project-id"].isEnabled)
-        XCTAssertFalse(app.buttons["continuity-delete-project"].isEnabled)
+        XCTAssertFalse(app.buttons["continuity-delete-packets"].isEnabled)
         XCTAssertFalse(app.buttons["continuity-reset"].isEnabled)
-        XCTAssertFalse(app.buttons["continuity-delete-package"].isEnabled)
         XCTAssertTrue(app.buttons["continuity-clear-cache"].isEnabled)
         attachNativeSurface("owner-workflow-continuity")
 
@@ -1660,15 +1659,16 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
     private var app: XCUIApplication!
     private var candidatePath = ""
 
-    func testLiveContinuityDeletesSelectedProjectDataAndPersistsAcrossRelaunch() async throws {
+    func testLiveContinuityDeletesOnlyExplicitDisposablePacket() async throws {
         let environment = ProcessInfo.processInfo.environment
-        let explicitMarker = "/tmp/forge-run-live-continuity-clear"
-        guard environment["FORGE_RUN_LIVE_CONTINUITY_CLEAR"] == "1"
-                || FileManager.default.fileExists(atPath: explicitMarker) else {
+        guard environment["FORGE_RUN_LIVE_CONTINUITY_PACKET_DELETE"] == "1" else {
             throw XCTSkip(
-                "Requires explicit FORGE_RUN_LIVE_CONTINUITY_CLEAR=1 authorization "
-                    + "or the local live-clear marker"
+                "Requires explicit FORGE_RUN_LIVE_CONTINUITY_PACKET_DELETE=1 authorization"
             )
+        }
+        guard let disposablePacketID = environment["FORGE_DISPOSABLE_CONTINUITY_PACKET_ID"],
+              !disposablePacketID.isEmpty else {
+            throw XCTSkip("Requires the exact disposable continuity packet ID")
         }
         guard let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"],
               !requestedPath.isEmpty else {
@@ -1677,42 +1677,32 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         candidatePath = URL(fileURLWithPath: requestedPath).standardizedFileURL.path
         try attachToRunningCandidate()
 
-        let beforeIDs = try await waitForContinuityIDs(minimumCount: 1, timeout: 20)
-        print("EVIDENCE continuity_before_ids=\(beforeIDs.joined(separator: ","))")
+        let beforeIDs = try await continuityPacketIDs()
+        XCTAssertTrue(beforeIDs.contains(disposablePacketID))
+        print("EVIDENCE continuity_packet_before_ids=\(beforeIDs.joined(separator: ","))")
 
         try openContinuity()
         let selectedRow = app.staticTexts["continuity-project-row-\(projectID)"]
         XCTAssertTrue(selectedRow.waitForExistence(timeout: 10))
         try makeHittable(selectedRow)
         selectedRow.click()
-        try clickControl("continuity-delete-project", expectedLabel: "Delete")
-        XCTAssertTrue(app.staticTexts["Delete continuity data?"].waitForExistence(timeout: 5))
+        let packetRow = app.descendants(matching: .any)["continuity-packet-row-\(disposablePacketID)"]
+        XCTAssertTrue(packetRow.waitForExistence(timeout: 10))
+        try makeHittable(packetRow)
+        packetRow.click()
+        try clickControl("continuity-delete-packets", expectedLabel: "Delete")
+        XCTAssertTrue(app.staticTexts["Delete selected continuity packets?"].waitForExistence(timeout: 5))
         let confirmSelected = app.sheets.buttons["Delete"]
         XCTAssertTrue(confirmSelected.waitForExistence(timeout: 5))
         confirmSelected.click()
 
-        let afterSelectedIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
+        let expectedIDs = beforeIDs.filter { $0 != disposablePacketID }
+        let afterSelectedIDs = try await waitForContinuityPacketIDs(expected: expectedIDs, timeout: 30)
         try refreshCurrentView()
-        XCTAssertTrue(waitUntil(timeout: 10) { !selectedRow.exists })
-        XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].exists)
-        print("EVIDENCE continuity_button=Delete project_id=\(projectID) after_refresh_ids=\(afterSelectedIDs.joined(separator: ","))")
-
-        app.terminate()
-        for running in NSWorkspace.shared.runningApplications where
-            running.bundleURL?.standardizedFileURL.path == candidatePath {
-            _ = running.terminate()
-        }
-        XCTAssertTrue(waitUntil(timeout: 15) {
-            !NSWorkspace.shared.runningApplications.contains(where: {
-                $0.bundleURL?.standardizedFileURL.path == self.candidatePath
-            })
-        })
-        try await launchCandidateAtExactPath()
-        try attachToRunningCandidate()
-        let afterRelaunchIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
-        try openContinuity()
-        XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].waitForExistence(timeout: 10))
-        print("EVIDENCE continuity_after_relaunch_ids=\(afterRelaunchIDs) candidate_path=\(candidatePath)")
+        XCTAssertTrue(waitUntil(timeout: 10) { !packetRow.exists })
+        XCTAssertEqual(afterSelectedIDs, expectedIDs)
+        print("EVIDENCE continuity_packet_deleted=\(disposablePacketID) retained_ids=\(afterSelectedIDs.joined(separator: ","))")
+        attachScreenshot("desktop-candidate-continuity-packet-delete")
     }
 
     func testLiveInstructionReorderDeleteAndProjectMaintenanceControls() async throws {
@@ -1874,16 +1864,20 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         refresh.click()
     }
 
-    private func continuityIDs() async throws -> [String] {
-        let snapshot = try await operatorSnapshot()
-        let operations = snapshot["continuity_operations"] as? [[String: Any]] ?? []
-        return operations.compactMap { $0["operation_id"] as? String }
+    private func continuityPacketIDs() async throws -> [String] {
+        let object = try await request(
+            path: "/api/manager/continuity/packets?project_id=\(projectID)",
+            method: "GET",
+            body: nil
+        )
+        guard let packets = object["packets"] as? [[String: Any]] else {
+            throw LiveProjectsEvidenceError.invalidPayload("continuity packet list")
+        }
+        return packets.compactMap { $0["packet_id"] as? String }
     }
 
-    private func waitForContinuityIDs(
-        minimumCount: Int? = nil,
-        expectedCount: Int? = nil,
-        excluding excluded: Set<String> = [],
+    private func waitForContinuityPacketIDs(
+        expected: [String],
         timeout: TimeInterval
     ) async throws -> [String] {
         let deadline = Date().addingTimeInterval(timeout)
@@ -1891,12 +1885,8 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         var lastError: Error?
         while Date() < deadline {
             do {
-                latest = try await continuityIDs()
-                let satisfiesMinimum = minimumCount.map { latest.count >= $0 } ?? true
-                let satisfiesExpected = expectedCount.map { latest.count == $0 } ?? true
-                if satisfiesMinimum,
-                   satisfiesExpected,
-                   excluded.isDisjoint(with: latest) {
+                latest = try await continuityPacketIDs()
+                if latest == expected {
                     return latest
                 }
             } catch {
@@ -1906,7 +1896,7 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         }
         if let lastError, latest.isEmpty { throw lastError }
         throw LiveProjectsEvidenceError.invalidPayload(
-            "continuity IDs did not reach the expected state; latest=\(latest)"
+            "continuity packet IDs did not reach the expected state; latest=\(latest)"
         )
     }
 

@@ -376,6 +376,40 @@ public final class ContextContinuityService: @unchecked Sendable {
         ]
     }
 
+    /// Operator-only packet inventory. It returns the same durable legacy
+    /// packets visible to `context_get`, without exposing packet payloads.
+    public func operatorPackets() throws -> [HandoffPacket] {
+        try store.handoffLegacyListAll()
+    }
+
+    /// Removes exact context packet identities and their derived projections.
+    /// The SQLite transaction is authoritative; projection repair follows under
+    /// the same cross-process continuity lock.
+    public func deleteOperatorPackets(ids: [String]) throws -> [String] {
+        try lockContinuityMutex(lock, operation: "lock continuity service", cancellation: nil)
+        defer { lock.unlock() }
+        try paths.ensureLayout()
+        return try withPersistenceFileLock(cancellation: nil) {
+            let deleted = try store.handoffLegacyDelete(ids: ids)
+            for id in deleted {
+                let url = try packetProjectionURL(id: id)
+                if FileManager.default.fileExists(atPath: url.path) {
+                    try FileManager.default.removeItem(at: url)
+                }
+            }
+            if let latest = try store.handoffLegacyLatest(resumeReadyOnly: false) {
+                try writeLatestProjections(latest)
+            } else {
+                for url in [paths.memoryHandoffsDir.appendingPathComponent("LATEST"),
+                            paths.memoryCurrentTask, paths.memoryNextChat]
+                where FileManager.default.fileExists(atPath: url.path) {
+                    try FileManager.default.removeItem(at: url)
+                }
+            }
+            return deleted
+        }
+    }
+
     /// Compact status for forge_status.
     public func statusSummary(
         cancellation: ToolCallCancellation? = nil

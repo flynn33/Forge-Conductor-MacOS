@@ -1,5 +1,5 @@
 // ContinuityViewModel.swift
-// Project continuity identity projection with explicit project-scoped deletion.
+// Project-scoped continuity packet inventory with exact packet deletion.
 
 import Foundation
 import ForgeConductorCore
@@ -8,21 +8,31 @@ import ForgeConductorCore
 final class ContinuityViewModel: ObservableObject {
     @Published private(set) var projectIDs: [String] = []
     @Published var selectedProjectID: String?
+    @Published private(set) var packets: [OperatorContinuityPacket] = []
+    @Published var selectedPacketIDs = Set<String>()
     @Published private(set) var isLoading = false
-    @Published private(set) var deletingProjectID: String?
+    @Published private(set) var isLoadingPackets = false
+    @Published private(set) var deletingPacketIDs = Set<String>()
+    @Published private(set) var isResetting = false
+    @Published private(set) var isClearingCache = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var commandErrorMessage: String?
     @Published private(set) var notice: String?
 
     private let client: any OperatorManagerClientProtocol
     private var loadTask: Task<Void, Never>?
+    private var packetTask: Task<Void, Never>?
 
     init(client: any OperatorManagerClientProtocol) {
         self.client = client
     }
 
-    var canDeleteSelectedProject: Bool {
-        selectedProjectID != nil && !isLoading && deletingProjectID == nil
+    var canDeleteSelectedPackets: Bool {
+        !selectedPacketIDs.isEmpty && !isLoadingPackets && deletingPacketIDs.isEmpty
+    }
+
+    var canResetSelectedProject: Bool {
+        selectedProjectID != nil && !isLoadingPackets && !isResetting
     }
 
     func load() {
@@ -39,12 +49,12 @@ final class ContinuityViewModel: ObservableObject {
                     .map { $0.projectID.lowercased() }
                     .sorted()
                 projectIDs = loadedProjectIDs
-                if let selectedProjectID,
-                   loadedProjectIDs.contains(selectedProjectID) {
+                if let selectedProjectID, loadedProjectIDs.contains(selectedProjectID) {
                     self.selectedProjectID = selectedProjectID
                 } else {
                     selectedProjectID = loadedProjectIDs.first
                 }
+                loadPackets()
             } catch is CancellationError {
                 return
             } catch {
@@ -54,15 +64,85 @@ final class ContinuityViewModel: ObservableObject {
         }
     }
 
-    func deleteSelectedProjectContinuity() {
-        guard canDeleteSelectedProject,
-              let selectedProjectID,
-              let identifier = UUID(uuidString: selectedProjectID) else {
-            commandErrorMessage = "The selected continuity project has an invalid identity."
+    func loadPackets() {
+        packetTask?.cancel()
+        selectedPacketIDs.removeAll()
+        packets = []
+        guard let projectID = selectedProjectID else {
+            isLoadingPackets = false
             return
         }
+        isLoadingPackets = true
+        commandErrorMessage = nil
+        packetTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let response = try await client.continuityPackets(projectID: projectID)
+                try Task.checkCancellation()
+                guard response.projectID.description == projectID else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "manager returned continuity packets for another project"
+                    )
+                }
+                packets = response.packets
+            } catch is CancellationError {
+                return
+            } catch {
+                commandErrorMessage = error.localizedDescription
+            }
+            isLoadingPackets = false
+        }
+    }
 
-        deletingProjectID = selectedProjectID
+    func deleteSelectedPackets() {
+        guard canDeleteSelectedPackets,
+              let projectID = selectedProjectID,
+              let projectUUID = UUID(uuidString: projectID) else {
+            commandErrorMessage = "Select one or more continuity packets to delete."
+            return
+        }
+        let selection = packets.map(\.packetID).filter(selectedPacketIDs.contains)
+        guard selection.count == selectedPacketIDs.count else {
+            commandErrorMessage = "The selected continuity packet list changed. Reload and retry."
+            return
+        }
+        deletingPacketIDs = Set(selection)
+        commandErrorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let request = OperatorContinuityPacketDeleteRequest(
+                    projectID: ProjectID(projectUUID),
+                    packetIDs: selection
+                )
+                let receipt = try await client.deleteContinuityPackets(request)
+                guard Set(receipt.deletedPacketIDs) == Set(selection) else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "manager did not delete the exact continuity packet selection"
+                    )
+                }
+                packets.removeAll { selection.contains($0.packetID) }
+                selectedPacketIDs.removeAll()
+                notice = selection.count == 1
+                    ? "Deleted continuity packet \(selection[0])."
+                    : "Deleted \(selection.count) continuity packets."
+            } catch {
+                commandErrorMessage = error.localizedDescription
+            }
+            deletingPacketIDs.removeAll()
+            if commandErrorMessage == nil { loadPackets() }
+        }
+    }
+
+    func resetSelectedProjectContinuity() {
+        guard canResetSelectedProject,
+              let projectID = selectedProjectID,
+              let projectUUID = UUID(uuidString: projectID) else {
+            commandErrorMessage = "Select a continuity project to reset."
+            return
+        }
+        isResetting = true
         commandErrorMessage = nil
         notice = nil
         Task { [weak self] in
@@ -70,27 +150,45 @@ final class ContinuityViewModel: ObservableObject {
             do {
                 let request = ContinuityHistoryClearRequest(
                     scope: .project,
-                    projectID: ProjectID(identifier)
+                    projectID: ProjectID(projectUUID)
                 )
                 let receipt = try await client.clearContinuityHistory(request)
                 guard receipt.scope == .project,
                       receipt.requestedProjectID == request.projectID else {
                     throw OperatorManagerClientError.invalidPayload(
-                        "manager returned a continuity deletion receipt for a different project"
+                        "manager returned a continuity reset receipt for another project"
                     )
                 }
-                projectIDs.removeAll { $0 == selectedProjectID }
-                self.selectedProjectID = projectIDs.first
-                notice = receipt.clearedOperationCount == 0
-                    ? "This project's continuity data was already clear."
-                    : "Deleted continuity data for project \(selectedProjectID)."
+                notice = "Reset continuity history for project \(projectID). "
+                    + "Durable packets remain available until explicitly deleted."
+                loadPackets()
             } catch {
                 commandErrorMessage = error.localizedDescription
             }
-            deletingProjectID = nil
-            if commandErrorMessage == nil {
-                load()
+            isResetting = false
+        }
+    }
+
+    func clearDisposableCache() {
+        guard !isClearingCache else { return }
+        isClearingCache = true
+        commandErrorMessage = nil
+        notice = nil
+        let operationID = UUID()
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let receipt = try await client.clearApplicationCache(operationID: operationID)
+                guard receipt.operationID == operationID, receipt.removedEntryCount >= 0 else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "cache clear receipt did not match the requested operation"
+                    )
+                }
+                notice = "Cleared disposable Forge cache (\(receipt.removedEntryCount) top-level item(s))."
+            } catch {
+                commandErrorMessage = error.localizedDescription
             }
+            isClearingCache = false
         }
     }
 }

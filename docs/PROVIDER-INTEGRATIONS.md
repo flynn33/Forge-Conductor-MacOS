@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.16.0**, build **15**. Qualification remains
+Product identity: version **0.16.0**, build **17**. Qualification remains
 evidence-bound per host and candidate.
 
 ## Current provider workflow
@@ -17,7 +17,8 @@ preparation contract. None of those actions starts or resumes a Managed Run.
 The preparation contract:
 
 1. authenticates to the running Forge Manager;
-2. loads the saved LM Studio endpoint and optional credential;
+2. loads the saved LM Studio endpoint; the same-host local path carries no LM
+   Studio credential, while linked HTTPS endpoints may use one;
 3. uses the supported `lms` command-line interface for bounded local-server
    discovery or recovery when the endpoint is offline;
 4. fetches bounded model inventory;
@@ -66,9 +67,10 @@ timeouts, truncation, or failed inventory verification remain explicit.
 ## Stored configuration and credentials
 
 Provider configuration and redacted readiness receipts are bounded under the
-Forge application home. Replacement tokens are stored through Keychain and are
-not returned in snapshots or written to receipts. The UI supports keeping,
-replacing, or clearing a credential.
+Forge application home. The same-host local path has no operator credential
+control, never accepts a replacement token, and migrates an obsolete local
+Keychain reference to a cleared state. Linked HTTPS provider tokens remain in
+Keychain and are not returned in snapshots or written to receipts.
 
 Saving configuration does not require LM Studio to be online. **Connect and
 Check** is the operation that establishes current live readiness. Forge does

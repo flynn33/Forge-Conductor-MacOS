@@ -68,6 +68,10 @@ protocol OperatorManagerClientProtocol: Sendable {
     func clearContinuityHistory(
         _ request: ContinuityHistoryClearRequest
     ) async throws -> ContinuityHistoryClearReceipt
+    func continuityPackets(projectID: String) async throws -> OperatorContinuityPacketList
+    func deleteContinuityPackets(
+        _ request: OperatorContinuityPacketDeleteRequest
+    ) async throws -> OperatorContinuityPacketDeleteReceipt
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -323,6 +327,20 @@ extension OperatorManagerClientProtocol {
     ) async throws -> ContinuityHistoryClearReceipt {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Continuity history clearing is unavailable from this manager client."
+        )
+    }
+
+    func continuityPackets(projectID: String) async throws -> OperatorContinuityPacketList {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Continuity packet listing is unavailable from this manager client."
+        )
+    }
+
+    func deleteContinuityPackets(
+        _ request: OperatorContinuityPacketDeleteRequest
+    ) async throws -> OperatorContinuityPacketDeleteReceipt {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Continuity packet deletion is unavailable from this manager client."
         )
     }
 
@@ -1204,6 +1222,58 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         return receipt
     }
 
+    func continuityPackets(projectID: String) async throws -> OperatorContinuityPacketList {
+        guard let identifier = UUID(uuidString: projectID) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "continuity packet listing requires a project UUID"
+            )
+        }
+        let response: OperatorContinuityPacketList = try await request(
+            method: "GET",
+            path: "/api/manager/continuity/packets",
+            queryItems: [URLQueryItem(name: "project_id", value: identifier.uuidString.lowercased())],
+            unavailableMessage: "Continuity packet listing is unavailable. Update or restart the manager from this build, then retry."
+        )
+        guard response.projectID.description == identifier.uuidString.lowercased(),
+              response.packets.allSatisfy({
+                  $0.projectID == response.projectID
+                      && !$0.packetID.isEmpty
+                      && ["checkpoint", "handoff"].contains($0.type)
+                      && ISO8601.date(from: $0.timestamp) != nil
+              }) else {
+            throw OperatorManagerClientError.invalidPayload(
+                "manager returned an invalid continuity packet list"
+            )
+        }
+        return response
+    }
+
+    func deleteContinuityPackets(
+        _ mutation: OperatorContinuityPacketDeleteRequest
+    ) async throws -> OperatorContinuityPacketDeleteReceipt {
+        guard !mutation.packetIDs.isEmpty,
+              mutation.packetIDs.count <= 100,
+              Set(mutation.packetIDs).count == mutation.packetIDs.count else {
+            throw OperatorManagerClientError.invalidPayload(
+                "continuity packet deletion requires one or more unique packet IDs"
+            )
+        }
+        let receipt: OperatorContinuityPacketDeleteReceipt = try await request(
+            method: "POST",
+            path: "/api/manager/continuity/packets/delete",
+            body: mutation,
+            unavailableMessage: "Continuity packet deletion is unavailable. Update or restart the manager from this build, then retry."
+        )
+        guard receipt.projectID == mutation.projectID,
+              Set(receipt.deletedPacketIDs) == Set(mutation.packetIDs),
+              ISO8601.date(from: receipt.completedAt) != nil else {
+            throw OperatorManagerClientError.invalidPayload(
+                "continuity packet deletion receipt did not match the exact selection"
+            )
+        }
+        return receipt
+    }
+
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -1823,6 +1893,16 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         _ request: ContinuityHistoryClearRequest
     ) async throws -> ContinuityHistoryClearReceipt {
         try await current.clearContinuityHistory(request)
+    }
+
+    func continuityPackets(projectID: String) async throws -> OperatorContinuityPacketList {
+        try await current.continuityPackets(projectID: projectID)
+    }
+
+    func deleteContinuityPackets(
+        _ request: OperatorContinuityPacketDeleteRequest
+    ) async throws -> OperatorContinuityPacketDeleteReceipt {
+        try await current.deleteContinuityPackets(request)
     }
 
     func relinkProject(

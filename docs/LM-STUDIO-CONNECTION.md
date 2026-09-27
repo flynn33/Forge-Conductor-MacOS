@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.16.0**, build **15**. This connection document does
+Product identity: version **0.16.0**, build **17**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -60,8 +60,12 @@ background snapshot is still loading when LM Studio is selected, the explicit
 activation supersedes that load instead of silently ignoring the click.
 
 The native Provider screen saves the LM Studio server origin and an exact model
-key. Saving is durable and does not prove the server is reachable. With a saved
-loopback endpoint, **Connect and Check** is the ordinary one-button path. Forge
+key. A same-host local endpoint has no LM Studio token field and rejects token
+replacement through the Manager API; any legacy local Forge credential
+reference is removed from configuration and Keychain. Linked HTTPS endpoints
+retain their separate optional credential path. Saving is durable and does not
+prove the server is reachable. With a saved loopback endpoint, **Connect and
+Check** is the ordinary one-button path. Forge
 first attempts normal inventory. After a transport-level offline result, it
 locates LM Studio's supported `lms` CLI in the system or per-user application,
 the standard LM Studio user location, Homebrew locations, or `PATH`; reads `lms

@@ -3,7 +3,8 @@ import Foundation
 enum GuidedControlAnchor {
     static let knownIdentifiers: Set<String> = [
         "continuity-copy-project-id",
-        "continuity-delete-project",
+        "continuity-delete-packets",
+        "continuity-packet-list",
         "continuity-project-list",
         "context-gauge",
         "project-clear-content",
@@ -15,10 +16,9 @@ enum GuidedControlAnchor {
         "project-remove",
         "project-reset",
         "project-reset-receipt",
-        "provider-credential-action",
+        "provider-local-no-auth",
         "provider-run-contract-probe",
         "provider-test-connection",
-        "provider-token",
         "run-cancel",
         "run-pause",
         "run-preparation-recovery",

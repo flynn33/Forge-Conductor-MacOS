@@ -257,18 +257,28 @@ struct ProviderOperatorView: View {
                     }
                     .accessibilityIdentifier("provider-model-selection")
                 }
-                Picker("Credential", selection: $viewModel.credentialAction) {
-                    Text("Keep existing credential").tag(ProviderCredentialAction.keep)
-                    Text("Replace credential").tag(ProviderCredentialAction.replace)
-                    Text("Clear credential").tag(ProviderCredentialAction.clear)
+                if viewModel.configuration?.endpointMode == .local {
+                    Text("Local LM Studio uses the private loopback connection without an operator login or token.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("provider-local-no-auth")
+                } else {
+                    Picker("Credential", selection: $viewModel.credentialAction) {
+                        Text("Keep existing credential").tag(ProviderCredentialAction.keep)
+                        Text("Replace credential").tag(ProviderCredentialAction.replace)
+                        Text("Clear credential").tag(ProviderCredentialAction.clear)
+                    }
+                    .accessibilityIdentifier("provider-credential-action")
+                    if viewModel.credentialAction == .replace {
+                        SecureField("Linked LM Studio access token", text: $viewModel.token)
+                            .accessibilityIdentifier("provider-token")
+                    }
+                    Text(viewModel.configuration?.credentialConfigured == true
+                         ? "A linked-provider Keychain credential is configured."
+                         : "No linked-provider Keychain credential is configured.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .accessibilityIdentifier("provider-credential-action")
-                if viewModel.credentialAction == .replace {
-                    SecureField("LM Studio access token", text: $viewModel.token)
-                        .accessibilityIdentifier("provider-token")
-                }
-                Text(viewModel.configuration?.credentialConfigured == true ? "A Keychain credential is configured." : "No Keychain credential is configured.")
-                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("Save", action: viewModel.save)
                         .disabled(viewModel.configuration == nil)

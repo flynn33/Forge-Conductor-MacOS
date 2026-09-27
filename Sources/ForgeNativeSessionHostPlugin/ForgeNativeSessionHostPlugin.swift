@@ -5681,6 +5681,18 @@ public enum ForgeNativeSessionHostPlugin {
         LMStudioProviderConfiguration, URL
     ) throws -> any LMStudioAuthorizationProviding
 
+    public static func defaultAuthorization(
+        for configuration: LMStudioProviderConfiguration
+    ) throws -> any LMStudioAuthorizationProviding {
+        guard configuration.endpointMode != .local else {
+            return LMStudioNoAuthorization()
+        }
+        if let reference = configuration.keychainTokenReference {
+            return try LMStudioKeychainAuthorization(reference: reference)
+        }
+        return LMStudioNoAuthorization()
+    }
+
     public static let manifest = HostPluginManifest(
         identifier: identifier, version: version, minimumContractVersion: 2,
         hostType: "lmstudio-rest-managed",
@@ -5706,10 +5718,7 @@ public enum ForgeNativeSessionHostPlugin {
             try LMStudioProviderConfiguration.loadIfPresent(in: directory)
         },
         authorizationSource: @escaping AuthorizationSource = { configuration, _ in
-            if let reference = configuration.keychainTokenReference {
-                return try LMStudioKeychainAuthorization(reference: reference)
-            }
-            return LMStudioNoAuthorization()
+            try defaultAuthorization(for: configuration)
         }
     ) {
         let transportFactory: @Sendable (URL) throws -> LMStudioManagedSessionTransport = {

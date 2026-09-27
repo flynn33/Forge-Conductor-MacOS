@@ -1658,6 +1658,39 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         )
     }
 
+    /// Deletes only legacy context packets used by `context_get`. Task-owned
+    /// ingress packets are excluded by the same ownership predicate as the
+    /// public context tools and cannot be removed through this operator API.
+    public func handoffLegacyDelete(
+        ids: [String],
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String] {
+        let unique = Array(Set(ids)).sorted()
+        guard !unique.isEmpty, unique.count <= 100,
+              unique.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw ProjectMemoryError.invalidRequest("continuity packet ids are invalid")
+        }
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                var deleted: [String] = []
+                for id in unique {
+                    try cancellation?.checkCancellation()
+                    try withStatementUnlocked(
+                        "DELETE FROM context_handoffs WHERE id=? AND " + Self.legacyHandoffPredicate
+                    ) { statement in
+                        bind(statement, 1, id)
+                        try stepDone(statement)
+                        if changesUnlocked() == 1 { deleted.append(id) }
+                    }
+                }
+                try repairLegacyContinuityPointersUnlocked(
+                    timestamp: ISO8601.string(from: clock.now())
+                )
+                return deleted
+            }
+        }
+    }
+
     private func handoffList(
         sql: String,
         cancellation: ToolCallCancellation?

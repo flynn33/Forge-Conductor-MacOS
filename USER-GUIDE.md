@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.16.0**, build **15**.
+Version **0.16.0**, build **17**.
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -25,15 +25,16 @@ Studio connection or model error.
 4. Choose **Connect and Check**.
 
 Provider selection, **Connect and Check**, the Advanced connection check, and
-the probe use the same preparation path. The check authenticates to Manager,
-uses the saved endpoint and credential, performs bounded supported-CLI recovery
-for a local offline server, discovers loaded models, resolves the configured
-model, validates the tool contract, and saves a readiness receipt.
+the probe use the same preparation path. For same-host LM Studio, the check
+authenticates only to Forge Manager and uses LM Studio's private loopback server
+without an operator login or token. It performs bounded supported-CLI recovery,
+discovers loaded models, resolves the configured model, validates the tool
+contract, and saves a readiness receipt.
 
 Forge does not load a model on the user's behalf and does not scan arbitrary
-ports. Advanced settings let the user save an explicit endpoint, model, and
-optional credential. Saving is allowed while LM Studio is offline; live
-readiness still requires **Connect and Check**.
+ports. Local Advanced settings expose endpoint and model but no token field.
+Linked HTTPS providers retain an optional credential control. Saving is allowed
+while LM Studio is offline; live readiness still requires **Connect and Check**.
 
 ## 3. Select projects
 
@@ -136,16 +137,20 @@ The **Continuity** view contains:
 - a scrollable list of project IDs that have continuity data;
 - project selection;
 - **Copy Project ID**;
-- one confirmed **Delete** action for the selected project's continuity data;
-- **Reset** for the selected project generation;
-- a selected-project instruction-package picker with **Delete Package**; and
+- a packet list under the selected project showing each checkpoint/handoff ID,
+  type, source, and timestamp;
+- one confirmed **Delete** action that removes only the selected packet or
+  multi-selection;
+- **Reset** for the selected project's settled automatic continuity history;
 - **Clear Cache** for disposable Forge cache data.
 
 There are no checkpoint, rollover, run-selection, timeline, or recovery
 controls on this screen. The maintenance controls are directly usable on
-Continuity without opening Projects. Continuity deletion does not remove
-ordinary project files, instruction packages, policy, credentials, or project
-memory.
+Continuity without opening Projects. Packet deletion does not remove other
+packets, ordinary project files, instruction packages, policy, credentials, or
+project memory. Reset does not advance the project generation, and durable
+packets remain until explicitly selected and deleted. Instruction-package
+deletion remains on Projects.
 
 ## 9. Read Dashboard and evidence
 

@@ -32,29 +32,37 @@ this workflow.
    `resume=true`, verifies that the successor consumed the exact handoff, and
    only then seals the predecessor. Crash recovery is idempotent.
 8. The Continuity view is an operator data-management surface only. It always
-   shows project IDs in a scrollable frame, supports selecting and copying IDs,
-   and deletes the selected project's continuity data through one clear
-   **Delete** action. The same Continuity surface always exposes **Reset**,
-   **Clear Cache**, and a selected-project package picker with **Delete
-   Package**; none of these actions requires opening Projects. It does not
-   expose manual checkpoint, rollover, run selection, or operation-timeline
-   controls.
-9. Project reset, selected instruction-package deletion, and disposable-cache
-   clearing may also remain available on Projects, but Projects is not a
-   substitute for the required Continuity controls.
+   shows project IDs in a scrollable frame and supports selecting and copying
+   IDs. Under the selected project it lists every actual continuity packet—the
+   durable handoff/checkpoint rows consumed by continuity and `context_get`—with
+   packet ID, type, and timestamp. **Delete** removes only the selected packet
+   or multi-selection after one confirmation. **Reset** and **Clear Cache** stay
+   on Continuity: Reset clears settled automatic continuity history without
+   advancing the project generation, and Clear Cache removes only Forge's
+   bounded disposable cache namespace. Neither deletes unrelated project files. It does
+   not expose instruction-package controls, manual checkpoint, rollover, run
+   selection, or operation-timeline controls.
+9. Instruction-package selection, ordering, and **Delete Package** belong to
+   Projects. Project reset and disposable-cache clearing may also remain there,
+   but Projects is not a substitute for the required Continuity packet surface.
+10. Same-host LM Studio connection, Advanced probe, MCP chat use, and automatic
+    successor creation require no Forge-held LM Studio token, operator login, or
+    local credential field. Authentication of Forge's own Manager remains a
+    separate internal control boundary. Linked HTTPS providers may retain their
+    separate credential path.
 
 ## Required repair and acceptance state
 
 | Area | Current state | Required acceptance |
 |---|---|---|
-| LM Studio provider | **Native source-path acceptance passed; exact Desktop-candidate acceptance open.** An ordinary Apple Development-signed app launched its embedded Manager, discovered loaded model `qwen/qwen3.8-27b`, and completed **Connect and Check** before and after relaunch without `operator-unavailable`. Advanced/probe controls are pinned and use the same preparation path. | Every native entry point reaches the same live LM Studio configuration and contract check, distinguishes Manager transport/authentication failures from LM Studio endpoint/model/tool-contract failures, and succeeds against the owner-selected loaded model. |
+| LM Studio provider | **Build-17 source path passes without a local credential; exact Desktop-candidate acceptance open.** The live Manager removed the obsolete local Forge Keychain reference, then discovered loaded model `qwen/qwen3.8-27b`; Connect and Check and the advanced contract probe returned ready/contract-valid with `credential_configured=false`. | Every native entry point reaches the same live tokenless local LM Studio configuration and contract check, distinguishes Forge Manager failures from LM Studio endpoint/model/tool-contract failures, and succeeds in the exact Desktop candidate. |
 | Project selection | **Implemented and focused-tested.** Projects accepts multiple folders and exposes registered project context without starting a run. | One or more selected project folders remain available to the LM Studio model through project-scoped Forge tools. |
 | Instruction packages | **Implemented and focused-tested.** Multiple packages can be selected, displayed, drag-reordered, removed with **Delete Package**, and discovered through project-scoped tools. | The complete selection, ordering, deletion, persistence, and LM Studio query flow passes in the current candidate. |
 | Rune Forge policy | **Implemented and focused-tested.** Files and folders can be selected, persisted in priority order, drag-reordered, and queried with project isolation. | The complete selection, ordering, persistence, and model-query flow passes in the current candidate. |
 | CLU governance | **Deterministic contract implemented; live-session acceptance open.** Notices carry the violated policy identity and full applicable policy statement; logs are project-isolated, bounded, and exportable. | CLU monitors model activity, preserves a separate log per project, exports it, and sends the active model a notice containing the exact violated policy and policy content. |
 | Continuity automation | **Deterministic host-boundary implementation and tests complete; live LM Studio acceptance open.** A resume-ready handoff starts the 30-second state machine, creates one stored LM Studio chat, submits `get_forge_status` with `resume=true`, requires exact handoff acknowledgement, and handles repeated watchdog ticks idempotently. | A current owner-machine flow proves durable handoff, the visible countdown, exactly one successor chat, bootstrap submission, exact acknowledgement, predecessor sealing, and crash recovery. |
-| Continuity view | **Exact build-16 Desktop candidate passed native UI verification; owner review open.** It always renders a scrollable project-ID list with selection, copy, one confirmed selected-project **Delete**, **Reset**, selected-project package selection and **Delete Package**, and **Clear Cache**, including the empty-list state. | The owner opens the build-16 Desktop candidate and confirms every named Continuity control is visible without opening Projects. |
-| Reset / package deletion / cache clearing | **Exact build-16 Desktop candidate passed native UI verification; owner review open.** Continuity owns directly usable reset/package/cache controls; Projects retains equivalent project-management actions without acting as a substitute. | The owner verifies each action is correctly scoped and durable; automated disposable fixtures prove continuity and package deletion without touching live records. |
+| Continuity view | **Build-17 source and fixture UI acceptance passed; exact Desktop-candidate acceptance open.** It renders scrollable project IDs and the selected project's first-class checkpoint/handoff rows with ID, type, source, timestamp, exact selection, and confirmed packet-only delete. Reset and Clear Cache remain visible; instruction packages are absent. | The exact build-17 Desktop candidate shows live packet rows and deletes only disposable selected packets, including multi-selection, while pre-existing packet IDs remain unchanged. |
+| Reset / packet deletion / cache clearing | **Focused source/UI acceptance passed; live disposable proof open.** Exact packet deletion cannot reach project-wide clearing, task-owned ingress, instruction packages, or project files. Continuity Reset uses only project-scoped settled continuity-history clearing and does not advance the project generation; Clear Cache remains bounded to Forge's disposable cache directory. | Owner-machine evidence creates and deletes disposable packets only, verifies unrelated live packets are unchanged, and confirms Reset and Clear Cache scopes. |
 | Managed Run removal | **Removed from primary navigation and the current workflow.** Compatibility internals remain only where required to preserve stored data or reusable low-level services. | No current action, guide, status text, or continuity dependency directs the user to start project work through Managed Run. |
 
 ## Release boundary
@@ -70,8 +78,8 @@ Focused deterministic tests cover provider preparation convergence,
 `get_forge_status`, registered-project and location discovery, multi-folder and
 multi-package selection, drag ordering, package deletion, project reset,
 disposable-cache clearing, ordered Development Policy sources, CLU notice
-content, per-project log export, the Continuity project-ID and maintenance
-surface, project-scoped continuity deletion, and the 30-second LM Studio successor state
+content, per-project log export, the Continuity project-ID and packet-management
+surface, exact packet batch deletion, and the 30-second LM Studio successor state
 machine. The complete Swift suite passed 1,902 tests with zero failures and 12
 explicit environment-dependent skips. The current source also passed a native
 LM Studio connection test before and after app relaunch against
@@ -90,23 +98,22 @@ handoff/countdown/successor/acknowledgement/sealing/recovery sequence.
 Historical evidence remains available in Git history and dedicated evidence
 documents; it is not part of this roadmap.
 
-Build-16 correction evidence on the final source inputs: the five selected
-Continuity native UI tests executed with zero failures, including minimum-window
-containment, populated control visibility, project-ID copy, disposable
-continuity deletion, and selected-package deletion. The stale-generation
-provider regression and both version-alignment tests each executed one test
-with zero failures; `swift build --product forge-conductor-app`, the canonical
-Debug workspace build, `git diff --check`, and repository hygiene also passed.
-At that source-checkpoint, the exact Desktop archive/UI rerun and live
-authenticated LM Studio rollover remained acceptance requirements rather than
-inferred passes.
+Build-17 correction evidence on the current source inputs: the packet store and
+wire-contract test, populated Continuity packet-row UI test, confirmed exact
+packet-delete UI test, and local-credential migration/rejection test each
+executed with zero failures. `swift build --product forge-conductor-app` and the
+canonical signed Debug workspace build passed. Live same-host Connect and Check
+returned `ready` and the advanced contract probe returned `contract_valid` for
+`qwen/qwen3.8-27b`, both with no configured local Forge credential. Exact
+Desktop archive/UI, disposable live packet deletion, and automatic successor
+acceptance remain requirements rather than inferred passes.
 
-Exact-candidate evidence then completed for the UI boundary. Source revision
+Historical build-16 candidate evidence remains available for comparison. Source revision
 `f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple
 Development-signed Desktop app and `.xcarchive` named `Forge Conductor 0.16.0
 (16)-f2cc6ca`. Strict deep signature validation passed and the app reports
 `0.16.0 (16)`. With `FORGE_DESKTOP_CANDIDATE_PATH` set to that exact app,
 `testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch` executed one
 test with zero failures and retained a Continuity screenshot plus accessibility
-hierarchy showing list, copy, delete, reset, package picker/delete, and cache
-controls. Its isolated empty fixture changed no live Continuity records.
+hierarchy showing the then-current controls. It is superseded for packet and
+local-credential acceptance by build 17 and cannot close the current gate.

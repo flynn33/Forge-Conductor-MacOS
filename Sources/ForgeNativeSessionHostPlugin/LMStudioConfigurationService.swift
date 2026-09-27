@@ -333,12 +333,8 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
                 credentials: any LMStudioCredentialStoring = LMStudioKeychainCredentialStore(),
                 persist: @escaping Persist = { try OwnerOnlyAtomicFile.write($0, to: $1) },
                 inventory: @escaping Inventory = { configuration in
-                    let authorization: any LMStudioAuthorizationProviding
-                    if let reference = configuration.keychainTokenReference {
-                        authorization = try LMStudioKeychainAuthorization(reference: reference)
-                    } else {
-                        authorization = LMStudioNoAuthorization()
-                    }
+                    let authorization = try ForgeNativeSessionHostPlugin
+                        .defaultAuthorization(for: configuration)
                     return try await LMStudioRESTClient(configuration: configuration, authorization: authorization).listModels()
                 }) {
         self.init(
@@ -370,7 +366,28 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
     }
 
     private func readLocked() throws -> ProviderConfigurationSnapshot {
-        let configuration = try load()
+        var configuration = try load()
+        if var local = configuration,
+           local.endpointMode == .local,
+           let obsoleteReference = local.keychainTokenReference {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            local.keychainTokenReference = nil
+            local.revision = UUID().uuidString.lowercased()
+            do {
+                try persist(
+                    encoder.encode(CredentialIntent(
+                        oldReference: obsoleteReference,
+                        newReference: nil
+                    )),
+                    journalURL
+                )
+                try persist(encoder.encode(local), configurationURL)
+                configuration = local
+            } catch {
+                throw ProviderConfigurationError.persistenceFailed
+            }
+        }
         let pending = !recoverCredentials(configuration)
         return snapshot(configuration, cleanupPending: pending)
     }
@@ -403,8 +420,15 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
         next.baseURL = endpoint
         next.modelKey = request.modelKey
         next.revision = UUID().uuidString.lowercased()
-        if request.credentialAction == .clear { next.keychainTokenReference = nil }
-        if request.credentialAction == .replace {
+        if next.endpointMode == .local,
+           request.credentialAction == .replace || request.token != nil {
+            throw ProviderConfigurationError.invalidRequest
+        }
+        let credentialAction: ProviderCredentialAction = next.endpointMode == .local
+            ? .clear
+            : request.credentialAction
+        if credentialAction == .clear { next.keychainTokenReference = nil }
+        if credentialAction == .replace {
             next.keychainTokenReference = "provider-" + next.revision
         }
         do { _ = try next.validated() } catch { throw ProviderConfigurationError.invalidRequest }
@@ -415,13 +439,15 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
         guard data.count <= LMStudioProviderConfiguration.maximumFileBytes else {
             throw ProviderConfigurationError.invalidRequest
         }
-        let changesCredential = request.credentialAction != .keep
+        let changesCredential = credentialAction != .keep
         if changesCredential {
             let intent = CredentialIntent(oldReference: previous?.keychainTokenReference,
                                           newReference: next.keychainTokenReference)
             do { try persist(encoder.encode(intent), journalURL) }
             catch { throw ProviderConfigurationError.persistenceFailed }
-            if let token = request.token, let reference = next.keychainTokenReference {
+            if credentialAction == .replace,
+               let token = request.token,
+               let reference = next.keychainTokenReference {
                 do { try credentials.insert(token: token, reference: reference) }
                 catch {
                     _ = recoverCredentials(previous)

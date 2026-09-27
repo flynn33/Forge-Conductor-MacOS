@@ -961,6 +961,188 @@ public enum ContinuityHistoryClearScope: String, Codable, Sendable, CaseIterable
     case allSettled = "all_settled"
 }
 
+/// A compact operator projection of the durable packet consumed by
+/// `context_get`. Packet contents remain private; the Continuity UI receives
+/// only identity, type, source, and time metadata needed for selection.
+public struct OperatorContinuityPacket: Codable, Sendable, Equatable, Identifiable {
+    public let packetID: String
+    public let projectID: ProjectID
+    public let type: String
+    public let source: HandoffSource
+    public let timestamp: String
+    public let resumeReady: Bool
+
+    public var id: String { packetID }
+
+    public init(
+        packetID: String,
+        projectID: ProjectID,
+        type: String,
+        source: HandoffSource,
+        timestamp: String,
+        resumeReady: Bool
+    ) {
+        self.packetID = packetID
+        self.projectID = projectID
+        self.type = type
+        self.source = source
+        self.timestamp = timestamp
+        self.resumeReady = resumeReady
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case packetID = "packet_id"
+        case projectID = "project_id"
+        case type, source, timestamp
+        case resumeReady = "resume_ready"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        packetID = try values.decode(String.self, forKey: .packetID)
+        projectID = try Self.decodeProjectID(values, key: .projectID)
+        type = try values.decode(String.self, forKey: .type)
+        source = try values.decode(HandoffSource.self, forKey: .source)
+        timestamp = try values.decode(String.self, forKey: .timestamp)
+        resumeReady = try values.decode(Bool.self, forKey: .resumeReady)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(packetID, forKey: .packetID)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(type, forKey: .type)
+        try values.encode(source, forKey: .source)
+        try values.encode(timestamp, forKey: .timestamp)
+        try values.encode(resumeReady, forKey: .resumeReady)
+    }
+
+    private static func decodeProjectID(
+        _ values: KeyedDecodingContainer<CodingKeys>,
+        key: CodingKeys
+    ) throws -> ProjectID {
+        let value = try values.decode(String.self, forKey: key)
+        guard let identifier = UUID(uuidString: value) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: key,
+                in: values,
+                debugDescription: "project_id must be a UUID"
+            )
+        }
+        return ProjectID(identifier)
+    }
+}
+
+public struct OperatorContinuityPacketList: Codable, Sendable, Equatable {
+    public let projectID: ProjectID
+    public let packets: [OperatorContinuityPacket]
+
+    public init(projectID: ProjectID, packets: [OperatorContinuityPacket]) {
+        self.projectID = projectID
+        self.packets = packets
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case packets
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let value = try values.decode(String.self, forKey: .projectID)
+        guard let identifier = UUID(uuidString: value) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .projectID,
+                in: values,
+                debugDescription: "project_id must be a UUID"
+            )
+        }
+        projectID = ProjectID(identifier)
+        packets = try values.decode([OperatorContinuityPacket].self, forKey: .packets)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(packets, forKey: .packets)
+    }
+}
+
+public struct OperatorContinuityPacketDeleteRequest: Codable, Sendable, Equatable {
+    public let projectID: ProjectID
+    public let packetIDs: [String]
+
+    public init(projectID: ProjectID, packetIDs: [String]) {
+        self.projectID = projectID
+        self.packetIDs = packetIDs
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case packetIDs = "packet_ids"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let value = try values.decode(String.self, forKey: .projectID)
+        guard let identifier = UUID(uuidString: value) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .projectID,
+                in: values,
+                debugDescription: "project_id must be a UUID"
+            )
+        }
+        projectID = ProjectID(identifier)
+        packetIDs = try values.decode([String].self, forKey: .packetIDs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(packetIDs, forKey: .packetIDs)
+    }
+}
+
+public struct OperatorContinuityPacketDeleteReceipt: Codable, Sendable, Equatable {
+    public let projectID: ProjectID
+    public let deletedPacketIDs: [String]
+    public let completedAt: String
+
+    public init(projectID: ProjectID, deletedPacketIDs: [String], completedAt: String) {
+        self.projectID = projectID
+        self.deletedPacketIDs = deletedPacketIDs
+        self.completedAt = completedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case deletedPacketIDs = "deleted_packet_ids"
+        case completedAt = "completed_at"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let value = try values.decode(String.self, forKey: .projectID)
+        guard let identifier = UUID(uuidString: value) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .projectID,
+                in: values,
+                debugDescription: "project_id must be a UUID"
+            )
+        }
+        projectID = ProjectID(identifier)
+        deletedPacketIDs = try values.decode([String].self, forKey: .deletedPacketIDs)
+        completedAt = try values.decode(String.self, forKey: .completedAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(projectID.description, forKey: .projectID)
+        try values.encode(deletedPacketIDs, forKey: .deletedPacketIDs)
+        try values.encode(completedAt, forKey: .completedAt)
+    }
+}
+
 public struct ContinuityHistoryClearRequest: Codable, Sendable, Equatable {
     public let scope: ContinuityHistoryClearScope
     public let operationID: UUID?

@@ -529,33 +529,40 @@
       "controls": [
         "Select project ID",
         "Copy Project ID",
-        "Delete"
+        "Select one or more continuity packets",
+        "Delete selected packets",
+        "Reset",
+        "Clear Cache"
       ],
       "status_meanings": [
         "project identity available",
         "no continuity projects",
-        "deleting",
+        "packet selected",
+        "deleting selected packets",
         "delete failed"
       ],
       "normal_workflow": [
         "No setup or rollover action is required here",
-        "Select an ID to copy it",
-        "Use Delete only when that project's continuity data is no longer needed"
+        "Select an ID to filter its handoffs and checkpoints",
+        "Command-click packet rows for multi-selection",
+        "Use Delete to remove only the selected packet identities"
       ],
       "troubleshooting": [
         "Provider unavailable: progress remains saved and rollover retries",
-        "Delete failure: refresh and retain the project ID for diagnostics",
+        "Delete failure: refresh and retain the packet IDs for diagnostics",
         "LM Studio foreground activation is limited to supported host APIs"
       ],
       "advanced_details": [
         "Project ID",
-        "project-scoped storage boundary",
-        "deletion receipt"
+        "HandoffPacket identity",
+        "packet source/type/timestamp",
+        "exact deletion receipt"
       ],
       "control_anchors": [
         "continuity-project-list",
+        "continuity-packet-list",
         "continuity-copy-project-id",
-        "continuity-delete-project"
+        "continuity-delete-packets"
       ]
     },
     {
@@ -787,32 +794,25 @@
       ],
       "controls": [
         "Keep existing",
-        "Replace",
-        "Clear",
-        "Secure entry",
         "Save"
       ],
       "status_meanings": [
-        "configured",
+        "local loopback configured",
         "not configured",
-        "authentication not required",
-        "rejected"
+        "authentication not required"
       ],
       "normal_workflow": [
-        "Choose action",
-        "Enter credential only when replacing",
-        "Save and Connect and Check"
+        "Save the local endpoint and model",
+        "Choose Connect and Check"
       ],
       "troubleshooting": [
-        "Credential rejected: verify provider configuration",
-        "Lost Keychain access: re-enter"
+        "Local connection rejected: verify LM Studio server and MCP settings"
       ],
       "advanced_details": [
-        "Keychain item identity and redacted status only"
+        "Local LM Studio uses loopback without an operator token"
       ],
       "control_anchors": [
-        "provider-token",
-        "provider-credential-action"
+        "provider-local-no-auth"
       ]
     },
     {

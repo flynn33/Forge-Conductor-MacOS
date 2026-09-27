@@ -12,33 +12,32 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
-- Added **Reset**, a selected-project instruction-package picker with **Delete
-  Package**, and **Clear Cache** directly to Continuity beside its scrollable
-  project-ID list, **Copy Project ID**, and confirmed continuity **Delete**.
-  These controls remain visible in the empty state and do not require opening
-  Projects.
+- Added first-class Continuity packet inventory grouped by project ID. Packet
+  rows expose the durable checkpoint/handoff ID, type, source, and timestamp,
+  and support exact single or multi-selection deletion after one confirmation.
+- Kept **Copy Project ID**, **Reset**, and **Clear Cache** directly on
+  Continuity. Reset now clears only project-scoped settled continuity history;
+  it no longer delegates to the Projects generation reset. Instruction-package
+  selection and deletion remain on Projects.
 
 ### Fixed
 
-- Advanced the candidate identity to `0.16.0 (16)` and corrected provider
-  configuration ownership so durable nonterminal runs from reset generations
-  remain historical evidence without permanently returning `manager
-  unavailable` for current-generation LM Studio configuration.
+- Advanced the candidate identity to `0.16.0 (17)`. Same-host LM Studio now
+  rejects new Forge credential values, automatically removes any legacy local
+  Keychain reference, and hides credential controls for the local endpoint.
+  Linked HTTPS provider credentials remain supported.
+- Corrected packet JSON encoding so `project_id` is a UUID string at the
+  Manager boundary instead of a synthesized nested value.
 
 ### Verification
 
-- Five focused native UI tests passed with zero failures for the populated Continuity controls,
-  project-ID copy, disposable continuity deletion, selected-package deletion,
-  and constrained-window containment. The ordinary signed-launch test now
-  asserts the Continuity reset, package, and cache identifiers directly.
-  The stale-generation provider regression and two version-alignment tests also
-  passed, as did the SwiftPM app product, canonical signed Debug build,
-  whitespace check, and repository hygiene. The exact universal Apple
-  Development-signed Desktop app and archive at revision `f2cc6ca` report
-  `0.16.0 (16)` and pass strict deep-signature validation. The ordinary-launch
-  test targeted that exact app and executed one test with zero failures while
-  retaining the Continuity screenshot and accessibility hierarchy. Live LM
-  Studio successor evidence and owner review remain required before shipment.
+- Focused tests execute the packet store's list and exact batch-delete behavior,
+  packet wire format, populated native packet rows, and confirmed packet-only
+  deletion. Provider configuration tests execute local credential migration and
+  rejection. A live source-path check on this host completed same-host Connect
+  and Check plus the advanced contract probe with `credentialConfigured=false`.
+  Exact build-17 Desktop-candidate UI and rollover acceptance remain required
+  before shipment.
 
 ## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)
 

@@ -481,6 +481,18 @@ final class NativeSessionHostPluginTests: XCTestCase {
         }
     }
 
+    func testDefaultAuthorizationNeverReadsLegacyCredentialForLocalEndpoint() async throws {
+        let local = LMStudioProviderConfiguration(
+            endpointMode: .local,
+            baseURL: URL(string: "http://127.0.0.1:1234")!,
+            modelKey: "fixture/tool-model",
+            keychainTokenReference: "obsolete-local-reference"
+        )
+        let authorization = try ForgeNativeSessionHostPlugin.defaultAuthorization(for: local)
+        let token = try await authorization.bearerToken()
+        XCTAssertNil(token)
+    }
+
     func testCancellingBootstrapOwnerStopsTransportAndPreservesRestartRecovery() async throws {
         let root = temporaryRoot("v2-owner-cancel")
         defer {

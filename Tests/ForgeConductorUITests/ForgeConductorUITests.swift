@@ -1017,18 +1017,18 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let title = app.staticTexts["detail-continuity"]
         let subtitle = app.staticTexts["continuity-operator-view"]
         let projectList = app.descendants(matching: .any)["continuity-project-list"]
+        let packetList = app.descendants(matching: .any)["continuity-packet-list"]
         let copy = app.buttons["continuity-copy-project-id"]
-        let delete = app.buttons["continuity-delete-project"]
+        let delete = app.buttons["continuity-delete-packets"]
         let reset = app.buttons["continuity-reset"]
-        let deletePackage = app.buttons["continuity-delete-package"]
         let clearCache = app.buttons["continuity-clear-cache"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertTrue(subtitle.waitForExistence(timeout: 5))
         XCTAssertTrue(projectList.waitForExistence(timeout: 5))
+        XCTAssertTrue(packetList.waitForExistence(timeout: 5))
         XCTAssertTrue(copy.waitForExistence(timeout: 5))
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         XCTAssertTrue(reset.waitForExistence(timeout: 5))
-        XCTAssertTrue(deletePackage.waitForExistence(timeout: 5))
         XCTAssertTrue(clearCache.waitForExistence(timeout: 5))
         XCTAssertFalse(
             app.descendants(matching: .any)["continuity-operation-list"].exists,
@@ -1040,7 +1040,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Continuity must not expose a manual refresh operation"
         )
 
-        for element in [title, subtitle, projectList, copy, delete, reset, deletePackage, clearCache] {
+        for element in [title, subtitle, projectList, packetList, copy, delete, reset, clearCache] {
             XCTAssertTrue(
                 frameIsContained(element.frame, in: detail.frame, tolerance: 2),
                 "\(element.identifier) escaped the Continuity content area"
@@ -1191,7 +1191,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
     }
 
-    func testContinuityShowsOnlyScrollableProjectIDsAndDataActions() throws {
+    func testContinuityShowsProjectIDsAndContinuityPacketRows() throws {
         let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
         relaunch(with: fixture)
 
@@ -1200,15 +1200,22 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         continuity.click()
 
         let list = app.descendants(matching: .any)["continuity-project-list"]
+        let packets = app.descendants(matching: .any)["continuity-packet-list"]
         let row = app.staticTexts["continuity-project-row-\(fixture.projectID)"]
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(packets.waitForExistence(timeout: 5))
+        let checkpoint = app.descendants(matching: .any)[
+            "continuity-packet-row-\(fixture.continuityCheckpointID)"
+        ]
+        XCTAssertTrue(checkpoint.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityHandoffID)"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["continuity-copy-project-id"].exists)
-        XCTAssertTrue(app.buttons["continuity-delete-project"].exists)
+        XCTAssertTrue(app.buttons["continuity-delete-packets"].exists)
         XCTAssertTrue(app.buttons["continuity-reset"].exists)
-        XCTAssertTrue(app.buttons["continuity-delete-package"].exists)
         XCTAssertTrue(app.buttons["continuity-clear-cache"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["continuity-package-picker"].exists)
+        XCTAssertFalse(app.buttons["continuity-delete-package"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["continuity-package-picker"].exists)
         XCTAssertFalse(app.buttons["checkpoint-command"].exists)
         XCTAssertFalse(app.buttons["rollover-command"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["continuity-operation-list"].exists)
@@ -1230,51 +1237,70 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), fixture.projectID)
     }
 
-    func testContinuityProjectDataCanBeDeletedWithConfirmation() throws {
+    func testContinuityPacketCanBeDeletedWithConfirmation() throws {
         let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
         relaunch(with: fixture)
 
         let continuity = app.buttons["tab-continuity"]
         XCTAssertTrue(continuity.waitForExistence(timeout: 8))
         continuity.click()
-        let row = app.staticTexts["continuity-project-row-\(fixture.projectID)"]
+        let row = app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityCheckpointID)"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        let delete = app.buttons["continuity-delete-project"]
+        row.click()
+        let delete = app.buttons["continuity-delete-packets"]
         XCTAssertTrue(waitForEnabled(delete, timeout: 5))
         makeHittable(delete)
         delete.click()
         let confirmation = app.sheets.firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
-        XCTAssertTrue(confirmation.staticTexts["Delete continuity data?"].exists)
+        XCTAssertTrue(confirmation.staticTexts["Delete selected continuity packets?"].exists)
         confirmation.buttons["Delete"].click()
 
         XCTAssertTrue(waitUntil(timeout: 5) { !row.exists })
-        XCTAssertEqual(fixture.continuityHistoryClearScopes, ["project"])
+        XCTAssertEqual(fixture.continuityPacketIDs, [fixture.continuityHandoffID])
         XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityHandoffID)"].exists)
     }
 
-    func testContinuityInstructionPackageCanBeDeletedWithConfirmation() throws {
-        let fixture = try OperatorManagerUITestFixture(includeSecondInstructionPackage: true)
+    func testContinuityResetClearsOnlyContinuityHistory() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        let originalGeneration = fixture.projectGeneration
+        let originalPacketIDs = fixture.continuityPacketIDs
         relaunch(with: fixture)
 
         let continuity = app.buttons["tab-continuity"]
         XCTAssertTrue(continuity.waitForExistence(timeout: 8))
         continuity.click()
 
-        let remove = app.buttons["continuity-delete-package"]
-        XCTAssertTrue(waitForEnabled(remove, timeout: 8))
-        makeHittable(remove)
-        remove.click()
+        let reset = app.buttons["continuity-reset"]
+        XCTAssertTrue(waitForEnabled(reset, timeout: 5))
+        makeHittable(reset)
+        reset.click()
+
         let confirmation = app.sheets.firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
-        XCTAssertTrue(confirmation.staticTexts["Delete instruction package?"].exists)
-        confirmation.buttons["Delete Package"].click()
+        XCTAssertTrue(confirmation.staticTexts["Reset continuity history?"].exists)
+        confirmation.buttons["Reset"].click()
 
         XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.instructionQueueRemoveRequestCount == 1
-                && fixture.instructionPackageIDs == [fixture.secondInstructionPackageID]
+            fixture.continuityHistoryClearScopes == ["project"]
         })
+        XCTAssertEqual(fixture.projectGeneration, originalGeneration)
+        XCTAssertEqual(fixture.continuityPacketIDs, originalPacketIDs)
+    }
+
+    func testContinuityDoesNotExposeInstructionPackageDeletion() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-packet-list"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["continuity-delete-package"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["continuity-package-picker"].exists)
+        XCTAssertEqual(fixture.instructionQueueRemoveRequestCount, 0)
     }
 
     func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {
@@ -1319,6 +1345,23 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(waitForValue("fixture/configured-model", on: app.textFields["provider-model-key"]))
         XCTAssertTrue(app.buttons["provider-test-connection"].exists)
         XCTAssertTrue(app.buttons["provider-refresh-models"].exists)
+    }
+
+    func testLocalLMStudioAdvancedSettingsDoNotExposeCredentialControls() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+
+        let provider = app.buttons["tab-provider"]
+        XCTAssertTrue(provider.waitForExistence(timeout: 8))
+        provider.click()
+
+        let advanced = app.buttons["provider-advanced-toggle"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        advanced.click()
+
+        XCTAssertTrue(app.staticTexts["provider-local-no-auth"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["provider-credential-action"].exists)
+        XCTAssertFalse(app.secureTextFields["provider-token"].exists)
     }
 
     func testProviderCardsExposeSingleSelectionAndLMStudioConnectAndCheck() throws {
@@ -2241,6 +2284,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     let policyEventID = "55555555-5555-4555-8555-555555555555"
     let continuityOperationID = "99999999-9999-4999-8999-999999999999"
     let continuityEventID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    let continuityCheckpointID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    let continuityHandoffID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 
     private let listener: NWListener
     private let queue = DispatchQueue(label: "forge.operator-ui-fixture")
@@ -2263,6 +2308,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableRejectNextContinuityCommand = false
     private var mutableContinuityOperationCleared = false
     private var mutableContinuityHistoryClearScopes: [String] = []
+    private var mutableContinuityPacketIDs: [String] = []
     private var mutableAcceptedStart = false
     private var mutableAcceptedStartRunID: String?
     private var mutableShellEnabled = true
@@ -2332,6 +2378,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var continuityHistoryClearScopes: [String] {
         locked { mutableContinuityHistoryClearScopes }
     }
+    var continuityPacketIDs: [String] { locked { mutableContinuityPacketIDs } }
     var acceptedStartRunID: String { locked { mutableAcceptedStartRunID ?? "" } }
     var shellEnabled: Bool { locked { mutableShellEnabled } }
     var allowedRoots: [String] { locked { mutableAllowedRoots } }
@@ -2414,6 +2461,12 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
         self.includeContinuityOperation = includeContinuityOperation
         self.continuityOperationState = continuityOperationState
+        mutableContinuityPacketIDs = includeContinuityOperation
+            ? [
+                "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            ]
+            : []
         mutableRunState = initialRunState
         mutableInstructionQueueRevision = 1
         mutableInstructionQueueRunning = activeInstructionQueue
@@ -2602,6 +2655,54 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             respond(status: 200, object: managerSettings(), to: connection)
         case "/api/manager/operator/snapshot":
             respond(status: 200, object: snapshot(), to: connection)
+        case "/api/manager/continuity/packets":
+            guard request.method == "GET",
+                  request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  exactQuery(request.queryItems, equals: ["project_id": projectID]) else {
+                respond(status: 401, object: ["message": "missing packet list authority"], to: connection)
+                return
+            }
+            let packets: [[String: Any]] = locked {
+                mutableContinuityPacketIDs.enumerated().map { index, id in
+                    [
+                        "packet_id": id,
+                        "project_id": projectID,
+                        "type": index == 0 ? "checkpoint" : "handoff",
+                        "source": index == 0 ? "auto" : "model",
+                        "timestamp": index == 0
+                            ? "2026-09-27T11:59:00Z"
+                            : "2026-09-27T12:00:00Z",
+                        "resume_ready": index != 0,
+                    ]
+                }
+            }
+            respond(status: 200, object: ["project_id": projectID, "packets": packets], to: connection)
+        case "/api/manager/continuity/packets/delete":
+            guard request.method == "POST",
+                  request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  let ids = object["packet_ids"] as? [String],
+                  !ids.isEmpty else {
+                respond(status: 401, object: ["message": "missing exact packet delete authority"], to: connection)
+                return
+            }
+            let deleted = locked { () -> [String] in
+                let visible = Set(mutableContinuityPacketIDs)
+                let exact = ids.filter(visible.contains)
+                mutableContinuityPacketIDs.removeAll { ids.contains($0) }
+                mutableMutationAuthorizationCount += 1
+                return exact
+            }
+            guard deleted.count == ids.count else {
+                respond(status: 409, object: ["message": "packet selection changed"], to: connection)
+                return
+            }
+            respond(status: 200, object: [
+                "project_id": projectID,
+                "deleted_packet_ids": deleted,
+                "completed_at": "2026-09-27T12:01:00Z",
+            ], to: connection)
         case "/api/manager/continuity/history/clear":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body)

@@ -47,7 +47,7 @@ final class ProviderViewModel: ObservableObject {
     var hasUnsavedChanges: Bool {
         guard let configuration else { return false }
         return endpoint != configuration.endpoint || modelKey != (configuration.modelKey ?? "")
-            || credentialAction != .keep
+            || (configuration.endpointMode != .local && credentialAction != .keep)
     }
 
     var selectedProviderID: ProviderIntegrationID? {
@@ -432,12 +432,13 @@ final class ProviderViewModel: ObservableObject {
 
     func save() {
         guard !isBusy, let current = configuration else { return }
+        let local = current.endpointMode == .local
         let request = ProviderConfigurationUpdate(
             expectedRevision: current.revision,
             endpoint: endpoint,
             modelKey: modelKey.isEmpty ? nil : modelKey,
-            credentialAction: credentialAction,
-            token: credentialAction == .replace ? token : nil
+            credentialAction: local ? .keep : credentialAction,
+            token: local || credentialAction != .replace ? nil : token
         )
         token = ""
         isSaving = true

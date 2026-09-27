@@ -183,6 +183,9 @@ private func lmStudioCommandResult(
 }
 
 final class ProviderConfigurationTests: XCTestCase {
+    private static let linkedNodeID = LMStudioLinkNodeID(
+        UUID(uuidString: "7bf607c2-8f5e-4ef6-a99c-c1dd45dbb5ec")!
+    )
     private var directory: URL!
     private var credentials: ProviderCredentialFixture!
 
@@ -196,10 +199,26 @@ final class ProviderConfigurationTests: XCTestCase {
     }
 
     private func request(_ revision: String = "0", endpoint: String = "http://127.0.0.1:1234",
+                         endpointMode: LMStudioEndpointMode? = nil,
                          model: String? = "fixture/tool-model", action: ProviderCredentialAction = .keep,
                          token: String? = nil) -> ProviderConfigurationUpdate {
-        ProviderConfigurationUpdate(expectedRevision: revision, endpoint: endpoint, modelKey: model,
+        ProviderConfigurationUpdate(expectedRevision: revision, endpoint: endpoint,
+                                    endpointMode: endpointMode, modelKey: model,
                                     credentialAction: action, token: token)
+    }
+
+    private func linkedRequest(
+        _ revision: String = "0",
+        action: ProviderCredentialAction = .keep,
+        token: String? = nil
+    ) -> ProviderConfigurationUpdate {
+        request(
+            revision,
+            endpoint: "https://provider.fixture",
+            endpointMode: .linked(nodeID: Self.linkedNodeID),
+            action: action,
+            token: token
+        )
     }
 
     func testLocalServerDiscoveryPrefersAppMatchedCLIAndRetainsBoundedFallbacks() {
@@ -377,18 +396,18 @@ final class ProviderConfigurationTests: XCTestCase {
         }
         let service = LMStudioConfigurationService(storageDirectory: directory, credentials: store)
         let originalToken = UUID().uuidString + UUID().uuidString
-        let saved = try await service.update(request(action: .replace, token: originalToken))
+        let saved = try await service.update(linkedRequest(action: .replace, token: originalToken))
         let originalConfig = try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
         let originalReference = try XCTUnwrap(originalConfig.keychainTokenReference)
         let originalRead = try await LMStudioKeychainAuthorization(reference: originalReference).bearerToken()
         XCTAssertTrue(originalRead == originalToken, "Disposable credential could not be read back")
         let restarted = LMStudioConfigurationService(storageDirectory: directory, credentials: store)
-        let kept = try await restarted.update(request(saved.revision))
+        let kept = try await restarted.update(linkedRequest(saved.revision))
         XCTAssertTrue(kept.credentialConfigured)
         let keptRead = try await LMStudioKeychainAuthorization(reference: originalReference).bearerToken()
         XCTAssertTrue(keptRead == originalToken, "Keep changed the disposable credential")
         let replacementToken = UUID().uuidString + UUID().uuidString
-        let replaced = try await restarted.update(request(kept.revision, action: .replace, token: replacementToken))
+        let replaced = try await restarted.update(linkedRequest(kept.revision, action: .replace, token: replacementToken))
         let replacementConfig = try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
         let replacementReference = try XCTUnwrap(replacementConfig.keychainTokenReference)
         XCTAssertNotEqual(originalReference, replacementReference)
@@ -398,7 +417,7 @@ final class ProviderConfigurationTests: XCTestCase {
         catch let error as LMStudioProviderError {
             guard case .invalidConfiguration = error else { return XCTFail("Unexpected retired credential failure") }
         }
-        let cleared = try await restarted.update(request(replaced.revision, action: .clear))
+        let cleared = try await restarted.update(linkedRequest(replaced.revision, action: .clear))
         XCTAssertFalse(cleared.credentialConfigured)
         XCTAssertFalse(cleared.credentialCleanupPending)
         do { _ = try await LMStudioKeychainAuthorization(reference: replacementReference).bearerToken(); XCTFail("Cleared credential remains accessible") }
@@ -420,6 +439,39 @@ final class ProviderConfigurationTests: XCTestCase {
         let path = directory.appendingPathComponent(LMStudioProviderConfiguration.fileName)
         let permissions = try FileManager.default.attributesOfItem(atPath: path.path)[.posixPermissions] as? NSNumber
         XCTAssertEqual(permissions?.intValue, 0o600)
+    }
+
+    func testLocalConfigurationPurgesPriorCredentialAndRejectsNewToken() async throws {
+        let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
+        let linked = try await service.update(
+            linkedRequest(action: .replace, token: "transient-fixture-value")
+        )
+        XCTAssertTrue(linked.credentialConfigured)
+        XCTAssertEqual(credentials.count, 1)
+
+        let local = try await service.update(request(
+            linked.revision,
+            endpointMode: .local
+        ))
+        XCTAssertEqual(local.endpointMode, .local)
+        XCTAssertFalse(local.credentialConfigured)
+        XCTAssertFalse(local.credentialCleanupPending)
+        XCTAssertEqual(credentials.count, 0)
+        XCTAssertNil(
+            try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
+                .keychainTokenReference
+        )
+
+        do {
+            _ = try await service.update(request(
+                local.revision,
+                action: .replace,
+                token: "rejected-local-token"
+            ))
+            XCTFail("Accepted a credential for local LM Studio")
+        } catch {
+            XCTAssertEqual(error as? ProviderConfigurationError, .invalidRequest)
+        }
     }
 
     func testMalformedOriginsAndTokenActionsRetainLastValidConfiguration() async throws {
@@ -444,18 +496,18 @@ final class ProviderConfigurationTests: XCTestCase {
 
     func testKeepReplaceAndClearCredentialsNeverPersistSecretAndRecoverCleanup() async throws {
         let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
-        let first = try await service.update(request(action: .replace, token: "transient-fixture-value"))
+        let first = try await service.update(linkedRequest(action: .replace, token: "transient-fixture-value"))
         let initial = try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
         let initialReference = try XCTUnwrap(initial.keychainTokenReference)
         XCTAssertTrue(credentials.contains(initialReference))
-        let kept = try await service.update(request(first.revision))
+        let kept = try await service.update(linkedRequest(first.revision))
         XCTAssertTrue(kept.credentialConfigured)
         XCTAssertTrue(credentials.contains(initialReference))
         credentials.denyRemoval = true
-        let replaced = try await service.update(request(kept.revision, action: .replace, token: "replacement-fixture-value"))
+        let replaced = try await service.update(linkedRequest(kept.revision, action: .replace, token: "replacement-fixture-value"))
         XCTAssertTrue(replaced.credentialCleanupPending)
         XCTAssertEqual(credentials.count, 2)
-        do { _ = try await service.update(request(replaced.revision)); XCTFail("Unbounded credential accumulation") }
+        do { _ = try await service.update(linkedRequest(replaced.revision)); XCTFail("Unbounded credential accumulation") }
         catch { XCTAssertEqual(error as? ProviderConfigurationError, .credentialUnavailable) }
         credentials.denyRemoval = false
         let restarted = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
@@ -463,7 +515,7 @@ final class ProviderConfigurationTests: XCTestCase {
         XCTAssertFalse(recovered.credentialCleanupPending)
         XCTAssertEqual(credentials.count, 1)
         XCTAssertFalse(credentials.contains(initialReference))
-        let cleared = try await restarted.update(request(recovered.revision, action: .clear))
+        let cleared = try await restarted.update(linkedRequest(recovered.revision, action: .clear))
         XCTAssertFalse(cleared.credentialConfigured)
         XCTAssertEqual(credentials.count, 0)
         for file in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
@@ -474,9 +526,9 @@ final class ProviderConfigurationTests: XCTestCase {
 
     func testDeniedKeychainRetainsPriorCredentialAndConfiguration() async throws {
         let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
-        let saved = try await service.update(request(action: .replace, token: "transient-fixture-value"))
+        let saved = try await service.update(linkedRequest(action: .replace, token: "transient-fixture-value"))
         credentials.denyInsertion = true
-        do { _ = try await service.update(request(saved.revision, action: .replace, token: "replacement-fixture-value")); XCTFail("Accepted denied Keychain write") }
+        do { _ = try await service.update(linkedRequest(saved.revision, action: .replace, token: "replacement-fixture-value")); XCTFail("Accepted denied Keychain write") }
         catch { XCTAssertEqual(error as? ProviderConfigurationError, .credentialUnavailable) }
         let reread = try await service.read()
         XCTAssertEqual(reread, saved)
@@ -485,12 +537,12 @@ final class ProviderConfigurationTests: XCTestCase {
 
     func testInterruptedPersistencePreservesPriorCredentialAndCleansStagedCredential() async throws {
         let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
-        let saved = try await service.update(request(action: .replace, token: "transient-fixture-value"))
+        let saved = try await service.update(linkedRequest(action: .replace, token: "transient-fixture-value"))
         let failing = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials, persist: { data, url in
             if url.lastPathComponent == LMStudioProviderConfiguration.fileName { throw ProviderConfigurationError.persistenceFailed }
             try OwnerOnlyAtomicFile.write(data, to: url)
         })
-        do { _ = try await failing.update(request(saved.revision, action: .replace, token: "replacement-fixture-value")); XCTFail("Accepted failed persistence") }
+        do { _ = try await failing.update(linkedRequest(saved.revision, action: .replace, token: "replacement-fixture-value")); XCTFail("Accepted failed persistence") }
         catch { XCTAssertEqual(error as? ProviderConfigurationError, .persistenceFailed) }
         let reread = try await service.read()
         XCTAssertEqual(reread, saved)
@@ -499,12 +551,12 @@ final class ProviderConfigurationTests: XCTestCase {
 
     func testCommittedRenameThenSynchronizationFailureKeepsNewCredential() async throws {
         let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
-        let saved = try await service.update(request(action: .replace, token: "transient-fixture-value"))
+        let saved = try await service.update(linkedRequest(action: .replace, token: "transient-fixture-value"))
         let ambiguous = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials, persist: { data, url in
             try OwnerOnlyAtomicFile.write(data, to: url)
             if url.lastPathComponent == LMStudioProviderConfiguration.fileName { throw ProviderConfigurationError.persistenceFailed }
         })
-        do { _ = try await ambiguous.update(request(saved.revision, action: .replace, token: "replacement-fixture-value")); XCTFail("Ambiguous durability reported as saved") }
+        do { _ = try await ambiguous.update(linkedRequest(saved.revision, action: .replace, token: "replacement-fixture-value")); XCTFail("Ambiguous durability reported as saved") }
         catch { XCTAssertEqual(error as? ProviderConfigurationError, .persistenceFailed) }
         XCTAssertEqual(credentials.count, 2)
         let reread = try await service.read()
@@ -675,7 +727,7 @@ final class ProviderConfigurationTests: XCTestCase {
         XCTAssertEqual(unchanged, saved)
     }
 
-    func testFailedLocalRecoveryDoesNotMutateEndpointPinOrCredentialReference() async throws {
+    func testFailedLocalRecoveryDoesNotMutateEndpointPinOrNoCredentialState() async throws {
         let recorder = ProviderRecoveryRecorder()
         let service = LMStudioConfigurationService(
             storageDirectory: directory,
@@ -689,11 +741,7 @@ final class ProviderConfigurationTests: XCTestCase {
                 return 5_678
             }
         )
-        let saved = try await service.update(request(
-            model: "fixture/pinned",
-            action: .replace,
-            token: "transient-fixture-value"
-        ))
+        let saved = try await service.update(request(model: "fixture/pinned"))
 
         do {
             _ = try await service.recoverConnection()
@@ -705,7 +753,8 @@ final class ProviderConfigurationTests: XCTestCase {
         XCTAssertTrue(recorder.observedEndpoints.allSatisfy { ($0.port ?? 80) == 5_678 })
         let unchanged = try await service.read()
         XCTAssertEqual(unchanged, saved)
-        XCTAssertTrue(saved.credentialConfigured)
+        XCTAssertFalse(saved.credentialConfigured)
+        XCTAssertEqual(credentials.count, 0)
         XCTAssertEqual(saved.modelKey, "fixture/pinned")
     }
 
