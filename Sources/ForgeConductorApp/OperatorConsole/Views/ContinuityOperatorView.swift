@@ -68,8 +68,8 @@ struct ContinuityOperatorView: View {
                 switch confirmation {
                 case .selected:
                     viewModel.clearSelectedHistory()
-                case .allSettled:
-                    viewModel.clearAllSettledHistory()
+                case .allOld:
+                    viewModel.clearAllOldHistory()
                 }
             }
         } message: { confirmation in
@@ -270,7 +270,7 @@ struct ContinuityOperatorView: View {
     private var historyActions: some View {
         GroupBox("Stored continuity data") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Remove settled checkpoint and handoff payloads when they are no longer needed. Active or recoverable continuity cannot be cleared.")
+                Text("Remove old checkpoint and handoff payloads, continuity memories, and derived cache. Stale work owned by a finished task is retired before removal.")
                     .foregroundStyle(.secondary)
                 HStack(spacing: 10) {
                     Button("Clear Selected…", role: .destructive) {
@@ -279,11 +279,11 @@ struct ContinuityOperatorView: View {
                     .disabled(!viewModel.canClearSelectedHistory)
                     .accessibilityIdentifier("continuity-clear-selected")
 
-                    Button("Clear All Settled…", role: .destructive) {
-                        historyClearConfirmation = .allSettled
+                    Button("Clear All Old…", role: .destructive) {
+                        historyClearConfirmation = .allOld
                     }
-                    .disabled(!viewModel.canClearAllSettledHistory)
-                    .accessibilityIdentifier("continuity-clear-all-settled")
+                    .disabled(!viewModel.canClearAllOldHistory)
+                    .accessibilityIdentifier("continuity-clear-all-old")
 
                     if let scope = viewModel.historyClearInFlight {
                         ProgressView()
@@ -299,6 +299,15 @@ struct ContinuityOperatorView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("continuity-clear-scope")
+                if let blocker = viewModel.selectedHistoryBlocker {
+                    Text(blocker)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("continuity-clear-blocker")
+                    Button("Open Run Details", action: onOpenAutonomy)
+                        .accessibilityIdentifier("continuity-clear-open-run-details")
+                }
             }
         }
     }
@@ -555,23 +564,23 @@ struct ContinuityOperatorView: View {
 
 private enum HistoryClearConfirmation: String, Identifiable {
     case selected
-    case allSettled
+    case allOld
 
     var id: String { rawValue }
 
     var actionTitle: String {
         switch self {
         case .selected: "Clear Selected"
-        case .allSettled: "Clear All Settled"
+        case .allOld: "Clear All Old"
         }
     }
 
     var message: String {
         switch self {
         case .selected:
-            "This removes the selected settled checkpoint, handoff payload, transition history, and derived cache. The task and ordinary project memory remain."
-        case .allSettled:
-            "This removes settled continuity payloads and derived caches across projects. Active or recoverable continuity, tasks, and ordinary project memory remain."
+            "This removes the selected old checkpoint, handoff payload, continuity memory, transition history, and derived cache. If its task is already finished, stale control state is retired first. The task and ordinary project memory remain."
+        case .allOld:
+            "This removes all old continuity payloads, memories, and derived caches across projects. Continuity owned by a live task remains; its exact state and retirement action stay visible. Tasks and ordinary project memory remain."
         }
     }
 }

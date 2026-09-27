@@ -1333,12 +1333,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let continuity = app.buttons["tab-continuity"]
         XCTAssertTrue(continuity.waitForExistence(timeout: 8))
         continuity.click()
-        let clear = app.buttons["continuity-clear-all-settled"]
+        let clear = app.buttons["continuity-clear-all-old"]
         XCTAssertTrue(waitForEnabled(clear, timeout: 5))
         makeHittable(clear)
         clear.click()
         XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 3))
-        let confirmAction = app.sheets.buttons["Clear All Settled"]
+        let confirmAction = app.sheets.buttons["Clear All Old"]
         XCTAssertTrue(confirmAction.waitForExistence(timeout: 3))
         confirmAction.click()
 
@@ -1347,6 +1347,25 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         })
         XCTAssertEqual(fixture.continuityHistoryClearScopes, ["all_settled"])
         XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
+    }
+
+    func testContinuityHistoryShowsExactBlockerAndRetirementActionForLiveWork() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            includeContinuityOperation: true,
+            continuityOperationState: "running"
+        )
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+        let blocker = app.descendants(matching: .any)["continuity-clear-blocker"]
+        XCTAssertTrue(blocker.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(blocker, contains: "continuity state successor_bootstrapping"))
+        XCTAssertTrue(element(blocker, contains: "task state running"))
+        XCTAssertTrue(element(blocker, contains: "finish or cancel"))
+        XCTAssertFalse(app.buttons["continuity-clear-selected"].isEnabled)
+        XCTAssertTrue(app.buttons["continuity-clear-open-run-details"].exists)
     }
 
     func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {

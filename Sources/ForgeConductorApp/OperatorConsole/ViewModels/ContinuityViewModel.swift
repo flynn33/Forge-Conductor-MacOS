@@ -55,11 +55,19 @@ final class ContinuityViewModel: ObservableObject {
     var canClearSelectedHistory: Bool {
         guard let selectedOperation else { return false }
         return !isLoading && controlInFlight == nil && historyClearInFlight == nil
-            && Self.isSettledHistory(selectedOperation)
+            && isOldHistory(selectedOperation)
     }
-    var canClearAllSettledHistory: Bool {
+    var canClearAllOldHistory: Bool {
         !isLoading && controlInFlight == nil && historyClearInFlight == nil
-            && operations.contains(where: Self.isSettledHistory)
+            && operations.contains(where: isOldHistory)
+    }
+
+    var selectedHistoryBlocker: String? {
+        guard let operation = selectedOperation, !isOldHistory(operation) else { return nil }
+        let runState = runs.first(where: { $0.runID == operation.runID })?.state ?? "missing"
+        return "Operation \(operation.operationID) is not old: continuity state "
+            + "\(operation.controlState ?? operation.state), task state \(runState). "
+            + "Open Run Details and finish or cancel that task; Refresh will then make it clearable."
     }
 
     var eligibilityMessage: String {
@@ -153,8 +161,8 @@ final class ContinuityViewModel: ObservableObject {
         )
     }
 
-    func clearAllSettledHistory() {
-        guard canClearAllSettledHistory else { return }
+    func clearAllOldHistory() {
+        guard canClearAllOldHistory else { return }
         clearHistory(ContinuityHistoryClearRequest(scope: .allSettled))
     }
 
@@ -225,6 +233,14 @@ final class ContinuityViewModel: ObservableObject {
             .contains(operation.state)
     }
 
+    private func isOldHistory(_ operation: OperatorContinuity) -> Bool {
+        if Self.isSettledHistory(operation) { return true }
+        guard let run = runs.first(where: { $0.runID == operation.runID }) else {
+            return true
+        }
+        return ["completed", "cancelled", "failed_terminal"].contains(run.state)
+    }
+
     private func clearHistory(_ request: ContinuityHistoryClearRequest) {
         historyClearInFlight = request.scope
         commandErrorMessage = nil
@@ -240,16 +256,16 @@ final class ContinuityViewModel: ObservableObject {
                         ) == .orderedSame
                     }
                 } else {
-                    operations.removeAll(where: Self.isSettledHistory)
+                    operations.removeAll(where: isOldHistory)
                 }
                 if receipt.retainedOperationCount > 0 {
-                    notice = "Cleared \(receipt.clearedOperationCount) settled continuity entries. \(receipt.retainedOperationCount) active or recoverable entries were retained."
+                    notice = "Cleared \(receipt.clearedOperationCount) old continuity entries. \(receipt.retainedOperationCount) live entries were retained."
                 } else if receipt.clearedOperationCount == 0 {
                     notice = "The selected continuity history was already clear."
                 } else {
                     notice = receipt.scope == .operation
                         ? "Cleared the selected continuity history and derived cache."
-                        : "Cleared all settled continuity history and derived caches."
+                        : "Cleared all old continuity history and derived caches."
                 }
             } catch {
                 commandErrorMessage = error.localizedDescription

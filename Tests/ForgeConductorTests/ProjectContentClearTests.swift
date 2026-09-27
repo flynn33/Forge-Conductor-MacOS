@@ -615,6 +615,86 @@ final class ProjectContentClearTests: XCTestCase {
         )
     }
 
+    func testManagerRetiresAndClearsStaleContinuityOwnedByTerminalTask() async throws {
+        let app = try configuredApp()
+        defer { app.shutdown() }
+        let manager = ManagerNode(app: app)
+        let projectID = try register(projectA, named: "Stale Continuity History", using: manager)
+        let runID = RunID()
+        try await app.projectContexts.repository.reserveContinuityRun(
+            runID: runID,
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Retire stale continuity after the task ends",
+            mode: .managedAutonomous
+        )
+        let handoff = try continuityHandoff(projectID: projectID, runID: runID)
+        let memory = try app.projectMemory.repositoryForProject(projectID.description)
+        let operation = try memory.continuityCreateOperationV2(
+            handoff: handoff,
+            predecessorSessionID: "history-predecessor",
+            predecessorProviderResponseID: "history-response",
+            adapterID: "forge.native-session-host",
+            idempotencyKey: "stale-clear-\(handoff.operationID)"
+        )
+        let operationID = try XCTUnwrap(UUID(uuidString: operation.operationID))
+        let command = try await app.projectContexts.repository.enqueueContinuityCommand(
+            ContinuityCommandRequest(
+                operationID: operationID,
+                runID: runID,
+                projectID: projectID,
+                projectGeneration: .initial,
+                type: .rollover,
+                requestedBy: "operator-test",
+                reason: "stale fixture",
+                idempotencyKey: "stale-command-\(operation.operationID)",
+                payloadSHA256: String(repeating: "a", count: 64)
+            )
+        )
+        XCTAssertEqual(command.state, .queued)
+        let currentRunValue = try await app.projectContexts.repository.autonomousRun(runID)
+        let currentRun = try XCTUnwrap(currentRunValue)
+        let lease = try await app.projectContexts.repository.acquireRunLease(
+            runID: runID,
+            ownerID: "stale-continuity-fixture"
+        )
+        _ = try await app.projectContexts.repository.transitionAutonomousRun(
+            runID: runID,
+            lease: lease,
+            transition: AutonomousRunTransition(
+                expectedState: currentRun.state,
+                expectedRevision: currentRun.revision,
+                nextState: .failedTerminal,
+                eventType: "fixture_task_ended",
+                eventSummary: "Task ended before queued continuity ran",
+                errorCode: "fixture_terminal",
+                errorSummary: "Intentional stale continuity fixture"
+            )
+        )
+
+        let receipt = try manager.clearContinuityHistory(
+            ContinuityHistoryClearRequest(
+                scope: .operation,
+                operationID: operationID,
+                projectID: projectID,
+                projectGeneration: .initial
+            )
+        )
+
+        XCTAssertEqual(receipt.clearedOperationCount, 1)
+        XCTAssertEqual(receipt.retainedOperationCount, 0)
+        XCTAssertNil(try memory.continuityOperationV2(id: operation.operationID))
+        XCTAssertNil(try memory.continuityHandoffV2(id: handoff.handoffID))
+        let removedCommand = try await app.projectContexts.repository.continuityCommand(
+            operationID: operationID
+        )
+        XCTAssertNil(removedCommand)
+        let preservedRunValue = try await app.projectContexts.repository.autonomousRun(runID)
+        let preservedRun = try XCTUnwrap(preservedRunValue)
+        XCTAssertEqual(preservedRun.state, .failedTerminal)
+        XCTAssertNil(preservedRun.activeOperationID)
+    }
+
     private func configuredApp() throws -> ForgeApp {
         let app = try ForgeApp.bootstrap(home: home)
         _ = try app.config.update(["allowed_roots": [root.path]], save: true)

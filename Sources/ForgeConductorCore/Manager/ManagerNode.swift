@@ -2480,8 +2480,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
     }
 
-    /// Clears settled continuity payload/history without resetting projects,
-    /// advancing generations, or disturbing active/recoverable operations.
+    /// Clears old continuity payload/history without resetting projects or
+    /// advancing generations. Stale operations owned by terminal tasks are
+    /// retired first; continuity owned by a live task fails closed.
     public func clearContinuityHistory(
         _ request: ContinuityHistoryClearRequest
     ) throws -> ContinuityHistoryClearReceipt {
@@ -2507,7 +2508,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
         let candidates = try Self.waitForAsync(timeoutSeconds: 10) {
             try await self.app.projectContexts.repository
-                .settledContinuityHistoryCommands(operationID: request.operationID)
+                .oldContinuityHistoryCommands(operationID: request.operationID)
         }
         if request.scope == .operation, let command = candidates.first {
             guard command.operationID == request.operationID,
@@ -2535,8 +2536,18 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             let operationIDs = commands.map { $0.operationID.uuidString.lowercased() }
             let purge: ProjectContinuityHistoryPurgeResult
             do {
-                purge = try app.projectMemory.repositoryForProject(scope.projectID)
-                    .purgeSettledContinuityHistory(
+                let repository = try app.projectMemory.repositoryForProject(scope.projectID)
+                for command in commands {
+                    if let operation = try repository.continuityOperationV2(
+                        id: command.operationID.uuidString.lowercased()
+                    ), !operation.state.isTerminal, operation.quarantineState == nil {
+                        _ = try repository.continuityCancelOperationV2(
+                            operationID: operation.operationID,
+                            runID: operation.runID
+                        )
+                    }
+                }
+                purge = try repository.purgeSettledContinuityHistory(
                         operationIDs: operationIDs,
                         requireEveryOperationSettled: request.scope == .operation
                     )
@@ -2556,7 +2567,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             if !authorizedCommands.isEmpty {
                 let deletedCommands = try Self.waitForAsync(timeoutSeconds: 10) {
                     try await self.app.projectContexts.repository
-                        .deleteSettledContinuityHistoryCommands(authorizedCommands)
+                        .deleteOldContinuityHistoryCommands(authorizedCommands)
                 }
                 clearedOperationCount += deletedCommands
                 clearedProjectCount += 1

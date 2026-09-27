@@ -8007,6 +8007,59 @@ public actor ProjectControlPlaneRepository {
         return commands
     }
 
+    /// Returns operator-visible continuity that is old because either its command
+    /// is terminal or its owning task is terminal/missing. A nonterminal command
+    /// owned by a live task remains authoritative and cannot be cleared.
+    public func oldContinuityHistoryCommands(
+        operationID: UUID? = nil,
+        limit: Int = 4_096
+    ) throws -> [ContinuityCommand] {
+        guard (1...4_096).contains(limit) else {
+            throw AutonomyError.invalidRequest(
+                "continuity history deletion limit must be between 1 and 4096"
+            )
+        }
+        let connection = try requiredConnection()
+        let commands: [ContinuityCommand]
+        if let operationID {
+            guard let command = try continuityCommandByOperationUnlocked(
+                operationID: operationID,
+                connection: connection
+            ) else {
+                return []
+            }
+            commands = [command]
+        } else {
+            commands = try connection.all(
+                Self.continuityCommandSelect
+                    + " ORDER BY updated_at,command_id LIMIT ?",
+                bindings: [.int64(Int64(limit + 1))],
+                map: Self.decodeContinuityCommand
+            )
+            guard commands.count <= limit else {
+                throw AutonomyError.invalidRequest(
+                    "Continuity history exceeds the bounded one-action deletion limit"
+                )
+            }
+        }
+
+        var old: [ContinuityCommand] = []
+        for command in commands {
+            let commandIsTerminal = Self.isTerminalContinuityCommand(command.state)
+            let run = try autonomousRunUnlocked(command.runID, connection: connection)
+            if commandIsTerminal || run == nil || run?.state.isTerminal == true {
+                old.append(command)
+            } else if operationID != nil {
+                throw AutonomyError.invalidRequest(
+                    "Operation \(command.operationID.uuidString.lowercased()) cannot be cleared: "
+                        + "continuity state \(command.state.rawValue), task state "
+                        + "\(run?.state.rawValue ?? "missing"). Finish or cancel the task in Run Details, then Refresh and clear it."
+                )
+            }
+        }
+        return old
+    }
+
     /// Removes exact settled command rows after project memory has removed the
     /// corresponding canonical payloads. Payload-free tombstones prevent replay.
     @discardableResult
@@ -8099,6 +8152,130 @@ public actor ProjectControlPlaneRepository {
             }
             return deleted
         }
+    }
+
+    /// Retires stale command state and removes exact old continuity roots after
+    /// canonical project payloads and projections have been purged.
+    @discardableResult
+    public func deleteOldContinuityHistoryCommands(
+        _ commands: [ContinuityCommand]
+    ) throws -> Int {
+        guard !commands.isEmpty, commands.count <= 4_096,
+              Set(commands.map(\.operationID)).count == commands.count else {
+            throw AutonomyError.invalidRequest(
+                "continuity history deletion requires unique old commands"
+            )
+        }
+        let connection = try requiredConnection()
+        return try connection.transaction {
+            let retainedTombstones = try connection.scalarInt(
+                "SELECT COUNT(*) FROM continuity_authority_tombstones"
+            )
+            var newTombstones = 0
+            var resolved: [(ContinuityCommand, AutonomousRunRecord?)] = []
+            for requested in commands {
+                guard let current = try continuityCommandByOperationUnlocked(
+                    operationID: requested.operationID,
+                    connection: connection
+                ), current == requested else {
+                    throw AutonomyError.invalidRequest(
+                        "Continuity history changed before it could be cleared"
+                    )
+                }
+                let run = try autonomousRunUnlocked(requested.runID, connection: connection)
+                guard Self.isTerminalContinuityCommand(current.state)
+                        || run == nil || run?.state.isTerminal == true else {
+                    throw AutonomyError.invalidRequest(
+                        "Operation \(current.operationID.uuidString.lowercased()) cannot be cleared: "
+                            + "continuity state \(current.state.rawValue), task state "
+                            + "\(run?.state.rawValue ?? "missing"). Finish or cancel the task in Run Details, then Refresh and clear it."
+                    )
+                }
+                if let run {
+                    guard run.projectID == requested.projectID,
+                          run.projectGeneration == requested.projectGeneration else {
+                        throw ProjectContextError.projectScopeMismatch
+                    }
+                }
+                let exists = try connection.scalarInt(
+                    "SELECT COUNT(*) FROM continuity_authority_tombstones WHERE kind='operation' AND identity=?",
+                    bindings: [.text(requested.operationID.uuidString.lowercased())]
+                )
+                if exists == 0 { newTombstones += 1 }
+                resolved.append((current, run))
+            }
+            guard retainedTombstones
+                    <= Self.maximumContinuityAuthorityTombstones - newTombstones else {
+                throw ProjectContextError.databaseFailure(
+                    "continuity authority tombstone capacity is exhausted"
+                )
+            }
+
+            let timestamp = ISO8601.string(from: clock.now())
+            var deleted = 0
+            for (command, run) in resolved {
+                if !Self.isTerminalContinuityCommand(command.state) {
+                    let retired = try connection.execute(
+                        """
+                        UPDATE continuity_commands
+                        SET state='cancelled',retry_at=NULL,last_error_code='stale_task_terminal',
+                            last_error_summary='Owning task finished before continuity cleanup',updated_at=?
+                        WHERE command_id=? AND operation_id=? AND state=?
+                        """,
+                        bindings: [
+                            .text(timestamp),
+                            .text(command.commandID.uuidString.lowercased()),
+                            .text(command.operationID.uuidString.lowercased()),
+                            .text(command.state.rawValue),
+                        ]
+                    )
+                    guard retired == 1 else {
+                        throw ProjectContextError.databaseFailure(
+                            "stale continuity command could not be retired"
+                        )
+                    }
+                }
+                if let run, run.activeOperationID == command.operationID {
+                    try connection.execute(
+                        "UPDATE autonomous_runs SET active_operation_id=NULL,updated_at=? WHERE run_id=? AND active_operation_id=?",
+                        bindings: [
+                            .text(timestamp), .text(command.runID.description),
+                            .text(command.operationID.uuidString.lowercased()),
+                        ]
+                    )
+                }
+                try connection.execute(
+                    """
+                    INSERT OR IGNORE INTO continuity_authority_tombstones(
+                        kind,identity,project_id,project_generation,retained_at
+                    ) VALUES('operation',?,?,?,?)
+                    """,
+                    bindings: [
+                        .text(command.operationID.uuidString.lowercased()),
+                        .text(command.projectID.description),
+                        .int64(try Self.sqliteGeneration(command.projectGeneration)),
+                        .text(timestamp),
+                    ]
+                )
+                deleted += try connection.execute(
+                    "DELETE FROM continuity_commands WHERE command_id=? AND operation_id=? AND state IN ('completed','failed','cancelled')",
+                    bindings: [
+                        .text(command.commandID.uuidString.lowercased()),
+                        .text(command.operationID.uuidString.lowercased()),
+                    ]
+                )
+            }
+            guard deleted == commands.count else {
+                throw ProjectContextError.databaseFailure(
+                    "continuity history deletion did not remove every authorized command"
+                )
+            }
+            return deleted
+        }
+    }
+
+    private static func isTerminalContinuityCommand(_ state: ContinuityCommandState) -> Bool {
+        [.completed, .failed, .cancelled].contains(state)
     }
 
     /// Resolves the newest continuity command for one exact project without
