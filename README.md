@@ -18,8 +18,11 @@ supported desktop coding hosts.
 > Development-signed repair build. The installed app admitted the owner's same
 > project and instruction package through **Start Ordered Work**, selected the
 > pinned LM Studio model, and executed managed model/tool turns without the
-> reported configuration error. Provider selection/reconnection and
-> launch-without-Guided-Setup are covered by native UI and installed-state
+> reported configuration error. Current source also restores visible,
+> persisted instruction-package reordering/removal and makes **Stop Active
+> Work** cancel the exact active package run before the package becomes
+> removable. Provider selection/reconnection, launch-without-Guided-Setup, and
+> the repaired Projects controls are covered by native UI or installed-state
 > evidence. Developer ID distribution, notarization, and shipment qualification
 > remain required before shipment.
 
@@ -155,6 +158,11 @@ when the app launches and opens only when explicitly requested.
    bootstrap summary; managed runs page them through project/run-bound read-only
    tools sized against both the transport ceiling and current provider context.
    Large queue refreshes are also loaded in stable revision-bound pages.
+   Reorder pending packages by dragging or with the visible earlier/later
+   buttons. **Stop Active Work** first stops queue advancement, then quiesces
+   and durably cancels the exact active run; its package becomes removable or
+   reorderable only after that safe cancellation boundary. The run remains in
+   **Run Details** as retained history.
 5. In **Projects → Run Details**, configure a direct task: select the project and one or more existing instruction
    packages in their displayed order, or type, paste, drop, or add a file,
    folder, or ZIP, then select **Start Task**. Forge confirms provider readiness

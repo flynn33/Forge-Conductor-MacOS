@@ -372,6 +372,94 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attachScreenshot("native-projects-mixed-folder")
     }
 
+    func testNativeProjectsReordersAndRemovesInstructionPackagesWithExplicitControls() async throws {
+        let firstSource = projectRoot.appendingPathComponent("first-instructions.md")
+        let secondSource = projectRoot.appendingPathComponent("second-instructions.md")
+        try Data("Complete the first instruction package.\n".utf8).write(
+            to: firstSource, options: .atomic
+        )
+        try Data("Complete the second instruction package.\n".utf8).write(
+            to: secondSource, options: .atomic
+        )
+
+        _ = try await launchOrdinaryApplication()
+        try openManager()
+        try openFolderPicker()
+        try chooseFolderInNativePanel(projectRoot.path)
+        try click(app.buttons["settings-save"])
+        _ = try await waitForSettings(roots: [projectRoot.path])
+
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-register-by-path"])
+        try replace(app.textFields["project-register-path"], with: projectRoot.path)
+        try click(app.buttons["project-register-confirm"])
+        let projects: OnboardingProjectSnapshot = try await read(
+            "/api/manager/operator/snapshot?limit=1"
+        )
+        let project = try XCTUnwrap(projects.projects.first)
+        let generation = OnboardingProjectGenerationRequest(
+            projectID: project.projectID,
+            projectGeneration: project.projectGeneration
+        )
+        let firstQueue: OnboardingInstructionQueue = try await post(
+            "/api/manager/projects/instruction-packages/import",
+            body: OnboardingInstructionImportRequest(
+                projectID: project.projectID,
+                projectGeneration: project.projectGeneration,
+                sourcePath: firstSource.path
+            )
+        )
+        let imported: OnboardingInstructionQueue = try await post(
+            "/api/manager/projects/instruction-packages/import",
+            body: OnboardingInstructionImportRequest(
+                projectID: project.projectID,
+                projectGeneration: project.projectGeneration,
+                sourcePath: secondSource.path
+            )
+        )
+        let firstID = try XCTUnwrap(firstQueue.packages.first?.id)
+        let secondID = try XCTUnwrap(imported.packages.last?.id)
+        XCTAssertEqual(imported.packages.map(\.id), [firstID, secondID])
+
+        XCTAssertTrue(
+            element("instruction-package-move-down-\(firstID)")
+                .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(
+            element("instruction-package-move-up-\(secondID)")
+                .waitForExistence(timeout: 10)
+        )
+        try click(element("instruction-package-move-down-\(firstID)"))
+
+        let reorderDeadline = Date().addingTimeInterval(10)
+        var reorderedIDs: [String] = []
+        repeat {
+            let queue: OnboardingInstructionQueue = try await post(
+                "/api/manager/projects/instruction-packages",
+                body: generation
+            )
+            reorderedIDs = queue.packages.map(\.id)
+            if reorderedIDs == [secondID, firstID] { break }
+            try await Task.sleep(for: .milliseconds(100))
+        } while Date() < reorderDeadline
+        XCTAssertEqual(reorderedIDs, [secondID, firstID])
+
+        try click(element("instruction-package-remove-\(firstID)"))
+        let removalDeadline = Date().addingTimeInterval(10)
+        var remainingIDs: [String] = []
+        repeat {
+            let queue: OnboardingInstructionQueue = try await post(
+                "/api/manager/projects/instruction-packages",
+                body: generation
+            )
+            remainingIDs = queue.packages.map(\.id)
+            if remainingIDs == [secondID] { break }
+            try await Task.sleep(for: .milliseconds(100))
+        } while Date() < removalDeadline
+        XCTAssertEqual(remainingIDs, [secondID])
+        attachScreenshot("native-projects-explicit-order-and-remove")
+    }
+
     func testProjectRemovalIsAvailableFromSidebarAndPersists() async throws {
         _ = try await launchOrdinaryApplication()
         try click(app.buttons["tab-projects"])
@@ -1113,6 +1201,18 @@ private struct OnboardingProjectGenerationRequest: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
+    }
+}
+
+private struct OnboardingInstructionImportRequest: Encodable, Sendable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let sourcePath: String
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case sourcePath = "source_path"
     }
 }
 

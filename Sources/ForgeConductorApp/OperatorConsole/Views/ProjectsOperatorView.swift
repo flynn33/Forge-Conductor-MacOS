@@ -442,7 +442,7 @@ struct ProjectsOperatorView: View {
     private func instructionPackages(_ project: OperatorProject) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows to set the order used by autonomous runs.")
+                Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows or use the arrow buttons to set the order used by autonomous runs.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -457,7 +457,7 @@ struct ProjectsOperatorView: View {
                     } else {
                         List {
                             ForEach(queue.packages) { package in
-                                instructionPackageRow(package)
+                                instructionPackageRow(package, packages: queue.packages)
                             }
                             .onMove { offsets, destination in
                                 var packages = queue.packages
@@ -466,44 +466,60 @@ struct ProjectsOperatorView: View {
                             }
                             .moveDisabled(viewModel.isLoading)
                         }
-                        .frame(height: min(max(CGFloat(queue.packages.count) * 112, 160), 520))
+                        .frame(height: min(max(CGFloat(queue.packages.count) * 140, 180), 560))
                         .accessibilityIdentifier("instruction-package-list")
                     }
 
-                    HStack {
-                        Button("Add Instructions…", systemImage: "plus") {
-                            chooseInstructionPackage()
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Button("Add Instructions…", systemImage: "plus") {
+                                chooseInstructionPackage()
+                            }
+                            .disabled(viewModel.isLoading)
+                            .accessibilityIdentifier("instruction-package-add")
+                            GuidedHelpButton(context: .instructionImport)
+                            Spacer()
+                            if let current = queue.packages.first(where: { $0.state == "running" }) {
+                                Text("Current: \(current.displayName)")
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                    .accessibilityIdentifier("instruction-queue-current-package")
+                            }
                         }
-                        .disabled(viewModel.isLoading)
-                        .accessibilityIdentifier("instruction-package-add")
-                        GuidedHelpButton(context: .instructionImport)
-                        Spacer()
-                        if let current = queue.packages.first(where: { $0.state == "running" }) {
-                            Text("Current: \(current.displayName)")
-                                .font(.caption.weight(.semibold))
-                                .accessibilityIdentifier("instruction-queue-current-package")
+                        HStack {
+                            Button(
+                                viewModel.instructionQueueHasActiveWork
+                                    ? "Stop Active Work" : "Start Ordered Work"
+                            ) {
+                                viewModel.toggleInstructionQueue()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(
+                                viewModel.isLoading
+                                    || (!viewModel.instructionQueueHasActiveWork
+                                        && !queue.packages.contains(where: { $0.state == "queued" }))
+                                    || (!viewModel.instructionQueueHasActiveWork && queue.packages
+                                        .filter { $0.state == "queued" }
+                                        .sorted { $0.position < $1.position }
+                                        .first?.importReady == false)
+                            )
+                            .accessibilityIdentifier("instruction-queue-toggle")
+                            Button("Run Details…", systemImage: "list.bullet.rectangle") {
+                                showingRunDetails = true
+                            }
+                            .disabled(viewModel.isLoading)
+                            .accessibilityIdentifier("project-run-details")
+                            Spacer()
+                            Text(
+                                queue.running
+                                    ? "Running in order"
+                                    : queue.packages.contains(where: { $0.state == "running" })
+                                        ? "Active work is stopping"
+                                        : "Queue stopped"
+                            )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        Text(queue.running ? "Running in order" : "Queue stopped")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Button(queue.running ? "Stop Ordered Work" : "Start Ordered Work") {
-                            viewModel.toggleInstructionQueue()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(
-                            viewModel.isLoading
-                                || (!queue.running && !queue.packages.contains(where: { $0.state == "queued" }))
-                                || (!queue.running && queue.packages
-                                    .filter { $0.state == "queued" }
-                                    .sorted { $0.position < $1.position }
-                                    .first?.importReady == false)
-                        )
-                        .accessibilityIdentifier("instruction-queue-toggle")
-                        Button("Run Details…", systemImage: "list.bullet.rectangle") {
-                            showingRunDetails = true
-                        }
-                        .disabled(viewModel.isLoading)
-                        .accessibilityIdentifier("project-run-details")
                     }
                 } else {
                     HStack {
@@ -525,7 +541,10 @@ struct ProjectsOperatorView: View {
     }
 
     @ViewBuilder
-    private func instructionPackageRow(_ package: OperatorInstructionPackage) -> some View {
+    private func instructionPackageRow(
+        _ package: OperatorInstructionPackage,
+        packages: [OperatorInstructionPackage]
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: "line.3.horizontal")
@@ -569,6 +588,33 @@ struct ProjectsOperatorView: View {
                 }
                 Spacer()
                 OperatorStateBadge(state: package.state)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    viewModel.moveInstructionPackage(package.id, by: -1)
+                } label: {
+                    Image(systemName: "arrow.up")
+                }
+                .buttonStyle(.borderless)
+                .disabled(
+                    viewModel.isLoading || packages.first?.id == package.id
+                )
+                .help("Move this instruction package earlier")
+                .accessibilityLabel("Move \(package.displayName) earlier")
+                .accessibilityIdentifier("instruction-package-move-up-\(package.id)")
+                Button {
+                    viewModel.moveInstructionPackage(package.id, by: 1)
+                } label: {
+                    Image(systemName: "arrow.down")
+                }
+                .buttonStyle(.borderless)
+                .disabled(
+                    viewModel.isLoading || packages.last?.id == package.id
+                )
+                .help("Move this instruction package later")
+                .accessibilityLabel("Move \(package.displayName) later")
+                .accessibilityIdentifier("instruction-package-move-down-\(package.id)")
                 Button(role: .destructive) {
                     viewModel.removeInstructionPackage(package.id)
                 } label: {
@@ -578,6 +624,7 @@ struct ProjectsOperatorView: View {
                 .disabled(viewModel.isLoading || package.state == "running")
                 .help("Remove this instruction package")
                 .accessibilityIdentifier("instruction-package-remove-\(package.id)")
+                Spacer()
             }
 
             Button {

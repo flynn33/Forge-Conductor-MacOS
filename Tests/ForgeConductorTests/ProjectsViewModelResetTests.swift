@@ -389,6 +389,94 @@ final class ProjectsViewModelResetTests: XCTestCase {
 
     // MARK: - Tests
 
+    func testInstructionPackageArrowOrderingMovesExactlyOnePosition() {
+        XCTAssertEqual(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "two", by: -1
+            ),
+            ["two", "one", "three"]
+        )
+        XCTAssertEqual(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "two", by: 1
+            ),
+            ["one", "three", "two"]
+        )
+        XCTAssertNil(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "one", by: -1
+            )
+        )
+        XCTAssertNil(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "missing", by: 1
+            )
+        )
+        XCTAssertNil(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "two", by: .min
+            )
+        )
+    }
+
+    func testStoppedQueueWithRunningPackageStillReportsActiveWork() throws {
+        let queue = try Self.fixture(
+            OperatorInstructionQueue.self,
+            from: """
+            {
+              "project_id": "\(Self.projectID)",
+              "project_generation": 1,
+              "revision": 4,
+              "running": false,
+              "packages": [{
+                "id": "11111111-1111-4111-8111-111111111111",
+                "project_id": "\(Self.projectID)",
+                "project_generation": 1,
+                "package_id": "active",
+                "version": "1",
+                "display_name": "Active",
+                "mission": "Complete active work.",
+                "source_path": "/tmp/active.md",
+                "content_sha256": "\(String(repeating: "a", count: 64))",
+                "allowed_tools": [],
+                "completion_gates": [],
+                "position": 0,
+                "state": "running",
+                "run_id": "22222222-2222-4222-8222-222222222222",
+                "created_at": "2026-09-27T00:00:00Z",
+                "updated_at": "2026-09-27T00:00:00Z"
+              }]
+            }
+            """
+        )
+
+        XCTAssertTrue(ProjectsViewModel.hasActiveWork(in: queue))
+        let staleQueue = try Self.fixture(
+            OperatorInstructionQueue.self,
+            from: """
+            {
+              "project_id": "\(Self.projectID)",
+              "project_generation": 1,
+              "revision": 3,
+              "running": false,
+              "packages": []
+            }
+            """
+        )
+        XCTAssertFalse(
+            ProjectsViewModel.queueRevisionIsCurrent(
+                candidate: staleQueue,
+                current: queue
+            )
+        )
+        XCTAssertTrue(
+            ProjectsViewModel.queueRevisionIsCurrent(
+                candidate: queue,
+                current: staleQueue
+            )
+        )
+    }
+
     /// Confirmed success: the action invokes the service once with the selected
     /// project and its generation, then reports the real receipt and refreshed row.
     func testConfirmedResetInvokesServiceWithSelectedProjectAndReportsReceipt() async throws {

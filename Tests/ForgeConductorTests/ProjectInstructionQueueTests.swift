@@ -1440,6 +1440,37 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertEqual(fixture.store.nextRunnable()?.id, third.id)
     }
 
+    func testStoppedQueueCanRetryCancellationWhileItsPackageIsStillRunning() throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.external.appendingPathComponent("active.md")
+        try "Complete active work.".write(to: source, atomically: true, encoding: .utf8)
+        let imported = try fixture.store.importPackage(
+            sourceURL: source,
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        _ = try fixture.store.start(projectID: fixture.projectID, generation: .initial)
+        let runID = RunID()
+        _ = try fixture.store.markStarted(packageID: package.id, runID: runID)
+
+        let stopped = try fixture.store.stop(
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        XCTAssertFalse(stopped.running)
+        XCTAssertEqual(stopped.packages.first?.state, .running)
+
+        let retried = try fixture.store.stop(
+            projectID: fixture.projectID,
+            generation: .initial
+        )
+        XCTAssertFalse(retried.running)
+        XCTAssertEqual(retried.packages.first?.runID, runID)
+        XCTAssertEqual(retried.packages.first?.state, .running)
+    }
+
     func testLegacyQueueMetadataMigratesWithoutLosingPackageIdentity() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }

@@ -1,5 +1,31 @@
 # Version and qualification status
 
+## 0.14.7 Projects instruction controls repair — source candidate verified
+
+The current source repairs the reported inability to stop, reorder, or remove
+project instruction packages. **Stop Active Work** now fences queue advancement,
+quiesces and durably cancels the exact active run, and only then reconciles the
+package to a removable terminal state. A stopped queue with a still-running
+package retains a retryable cancellation path. Reordering has explicit native
+earlier/later controls in addition to drag behavior, and package/remove plus
+queue actions use leading rows that remain hittable in the constrained Projects
+layout. Revision-monotonic queue acceptance prevents a two-second background
+poll from replacing a newer mutation response.
+
+**E0:** a production-composition, Apple Development-signed UI test imported two
+real files through the authenticated Manager API, found the native move and
+remove controls, persisted the reversed package order, removed one package, and
+verified the remaining durable identity. The first reproductions recorded the
+original action controls as present but non-hittable beyond the visible window;
+the identical final flow passed after the layout repair. Focused queue,
+Projects view-model, and Manager-route tests passed, including stopped-queue
+cancellation retry and stale-revision rejection. Complete regression and build
+counts are recorded in the current roadmap row.
+
+The working installation was not replaced. Developer ID signing, notarization,
+Gatekeeper distribution acceptance, and owner shipment remain separate from
+this source-candidate repair.
+
 ## 0.14.6 Provider and ordered-run repair — installed development build verified
 
 Product repairs `675d267fdd2f45cd412e5398a04a2321bfe51def`,

@@ -12,6 +12,16 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Made **Stop Active Work** fence automatic queue advancement, quiesce and
+  durably cancel the exact active run, and reconcile its package to a terminal
+  state before returning it to the removable/reorderable UI. A transient
+  cancellation failure leaves the queue stopped while preserving a retryable
+  stop action.
+- Restored usable Projects instruction-package controls in constrained window
+  geometry. Explicit earlier/later buttons and the remove action now occupy a
+  leading action row, drag reordering remains available, and stale background
+  queue snapshots can no longer roll back a newer persisted order or prune its
+  catalog state.
 - Made **Start Ordered Work** perform a live, no-resume readiness check for the
   selected LM Studio endpoint, pinned model, loaded inventory, and tool contract
   before mutating the instruction queue or creating a run. An unloaded pin now
@@ -30,6 +40,12 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- A signed native UI test imported two real instruction packages through the
+  Manager, clicked the visible move control, verified the persisted reversed
+  order, removed a package, and verified the persisted result. Focused queue,
+  Projects view-model, and authenticated Manager-route regressions passed. The
+  complete regression and product-build evidence is recorded in the roadmap
+  and qualification status for the published repair revision.
 - Published ordered-readiness/receipt repair
   `675d267fdd2f45cd412e5398a04a2321bfe51def`, budget-escalation repair
   `f39c79ad0e60259d7a02ba0361825e5b6940c136`, and cancellation-authority

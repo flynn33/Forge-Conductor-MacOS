@@ -14,7 +14,7 @@ Instruction packages turn a registered local repository into an ordered work que
    registration authorizes that exact canonical root without widening access to
    its parent.
 4. Under **Instruction packages**, choose **Add Instructions…** and arrange
-   packages by dragging rows.
+   packages by dragging rows or using the earlier/later arrow buttons.
 5. In **Provider**, select and verify exactly one provider. LM Studio requires a
    current saved model/readiness receipt; desktop providers require a verified
    integration and retain their host-selected model.
@@ -114,11 +114,13 @@ invocations.
 
 ## Ordering and execution
 
-The Projects list order is authoritative. Drag rows before or during ordered
-execution. New packages can be added while work is running. Forge preserves the
-active run identity and applies the revised order to pending packages. Every
-order change carries a queue revision so concurrent or stale edits fail instead
-of silently overwriting a newer order.
+The Projects list order is authoritative. Drag rows or use the explicit
+earlier/later buttons before or during ordered execution. New packages can be
+added while work is running. Forge preserves the active run identity and
+applies the revised order to pending packages. Every order change carries a
+queue revision so concurrent or stale edits fail instead of silently
+overwriting a newer order. The native view also rejects a background snapshot
+whose revision predates the queue already shown.
 
 **Start Ordered Work** requires one selected, verified provider and a
 running managed autonomy service. LM Studio requires a live no-resume readiness
@@ -136,7 +138,14 @@ run cannot be committed after the package receives its durable run identity,
 Forge retains that exact identity and retries it through the existing Manager
 watchdog instead of converting the package into a configuration blocker.
 
-**Stop Ordered Work** prevents the next package from starting. It does not discard or silently cancel an already admitted run; that run remains visible in **Projects → Run Details**.
+**Stop Active Work** first fences the queue so no next package can start. If a
+package already owns a run, Forge quiesces and durably requests cancellation of
+that exact run before reconciling the package to `cancelled`. The package can
+then be removed or reordered, while the run remains visible as retained history
+in **Projects → Run Details**. If the bounded cancellation transaction fails,
+the queue remains stopped, the package remains linked to its run, and the stop
+action stays available for retry; Forge does not manufacture a terminal package
+while work may still be active.
 
 **Dashboard** monitors the active queue without changing it. Its project status
 shows delivered document steps and completed packages; the Managed Activity

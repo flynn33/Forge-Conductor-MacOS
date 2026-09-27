@@ -998,7 +998,7 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
             method: "POST",
             path: "/api/manager/projects/instruction-packages/\(action)",
             body: ProjectGenerationBody(projectID: projectID, projectGeneration: generation),
-            timeoutInterval: 12
+            timeoutInterval: 20
         )
         return try validated(queue, projectID: projectID, generation: generation)
     }

@@ -2253,7 +2253,65 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         expectedGeneration: ProjectGeneration
     ) throws -> [String: Any] {
         try requireActiveProject(projectID, generation: expectedGeneration)
-        return try instructionQueueStore().stop(
+        let store = try instructionQueueStore()
+        let stopped = try store.stop(
+            projectID: projectID,
+            generation: expectedGeneration
+        )
+        guard let activePackage = stopped.packages.first(where: { $0.state == .running }),
+              let runID = activePackage.runID else {
+            return stopped.asDictionary()
+        }
+
+        lock.lock()
+        let autonomy = managedAutonomy
+        lock.unlock()
+        guard let autonomy else { throw AutonomyError.shutdown }
+        try beginProviderRunOperation()
+        defer { finishProviderRunOperation() }
+
+        let resolvedState = try Self.waitForAsync(timeoutSeconds: 15) {
+            guard let current = try await self.app.projectContexts.repository.autonomousRun(runID) else {
+                return AutonomousRunState.cancelled
+            }
+            if current.state.isTerminal { return current.state }
+            do {
+                let controlled = try await autonomy.controlRun(runID, action: .cancel)
+                return controlled.state == .cancelRequested ? .cancelled : controlled.state
+            } catch {
+                if let latest = try await self.app.projectContexts.repository.autonomousRun(runID),
+                   latest.state.isTerminal {
+                    return latest.state
+                }
+                throw error
+            }
+        }
+        let queueState: AutonomousRunState
+        switch resolvedState {
+        case .completed, .cancelled, .failedTerminal:
+            queueState = resolvedState
+        default:
+            throw ProjectInstructionQueueError.storageFailure(
+                "stopped run did not reach a safe terminal or cancellation-requested boundary"
+            )
+        }
+        do {
+            _ = try store.reconcile(
+                packageID: activePackage.id,
+                runID: runID,
+                runState: queueState,
+                error: queueState == .cancelled ? "Stopped by operator" : nil
+            )
+        } catch ProjectInstructionQueueError.activePackage {
+            let latest = try store.snapshot(
+                projectID: projectID,
+                generation: expectedGeneration
+            )
+            guard latest.packages.first(where: { $0.id == activePackage.id })?.state != .running else {
+                throw ProjectInstructionQueueError.activePackage(activePackage.id)
+            }
+        }
+        return try store.snapshot(
             projectID: projectID,
             generation: expectedGeneration
         ).asDictionary()

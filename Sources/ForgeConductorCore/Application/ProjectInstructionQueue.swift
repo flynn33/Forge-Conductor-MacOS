@@ -1753,12 +1753,19 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
             $0.projectID == projectID && $0.projectGeneration == generation
         }) else { throw ProjectInstructionQueueError.queueNotRunning }
         let key = projectID.description
-        guard state.runningProjects.contains(key) else {
+        let hasActivePackage = state.packages.contains {
+            $0.projectID == projectID
+                && $0.projectGeneration == generation
+                && $0.state == .running
+        }
+        guard state.runningProjects.contains(key) || hasActivePackage else {
             throw ProjectInstructionQueueError.queueNotRunning
         }
         let prior = state
         state.runningProjects.removeAll { $0 == key }
-        try commitUnlocked(restoring: prior)
+        if prior.runningProjects.contains(key) {
+            try commitUnlocked(restoring: prior)
+        }
         return try snapshotUnlocked(projectID: projectID, generation: generation)
     }
 

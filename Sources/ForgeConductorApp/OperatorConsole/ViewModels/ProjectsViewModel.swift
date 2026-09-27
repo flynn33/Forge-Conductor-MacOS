@@ -92,6 +92,11 @@ final class ProjectsViewModel: ObservableObject {
         nextPendingRegistration?.message
     }
 
+    var instructionQueueHasActiveWork: Bool {
+        guard let instructionQueue else { return false }
+        return Self.hasActiveWork(in: instructionQueue)
+    }
+
     var pendingRegistrationProjectID: String? {
         nextPendingRegistration?.projectID
     }
@@ -207,7 +212,11 @@ final class ProjectsViewModel: ObservableObject {
                 guard selectedProjectID?.caseInsensitiveCompare(identity) == .orderedSame else {
                     return
                 }
-                instructionQueue = queue
+                guard acceptInstructionQueue(
+                    queue,
+                    projectID: identity,
+                    generation: generation
+                ) else { return }
                 let currentPackageIDs = Set(queue.packages.map(\.id))
                 instructionCatalogs = instructionCatalogs.filter {
                     currentPackageIDs.contains($0.key)
@@ -304,12 +313,17 @@ final class ProjectsViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                instructionQueue = try await client.importInstructionPackage(
+                let queue = try await client.importInstructionPackage(
                     projectID: project.projectID,
                     generation: project.projectGeneration,
                     sourcePath: path
                 )
-                notice = "Added the instruction package to \(project.displayName). Drag packages to set execution order."
+                acceptInstructionQueue(
+                    queue,
+                    projectID: project.projectID,
+                    generation: project.projectGeneration
+                )
+                notice = "Added the instruction package to \(project.displayName). Drag packages or use the arrow buttons to set execution order."
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -325,19 +339,34 @@ final class ProjectsViewModel: ObservableObject {
         errorMessage = nil
         Task { [weak self] in
             guard let self else { return }
+            var refreshNeeded = false
             do {
-                instructionQueue = try await client.reorderInstructionPackages(
+                let reordered = try await client.reorderInstructionPackages(
                     projectID: project.projectID,
                     generation: project.projectGeneration,
                     packageIDs: packageIDs,
                     expectedRevision: queue.revision
                 )
+                acceptInstructionQueue(
+                    reordered,
+                    projectID: project.projectID,
+                    generation: project.projectGeneration
+                )
             } catch {
                 errorMessage = error.localizedDescription
-                loadInstructionQueue()
+                refreshNeeded = true
             }
             isLoading = false
+            if refreshNeeded { loadInstructionQueue() }
         }
+    }
+
+    func moveInstructionPackage(_ packageID: String, by offset: Int) {
+        guard let queue = instructionQueue,
+              let packageIDs = Self.reorderedPackageIDs(
+                  queue.packages.map(\.id), moving: packageID, by: offset
+              ) else { return }
+        reorderInstructionPackages(packageIDs)
     }
 
     func removeInstructionPackage(_ packageID: String) {
@@ -347,10 +376,15 @@ final class ProjectsViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                instructionQueue = try await client.removeInstructionPackage(
+                let queue = try await client.removeInstructionPackage(
                     projectID: project.projectID,
                     generation: project.projectGeneration,
                     packageID: packageID
+                )
+                acceptInstructionQueue(
+                    queue,
+                    projectID: project.projectID,
+                    generation: project.projectGeneration
                 )
             } catch {
                 errorMessage = error.localizedDescription
@@ -368,14 +402,24 @@ final class ProjectsViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                if queue.running {
-                    instructionQueue = try await client.stopInstructionQueue(
+                if Self.hasActiveWork(in: queue) {
+                    let stopped = try await client.stopInstructionQueue(
                         projectID: project.projectID,
                         generation: project.projectGeneration
                     )
-                    notice = "Stopped automatic package advancement. The active run, if any, remains available in this project's Run Details."
+                    acceptInstructionQueue(
+                        stopped,
+                        projectID: project.projectID,
+                        generation: project.projectGeneration
+                    )
+                    notice = "Stopped ordered work. Any active instruction run was cancelled and its package can now be removed or reordered."
                 } else {
-                    instructionQueue = try await client.startInstructionQueue(
+                    let started = try await client.startInstructionQueue(
+                        projectID: project.projectID,
+                        generation: project.projectGeneration
+                    )
+                    acceptInstructionQueue(
+                        started,
                         projectID: project.projectID,
                         generation: project.projectGeneration
                     )
@@ -386,6 +430,52 @@ final class ProjectsViewModel: ObservableObject {
             }
             isLoading = false
         }
+    }
+
+    static func reorderedPackageIDs(
+        _ packageIDs: [String],
+        moving packageID: String,
+        by offset: Int
+    ) -> [String]? {
+        guard offset == -1 || offset == 1,
+              let source = packageIDs.firstIndex(of: packageID) else { return nil }
+        let destination = source + offset
+        guard packageIDs.indices.contains(destination) else { return nil }
+        var reordered = packageIDs
+        reordered.swapAt(source, destination)
+        return reordered
+    }
+
+    static func hasActiveWork(in queue: OperatorInstructionQueue) -> Bool {
+        queue.running || queue.packages.contains(where: { $0.state == "running" })
+    }
+
+    static func queueRevisionIsCurrent(
+        candidate: OperatorInstructionQueue,
+        current: OperatorInstructionQueue?
+    ) -> Bool {
+        guard let current,
+              current.projectID.caseInsensitiveCompare(candidate.projectID) == .orderedSame,
+              current.projectGeneration == candidate.projectGeneration else { return true }
+        return candidate.revision >= current.revision
+    }
+
+    @discardableResult
+    private func acceptInstructionQueue(
+        _ queue: OperatorInstructionQueue,
+        projectID: String,
+        generation: UInt64
+    ) -> Bool {
+        guard queue.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              queue.projectGeneration == generation,
+              selectedProjectID?.caseInsensitiveCompare(projectID) == .orderedSame,
+              selectedProject?.projectGeneration == generation else { return false }
+        guard Self.queueRevisionIsCurrent(
+            candidate: queue,
+            current: instructionQueue
+        ) else { return false }
+        instructionQueue = queue
+        return true
     }
 
     func clearConfirmationForSelectedProject(
