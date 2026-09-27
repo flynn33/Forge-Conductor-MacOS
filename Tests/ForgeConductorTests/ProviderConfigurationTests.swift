@@ -753,4 +753,62 @@ final class ProviderConfigurationTests: XCTestCase {
         XCTAssertEqual(try manager.readProviderConfiguration(), saved)
     }
 
+    func testResetGenerationRunRemainsDurableWithoutDeadlockingConfiguration() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        defer { app.shutdown() }
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let saved = try manager.updateProviderConfiguration(request())
+        let root = directory.appendingPathComponent("reset-generation-project")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let registered = try manager.registerProject(
+            path: root.path,
+            displayName: "Reset Generation Provider Fixture"
+        )
+        let uuid = try XCTUnwrap(
+            (registered["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        )
+        let storedProject = try await app.projectContexts.repository.project(ProjectID(uuid))
+        let project = try XCTUnwrap(storedProject)
+        let run = try await app.projectContexts.repository.createAutonomousRun(
+            AutonomousRunRequest(
+                projectID: project.projectID,
+                projectGeneration: project.generation,
+                mission: "Retain fenced run history",
+                providerID: "lmstudio",
+                adapterID: "forge.native-session-host",
+                modelKey: "fixture-model",
+                specification: AutonomousRunSpecification(
+                    allowedTools: ["project_memory.search"],
+                    completionGates: ["fixture-gate"]
+                ),
+                authorizationScope: ToolAuthorizationScope(
+                    canonicalRoots: [root],
+                    allowedTools: ["project_memory.search"],
+                    networkAllowed: false,
+                    maximumInlineOutputBytes: 1_024
+                )
+            )
+        )
+
+        _ = try manager.resetProjectGeneration(
+            projectID: project.projectID,
+            expectedGeneration: project.generation
+        )
+
+        let historical = try await app.projectContexts.repository
+            .nonterminalAutonomousRuns(limit: 10)
+        XCTAssertEqual(historical.map(\.runID), [run.runID])
+        let executable = try await app.projectContexts.repository
+            .nonterminalAutonomousRunsInActiveProjectGenerations(limit: 10)
+        XCTAssertTrue(executable.isEmpty)
+
+        let updated = try manager.updateProviderConfiguration(request(saved.revision))
+        XCTAssertNotEqual(updated.revision, saved.revision)
+        let retained = try await app.projectContexts.repository.autonomousRun(run.runID)
+        XCTAssertEqual(retained?.state, run.state)
+        XCTAssertEqual(retained?.projectGeneration, run.projectGeneration)
+    }
+
 }

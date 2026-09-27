@@ -2958,9 +2958,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     public func updateProviderConfiguration(_ request: ProviderConfigurationUpdate) throws -> ProviderConfigurationSnapshot {
         try performProviderConfiguration { service in
-            // This query includes paused/recoverable runs. Changing an endpoint under
-            // any durable session would invalidate its receipt reconciliation domain.
-            let runs = try await self.app.projectContexts.repository.nonterminalAutonomousRuns(limit: 1)
+            // Paused and recoverable runs in the active project generation own
+            // their receipt reconciliation domain. A generation reset already
+            // fences older runs from execution, so retaining those historical
+            // records must not permanently deadlock provider configuration.
+            let runs = try await self.app.projectContexts.repository
+                .nonterminalAutonomousRunsInActiveProjectGenerations(limit: 1)
             guard runs.isEmpty,
                   !(try await self.app.projectContexts.repository.hasNativeSourceProviderConfigurationBinding()) else {
                 throw ProviderConfigurationError.busy

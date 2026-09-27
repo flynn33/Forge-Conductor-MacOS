@@ -2,7 +2,7 @@
 
 ## 0.16.0 owner-workflow visibility and Manager correction
 
-Product identity is **0.16.0, build 15**. An ordinary Apple
+Product identity is **0.16.0, build 16**. An ordinary Apple
 Development-signed app launch started the embedded Manager and passed
 `testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch`, retaining
 screenshots and accessibility hierarchies for Projects, Continuity, Rune Forge,
@@ -248,7 +248,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.0, build 15**, supporting **macOS 26+**. The owner will
+Product identity: **0.16.0, build 16**, supporting **macOS 26+**. The owner will
 test the staged Desktop candidate and perform shipment separately. The version
 advance and repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -259,7 +259,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.0, build 15**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.0, build 16**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

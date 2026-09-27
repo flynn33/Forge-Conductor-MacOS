@@ -199,12 +199,19 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
             "continuity-project-list",
             "continuity-copy-project-id",
             "continuity-delete-project",
+            "continuity-reset",
+            "continuity-delete-package",
+            "continuity-clear-cache",
+            "continuity-package-picker",
             "continuity-projects-empty",
         ] {
             XCTAssertTrue(element(identifier).waitForExistence(timeout: 8), identifier)
         }
         XCTAssertFalse(app.buttons["continuity-copy-project-id"].isEnabled)
         XCTAssertFalse(app.buttons["continuity-delete-project"].isEnabled)
+        XCTAssertFalse(app.buttons["continuity-reset"].isEnabled)
+        XCTAssertFalse(app.buttons["continuity-delete-package"].isEnabled)
+        XCTAssertTrue(app.buttons["continuity-clear-cache"].isEnabled)
         attachNativeSurface("owner-workflow-continuity")
 
         try click(app.buttons["tab-rune-forge"])

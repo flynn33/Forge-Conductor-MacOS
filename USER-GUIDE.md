@@ -131,16 +131,21 @@ UI automation.
 
 ## 8. Manage continuity data
 
-The **Continuity** view contains only:
+The **Continuity** view contains:
 
 - a scrollable list of project IDs that have continuity data;
 - project selection;
-- **Copy Project ID**; and
-- one confirmed **Delete** action for the selected project's continuity data.
+- **Copy Project ID**;
+- one confirmed **Delete** action for the selected project's continuity data;
+- **Reset** for the selected project generation;
+- a selected-project instruction-package picker with **Delete Package**; and
+- **Clear Cache** for disposable Forge cache data.
 
 There are no checkpoint, rollover, run-selection, timeline, or recovery
-controls on this screen. Deletion does not remove ordinary project files,
-instruction packages, policy, credentials, or project memory.
+controls on this screen. The maintenance controls are directly usable on
+Continuity without opening Projects. Continuity deletion does not remove
+ordinary project files, instruction packages, policy, credentials, or project
+memory.
 
 ## 9. Read Dashboard and evidence
 

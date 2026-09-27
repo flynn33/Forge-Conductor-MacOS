@@ -9,7 +9,7 @@ continuity. The user does not start project work through a Forge Managed Run.
 | | |
 |---|---|
 | **Version** | **0.16.0** |
-| **Build** | **15** |
+| **Build** | **16** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -63,8 +63,10 @@ from a source build, or claim shipment from successful compilation alone.
    30-second Dashboard countdown, creates exactly one stored LM Studio
    successor chat, submits `get_forge_status` with `resume=true`, verifies the
    exact handoff acknowledgement, and then seals the predecessor.
-9. **Continuity** contains only a scrollable project-ID list, **Copy Project
-   ID**, and a confirmed project-scoped **Delete** action.
+9. **Continuity** contains a scrollable project-ID list, **Copy Project ID**, a
+   confirmed project-scoped **Delete** action, **Reset**, a selected-project
+   package picker with **Delete Package**, and **Clear Cache**. These controls
+   are usable without opening Projects.
 
 LM Studio documents that `/api/v1/chat` creates a stored stateful chat and can
 use installed MCP integrations. It does not document a guarantee that an
@@ -118,7 +120,7 @@ connection](docs/LM-STUDIO-CONNECTION.md).
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Multi-folder registration, reset, scoped maintenance, and drag-ordered instruction-package selection and deletion |
 | **Rune Forge** | Development Policy selection and ordering, CLU violation delivery, per-project history, and log export |
-| **Continuity** | Scrollable project-ID selection with Copy and project-scoped Delete only |
+| **Continuity** | Scrollable project-ID selection with Copy, confirmed continuity Delete, Reset, selected-project Delete Package, and Clear Cache |
 | **Provider** | Provider selection, connection verification, provisioning, repair, removal, and advanced LM Studio configuration |
 | **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
 | **Events & Evidence** | Bounded audit events, receipts, diagnostics, and exports |

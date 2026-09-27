@@ -512,7 +512,7 @@ private struct GuidedSetupWizardView: View {
             actions: [
                 "Review the visible package order and each package's per-file catalog in Projects.",
                 "Review the Development Policy source order in Rune Forge. The top source has highest priority.",
-                "Continuity remains automatic; its view is only for project-ID copy and project-scoped deletion.",
+                "Continuity remains automatic; its view manages project-ID copy/deletion, reset, selected-package deletion, and disposable-cache clearing.",
             ],
             recovery: [
                 "Use Provider → Connect and Check when LM Studio readiness requires attention.",

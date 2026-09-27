@@ -8851,6 +8851,27 @@ public actor ProjectControlPlaneRepository {
         )
     }
 
+    /// Returns nonterminal runs that can still execute for the active project
+    /// generation. Reset generations remain durable history, but they cannot
+    /// legally resume and therefore do not own the current provider settings.
+    public func nonterminalAutonomousRunsInActiveProjectGenerations(
+        limit: Int = 256
+    ) throws -> [AutonomousRunRecord] {
+        guard (1...1_024).contains(limit) else {
+            throw AutonomyError.invalidRequest("run recovery limit must be between 1 and 1024")
+        }
+        return try requiredConnection().all(
+            Self.autonomousRunSelect
+                + " WHERE state NOT IN ('completed','cancelled','failed_terminal')"
+                + " AND NOT EXISTS(SELECT 1 FROM continuity_operation_cancellations c WHERE c.operation_id=autonomous_runs.active_operation_id)"
+                + " AND EXISTS(SELECT 1 FROM control_projects p WHERE p.project_id=autonomous_runs.project_id"
+                + " AND p.generation=autonomous_runs.project_generation AND p.lifecycle_state='active')"
+                + " ORDER BY updated_at,run_id LIMIT ?",
+            bindings: [.int64(Int64(limit))],
+            map: Self.decodeAutonomousRun
+        )
+    }
+
     public func validateAutonomousRunGeneration(_ runID: RunID) throws -> AutonomousRunRecord {
         let connection = try requiredConnection()
         guard let run = try autonomousRunUnlocked(runID, connection: connection) else {

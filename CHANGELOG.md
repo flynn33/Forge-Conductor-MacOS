@@ -10,6 +10,32 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### Added
+
+- Added **Reset**, a selected-project instruction-package picker with **Delete
+  Package**, and **Clear Cache** directly to Continuity beside its scrollable
+  project-ID list, **Copy Project ID**, and confirmed continuity **Delete**.
+  These controls remain visible in the empty state and do not require opening
+  Projects.
+
+### Fixed
+
+- Advanced the candidate identity to `0.16.0 (16)` and corrected provider
+  configuration ownership so durable nonterminal runs from reset generations
+  remain historical evidence without permanently returning `manager
+  unavailable` for current-generation LM Studio configuration.
+
+### Verification
+
+- Five focused native UI tests passed with zero failures for the populated Continuity controls,
+  project-ID copy, disposable continuity deletion, selected-package deletion,
+  and constrained-window containment. The ordinary signed-launch test now
+  asserts the Continuity reset, package, and cache identifiers directly.
+  The stale-generation provider regression and two version-alignment tests also
+  passed, as did the SwiftPM app product, canonical signed Debug build,
+  whitespace check, and repository hygiene. Exact build-16 Desktop-candidate
+  and live LM Studio successor evidence remain required before shipment.
+
 ## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)
 
 ### Added

@@ -10,8 +10,8 @@ struct GuidedHelpState: Equatable, Sendable {
         case .continuity, .continuitySaveProgress, .continuityFreshSession:
             Self(
                 status: "Automatic continuity",
-                detail: "LM Studio sessions are protected automatically without controls in the Continuity view.",
-                recommendedAction: "Use Continuity only to copy a project ID or delete its continuity data."
+                detail: "LM Studio sessions are protected automatically; the Continuity view manages only project-scoped data and maintenance.",
+                recommendedAction: "Use Continuity to copy or delete a project ID, reset it, delete one of its instruction packages, or clear disposable cache."
             )
         case .provider, .providerCredential:
             Self(

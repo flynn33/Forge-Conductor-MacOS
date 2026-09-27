@@ -50,8 +50,9 @@ order:
    `get_forge_status`, then give the model the task.
 7. **Monitor governance and continuity** — use Dashboard for the automatic
    rollover countdown, Rune Forge for CLU policy observations/log export, and
-   Events & Evidence for durable audit detail. Continuity itself only manages
-   project IDs and project-scoped deletion.
+   Events & Evidence for durable audit detail. Continuity manages project-ID
+   copy/deletion plus reset, selected-package deletion, and disposable-cache
+   clearing without initiating rollover.
 8. **Resolve issues and continue** — follow the current provider, package,
    policy, or continuity action without switching to Managed Run.
 
@@ -100,8 +101,9 @@ product controls rather than hidden guide side effects.
 ## State-aware guidance
 
 Project guidance distinguishes loading, missing project, provider action, and
-LM Studio-ready states. Continuity explains project-ID copying and deletion;
-it exposes no manual checkpoint or rollover action. Provider guidance distinguishes the durable selection,
+LM Studio-ready states. Continuity explains project-ID copying/deletion, reset,
+selected-package deletion, and cache clearing; it exposes no manual checkpoint
+or rollover action. Provider guidance distinguishes the durable selection,
 provisioning operation, remaining desktop-host action, verified deployment,
 repair/removal availability, and LM Studio's unsaved or unverified advanced
 connection settings. Runtimes guidance reports the selected job state or that

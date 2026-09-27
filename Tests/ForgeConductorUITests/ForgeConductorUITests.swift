@@ -1019,11 +1019,17 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let projectList = app.descendants(matching: .any)["continuity-project-list"]
         let copy = app.buttons["continuity-copy-project-id"]
         let delete = app.buttons["continuity-delete-project"]
+        let reset = app.buttons["continuity-reset"]
+        let deletePackage = app.buttons["continuity-delete-package"]
+        let clearCache = app.buttons["continuity-clear-cache"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertTrue(subtitle.waitForExistence(timeout: 5))
         XCTAssertTrue(projectList.waitForExistence(timeout: 5))
         XCTAssertTrue(copy.waitForExistence(timeout: 5))
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        XCTAssertTrue(reset.waitForExistence(timeout: 5))
+        XCTAssertTrue(deletePackage.waitForExistence(timeout: 5))
+        XCTAssertTrue(clearCache.waitForExistence(timeout: 5))
         XCTAssertFalse(
             app.descendants(matching: .any)["continuity-operation-list"].exists,
             "Continuity must not expose the obsolete operation timeline"
@@ -1034,7 +1040,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Continuity must not expose a manual refresh operation"
         )
 
-        for element in [title, subtitle, projectList, copy, delete] {
+        for element in [title, subtitle, projectList, copy, delete, reset, deletePackage, clearCache] {
             XCTAssertTrue(
                 frameIsContained(element.frame, in: detail.frame, tolerance: 2),
                 "\(element.identifier) escaped the Continuity content area"
@@ -1199,6 +1205,10 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["continuity-copy-project-id"].exists)
         XCTAssertTrue(app.buttons["continuity-delete-project"].exists)
+        XCTAssertTrue(app.buttons["continuity-reset"].exists)
+        XCTAssertTrue(app.buttons["continuity-delete-package"].exists)
+        XCTAssertTrue(app.buttons["continuity-clear-cache"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-package-picker"].exists)
         XCTAssertFalse(app.buttons["checkpoint-command"].exists)
         XCTAssertFalse(app.buttons["rollover-command"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["continuity-operation-list"].exists)
@@ -1242,6 +1252,29 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(fixture.continuityHistoryClearScopes, ["project"])
         XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].exists)
+    }
+
+    func testContinuityInstructionPackageCanBeDeletedWithConfirmation() throws {
+        let fixture = try OperatorManagerUITestFixture(includeSecondInstructionPackage: true)
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+
+        let remove = app.buttons["continuity-delete-package"]
+        XCTAssertTrue(waitForEnabled(remove, timeout: 8))
+        makeHittable(remove)
+        remove.click()
+        let confirmation = app.sheets.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts["Delete instruction package?"].exists)
+        confirmation.buttons["Delete Package"].click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.instructionQueueRemoveRequestCount == 1
+                && fixture.instructionPackageIDs == [fixture.secondInstructionPackageID]
+        })
     }
 
     func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {
