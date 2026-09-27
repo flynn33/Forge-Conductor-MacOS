@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.15.0**, build **14**. This connection document does
+Product identity: version **0.16.0**, build **15**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -175,14 +175,15 @@ general-tool entry. The CLI normally resolves the installed CLI executable. The
 GUI deliberately supplies its own app executable. Primary, fallback, and CLU
 never mix versions within one deployment.
 
-SwiftPM builds place `ForgeConductor_ForgeConductorCore.bundle` beside the CLI
-product. `forge-conductor install` stages that bundle in the same artifact
-transaction as the executable and runtime launcher, and copies it into the
-staged app's `Contents/Resources`. Installing a bare SwiftPM binary without
-the bundle now fails before changing the Forge home. A relocated CLI lacking
-the bundle previously aborted before MCP `initialize`, so both role smokes
-failed with an incomplete handshake. The focused deployment acceptance test
-now exercises the relocated executable with its complete resource boundary.
+SwiftPM builds place both `ForgeConductor_ForgeConductorCore.bundle` and
+`ForgeConductor_ForgeConductorApp.bundle` beside their products. The native
+staging path copies both into the app's `Contents/Resources`; its verification
+mode waits three seconds and fails if the launched process exits. Installing a
+bare CLI without the Core bundle still fails before changing the Forge home. A
+relocated CLI lacking that bundle previously aborted before MCP `initialize`,
+so both role smokes failed with an incomplete handshake. Focused deployment
+acceptance exercises the relocated executable with its complete resource
+boundary.
 
 **Ship path (when deliberately registering an installed app):**
 

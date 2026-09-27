@@ -1397,8 +1397,8 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
     }
 
-    func testProviderControlsSendExactProtectedRequestsAndSurfaceSuccessAndFailure() throws {
-        let fixture = try OperatorManagerUITestFixture(failContractProbe: true)
+    func testProviderControlsUseProtectedPreparationWithoutManagerUnavailable() throws {
+        let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
         let provider = app.buttons["tab-provider"]
@@ -1415,11 +1415,11 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         makeHittable(testConnection)
         testConnection.click()
 
-        XCTAssertTrue(waitUntil(timeout: 8) {
-            fixture.providerPreparationCount == 1
+        XCTAssertTrue(waitUntil(timeout: 12) {
+            fixture.providerPreparationCount == 2
                 && fixture.providerIntegrationMutationRecords.count == 1
         })
-        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 1)
+        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 2)
         XCTAssertEqual(fixture.providerIntegrationMutationAuthorizationCount, 1)
         XCTAssertTrue(fixture.providerProbeRecords.isEmpty)
         let notice = app.descendants(matching: .any)["provider-probe-notice"]
@@ -1431,27 +1431,16 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         makeHittable(runContractProbe)
         runContractProbe.click()
 
-        let expectedContract = OperatorManagerUITestFixture.ProviderProbeRecord(
-            adapterID: "forge.native-session-host",
-            mode: "contract"
-        )
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.providerProbeRecords == [expectedContract]
+        XCTAssertTrue(waitUntil(timeout: 12) {
+            fixture.providerPreparationCount == 4
+                && fixture.providerIntegrationMutationRecords.count == 2
         })
-        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 1)
-        XCTAssertEqual(
-            fixture.providerProbeBodies.map { String(decoding: $0, as: UTF8.self) },
-            ["{\"adapter_id\":\"forge.native-session-host\",\"mode\":\"contract\"}"]
-        )
-
-        let structuredFailure = app.descendants(matching: .any)["operator-unavailable"]
-        XCTAssertTrue(structuredFailure.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(structuredFailure, contains: "HTTP 422"))
-        XCTAssertTrue(element(structuredFailure, contains: "Provider contract probe failed"))
-        XCTAssertTrue(element(structuredFailure, contains: "custom tools"))
-        let lastProbeError = app.descendants(matching: .any)["provider-last-probe-error"]
-        XCTAssertTrue(lastProbeError.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(lastProbeError, contains: "custom tools"))
+        XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 4)
+        XCTAssertEqual(fixture.providerIntegrationMutationAuthorizationCount, 2)
+        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 0)
+        XCTAssertTrue(fixture.providerProbeBodies.isEmpty)
+        XCTAssertFalse(app.descendants(matching: .any)["operator-unavailable"].exists)
+        XCTAssertTrue(element(notice, contains: "integration passed verification"))
     }
 
     func testRuntimeCancelUsesProtectedTypedRequestAndReconcilesSuccessAndRejection() throws {

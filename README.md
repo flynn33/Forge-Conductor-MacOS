@@ -8,8 +8,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.15.0** |
-| **Build** | **14** |
+| **Version** | **0.16.0** |
+| **Build** | **15** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -46,8 +46,8 @@ from a source build, or claim shipment from successful compilation alone.
 
 1. Start Forge Conductor and confirm Manager is running.
 2. In **Provider**, select **LM Studio** and choose **Connect and Check**. The
-   selector, main action, Advanced connection check, and probe use the same
-   Manager preparation path.
+   pinned **LM Studio Advanced**, **Connect and Check**, and **Run Advanced
+   Probe** controls use the same Manager preparation path.
 3. In **Projects**, select one or more project folders.
 4. Add one or more instruction files, folders, ZIPs, or packages. Drag package
    rows to set priority. **Delete Package** removes the selected package.

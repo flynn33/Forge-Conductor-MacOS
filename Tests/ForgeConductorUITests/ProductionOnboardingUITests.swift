@@ -61,7 +61,16 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
             configuration.timeoutIntervalForResource = 45
             configuration.urlCache = nil
             session = URLSession(configuration: configuration)
-            app = XCUIApplication()
+            if let candidatePath = ProcessInfo.processInfo.environment["FORGE_DESKTOP_CANDIDATE_PATH"],
+               !candidatePath.isEmpty {
+                let candidateURL = URL(fileURLWithPath: candidatePath).standardizedFileURL
+                guard FileManager.default.fileExists(atPath: candidateURL.path) else {
+                    throw OnboardingFailure.invalidDesktopCandidate(candidateURL.path)
+                }
+                app = XCUIApplication(url: candidateURL)
+            } else {
+                app = XCUIApplication()
+            }
             app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = forgeHome.path
             guidedSetupDefaultsSuite = "com.forge-conductor.production-onboarding.\(fixture.lastPathComponent)"
             UserDefaults(suiteName: guidedSetupDefaultsSuite)?.set(
@@ -163,6 +172,63 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         let persisted: OnboardingManagerSettings = try await read("/api/manager/settings")
         XCTAssertEqual(persisted, saved)
         attach("authorized-folder-after-relaunch", persisted)
+    }
+
+    func testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch() async throws {
+        _ = try await launchOrdinaryApplication()
+
+        try click(app.buttons["tab-projects"])
+        for identifier in [
+            "project-workflow-actions",
+            "project-register-primary",
+            "instruction-package-add-primary",
+            "project-reset",
+            "project-clear-cache",
+            "project-instruction-packages",
+        ] {
+            XCTAssertTrue(element(identifier).waitForExistence(timeout: 8), identifier)
+        }
+        XCTAssertTrue(app.buttons["project-register-primary"].isEnabled)
+        XCTAssertFalse(app.buttons["instruction-package-add-primary"].isEnabled)
+        XCTAssertFalse(app.buttons["project-reset"].isEnabled)
+        XCTAssertTrue(app.buttons["project-clear-cache"].isEnabled)
+        attachNativeSurface("owner-workflow-projects")
+
+        try click(app.buttons["tab-continuity"])
+        for identifier in [
+            "continuity-project-list",
+            "continuity-copy-project-id",
+            "continuity-delete-project",
+            "continuity-projects-empty",
+        ] {
+            XCTAssertTrue(element(identifier).waitForExistence(timeout: 8), identifier)
+        }
+        XCTAssertFalse(app.buttons["continuity-copy-project-id"].isEnabled)
+        XCTAssertFalse(app.buttons["continuity-delete-project"].isEnabled)
+        attachNativeSurface("owner-workflow-continuity")
+
+        try click(app.buttons["tab-rune-forge"])
+        for identifier in [
+            "rune-policy-add",
+            "rune-policy-export",
+            "rune-policy-source-list",
+            "rune-violation-list",
+        ] {
+            XCTAssertTrue(element(identifier).waitForExistence(timeout: 8), identifier)
+        }
+        attachNativeSurface("owner-workflow-rune-forge")
+
+        try click(app.buttons["tab-provider"])
+        for identifier in [
+            "provider-advanced-toggle",
+            "provider-test-connection",
+            "provider-run-contract-probe",
+        ] {
+            XCTAssertTrue(element(identifier).waitForExistence(timeout: 8), identifier)
+        }
+        XCTAssertEqual(app.buttons["provider-test-connection"].label, "Connect and Check")
+        XCTAssertEqual(app.buttons["provider-run-contract-probe"].label, "Run Advanced Probe")
+        attachNativeSurface("owner-workflow-provider")
     }
 
     func testNativeProjectRegistrationUsesSelectedFolderAndSurvivesRelaunch() async throws {
@@ -591,6 +657,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(loaded.toolUseCapable)
         attach("real-provider-model-discovery", inventory)
         try await assertRealConnection(model: model)
+        try await assertRealAdvancedProbe(model: model)
         attachScreenshot("real-provider-native-connection")
 
         app.terminate()
@@ -601,6 +668,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         try openProvider()
         XCTAssertTrue(waitUntil { (self.app.textFields["provider-model-key"].value as? String) == model })
         try await assertRealConnection(model: model)
+        try await assertRealAdvancedProbe(model: model)
         attach("real-provider-configuration-after-relaunch", persisted)
     }
 
@@ -772,6 +840,21 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(app.launchArguments.contains("--uitesting"))
         app.launch()
         XCTAssertTrue(app.buttons["tab-manager"].waitForExistence(timeout: 15))
+        if let candidatePath = ProcessInfo.processInfo.environment["FORGE_DESKTOP_CANDIDATE_PATH"],
+           !candidatePath.isEmpty {
+            let expectedPath = URL(fileURLWithPath: candidatePath).standardizedFileURL.path
+            let exactCandidate = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleURL?.standardizedFileURL.path == expectedPath
+            })
+            XCTAssertNotNil(
+                exactCandidate,
+                "The UI test must exercise the exact requested Desktop candidate at \(expectedPath)"
+            )
+            print(
+                "EVIDENCE exact_candidate_path=\(expectedPath) "
+                    + "pid=\(exactCandidate?.processIdentifier ?? -1)"
+            )
+        }
         retainBootstrapDiagnostics("ordinary-bootstrap-before-status", home: forgeHome)
         let deadline = Date().addingTimeInterval(20)
         var lastFailure = "No status attempt completed"
@@ -911,6 +994,27 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertNotNil(provider.lastProbeAt)
         XCTAssertNil(provider.lastProbeError)
         attach("real-provider-manager-probe-readback", provider)
+    }
+
+    private func assertRealAdvancedProbe(model: String) async throws {
+        try click(app.buttons["provider-run-contract-probe"])
+        XCTAssertTrue(waitUntil(timeout: 40) {
+            self.contains(
+                self.element("provider-probe-notice"),
+                "ready for Forge MCP and automatic continuity"
+            )
+        })
+        XCTAssertFalse(element("operator-unavailable").exists)
+        let snapshot: OnboardingOperatorSnapshot = try await read(
+            "/api/manager/operator/snapshot?limit=1"
+        )
+        let provider = try XCTUnwrap(snapshot.provider)
+        XCTAssertEqual(provider.health, "contract_valid")
+        XCTAssertEqual(provider.modelKey, model)
+        XCTAssertEqual(provider.lastProbeMode, "contract")
+        XCTAssertNil(provider.lastProbeError)
+        attach("real-provider-manager-advanced-probe-readback", provider)
+        attachScreenshot("real-provider-native-advanced-probe")
     }
 
     private func waitForSettings(roots: [String]) async throws -> OnboardingManagerSettings {
@@ -1125,10 +1229,19 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
+    private func attachNativeSurface(_ name: String) {
+        attachScreenshot(name)
+        let attachment = XCTAttachment(string: app.debugDescription)
+        attachment.name = "\(name)-accessibility"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
 }
 
 private enum OnboardingFailure: Error {
     case managerUnavailable, settingsNotPersisted, invalidManagerCredential, responseTooLarge
+    case invalidDesktopCandidate(String)
     case managerResponseRejected(route: String, status: Int)
     case controlUnavailable(identifier: String), controlNotHittable(identifier: String)
     case socketOperation
@@ -1550,8 +1663,10 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
                     + "or the local live-clear marker"
             )
         }
-        let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"]
-            ?? "/Users/flynn/Desktop/Forge Conductor 0.15.0 (14)-849b879.app"
+        guard let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"],
+              !requestedPath.isEmpty else {
+            throw XCTSkip("Requires the exact owner Desktop candidate path")
+        }
         candidatePath = URL(fileURLWithPath: requestedPath).standardizedFileURL.path
         try attachToRunningCandidate()
 
@@ -1595,8 +1710,10 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
 
     func testLiveInstructionReorderDeleteAndProjectMaintenanceControls() async throws {
         let environment = ProcessInfo.processInfo.environment
-        let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"]
-            ?? "/Users/flynn/Desktop/Forge Conductor 0.14.7 (13)-74ead97.app"
+        guard let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"],
+              !requestedPath.isEmpty else {
+            throw XCTSkip("Requires the exact owner Desktop candidate path")
+        }
         candidatePath = URL(fileURLWithPath: requestedPath).standardizedFileURL.path
         guard FileManager.default.fileExists(atPath: candidatePath),
               let running = NSWorkspace.shared.runningApplications.first(where: {

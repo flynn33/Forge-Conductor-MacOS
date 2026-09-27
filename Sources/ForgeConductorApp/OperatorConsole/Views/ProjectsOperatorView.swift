@@ -100,6 +100,7 @@ struct ProjectsOperatorView: View {
                     if let notice = viewModel.notice {
                         OperatorNoticeBanner(message: notice)
                     }
+                    projectWorkflowActions
                     if let pendingPath = viewModel.pendingRegistrationPath {
                         GroupBox("Registration reconciliation") {
                             VStack(alignment: .leading, spacing: 10) {
@@ -148,6 +149,13 @@ struct ProjectsOperatorView: View {
                     if let project = viewModel.selectedProject {
                         projectDetail(project)
                     } else if viewModel.errorMessage == nil, !viewModel.isLoading {
+                        GroupBox("Instruction packages") {
+                            Text("Select or add a project to add, reorder, and delete instruction packages.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                        }
+                        .accessibilityIdentifier("project-instruction-packages")
                         ContentUnavailableView(
                             "No Registered Projects",
                             systemImage: "folder.badge.questionmark",
@@ -417,26 +425,46 @@ struct ProjectsOperatorView: View {
                 .help("Choose another location for this same Git repository.")
                 .accessibilityIdentifier("project-relink")
                 GuidedHelpButton(context: .projectRelink)
-                Spacer()
-                Button("Reset Generation…", role: .destructive) {
-                    resetConfirmation = viewModel.resetConfirmationForSelectedProject()
-                }
-                .disabled(viewModel.isLoading)
-                .accessibilityIdentifier("project-reset")
-                GuidedHelpButton(context: .projectReset)
-            }
-
-            HStack {
-                Button("Clear Cache…", role: .destructive) {
-                    showClearCacheConfirmation = true
-                }
-                .disabled(viewModel.isLoading)
-                .accessibilityIdentifier("project-clear-cache")
-                Text("Removes disposable Forge cache files without deleting project or continuity data.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var projectWorkflowActions: some View {
+        GroupBox("Project workflow") {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { projectWorkflowButtons }
+                VStack(alignment: .leading, spacing: 8) { projectWorkflowButtons }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("project-workflow-actions")
+    }
+
+    @ViewBuilder
+    private var projectWorkflowButtons: some View {
+        Button("Add Project Folders…", systemImage: "plus") {
+            chooseProjectFolder()
+        }
+        .accessibilityIdentifier("project-register-primary")
+
+        Button("Add Instructions…", systemImage: "doc.badge.plus") {
+            chooseInstructionPackage()
+        }
+        .disabled(viewModel.isLoading || viewModel.selectedProject?.lifecycleState != "active")
+        .accessibilityIdentifier("instruction-package-add-primary")
+
+        Button("Reset Generation…", role: .destructive) {
+            resetConfirmation = viewModel.resetConfirmationForSelectedProject()
+        }
+        .disabled(viewModel.isLoading || viewModel.selectedProject == nil)
+        .accessibilityIdentifier("project-reset")
+
+        Button("Clear Cache…", role: .destructive) {
+            showClearCacheConfirmation = true
+        }
+        .disabled(viewModel.isLoading)
+        .help("Removes disposable Forge cache files without deleting project or continuity data.")
+        .accessibilityIdentifier("project-clear-cache")
     }
 
     private func requestSelectedProjectRemoval() {

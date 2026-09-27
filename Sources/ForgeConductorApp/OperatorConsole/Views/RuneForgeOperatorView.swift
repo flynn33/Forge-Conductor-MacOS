@@ -184,11 +184,11 @@ struct RuneForgeOperatorView: View {
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Development Policy sources")
+                        .accessibilityIdentifier("rune-policy-source-list")
                     Text("Drag to set priority")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityIdentifier("rune-policy-source-list")
             }
 
             Section {

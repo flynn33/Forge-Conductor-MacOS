@@ -135,6 +135,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.15.0`
+`0.16.0`
 
-Build: `14`
+Build: `15`

@@ -13,8 +13,8 @@ struct ProviderOperatorView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
                 OperatorHeader(
                     title: "Provider",
                     subtitle: "Choose the provider Forge connects to for MCP governance and automatic continuity.",
@@ -32,32 +32,31 @@ struct ProviderOperatorView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("provider-probe-notice")
                 }
-                providerSelection
-                if let operation = viewModel.currentProviderOperation {
-                    providerOperation(operation)
-                }
-                Button {
-                    showingAdvancedSettings.toggle()
-                } label: {
-                    Label(
-                        "LM Studio Advanced",
-                        systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("provider-advanced-toggle")
-                if showingAdvancedSettings {
-                    VStack(alignment: .leading, spacing: 16) {
-                        readiness
-                        configurationEditor
-                        if let provider = viewModel.provider {
-                            providerDetail(provider)
-                        }
-                    }
-                    .padding(.top, 8)
-                }
+                primaryActions
             }
             .padding(20)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    providerSelection
+                    if let operation = viewModel.currentProviderOperation {
+                        providerOperation(operation)
+                    }
+                    if showingAdvancedSettings {
+                        VStack(alignment: .leading, spacing: 16) {
+                            readiness
+                            configurationEditor
+                            if let provider = viewModel.provider {
+                                providerDetail(provider)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+                .padding(20)
+            }
         }
         .task { viewModel.load() }
         .onDisappear {
@@ -65,6 +64,34 @@ struct ProviderOperatorView: View {
             viewModel.stopObservingProviderOperation()
         }
         .guidedHelpState(viewModel.guidedHelpState, for: .provider)
+    }
+
+    private var primaryActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { providerActionButtons }
+            VStack(alignment: .leading, spacing: 8) { providerActionButtons }
+        }
+    }
+
+    @ViewBuilder
+    private var providerActionButtons: some View {
+        Button {
+            showingAdvancedSettings.toggle()
+        } label: {
+            Label(
+                "LM Studio Advanced",
+                systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
+            )
+        }
+        .accessibilityIdentifier("provider-advanced-toggle")
+
+        Button("Connect and Check", action: viewModel.connectAndCheck)
+            .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
+            .accessibilityIdentifier("provider-test-connection")
+
+        Button("Run Advanced Probe", action: viewModel.runContractProbe)
+            .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
+            .accessibilityIdentifier("provider-run-contract-probe")
     }
 
     private var providerSelection: some View {
@@ -197,11 +224,8 @@ struct ProviderOperatorView: View {
                 if let action = viewModel.preparation?.recoveryAction, action != .none {
                     LabeledContent("Next action", value: recoveryActionLabel(action))
                 }
-                HStack {
-                    Button("Connect and Check", action: viewModel.connectAndCheck)
-                        .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
-                        .accessibilityIdentifier("provider-test-connection")
-                    if viewModel.isProbing {
+                if viewModel.isProbing {
+                    HStack {
                         Button("Cancel", action: viewModel.cancelConnectAndCheck)
                             .accessibilityIdentifier("provider-cancel-connect-and-check")
                         ProgressView().controlSize(.small)
@@ -255,16 +279,11 @@ struct ProviderOperatorView: View {
                 }
                 Text("Save updates the LM Studio connection used by Forge MCP and continuity. Saving does not test the connection; model loading remains in LM Studio.")
                     .font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    Button("Connect and Check", action: viewModel.runContractProbe)
-                        .accessibilityIdentifier("provider-run-contract-probe")
-                    if viewModel.isProbing {
-                        ProgressView()
-                            .controlSize(.small)
-                            .accessibilityIdentifier("provider-probe-progress")
-                    }
+                if viewModel.isProbing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityIdentifier("provider-probe-progress")
                 }
-                .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
                 if viewModel.hasUnsavedChanges {
                     Text("Save changes before refreshing models or testing this endpoint and model.")
                         .font(.caption).foregroundStyle(.secondary)

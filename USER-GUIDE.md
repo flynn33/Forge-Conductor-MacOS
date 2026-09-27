@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.15.0**, build **14**.
+Version **0.16.0**, build **15**.
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy

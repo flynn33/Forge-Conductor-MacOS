@@ -10,6 +10,8 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)
+
 ### Added
 
 - Replaced the primary Managed Run workflow with ordinary LM Studio chat use:
@@ -28,10 +30,17 @@ Product versions do not by themselves claim shipment.
   ordering in Rune Forge, plus per-project policy-log export. CLU notices now
   identify the violated policy and include its bounded redacted policy content.
 
-- Advanced the product identity to `0.15.0 (14)` across repository authorities,
+- Advanced the product identity to `0.16.0 (15)` across repository authorities,
   runtime constants, tests, and every Xcode build configuration.
 
 ### Fixed
+
+- Kept Projects folder/package/reset/cache actions, the Continuity project-ID
+  list/copy/delete actions, and Provider Advanced/connection/probe actions in
+  persistent visible regions. Continuity retains its controls in the empty
+  state, and the staged application bundle now includes both SwiftPM resource
+  bundles and must remain alive for three seconds before smoke verification
+  succeeds.
 
 - Unified LM Studio selection, **Connect and Check**, the Advanced connection
   check, and provider probe on the same actionable Manager preparation path so
@@ -66,6 +75,16 @@ Product versions do not by themselves claim shipment.
   proving that its owning control-plane run is terminal.
 
 ### Verification
+
+- An ordinary Apple Development-signed app launch passed
+  `testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch`, retaining a
+  screenshot and accessibility hierarchy for Projects, Continuity, Rune Forge,
+  and Provider. The versioned source also passed
+  `testRealProviderModelDiscoveryAndConnectionFromSavedNativeConfiguration`
+  against loaded model `qwen/qwen3.8-27b`; **Connect and Check** succeeded before
+  and after relaunch without `operator-unavailable`. Final Desktop-candidate
+  archive, exact-binary UI rerun, Advanced-probe rerun, and ordinary LM Studio
+  chat acceptance remain open, so this is not a shipment claim.
 
 - The September 27 owner-workflow correction passed the complete 1,902-test
   Swift suite with 12 explicit environment-dependent skips and zero failures;

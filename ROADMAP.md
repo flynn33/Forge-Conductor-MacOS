@@ -43,14 +43,14 @@ this workflow.
 
 | Area | Current state | Required acceptance |
 |---|---|---|
-| LM Studio provider | **Implemented; live source route verified; native candidate acceptance open.** Provider selection, **Connect and Check**, the Advanced connection check, and probe use one actionable preparation path. The current source passed the production preparation and probe routes against loaded model `qwen/qwen3.8-27b`. | Every native entry point reaches the same live LM Studio configuration and contract check, distinguishes Manager transport/authentication failures from LM Studio endpoint/model/tool-contract failures, and succeeds against the owner-selected loaded model. |
+| LM Studio provider | **Native source-path acceptance passed; exact Desktop-candidate acceptance open.** An ordinary Apple Development-signed app launched its embedded Manager, discovered loaded model `qwen/qwen3.8-27b`, and completed **Connect and Check** before and after relaunch without `operator-unavailable`. Advanced/probe controls are pinned and use the same preparation path. | Every native entry point reaches the same live LM Studio configuration and contract check, distinguishes Manager transport/authentication failures from LM Studio endpoint/model/tool-contract failures, and succeeds against the owner-selected loaded model. |
 | Project selection | **Implemented and focused-tested.** Projects accepts multiple folders and exposes registered project context without starting a run. | One or more selected project folders remain available to the LM Studio model through project-scoped Forge tools. |
 | Instruction packages | **Implemented and focused-tested.** Multiple packages can be selected, displayed, drag-reordered, removed with **Delete Package**, and discovered through project-scoped tools. | The complete selection, ordering, deletion, persistence, and LM Studio query flow passes in the current candidate. |
 | Rune Forge policy | **Implemented and focused-tested.** Files and folders can be selected, persisted in priority order, drag-reordered, and queried with project isolation. | The complete selection, ordering, persistence, and model-query flow passes in the current candidate. |
 | CLU governance | **Deterministic contract implemented; live-session acceptance open.** Notices carry the violated policy identity and full applicable policy statement; logs are project-isolated, bounded, and exportable. | CLU monitors model activity, preserves a separate log per project, exports it, and sends the active model a notice containing the exact violated policy and policy content. |
 | Continuity automation | **Deterministic host-boundary implementation and tests complete; live LM Studio acceptance open.** A resume-ready handoff starts the 30-second state machine, creates one stored LM Studio chat, submits `get_forge_status` with `resume=true`, requires exact handoff acknowledgement, and handles repeated watchdog ticks idempotently. | A current owner-machine flow proves durable handoff, the visible countdown, exactly one successor chat, bootstrap submission, exact acknowledgement, predecessor sealing, and crash recovery. |
-| Continuity view | **Implemented and focused-tested.** It is a scrollable project-ID list with selection, copy, and one confirmed selected-project **Delete** action. | Current-candidate UI evidence proves the exact reduced surface and durable deletion behavior. |
-| Reset / package deletion / cache clearing | **Implemented and focused-tested.** Projects exposes confirmed reset, explicit package deletion, and disposable-cache clearing that preserves durable data. | Each action is discoverable, correctly scoped, durable across relaunch, and verified in the current candidate. |
+| Continuity view | **Implemented and native source-path tested.** It always renders a scrollable project-ID list with selection, copy, and one confirmed selected-project **Delete** action, including an in-list empty state. | Exact Desktop-candidate UI evidence proves the reduced surface and durable deletion behavior. |
+| Reset / package deletion / cache clearing | **Implemented and native source-path tested.** Projects pins folder/package/reset/cache actions above its scrolling detail; package rows retain drag ordering and explicit **Delete Package**. | Each action is correctly scoped, durable across relaunch, and verified in the exact Desktop candidate. |
 | Managed Run removal | **Removed from primary navigation and the current workflow.** Compatibility internals remain only where required to preserve stored data or reusable low-level services. | No current action, guide, status text, or continuity dependency directs the user to start project work through Managed Run. |
 
 ## Release boundary
@@ -69,12 +69,14 @@ disposable-cache clearing, ordered Development Policy sources, CLU notice
 content, per-project log export, the project-ID-only Continuity surface,
 project-scoped continuity deletion, and the 30-second LM Studio successor state
 machine. The complete Swift suite passed 1,902 tests with zero failures and 12
-explicit environment-dependent skips. The current source also passed the two
-live LM Studio production preparation/probe tests against
-`qwen/qwen3.8-27b`, and five focused native UI tests proved the reduced
-Continuity surface, project-ID copy/deletion, and minimum-window instruction
-package reorder/deletion controls. Both SwiftPM products and the canonical
-Apple Development-signed Debug app build compile.
+explicit environment-dependent skips. The current source also passed a native
+LM Studio connection test before and after app relaunch against
+`qwen/qwen3.8-27b` without `operator-unavailable`. A new ordinary-launch native
+UI test retained screenshots and accessibility hierarchies for Projects,
+Continuity, Rune Forge, and Provider, while five earlier focused tests proved
+the reduced Continuity surface, project-ID copy/deletion, and minimum-window
+instruction package reorder/deletion controls. Both SwiftPM products and the
+canonical Apple Development-signed Debug app build compile.
 
 These results prove only their tested boundaries. The roadmap remains open
 until the current native candidate passes every Provider entry point and the

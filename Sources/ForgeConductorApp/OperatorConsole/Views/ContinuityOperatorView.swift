@@ -53,20 +53,8 @@ struct ContinuityOperatorView: View {
                     OperatorNoticeBanner(message: notice)
                 }
 
-                if viewModel.projectIDs.isEmpty, !viewModel.isLoading {
-                    ContentUnavailableView(
-                        "No continuity projects",
-                        systemImage: "arrow.trianglehead.2.clockwise.rotate.90",
-                        description: Text(
-                            "Project identities appear here automatically after continuity data is saved."
-                        )
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("continuity-projects-empty")
-                } else {
-                    actions
-                    projectList
-                }
+                actions
+                projectList
             }
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -88,6 +76,20 @@ struct ContinuityOperatorView: View {
 
     private var projectList: some View {
         List(selection: $viewModel.selectedProjectID) {
+            if viewModel.projectIDs.isEmpty, !viewModel.isLoading {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(
+                        "No continuity projects",
+                        systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                    )
+                    .font(.headline)
+                    Text("Project IDs appear here automatically after continuity data is saved.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 16)
+                .accessibilityIdentifier("continuity-projects-empty")
+            }
             ForEach(viewModel.projectIDs, id: \.self) { projectID in
                 Text(projectID)
                     .font(.system(.body, design: .monospaced))

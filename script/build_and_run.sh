@@ -107,6 +107,7 @@ BUILD_CLI_EXECUTABLE="$BUILD_DIR/$CLI_PRODUCT"
 BUILD_RUNTIME_HELPER="$BUILD_DIR/$RUNTIME_HELPER_PRODUCT"
 BUILD_FILESYSTEM_DAEMON="$BUILD_DIR/$FILESYSTEM_DAEMON_PRODUCT"
 CORE_RESOURCE_BUNDLE="$BUILD_DIR/ForgeConductor_ForgeConductorCore.bundle"
+APP_RESOURCE_BUNDLE="$BUILD_DIR/ForgeConductor_ForgeConductorApp.bundle"
 
 if [[ ! -x "$BUILD_BINARY" ]]; then
   echo "built GUI executable was not found at $BUILD_BINARY" >&2
@@ -137,6 +138,10 @@ if [[ ! -d "$CORE_RESOURCE_ROOT/Agents" || ! -d "$CORE_RESOURCE_ROOT/TelemetrySt
   echo "built Core resources are missing or have an incompatible layout at $CORE_RESOURCE_BUNDLE" >&2
   exit 1
 fi
+if [[ ! -d "$APP_RESOURCE_BUNDLE" ]]; then
+  echo "built app resources are missing at $APP_RESOURCE_BUNDLE" >&2
+  exit 1
+fi
 
 # APP_BUNDLE is deliberately fixed beneath this repository's dist directory.
 rm -rf "$APP_BUNDLE"
@@ -152,6 +157,7 @@ chmod 0755 "$APP_BINARY" "$CLI_EXECUTABLE" "$RUNTIME_HELPER" "$FILESYSTEM_DAEMON
 cp "$ROOT_DIR/Sources/ForgeConductorApp/Resources/Info.plist" "$INFO_PLIST"
 cp "$ROOT_DIR/Sources/ForgeConductorApp/Resources/Forge-Conductor.icns" "$APP_RESOURCES/Forge-Conductor.icns"
 /usr/bin/ditto "$CORE_RESOURCE_BUNDLE" "$APP_RESOURCES/ForgeConductor_ForgeConductorCore.bundle"
+/usr/bin/ditto "$APP_RESOURCE_BUNDLE" "$APP_RESOURCES/ForgeConductor_ForgeConductorApp.bundle"
 chmod 0644 "$INFO_PLIST" "$APP_RESOURCES/Forge-Conductor.icns" "$FILESYSTEM_DAEMON_PLIST"
 
 /usr/bin/plutil -lint "$FILESYSTEM_DAEMON_PLIST" >/dev/null
@@ -245,8 +251,15 @@ case "$MODE" in
     open_app
     for _ in {1..20}; do
       if pgrep -f "^$APP_BINARY$" >/dev/null; then
-        echo "$APP_NAME development smoke process launched from $APP_BUNDLE; product qualification remains separate"
-        exit 0
+        # A process can appear briefly and then abort during Swift resource
+        # bundle initialization. Require it to survive bootstrap before this
+        # convenience check reports a launch.
+        sleep 3
+        if pgrep -f "^$APP_BINARY$" >/dev/null; then
+          echo "$APP_NAME development smoke process launched from $APP_BUNDLE; product qualification remains separate"
+          exit 0
+        fi
+        break
       fi
       sleep 0.25
     done

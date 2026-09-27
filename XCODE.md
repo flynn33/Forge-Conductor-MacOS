@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.15.0**, build **14**. `VERSION` and
+Product identity: marketing version **0.16.0**, build **15**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -74,7 +74,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.15.0 (14)` build keeps the Provider and Guided Setup repair in
+The current `0.16.0 (15)` build keeps the Provider and Guided Setup repair in
 the canonical graph. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
 descriptor per catalog request, and the existing `ProviderOperatorView.swift`
@@ -609,7 +609,7 @@ Address Sanitizer and Thread Sanitizer use separate DerivedData and result
 bundles. Process-runner regressions exercise large output on both streams,
 continuous output with timeout, termination-handler output, cancellation and
 process-group reaping. A sanitizer pass is not a clean performance profile;
-runtime diagnostics still need their own assessment. The `0.15.0 (14)`
+runtime diagnostics still need their own assessment. The `0.16.0 (15)`
 app-hosted suite has an empty structured runtime-warning list after the bounded
 QoS and main-actor credential-I/O repairs. Native XCUITest runs retain a
 Security trust warning at their first accessibility snapshot; the same warning

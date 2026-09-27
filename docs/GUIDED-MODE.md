@@ -73,7 +73,7 @@ begins and remains in the ordinary LM Studio interface. Forge uses the supported
 stateful chat API only for automatic successor creation after a durable handoff;
 it does not use private GUI automation.
 
-Grok Build remains visible in Provider but is non-selectable in 0.15.0. Its
+Grok Build remains visible in Provider but is non-selectable in 0.16.0. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.
