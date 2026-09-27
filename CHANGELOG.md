@@ -33,8 +33,12 @@ Product versions do not by themselves claim shipment.
   asserts the Continuity reset, package, and cache identifiers directly.
   The stale-generation provider regression and two version-alignment tests also
   passed, as did the SwiftPM app product, canonical signed Debug build,
-  whitespace check, and repository hygiene. Exact build-16 Desktop-candidate
-  and live LM Studio successor evidence remain required before shipment.
+  whitespace check, and repository hygiene. The exact universal Apple
+  Development-signed Desktop app and archive at revision `f2cc6ca` report
+  `0.16.0 (16)` and pass strict deep-signature validation. The ordinary-launch
+  test targeted that exact app and executed one test with zero failures while
+  retaining the Continuity screenshot and accessibility hierarchy. Live LM
+  Studio successor evidence and owner review remain required before shipment.
 
 ## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)
 

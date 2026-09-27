@@ -53,8 +53,8 @@ this workflow.
 | Rune Forge policy | **Implemented and focused-tested.** Files and folders can be selected, persisted in priority order, drag-reordered, and queried with project isolation. | The complete selection, ordering, persistence, and model-query flow passes in the current candidate. |
 | CLU governance | **Deterministic contract implemented; live-session acceptance open.** Notices carry the violated policy identity and full applicable policy statement; logs are project-isolated, bounded, and exportable. | CLU monitors model activity, preserves a separate log per project, exports it, and sends the active model a notice containing the exact violated policy and policy content. |
 | Continuity automation | **Deterministic host-boundary implementation and tests complete; live LM Studio acceptance open.** A resume-ready handoff starts the 30-second state machine, creates one stored LM Studio chat, submits `get_forge_status` with `resume=true`, requires exact handoff acknowledgement, and handles repeated watchdog ticks idempotently. | A current owner-machine flow proves durable handoff, the visible countdown, exactly one successor chat, bootstrap submission, exact acknowledgement, predecessor sealing, and crash recovery. |
-| Continuity view | **Corrected in source and focused native UI tests.** It always renders a scrollable project-ID list with selection, copy, one confirmed selected-project **Delete**, **Reset**, selected-project package selection and **Delete Package**, and **Clear Cache**, including the empty-list state. | Exact build-16 Desktop-candidate UI evidence proves every named Continuity control exists and is visible without opening Projects; disposable data proves deletion without touching live records. |
-| Reset / package deletion / cache clearing | **Corrected in source and focused native UI tests.** Continuity owns directly usable reset/package/cache controls; Projects retains equivalent project-management actions without acting as a substitute. | Each action is correctly scoped, durable across relaunch, and verified on Continuity in the exact Desktop candidate. |
+| Continuity view | **Exact build-16 Desktop candidate passed native UI verification; owner review open.** It always renders a scrollable project-ID list with selection, copy, one confirmed selected-project **Delete**, **Reset**, selected-project package selection and **Delete Package**, and **Clear Cache**, including the empty-list state. | The owner opens the build-16 Desktop candidate and confirms every named Continuity control is visible without opening Projects. |
+| Reset / package deletion / cache clearing | **Exact build-16 Desktop candidate passed native UI verification; owner review open.** Continuity owns directly usable reset/package/cache controls; Projects retains equivalent project-management actions without acting as a substitute. | The owner verifies each action is correctly scoped and durable; automated disposable fixtures prove continuity and package deletion without touching live records. |
 | Managed Run removal | **Removed from primary navigation and the current workflow.** Compatibility internals remain only where required to preserve stored data or reusable low-level services. | No current action, guide, status text, or continuity dependency directs the user to start project work through Managed Run. |
 
 ## Release boundary
@@ -79,8 +79,9 @@ LM Studio connection test before and after app relaunch against
 UI test retained screenshots and accessibility hierarchies for Projects,
 Continuity, Rune Forge, and Provider, while five earlier focused tests proved
 the Continuity list/copy/delete/reset/package/cache controls, project-ID
-copy/deletion, and minimum-window instruction package reorder/deletion controls. Both SwiftPM products and the
-canonical Apple Development-signed Debug app build compile.
+copy/deletion, and minimum-window instruction package reorder/deletion controls.
+Both SwiftPM products and the canonical Apple Development-signed Debug app
+build compile.
 
 These results prove only their tested boundaries. The roadmap remains open
 until the current native candidate passes every Provider entry point and the
@@ -96,5 +97,16 @@ continuity deletion, and selected-package deletion. The stale-generation
 provider regression and both version-alignment tests each executed one test
 with zero failures; `swift build --product forge-conductor-app`, the canonical
 Debug workspace build, `git diff --check`, and repository hygiene also passed.
-The exact Desktop archive/UI rerun and live authenticated LM Studio rollover
-remain acceptance requirements, not inferred passes.
+At that source-checkpoint, the exact Desktop archive/UI rerun and live
+authenticated LM Studio rollover remained acceptance requirements rather than
+inferred passes.
+
+Exact-candidate evidence then completed for the UI boundary. Source revision
+`f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple
+Development-signed Desktop app and `.xcarchive` named `Forge Conductor 0.16.0
+(16)-f2cc6ca`. Strict deep signature validation passed and the app reports
+`0.16.0 (16)`. With `FORGE_DESKTOP_CANDIDATE_PATH` set to that exact app,
+`testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch` executed one
+test with zero failures and retained a Continuity screenshot plus accessibility
+hierarchy showing list, copy, delete, reset, package picker/delete, and cache
+controls. Its isolated empty fixture changed no live Continuity records.

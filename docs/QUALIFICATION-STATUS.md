@@ -2,15 +2,24 @@
 
 ## 0.16.0 owner-workflow visibility and Manager correction
 
-Product identity is **0.16.0, build 16**. An ordinary Apple
-Development-signed app launch started the embedded Manager and passed
-`testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch`, retaining
-screenshots and accessibility hierarchies for Projects, Continuity, Rune Forge,
-and Provider. The native live-provider test discovered loaded model
+Product identity is **0.16.0, build 16**. Published source revision
+`f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple
+Development-signed Desktop app and `.xcarchive` named `Forge Conductor 0.16.0
+(16)-f2cc6ca`; the app reports `0.16.0 (16)` and passes strict deep-signature
+validation. An ordinary launch targeted that exact Desktop app and passed
+`testOwnerWorkflowSurfacesRemainVisibleFromOrdinarySignedLaunch` with one test,
+zero skips, and zero failures, retaining screenshots and accessibility
+hierarchies for Projects, Continuity, Rune Forge, and Provider. The Continuity
+evidence directly contains its project list, Copy Project ID, Delete, Reset,
+selected-project package picker and Delete Package, and Clear Cache. The test
+used an isolated empty home and changed no live Continuity records.
+
+The native live-provider test discovered loaded model
 `qwen/qwen3.8-27b` and completed **Connect and Check** before and after relaunch
-without `operator-unavailable`. The exact Desktop candidate, Advanced probe,
-ordinary LM Studio `get_forge_status`, CLU delivery, and automatic rollover
-sequence remain open. This is not shipment acceptance.
+without `operator-unavailable`. Owner review of the exact Desktop candidate,
+the Advanced probe, ordinary LM Studio `get_forge_status`, CLU delivery, and
+automatic rollover sequence remain open. This is not shipment acceptance, and
+`/Applications/Forge Conductor.app` was not replaced.
 
 ## 0.15.0 Continuity history retention controls
 
