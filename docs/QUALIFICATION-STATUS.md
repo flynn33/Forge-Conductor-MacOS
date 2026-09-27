@@ -46,9 +46,10 @@ IDs and retained the third packet. Exported screenshots and accessibility
 dumps are beside the candidate in `Forge Conductor 0.16.0 (19)-868645e
 Evidence`.
 
-The tracked repository, candidate, and Forge support directory contain no
-`LM_API_TOKEN`, `sk-lm-`, or `Bearer sk-lm-` marker. The rejected Forge Keychain
-item is absent, and the local provider JSON contains no credential reference.
+The tracked repository, candidate, and Forge support directory contain no local
+LM Studio token variable, secret prefix, or token-bearing authorization value.
+The rejected Forge Keychain item is absent, and the local provider JSON contains
+no credential reference.
 Ordinary LM Studio `get_forge_status` on this exact build, CLU delivery, and the
 complete automatic rollover sequence remain open. This is not shipment
 acceptance, and `/Applications/Forge Conductor.app` has not been replaced.
