@@ -40,12 +40,14 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
-- A signed native UI test imported two real instruction packages through the
-  Manager, clicked the visible move control, verified the persisted reversed
-  order, removed a package, and verified the persisted result. Focused queue,
-  Projects view-model, and authenticated Manager-route regressions passed. The
-  complete regression and product-build evidence is recorded in the roadmap
-  and qualification status for the published repair revision.
+- Published Projects instruction-control repair
+  `b4bf571de822cc463dc69c30f4a10c12033919cd`. A signed native UI test
+  imported two real instruction packages through the Manager, clicked the
+  visible move control, verified the persisted reversed order, removed a
+  package, and verified the persisted result. Focused queue, Projects
+  view-model, and authenticated Manager-route regressions passed. The complete
+  regression and product-build evidence is recorded in the roadmap and
+  qualification status for the published repair revision.
 - Published ordered-readiness/receipt repair
   `675d267fdd2f45cd412e5398a04a2321bfe51def`, budget-escalation repair
   `f39c79ad0e60259d7a02ba0361825e5b6940c136`, and cancellation-authority
