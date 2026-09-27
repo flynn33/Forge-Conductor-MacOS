@@ -1,168 +1,96 @@
-# Context & Agent Continuity (v0.15.0)
+# Context and agent continuity (v0.15.0)
 
-## Summary
+## Current workflow
 
-Operator walkthrough: [USER-GUIDE.md](../USER-GUIDE.md).
+Continuity belongs to the ordinary LM Studio conversation. It is automatic and
+is not started from the Forge Conductor Continuity view.
 
-Forge Conductor preserves **context handoff** and **agent session continuity**
-for externally owned LM Studio chats over the existing **stdio MCP** server
-(`serve`). Managed Autonomy is a separate manager-owned provider path: the
-persistent manager owns provider turns, context accounting, fresh-root
-rollover, and automatic continuation while the GUI is closed.
+1. The user opens a normal LM Studio chat and asks the model to call
+   `get_forge_status`.
+2. Forge returns the registered project identity plus the project-file,
+   instruction-package, and continuity locations and query tools.
+   `resume=true` requests the latest resume-ready handoff.
+3. While working, the model can save compact checkpoints. At context pressure
+   it saves a resume-ready handoff.
+4. After the durable handoff commit, Forge shows a 30-second countdown on the
+   Dashboard.
+5. At expiry the Manager creates exactly one stored successor chat through LM
+   Studio's supported stateful-chat API and submits the exact bootstrap input:
 
-## Product constraints
+   ```text
+   get_forge_status
+   resume=true
+   ```
 
-- Dependency-free (Foundation + system SQLite only)
-- Same Mac app auto-deploy path (`LMStudioDeployService` / mcpBridge)
-- Work developed in this repository; does not alter a running install until the operator deploys the next build
+6. The successor must acknowledge the exact handoff identifier. Only then does
+   Forge seal the predecessor. Repeated watchdog ticks and restart recovery are
+   idempotent.
 
-## Surfaces (stdio MCP)
+LM Studio documents that `POST /api/v1/chat` creates a stored stateful chat and
+supports installed MCP integrations. Its public API does not promise that an
+API-created chat becomes the foreground GUI tab. Forge does not use unsupported
+private UI automation to make that claim.
+
+## MCP surfaces
 
 | Tool | Purpose |
-|------|---------|
-| `session_checkpoint` | Soft save: write/update handoff packet; continue working |
-| `session_handoff` | Finalize packet; mark resume-ready; return seed for new chat |
-| `context_get` | Load latest (or id) packet for bootstrap in a new chat |
-| `context_list` | List recent handoffs |
+|---|---|
+| `get_forge_status` | Load registered project identity, query locations, available tools, and optional resume state without starting a run |
+| `forge_status` | Compatibility alias for the same status contract |
+| `session_checkpoint` | Durably update compact continuity state while work continues |
+| `session_handoff` | Commit a resume-ready handoff and start automatic successor handling |
+| `context_get` | Read the latest or named handoff |
+| `context_list` | List bounded recent handoffs for the selected project |
 
-`forge_status` reports `continuity` (latest handoff id, resume_ready, open agent sessions).
+All project-bound calls validate stable project identity and generation. With
+multiple registered projects, callers pass `project_id` explicitly rather than
+receiving another project's state.
 
-## Packet (`schema_version: 1`)
+## Durable packet
 
-- **meta** — id, timestamps, source (`model` \| `budget` \| `user`), chat_label, client_id
-- **task** — goal, status, project_slug, cwd, blockers, next_actions
-- **working_set** — key files / decisions
-- **agents** — open sessions with session_id, agent_id, goal, cwd, status (reattach instructions)
-- **narrative** — capped free text
-- **resume** — bootstrap string, custom-seed marker, and continuation instructions
+The current packet retains bounded task status, project identity, working-set
+references, decisions, next actions, model narrative, and the exact handoff
+identity. SQLite is authoritative. JSON, latest-pointer, and Markdown files are
+rebuildable projections.
 
-Durable copies:
+The handoff row and its pointer notes commit transactionally. Projection repair
+rebuilds interrupted or older projections from the authoritative row. Content
+and list sizes are bounded, and continuity arguments are redacted from ordinary
+tool audit output.
 
-- SQLite `context_handoffs` (authoritative, transactionally ordered by write sequence)
-- SQLite `memory_notes` pointers `continuity/latest` and `continuity/resume_ready`
-- `memory/handoffs/<id>.json`
-- `memory/handoffs/LATEST`
-- Projection into `memory/current-task.md`
+## Automatic successor state machine
 
-Primary and fallback MCP processes serialize continuity mutations through a
-home-scoped lock. A handoff row and its SQLite pointer notes commit in one
-transaction. JSON and Markdown are rebuildable projections; bootstrap repairs
-them from SQLite after an interrupted or older-version write.
+The Manager owns the countdown and successor transitions, independent of the
+Continuity screen. A resume-ready handoff progresses through durable states for
+countdown, successor creation, bootstrap submission, exact acknowledgement,
+and predecessor sealing. The state machine preserves one successor identity so
+retries cannot create an unbounded set of chats.
 
-## Triggers (hybrid)
+Failure remains explicit and recoverable. Endpoint, authentication, model, MCP
+integration, bootstrap, and acknowledgement failures retain the same handoff
+identity and a bounded diagnostic instead of claiming rollover completion.
 
-1. **Model** — calls checkpoint/handoff tools
-2. **Budget** — ToolRouter tracks canonical consecutive tool fingerprints. The fourth identical call writes a soft handoff signal; the ninth is blocked with `identical_call_loop`. Continuity calls do not count toward the loop.
-3. **External MCP compatibility** — `ContinuityAutomation` retains the legacy
-   progress-tool/time fallback for a chat Forge does not own. It can persist a
-   resume-ready handoff and fence that external client, but cannot claim an
-   automatic successor.
-4. **Managed provider** — the persistent manager records provider-reported
-   capacity and usage, calculates explicit reserves, and triggers a fresh-root
-   rollover without waiting for a model continuity-tool call. After exact
-   acknowledgment it fences the predecessor and issues the successor's
-   continuation automatically.
+## Continuity view
 
-## Manager-owned provider path
+The native Continuity view is intentionally limited to data management:
 
-The established external MCP handoff path remains available: Forge returns a
-`resume_seed`, and an operator can start a new LM Studio GUI chat and call
-`context_get`. The current source also implements manager-owned provider
-session creation through the native session-host adapter, persisted successor
-and fencing state, automatic-continuation records, and provider receipt
-recovery. Those implemented surfaces are not, by themselves, proof of a
-qualified autonomous rollover. The intended operator experience is automatic
-session handoff; end-to-end owner live review of this candidate remains pending.
+- a scrollable list containing only project IDs that have continuity data;
+- single-project selection;
+- **Copy Project ID**; and
+- one confirmed **Delete** action for the selected project's continuity data.
 
-Accepted provider receipts survive manager restart. When a provider response is
-unresolved after a crash, the request is fenced for **660 seconds** before a
-retry may proceed. LM Studio exposes no request-ID receipt lookup, so each retry
-attempt can create at most one duplicate model inference and repeated operator
-or recovery retries can repeat inference. Manager tool-effect reconciliation
-prevents the same reconciled tool effect from executing twice. This is
-mitigation, not elimination of the provider-response race.
+The view does not expose checkpoint, rollover, successor, run-selection,
+timeline, or recovery controls. Deleting the selected project entry clears its
+continuity records and projections without deleting ordinary project files,
+instruction packages, policy sources, credentials, or project memory.
 
-The retained qualification record includes one threshold-forced
-manager-owned provider run with successor acknowledgment, predecessor fencing,
-idempotent sealing, automatic continuation, and GUI-closed operation. The
-deterministic crash matrix covers the other durable transitions. Those records
-remain bound to their exact revisions; current source and an installed build
-still require their own qualification before shipment.
+Project reset, instruction-package deletion, and disposable-cache clearing are
+separate controls on the Projects surface.
 
-The native **Provider** screen creates and updates validated, revisioned
-endpoint/model settings through authenticated manager routes. Credentials can
-be kept, replaced, or cleared; replacement tokens are stored in Keychain and
-are not returned in snapshots. **Save** persists settings even while LM Studio
-is offline. **Connect and Check** uses the saved configuration, performs
-bounded supported-CLI recovery for a local LM Studio server after an offline
-transport result, resolves a compatible loaded model, and runs the contract
-probe. It does not scan ports or load a model. See the
-[provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
+## Verification boundary
 
-## Native Continuity view and recovery
-
-The Continuity header, status, and Refresh control remain above the content
-panes so they are reachable below the app title bar. When no operation exists,
-the view uses the full detail width instead of reserving an empty list column.
-When operations exist, the bounded operation list and detail pane share the
-available width. Optional checkpoint/rollover actions, exact operation identity,
-context budget, handoff/successor fields, and event history remain present; the
-layout correction does not remove those capabilities.
-
-The **Stored continuity data** section supports two confirmed retention actions:
-**Clear Selected…** removes one selected old item, and **Clear All Old…**
-removes every old item. The control-plane predicate is
-`commandIsTerminal || run == nil || run?.state.isTerminal == true`; the
-project-memory deletion predicate is
-`stored.state == ContinuityState.predecessorSealed.rawValue || stored.quarantined`.
-For an old row whose project operation is still nonterminal, the Manager first
-retires that stale operation, then removes its canonical operation, transition,
-handoff, repair, and schema-2 rows plus rebuildable JSON/current/latest
-projections. It deletes the control-plane list root and writes a payload-free
-tombstone so Refresh or relaunch cannot recreate the item. A genuinely live
-owner remains visible with its exact run/command blocker and **Open Run
-Details** recovery action. Ordinary project memory records, tasks, runs,
-credentials, project files, and unrelated project data remain unchanged.
-
-**Protection** is an operator-facing state, not a generic alarm. The detail and
-next-action text explain the exact transition:
-
-- provider failures retain the saved task and offer **Open Provider**. LM Studio
-  readiness and desktop integration verification/repair use that provider
-  card's **Connect and Check** action; any host reload, activation, or trust
-  action remains explicit;
-- automatic completion failures offer **Open Project Runs**, where the named check
-  or package-owned requirement is corrected and retried;
-- other recoverable states route to the exact recorded run condition in
-  Project Runs while continuity preserves durable task state.
-
-Queued, saving, quiescing, successor-creation, restoration, acknowledgment, and
-automatic retry states explain what Forge is doing next. **Action required**
-therefore always accompanies concrete detail and an owning-view recovery path;
-it is not the former unexplained “Needs attention” label.
-
-Separate native onboarding tests passed offline save/rejection/manager
-replacement and real-provider discovery/connection. These configure and probe
-the provider; they do not prove autonomous rollover. The retained final
-manager-owned run failed before an accepted bootstrap receipt and did not reach
-the intended injected crash. A smaller passing fresh-root/continuation
-diagnostic remains supporting evidence, as recorded in the
-[shipping checkpoint](../.forge-codex/state/release-handoff.md#retained-qualification).
-See [qualification status](QUALIFICATION-STATUS.md) for the current summary of
-retained local and CI results.
-
-## Bootstrap (new chat)
-
-1. Enable `mcp/forge-conductor` (or fallback)
-2. Call `context_get` (or read `forge_status.continuity`)
-3. Reattach agents via `agent_run_status` / complete+restart as needed
-4. Continue task from the packet
-5. Pass the returned `handoff_id` to later checkpoints or handoffs so the resumed packet is updated explicitly
-
-`agent_run_status(session_id)` transfers an open session binding to the calling
-MCP client and restores its goal, workspace, tool policy, and output contract.
-Only sessions owned by the calling client are included in new packet snapshots.
-
-Packet identity and schema metadata are validated before projection. Narrative
-text is capped at 4,000 characters, list limits are clamped to 1–100, and
-continuity content is redacted from tool-audit arguments.
+Deterministic tests cover durable handoff creation, the exact 30-second
+boundary, single-successor idempotence, the LM Studio request contract,
+exact-handoff acknowledgement, predecessor sealing, project isolation, and the
+reduced Continuity UI. Shipment still requires the current candidate to repeat
+the complete flow against the owner's running LM Studio configuration.

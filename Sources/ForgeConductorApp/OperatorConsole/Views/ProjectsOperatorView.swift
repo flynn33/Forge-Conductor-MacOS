@@ -6,15 +6,13 @@ import SwiftUI
 
 struct ProjectsOperatorView: View {
     @StateObject private var viewModel: ProjectsViewModel
-    private let client: any OperatorManagerClientProtocol
-    private let onOpenProvider: () -> Void
     @State private var registrationDraft: ProjectRegistrationDraft?
     @State private var registrationPickerErrorMessage: String?
     @State private var resetConfirmation: ProjectsViewModel.ResetConfirmation?
     @State private var removeConfirmation: ProjectsViewModel.RemoveConfirmation?
     @State private var clearConfirmation: ProjectsViewModel.ClearConfirmation?
     @State private var clearMode: OperatorProjectContentClearMode = .memory
-    @State private var showingRunDetails = false
+    @State private var showClearCacheConfirmation = false
     @State private var expandedInstructionPackageIDs: Set<String> = []
 
     init(
@@ -22,8 +20,7 @@ struct ProjectsOperatorView: View {
         onOpenProvider: @escaping () -> Void = {}
     ) {
         _viewModel = StateObject(wrappedValue: ProjectsViewModel(client: client))
-        self.client = client
-        self.onOpenProvider = onOpenProvider
+        _ = onOpenProvider
     }
 
     var body: some View {
@@ -57,7 +54,7 @@ struct ProjectsOperatorView: View {
                 .listStyle(.sidebar)
                 Divider()
                 VStack(spacing: 8) {
-                    Button("Register Project…", systemImage: "plus") {
+                    Button("Add Project Folders…", systemImage: "plus") {
                         chooseProjectFolder()
                     }
                     .accessibilityIdentifier("project-register")
@@ -165,17 +162,6 @@ struct ProjectsOperatorView: View {
         .sheet(item: $registrationDraft) { draft in
             ProjectRegistrationSheet(draft: draft, viewModel: viewModel)
         }
-        .sheet(isPresented: $showingRunDetails) {
-            AutonomyOperatorView(
-                client: client,
-                onOpenProjects: { showingRunDetails = false },
-                onOpenProvider: {
-                    showingRunDetails = false
-                    onOpenProvider()
-                }
-            )
-            .frame(minWidth: 1_000, minHeight: 680)
-        }
         .alert(
             "Remove project from Forge Conductor?",
             isPresented: Binding(
@@ -223,6 +209,14 @@ struct ProjectsOperatorView: View {
             }
         } message: { confirmation in
             Text("\(confirmation.displayName)\n\(confirmation.projectID)\nGeneration \(confirmation.generation)\n\(confirmation.mode.effectDescription) This removes content from active retrieval, not secure physical storage. Minimal recovery metadata is retained.")
+        }
+        .alert("Clear Forge application cache?", isPresented: $showClearCacheConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear Cache", role: .destructive) {
+                viewModel.clearApplicationCache()
+            }
+        } message: {
+            Text("This removes disposable Forge cache files only. Project files, instruction packages, continuity, policy logs, settings, and credentials remain.")
         }
         .task { viewModel.load() }
         .task(id: viewModel.selectedProjectID) {
@@ -431,6 +425,17 @@ struct ProjectsOperatorView: View {
                 .accessibilityIdentifier("project-reset")
                 GuidedHelpButton(context: .projectReset)
             }
+
+            HStack {
+                Button("Clear Cache…", role: .destructive) {
+                    showClearCacheConfirmation = true
+                }
+                .disabled(viewModel.isLoading)
+                .accessibilityIdentifier("project-clear-cache")
+                Text("Removes disposable Forge cache files without deleting project or continuity data.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -442,7 +447,7 @@ struct ProjectsOperatorView: View {
     private func instructionPackages(_ project: OperatorProject) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Use the earlier/later arrows to set the order used by autonomous runs.")
+                Text("Add files, folders, or ZIPs in their existing format. Forge preserves every source, converts supported instruction content into immutable project-scoped artifacts, and reports anything it cannot interpret. Drag packages to set their priority; the top package has highest priority.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -456,44 +461,7 @@ struct ProjectsOperatorView: View {
                             .accessibilityIdentifier("instruction-package-add")
                             GuidedHelpButton(context: .instructionImport)
                             Spacer()
-                            if let current = queue.packages.first(where: { $0.state == "running" }) {
-                                Text("Current: \(current.displayName)")
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(1)
-                                    .accessibilityIdentifier("instruction-queue-current-package")
-                            }
-                        }
-                        HStack {
-                            Button(
-                                viewModel.instructionQueueHasActiveWork
-                                    ? "Stop Active Work" : "Start Ordered Work"
-                            ) {
-                                viewModel.toggleInstructionQueue()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(
-                                viewModel.isLoading
-                                    || (!viewModel.instructionQueueHasActiveWork
-                                        && !queue.packages.contains(where: { $0.state == "queued" }))
-                                    || (!viewModel.instructionQueueHasActiveWork && queue.packages
-                                        .filter { $0.state == "queued" }
-                                        .sorted { $0.position < $1.position }
-                                        .first?.importReady == false)
-                            )
-                            .accessibilityIdentifier("instruction-queue-toggle")
-                            Button("Run Details…", systemImage: "list.bullet.rectangle") {
-                                showingRunDetails = true
-                            }
-                            .disabled(viewModel.isLoading)
-                            .accessibilityIdentifier("project-run-details")
-                            Spacer()
-                            Text(
-                                queue.running
-                                    ? "Running in order"
-                                    : queue.packages.contains(where: { $0.state == "running" })
-                                        ? "Active work is stopping"
-                                        : "Queue stopped"
-                            )
+                            Text("\(queue.packages.count) package\(queue.packages.count == 1 ? "" : "s")")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -513,6 +481,15 @@ struct ProjectsOperatorView: View {
                                     .padding(10)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                                    .draggable(package.id)
+                                    .dropDestination(for: String.self) { items, _ in
+                                        guard let draggedPackageID = items.first else { return false }
+                                        viewModel.moveInstructionPackage(
+                                            draggedPackageID,
+                                            to: package.id
+                                        )
+                                        return draggedPackageID != package.id
+                                    }
                             }
                         }
                     }
@@ -609,13 +586,13 @@ struct ProjectsOperatorView: View {
                 .help("Move this instruction package later")
                 .accessibilityLabel("Move \(package.displayName) later")
                 .accessibilityIdentifier("instruction-package-move-down-\(package.id)")
-                Button("Remove", role: .destructive) {
+                Button("Delete Package", role: .destructive) {
                     viewModel.removeInstructionPackage(package.id)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(viewModel.isLoading || package.state == "running")
-                .help("Remove this instruction package")
+                .help("Delete this instruction package from the project")
                 .accessibilityIdentifier("instruction-package-remove-\(package.id)")
                 Spacer()
             }
@@ -710,12 +687,15 @@ struct ProjectsOperatorView: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.prompt = "Add Instructions"
         panel.message = "Choose an instruction file, folder, or ZIP. Forge preserves the originals and reports unsupported content without executing imported files."
-        guard panel.runModal() == .OK, let url = panel.urls.first,
-              url.isFileURL, (url.path as NSString).isAbsolutePath else { return }
-        viewModel.importInstructionPackage(path: url.path)
+        guard panel.runModal() == .OK else { return }
+        let paths: [String] = panel.urls.compactMap { url -> String? in
+            guard url.isFileURL, (url.path as NSString).isAbsolutePath else { return nil }
+            return url.path
+        }
+        viewModel.importInstructionPackages(paths: paths)
     }
 
     private func chooseProjectFolder() {
@@ -723,18 +703,19 @@ struct ProjectsOperatorView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Choose Project"
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add Projects"
         guard panel.runModal() == .OK else { return }
-        guard let url = panel.urls.first, url.isFileURL,
-              (url.path as NSString).isAbsolutePath else {
+        let paths: [String] = panel.urls.compactMap { url -> String? in
+            guard url.isFileURL, (url.path as NSString).isAbsolutePath else { return nil }
+            return url.path
+        }
+        guard !paths.isEmpty else {
             registrationPickerErrorMessage = "The folder picker did not return an absolute project path. Use Enter Project Path… to register the folder."
             return
         }
         registrationPickerErrorMessage = nil
-        registrationDraft = ProjectRegistrationDraft(
-            path: url.path, name: url.lastPathComponent, allowsPathEntry: false
-        )
+        viewModel.register(paths: paths)
     }
 
     /// Uses the native directory picker in production. UI qualification can

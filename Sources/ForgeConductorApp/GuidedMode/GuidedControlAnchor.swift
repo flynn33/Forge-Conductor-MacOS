@@ -2,7 +2,9 @@ import Foundation
 
 enum GuidedControlAnchor {
     static let knownIdentifiers: Set<String> = [
-        "checkpoint-command",
+        "continuity-copy-project-id",
+        "continuity-delete-project",
+        "continuity-project-list",
         "context-gauge",
         "project-clear-content",
         "project-clear-mode",
@@ -17,7 +19,6 @@ enum GuidedControlAnchor {
         "provider-run-contract-probe",
         "provider-test-connection",
         "provider-token",
-        "rollover-command",
         "run-cancel",
         "run-pause",
         "run-preparation-recovery",

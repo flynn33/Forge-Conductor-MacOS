@@ -542,6 +542,76 @@ private struct ManagerProviderProbeSessionAdapter: SessionHostAdapter {
     }
 }
 
+private actor ManagerInteractiveContinuityAdapter: SessionHostAdapter {
+    nonisolated let identifier = ManagerNode.nativeSessionHostAdapterID
+    nonisolated let version = "interactive-fixture"
+    private var creations: [SessionCreationRequest] = []
+    private var bootstraps: [(sessionID: String, handoffID: String, projectID: String)] = []
+
+    func capabilities() async throws -> HostCapabilities {
+        managerProviderHostCapabilities()
+    }
+
+    func createSession(_ request: SessionCreationRequest) async throws -> HostSession {
+        creations.append(request)
+        return HostSession(
+            id: "interactive-successor-session",
+            providerSessionID: "resp_interactive_successor",
+            model: "fixture/tool-model"
+        )
+    }
+
+    func session(forIdempotencyKey key: String) async throws -> HostSession? {
+        _ = key
+        return nil
+    }
+
+    func bootstrap(_ session: HostSession, handoff: ContinuityHandoff) async throws {
+        bootstraps.append((
+            sessionID: session.id,
+            handoffID: handoff.handoffID,
+            projectID: handoff.project["project_id"] as? String ?? ""
+        ))
+    }
+
+    func awaitAcknowledgement(
+        session: HostSession,
+        handoffID: String,
+        timeout: Duration
+    ) async throws -> HandoffAcknowledgement {
+        _ = timeout
+        return HandoffAcknowledgement(
+            handoffID: handoffID,
+            successorSessionID: session.id,
+            adapterID: identifier
+        )
+    }
+
+    func cancel(operationID: String) async {
+        _ = operationID
+    }
+
+    func observed() -> (
+        createCount: Int,
+        operationID: String?,
+        projectID: String?,
+        idempotencyKey: String?,
+        bootstrapCount: Int,
+        bootstrappedHandoffID: String?,
+        bootstrappedProjectID: String?
+    ) {
+        (
+            creations.count,
+            creations.first?.operationID,
+            creations.first?.projectID,
+            creations.first?.idempotencyKey,
+            bootstraps.count,
+            bootstraps.first?.handoffID,
+            bootstraps.first?.projectID
+        )
+    }
+}
+
 private func managerProviderHostCapabilities() -> HostCapabilities {
     HostCapabilities(
         create: true,
@@ -1032,6 +1102,83 @@ final class ManagerTests: XCTestCase {
             1,
             "The embedded manager must retain a firing watchdog after startup"
         )
+    }
+
+    func testInteractiveContinuityCreatesOneSuccessorForSavedHandoff() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent("interactive-project", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: projectRoot,
+            withIntermediateDirectories: true
+        )
+        let adapter = ManagerInteractiveContinuityAdapter()
+        let registry = HostAdapterRegistry()
+        registry.register(
+            manifest: HostPluginManifest(
+                identifier: ManagerNode.nativeSessionHostAdapterID,
+                version: "interactive-fixture",
+                minimumContractVersion: 1,
+                hostType: "lmstudio-interactive-fixture",
+                capabilities: managerProviderHostCapabilities(),
+                configurationKeys: [],
+                privacyRequirements: [],
+                migrationVersion: 1
+            ),
+            factory: { _ in adapter }
+        )
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(
+            path: projectRoot.path,
+            displayName: "Interactive Project"
+        )
+        let projectID = try XCTUnwrap(registered["project_id"] as? String)
+        let handoffID = "e811398e-3cbe-40d6-b032-59ee89a8c012"
+        try app.store.handoffUpsert(HandoffPacket(
+            id: handoffID,
+            resumeReady: true,
+            clientID: "lmstudio-predecessor",
+            goal: "Continue ordinary LM Studio work",
+            status: "ready",
+            projectSlug: "Interactive Project",
+            cwd: projectRoot.path,
+            nextActions: ["Resume from the saved handoff"]
+        ))
+
+        let countdown = try XCTUnwrap(node.operatorSnapshot().interactiveContinuity)
+        XCTAssertEqual(countdown.handoffID, handoffID)
+        XCTAssertEqual(countdown.projectID, projectID)
+        XCTAssertEqual(countdown.state, "countdown")
+        XCTAssertTrue((1...30).contains(countdown.countdownSeconds))
+
+        let firstResult = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        let replayResult = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(firstResult, handoffID)
+        XCTAssertEqual(replayResult, handoffID)
+
+        let observed = await adapter.observed()
+        XCTAssertEqual(observed.createCount, 1)
+        XCTAssertEqual(observed.operationID, handoffID)
+        XCTAssertEqual(observed.projectID, projectID)
+        XCTAssertEqual(observed.idempotencyKey, "interactive-continuity:\(handoffID)")
+        XCTAssertEqual(observed.bootstrapCount, 1)
+        XCTAssertEqual(observed.bootstrappedHandoffID, handoffID)
+        XCTAssertEqual(observed.bootstrappedProjectID, projectID)
+        let completed = try XCTUnwrap(node.operatorSnapshot().interactiveContinuity)
+        XCTAssertEqual(completed.state, "completed")
+        XCTAssertEqual(completed.countdownSeconds, countdown.countdownSeconds)
+
+        let restartedNode = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let recovered = try XCTUnwrap(restartedNode.operatorSnapshot().interactiveContinuity)
+        XCTAssertEqual(recovered.handoffID, handoffID)
+        XCTAssertEqual(recovered.state, "completed")
+        let recoveredResult = try await restartedNode.processInteractiveContinuityOnce(
+            ignoreDelay: true
+        )
+        XCTAssertEqual(recoveredResult, handoffID)
+        let afterRestart = await adapter.observed()
+        XCTAssertEqual(afterRestart.createCount, 1)
+        XCTAssertEqual(afterRestart.bootstrapCount, 1)
     }
 
     func testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths() async throws {

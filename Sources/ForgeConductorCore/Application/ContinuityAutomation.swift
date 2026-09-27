@@ -438,7 +438,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         let uniqueTools = Array(NSOrderedSet(array: lastTools)) as? [String] ?? lastTools
         args["narrative"] = "Auto-saved after tools: \(uniqueTools.suffix(8).joined(separator: ", "))."
         args["next_actions"] = [
-            "Call context_get if this is a new chat",
+            "Call get_forge_status with resume=true in the successor chat",
             "Continue from the workspace in this packet",
         ]
         return args
@@ -475,7 +475,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     ]
 
     static let resumeTools: Set<String> = [
-        "forge_status", "context_get", "context_list",
+        "forge_status", "get_forge_status", "context_get", "context_list",
         "session_checkpoint", "session_handoff",
         "memory_get", "memory_list", "memory_search", "memory_set", "memory_delete",
         "agent_list", "agent_get", "agent_context", "agent_recommend",

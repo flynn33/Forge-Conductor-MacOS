@@ -434,6 +434,31 @@ final class ProjectsViewModelResetTests: XCTestCase {
         )
     }
 
+    func testInstructionPackageDragOrderingMovesToDroppedPosition() {
+        XCTAssertEqual(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "one", to: "three"
+            ),
+            ["two", "three", "one"]
+        )
+        XCTAssertEqual(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "three", to: "one"
+            ),
+            ["three", "one", "two"]
+        )
+        XCTAssertNil(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "two", to: "two"
+            )
+        )
+        XCTAssertNil(
+            ProjectsViewModel.reorderedPackageIDs(
+                ["one", "two", "three"], moving: "missing", to: "two"
+            )
+        )
+    }
+
     func testStoppedQueueWithRunningPackageStillReportsActiveWork() throws {
         let queue = try Self.fixture(
             OperatorInstructionQueue.self,

@@ -310,8 +310,8 @@ public final class ContextContinuityService: @unchecked Sendable {
         var payload = successPayload(packet, action: "handoff", projectionWarning: persisted.projectionWarning)
         payload["handoff_required"] = true
         payload["message"] =
-            "Handoff saved. Start a new LM Studio chat with Forge MCP enabled, then call context_get " +
-            "(or use resume.seed as the first user message)."
+            "Handoff saved. Forge will start the successor LM Studio session and request "
+                + "get_forge_status with resume=true after the rollover delay."
         return payload
     }
 
@@ -344,7 +344,7 @@ public final class ContextContinuityService: @unchecked Sendable {
                 "found": false,
                 "message": message,
                 "bootstrap": [
-                    "forge_status",
+                    "get_forge_status",
                     "session_checkpoint when you have a goal",
                 ],
             ]
@@ -401,7 +401,7 @@ public final class ContextContinuityService: @unchecked Sendable {
                 "context_get",
                 "context_list",
             ],
-            "note": "New chat bootstrap: call context_get over stdio MCP (forge-conductor).",
+            "note": "Successor bootstrap: call get_forge_status with resume=true over Forge MCP.",
             "auto": [
                 "checkpoint_every_tools": ContinuityAutomation.checkpointEveryTools,
                 "handoff_every_tools": ContinuityAutomation.handoffEveryTools,
@@ -508,8 +508,8 @@ public final class ContextContinuityService: @unchecked Sendable {
             if packet.goal.isEmpty { packet.goal = "Auto-checkpoint: \(reason)" }
             if packet.nextActions.isEmpty {
                 packet.nextActions = [
-                    "Start a new chat if context is full",
-                    "Call context_get",
+                    "Wait for Forge to create the successor chat",
+                    "Resume through get_forge_status with resume=true",
                     "Continue from open agents",
                 ]
             }
@@ -1033,7 +1033,7 @@ public final class ContextContinuityService: @unchecked Sendable {
         | `current-task.md` | Active goal / handoff projection |
         | `handoffs/` | Versioned context + agent continuity packets |
 
-        Bootstrap every new chat: `forge_status` → `context_get` → continue task.
+        Bootstrap every new chat: `get_forge_status(resume=true)` → continue task.
         """
         try index.write(to: paths.memoryIndex, atomically: true, encoding: .utf8)
     }

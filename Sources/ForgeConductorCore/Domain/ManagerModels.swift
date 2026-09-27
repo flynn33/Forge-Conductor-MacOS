@@ -584,6 +584,39 @@ public struct ManagerProjectRelinkResult: Codable, Sendable, Equatable {
 /// request bodies, tool arguments, runtime output, and full provider transcripts are
 /// not part of this contract. A run may include only its latest secret-redacted,
 /// byte-capped assistant projection for owner-facing live monitoring.
+public struct ManagerInteractiveContinuityStatus: Codable, Sendable, Equatable {
+    public let handoffID: String
+    public let projectID: String?
+    public let state: String
+    public let countdownSeconds: Int
+    public let dueAt: String
+    public let detail: String
+
+    enum CodingKeys: String, CodingKey {
+        case state, detail
+        case handoffID = "handoff_id"
+        case projectID = "project_id"
+        case countdownSeconds = "countdown_seconds"
+        case dueAt = "due_at"
+    }
+
+    public init(
+        handoffID: String,
+        projectID: String?,
+        state: String,
+        countdownSeconds: Int,
+        dueAt: String,
+        detail: String
+    ) {
+        self.handoffID = handoffID
+        self.projectID = projectID
+        self.state = state
+        self.countdownSeconds = countdownSeconds
+        self.dueAt = dueAt
+        self.detail = detail
+    }
+}
+
 public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     public let generatedAt: String
     public let limit: Int
@@ -592,6 +625,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
     public let runs: [ManagerOperatorRun]
     public let continuityReadiness: [ManagerContinuityReadiness]
     public let continuityOperations: [ManagerOperatorContinuity]
+    public let interactiveContinuity: ManagerInteractiveContinuityStatus?
     public let runtimeJobs: [ManagerOperatorRuntimeJob]
     public let provider: ManagerOperatorProvider
     public let runPreparation: ManagerOperatorRunPreparation
@@ -605,6 +639,7 @@ public struct ManagerOperatorSnapshot: Encodable, Sendable, Equatable {
         case continuityReadiness = "continuity_readiness"
         case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
+        case interactiveContinuity = "interactive_continuity"
         case runtimeJobs = "runtime_jobs"
         case provider, runtime, events
         case runPreparation = "run_preparation"
@@ -1508,6 +1543,28 @@ public struct ManagerOperatorRuntimeExecutable: Codable, Sendable, Equatable {
     public let path: String?
     public let version: String?
     public let status: RuntimeExecutableProbeState
+}
+
+public struct ManagerCacheClearReceipt: Codable, Sendable, Equatable {
+    public let operationID: UUID
+    public let removedEntryCount: Int
+    public let completedAt: String
+
+    public init(operationID: UUID, removedEntryCount: Int, completedAt: String) {
+        self.operationID = operationID
+        self.removedEntryCount = removedEntryCount
+        self.completedAt = completedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operation_id"
+        case removedEntryCount = "removed_entry_count"
+        case completedAt = "completed_at"
+    }
+
+    public func asDictionary() throws -> [String: Any] {
+        try JSONSupport.object(from: JSONEncoder().encode(self))
+    }
 }
 
 public struct ManagerOperatorRuntime: Codable, Sendable, Equatable {

@@ -11,10 +11,10 @@ source-bound historical receipt says otherwise.
 | --- | --- |
 | [User guide](../USER-GUIDE.md) | Install, configure, and operate Forge Conductor |
 | [Xcode guide](../XCODE.md) | Build, test, archive, sign, and inspect the native app |
-| [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow the ordered project-run wizard or open contextual offline help |
+| [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow current setup guidance or open contextual offline help |
 | [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
-| [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect the managed provider; deploy, inspect, and repair LM Studio MCP roles |
-| [Instruction packages](INSTRUCTION-PACKAGES.md) | Queue ordered project work |
+| [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
+| [Instruction packages](INSTRUCTION-PACKAGES.md) | Import, order, query, and delete project instruction packages |
 | [Completion evidence](NATIVE-COMPLETION.md) | Understand built-in evidence checks and instruction-package-owned requirements |
 | [Automation and usability remediation](AUTOMATION-USABILITY-REMEDIATION.md) | Track the revision-2 minimal-input remediation and its evidence |
 

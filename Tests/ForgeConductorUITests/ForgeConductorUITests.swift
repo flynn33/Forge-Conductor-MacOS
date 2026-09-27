@@ -2,6 +2,7 @@
 // Launches the signed macOS product and exercises its native navigation and controls.
 // Stable accessibility identifiers make the checks independent of display coordinates.
 
+import AppKit
 import Network
 import XCTest
 
@@ -890,7 +891,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertGreaterThan(orchestration.frame.minY, storage.frame.maxY)
 
         XCTAssertTrue(app.staticTexts["CURRENT PACKAGE · No active instruction package"].exists)
-        XCTAssertTrue(app.staticTexts["ACTIVE MANAGED RUN · RUNNING"].exists)
+        XCTAssertTrue(app.staticTexts["BACKGROUND EXECUTION · RUNNING"].exists)
         XCTAssertTrue(app.staticTexts["PHASE · Implementation"].exists)
         XCTAssertTrue(app.staticTexts["WORK · Render managed activity"].exists)
         XCTAssertTrue(app.staticTexts["NEXT · Verify the live activity feed"].exists)
@@ -918,8 +919,8 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         try assertEveryPrimaryViewContainedAndAligned(in: window)
     }
 
-    func testProjectsStopReorderAndRemoveRemainHittableAtMinimumWindow() throws {
-        let fixture = try OperatorManagerUITestFixture(activeInstructionQueue: true)
+    func testProjectsReorderAndDeletePackageRemainHittableAtMinimumWindow() throws {
+        let fixture = try OperatorManagerUITestFixture(includeSecondInstructionPackage: true)
         relaunch(with: fixture)
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 8))
@@ -938,26 +939,17 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Instruction packages must not use a nested List inside the Projects ScrollView"
         )
 
-        let stop = app.buttons["instruction-queue-toggle"]
-        XCTAssertTrue(stop.waitForExistence(timeout: 5))
-        makeHittable(stop)
-        XCTAssertTrue(stop.label.contains("Stop Active Work"))
-        stop.click()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.instructionQueueStopRequestCount == 1
-                && !fixture.instructionQueueRunning
-                && fixture.instructionPackageStates[fixture.instructionPackageID] == "cancelled"
-        })
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            stop.exists && stop.label.contains("Start Ordered Work")
-        })
+        XCTAssertFalse(
+            app.buttons["instruction-queue-toggle"].exists,
+            "Projects must not expose the obsolete Managed Run start/stop action"
+        )
 
         let moveLater = app.buttons[
             "instruction-package-move-down-\(fixture.instructionPackageID)"
         ]
         XCTAssertTrue(moveLater.waitForExistence(timeout: 5))
         makeHittable(moveLater)
-        XCTAssertTrue(moveLater.isEnabled)
+        XCTAssertTrue(waitForEnabled(moveLater, timeout: 5))
         moveLater.click()
         XCTAssertTrue(waitUntil(timeout: 5) {
             fixture.instructionQueueReorderRequestCount == 1
@@ -984,6 +976,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(remove.waitForExistence(timeout: 5))
         makeHittable(remove)
         XCTAssertTrue(remove.isEnabled)
+        XCTAssertEqual(remove.label, "Delete Package")
         remove.click()
         XCTAssertTrue(waitUntil(timeout: 5) {
             fixture.instructionQueueRemoveRequestCount == 1
@@ -1023,32 +1016,37 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         let title = app.staticTexts["detail-continuity"]
         let subtitle = app.staticTexts["continuity-operator-view"]
-        let refresh = app.buttons["operator-refresh"]
-        let detailPane = app.descendants(matching: .any)["continuity-detail-pane"]
+        let projectList = app.descendants(matching: .any)["continuity-project-list"]
+        let copy = app.buttons["continuity-copy-project-id"]
+        let delete = app.buttons["continuity-delete-project"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertTrue(subtitle.waitForExistence(timeout: 5))
-        XCTAssertTrue(refresh.waitForExistence(timeout: 5))
-        XCTAssertTrue(detailPane.waitForExistence(timeout: 5))
+        XCTAssertTrue(projectList.waitForExistence(timeout: 5))
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
         XCTAssertFalse(
             app.descendants(matching: .any)["continuity-operation-list"].exists,
-            "An empty continuity history must not reserve an unused list column"
+            "Continuity must not expose the obsolete operation timeline"
         )
 
-        for element in [title, subtitle, refresh, detailPane] {
+        XCTAssertFalse(
+            app.buttons["operator-refresh"].exists,
+            "Continuity must not expose a manual refresh operation"
+        )
+
+        for element in [title, subtitle, projectList, copy, delete] {
             XCTAssertTrue(
                 frameIsContained(element.frame, in: detail.frame, tolerance: 2),
                 "\(element.identifier) escaped the Continuity content area"
             )
         }
-        XCTAssertTrue(refresh.isHittable, "Continuity refresh must remain accessible below the title bar")
-        XCTAssertGreaterThanOrEqual(detailPane.frame.minY, subtitle.frame.maxY - 2)
+        XCTAssertGreaterThanOrEqual(copy.frame.minY, subtitle.frame.maxY - 2)
         XCTAssertLessThanOrEqual(
-            detailPane.frame.minY - subtitle.frame.maxY,
+            copy.frame.minY - subtitle.frame.maxY,
             36,
             "Continuity content must follow the header without an unexplained vertical gap"
         )
-        XCTAssertEqual(detailPane.frame.minX, detail.frame.minX, accuracy: 4)
-        XCTAssertEqual(detailPane.frame.maxX, detail.frame.maxX, accuracy: 4)
+        XCTAssertGreaterThan(projectList.frame.minY, copy.frame.maxY)
     }
 
     func testPrimaryContentStartsBelowToolbarAtMinimumWindowSize() throws {
@@ -1187,77 +1185,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
     }
 
-    func testContinuityControlsSendTypedActionsAndSurfaceManagerRejection() throws {
-        let fixture = try OperatorManagerUITestFixture()
-        relaunch(with: fixture)
-
-        let continuity = app.buttons["tab-continuity"]
-        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
-        continuity.click()
-
-        XCTAssertTrue(app.staticTexts["Automatic continuity"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Automatic continuity is monitoring this managed task."].exists)
-        XCTAssertTrue(app.staticTexts["Working context"].exists)
-        let checkpoint = app.buttons["checkpoint-command"]
-        let rollover = app.buttons["rollover-command"]
-        XCTAssertTrue(waitForEnabled(checkpoint, timeout: 5))
-        XCTAssertTrue(waitForEnabled(rollover, timeout: 5))
-        XCTAssertFalse(
-            app.buttons["continuity-advanced-toggle"].exists,
-            "Manual continuity actions must not be hidden behind an Advanced disclosure"
-        )
-        XCTAssertEqual(checkpoint.label, "Save progress now")
-        XCTAssertEqual(rollover.label, "Start a fresh session and continue")
-        let activeSession = app.descendants(matching: .any)["continuity-active-session-id"]
-        XCTAssertTrue(activeSession.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(activeSession, contains: "fixture-active-session"))
-        XCTAssertTrue(app.descendants(matching: .any)["continuity-controls-authority"].exists)
-        XCTAssertTrue(
-            element(
-                app.descendants(matching: .any)["continuity-control-eligibility"],
-                contains: "manager will still verify"
-            )
-        )
-
-        makeHittable(checkpoint)
-        checkpoint.click()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.controlActions == ["checkpoint"]
-        })
-        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
-        XCTAssertTrue(
-            app.descendants(matching: .any)["operator-notice"].waitForExistence(timeout: 5)
-        )
-
-        fixture.completeContinuityCycle()
-        let refresh = app.buttons["operator-refresh"]
-        XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
-        refresh.click()
-        XCTAssertTrue(waitForEnabled(rollover, timeout: 5))
-        makeHittable(rollover)
-        rollover.click()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.controlActions == ["checkpoint", "rollover"]
-        })
-        XCTAssertEqual(fixture.mutationAuthorizationCount, 2)
-
-        fixture.completeContinuityCycle()
-        fixture.rejectNextContinuityCommand()
-        XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
-        refresh.click()
-        XCTAssertTrue(waitForEnabled(checkpoint, timeout: 5))
-        makeHittable(checkpoint)
-        checkpoint.click()
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            fixture.controlActions == ["checkpoint", "rollover", "checkpoint"]
-        })
-        let commandError = app.descendants(matching: .any)["continuity-command-error"]
-        XCTAssertTrue(commandError.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(commandError, contains: "current usage observation"))
-        XCTAssertEqual(fixture.mutationAuthorizationCount, 3)
-    }
-
-    func testContinuityOperationRestoresImmediatelyVisibleDurableDetail() throws {
+    func testContinuityShowsOnlyScrollableProjectIDsAndDataActions() throws {
         let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
         relaunch(with: fixture)
 
@@ -1265,107 +1193,55 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(continuity.waitForExistence(timeout: 8))
         continuity.click()
 
-        let operationList = app.descendants(matching: .any)["continuity-operation-list"]
-        XCTAssertTrue(operationList.waitForExistence(timeout: 5))
-        let row = app.descendants(matching: .any)[
-            "continuity-operation-row-\(fixture.continuityOperationID)"
-        ]
+        let list = app.descendants(matching: .any)["continuity-project-list"]
+        let row = app.staticTexts["continuity-project-row-\(fixture.projectID)"]
+        XCTAssertTrue(list.waitForExistence(timeout: 5))
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(row, contains: "Fixture managed run"))
-        XCTAssertTrue(element(row, contains: "Attempt 2"))
-        XCTAssertTrue(element(row, contains: fixture.runID))
-
-        XCTAssertFalse(
-            app.buttons["continuity-technical-toggle"].exists,
-            "Durable continuity detail must not be hidden behind a Technical disclosure"
-        )
-        let exactState = app.descendants(matching: .any)["continuity-exact-operation-state"]
-        XCTAssertTrue(exactState.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(exactState, contains: "awaiting_durable_acknowledgement"))
-        XCTAssertTrue(app.descendants(matching: .any)["context-gauge"].exists)
-        let successor = app.descendants(matching: .any)["continuity-successor-id"]
-        XCTAssertTrue(successor.exists)
-        XCTAssertTrue(element(successor, contains: "fixture-successor-session"))
-
-        let eventMetadata = app.descendants(matching: .any)[
-            "continuity-event-metadata-\(fixture.continuityEventID)"
-        ]
-        XCTAssertTrue(eventMetadata.exists)
-        XCTAssertTrue(element(eventMetadata, contains: "2026-08-31T12:00:06Z"))
-        XCTAssertTrue(element(eventMetadata, contains: "continuity_successor_created"))
+        XCTAssertTrue(app.buttons["continuity-copy-project-id"].exists)
+        XCTAssertTrue(app.buttons["continuity-delete-project"].exists)
+        XCTAssertFalse(app.buttons["checkpoint-command"].exists)
+        XCTAssertFalse(app.buttons["rollover-command"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["continuity-operation-list"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["continuity-exact-operation-state"].exists)
     }
 
-    func testContinuityHistoryCanBeClearedIndividuallyWithConfirmation() throws {
-        let fixture = try OperatorManagerUITestFixture(
-            includeContinuityOperation: true,
-            continuityOperationState: "completed"
-        )
+    func testContinuityProjectIDCanBeCopied() throws {
+        let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
         let continuity = app.buttons["tab-continuity"]
         XCTAssertTrue(continuity.waitForExistence(timeout: 8))
         continuity.click()
-        let row = app.descendants(matching: .any)[
-            "continuity-operation-row-\(fixture.continuityOperationID)"
-        ]
+        let copy = app.buttons["continuity-copy-project-id"]
+        XCTAssertTrue(waitForEnabled(copy, timeout: 5))
+        makeHittable(copy)
+        NSPasteboard.general.clearContents()
+        copy.click()
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), fixture.projectID)
+    }
+
+    func testContinuityProjectDataCanBeDeletedWithConfirmation() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        relaunch(with: fixture)
+
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+        let row = app.staticTexts["continuity-project-row-\(fixture.projectID)"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        let clear = app.buttons["continuity-clear-selected"]
-        XCTAssertTrue(waitForEnabled(clear, timeout: 5))
-        makeHittable(clear)
-        clear.click()
-        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 3))
-        let confirmAction = app.sheets.buttons["Clear Selected"]
-        XCTAssertTrue(confirmAction.waitForExistence(timeout: 3))
-        confirmAction.click()
+        let delete = app.buttons["continuity-delete-project"]
+        XCTAssertTrue(waitForEnabled(delete, timeout: 5))
+        makeHittable(delete)
+        delete.click()
+        let confirmation = app.sheets.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts["Delete continuity data?"].exists)
+        confirmation.buttons["Delete"].click()
 
         XCTAssertTrue(waitUntil(timeout: 5) { !row.exists })
-        XCTAssertEqual(fixture.continuityHistoryClearScopes, ["operation"])
+        XCTAssertEqual(fixture.continuityHistoryClearScopes, ["project"])
         XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
-    }
-
-    func testContinuityHistoryCanClearAllSettledEntriesWithConfirmation() throws {
-        let fixture = try OperatorManagerUITestFixture(
-            includeContinuityOperation: true,
-            continuityOperationState: "completed"
-        )
-        relaunch(with: fixture)
-
-        let continuity = app.buttons["tab-continuity"]
-        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
-        continuity.click()
-        let clear = app.buttons["continuity-clear-all-old"]
-        XCTAssertTrue(waitForEnabled(clear, timeout: 5))
-        makeHittable(clear)
-        clear.click()
-        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 3))
-        let confirmAction = app.sheets.buttons["Clear All Old"]
-        XCTAssertTrue(confirmAction.waitForExistence(timeout: 3))
-        confirmAction.click()
-
-        XCTAssertTrue(waitUntil(timeout: 5) {
-            !app.descendants(matching: .any)["continuity-operation-list"].exists
-        })
-        XCTAssertEqual(fixture.continuityHistoryClearScopes, ["all_settled"])
-        XCTAssertTrue(app.descendants(matching: .any)["operator-notice"].exists)
-    }
-
-    func testContinuityHistoryShowsExactBlockerAndRetirementActionForLiveWork() throws {
-        let fixture = try OperatorManagerUITestFixture(
-            includeContinuityOperation: true,
-            continuityOperationState: "running"
-        )
-        relaunch(with: fixture)
-
-        let continuity = app.buttons["tab-continuity"]
-        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
-        continuity.click()
-        let blocker = app.descendants(matching: .any)["continuity-clear-blocker"]
-        XCTAssertTrue(blocker.waitForExistence(timeout: 5))
-        XCTAssertTrue(element(blocker, contains: "continuity state successor_bootstrapping"))
-        XCTAssertTrue(element(blocker, contains: "task state running"))
-        XCTAssertTrue(element(blocker, contains: "finish or cancel"))
-        XCTAssertFalse(app.buttons["continuity-clear-selected"].isEnabled)
-        XCTAssertTrue(app.buttons["continuity-clear-open-run-details"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].exists)
     }
 
     func testProviderSettingsSaveUsesRedactedManagerStateAndSurvivesViewReopen() throws {
@@ -2504,7 +2380,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         initialRunState: String = "running",
         includeContinuityOperation: Bool = false,
         continuityOperationState: String = "awaiting_durable_acknowledgement",
-        activeInstructionQueue: Bool = false
+        activeInstructionQueue: Bool = false,
+        includeSecondInstructionPackage: Bool = false
     ) throws {
         self.failStartResponse = failStartResponse
         self.failContractProbe = failContractProbe
@@ -2518,7 +2395,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         mutableRunState = initialRunState
         mutableInstructionQueueRevision = 1
         mutableInstructionQueueRunning = activeInstructionQueue
-        mutableInstructionPackageIDs = activeInstructionQueue
+        mutableInstructionPackageIDs = activeInstructionQueue || includeSecondInstructionPackage
             ? [
                 "44444444-4444-4444-8444-444444444444",
                 "45454545-4545-4545-8545-454545454545",
@@ -2529,7 +2406,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "44444444-4444-4444-8444-444444444444": "running",
                 "45454545-4545-4545-8545-454545454545": "queued",
             ]
-            : ["44444444-4444-4444-8444-444444444444": "queued"]
+            : Dictionary(
+                uniqueKeysWithValues: mutableInstructionPackageIDs.map { ($0, "queued") }
+            )
         listener = try NWListener(using: .tcp, on: .any)
 
         let ready = DispatchSemaphore(value: 0)
@@ -2706,12 +2585,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                   let object = try? JSONSerialization.jsonObject(with: request.body)
                     as? [String: Any],
                   let scope = object["scope"] as? String,
-                  ["operation", "all_settled"].contains(scope),
-                  (scope == "all_settled" || (
-                    object["operation_id"] as? String == continuityOperationID
-                        && object["project_id"] as? String == projectID
-                        && (object["project_generation"] as? NSNumber)?.uint64Value == 4
-                  )) else {
+                  scope == "project",
+                  object["project_id"] as? String == projectID else {
                 respond(
                     status: 401,
                     object: ["message": "missing exact continuity clear authority"],
@@ -2726,8 +2601,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             }
             respond(status: 200, object: [
                 "scope": scope,
-                "requested_operation_id": scope == "operation"
-                    ? continuityOperationID : NSNull(),
+                "requested_project_id": projectID,
+                "requested_operation_id": NSNull(),
                 "cleared_operation_count": 1,
                 "cleared_project_count": 1,
                 "deleted_record_count": 5,
@@ -3874,8 +3749,10 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     }
 
     private func project() -> [String: Any] {
-        let state = locked { (mutableProjectRoot, mutableProjectGeneration) }
-        return [
+        let state = locked {
+            (mutableProjectRoot, mutableProjectGeneration, mutableContinuityOperationCleared)
+        }
+        var value: [String: Any] = [
             "project_id": projectID,
             "display_name": "Fixture Project",
             "canonical_root": state.0,
@@ -3883,9 +3760,14 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "lifecycle_state": "active",
             "bindings": [],
             "memory": ["state": "healthy", "database_bytes": 4_096, "record_count": 2],
-            "continuity": ["state": "ready", "migration_state": "not_required"],
             "migration_warnings": [],
         ]
+        if !state.2 {
+            value["continuity"] = ["state": "ready", "migration_state": "not_required"]
+        } else {
+            value["continuity"] = ["state": "unavailable"]
+        }
+        return value
     }
 
     private func instructionQueue() -> [String: Any] {

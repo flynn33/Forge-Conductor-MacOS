@@ -1,6 +1,8 @@
 # Project instruction packages
 
-Instruction packages turn a registered local repository into an ordered work queue. Each accepted package is bound to the selected project UUID and generation. Forge Conductor runs one package at a time in the order shown in **Projects**.
+Instruction packages give the LM Studio model an ordered, immutable instruction
+catalog for a registered project. Each accepted package is bound to the selected
+project UUID and generation; Forge does not require a Managed Run to use it.
 
 ## Setup
 
@@ -13,27 +15,18 @@ Instruction packages turn a registered local repository into an ordered work que
 3. In **Projects**, register the local repository folder and select it. The
    registration authorizes that exact canonical root without widening access to
    its parent.
-4. Under **Instruction packages**, choose **Add Instructions…** and arrange
-   packages with the earlier/later arrow buttons.
+4. Under **Instruction packages**, choose **Add Instructions…** one or more
+   times and arrange packages by drag-and-drop or the earlier/later buttons.
 5. In **Provider**, select and verify exactly one provider. LM Studio requires a
    current saved model/readiness receipt; desktop providers require a verified
    integration and retain their host-selected model.
    Grok Build remains visible but cannot be selected or admit a run in 0.14.1
    because its documented hook outputs cannot deliver the initial assignment
    context to the model.
-6. For an ordinary task, open **Projects → Run Details**, select one or more imported packages,
-   and choose **Start Task**. Forge prepares the run against that exact durable
-   provider selection and returns one exact Provider action if it is not ready.
-   A selectable desktop host receives the exact assignment through its hook and
-   must complete the instructed one-time `desktop_run_attach` before any
-   project-scoped Forge tool is available.
-7. To run the whole project queue, choose **Start Ordered Work** in Projects.
-   For LM Studio, Forge rechecks the endpoint, exact pinned model, loaded
-   inventory, and tool contract before changing queue state or creating a run.
-   An unloaded pin remains queued and reports **Load the pinned model in LM
-   Studio, then choose Connect and Check again.** LM Studio controls remain
-   under **LM Studio Advanced**; they are not prerequisites for a desktop-host
-   run.
+6. Open a normal LM Studio chat and call `get_forge_status`. Select the intended
+   `project_id` when more than one project is registered, then let the model use
+   `instruction_catalog` and `instruction_read` to consume packages in the
+   displayed priority order.
 
 The question-mark toolbar button opens the same setup sequence inside the app.
 
@@ -112,64 +105,35 @@ built-in `forge.package.tool-success` requirement needs at least one durable
 tool result from the exact run and rejects unresolved or failed tool
 invocations.
 
-## Ordering and execution
+## Ordering and model access
 
-The Projects list order is authoritative. Use the explicit earlier/later
-buttons before or during ordered execution. New packages can be
-added while work is running. Forge preserves the active run identity and
-applies the revised order to pending packages. Every order change carries a
+The Projects list order is authoritative. Drag packages or use the explicit
+earlier/later buttons. New packages can be added while the model is working;
+the next `instruction_catalog` query observes the durable order. Every order change carries a
 queue revision so concurrent or stale edits fail instead of silently
 overwriting a newer order. The native view also rejects a background snapshot
 whose revision predates the queue already shown, and it does not hide the
-visible queue while Stop, Remove, or Reorder is in flight.
+visible queue while Delete or Reorder is in flight.
 
 The package rows are plain content inside the Projects detail `ScrollView`, not
-a nested list. **Move earlier**, **Move later**, and **Remove** retain separate
+a nested list. **Move earlier**, **Move later**, and **Delete Package** retain separate
 native control identities at the minimum supported window size. The package
 container deliberately has no parent accessibility identifier because SwiftUI
 would otherwise replace those child identities.
 
-**Start Ordered Work** requires one selected, verified provider and a
-running managed autonomy service. LM Studio requires a live no-resume readiness
-check of its exact saved and loaded model before any queue/run mutation; desktop
-providers use the model chosen by their host. Forge creates a managed run scoped to the registered
-repository root, package project UUID, and current project generation. It
-advances to the next queued package only after the current package reaches
-`completed`. A failed, cancelled, paused, or terminally failed run stops
-automatic advancement so the operator can review it in **Projects → Run Details**. Provider
-readiness uses the bounded `waiting_provider` recovery path and resumes the
-retained operation automatically after **Connect and Check** succeeds. A
-persisted legacy `blocked_configuration` value is recovered automatically; it
-does not require additional Forge configuration or an environment reset. If a
-run cannot be committed after the package receives its durable run identity,
-Forge retains that exact identity and retries it through the existing Manager
-watchdog instead of converting the package into a configuration blocker.
+### LM Studio model access
 
-**Stop Active Work** first fences the queue so no next package can start. If a
-package already owns a run, Forge quiesces and durably requests cancellation of
-that exact run before reconciling the package to `cancelled`. The package can
-then be removed or reordered, while the run remains visible as retained history
-in **Projects → Run Details**. If the bounded cancellation transaction fails,
-the queue remains stopped, the package remains linked to its run, and the stop
-action stays available for retry; Forge does not manufacture a terminal package
-while work may still be active.
+Instruction packages do not start or own a Forge-managed model run. The user
+opens an ordinary LM Studio chat and asks the model to call
+`get_forge_status`. The returned project-scoped locations and query tools let
+the model discover the ordered instruction catalog and fetch bounded content.
+With multiple registered projects, the model passes the applicable
+`project_id` on later calls.
 
-The `0.14.7 (13)` Desktop-candidate acceptance exercised this exact path with
-two real LM Studio-backed ordered runs. The native Projects controls stopped
-both runs to terminal `cancelled`, unlocked Remove, persisted earlier/later
-order changes after Refresh, and persisted removal after Refresh at both normal
-and 1100×788 window sizes. This is focused Projects evidence; it does not
-replace owner final testing, Developer ID signing, notarization, or shipment.
-
-**Dashboard** monitors the active queue without changing it. Its project status
-shows delivered document steps and completed packages; the Managed Activity
-frame names a current package only when its `run_id` exactly links it to the
-nonterminal active run. Failed, cancelled, terminal, and unrelated packages are
-never combined with that run. The first queued package is shown separately as
-**Next Package**. For an exact active package the frame shows the next inferred
-current step and durable delivered count together with the run's current phase,
-work item, and next action. The display refreshes every five seconds only while
-Dashboard is visible and does not treat a missing Manager snapshot as completed work.
+Package changes remain durable while the LM Studio conversation is active. A
+subsequent catalog query observes the newest committed order. **Delete
+Package** removes only the selected package; project reset and disposable-cache
+clearing are separate confirmed actions on the Projects surface.
 
 ## Storage and project linkage
 
@@ -185,19 +149,16 @@ The durable queue metadata is stored in:
 ~/.forge-conductor/instruction-packages/queue.json
 ```
 
-Editing or deleting the original selected file after import does not change the accepted snapshot. Package records include the source path for operator provenance, but autonomous tools receive the registered repository as their filesystem scope.
+Editing or deleting the original selected file after import does not change the
+accepted snapshot. Package records retain source provenance, while ordinary
+model filesystem tools remain scoped to the registered project folder.
 
-Queue admission inventories the immutable snapshot's documents and records each
-content-addressed reference, byte count, and SHA-256 in the manager-owned
-prepared-run descriptor. The durable run also records the descriptor revision,
-package snapshot hash, provider and tool-catalog revisions, continuity mode,
-and applicable budget-policy revisions. Direct starts use the same preparation
-contract, so queued work does not bypass ordinary grant, validation, or stale
-input checks. In **Projects → Run Details**, large pasted text plus every selected or dropped
-file, folder, or ZIP uses the same importer. A direct artifact is durably bound
-to its exact project generation and run UUID without entering or reordering the
-package queue. Prepare and Start carry only its compact bootstrap and snapshot
-digest, never the full large instruction body.
+Import inventories the immutable snapshot's documents and records each
+content-addressed reference, byte count, and SHA-256. The package remains bound
+to the exact project identity and generation. `get_forge_status` gives the LM
+Studio model the catalog tools and locations it needs; large instruction bodies
+stay in the immutable store and are fetched in bounded pages rather than being
+copied into the initial status response.
 
 Queue refreshes are delivered in revision-bound pages of at most 128 package
 records. The app accepts a page only when its project, generation, revision,
@@ -205,11 +166,10 @@ total count, cursor, and package positions agree, then reconstructs the visible
 order. Large instruction bodies never enter queue metadata.
 
 `instruction_read` accepts a requested byte ceiling but may lower it to fit the
-current provider-reported remaining context and the run's durable inline-result
-envelope. Its response reports the requested and effective limits plus
-`next_byte_offset`; callers continue until that cursor is absent. The durable
-invocation journal records accepted catalog and byte ranges, and managed
-handoffs carry the compact coverage bitmap and partial cursors across restart or
+current model context and transport result envelope. Its response reports the
+requested and effective limits plus `next_byte_offset`; callers continue until
+that cursor is absent. The durable invocation journal records accepted catalog
+and byte ranges, and handoffs carry the compact coverage bitmap and partial cursors across restart or
 rollover without preventing a document from being revisited by ID.
 
 Resetting a project generation fences unfinished packages from the old generation. Removing a project deletes its active package queue, advances the control-plane generation, invalidates bindings, and hides the registration while preserving project memory and historical run evidence. Registering the same repository again reconnects its durable project identity.
@@ -217,7 +177,6 @@ Resetting a project generation fences unfinished packages from the old generatio
 ## Resource budgets
 
 - 4,096 queued package records
-- 4,096 durable direct-run artifact records
 - 4,096 source files per import
 - 128 MiB per source file
 - 512 MiB aggregate source bytes per import

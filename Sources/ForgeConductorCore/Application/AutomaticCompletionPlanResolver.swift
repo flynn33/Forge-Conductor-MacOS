@@ -75,7 +75,8 @@ public enum AutomaticCompletionPlanResolver {
                 reason: "The instructions ask for analysis or reporting without a project mutation.",
                 evidenceRequirements: [.deliveredReport],
                 relevantToolNames: [
-                    "forge_status", "fs_read", "fs_list", "fs_glob", "search_text",
+                    "forge_status", "get_forge_status",
+                    "fs_read", "fs_list", "fs_glob", "search_text",
                     "git_diff", "git_log", "git_status",
                 ]
             ))

@@ -8012,11 +8012,17 @@ public actor ProjectControlPlaneRepository {
     /// owned by a live task remains authoritative and cannot be cleared.
     public func oldContinuityHistoryCommands(
         operationID: UUID? = nil,
+        projectID: ProjectID? = nil,
         limit: Int = 4_096
     ) throws -> [ContinuityCommand] {
         guard (1...4_096).contains(limit) else {
             throw AutonomyError.invalidRequest(
                 "continuity history deletion limit must be between 1 and 4096"
+            )
+        }
+        guard operationID == nil || projectID == nil else {
+            throw AutonomyError.invalidRequest(
+                "continuity history deletion accepts one exact scope"
             )
         }
         let connection = try requiredConnection()
@@ -8029,6 +8035,21 @@ public actor ProjectControlPlaneRepository {
                 return []
             }
             commands = [command]
+        } else if let projectID {
+            commands = try connection.all(
+                Self.continuityCommandSelect
+                    + " WHERE project_id=? ORDER BY updated_at,command_id LIMIT ?",
+                bindings: [
+                    .text(projectID.description),
+                    .int64(Int64(limit + 1)),
+                ],
+                map: Self.decodeContinuityCommand
+            )
+            guard commands.count <= limit else {
+                throw AutonomyError.invalidRequest(
+                    "Project continuity history exceeds the bounded one-action deletion limit"
+                )
+            }
         } else {
             commands = try connection.all(
                 Self.continuityCommandSelect
@@ -8049,7 +8070,7 @@ public actor ProjectControlPlaneRepository {
             let run = try autonomousRunUnlocked(command.runID, connection: connection)
             if commandIsTerminal || run == nil || run?.state.isTerminal == true {
                 old.append(command)
-            } else if operationID != nil {
+            } else if operationID != nil || projectID != nil {
                 throw AutonomyError.invalidRequest(
                     "Operation \(command.operationID.uuidString.lowercased()) cannot be cleared: "
                         + "continuity state \(command.state.rawValue), task state "

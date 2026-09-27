@@ -504,6 +504,7 @@ public struct CodingAgentPolicyNotice: Codable, Sendable, Equatable, Identifiabl
     public let violationID: PolicyViolationID
     public let ruleReference: PolicySourceReference
     public let summary: String
+    public let policyStatement: String?
     public let suggestedCorrection: String
     public let confidence: Double
     public let developmentContinues: Bool
@@ -513,6 +514,7 @@ public struct CodingAgentPolicyNotice: Codable, Sendable, Equatable, Identifiabl
         violationID: PolicyViolationID,
         ruleReference: PolicySourceReference,
         summary: String,
+        policyStatement: String? = nil,
         suggestedCorrection: String,
         confidence: Double
     ) {
@@ -520,6 +522,7 @@ public struct CodingAgentPolicyNotice: Codable, Sendable, Equatable, Identifiabl
         self.violationID = violationID
         self.ruleReference = ruleReference
         self.summary = summary
+        self.policyStatement = policyStatement
         self.suggestedCorrection = suggestedCorrection
         self.confidence = min(max(confidence, 0), 1)
         self.developmentContinues = true

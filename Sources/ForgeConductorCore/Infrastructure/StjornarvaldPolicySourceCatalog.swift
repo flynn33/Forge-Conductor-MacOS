@@ -253,11 +253,54 @@ public final class StjornarvaldPolicySourceCatalog: DevelopmentPolicySourceCatal
     ) throws -> [DevelopmentPolicySource] {
         lock.lock()
         defer { lock.unlock() }
+        return try sourcesUnlocked(includeRemoved: includeRemoved, limit: limit)
+    }
+
+    public func reorder(sourceIDs: [PolicySourceID]) throws -> [DevelopmentPolicySource] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !sourceIDs.isEmpty, sourceIDs.count <= 100,
+              Set(sourceIDs).count == sourceIDs.count else {
+            throw StjornarvaldPolicySourceError.invalidRequest(
+                "policy source ordering requires 1 through 100 unique source IDs"
+            )
+        }
+        let active = try sourcesUnlocked(includeRemoved: false, limit: 101)
+        guard active.count <= 100,
+              Set(active.map(\.id)) == Set(sourceIDs) else {
+            throw StjornarvaldPolicySourceError.conflict(
+                "policy source set changed; refresh before reordering"
+            )
+        }
+        try execUnlocked("BEGIN IMMEDIATE;")
+        do {
+            for (position, sourceID) in sourceIDs.enumerated() {
+                try executeUnlocked(
+                    "INSERT INTO stj_policy_source_order(source_id,position) VALUES(?,?) "
+                        + "ON CONFLICT(source_id) DO UPDATE SET position=excluded.position;",
+                    [.text(sourceID.description), .integer(Int64(position))]
+                )
+            }
+            try execUnlocked("COMMIT;")
+        } catch {
+            try? execUnlocked("ROLLBACK;")
+            throw error
+        }
+        return try sourcesUnlocked(includeRemoved: false, limit: 100)
+    }
+
+    private func sourcesUnlocked(
+        includeRemoved: Bool,
+        limit: Int
+    ) throws -> [DevelopmentPolicySource] {
         let boundedLimit = min(max(limit, 1), 10_000)
-        let sql = "SELECT source_id,origin,display_name,selected_path,standardized_path,root_kind," +
-            "bookmark_sha256,active,interpretation_state,added_at,latest_revision_id," +
-            "last_index_cursor,last_observation FROM stj_policy_sources " +
-            (includeRemoved ? "" : "WHERE active=1 ") + "ORDER BY added_at,source_id LIMIT ?;"
+        let sql = "SELECT s.source_id,s.origin,s.display_name,s.selected_path,s.standardized_path,s.root_kind," +
+            "s.bookmark_sha256,s.active,s.interpretation_state,s.added_at,s.latest_revision_id," +
+            "s.last_index_cursor,s.last_observation FROM stj_policy_sources s " +
+            "LEFT JOIN stj_policy_source_order o ON o.source_id=s.source_id " +
+            (includeRemoved ? "" : "WHERE s.active=1 ")
+            + "ORDER BY CASE WHEN s.active=1 THEN 0 ELSE 1 END,"
+            + "COALESCE(o.position,2147483647),s.added_at,s.source_id LIMIT ?;"
         let statement = try prepareUnlocked(sql)
         defer { sqlite3_finalize(statement) }
         try bind([.integer(Int64(boundedLimit))], to: statement)
@@ -399,6 +442,13 @@ public final class StjornarvaldPolicySourceCatalog: DevelopmentPolicySourceCatal
                     .text(PolicySourceInterpretationState.accepted.rawValue),
                     .text(ISO8601.string(from: now)), .text(try encodeStringMap(metadata)),
                 ]
+            )
+            let nextPosition = try scalarIntUnlocked(
+                "SELECT COALESCE(MAX(position),-1)+1 FROM stj_policy_source_order;"
+            )
+            try executeUnlocked(
+                "INSERT INTO stj_policy_source_order(source_id,position) VALUES(?,?);",
+                [.text(sourceID.description), .integer(Int64(nextPosition))]
             )
             try insertSourceEventUnlocked(
                 sourceID: sourceID, revisionID: nil, type: "source_added", occurredAt: now,
@@ -1266,6 +1316,10 @@ public final class StjornarvaldPolicySourceCatalog: DevelopmentPolicySourceCatal
                   interpretation_state TEXT NOT NULL, added_at TEXT NOT NULL, removed_at TEXT,
                   latest_revision_id TEXT, last_index_cursor TEXT, last_observation TEXT,
                   source_metadata_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS stj_policy_source_order (
+                  source_id TEXT PRIMARY KEY REFERENCES stj_policy_sources(source_id),
+                  position INTEGER NOT NULL CHECK(position>=0)
                 );
                 CREATE TABLE IF NOT EXISTS stj_source_revisions (
                   revision_id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES stj_policy_sources(source_id),

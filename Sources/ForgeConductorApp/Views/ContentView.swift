@@ -353,11 +353,7 @@ struct ContentView: View {
             }
         case .continuity:
             operatorContent {
-                ContinuityOperatorView(
-                    client: model.operatorManagerClient,
-                    onOpenAutonomy: { model.selectTab(.projects) },
-                    onOpenProvider: { model.selectTab(.provider) }
-                )
+                ContinuityOperatorView(client: model.operatorManagerClient)
             }
         case .runtimes:
             operatorContent { RuntimesOperatorView(client: model.operatorManagerClient) }
@@ -458,7 +454,7 @@ private struct GuidedSetupWizardView: View {
             kind: .provider,
             title: "Connect the model provider",
             symbol: "network",
-            purpose: "Forge needs one reachable, tool-capable model before it can prepare autonomous work.",
+            purpose: "Forge needs one reachable, tool-capable model for ordinary LM Studio chats to use its tools.",
             readyWhen: "Provider shows Ready. LM Studio names its validated model; desktop hosts show an active Forge integration and host-managed execution.",
             actions: [
                 "For LM Studio, install/load a tool-capable model, then choose Connect and Check once.",
@@ -477,7 +473,7 @@ private struct GuidedSetupWizardView: View {
             kind: .project,
             title: "Register the project",
             symbol: "folder.badge.gearshape",
-            purpose: "A registered project gives the run a stable identity and an exact authorized working folder.",
+            purpose: "A registered project gives LM Studio a stable identity and an exact authorized working folder.",
             readyWhen: "Projects shows the repository as Active with its current generation.",
             actions: [
                 "Open Projects and choose Register Project.",
@@ -509,59 +505,58 @@ private struct GuidedSetupWizardView: View {
         ),
         Step(
             kind: .configure,
-            title: "Review ordered work behavior",
+            title: "Review project inputs",
             symbol: "slider.horizontal.3",
-            purpose: "Before launch, confirm the model, tools, automatic completion evidence, retry behavior, and continuity defaults.",
+            purpose: "Before starting in LM Studio, confirm the provider, project folders, instruction order, and Development Policy priority.",
             readyWhen: "Provider, project, and instructions are ready and the intended failure behavior is understood.",
             actions: [
-                "For ordered packages, the package supplies its capabilities and completion requirements.",
                 "Review the visible package order and each package's per-file catalog in Projects.",
-                "Use Run Details only to inspect or control historical and current runs. Continuity remains automatic.",
+                "Review the Development Policy source order in Rune Forge. The top source has highest priority.",
+                "Continuity remains automatic; its view is only for project-ID copy and project-scoped deletion.",
             ],
             recovery: [
-                "Forge repairs provider readiness automatically when possible. A preparation card appears only when a project, permission, or source choice requires your input.",
+                "Use Provider → Connect and Check when LM Studio readiness requires attention.",
                 "If a package requirement is incorrect, correct the instruction package; Forge configuration does not create or override package requirements.",
             ],
             destinations: [(.projects, "Open Projects")]
         ),
         Step(
             kind: .start,
-            title: "Start the automated run",
+            title: "Start in LM Studio",
             symbol: "play.circle.fill",
-            purpose: "Choose the launch path that matches the instruction source; both paths create manager-owned durable runs.",
-            readyWhen: "Projects shows ordered work running, or Project Runs shows the accepted managed task.",
+            purpose: "Project work begins in the LM Studio chat interface, where you interact with the model normally.",
+            readyWhen: "LM Studio has a loaded tool-capable model and the Forge MCP integration is available.",
             actions: [
-                "For an ordered queue, open Projects and choose Start Ordered Work. Forge runs one package at a time in the displayed order.",
-                "A package advances only after its current run satisfies completion checks; failure stops advancement for review.",
+                "Open a chat in LM Studio and ask the model to call get_forge_status.",
+                "Give the model the task. It can query the selected project, instruction, policy, and continuity locations through Forge.",
             ],
             recovery: [
-                "If Start remains disabled, the same screen identifies the missing project, instructions, or provider readiness.",
-                "If a start response is interrupted, use Reconcile with Manager; do not create a second task.",
+                "If get_forge_status is unavailable, verify the LM Studio MCP registration and use Provider → Connect and Check.",
+                "If more than one project is registered, pass the intended project_id returned by get_forge_status.",
             ],
             destinations: [
-                (.projects, "Open Package Queue"),
-                (.projects, "Open Project Runs"),
+                (.projects, "Open Project Inputs"),
+                (.provider, "Open Provider"),
             ]
         ),
         Step(
             kind: .monitor,
-            title: "Monitor the run",
+            title: "Monitor governance and continuity",
             symbol: "gauge.with.dots.needle.67percent",
-            purpose: "Use Dashboard for live progress and activity, then open the owning view when more detail or control is needed.",
-            readyWhen: "Dashboard shows the current package, step, phase, work item, next action, model/tool activity, and policy events.",
+            purpose: "Continue working in LM Studio while Forge enforces Development Policy and protects session continuity.",
+            readyWhen: "Rune Forge reports policy observations and Forge accepts continuity handoffs from the active model chat.",
             actions: [
-                "Dashboard: overall health, current package and step, Managed Activity, orchestration, and resource load.",
-                "Projects → Run Details: exact run state, completion checks, pause/resume/retry, and failure detail.",
-                "Continuity: saved progress, context protection, rollover, and successor status.",
-                "Rune Forge: policy observations and violation feed. Events & Evidence: durable audit detail.",
+                "Rune Forge: ordered Development Policy sources, CLU policy observations, violations, and per-project log export.",
+                "Continuity: copy project IDs or delete continuity data; rollover itself is automatic.",
+                "Events & Evidence: durable audit detail.",
             ],
             recovery: [
                 "A stale or unavailable Dashboard source is not a zero value; refresh and open the owning view.",
                 "Use the latest named failure, policy violation, or next action—not an older activity row—as recovery authority.",
             ],
             destinations: [
-                (.projects, "Open Run Details"),
                 (.runeForge, "Open Policy Feed"),
+                (.continuity, "Open Project IDs"),
             ]
         ),
         Step(
@@ -569,20 +564,19 @@ private struct GuidedSetupWizardView: View {
             title: "Resolve issues and continue",
             symbol: "cross.case",
             purpose: "Forge preserves durable state and routes each issue to the view that owns the corrective action.",
-            readyWhen: "No active run or continuity item reports an issue requiring operator action.",
+            readyWhen: "Provider, policy enforcement, and continuity report no issue requiring operator action.",
             actions: [
-                "Provider issue: open Provider and choose Connect and Check. Forge resumes the exact retained run automatically after the contract check passes.",
-                "Automatic completion issue: Forge returns the run to work and re-evaluates it when more evidence is available.",
-                "Package completion issue: correct the named evidence or the instruction package. Forge re-evaluates the retained run automatically.",
-                "Continuity issue: read the exact detail and use its Open Provider or Open Project Runs action.",
-                "Policy violation: inspect Rune Forge and Events & Evidence, correct the named policy condition, then retry when allowed.",
+                "Provider issue: keep LM Studio open with a model loaded, then choose Connect and Check.",
+                "Instruction issue: correct or replace the named package in Projects, then ask the model to query Forge again.",
+                "Continuity issue: preserve the handoff ID and inspect Provider plus Events & Evidence.",
+                "Policy violation: CLU tells the model which policy was violated and supplies the applicable policy; inspect the per-project log in Rune Forge.",
             ],
             recovery: [
-                "Do not delete or duplicate an unsettled run to clear a warning. Retry or reconcile the existing durable identity.",
-                "If the same issue remains, export Diagnostics and preserve the displayed run/event identifiers.",
+                "Do not delete continuity data while a handoff is being resumed.",
+                "If the same issue remains, export Diagnostics and preserve the displayed project, handoff, and event identifiers.",
             ],
             destinations: [
-                (.projects, "Open Project Runs"),
+                (.provider, "Open Provider"),
                 (.evidence, "Open Events & Evidence"),
             ]
         ),
@@ -604,7 +598,7 @@ private struct GuidedSetupWizardView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Guided Setup")
                         .font(.title2.bold())
-                    Text("Set up, start, monitor, and recover an automated project run")
+                    Text("Set up Forge, work in LM Studio, and monitor policy and continuity")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -880,31 +874,25 @@ private struct GuidedSetupWizardView: View {
                 ? ("Ready to review", "The setup prerequisites are present.", "checkmark.circle.fill", .green)
                 : ("Waiting", "Complete the earlier setup steps first.", "clock", .secondary)
         case .start:
-            if let state = snapshot.activeRunState {
+            if snapshot.projectTotalPackages > 0 && providerReady {
                 return (
-                    "Started",
-                    "The current managed task reports "
-                        + OperatorRunStatePresentation.displayName(state) + ".",
-                    "play.circle.fill",
+                    "Ready in LM Studio",
+                    "Open a normal LM Studio chat and call get_forge_status.",
+                    "play.circle",
                     .green
                 )
             }
-            if snapshot.projectTotalPackages > 0 && providerReady {
-                return ("Ready to start", "Choose ordered or direct launch.", "play.circle", .accentColor)
-            }
             return ("Waiting", "Provider, project, and instructions must be ready.", "clock", .secondary)
         case .monitor:
-            if let state = snapshot.activeRunState {
-                return (needsAttention ? "Action required" : "Monitoring",
-                        "The current task reports "
-                            + OperatorRunStatePresentation.displayName(state) + ".",
-                        needsAttention ? "exclamationmark.triangle.fill" : "waveform.path.ecg",
-                        needsAttention ? .orange : .green)
-            }
-            return ("Ready", "Dashboard will populate when a managed task starts.", "gauge.with.dots.needle.67percent", .secondary)
+            return (
+                needsAttention ? "Action required" : "Automatic",
+                "CLU governance and continuity operate while you work in LM Studio.",
+                needsAttention ? "exclamationmark.triangle.fill" : "waveform.path.ecg",
+                needsAttention ? .orange : .green
+            )
         case .recover:
             if needsAttention {
-                return ("Action required", "A run, package, or continuity item needs attention.", "exclamationmark.triangle.fill", .orange)
+                return ("Action required", "A provider, package, policy, or continuity item needs attention.", "exclamationmark.triangle.fill", .orange)
             }
             return ("No current issue", "Forge has not reported an active blocking condition.", "checkmark.circle.fill", .green)
         }

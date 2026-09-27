@@ -1031,6 +1031,7 @@ final class CoreTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(tools.count, 10)
         let names = tools.compactMap { $0["name"] as? String }
         XCTAssertTrue(names.contains("forge_status"))
+        XCTAssertTrue(names.contains("get_forge_status"))
         XCTAssertTrue(names.contains("agent_run_start"))
         XCTAssertTrue(names.contains("pdf_write"))
     }
@@ -1051,6 +1052,58 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(result?["isError"] as? Bool, false)
         let content = result?["content"] as? [[String: Any]]
         XCTAssertNotNil(content?.first?["text"] as? String)
+    }
+
+    func testGetForgeStatusAcceptsResumeBootstrapArgument() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let result = try app.tools.call(
+            name: "get_forge_status",
+            arguments: ["resume": true],
+            clientID: ClientID("status-resume")
+        )
+        XCTAssertTrue(result.ok)
+        XCTAssertNotNil(result.payload["continuity"])
+        let resume = result.payload["resume"] as? [String: Any]
+        XCTAssertEqual(resume?["found"] as? Bool, false)
+    }
+
+    func testGetForgeStatusReturnsRegisteredProjectAndQueryLocationsWithoutRun() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let root = tempHome.appendingPathComponent("ordinary-lmstudio-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let projectID = UUID()
+        _ = try app.projectContexts.registerProjectUnchecked(
+            descriptor: ProjectMemoryDescriptor(
+                id: projectID.uuidString.lowercased(),
+                displayName: "Ordinary LM Studio Project",
+                repositoryIdentity: nil,
+                aliases: []
+            ),
+            canonicalRoot: root
+        )
+
+        let result = try app.tools.call(
+            name: "get_forge_status",
+            arguments: ["project_id": projectID.uuidString.lowercased()],
+            clientID: ClientID("ordinary-lmstudio-status")
+        )
+
+        XCTAssertTrue(result.ok)
+        let projects = try XCTUnwrap(result.payload["projects"] as? [[String: Any]])
+        XCTAssertEqual(projects.count, 1)
+        XCTAssertEqual(projects[0]["project_id"] as? String, projectID.uuidString.lowercased())
+        let project = try XCTUnwrap(result.payload["project"] as? [String: Any])
+        XCTAssertEqual(project["canonical_root"] as? String, root.path)
+        let locations = try XCTUnwrap(result.payload["locations"] as? [String: String])
+        XCTAssertEqual(locations["project_files"], root.path)
+        XCTAssertEqual(locations["instruction_store"], app.paths.instructionPackageStoreDir.path)
+        XCTAssertTrue(locations["continuity_store"]?.contains(projectID.uuidString.lowercased()) == true)
+        let tools = try XCTUnwrap(result.payload["query_tools"] as? [String: [String]])
+        XCTAssertEqual(tools["instructions"], ["instruction_catalog", "instruction_read"])
+        XCTAssertTrue(tools["project_files"]?.contains("fs_read") == true)
+        XCTAssertTrue(tools["continuity"]?.contains("context_get") == true)
     }
 
     // MARK: - JSON / domain

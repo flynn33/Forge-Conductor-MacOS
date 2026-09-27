@@ -370,20 +370,20 @@ final class ProviderViewModel: ObservableObject {
             if operation.providerID == .lmStudio,
                operation.phase != .removed {
                 do {
-                    let result = try await client.prepareProvider()
+                    let result = try await client.prepareProviderWithoutResumingRuns()
                     try Task.checkCancellation()
                     preparation = result
                     apply(result.configuration)
                     provider = result.provider.map(OperatorProvider.init)
                     if result.state == .ready {
-                        noticeMessage = "LM Studio and the selected tool-capable model are ready for managed tasks. \(result.detail) \(operation.detail ?? "LM Studio integration updated.") Retained tasks resumed after host activation completed."
+                        noticeMessage = "LM Studio and the selected tool-capable model are ready for Forge MCP and automatic continuity. \(result.detail) \(operation.detail ?? "LM Studio integration updated.")"
                     } else {
                         errorMessage = result.detail
                     }
                 } catch is CancellationError {
                     return
                 } catch {
-                    errorMessage = "LM Studio was deployed, but retained tasks could not be resumed: \(error.localizedDescription)"
+                    errorMessage = "LM Studio integration was updated, but its connection could not be verified: \(error.localizedDescription)"
                 }
             }
         case .awaitingUserAction:
@@ -575,38 +575,9 @@ final class ProviderViewModel: ObservableObject {
     }
 
     func runContractProbe() {
-        probe(.contract)
-    }
-
-    private func probe(_ mode: OperatorProviderProbeMode) {
-        guard !isBusy, !hasUnsavedChanges else { return }
-        loadTask?.cancel()
-        probeTask?.cancel()
-        isLoading = false
-        isProbing = true
-        errorMessage = nil
-        noticeMessage = nil
-        probeTask = Task { [weak self] in
-            guard let self else { return }
-            defer { isProbing = false }
-            do {
-                provider = try await client.probeProvider(
-                    adapterID: ManagerNode.nativeSessionHostAdapterID,
-                    mode: mode
-                )
-                try Task.checkCancellation()
-                noticeMessage = mode == .contract
-                    ? "The managed provider contract is available."
-                    : "The configured provider and model are reachable."
-            } catch is CancellationError {
-                return
-            } catch {
-                let probeError = error.localizedDescription
-                if let refreshed = try? await client.snapshot(limit: 100).provider {
-                    provider = refreshed
-                }
-                errorMessage = probeError
-            }
-        }
+        // Advanced verification uses the same preparation path as every other
+        // LM Studio action so model-selection failures retain their typed,
+        // actionable recovery instead of being flattened into a probe error.
+        connectAndCheck()
     }
 }

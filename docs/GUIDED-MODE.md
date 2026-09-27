@@ -23,8 +23,8 @@ tab. Guides describe:
 - advanced details and related guides.
 
 The first-use setup experience and the persistent contextual guides have
-different jobs. **Guided Setup** is the ordered project-run wizard; question-
-mark actions explain only the current view or control.
+different jobs. **Guided Setup** prepares Forge for normal LM Studio chat work;
+question-mark actions explain only the current view or control.
 
 ## Guided Setup wizard
 
@@ -42,17 +42,18 @@ order:
    reload, activation, or trust action reported by the host.
 3. **Register the project** — select the exact repository; normal registration
    authorizes that folder without a separate parent-root setup step.
-4. **Add and order instructions** — import packages, review their capabilities
-   and package-owned completion requirements, and arrange execution order.
-5. **Review automation behavior** — confirm tools, automatic completion checks,
-   failure handling, and continuity behavior.
-6. **Start the automated run** — launch the ordered queue or one direct task
-   from Projects.
-7. **Monitor the run** — use Dashboard for live state, Projects → Run Details for exact run
-   control, Continuity for rollover, Rune Forge for policy observations, and
-   Events & Evidence for durable audit detail.
-8. **Resolve issues and continue** — follow the current issue's owning-view
-   action without deleting or duplicating the durable run.
+4. **Add and order instructions** — import one or more packages and drag them
+   into the priority order the model should follow.
+5. **Review project inputs** — confirm provider readiness, instruction order,
+   and Development Policy priority in Rune Forge.
+6. **Start in LM Studio** — open a normal LM Studio chat, call
+   `get_forge_status`, then give the model the task.
+7. **Monitor governance and continuity** — use Dashboard for the automatic
+   rollover countdown, Rune Forge for CLU policy observations/log export, and
+   Events & Evidence for durable audit detail. Continuity itself only manages
+   project IDs and project-scoped deletion.
+8. **Resolve issues and continue** — follow the current provider, package,
+   policy, or continuity action without switching to Managed Run.
 
 Every step states its readiness condition, ordinary actions, recovery guidance,
 and links to the owning view. **Next required step** uses current Manager,
@@ -67,12 +68,10 @@ configuration and remain part of the bound instruction artifact.
 Only one provider can be selected. Desktop-host activation may transactionally
 install or update Forge-owned plugin, hook, skill, and MCP files, but the wizard
 does not approve host permissions. Claude and Codex can require a user trust
-review; any remaining host action stays visible in Provider. LM Studio uses a
-Forge-managed session, while desktop providers retain their model and
-conversation and exchange orchestration context at the hook boundary. A
-desktop provider with unfinished tasks cannot be replaced, repaired, or removed
-until those tasks are finished or cancelled through
-Projects → Run Details.
+review; any remaining host action stays visible in Provider. LM Studio work
+begins and remains in the ordinary LM Studio interface. Forge uses the supported
+stateful chat API only for automatic successor creation after a durable handoff;
+it does not use private GUI automation.
 
 Grok Build remains visible in Provider but is non-selectable in 0.15.0. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
@@ -88,9 +87,9 @@ specific guides are available for:
 
 - adding and ordering instruction packages;
 - relinking, resetting, and clearing project content;
-- Start Task and task-capability selection;
-- automatic completion checks;
-- save-progress and fresh-session continuity actions;
+- provider connection and project selection;
+- Development Policy source ordering and log export;
+- automatic continuity and project-ID data management;
 - runtime jobs;
 - provider credentials.
 
@@ -100,22 +99,17 @@ product controls rather than hidden guide side effects.
 
 ## State-aware guidance
 
-Project Runs guidance distinguishes loading, missing project, provider action, and
-task-ready states. Continuity explains whether operations exist and the state of
-the selected operation. Provider guidance distinguishes the durable selection,
+Project guidance distinguishes loading, missing project, provider action, and
+LM Studio-ready states. Continuity explains project-ID copying and deletion;
+it exposes no manual checkpoint or rollover action. Provider guidance distinguishes the durable selection,
 provisioning operation, remaining desktop-host action, verified deployment,
 repair/removal availability, and LM Studio's unsaved or unverified advanced
 connection settings. Runtimes guidance reports the selected job state or that
 no runtime job needs attention.
 
-Dashboard guidance explains the bounded, coalesced Managed Activity projection,
-including its current inferred instruction step, durable delivered count,
-rolling durable managed-response/tool/orchestration/project-policy rows,
-authenticated exact run/project/generation boundary, explicit source
-availability, five-second view-owned refresh, 100-row presentation bound,
-128-assistant plus 128-tool per-run retention, 2 KiB durable event, 8 KiB
-presentation, and 4 MiB streamed-response bounds, and the explicit boundary
-that it is not token streaming or a second full transcript.
+Dashboard guidance explains the bounded, coalesced Forge Activity projection
+and the visible automatic LM Studio successor countdown. The activity view is
+not token streaming or a second full transcript.
 Its provider step and Dashboard card use the same selected-provider projection:
 Claude or Codex can report **HOST READY** independently of LM Studio health only
 when ready preparation, the matching selection revision, and a verified receipt

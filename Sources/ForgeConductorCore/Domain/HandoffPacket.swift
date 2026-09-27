@@ -188,7 +188,7 @@ public struct HandoffPacket: Sendable, Equatable {
                 "seed": resumeSeed.isEmpty ? defaultResumeSeed() : resumeSeed,
                 "custom": resumeSeedIsCustom,
                 "instructions": [
-                    "Call context_get if you need the full packet again",
+                    "Call get_forge_status with resume=true to reload the handoff",
                     "Pass this handoff id to session_checkpoint/session_handoff when continuing it",
                     "Reattach open agents with agent_run_status(session_id) or complete and restart",
                     "Update memory/current-task.md via session_checkpoint as you progress",
@@ -222,7 +222,7 @@ public struct HandoffPacket: Sendable, Equatable {
             lines.append("Summary: \(narrative.prefix(500))")
         }
         lines.append("Continue this packet with handoff_id: \(id) on later checkpoints or handoffs.")
-        lines.append("Call context_get for the full structured packet, then continue the task.")
+        lines.append("Call get_forge_status with resume=true, then continue the task.")
         return lines.joined(separator: "\n")
     }
 

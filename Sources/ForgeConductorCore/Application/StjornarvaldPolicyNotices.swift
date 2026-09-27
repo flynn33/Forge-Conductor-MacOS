@@ -54,8 +54,11 @@ public enum StjornarvaldPolicyNoticeFormatter {
         notices.prefix(maximumNoticeCount).map { notice in
             let source = "\(notice.ruleReference.revision) / \(redacted(notice.ruleReference.path)) / " +
                 notice.ruleReference.locator
+            let policy = notice.policyStatement.map {
+                "Policy: \(bounded($0, bytes: 4_096)). "
+            } ?? ""
             return "- \(notice.violationID): \(bounded(notice.summary, bytes: 1_024)). " +
-                "Rule source: \(bounded(source, bytes: 1_024)). Suggested correction: " +
+                policy + "Rule source: \(bounded(source, bytes: 1_024)). Suggested correction: " +
                 "\(bounded(notice.suggestedCorrection, bytes: 1_024)). " +
                 "Confidence: \(String(format: "%.2f", notice.confidence))."
         }

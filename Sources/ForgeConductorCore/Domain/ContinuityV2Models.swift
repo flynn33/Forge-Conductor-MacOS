@@ -957,6 +957,7 @@ public struct ContinuityCommand: Codable, Sendable, Equatable {
 
 public enum ContinuityHistoryClearScope: String, Codable, Sendable, CaseIterable {
     case operation
+    case project
     case allSettled = "all_settled"
 }
 
@@ -1041,6 +1042,7 @@ public struct ContinuityHistoryClearRequest: Codable, Sendable, Equatable {
 public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
     public let scope: ContinuityHistoryClearScope
     public let requestedOperationID: UUID?
+    public let requestedProjectID: ProjectID?
     public let clearedOperationCount: Int
     public let clearedProjectCount: Int
     public let deletedRecordCount: Int
@@ -1050,6 +1052,7 @@ public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
     public init(
         scope: ContinuityHistoryClearScope,
         requestedOperationID: UUID?,
+        requestedProjectID: ProjectID? = nil,
         clearedOperationCount: Int,
         clearedProjectCount: Int,
         deletedRecordCount: Int,
@@ -1058,6 +1061,7 @@ public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
     ) {
         self.scope = scope
         self.requestedOperationID = requestedOperationID
+        self.requestedProjectID = requestedProjectID
         self.clearedOperationCount = clearedOperationCount
         self.clearedProjectCount = clearedProjectCount
         self.deletedRecordCount = deletedRecordCount
@@ -1068,6 +1072,7 @@ public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey {
         case scope
         case requestedOperationID = "requested_operation_id"
+        case requestedProjectID = "requested_project_id"
         case clearedOperationCount = "cleared_operation_count"
         case clearedProjectCount = "cleared_project_count"
         case deletedRecordCount = "deleted_record_count"
@@ -1091,6 +1096,18 @@ public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
         } else {
             requestedOperationID = nil
         }
+        if let value = try values.decodeIfPresent(String.self, forKey: .requestedProjectID) {
+            guard let identifier = UUID(uuidString: value) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .requestedProjectID,
+                    in: values,
+                    debugDescription: "requested_project_id must be a UUID"
+                )
+            }
+            requestedProjectID = ProjectID(identifier)
+        } else {
+            requestedProjectID = nil
+        }
         clearedOperationCount = try values.decode(Int.self, forKey: .clearedOperationCount)
         clearedProjectCount = try values.decode(Int.self, forKey: .clearedProjectCount)
         deletedRecordCount = try values.decode(Int.self, forKey: .deletedRecordCount)
@@ -1104,6 +1121,10 @@ public struct ContinuityHistoryClearReceipt: Codable, Sendable, Equatable {
         try values.encodeIfPresent(
             requestedOperationID?.uuidString.lowercased(),
             forKey: .requestedOperationID
+        )
+        try values.encodeIfPresent(
+            requestedProjectID?.description,
+            forKey: .requestedProjectID
         )
         try values.encode(clearedOperationCount, forKey: .clearedOperationCount)
         try values.encode(clearedProjectCount, forKey: .clearedProjectCount)

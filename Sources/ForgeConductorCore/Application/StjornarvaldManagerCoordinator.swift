@@ -478,6 +478,15 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
         return source
     }
 
+    public func reorderSources(
+        sourceIDs: [PolicySourceID]
+    ) throws -> [DevelopmentPolicySource] {
+        guard let sourceCatalog else {
+            throw StjornarvaldPolicySourceError.unavailable("manager source catalog unavailable")
+        }
+        return try sourceCatalog.reorder(sourceIDs: sourceIDs)
+    }
+
     public func submitObservations(
         _ observations: [DevelopmentObservation]
     ) -> StjornarvaldObservationReceiptBatch {

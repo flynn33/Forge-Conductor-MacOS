@@ -78,6 +78,7 @@ public enum ProductionToolReplayCatalog {
 
     public static let classifications: [String: ToolReplayClass] = [
         "forge_status": .readOnly,
+        "get_forge_status": .readOnly,
         "agent_list": .readOnly,
         "agent_get": .readOnly,
         "agent_context": .readOnly,

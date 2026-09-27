@@ -1,20 +1,15 @@
 // ContinuityViewModel.swift
-// Main-actor continuity and budget projection; all transitions remain manager-owned.
+// Project continuity identity projection with explicit project-scoped deletion.
 
 import Foundation
 import ForgeConductorCore
 
 @MainActor
 final class ContinuityViewModel: ObservableObject {
-    @Published private(set) var operations: [OperatorContinuity] = []
-    @Published private(set) var readiness: [ManagerContinuityReadiness] = []
-    @Published private(set) var runs: [OperatorRun] = []
-    @Published private(set) var events: [OperatorEvent] = []
-    @Published var selectedOperationID: String?
-    @Published var selectedRunID: String?
+    @Published private(set) var projectIDs: [String] = []
+    @Published var selectedProjectID: String?
     @Published private(set) var isLoading = false
-    @Published private(set) var controlInFlight: OperatorRunControlAction?
-    @Published private(set) var historyClearInFlight: ContinuityHistoryClearScope?
+    @Published private(set) var deletingProjectID: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var commandErrorMessage: String?
     @Published private(set) var notice: String?
@@ -26,95 +21,29 @@ final class ContinuityViewModel: ObservableObject {
         self.client = client
     }
 
-    var selectedOperation: OperatorContinuity? {
-        operations.first { $0.operationID == selectedOperationID }
-    }
-
-    var selectedRun: OperatorRun? {
-        runs.first { $0.runID == selectedRunID }
-    }
-
-    var selectedReadiness: ManagerContinuityReadiness? {
-        if let selectedRunID,
-           let match = readiness.first(where: { $0.runID?.description == selectedRunID }) {
-            return match
-        }
-        return readiness.first(where: { $0.runID == nil }) ?? readiness.first
-    }
-
-    var selectedEvents: [OperatorEvent] {
-        guard let operation = selectedOperation else { return [] }
-        return Array(events.filter { event in
-            event.operationID == operation.operationID
-                || (event.operationID == nil && event.runID == operation.runID)
-        }.prefix(50))
-    }
-
-    var canRequestCheckpoint: Bool { canRequest(.checkpoint) }
-    var canRequestRollover: Bool { canRequest(.rollover) }
-    var canClearSelectedHistory: Bool {
-        guard let selectedOperation else { return false }
-        return !isLoading && controlInFlight == nil && historyClearInFlight == nil
-            && isOldHistory(selectedOperation)
-    }
-    var canClearAllOldHistory: Bool {
-        !isLoading && controlInFlight == nil && historyClearInFlight == nil
-            && operations.contains(where: isOldHistory)
-    }
-
-    var selectedHistoryBlocker: String? {
-        guard let operation = selectedOperation, !isOldHistory(operation) else { return nil }
-        let runState = runs.first(where: { $0.runID == operation.runID })?.state ?? "missing"
-        return "Operation \(operation.operationID) is not old: continuity state "
-            + "\(operation.controlState ?? operation.state), task state \(runState). "
-            + "Open Run Details and finish or cancel that task; Refresh will then make it clearable."
-    }
-
-    var eligibilityMessage: String {
-        if let action = controlInFlight {
-            return "The manager is persisting the \(action.rawValue) request."
-        }
-        if isLoading {
-            return "Refreshing the manager's authoritative run state."
-        }
-        if let reason = selectedRunEligibilityIssue {
-            return reason
-        }
-        return "Eligible for an administrative continuity request. The manager will still verify the exact accepted session, current persisted budget observation, idle execution state, and action epoch before committing it."
+    var canDeleteSelectedProject: Bool {
+        selectedProjectID != nil && !isLoading && deletingProjectID == nil
     }
 
     func load() {
         loadTask?.cancel()
         isLoading = true
         errorMessage = nil
-        commandErrorMessage = nil
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let snapshot = try await client.snapshot(limit: 100)
                 try Task.checkCancellation()
-                let loadedOperations = snapshot.continuityOperations
-                let loadedRuns = snapshot.runs
-                operations = loadedOperations
-                readiness = snapshot.continuityReadiness
-                runs = loadedRuns
-                events = Array(snapshot.events.prefix(100))
-                let priorSelection = selectedOperationID
-                if priorSelection == nil
-                    || !loadedOperations.contains(where: { $0.operationID == priorSelection }) {
-                    selectedOperationID = loadedOperations.first?.operationID
-                }
-                let priorRunSelection = selectedRunID
-                if priorRunSelection == nil
-                    || !loadedRuns.contains(where: { $0.runID == priorRunSelection }) {
-                    let selectedOperationRunID = loadedOperations.first(where: {
-                        $0.operationID == self.selectedOperationID
-                    })?.runID
-                    selectedRunID = loadedRuns.first(where: {
-                        $0.runID == selectedOperationRunID
-                    })?.runID
-                        ?? loadedRuns.first(where: { Self.eligibilityIssue(for: $0) == nil })?.runID
-                        ?? loadedRuns.first?.runID
+                let loadedProjectIDs = snapshot.projects
+                    .filter { $0.continuity?.state != "unavailable" }
+                    .map { $0.projectID.lowercased() }
+                    .sorted()
+                projectIDs = loadedProjectIDs
+                if let selectedProjectID,
+                   loadedProjectIDs.contains(selectedProjectID) {
+                    self.selectedProjectID = selectedProjectID
+                } else {
+                    selectedProjectID = loadedProjectIDs.first
                 }
             } catch is CancellationError {
                 return
@@ -125,152 +54,40 @@ final class ContinuityViewModel: ObservableObject {
         }
     }
 
-    func selectRun(forOperationID operationID: String?) {
-        guard let operationID,
-              let runID = operations.first(where: { $0.operationID == operationID })?.runID,
-              runs.contains(where: { $0.runID == runID }) else {
+    func deleteSelectedProjectContinuity() {
+        guard canDeleteSelectedProject,
+              let selectedProjectID,
+              let identifier = UUID(uuidString: selectedProjectID) else {
+            commandErrorMessage = "The selected continuity project has an invalid identity."
             return
         }
-        selectedRunID = runID
-    }
 
-    func requestCheckpoint() {
-        request(.checkpoint)
-    }
-
-    func requestRollover() {
-        request(.rollover)
-    }
-
-    func clearSelectedHistory() {
-        guard canClearSelectedHistory,
-              let operation = selectedOperation,
-              let operationID = UUID(uuidString: operation.operationID),
-              let projectID = UUID(uuidString: operation.projectID),
-              operation.projectGeneration > 0 else {
-            commandErrorMessage = "Selected continuity history has an invalid stored identity."
-            return
-        }
-        clearHistory(
-            ContinuityHistoryClearRequest(
-                scope: .operation,
-                operationID: operationID,
-                projectID: ProjectID(projectID),
-                projectGeneration: ProjectGeneration(operation.projectGeneration)
-            )
-        )
-    }
-
-    func clearAllOldHistory() {
-        guard canClearAllOldHistory else { return }
-        clearHistory(ContinuityHistoryClearRequest(scope: .allSettled))
-    }
-
-    private func canRequest(_ action: OperatorRunControlAction) -> Bool {
-        guard action == .checkpoint || action == .rollover else { return false }
-        return !isLoading && controlInFlight == nil && selectedRunEligibilityIssue == nil
-    }
-
-    private var selectedRunEligibilityIssue: String? {
-        guard let selectedRun else {
-            return "Select a managed run before requesting continuity."
-        }
-        return Self.eligibilityIssue(for: selectedRun)
-    }
-
-    private static func eligibilityIssue(for run: OperatorRun) -> String? {
-        guard run.continuityMode == "managed_autonomous"
-                || run.continuityMode == "managedAutonomous" else {
-            return "Administrative checkpoint and rollover require managed-autonomous continuity."
-        }
-        guard run.state == "running" else {
-            return "Run \(run.runID) must be in the running state; the manager currently reports \(run.state)."
-        }
-        guard run.activeSessionID != nil else {
-            return "The manager has not published an accepted active session for this run."
-        }
-        guard run.activeOperationID == nil else {
-            return "A continuity operation is already active for this run."
-        }
-        guard !run.continuationPending else {
-            return "Automatic continuation is already pending for this run."
-        }
-        return nil
-    }
-
-    private func request(_ action: OperatorRunControlAction) {
-        guard let run = selectedRun, canRequest(action) else { return }
-        controlInFlight = action
+        deletingProjectID = selectedProjectID
         commandErrorMessage = nil
         notice = nil
         Task { [weak self] in
             guard let self else { return }
             do {
-                let updated = try await client.controlRun(runID: run.runID, action: action)
-                guard updated.runID == run.runID else {
+                let request = ContinuityHistoryClearRequest(
+                    scope: .project,
+                    projectID: ProjectID(identifier)
+                )
+                let receipt = try await client.clearContinuityHistory(request)
+                guard receipt.scope == .project,
+                      receipt.requestedProjectID == request.projectID else {
                     throw OperatorManagerClientError.invalidPayload(
-                        "manager returned run \(updated.runID) for command targeting \(run.runID)"
+                        "manager returned a continuity deletion receipt for a different project"
                     )
                 }
-                runs.removeAll { $0.runID == updated.runID }
-                runs.insert(updated, at: 0)
-                selectedRunID = updated.runID
-                notice = action == .checkpoint
-                    ? "Checkpoint request persisted by the manager."
-                    : "Early rollover request persisted by the manager."
+                projectIDs.removeAll { $0 == selectedProjectID }
+                self.selectedProjectID = projectIDs.first
+                notice = receipt.clearedOperationCount == 0
+                    ? "This project's continuity data was already clear."
+                    : "Deleted continuity data for project \(selectedProjectID)."
             } catch {
                 commandErrorMessage = error.localizedDescription
             }
-            controlInFlight = nil
-            if commandErrorMessage == nil {
-                load()
-            }
-        }
-    }
-
-    private static func isSettledHistory(_ operation: OperatorContinuity) -> Bool {
-        ["completed", "failed", "cancelled", "sealed", "predecessor_sealed"]
-            .contains(operation.state)
-    }
-
-    private func isOldHistory(_ operation: OperatorContinuity) -> Bool {
-        if Self.isSettledHistory(operation) { return true }
-        guard let run = runs.first(where: { $0.runID == operation.runID }) else {
-            return true
-        }
-        return ["completed", "cancelled", "failed_terminal"].contains(run.state)
-    }
-
-    private func clearHistory(_ request: ContinuityHistoryClearRequest) {
-        historyClearInFlight = request.scope
-        commandErrorMessage = nil
-        notice = nil
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let receipt = try await client.clearContinuityHistory(request)
-                if request.scope == .operation, let operationID = request.operationID {
-                    operations.removeAll {
-                        $0.operationID.caseInsensitiveCompare(
-                            operationID.uuidString
-                        ) == .orderedSame
-                    }
-                } else {
-                    operations.removeAll(where: isOldHistory)
-                }
-                if receipt.retainedOperationCount > 0 {
-                    notice = "Cleared \(receipt.clearedOperationCount) old continuity entries. \(receipt.retainedOperationCount) live entries were retained."
-                } else if receipt.clearedOperationCount == 0 {
-                    notice = "The selected continuity history was already clear."
-                } else {
-                    notice = receipt.scope == .operation
-                        ? "Cleared the selected continuity history and derived cache."
-                        : "Cleared all old continuity history and derived caches."
-                }
-            } catch {
-                commandErrorMessage = error.localizedDescription
-            }
-            historyClearInFlight = nil
+            deletingProjectID = nil
             if commandErrorMessage == nil {
                 load()
             }

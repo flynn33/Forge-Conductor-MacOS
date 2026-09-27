@@ -2116,6 +2116,83 @@ public actor LMStudioRESTClient {
         return turn
     }
 
+    /// Creates a stored LM Studio native chat thread and lets the installed Forge
+    /// MCP integration resolve the exact resume-ready handoff. This is the
+    /// supported interactive-session boundary; it does not automate the GUI.
+    public func createInteractiveSuccessor(
+        handoffID: String,
+        modelKey: String? = nil,
+        integrationID: String = "mcp/forge-conductor"
+    ) async throws -> String {
+        try LMStudioProviderConfiguration.validateBoundedString(
+            handoffID, field: "handoff ID", maximumBytes: 64
+        )
+        guard UUID(uuidString: handoffID) != nil else {
+            throw LMStudioProviderError.invalidConfiguration("handoff ID is not a UUID")
+        }
+        try LMStudioProviderConfiguration.validateBoundedString(
+            integrationID, field: "integration ID", maximumBytes: 128
+        )
+        let model = try await resolvedModel(modelKey)
+        let payload: [String: Any] = [
+            "model": model,
+            "input": "get_forge_status\nresume=true",
+            "integrations": [integrationID],
+            "store": true,
+            "stream": false,
+        ]
+        let body = try JSONSerialization.data(
+            withJSONObject: payload,
+            options: [.sortedKeys, .withoutEscapingSlashes]
+        )
+        guard body.count <= configuration.maximumRequestBytes else {
+            throw LMStudioProviderError.limitExceeded("interactive successor request body")
+        }
+        var request = URLRequest(url: try configuration.endpoint("api/v1/chat"))
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.timeoutInterval = min(configuration.totalTimeoutSeconds + 5, 1_200)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(
+            JSONSupport.sha256Hex("interactive-successor:\(handoffID)"),
+            forHTTPHeaderField: "X-Forge-Operation-Key"
+        )
+        try await authorize(&request)
+        let runner = LMStudioBoundedRequest(
+            configuration: sessionConfiguration,
+            providerConfiguration: configuration,
+            mode: .data(maximumBytes: configuration.maximumResponseBytes)
+        )
+        guard case .data(let data, _) = try await runner.run(request),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let responseID = object["response_id"] as? String else {
+            throw LMStudioProviderError.malformedResponse(
+                "interactive successor did not return a stored response ID"
+            )
+        }
+        try LMStudioProviderIdentifier.validate(responseID)
+        guard Self.containsHandoffID(object, handoffID: handoffID) else {
+            throw LMStudioProviderError.malformedResponse(
+                "interactive successor did not acknowledge the saved handoff"
+            )
+        }
+        return responseID
+    }
+
+    private static func containsHandoffID(_ value: Any, handoffID: String) -> Bool {
+        if let string = value as? String {
+            return string == handoffID || string.contains(handoffID)
+        }
+        if let values = value as? [Any] {
+            return values.contains { containsHandoffID($0, handoffID: handoffID) }
+        }
+        if let values = value as? [String: Any] {
+            return values.values.contains { containsHandoffID($0, handoffID: handoffID) }
+        }
+        return false
+    }
+
     /// Uses only an already observed capability value. Expiry never triggers a POST.
     public func createRoot(_ request: LMStudioRootRequest,
                            observedFingerprint: String) async throws -> LMStudioResponseTurn {
@@ -5066,22 +5143,38 @@ public actor LMStudioManagedSessionHostAdapter: SessionHostAdapter, SessionHostA
     public nonisolated let version = ForgeNativeSessionHostPlugin.version
     public nonisolated let transport: any LMStudioManagedTransporting
     public nonisolated let v2Adapter: LMStudioManagedSessionHostAdapterV2
+    private let interactiveAdapter: ForgeNativeSessionHostAdapter?
 
     public init(
         storageDirectory: URL,
-        transport: any LMStudioManagedTransporting
+        transport: any LMStudioManagedTransporting,
+        interactiveTransport: (any NativeSessionTransport)? = nil
     ) throws {
         self.transport = transport
         v2Adapter = try LMStudioManagedSessionHostAdapterV2(
             storageDirectory: storageDirectory, transport: transport
         )
+        interactiveAdapter = try interactiveTransport.map {
+            try ForgeNativeSessionHostAdapter(
+                storageDirectory: storageDirectory.appendingPathComponent(
+                    "interactive", isDirectory: true
+                ),
+                transport: $0
+            )
+        }
     }
 
     public func capabilities() async throws -> HostCapabilities {
         _ = try await transport.probe()
+        guard interactiveAdapter != nil else {
+            return HostCapabilities(
+                create: false, bootstrap: false, usageReporting: true,
+                resume: false, idempotency: true, queryByIdempotencyKey: true
+            )
+        }
         return HostCapabilities(
-            create: false, bootstrap: false, usageReporting: true,
-            resume: false, idempotency: true, queryByIdempotencyKey: true
+            create: true, bootstrap: true, usageReporting: true,
+            resume: true, idempotency: true, queryByIdempotencyKey: true
         )
     }
 
@@ -5120,22 +5213,33 @@ public actor LMStudioManagedSessionHostAdapter: SessionHostAdapter, SessionHostA
     }
 
     public func createSession(_ request: SessionCreationRequest) async throws -> HostSession {
-        throw ContinuityRunError.hostCapabilityUnavailable
+        guard let interactiveAdapter else { throw ContinuityRunError.hostCapabilityUnavailable }
+        return try await interactiveAdapter.createSession(request)
     }
 
-    public func session(forIdempotencyKey key: String) async throws -> HostSession? { nil }
+    public func session(forIdempotencyKey key: String) async throws -> HostSession? {
+        guard let interactiveAdapter else { return nil }
+        return try await interactiveAdapter.session(forIdempotencyKey: key)
+    }
 
     public func bootstrap(_ session: HostSession, handoff: ContinuityHandoff) async throws {
-        throw ContinuityRunError.hostCapabilityUnavailable
+        guard let interactiveAdapter else { throw ContinuityRunError.hostCapabilityUnavailable }
+        try await interactiveAdapter.bootstrap(session, handoff: handoff)
     }
 
     public func awaitAcknowledgement(
         session: HostSession, handoffID: String, timeout: Duration
     ) async throws -> HandoffAcknowledgement {
-        throw ContinuityRunError.hostCapabilityUnavailable
+        guard let interactiveAdapter else { throw ContinuityRunError.hostCapabilityUnavailable }
+        return try await interactiveAdapter.awaitAcknowledgement(
+            session: session,
+            handoffID: handoffID,
+            timeout: timeout
+        )
     }
 
     public func cancel(operationID: String) async {
+        await interactiveAdapter?.cancel(operationID: operationID)
         await transport.cancel(operationID: operationID)
     }
 }
@@ -5200,6 +5304,58 @@ public protocol NativeSessionTransport: Sendable {
     ) async throws -> NativeTransportSession
     func bootstrap(_ request: NativeBootstrapRequest) async throws -> NativeBootstrapResponse
     func cancel(operationID: String, providerSessionID: String?) async
+}
+
+/// Transport for ordinary LM Studio continuity. The bootstrap call creates a
+/// stored native chat through the documented API and asks the installed Forge
+/// MCP integration to load the exact resume-ready handoff.
+public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
+    private let client: LMStudioRESTClient
+    private var cancelledOperations: Set<String> = []
+
+    public init(client: LMStudioRESTClient) { self.client = client }
+
+    public func createSession(
+        request: SessionCreationRequest,
+        deadline: ContinuousClock.Instant
+    ) async throws -> NativeTransportSession {
+        guard !cancelledOperations.contains(request.operationID) else {
+            throw NativeHostPluginError.cancelled
+        }
+        guard ContinuousClock.now < deadline else {
+            throw NativeHostPluginError.deadlineExceeded
+        }
+        let capabilities = try await client.probe()
+        return NativeTransportSession(
+            providerSessionID: "interactive-\(JSONSupport.sha256Hex(request.idempotencyKey).prefix(24))",
+            model: capabilities.modelKey
+        )
+    }
+
+    public func bootstrap(_ request: NativeBootstrapRequest) async throws
+        -> NativeBootstrapResponse {
+        guard !cancelledOperations.contains(request.operationID) else {
+            throw NativeHostPluginError.cancelled
+        }
+        guard ContinuousClock.now < request.deadline else {
+            throw NativeHostPluginError.deadlineExceeded
+        }
+        _ = try await client.createInteractiveSuccessor(handoffID: request.handoffID)
+        guard !cancelledOperations.contains(request.operationID) else {
+            throw NativeHostPluginError.cancelled
+        }
+        return NativeBootstrapResponse(chunks: [try JSONSupport.data(from: [
+            "handoff_id": request.handoffID,
+            "successor_session_id": request.successorSessionID,
+        ])])
+    }
+
+    public func cancel(operationID: String, providerSessionID: String?) async {
+        if cancelledOperations.count >= 256, let oldest = cancelledOperations.sorted().first {
+            cancelledOperations.remove(oldest)
+        }
+        cancelledOperations.insert(operationID)
+    }
 }
 
 public actor LocalLogicalSessionTransport: NativeSessionTransport {
@@ -5579,9 +5735,13 @@ public enum ForgeNativeSessionHostPlugin {
                 LMStudioConfigurationService(storageDirectory: storageDirectory)
             }
         ) { storageDirectory in
+            let transport = try transportFactory(storageDirectory)
             return try LMStudioManagedSessionHostAdapter(
                 storageDirectory: storageDirectory,
-                transport: try transportFactory(storageDirectory)
+                transport: transport,
+                interactiveTransport: LMStudioInteractiveSessionTransport(
+                    client: transport.client
+                )
             )
         }
     }

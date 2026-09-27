@@ -642,6 +642,43 @@ public final class ManagerRoutes: @unchecked Sendable {
                     "message": error.localizedDescription,
                 ])
             }
+        case ("POST", "/api/manager/stjornarvald/sources/reorder"):
+            guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "stjornarvald_request_too_large",
+                    "message": "Policy source ordering exceeds its byte bound",
+                ])
+                return
+            }
+            do {
+                let object = try JSONSupport.object(from: body)
+                guard Set(object.keys) == ["source_ids"],
+                      let rawIDs = object["source_ids"] as? [String],
+                      !rawIDs.isEmpty, rawIDs.count <= 100,
+                      Set(rawIDs).count == rawIDs.count else {
+                    throw StjornarvaldPolicySourceError.invalidRequest(
+                        "source ordering requires 1 through 100 unique source IDs"
+                    )
+                }
+                let sourceIDs = try rawIDs.map { raw -> PolicySourceID in
+                    guard let identifier = UUID(uuidString: raw) else {
+                        throw StjornarvaldPolicySourceError.invalidRequest(
+                            "source ordering contains an invalid source ID"
+                        )
+                    }
+                    return PolicySourceID(identifier)
+                }
+                http.respondJSON(
+                    connection,
+                    status: 200,
+                    object: try manager.stjornarvaldReorderSources(sourceIDs: sourceIDs)
+                )
+            } catch {
+                http.respondJSON(connection, status: 409, object: [
+                    "ok": false, "code": "invalid_stjornarvald_source_order",
+                    "message": error.localizedDescription,
+                ])
+            }
         case ("POST", "/api/manager/stjornarvald/scan"):
             guard body.count <= Self.maximumStjornarvaldMutationBodyBytes else {
                 http.respondJSON(connection, status: 413, object: [
@@ -1103,6 +1140,24 @@ public final class ManagerRoutes: @unchecked Sendable {
                 uniquingKeysWith: { receipt, _ in receipt }
             )
             http.respondJSON(connection, status: 200, object: result)
+        case ("POST", "/api/manager/cache/clear"):
+            guard target.queryItems.isEmpty, body.count <= 128 else {
+                throw AutonomyError.invalidRequest(
+                    "Cache clearing accepts one bounded operation request"
+                )
+            }
+            let object = try JSONSupport.object(from: body)
+            guard object.count == 1,
+                  Set(object.keys) == ["operation_id"],
+                  let operationValue = object["operation_id"] as? String,
+                  operationValue.utf8.count <= 36,
+                  let operationID = UUID(uuidString: operationValue) else {
+                throw AutonomyError.invalidRequest(
+                    "Cache clearing requires exactly one operation UUID"
+                )
+            }
+            let receipt = try manager.clearApplicationCache(operationID: operationID)
+            http.respondJSON(connection, status: 200, object: try receipt.asDictionary())
         case ("POST", "/api/manager/projects/remove"):
             dispatchProjectRemoval(body: body, connection: connection)
         case ("POST", "/api/manager/projects/instruction-packages"),
@@ -1799,6 +1854,20 @@ public final class ManagerRoutes: @unchecked Sendable {
                         operationID: operationID,
                         projectID: ProjectID(projectID),
                         projectGeneration: ProjectGeneration(UInt64(generation))
+                    )
+                case .project:
+                    guard object.count == 2,
+                          Set(object.keys) == ["scope", "project_id"],
+                          let projectValue = object["project_id"] as? String,
+                          projectValue.utf8.count <= 36,
+                          let projectID = UUID(uuidString: projectValue) else {
+                        throw AutonomyError.invalidRequest(
+                            "Project continuity deletion requires one exact project identity"
+                        )
+                    }
+                    request = ContinuityHistoryClearRequest(
+                        scope: .project,
+                        projectID: ProjectID(projectID)
                     )
                 case .allSettled:
                     guard object.count == 1, Set(object.keys) == ["scope"] else {

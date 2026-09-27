@@ -357,6 +357,16 @@ public final class ProjectContextService: @unchecked Sendable {
         }
     }
 
+    public func operatorProjects(
+        limit: Int = 100,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [ProjectControlRecord] {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try control.checkCancellation()
+            return try await self.repository.operatorProjects(limit: limit)
+        }
+    }
+
     func project(
         atCanonicalRoot canonicalRoot: URL,
         cancellation: ToolCallCancellation? = nil

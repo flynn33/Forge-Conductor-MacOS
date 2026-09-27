@@ -5,6 +5,7 @@ import Foundation
 import ForgeConductorCore
 
 protocol RuneForgeManagerClientProtocol: Sendable {
+    func runeForgeProjectIDs() async throws -> [String]
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot
     func runeForgeSnapshot(
         projectID: String?,
@@ -19,6 +20,9 @@ protocol RuneForgeManagerClientProtocol: Sendable {
         sourceID: PolicySourceID,
         requestID: UUID
     ) async throws -> DevelopmentPolicySource
+    func reorderRuneForgeSources(
+        sourceIDs: [PolicySourceID]
+    ) async throws -> [DevelopmentPolicySource]
     func runeForgeViolations(
         cursor: Int64,
         limit: Int,
@@ -34,12 +38,22 @@ protocol RuneForgeManagerClientProtocol: Sendable {
 }
 
 extension RuneForgeManagerClientProtocol {
+    func runeForgeProjectIDs() async throws -> [String] { [] }
+
     func runeForgeSnapshot(
         projectID: String?,
         projectGeneration: UInt64?
     ) async throws -> StjornarvaldManagerSnapshot {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Project-scoped policy monitoring is unavailable from this manager client."
+        )
+    }
+
+    func reorderRuneForgeSources(
+        sourceIDs: [PolicySourceID]
+    ) async throws -> [DevelopmentPolicySource] {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Development Policy ordering is unavailable from this manager client."
         )
     }
 }
@@ -159,6 +173,7 @@ final class RuneForgeViewModel: ObservableObject {
     @Published private(set) var violations: [StjornarvaldViolationPageItem] = []
     @Published private(set) var events: [PolicyViolationEvent] = []
     @Published private(set) var evaluationActivity: [PolicyEvaluationActivity] = []
+    @Published private(set) var projectLogIDs: [String] = []
     @Published private(set) var governingPolicy: GoverningPolicyIdentity?
     @Published private(set) var health: StjornarvaldManagerHealth?
     @Published private(set) var limitations: [String] = []
@@ -226,6 +241,7 @@ final class RuneForgeViewModel: ObservableObject {
             )
             let (snapshot, page) = try await (snapshotRequest, violationRequest)
             try Task.checkCancellation()
+            let registeredProjectIDs = (try? await client.runeForgeProjectIDs()) ?? []
             let pending = sources.filter(\.isOptimistic)
             let remote = snapshot.sources.prefix(Self.maximumSources).map(RuneForgeSourceItem.init)
             let remotePaths = Set(remote.map(\.standardizedPath))
@@ -238,6 +254,10 @@ final class RuneForgeViewModel: ObservableObject {
                 snapshot.violationEvents
                     .sorted { $0.sequence > $1.sequence }
                     .prefix(Self.maximumEvents)
+            )
+            projectLogIDs = Self.projectLogIDs(
+                registeredProjectIDs: registeredProjectIDs,
+                events: events
             )
             governingPolicy = snapshot.governingPolicy
             evaluationActivity = Array((snapshot.evaluationActivity ?? []).prefix(Self.maximumEvents))
@@ -252,33 +272,90 @@ final class RuneForgeViewModel: ObservableObject {
     }
 
     func addPolicySource(_ url: URL) {
-        guard url.isFileURL else {
-            errorMessage = "Choose one local file or folder."
+        addPolicySources([url])
+    }
+
+    func addPolicySources(_ urls: [URL]) {
+        var seen = Set<String>()
+        let selectedURLs = urls.filter(\.isFileURL).filter {
+            seen.insert($0.standardizedFileURL.path).inserted
+        }
+        guard !selectedURLs.isEmpty, selectedURLs.count <= Self.maximumSources else {
+            errorMessage = "Choose between 1 and \(Self.maximumSources) local files or folders."
             return
         }
-        let optimistic = RuneForgeSourceItem(acceptedURL: url)
-        sources.removeAll { $0.standardizedPath == optimistic.standardizedPath && $0.isOptimistic }
-        sources.insert(optimistic, at: 0)
+        let optimisticSources = selectedURLs.map { RuneForgeSourceItem(acceptedURL: $0) }
+        for optimistic in optimisticSources {
+            sources.removeAll {
+                $0.standardizedPath == optimistic.standardizedPath && $0.isOptimistic
+            }
+            sources.append(optimistic)
+        }
         sources = Array(sources.prefix(Self.maximumSources))
-        noticeMessage = "Accepted \(optimistic.displayName) as an active policy source."
+        noticeMessage = "Accepted \(optimisticSources.count) active policy source\(optimisticSources.count == 1 ? "" : "s")."
+        runCommand { [weak self] in
+            guard let self else { return }
+            for optimistic in optimisticSources {
+                do {
+                    let source = try await client.addRuneForgeSource(
+                        path: optimistic.standardizedPath,
+                        requestID: UUID()
+                    )
+                    try Task.checkCancellation()
+                    replaceSource(id: optimistic.id, with: RuneForgeSourceItem(source: source))
+                } catch is CancellationError {
+                    return
+                } catch {
+                    updateSource(
+                        id: optimistic.id,
+                        state: .refreshPending,
+                        observation: "Manager confirmation is pending; the accepted source remains visible."
+                    )
+                    errorMessage = error.localizedDescription
+                    return
+                }
+            }
+            noticeMessage = "Cataloging \(optimisticSources.count) Development Policy source\(optimisticSources.count == 1 ? "" : "s"); development is continuing."
+        }
+    }
+
+    func movePolicySource(_ sourceID: String, to destinationSourceID: String) {
+        guard sourceID != destinationSourceID,
+              let source = sources.first(where: { $0.id == sourceID }),
+              let destination = sources.first(where: { $0.id == destinationSourceID }),
+              source.origin == .userSelected,
+              destination.origin == .userSelected,
+              let sourceIndex = sources.firstIndex(where: { $0.id == sourceID }),
+              let destinationIndex = sources.firstIndex(where: { $0.id == destinationSourceID })
+        else { return }
+
+        var reordered = sources
+        let moved = reordered.remove(at: sourceIndex)
+        reordered.insert(moved, at: min(destinationIndex, reordered.endIndex))
+        guard reordered != sources else { return }
+        let prior = sources
+        sources = reordered
+        let orderedIDs = reordered.compactMap { item -> PolicySourceID? in
+            guard item.origin == .userSelected else { return nil }
+            return item.sourceID
+        }
+        guard orderedIDs.count == reordered.filter({ $0.origin == .userSelected }).count else {
+            sources = prior
+            errorMessage = "Wait for every selected policy source to finish registering before reordering."
+            return
+        }
         runCommand { [weak self] in
             guard let self else { return }
             do {
-                let source = try await client.addRuneForgeSource(
-                    path: optimistic.standardizedPath,
-                    requestID: UUID()
-                )
-                try Task.checkCancellation()
-                replaceSource(id: optimistic.id, with: RuneForgeSourceItem(source: source))
-                noticeMessage = "Cataloging \(source.displayName); development is continuing."
+                let persisted = try await client.reorderRuneForgeSources(sourceIDs: orderedIDs)
+                let remote = persisted.map(RuneForgeSourceItem.init)
+                let builtIn = sources.filter { $0.origin == .builtInRavenForge }
+                sources = Array((builtIn + remote).prefix(Self.maximumSources))
+                noticeMessage = "Development Policy priority updated."
             } catch is CancellationError {
-                return
+                sources = prior
             } catch {
-                updateSource(
-                    id: optimistic.id,
-                    state: .refreshPending,
-                    observation: "Manager confirmation is pending; the accepted source remains visible."
-                )
+                sources = prior
                 errorMessage = error.localizedDescription
             }
         }
@@ -384,6 +461,30 @@ final class RuneForgeViewModel: ObservableObject {
         }
     }
 
+    func requestProjectExport(
+        projectID: String,
+        format: StjornarvaldExportFormat,
+        destination: URL
+    ) {
+        requestExport(
+            format: format,
+            destination: destination,
+            filters: StjornarvaldExportFilters(projectID: projectID)
+        )
+    }
+
+    static func projectLogIDs(
+        registeredProjectIDs: [String],
+        events: [PolicyViolationEvent]
+    ) -> [String] {
+        var seen = Set<String>()
+        return (registeredProjectIDs + events.compactMap(\.candidate.scope.projectID))
+            .filter { !$0.isEmpty && $0.utf8.count <= 1_024 && seen.insert($0).inserted }
+            .sorted()
+            .prefix(100)
+            .map { $0 }
+    }
+
     func latestEvent(for violationID: PolicyViolationID) -> PolicyViolationEvent? {
         events.first { $0.violationID == violationID }
     }
@@ -432,8 +533,10 @@ final class RuneForgeViewModel: ObservableObject {
     }
 
     private func replaceSource(id: String, with source: RuneForgeSourceItem) {
+        let replacementIndex = sources.firstIndex { $0.id == id }
+            ?? sources.firstIndex { $0.standardizedPath == source.standardizedPath }
         sources.removeAll { $0.id == id || $0.standardizedPath == source.standardizedPath }
-        sources.insert(source, at: 0)
+        sources.insert(source, at: min(replacementIndex ?? 0, sources.endIndex))
         sources = Array(sources.prefix(Self.maximumSources))
     }
 

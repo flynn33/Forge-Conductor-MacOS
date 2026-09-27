@@ -10,6 +10,7 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
     let runs: [OperatorRun]
     let continuityReadiness: [ManagerContinuityReadiness]
     let continuityOperations: [OperatorContinuity]
+    let interactiveContinuity: ManagerInteractiveContinuityStatus?
     let runtimeJobs: [OperatorRuntimeJob]
     let provider: OperatorProvider?
     let runPreparation: OperatorRunPreparation?
@@ -23,6 +24,7 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
         case runPreparation = "run_preparation"
         case pendingProjectRegistrations = "pending_project_registrations"
         case continuityOperations = "continuity_operations"
+        case interactiveContinuity = "interactive_continuity"
         case runtimeJobs = "runtime_jobs"
         case nextCursor = "next_cursor"
     }
@@ -43,6 +45,10 @@ struct OperatorSnapshot: Decodable, Sendable, Equatable {
             [OperatorContinuity].self,
             forKey: .continuityOperations
         ) ?? []
+        interactiveContinuity = try container.decodeIfPresent(
+            ManagerInteractiveContinuityStatus.self,
+            forKey: .interactiveContinuity
+        )
         runtimeJobs = try container.decodeIfPresent([OperatorRuntimeJob].self, forKey: .runtimeJobs) ?? []
         provider = try container.decodeIfPresent(OperatorProvider.self, forKey: .provider)
         runPreparation = try container.decodeIfPresent(OperatorRunPreparation.self, forKey: .runPreparation)
@@ -441,6 +447,18 @@ struct OperatorProjectContentClearReceipt: Decodable, Sendable, Equatable {
         case invalidatedBindingCount = "invalidated_binding_count"
         case completedAt = "completed_at"
         case replayed
+    }
+}
+
+struct OperatorCacheClearReceipt: Decodable, Sendable, Equatable {
+    let operationID: UUID
+    let removedEntryCount: Int
+    let completedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operation_id"
+        case removedEntryCount = "removed_entry_count"
+        case completedAt = "completed_at"
     }
 }
 

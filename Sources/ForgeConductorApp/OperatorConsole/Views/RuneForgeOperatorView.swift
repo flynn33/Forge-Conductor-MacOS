@@ -14,12 +14,12 @@ private enum RuneForgeSelection: Hashable {
 struct RuneForgeOperatorView: View {
     @StateObject private var viewModel: RuneForgeViewModel
     @State private var selection: RuneForgeSelection? = .overview
-    private let selectPolicySource: @MainActor () -> URL?
+    private let selectPolicySources: @MainActor () -> [URL]
     private let selectExportDestination: @MainActor (StjornarvaldExportFormat) -> URL?
 
     init(
         client: any RuneForgeManagerClientProtocol,
-        selectPolicySource: @escaping @MainActor () -> URL? = {
+        selectPolicySources: @escaping @MainActor () -> [URL] = {
             RuneForgePolicyPicker.select()
         },
         selectExportDestination: @escaping @MainActor (StjornarvaldExportFormat) -> URL? = {
@@ -27,7 +27,7 @@ struct RuneForgeOperatorView: View {
         }
     ) {
         _viewModel = StateObject(wrappedValue: RuneForgeViewModel(client: client))
-        self.selectPolicySource = selectPolicySource
+        self.selectPolicySources = selectPolicySources
         self.selectExportDestination = selectExportDestination
     }
 
@@ -71,7 +71,7 @@ struct RuneForgeOperatorView: View {
             Text("Rune Forge")
                 .font(.title2.bold())
                 .accessibilityIdentifier("rune-forge-view")
-            Text("Development Policy sources and Stjornarvald history")
+            Text("Development Policy sources, CLU enforcement, and per-project logs")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("detail-rune-forge")
@@ -84,8 +84,9 @@ struct RuneForgeOperatorView: View {
                 ProgressView().controlSize(.small)
             }
             Button("Add Development Policy…", systemImage: "plus") {
-                guard let url = selectPolicySource() else { return }
-                viewModel.addPolicySource(url)
+                let urls = selectPolicySources()
+                guard !urls.isEmpty else { return }
+                viewModel.addPolicySources(urls)
             }
             .accessibilityIdentifier("rune-policy-add")
             Button("Refresh", systemImage: "arrow.clockwise") {
@@ -93,12 +94,37 @@ struct RuneForgeOperatorView: View {
             }
             .accessibilityIdentifier("rune-policy-refresh")
             Menu("Export Policy Log", systemImage: "square.and.arrow.up") {
-                ForEach(StjornarvaldExportFormat.allCases, id: \.self) { format in
-                    Button(exportTitle(format)) {
-                        guard let destination = selectExportDestination(format) else { return }
-                        viewModel.requestExport(format: format, destination: destination)
+                Section("All Projects") {
+                    ForEach(StjornarvaldExportFormat.allCases, id: \.self) { format in
+                        Button(exportTitle(format)) {
+                            guard let destination = selectExportDestination(format) else { return }
+                            viewModel.requestExport(format: format, destination: destination)
+                        }
+                        .accessibilityIdentifier("rune-policy-export-\(format.rawValue)")
                     }
-                    .accessibilityIdentifier("rune-policy-export-\(format.rawValue)")
+                }
+                if !viewModel.projectLogIDs.isEmpty {
+                    Section("Per Project") {
+                        ForEach(viewModel.projectLogIDs, id: \.self) { projectID in
+                            Menu(projectID) {
+                                ForEach(StjornarvaldExportFormat.allCases, id: \.self) { format in
+                                    Button(exportTitle(format)) {
+                                        guard let destination = selectExportDestination(format) else {
+                                            return
+                                        }
+                                        viewModel.requestProjectExport(
+                                            projectID: projectID,
+                                            format: format,
+                                            destination: destination
+                                        )
+                                    }
+                                    .accessibilityIdentifier(
+                                        "rune-policy-export-project-\(format.rawValue)"
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .accessibilityIdentifier("rune-policy-export")
@@ -121,7 +147,7 @@ struct RuneForgeOperatorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                ForEach(viewModel.sources) { source in
+                ForEach(Array(viewModel.sources.enumerated()), id: \.element.id) { index, source in
                     Button {
                         selection = .source(source.id)
                     } label: {
@@ -134,7 +160,11 @@ struct RuneForgeOperatorView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(source.displayName)
                                     .lineLimit(1)
-                                Text(RuneForgeViewModel.sourceStateTitle(source.interpretationState))
+                                Text(
+                                    source.origin == .userSelected
+                                        ? "Priority \(index + 1) · \(RuneForgeViewModel.sourceStateTitle(source.interpretationState))"
+                                        : RuneForgeViewModel.sourceStateTitle(source.interpretationState)
+                                )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -144,10 +174,21 @@ struct RuneForgeOperatorView: View {
                     .buttonStyle(.plain)
                     .tag(RuneForgeSelection.source(source.id))
                     .accessibilityIdentifier("rune-policy-source-row-\(source.id)")
+                    .draggable(source.id)
+                    .dropDestination(for: String.self) { items, _ in
+                        guard let draggedSourceID = items.first else { return false }
+                        viewModel.movePolicySource(draggedSourceID, to: source.id)
+                        return draggedSourceID != source.id
+                    }
                 }
             } header: {
-                Text("Development Policy sources")
-                    .accessibilityIdentifier("rune-policy-source-list")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Development Policy sources")
+                    Text("Drag to set priority")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityIdentifier("rune-policy-source-list")
             }
 
             Section {

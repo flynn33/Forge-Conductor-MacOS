@@ -15,10 +15,10 @@ not authorize release; the qualification boundary below remains controlling.
 | **CLI `forge-conductor serve`** | Same MCP server (default registration target) |
 
 There is **no** in-process link from the GUI into LM Studio’s address space.
-There is **no** LM Studio SDK client inside Core for chat/completions.
-Forge-managed sessions use a separate Foundation-native HTTP transport in the
-native session-host plugin; the stdio registration below serves externally
-owned LM Studio chats.
+The statically registered native session-host plugin uses LM Studio's documented
+Foundation-accessible REST boundary for automatic successor chats. Ordinary
+work remains in the user's LM Studio interface; the stdio registration below
+serves those externally owned chats.
 
 ## Forge Link implementation boundary
 
@@ -44,9 +44,9 @@ remain the only qualified behavior until those later milestones close.
 | `manager run [--home …] [--open]` | Dashboard manager (LaunchAgent path) |
 | `provider-hook <provider> <event> --home …` | Internal bounded desktop-host hook bridge; not an interactive operator command |
 
-## Native managed-run setup
+## LM Studio chat and connection setup
 
-Turn on **LM Studio** in Provider before preparing new LM Studio work. The
+Turn on **LM Studio** in Provider before starting LM Studio work. The
 mutually exclusive activation toggle runs the manager-owned **Connect and
 Check** workflow, verifies the transactional MCP deployment and exact saved
 model contract, and commits the durable `lmstudio` selection only after that
@@ -55,7 +55,7 @@ model path; see
 [Provider integrations](PROVIDER-INTEGRATIONS.md).
 
 Forge keeps the active selection until another provider is ready, so clicking
-the active selector cannot leave run admission providerless. If a replaceable
+the active selector cannot leave the MCP workflow providerless. If a replaceable
 background snapshot is still loading when LM Studio is selected, the explicit
 activation supersedes that load instead of silently ignoring the click.
 
@@ -74,28 +74,25 @@ Each candidate must pass the ordinary model-inventory transport before Forge
 may persist the corrected endpoint. Forge does not scan ports.
 
 The same action then chooses the sole compatible loaded model when no model is
-pinned, runs the complete managed-provider contract probe, and durably records
+pinned, runs the complete model/tool contract check, and durably records
 readiness. Forge never loads a model; when zero or multiple compatible models
 are loaded, Provider gives the required load or selection action. A missing or
 failing `lms` CLI, non-loopback endpoint, authentication failure, timeout, or
 invalid inventory remains a typed failure instead of triggering broad host
-discovery. **Refresh Models** and the separate contract probe remain available
-for advanced diagnosis.
+discovery. **Refresh Models**, the Advanced connection check, and the probe
+remain available for diagnosis; the connection check and probe use the same
+actionable preparation path as the primary button.
 
-The readiness probe does not resume retained provider-wait tasks before the
-Forge-owned MCP deployment finishes. If LM Studio has already synchronized the
-exact versioned MCP configuration, deployment preserves the running host and
-its loaded model while its MCP child processes remain available for lazy chat
-activation. A relaunch is reserved for a genuinely stale unsynchronized state.
-Forge keeps retained tasks quiescent throughout deployment, performs a fresh
-readiness check, and only then resumes the exact durable run identities. If the
-Provider view closes mid-operation, the Manager performs the same bounded
-post-operation recovery.
+If LM Studio has already synchronized the exact versioned MCP configuration,
+deployment preserves the running host and its loaded model while MCP child
+processes remain available for lazy chat activation. A relaunch is reserved for
+a genuinely stale unsynchronized state. Closing the Provider view does not
+cancel Manager-owned preparation; reopening the view reconciles the durable
+operation state.
 
-The native app's manager-client router preserves the initial
-`resume_waiting_runs: false` request. Only the post-repair preparation sends
-`resume_waiting_runs: true`, so the view/router boundary cannot resume retained
-work before the integration transaction is verified.
+Every current Provider entry point sends a no-run-resumption preparation
+request. Provider verification therefore cannot start, resume, or otherwise
+take ownership of the user's LM Studio conversation.
 
 Forge's native adapter reads LM Studio's `GET /api/v1/models` inventory as
 authoritative model metadata. When that native response omits
@@ -113,7 +110,22 @@ array. The Xcode **My Mac** Debug candidate reconciled that exact observation,
 reported the model loaded, and passed the manager connection probe. That is
 historical connection evidence bound to that source and host.
 
-Register the repository in **Projects** using the native picker or **Enter Project Path…**. Forge records the selected canonical folder through that project workflow; no separate Manager authorization step is required. Ordered work and direct **Run Details** both live in Projects. Runs start after the project is registered and **Connect and Check** has prepared the selected Provider. For a new direct task, Forge confirms provider readiness before importing its immutable instruction artifact.
+Register one or more repositories in **Projects** with the native picker or
+**Enter Project Path…**. Add and order instruction packages there, add and order
+Development Policy sources in **Rune Forge**, then open a normal LM Studio chat
+and call `get_forge_status`. The response lists registered project identities;
+passing `project_id` returns that project's file, instruction, and continuity
+locations. No Managed Run is required.
+
+When the model saves a resume-ready handoff, Manager publishes a visible
+30-second Dashboard countdown. At expiry, the native adapter calls LM Studio's
+documented `POST /api/v1/chat` with `store=true`, enables the installed
+`mcp/forge-conductor` integration, and submits `get_forge_status` with
+`resume=true`. Forge requires the response to contain the exact handoff ID and
+uses its durable idempotency ledger to prevent duplicate successor creation.
+LM Studio documents stored stateful chat creation and MCP integrations, but it
+does not document foreground GUI-tab activation for API-created chats; Forge
+does not use private UI automation.
 
 ## Authoritative connection path (stable)
 
@@ -309,7 +321,10 @@ The two registrations are separate LM Studio-hosted processes with distinct `ser
    `swift build --product forge-conductor-app` command.
 2. Install CLI layout: `forge-conductor install` (does **not** write LM Studio by itself).
 3. Deploy and activate: **Deploy to LM Studio** in the GUI, or `forge-conductor install-lmstudio-plugin`.
-4. Load a tool-capable local model. Configuration, activation, and connection verification are already complete.
+4. Load a tool-capable local model and run **Provider → Connect and Check**.
+5. Register project folders, order instruction packages, and order Development
+   Policy sources.
+6. Open an LM Studio chat, call `get_forge_status`, and provide the task.
 
 ### App-as-MCP qualification checklist
 
@@ -335,7 +350,7 @@ manager-owned real-provider forced rollover, and owner-deferred representative
 physical-hardware qualification remain open. Focused connector or onboarding
 passes do not replace those release-blocking runs.
 
-Managed Autonomy uses a separate typed LM Studio provider configuration from
+The retained compatibility automation uses the same typed LM Studio provider configuration as
 the MCP plugin registration described above. In **Provider**, enter the endpoint
 and model identifier, choose to keep/replace/clear the Keychain credential, and
 select **Save**. Saving works offline. Choose **Connect and Check** for automatic
@@ -343,7 +358,7 @@ local-server recovery, model resolution, and contract verification. Save edits
 before connection work, and load models in LM Studio itself. Active runs and
 in-flight operations block conflicting configuration changes. The native screen
 uses authenticated, revisioned manager controls and follows manager replacement.
-See the [provider workflow](../USER-GUIDE.md#configure-the-managed-provider).
+See the [provider workflow](../USER-GUIDE.md#2-connect-lm-studio).
 
 ## Auto-heal
 

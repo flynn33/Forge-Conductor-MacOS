@@ -193,6 +193,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
     var continuityActiveCount: Int
     var continuityBlockedCount: Int
     var continuityContextLoad: Double?
+    var interactiveContinuity: ManagerInteractiveContinuityStatus?
     var runeForgeState: StjornarvaldManagerState?
     var runeForgeActiveSourceCount: Int
     var runeForgeSelectedSourceCount: Int
@@ -233,6 +234,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         continuityActiveCount: 0,
         continuityBlockedCount: 0,
         continuityContextLoad: nil,
+        interactiveContinuity: nil,
         runeForgeState: nil,
         runeForgeActiveSourceCount: 0,
         runeForgeSelectedSourceCount: 0,
@@ -375,6 +377,7 @@ struct RigOperationalSnapshot: Sendable, Equatable {
                 blockedContinuityStates.contains($0.state)
             }.count,
             continuityContextLoad: contextLoads.max(),
+            interactiveContinuity: operatorSnapshot?.interactiveContinuity,
             runeForgeState: runeForge?.health.state,
             runeForgeActiveSourceCount: activeSources.count,
             runeForgeSelectedSourceCount: selectedSources.count,
@@ -1076,8 +1079,8 @@ public final class AppModel: ObservableObject {
 
         public var id: String { rawValue }
 
-        /// Autonomy is retained as an internal compatibility route for saved
-        /// state and automation. Run controls now live under Projects.
+        /// Autonomy is retained only as an internal compatibility route for
+        /// saved navigation state. It resolves to the current Projects view.
         public static var primaryNavigationTabs: [AppTab] {
             allCases.filter { $0 != .autonomy }
         }

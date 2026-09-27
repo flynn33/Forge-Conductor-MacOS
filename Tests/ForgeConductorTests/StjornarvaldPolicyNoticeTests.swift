@@ -339,10 +339,12 @@ final class StjornarvaldPolicyNoticeTests: XCTestCase {
         let event = try fixture.record(.violation, observationID: UUID(), occurredAt: Date())
         let notice = try XCTUnwrap(try fixture.notices.queue(event))
         XCTAssertFalse(notice.summary.contains("super-secret-value"))
+        XCTAssertEqual(notice.policyStatement, fixture.rule.statement)
         let text = try XCTUnwrap(StjornarvaldPolicyNoticeFormatter.interactivePresentation(
             notices: Array(repeating: notice, count: 100), maximumBytes: 1_024
         ))
         XCTAssertLessThanOrEqual(text.utf8.count, 1_024)
+        XCTAssertTrue(text.contains("Policy:"))
         XCTAssertTrue(text.contains("Development continues"))
     }
 }

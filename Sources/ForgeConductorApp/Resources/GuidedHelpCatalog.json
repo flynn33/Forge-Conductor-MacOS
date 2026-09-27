@@ -14,12 +14,12 @@
     {
       "id": "rig",
       "title": "Dashboard guide",
-      "purpose": "Monitor live system, managed-model, instruction-progress, policy, tool, and orchestration telemetry after using Guided Setup to prepare a project.",
+      "purpose": "Monitor live system, LM Studio, instruction, policy, tool, and continuity telemetry after configuring a project.",
       "forge_handles_automatically": [
         "Collect and coalesce supported telemetry",
         "Mark unavailable or stale measurements",
-        "Keep active automation manager-owned",
-        "Keep Managed Activity to 100 app-local rows, retain at most 128 assistant plus 128 tool rows per run, and cap displayed rows at 8 KiB"
+        "Keep continuity and CLU governance manager-owned",
+        "Keep Forge Activity bounded to 100 app-local rows and cap displayed rows at 8 KiB"
       ],
       "controls": [
         "Refresh",
@@ -27,26 +27,26 @@
         "Instrument panels",
         "History traces",
         "Activity panels",
-        "Managed Activity feed"
+        "Forge Activity feed"
       ],
       "status_meanings": [
         "live: recent measurements",
         "stale: last sample exceeded freshness window",
         "unavailable: collector or source cannot provide a verified value",
         "disconnected: source is not currently reachable",
-        "Managed Activity is latest bounded state, not a persisted full conversation transcript"
+        "Forge Activity is latest bounded state, not a persisted full conversation transcript"
       ],
       "normal_workflow": [
-        "Use Guided Setup in the Dashboard title bar when preparing a project or reviewing the correct launch order",
+        "Use Guided Setup in the Dashboard title bar when preparing a project for LM Studio",
         "Use the Dashboard to observe health and load",
-        "Use Managed Activity to follow the current package, step, model output, orchestration, and policy events",
+        "Use Forge Activity to follow instruction, continuity, orchestration, and policy events",
         "Open the relevant feature tab to change behavior"
       ],
       "troubleshooting": [
         "No data: check Manager and provider status",
         "Stale data: refresh and inspect source age",
         "A missing metric is not evidence of zero usage",
-        "No managed activity: confirm that Manager is running and ordered project work is active"
+        "No Forge activity: confirm that Manager is running and LM Studio is connected"
       ],
       "advanced_details": [
         "Sampling cadence",
@@ -83,7 +83,7 @@
       "normal_workflow": [
         "Start LM Studio if needed",
         "Use the repair action only when status requires it",
-        "Return to Projects; starting ordered work rechecks readiness"
+        "Open a normal LM Studio chat and call get_forge_status"
       ],
       "troubleshooting": [
         "LM Studio closed",
@@ -222,7 +222,7 @@
         "Register Project",
         "Add Instructions",
         "Reorder packages",
-        "Start ordered work",
+        "Delete Package",
         "Relink",
         "Remove",
         "Reset generation",
@@ -242,7 +242,7 @@
         "Add package(s)",
         "Review import report",
         "Arrange order",
-        "Start"
+        "Open LM Studio and call get_forge_status"
       ],
       "troubleshooting": [
         "Folder moved: Relink",
@@ -354,46 +354,37 @@
     {
       "id": "instructionQueue",
       "title": "Instruction Queue guide",
-      "purpose": "Order imported assignments and understand queue state and autonomous advancement.",
+      "purpose": "Order imported instruction packages for the LM Studio model to query.",
       "forge_handles_automatically": [
         "Persist order",
-        "Reserve one eligible package",
-        "Bind run to project generation",
-        "Advance only after accepted outcome"
+        "Bind each package to the project generation",
+        "Expose immutable instruction content through Forge tools",
+        "Preserve the selected priority order"
       ],
       "controls": [
         "Drag to reorder",
-        "Start",
-        "Pause",
-        "Retry",
-        "Cancel",
-        "Remove non-running item"
+        "Delete Package"
       ],
       "status_meanings": [
         "queued",
-        "reserved",
-        "running",
-        "checking",
-        "completed",
-        "blocked",
-        "failed",
-        "cancelled"
+        "ready",
+        "unresolved",
+        "deleted"
       ],
       "normal_workflow": [
         "Arrange packages",
-        "Start ordered work",
-        "Review current item and blockers"
+        "Open LM Studio and call get_forge_status",
+        "Let the model query the ordered instruction catalog"
       ],
       "troubleshooting": [
         "No readable instructions: add a supported instruction document",
-        "Failed run: open Projects → Run Details and Evidence",
+        "Unreadable package: inspect its file catalog and replace the source",
         "Stale generation: refresh project"
       ],
       "advanced_details": [
         "Queue revision",
-        "lease",
         "package hash",
-        "run binding"
+        "project-generation binding"
       ],
       "control_anchors": []
     },
@@ -526,7 +517,7 @@
     {
       "id": "continuity",
       "title": "Continuity guide",
-      "purpose": "Explain how Forge saves progress, creates a fresh managed session, restores exact task state, and continues automatically.",
+      "purpose": "Explain automatic LM Studio handoff recovery and manage project-scoped continuity data.",
       "forge_handles_automatically": [
         "Monitor context",
         "Save checkpoints",
@@ -536,59 +527,48 @@
         "Recover after restart"
       ],
       "controls": [
-        "Save progress now",
-        "Start a fresh session and continue",
-        "Select task",
-        "Open Technical details"
+        "Select project ID",
+        "Copy Project ID",
+        "Delete"
       ],
       "status_meanings": [
-        "ready",
-        "monitoring",
-        "saving progress",
-        "rollover queued",
-        "quiescing",
-        "creating successor",
-        "restoring",
-        "continuing",
-        "waiting for provider",
-        "blocked",
-        "external-only"
+        "project identity available",
+        "no continuity projects",
+        "deleting",
+        "delete failed"
       ],
       "normal_workflow": [
-        "No setup required",
-        "Open to observe protection",
-        "Use advanced actions only when desired or instructed"
+        "No setup or rollover action is required here",
+        "Select an ID to copy it",
+        "Use Delete only when that project's continuity data is no longer needed"
       ],
       "troubleshooting": [
-        "Provider unavailable: progress remains saved",
-        "Duplicate successor: Forge accepts one and quarantines others",
-        "External host: automatic chat creation unavailable"
+        "Provider unavailable: progress remains saved and rollover retries",
+        "Delete failure: refresh and retain the project ID for diagnostics",
+        "LM Studio foreground activation is limited to supported host APIs"
       ],
       "advanced_details": [
-        "Budget source/confidence",
-        "checkpoint/handoff IDs",
-        "checksums",
-        "nonce",
-        "predecessor/successor",
-        "fencing"
+        "Project ID",
+        "project-scoped storage boundary",
+        "deletion receipt"
       ],
       "control_anchors": [
-        "checkpoint-command",
-        "rollover-command",
-        "context-gauge"
+        "continuity-project-list",
+        "continuity-copy-project-id",
+        "continuity-delete-project"
       ]
     },
     {
       "id": "continuitySaveProgress",
-      "title": "Save progress now guide",
-      "purpose": "Request a durable checkpoint without ending the active managed session.",
+      "title": "Automatic checkpoint guide",
+      "purpose": "Explain that checkpoint creation is model-driven and automatic rather than initiated from this view.",
       "forge_handles_automatically": [
-        "Validate active run/session and current observation",
-        "Persist exact run/package progress"
+        "Persist an accepted model handoff",
+        "Start the bounded LM Studio successor countdown"
       ],
       "controls": [
-        "Save progress now",
-        "Cancel"
+        "Copy Project ID",
+        "Delete"
       ],
       "status_meanings": [
         "eligible",
@@ -598,14 +578,13 @@
         "failed"
       ],
       "normal_workflow": [
-        "Select running managed task",
-        "Request save",
-        "Continue work"
+        "Continue working in LM Studio",
+        "Let the model save its handoff at context pressure"
       ],
       "troubleshooting": [
         "No accepted session",
         "another continuity action active",
-        "run not running"
+        "no resume-ready handoff"
       ],
       "advanced_details": [
         "Checkpoint ID",
@@ -613,13 +592,13 @@
         "action epoch"
       ],
       "control_anchors": [
-        "checkpoint-command"
+        "continuity-project-list"
       ]
     },
     {
       "id": "continuityFreshSession",
       "title": "Fresh session and continue guide",
-      "purpose": "Request an early managed rollover while preserving and automatically resuming the task.",
+      "purpose": "Explain automatic LM Studio rollover after a resume-ready handoff.",
       "forge_handles_automatically": [
         "Quiesce",
         "reconcile tools",
@@ -630,8 +609,8 @@
         "continue"
       ],
       "controls": [
-        "Start a fresh session and continue",
-        "Cancel"
+        "Copy Project ID",
+        "Delete"
       ],
       "status_meanings": [
         "eligible",
@@ -642,8 +621,8 @@
         "blocked"
       ],
       "normal_workflow": [
-        "Use only when an early fresh context is desirable",
-        "Observe progress; no IDs need to be copied"
+        "No rollover action is initiated from Continuity",
+        "Continue in LM Studio while Forge creates and verifies the successor"
       ],
       "troubleshooting": [
         "In-flight ambiguous tool",
@@ -656,7 +635,7 @@
         "successor receipt"
       ],
       "control_anchors": [
-        "rollover-command"
+        "continuity-project-list"
       ]
     },
     {
@@ -754,7 +733,7 @@
     {
       "id": "provider",
       "title": "Model connection guide",
-      "purpose": "Explain and prepare the LM Studio connection used automatically by managed tasks.",
+      "purpose": "Explain and prepare the LM Studio connection used by normal model chats and Forge tools.",
       "forge_handles_automatically": [
         "Reuse saved healthy configuration",
         "Discover models",
@@ -777,8 +756,8 @@
         "busy"
       ],
       "normal_workflow": [
-        "Usually do nothing; Start Ordered Work in Projects invokes preparation",
-        "Use Connect and Check to prepare manually or diagnose"
+        "Use Connect and Check before an LM Studio chat when readiness needs attention",
+        "Then call get_forge_status from the LM Studio model"
       ],
       "troubleshooting": [
         "LM Studio stopped",

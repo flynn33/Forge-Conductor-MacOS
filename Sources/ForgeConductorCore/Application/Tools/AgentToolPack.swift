@@ -12,7 +12,7 @@ public struct AgentToolPack: ToolPackHandling {
 
     public var toolNames: [String] {
         [
-            "forge_status",
+            "forge_status", "get_forge_status",
             "agent_list", "agent_get", "agent_context", "agent_recommend",
             "agent_run_start", "agent_run_status", "agent_run_complete",
         ]
@@ -29,8 +29,14 @@ public struct AgentToolPack: ToolPackHandling {
         guard toolNames.contains(name) else { return nil }
         try cancellation?.checkCancellation()
         switch name {
-        case "forge_status":
-            return try forgeStatus(clientID: clientID, app: app, cancellation: cancellation)
+        case "forge_status", "get_forge_status":
+            return try forgeStatus(
+                arguments: arguments,
+                context: context,
+                clientID: clientID,
+                app: app,
+                cancellation: cancellation
+            )
         case "agent_list":
             let result = ToolResult.success([
                 "ok": true,
@@ -107,6 +113,8 @@ public struct AgentToolPack: ToolPackHandling {
     }
 
     private func forgeStatus(
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
         clientID: ClientID,
         app: ForgeApp,
         cancellation: ToolCallCancellation?
@@ -120,7 +128,10 @@ public struct AgentToolPack: ToolPackHandling {
             cancellation: cancellation
         )) ?? 0
         let continuity = (try? app.continuity.statusSummary(cancellation: cancellation)) ?? [:]
-        let result = ToolResult.success([
+        let projects = try app.projectContexts.operatorProjects(
+            cancellation: cancellation
+        )
+        var payload: [String: Any] = [
             "ok": true,
             "version": ForgeApp.version,
             "runtime": "swift",
@@ -137,8 +148,73 @@ public struct AgentToolPack: ToolPackHandling {
                 for: clientID,
                 cancellation: cancellation
             ),
+            "projects": projects.map { project in
+                [
+                    "project_id": project.projectID.description,
+                    "project_generation": project.generation.rawValue,
+                    "display_name": project.displayName,
+                    "canonical_root": project.canonicalRoot.path,
+                ] as [String: Any]
+            },
+            "query_tools": [
+                "instructions": ["instruction_catalog", "instruction_read"],
+                "project_files": ["fs_list", "fs_read", "fs_glob", "search_text"],
+                "continuity": [
+                    "continuity.status", "continuity.get_pending_handoff",
+                    "context_get",
+                ],
+            ],
             "pid": ProcessInfo.processInfo.processIdentifier,
-        ])
+        ]
+        let requestedProjectID: ProjectID?
+        if let raw = ToolArgHelpers.string(arguments, "project_id") {
+            guard let uuid = UUID(uuidString: raw) else {
+                throw ProjectMemoryError.invalidRequest("project_id must be a UUID")
+            }
+            requestedProjectID = ProjectID(uuid)
+        } else {
+            requestedProjectID = nil
+        }
+        let selectedProject: ProjectControlRecord?
+        if let context {
+            selectedProject = try app.projectContexts.project(
+                context.projectID,
+                cancellation: cancellation
+            )
+        } else if let requestedProjectID {
+            selectedProject = try app.projectContexts.project(
+                requestedProjectID,
+                cancellation: cancellation
+            )
+        } else {
+            selectedProject = projects.count == 1 ? projects[0] : nil
+        }
+        if let project = selectedProject {
+            let projectStateDirectory = app.paths.projectsDir.appendingPathComponent(
+                project.projectID.description,
+                isDirectory: true
+            )
+            payload["project"] = [
+                "project_id": project.projectID.description,
+                "project_generation": project.generation.rawValue,
+                "canonical_root": project.canonicalRoot.path,
+                "run_id": context?.runID?.description as Any,
+            ] as [String: Any]
+            payload["locations"] = [
+                "project_files": project.canonicalRoot.path,
+                "instruction_store": app.paths.instructionPackageStoreDir.path,
+                "continuity_store": projectStateDirectory
+                    .appendingPathComponent("continuity", isDirectory: true).path,
+            ]
+        }
+        if ToolArgHelpers.bool(arguments, "resume") == true {
+            payload["resume"] = try app.continuity.get(
+                id: nil,
+                preferResumeReady: true,
+                cancellation: cancellation
+            )
+        }
+        let result = ToolResult.success(payload)
         try cancellation?.checkCancellation()
         return result
     }

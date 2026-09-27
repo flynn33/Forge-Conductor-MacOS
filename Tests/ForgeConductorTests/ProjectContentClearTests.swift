@@ -615,6 +615,121 @@ final class ProjectContentClearTests: XCTestCase {
         )
     }
 
+    func testManagerClearsContinuityForOneProjectAndPreservesOtherProject() async throws {
+        let app = try configuredApp()
+        defer { app.shutdown() }
+        let manager = ManagerNode(app: app)
+        let projectAID = try register(projectA, named: "Continuity Project A", using: manager)
+        let projectBID = try register(projectB, named: "Continuity Project B", using: manager)
+        let runA = RunID()
+        let runB = RunID()
+        try await app.projectContexts.repository.reserveContinuityRun(
+            runID: runA,
+            projectID: projectAID,
+            projectGeneration: .initial,
+            mission: "Clear only project A continuity",
+            mode: .managedAutonomous
+        )
+        try await app.projectContexts.repository.reserveContinuityRun(
+            runID: runB,
+            projectID: projectBID,
+            projectGeneration: .initial,
+            mission: "Preserve project B continuity",
+            mode: .managedAutonomous
+        )
+
+        func createSettledOperation(
+            projectID: ProjectID,
+            runID: RunID,
+            marker: Character
+        ) async throws -> (memory: ProjectMemoryRepository, operationID: String, commandID: UUID) {
+            let memory = try app.projectMemory.repositoryForProject(projectID.description)
+            let handoff = try continuityHandoff(projectID: projectID, runID: runID)
+            let operation = try memory.continuityCreateOperationV2(
+                handoff: handoff,
+                predecessorSessionID: "history-predecessor",
+                predecessorProviderResponseID: "history-response",
+                adapterID: "forge.native-session-host",
+                idempotencyKey: "project-delete-\(handoff.operationID)"
+            )
+            XCTAssertTrue(
+                try memory.continuityCancelOperationV2(
+                    operationID: operation.operationID,
+                    runID: operation.runID
+                )
+            )
+            let operationID = try XCTUnwrap(UUID(uuidString: operation.operationID))
+            let command = try await app.projectContexts.repository.enqueueContinuityCommand(
+                ContinuityCommandRequest(
+                    operationID: operationID,
+                    runID: runID,
+                    projectID: projectID,
+                    projectGeneration: .initial,
+                    type: .rollover,
+                    requestedBy: "operator-test",
+                    reason: "project-scoped deletion fixture",
+                    idempotencyKey: "project-delete-command-\(operation.operationID)",
+                    payloadSHA256: String(repeating: marker, count: 64)
+                )
+            )
+            let claimedValue = try await app.projectContexts.repository
+                .claimNextContinuityCommand()
+            let claimed = try XCTUnwrap(claimedValue)
+            XCTAssertEqual(claimed.commandID, command.commandID)
+            _ = try await app.projectContexts.repository.transitionContinuityCommand(
+                commandID: command.commandID,
+                expected: .claimed,
+                to: .running
+            )
+            _ = try await app.projectContexts.repository.transitionContinuityCommand(
+                commandID: command.commandID,
+                expected: .running,
+                to: .completed
+            )
+            return (memory, operation.operationID, command.commandID)
+        }
+
+        let settledA = try await createSettledOperation(
+            projectID: projectAID,
+            runID: runA,
+            marker: "a"
+        )
+        let settledB = try await createSettledOperation(
+            projectID: projectBID,
+            runID: runB,
+            marker: "b"
+        )
+        let preservedMemory = try settledA.memory.remember(
+            ProjectMemoryWrite(
+                kind: "decision",
+                title: "Preserve ordinary memory",
+                summary: "Project-scoped continuity deletion must not delete project memory"
+            )
+        ).0
+
+        let receipt = try manager.clearContinuityHistory(
+            ContinuityHistoryClearRequest(scope: .project, projectID: projectAID)
+        )
+
+        XCTAssertEqual(receipt.scope, .project)
+        XCTAssertEqual(receipt.requestedProjectID, projectAID)
+        XCTAssertNil(receipt.requestedOperationID)
+        XCTAssertEqual(receipt.clearedOperationCount, 1)
+        XCTAssertEqual(receipt.clearedProjectCount, 1)
+        XCTAssertEqual(receipt.retainedOperationCount, 0)
+        XCTAssertNil(try settledA.memory.continuityOperationV2(id: settledA.operationID))
+        XCTAssertNotNil(try settledB.memory.continuityOperationV2(id: settledB.operationID))
+        XCTAssertNotNil(try settledA.memory.get(id: preservedMemory.id))
+        let removedCommand = try await app.projectContexts.repository.continuityCommand(
+            commandID: settledA.commandID
+        )
+        let preservedCommand = try await app.projectContexts.repository.continuityCommand(
+            commandID: settledB.commandID
+        )
+        XCTAssertNil(removedCommand)
+        XCTAssertNotNil(preservedCommand)
+    }
+
     func testManagerRetiresAndClearsStaleContinuityOwnedByTerminalTask() async throws {
         let app = try configuredApp()
         defer { app.shutdown() }
@@ -693,6 +808,35 @@ final class ProjectContentClearTests: XCTestCase {
         let preservedRun = try XCTUnwrap(preservedRunValue)
         XCTAssertEqual(preservedRun.state, .failedTerminal)
         XCTAssertNil(preservedRun.activeOperationID)
+    }
+
+    func testManagerCacheClearDeletesOnlyDisposableCacheNamespace() throws {
+        let app = try configuredApp()
+        defer { app.shutdown() }
+        let manager = ManagerNode(app: app)
+        let fileManager = FileManager.default
+        let cachedFile = app.paths.cacheDir
+            .appendingPathComponent("nested", isDirectory: true)
+            .appendingPathComponent("artifact.bin")
+        try fileManager.createDirectory(
+            at: cachedFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("disposable".utf8).write(to: cachedFile)
+        let durableFile = app.paths.home.appendingPathComponent("durable-fixture.txt")
+        try Data("preserve".utf8).write(to: durableFile)
+
+        let operationID = UUID()
+        let receipt = try manager.clearApplicationCache(operationID: operationID)
+
+        XCTAssertEqual(receipt.operationID, operationID)
+        XCTAssertGreaterThanOrEqual(receipt.removedEntryCount, 1)
+        XCTAssertFalse(fileManager.fileExists(atPath: cachedFile.path))
+        XCTAssertTrue(fileManager.fileExists(atPath: app.paths.cacheDir.path))
+        XCTAssertTrue(fileManager.fileExists(
+            atPath: app.paths.cacheDir.appendingPathComponent("browser").path
+        ))
+        XCTAssertEqual(try Data(contentsOf: durableFile), Data("preserve".utf8))
     }
 
     private func configuredApp() throws -> ForgeApp {

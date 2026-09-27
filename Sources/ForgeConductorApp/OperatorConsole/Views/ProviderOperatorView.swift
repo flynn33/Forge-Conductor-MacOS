@@ -17,7 +17,7 @@ struct ProviderOperatorView: View {
             VStack(alignment: .leading, spacing: 16) {
                 OperatorHeader(
                     title: "Provider",
-                    subtitle: "Choose one execution provider. Forge manages LM Studio inference and orchestrates work in supported desktop coding hosts.",
+                    subtitle: "Choose the provider Forge connects to for MCP governance and automatic continuity.",
                     isLoading: viewModel.isBusy,
                     titleAccessibilityIdentifier: "detail-provider",
                     subtitleAccessibilityIdentifier: "provider-operator-view",
@@ -253,10 +253,10 @@ struct ProviderOperatorView: View {
                         .disabled(viewModel.configuration?.saved != true || viewModel.hasUnsavedChanges)
                         .accessibilityIdentifier("provider-refresh-models")
                 }
-                Text("Save applies to future managed runs. Finish or cancel existing runs before changing settings. Saving does not test the connection; model loading remains in LM Studio.")
+                Text("Save updates the LM Studio connection used by Forge MCP and continuity. Saving does not test the connection; model loading remains in LM Studio.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("Run Contract Probe", action: viewModel.runContractProbe)
+                    Button("Connect and Check", action: viewModel.runContractProbe)
                         .accessibilityIdentifier("provider-run-contract-probe")
                     if viewModel.isProbing {
                         ProgressView()
@@ -343,7 +343,7 @@ struct ProviderOperatorView: View {
                 }
             }
 
-            Text("Connect and Check performs model discovery, local LM Studio recovery when needed, and the full managed-provider contract probe. The separate probe remains available here for advanced diagnosis.")
+            Text("Connect and Check uses one manager-owned path for model discovery, LM Studio recovery, Forge MCP registration, and contract verification.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

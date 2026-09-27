@@ -1204,6 +1204,7 @@ final class ProductPathReliabilityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(tools.count, 20, "product must expose full tool surface")
         let names = Set(tools.compactMap { $0["name"] as? String })
         XCTAssertTrue(names.contains("forge_status"))
+        XCTAssertTrue(names.contains("get_forge_status"))
         XCTAssertTrue(names.contains("agent_list"))
         XCTAssertTrue(names.contains("shell_exec"))
         XCTAssertTrue(MCPServeVerifier.requiredProductTools.isSubset(of: names))

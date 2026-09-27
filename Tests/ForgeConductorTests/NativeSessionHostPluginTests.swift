@@ -346,7 +346,7 @@ final class NativeSessionHostPluginTests: XCTestCase {
         }
     }
 
-    func testConfiguredProductionRegistrationCannotYieldSyntheticV1Session() async throws {
+    func testConfiguredProductionRegistrationRequiresReachableProviderForInteractiveSession() async throws {
         let root = temporaryRoot("configured-registry")
         defer { try? FileManager.default.removeItem(at: root) }
         let registry = HostAdapterRegistry()
@@ -373,8 +373,10 @@ final class NativeSessionHostPluginTests: XCTestCase {
                 predecessorSessionID: "provider-predecessor",
                 idempotencyKey: "configured-production"
             ))
-            XCTFail("V1 must not fabricate a provider session before fresh-root bootstrap")
-        } catch ContinuityRunError.hostCapabilityUnavailable {}
+            XCTFail("The interactive adapter must not fabricate a provider session")
+        } catch let error as LMStudioProviderError {
+            XCTAssertEqual(error, .providerUnavailable)
+        }
     }
 
     func testProductionRegistrationLoadsBoundedProviderFile() throws {

@@ -12,42 +12,47 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
-- Added confirmed Continuity cleanup controls for deleting one selected old
-  item or every old item across registered project generations. An item is old
-  when its command is terminal or its owning run is missing or terminal.
-  Cleanup retires stale nonterminal project state, removes its list root,
-  continuity operation/handoff/transition/repair payloads and rebuildable
-  projection cache, and tombstones replay. A genuinely live item remains
-  visible with its exact blocker and **Open Run Details** recovery action.
-  Ordinary project memory, tasks, runs, credentials, project files, and
-  unrelated project data remain unchanged.
+- Replaced the primary Managed Run workflow with ordinary LM Studio chat use:
+  `get_forge_status` now accepts `project_id`, lists registered projects without
+  a run binding, and returns project-file, instruction-store, continuity-store,
+  and query-tool locations.
+- Added automatic ordinary-chat continuity. A resume-ready handoff publishes a
+  visible 30-second Dashboard countdown, then creates one stored LM Studio chat
+  through `/api/v1/chat`, enables `mcp/forge-conductor`, submits
+  `get_forge_status` with `resume=true`, verifies the exact handoff ID, and
+  reuses the durable host-adapter ledger across retries.
+- Added multi-folder project selection, multi-source instruction import,
+  drag-and-drop package ordering, explicit **Delete Package**, project reset,
+  and disposable **Clear Cache** controls.
+- Added multi-file/folder Development Policy selection and durable drag-priority
+  ordering in Rune Forge, plus per-project policy-log export. CLU notices now
+  identify the violated policy and include its bounded redacted policy content.
+
 - Advanced the product identity to `0.15.0 (14)` across repository authorities,
   runtime constants, tests, and every Xcode build configuration.
 
 ### Fixed
 
+- Unified LM Studio selection, **Connect and Check**, the Advanced connection
+  check, and provider probe on the same actionable Manager preparation path so
+  they no longer fall through the obsolete run-resumption path and report a
+  misleading `manager unavailable` result.
+- Replaced the Continuity operator UI with a scrollable registered project-ID
+  list plus **Copy Project ID** and project-scoped **Delete**. Manual checkpoint,
+  rollover, run selection, timelines, and old-item cleanup controls are no
+  longer part of that view.
+- Removed Managed Run launch instructions and labels from current Guided Setup,
+  Dashboard, Projects, Provider, Rune Forge, and Continuity guidance. Retained
+  low-level run services remain compatibility-only.
+
 - Removed the documented app-hosted Thread Performance Checker inversions by
   matching diagnostic delivery, shutdown, and project-context waiter QoS to
   their bounded callers. Authenticated operator credential file work also now
   leaves the main actor before request construction.
-- Made **Stop Active Work** fence automatic queue advancement, quiesce and
-  durably cancel the exact active run, and reconcile its package to a terminal
-  state before returning it to the removable/reorderable UI. A transient
-  cancellation failure leaves the queue stopped while preserving a retryable
-  stop action.
 - Restored usable Projects instruction-package controls in constrained window
-  geometry. Stop/Add/Run Details now sit above the package rows so a nested
-  list can no longer steal their hits. Explicit earlier/later and Remove
-  buttons are ordinary bordered controls in the detail ScrollView rather than
-  a nested List. Removed the package-container accessibility identifier that
-  SwiftUI propagated over every child button, preserving the exact Stop,
-  earlier/later, and Remove control identities. A two-second background poll
-  no longer clears the visible queue while a mutation is in flight, and stale
-  snapshots can no longer roll back a newer persisted order.
-- Made **Start Ordered Work** perform a live, no-resume readiness check for the
-  selected LM Studio endpoint, pinned model, loaded inventory, and tool contract
-  before mutating the instruction queue or creating a run. An unloaded pin now
-  returns the exact corrective action while leaving the package queued.
+  geometry. Explicit earlier/later and **Delete Package** buttons remain
+  distinct controls, and stale background snapshots cannot roll back a newer
+  persisted package order.
 - Limited provider-repair auto-resume to the active project generation, so a
   durable historical run cannot abort recovery of current-generation work.
 - Retained 1,024 bounded managed-provider receipts—two complete windows for the
@@ -62,6 +67,16 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- The September 27 owner-workflow correction passed the complete 1,902-test
+  Swift suite with 12 explicit environment-dependent skips and zero failures;
+  both SwiftPM products and the canonical Apple Development-signed Debug app
+  built. Two current-source production Manager routes passed against loaded LM
+  Studio model `qwen/qwen3.8-27b`: live **Connect and Check** readiness reuse
+  and the live provider probe. Five focused native UI tests passed for the
+  project-ID-only Continuity surface, ID copy, project-scoped deletion, and
+  minimum-window instruction package reorder/deletion. Current native-candidate
+  Provider-button, CLU-delivery, and full automatic rollover acceptance remain
+  open; these results do not claim shipment.
 - Product source `849b87953b4420f07a629fdcd29ecf0d58216756`
   passed the complete 1,890-test Swift suite with 12 explicit skips and zero
   failures and the complete 111-test app-hosted suite with zero failures. The

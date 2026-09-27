@@ -446,6 +446,33 @@ public final class ManagerDashboardClient: @unchecked Sendable {
         )
     }
 
+    public func reorderStjornarvaldSources(
+        sourceIDs: [PolicySourceID]
+    ) async throws -> [DevelopmentPolicySource] {
+        guard !sourceIDs.isEmpty, sourceIDs.count <= 100,
+              Set(sourceIDs).count == sourceIDs.count else {
+            throw ClientError.invalidRequest(
+                "Development Policy ordering requires 1 through 100 unique source IDs"
+            )
+        }
+        let object = try await request(
+            method: "POST",
+            path: "/api/manager/stjornarvald/sources/reorder",
+            body: ["source_ids": sourceIDs.map(\.description)],
+            timeoutInterval: 12
+        )
+        guard let rawSources = object["sources"] else { throw ClientError.invalidResponse }
+        do {
+            let data = try JSONSerialization.data(withJSONObject: rawSources, options: [.sortedKeys])
+            return try JSONDecoder().decode(
+                [DevelopmentPolicySource].self,
+                from: data
+            )
+        } catch {
+            throw ClientError.invalidResponse
+        }
+    }
+
     private func stjornarvaldSourceMutation(
         action: String,
         body: [String: Any]

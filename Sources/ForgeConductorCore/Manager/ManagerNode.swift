@@ -248,6 +248,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private static let presencePruneInterval: TimeInterval = 60
     private static let presenceMaxAge: TimeInterval = 120
     private static let operatorRedactor = ProjectMemoryRedactor()
+    static let interactiveRolloverDelaySeconds: TimeInterval = 30
 
     public let app: ForgeApp
     public let stjornarvald: StjornarvaldManagerCoordinator
@@ -258,6 +259,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     /// Serializes durable provider-selection acceptance with run-start admission.
     /// The lock is held only across bounded manager/coordinator transactions.
     private let providerSelectionAdmissionLock = NSLock()
+    /// Serializes replacement of the disposable application-cache namespace.
+    private let cacheMaintenanceLock = NSLock()
     /// Live desktop readiness invokes a host CLI. Keep one inspection in flight
     /// and retain admission until the underlying adapter task actually drains,
     /// including after the synchronous caller's deadline expires.
@@ -299,6 +302,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var nativeSourceRecoveryCursor: Int64?
     private var nativeSourceRecoveryCancellation: ToolCallCancellation?
     private var nativeTaskAttachmentClosing = false
+    private var interactiveContinuityTask: Task<Void, Never>?
+    private var completedInteractiveHandoffIDs: [String] = []
+    private var interactiveContinuityLastError: String?
 
     public convenience init(
         app: ForgeApp,
@@ -499,6 +505,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         self.projectRegistrationCheckpoint = projectRegistrationCheckpoint
         self.projectContentClearCheckpoint = projectContentClearCheckpoint
         self.instructionRunAdmissionCheckpoint = instructionRunAdmissionCheckpoint
+        self.completedInteractiveHandoffIDs = Self.loadCompletedInteractiveHandoffIDs(
+            from: app.paths.managedProvidersDir.appendingPathComponent(
+                "interactive-continuity-sealed.json"
+            )
+        )
     }
 
     deinit {
@@ -507,6 +518,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         taskHTTPService.closeAdmission()
         nativeSourceConversation?.setOperational(false)
         nativeSourceRecoveryCancellation?.cancel()
+        interactiveContinuityTask?.cancel()
         stopWatchdog()
         stopSignalHandlers()
         tearDownDashboard()
@@ -640,6 +652,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             try await self.stjornarvald.removeSource(sourceID: sourceID, requestID: requestID)
         }
         return try JSONSupport.object(from: JSONEncoder().encode(source))
+    }
+
+    public func stjornarvaldReorderSources(
+        sourceIDs: [PolicySourceID]
+    ) throws -> [String: Any] {
+        let sources = try stjornarvald.reorderSources(sourceIDs: sourceIDs)
+        return [
+            "sources": try sources.map {
+                try JSONSupport.object(from: JSONEncoder().encode($0))
+            },
+        ]
     }
 
     public func stjornarvaldSubmitObservations(
@@ -895,6 +918,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             limit: limit
         )
         let continuityRows = persisted.continuity.map(Self.operatorContinuity)
+        let interactiveContinuity = try interactiveContinuityStatus(
+            projects: persisted.projects
+        )
         let jobRows = persisted.runtimeJobs.map(Self.operatorRuntimeJob)
         let visibleEvents = Array(persisted.events.prefix(limit))
         let nextCursor = persisted.events.count > limit
@@ -974,6 +1000,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             runs: runRows,
             continuityReadiness: continuityReadinessRows,
             continuityOperations: continuityRows,
+            interactiveContinuity: interactiveContinuity,
             runtimeJobs: jobRows,
             provider: provider,
             runPreparation: ManagerOperatorRunPreparation(
@@ -2480,6 +2507,57 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
     }
 
+    /// Deletes only Forge's disposable cache namespace and immediately recreates
+    /// the directories required by cache consumers. Durable project, policy,
+    /// continuity, credential, and diagnostic state live outside this boundary.
+    public func clearApplicationCache(operationID: UUID) throws -> ManagerCacheClearReceipt {
+        cacheMaintenanceLock.lock()
+        defer { cacheMaintenanceLock.unlock() }
+
+        let fileManager = FileManager.default
+        let cacheURL = app.paths.cacheDir.standardizedFileURL
+        let expectedParent = app.paths.home.standardizedFileURL
+        guard cacheURL.deletingLastPathComponent() == expectedParent,
+              cacheURL.lastPathComponent == "cache" else {
+            throw AutonomyError.invalidRequest("Forge cache boundary is invalid")
+        }
+
+        var removedEntryCount = 0
+        if fileManager.fileExists(atPath: cacheURL.path) {
+            let values = try cacheURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
+            guard values.isSymbolicLink != true, values.isDirectory == true else {
+                throw AutonomyError.invalidRequest(
+                    "Forge cache must be a real directory inside the application home"
+                )
+            }
+            removedEntryCount = try fileManager.contentsOfDirectory(
+                at: cacheURL,
+                includingPropertiesForKeys: nil,
+                options: []
+            ).count
+            try fileManager.removeItem(at: cacheURL)
+        }
+        try fileManager.createDirectory(at: cacheURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(
+            at: cacheURL.appendingPathComponent("browser", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        let receipt = ManagerCacheClearReceipt(
+            operationID: operationID,
+            removedEntryCount: removedEntryCount,
+            completedAt: ISO8601.string(from: Date())
+        )
+        app.diagnostics.info(
+            "manager_application_cache_cleared",
+            [
+                "operation_id": operationID.uuidString.lowercased(),
+                "removed_entry_count": "\(removedEntryCount)",
+            ],
+            category: .manager
+        )
+        return receipt
+    }
+
     /// Clears old continuity payload/history without resetting projects or
     /// advancing generations. Stale operations owned by terminal tasks are
     /// retired first; continuity owned by a live task fails closed.
@@ -2496,6 +2574,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 )
             }
             _ = operationID
+        case .project:
+            guard request.operationID == nil,
+                  request.projectID != nil,
+                  request.projectGeneration == nil else {
+                throw AutonomyError.invalidRequest(
+                    "project continuity deletion requires one exact project identity"
+                )
+            }
         case .allSettled:
             guard request.operationID == nil,
                   request.projectID == nil,
@@ -2508,7 +2594,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
         let candidates = try Self.waitForAsync(timeoutSeconds: 10) {
             try await self.app.projectContexts.repository
-                .oldContinuityHistoryCommands(operationID: request.operationID)
+                .oldContinuityHistoryCommands(
+                    operationID: request.operationID,
+                    projectID: request.scope == .project ? request.projectID : nil
+                )
         }
         if request.scope == .operation, let command = candidates.first {
             guard command.operationID == request.operationID,
@@ -2549,7 +2638,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 }
                 purge = try repository.purgeSettledContinuityHistory(
                         operationIDs: operationIDs,
-                        requireEveryOperationSettled: request.scope == .operation
+                        requireEveryOperationSettled: request.scope != .allSettled
                     )
             } catch ProjectMemoryError.projectNotFound {
                 // A removed project has no remaining project-local payload/cache;
@@ -2579,6 +2668,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let receipt = ContinuityHistoryClearReceipt(
             scope: request.scope,
             requestedOperationID: request.operationID,
+            requestedProjectID: request.scope == .project ? request.projectID : nil,
             clearedOperationCount: clearedOperationCount,
             clearedProjectCount: clearedProjectCount,
             deletedRecordCount: deletedRecordCount,
@@ -3036,7 +3126,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             return ManagerProviderPreparationResult(
                 state: .ready,
                 recoveryAction: .none,
-                detail: "LM Studio and the selected tool-capable model are ready for managed tasks.",
+                detail: "LM Studio and the selected tool-capable model are ready for Forge MCP and automatic continuity.",
                 configuration: current,
                 provider: provider
             )
@@ -5124,8 +5214,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 runID: nil,
                 state: .ready,
                 automatic: true,
-                detail: "Automatic continuity is ready. It starts with the next managed task; no setup is required.",
-                nextAutomaticAction: "Forge will begin monitoring when the next managed task starts.",
+                detail: "Automatic continuity is ready for this project's LM Studio conversation.",
+                nextAutomaticAction: "Forge will monitor the next project handoff automatically.",
                 recoveryAction: ContinuityRecoveryAction.none
             ))
         }
@@ -5345,14 +5435,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             return (
                 .blocked,
                 detail,
-                "Open Projects, then Run Details, for the exact run condition and available recovery action; Forge retains durable task state.",
+                "Review the recorded project condition in Events & Evidence; Forge retains durable task state.",
                 .reviewRun
             )
         case .created, .validating, .ready, .starting, .running, .paused,
              .validatingCompletion, .cancelRequested:
             return (
                 .monitoring,
-                "Automatic continuity is monitoring this managed task.",
+                "Automatic continuity is monitoring this project task.",
                 "Forge will save progress before the rollover threshold.",
                 .none
             )
@@ -5360,7 +5450,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             return (
                 .ready,
                 "This task no longer needs active continuity monitoring.",
-                "Automatic continuity is ready for the next managed task.",
+                "Automatic continuity is ready for the next LM Studio handoff.",
                 .none
             )
         }
@@ -6257,6 +6347,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
         pruneStalePresenceIfDue()
         resumeProviderWaitsAfterCompletedIntegrationIfNeeded()
+        scheduleInteractiveContinuityTick()
         scheduleAutonomyTick()
 
         if !httpUp {
@@ -6310,6 +6401,278 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
 
         persistState()
+    }
+
+    /// Discovers the latest ordinary LM Studio handoff independently of Managed
+    /// Run, waits until its durable 30-second boundary, and bootstraps one stored
+    /// successor chat through the statically registered host adapter.
+    private func scheduleInteractiveContinuityTick() {
+        lock.lock()
+        guard interactiveContinuityTask == nil, !runtime.shutdownRequested else {
+            lock.unlock()
+            return
+        }
+        let task = Task { [weak self] in
+            defer { self?.finishInteractiveContinuityTick() }
+            do {
+                _ = try await self?.processInteractiveContinuityOnce()
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.recordInteractiveContinuityError(error)
+                self?.app.diagnostics.warn(
+                    "manager_interactive_continuity_deferred",
+                    ["error": error.localizedDescription],
+                    category: .manager
+                )
+            }
+        }
+        interactiveContinuityTask = task
+        lock.unlock()
+    }
+
+    private func finishInteractiveContinuityTick() {
+        lock.lock()
+        interactiveContinuityTask = nil
+        lock.unlock()
+    }
+
+    @discardableResult
+    func processInteractiveContinuityOnce(ignoreDelay: Bool = false) async throws -> String? {
+        guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true) else {
+            return nil
+        }
+        guard !interactiveHandoffAlreadyCompleted(packet.id) else { return packet.id }
+
+        guard let updatedAt = ISO8601.date(from: packet.updatedAt) else {
+            throw ProjectMemoryError.integrityFailure(
+                "interactive handoff timestamp is invalid"
+            )
+        }
+        if !ignoreDelay {
+            let remaining = updatedAt.addingTimeInterval(Self.interactiveRolloverDelaySeconds)
+                .timeIntervalSince(app.clock.now())
+            if remaining > 0 {
+                try await Task.sleep(for: .seconds(remaining))
+            }
+        }
+        try Task.checkCancellation()
+
+        let projects = try await app.projectContexts.repository.operatorProjects(limit: 100)
+        guard let project = Self.interactiveProject(for: packet, projects: projects) else {
+            throw ProjectMemoryError.invalidRequest(
+                "No registered project matches interactive handoff \(packet.id)"
+            )
+        }
+        let handoff = try Self.interactiveHandoff(packet: packet, project: project)
+        let adapter = try hostAdapterRegistry.adapter(
+            identifier: Self.nativeSessionHostAdapterID,
+            storageDirectory: providerStorageDirectory(
+                adapterID: Self.nativeSessionHostAdapterID
+            )
+        )
+        let capabilities = try await adapter.capabilities()
+        guard capabilities.create, capabilities.bootstrap,
+              capabilities.idempotency || capabilities.queryByIdempotencyKey else {
+            throw ContinuityRunError.hostCapabilityUnavailable
+        }
+        let idempotencyKey = "interactive-continuity:\(packet.id)"
+        let session: HostSession
+        if let existing = try await adapter.session(forIdempotencyKey: idempotencyKey) {
+            session = existing
+        } else {
+            session = try await adapter.createSession(SessionCreationRequest(
+                operationID: packet.id,
+                projectID: project.projectID.description,
+                predecessorSessionID: packet.clientID ?? "lmstudio-interactive",
+                idempotencyKey: idempotencyKey
+            ))
+        }
+        try await adapter.bootstrap(session, handoff: handoff)
+        let acknowledgement = try await adapter.awaitAcknowledgement(
+            session: session,
+            handoffID: packet.id,
+            timeout: .seconds(10)
+        )
+        guard acknowledgement.handoffID == packet.id,
+              acknowledgement.successorSessionID == session.id else {
+            throw ProjectMemoryError.integrityFailure(
+                "interactive successor acknowledgement identity differs"
+            )
+        }
+        try markInteractiveHandoffCompleted(packet.id)
+        app.diagnostics.info(
+            "manager_interactive_continuity_completed",
+            [
+                "handoff_id": packet.id,
+                "project_id": project.projectID.description,
+                "successor_session_id": session.id,
+                "delay_seconds": "\(Int(Self.interactiveRolloverDelaySeconds))",
+                "bootstrap": "get_forge_status resume=true",
+            ],
+            category: .manager
+        )
+        return packet.id
+    }
+
+    private func interactiveHandoffAlreadyCompleted(_ handoffID: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return completedInteractiveHandoffIDs.contains(handoffID)
+    }
+
+    private func markInteractiveHandoffCompleted(_ handoffID: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !completedInteractiveHandoffIDs.contains(handoffID) else {
+            interactiveContinuityLastError = nil
+            return
+        }
+        var completed = completedInteractiveHandoffIDs
+        completed.append(handoffID)
+        if completed.count > 128 {
+            completed.removeFirst(completed.count - 128)
+        }
+        let ledgerURL = app.paths.managedProvidersDir.appendingPathComponent(
+            "interactive-continuity-sealed.json"
+        )
+        try OwnerOnlyAtomicFile.write(
+            try JSONSerialization.data(withJSONObject: completed, options: [.sortedKeys]),
+            to: ledgerURL
+        )
+        completedInteractiveHandoffIDs = completed
+        interactiveContinuityLastError = nil
+    }
+
+    private static func loadCompletedInteractiveHandoffIDs(from url: URL) -> [String] {
+        guard let data = try? Data(contentsOf: url),
+              let values = try? JSONSerialization.jsonObject(with: data) as? [String] else {
+            return []
+        }
+        var seen = Set<String>()
+        return values.suffix(128).filter { value in
+            UUID(uuidString: value) != nil && seen.insert(value).inserted
+        }
+    }
+
+    private func recordInteractiveContinuityError(_ error: Error) {
+        let redacted = (try? Self.operatorRedactor.redact(error.localizedDescription))
+            ?? "Interactive continuity could not create the LM Studio successor."
+        lock.lock()
+        interactiveContinuityLastError = String(redacted.prefix(512))
+        lock.unlock()
+    }
+
+    private func interactiveContinuityStatus(
+        projects: [ProjectControlRecord]
+    ) throws -> ManagerInteractiveContinuityStatus? {
+        guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true),
+              let updatedAt = ISO8601.date(from: packet.updatedAt) else {
+            return nil
+        }
+        let projectID = Self.interactiveProject(for: packet, projects: projects)?
+            .projectID.description
+        let dueAt = updatedAt.addingTimeInterval(Self.interactiveRolloverDelaySeconds)
+        let remaining = max(0, Int(ceil(dueAt.timeIntervalSince(app.clock.now()))))
+        lock.lock()
+        let completed = completedInteractiveHandoffIDs.contains(packet.id)
+        let lastError = interactiveContinuityLastError
+        lock.unlock()
+        let state: String
+        let detail: String
+        if completed {
+            state = "completed"
+            detail = "LM Studio successor acknowledged the saved handoff."
+        } else if remaining > 0 {
+            state = "countdown"
+            detail = "Forge will create the LM Studio successor chat when the countdown reaches zero."
+        } else if let lastError {
+            state = "attention"
+            detail = lastError
+        } else {
+            state = "creating_successor"
+            detail = "Forge is creating and verifying the LM Studio successor chat."
+        }
+        return ManagerInteractiveContinuityStatus(
+            handoffID: packet.id,
+            projectID: projectID,
+            state: state,
+            countdownSeconds: remaining,
+            dueAt: ISO8601.string(from: dueAt),
+            detail: detail
+        )
+    }
+
+    private static func interactiveProject(
+        for packet: HandoffPacket,
+        projects: [ProjectControlRecord]
+    ) -> ProjectControlRecord? {
+        if let cwd = packet.cwd, !cwd.isEmpty {
+            let candidate = URL(fileURLWithPath: cwd).standardizedFileURL.path
+            let matches = projects.filter {
+                let root = $0.canonicalRoot.standardizedFileURL.path
+                return candidate == root || candidate.hasPrefix(root + "/")
+            }
+            if let longest = matches.max(by: {
+                $0.canonicalRoot.path.count < $1.canonicalRoot.path.count
+            }) {
+                return longest
+            }
+        }
+        if let slug = packet.projectSlug, !slug.isEmpty {
+            let matches = projects.filter {
+                $0.displayName.caseInsensitiveCompare(slug) == .orderedSame
+            }
+            if matches.count == 1 { return matches[0] }
+        }
+        return projects.count == 1 ? projects[0] : nil
+    }
+
+    private static func interactiveHandoff(
+        packet: HandoffPacket,
+        project: ProjectControlRecord
+    ) throws -> ContinuityHandoff {
+        let next = packet.nextActions.isEmpty ? ["Resume the saved Forge handoff."] : packet.nextActions
+        return try ContinuityHandoff(
+            handoffID: packet.id,
+            operationID: packet.id,
+            createdAt: packet.updatedAt,
+            project: [
+                "project_id": project.projectID.description,
+                "display_name": project.displayName,
+                "repository_root": project.canonicalRoot.path,
+                "branch": "interactive",
+                "commit": "unreported",
+                "dirty_summary": [String](),
+            ],
+            predecessorSession: [
+                "session_id": packet.clientID ?? "lmstudio-interactive",
+                "provider_session_id": NSNull(),
+                "model": NSNull(),
+            ],
+            mission: packet.goal.isEmpty ? "Resume the saved Forge project" : packet.goal,
+            currentWork: [
+                "phase_id": "interactive",
+                "work_item_id": packet.id,
+                "summary": packet.status,
+                "active_files": packet.keyFiles,
+            ],
+            decisions: packet.decisions.map { ["summary": $0] },
+            nextActions: next.enumerated().map {
+                [
+                    "order": $0.offset + 1,
+                    "action": $0.element,
+                    "command": "",
+                    "success_condition": "Saved work continues in the successor chat",
+                ] as [String: Any]
+            },
+            hostState: [
+                "adapter_id": Self.nativeSessionHostAdapterID,
+                "continuity_state": "checkpoint_persisted",
+                "context_budget_source": "lmstudio_interactive",
+                "retry": ["attempt": 0],
+            ]
+        ).validated()
     }
 
     private func resumeProviderWaitsAfterCompletedIntegrationIfNeeded() {

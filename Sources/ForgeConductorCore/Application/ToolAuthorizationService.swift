@@ -600,7 +600,8 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     }
 
     private static let sessionLifecycleTools: Set<String> = [
-        "forge_status", "agent_list", "agent_get", "agent_context", "agent_recommend",
+        "forge_status", "get_forge_status",
+        "agent_list", "agent_get", "agent_context", "agent_recommend",
         "agent_run_start", "agent_run_status", "agent_run_complete",
         // Durable memory remains available without and during agent sessions.
         "memory_set", "memory_get", "memory_list", "memory_delete", "memory_search",

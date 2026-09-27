@@ -10,13 +10,13 @@ import XCTest
 
 @MainActor
 final class RuneForgeAppTests: XCTestCase {
-    func testNativePickerAcceptsOneFileOrFolderWithoutContentTypeAllowlist() {
+    func testNativePickerAcceptsFilesAndFoldersWithoutContentTypeAllowlist() {
         let panel = RuneForgePolicyPicker.makePanel()
 
         XCTAssertTrue(panel.canChooseFiles)
         XCTAssertTrue(panel.canChooseDirectories)
         XCTAssertFalse(panel.canCreateDirectories)
-        XCTAssertFalse(panel.allowsMultipleSelection)
+        XCTAssertTrue(panel.allowsMultipleSelection)
         XCTAssertTrue(panel.allowsOtherFileTypes)
         XCTAssertTrue(panel.allowedContentTypes.isEmpty)
         XCTAssertEqual(panel.prompt, "Add Development Policy")
@@ -32,7 +32,7 @@ final class RuneForgeAppTests: XCTestCase {
             RuneForgePolicyPicker.select(
                 arguments: ["Forge Conductor", "--uitesting"],
                 environment: [RuneForgePolicyPicker.testSelectionEnvironmentKey: path]
-            )?.path,
+            ).first?.path,
             path
         )
     }
@@ -108,9 +108,9 @@ final class RuneForgeAppTests: XCTestCase {
         }
 
         XCTAssertEqual(viewModel.sources.count, RuneForgeViewModel.maximumSources)
-        XCTAssertEqual(viewModel.sources.first?.displayName, "policy-100.opaque")
+        XCTAssertEqual(viewModel.sources.first?.displayName, "policy-0.opaque")
         XCTAssertNil(
-            viewModel.sources.first(where: { $0.displayName == "policy-0.opaque" })
+            viewModel.sources.first(where: { $0.displayName == "policy-100.opaque" })
         )
     }
 
@@ -128,6 +128,20 @@ final class RuneForgeAppTests: XCTestCase {
         XCTAssertEqual(viewModel.events.first?.sequence, Int64(RuneForgeViewModel.maximumEvents + 1))
         XCTAssertEqual(viewModel.events.last?.sequence, 2)
         XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testProjectLogIDsIncludeRegisteredAndObservedProjectsExactlyOnce() {
+        let observed = policyEvent(sequence: 1, projectID: "project-observed")
+        XCTAssertEqual(
+            RuneForgeViewModel.projectLogIDs(
+                registeredProjectIDs: ["project-registered", "project-observed"],
+                events: [observed]
+            ),
+            ["project-observed", "project-registered"]
+        )
+        let filters = StjornarvaldExportFilters(projectID: "project-observed")
+        XCTAssertEqual(filters.projectID, "project-observed")
+        XCTAssertNil(filters.projectGeneration)
     }
 
     func testPolicyEventStateTitlesExposeEveryStateWithoutRelyingOnColor() {
@@ -170,7 +184,7 @@ final class RuneForgeAppTests: XCTestCase {
         )
     }
 
-    private func policyEvent(sequence: Int64) -> PolicyViolationEvent {
+    private func policyEvent(sequence: Int64, projectID: String? = nil) -> PolicyViolationEvent {
         let sourceID = PolicySourceID()
         let rule = PolicyRule(
             id: PolicyRuleID("fixture-rule-\(sequence)"),
@@ -188,6 +202,7 @@ final class RuneForgeAppTests: XCTestCase {
         let candidate = PolicyViolationCandidate(
             rule: rule,
             observationID: UUID(),
+            scope: DevelopmentObservationScope(projectID: projectID),
             subjectIdentity: "fixture-subject",
             summary: "Fixture policy event \(sequence)",
             evidenceReferences: ["fixture.swift:\(sequence)"],

@@ -16,7 +16,7 @@ enum RuneForgePolicyPicker {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.allowsOtherFileTypes = true
         panel.prompt = "Add Development Policy"
         panel.message = "Choose any file or folder containing development policy, governance, or guidance."
@@ -26,15 +26,15 @@ enum RuneForgePolicyPicker {
     static func select(
         arguments: [String] = CommandLine.arguments,
         environment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> URL? {
+    ) -> [URL] {
         if arguments.contains("--uitesting"),
            let path = environment[testSelectionEnvironmentKey],
            !path.isEmpty {
-            return URL(fileURLWithPath: path)
+            return [URL(fileURLWithPath: path)]
         }
         let panel = makePanel()
-        guard panel.runModal() == .OK else { return nil }
-        return panel.url
+        guard panel.runModal() == .OK else { return [] }
+        return panel.urls
     }
 
     static func makeExportPanel(format: StjornarvaldExportFormat) -> NSSavePanel {

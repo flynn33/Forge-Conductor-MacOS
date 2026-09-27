@@ -121,7 +121,7 @@ struct RuntimesOperatorView: View {
                 if let taskID = viewModel.runtimePolicy?.selectedTaskID {
                     LabeledContent("Task") { OperatorIdentifier(taskID) }
                 } else {
-                    Text("No managed task is selected. Missing optional runtimes do not block a task.")
+                    Text("No task runtime is selected. Missing optional runtimes do not block LM Studio chat work.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(viewModel.runtimePolicy?.requirements ?? [], id: \.runtime) { item in

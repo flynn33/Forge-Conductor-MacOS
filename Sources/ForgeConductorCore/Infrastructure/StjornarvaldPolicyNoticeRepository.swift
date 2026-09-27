@@ -113,6 +113,9 @@ public final class StjornarvaldPolicyNoticeRepository: @unchecked Sendable {
                 violationID: event.violationID,
                 ruleReference: event.candidate.rule.source,
                 summary: Self.bounded(Self.redacted(event.candidate.summary), bytes: 1_024),
+                policyStatement: Self.bounded(
+                    Self.redacted(event.candidate.rule.statement), bytes: 4_096
+                ),
                 suggestedCorrection: Self.bounded(
                     Self.redacted(event.candidate.suggestedCorrection), bytes: 1_024
                 ),

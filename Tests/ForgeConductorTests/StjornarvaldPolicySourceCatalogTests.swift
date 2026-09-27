@@ -21,6 +21,33 @@ final class StjornarvaldPolicySourceCatalogTests: XCTestCase {
         _ = try logFirst.makeCatalog()
     }
 
+    func testPolicySourcePriorityOrderIsDurableAndExact() async throws {
+        let fixture = try SourceFixture()
+        let catalog = try fixture.makeCatalog()
+        let first = try await catalog.add(
+            selectedURL: try fixture.file("first.md", data: Data("first".utf8)),
+            requestID: stableUUID(prefix: 0x01, index: 1)
+        )
+        let second = try await catalog.add(
+            selectedURL: try fixture.file("second.md", data: Data("second".utf8)),
+            requestID: stableUUID(prefix: 0x01, index: 2)
+        )
+        let third = try await catalog.add(
+            selectedURL: try fixture.file("third.md", data: Data("third".utf8)),
+            requestID: stableUUID(prefix: 0x01, index: 3)
+        )
+
+        let ordered = try catalog.reorder(sourceIDs: [third.id, first.id, second.id])
+        XCTAssertEqual(ordered.map(\.id), [third.id, first.id, second.id])
+
+        let reopened = try fixture.makeCatalog()
+        XCTAssertEqual(
+            try reopened.sources(includeRemoved: false).map(\.id),
+            [third.id, first.id, second.id]
+        )
+        XCTAssertThrowsError(try reopened.reorder(sourceIDs: [first.id, second.id]))
+    }
+
     func testEveryFormatSizeAndSpecialEntryReturnsDurableAcceptedIdentityBeforeIndexing() async throws {
         let fixture = try SourceFixture()
         let directory = try fixture.directory("folder")

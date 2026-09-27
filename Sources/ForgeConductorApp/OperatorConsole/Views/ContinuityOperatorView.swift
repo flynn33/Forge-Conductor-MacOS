@@ -1,115 +1,37 @@
 // ContinuityOperatorView.swift
-// Native rollover operation, context budget, acknowledgment, and recovery detail.
+// Project continuity identities only. Continuity execution remains automatic.
 
-import Foundation
-import SwiftUI
+import AppKit
 import ForgeConductorCore
+import SwiftUI
 
 struct ContinuityOperatorView: View {
     @StateObject private var viewModel: ContinuityViewModel
-    @State private var historyClearConfirmation: HistoryClearConfirmation?
-    private let onOpenAutonomy: () -> Void
-    private let onOpenProvider: () -> Void
+    @State private var confirmsDeletion = false
 
-    init(
-        client: any OperatorManagerClientProtocol,
-        onOpenAutonomy: @escaping () -> Void = {},
-        onOpenProvider: @escaping () -> Void = {}
-    ) {
+    init(client: any OperatorManagerClientProtocol) {
         _viewModel = StateObject(wrappedValue: ContinuityViewModel(client: client))
-        self.onOpenAutonomy = onOpenAutonomy
-        self.onOpenProvider = onOpenProvider
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            OperatorHeader(
-                title: "Continuity",
-                subtitle: "Automatic progress protection and fresh-session continuation",
-                isLoading: viewModel.isLoading,
-                titleAccessibilityIdentifier: "detail-continuity",
-                subtitleAccessibilityIdentifier: "continuity-operator-view",
-                onRefresh: viewModel.load
-            )
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Continuity")
+                    .font(.title2.bold())
+                    .accessibilityIdentifier("detail-continuity")
+                Text("Automatic continuity by project")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("continuity-operator-view")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.top, 18)
             .padding(.bottom, 14)
 
             Divider()
 
-            if viewModel.operations.isEmpty {
-                detailPane
-            } else {
-                HSplitView {
-                    operationList
-                        .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
-                    detailPane
-                        .frame(minWidth: 520, maxWidth: .infinity)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onChange(of: viewModel.selectedOperationID) { _, operationID in
-            viewModel.selectRun(forOperationID: operationID)
-        }
-        .task { viewModel.load() }
-        .guidedHelpState(viewModel.guidedHelpState, for: .continuity)
-        .alert(
-            "Clear continuity history?",
-            isPresented: Binding(
-                get: { historyClearConfirmation != nil },
-                set: { if !$0 { historyClearConfirmation = nil } }
-            ),
-            presenting: historyClearConfirmation
-        ) { confirmation in
-            Button("Cancel", role: .cancel) {}
-            Button(confirmation.actionTitle, role: .destructive) {
-                historyClearConfirmation = nil
-                switch confirmation {
-                case .selected:
-                    viewModel.clearSelectedHistory()
-                case .allOld:
-                    viewModel.clearAllOldHistory()
-                }
-            }
-        } message: { confirmation in
-            Text(confirmation.message)
-        }
-    }
-
-    private var operationList: some View {
-        List(selection: $viewModel.selectedOperationID) {
-            ForEach(viewModel.operations) { operation in
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(activityTitle(operation))
-                            .lineLimit(1)
-                        Text(mission(for: operation))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        Text("Attempt \(operation.attempt) · \(operation.runID)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .tag(operation.operationID)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("continuity-operation-row-\(operation.operationID)")
-            }
-        }
-        .listStyle(.sidebar)
-        .accessibilityIdentifier("continuity-operation-list")
-    }
-
-    private var detailPane: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                continuityStatus
+            VStack(alignment: .leading, spacing: 14) {
                 if let error = viewModel.errorMessage {
                     OperatorErrorBanner(message: error, retry: viewModel.load)
                 }
@@ -125,462 +47,82 @@ struct ContinuityOperatorView: View {
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-                    .accessibilityIdentifier("continuity-command-error")
+                    .accessibilityIdentifier("continuity-delete-error")
                 }
                 if let notice = viewModel.notice {
                     OperatorNoticeBanner(message: notice)
                 }
-                manualActions
-                if !viewModel.operations.isEmpty {
-                    historyActions
-                }
-                if let operation = viewModel.selectedOperation {
-                    operationDetail(operation)
-                } else if viewModel.errorMessage == nil, !viewModel.isLoading {
-                    Text("No rollover is active. Automatic continuity is ready and requires no setup.")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-                        .accessibilityIdentifier("continuity-no-operation-ready")
+
+                if viewModel.projectIDs.isEmpty, !viewModel.isLoading {
+                    ContentUnavailableView(
+                        "No continuity projects",
+                        systemImage: "arrow.trianglehead.2.clockwise.rotate.90",
+                        description: Text(
+                            "Project identities appear here automatically after continuity data is saved."
+                        )
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("continuity-projects-empty")
+                } else {
+                    actions
+                    projectList
                 }
             }
             .padding(20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .accessibilityIdentifier("continuity-detail-pane")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .task { viewModel.load() }
+        .guidedHelpState(viewModel.guidedHelpState, for: .continuity)
+        .alert("Delete continuity data?", isPresented: $confirmsDeletion) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                viewModel.deleteSelectedProjectContinuity()
+            }
+        } message: {
+            Text(
+                "This deletes saved checkpoints, handoffs, transition history, and derived continuity cache for the selected project. It does not delete project files, registration, instruction packages, policies, project memory, or run history."
+            )
+        }
     }
 
-    private var continuityStatus: some View {
-        GroupBox("Automatic continuity") {
-            if let readiness = viewModel.selectedReadiness {
-                VStack(alignment: .leading, spacing: 10) {
-                    LabeledContent("Protection") {
-                        OperatorStateBadge(state: stateTitle(readiness.state))
-                            .accessibilityIdentifier("continuity-readiness-state")
-                    }
-                    LabeledContent(
-                        "Task",
-                        value: selectedTaskTitle(for: readiness)
-                    )
-                    LabeledContent(
-                        "Progress saved",
-                        value: progressSaved(readiness.latestCheckpointAt)
-                    )
-                    LabeledContent(
-                        "Working context",
-                        value: contextRemaining(readiness)
-                    )
-                    Text(readiness.detail)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("continuity-readiness-detail")
-                    if let next = readiness.nextAutomaticAction {
-                        Label(next, systemImage: "arrow.forward.circle")
-                            .font(.callout)
-                            .accessibilityIdentifier("continuity-next-action")
-                    }
-                    if let recovery = readiness.recoveryAction,
-                       recovery != .none {
-                        Button(recoveryTitle(recovery)) {
-                            performRecovery(recovery)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("continuity-recovery-action")
-                    }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    OperatorStateBadge(state: "Ready")
-                        .accessibilityIdentifier("continuity-readiness-state")
-                    Text("Automatic continuity is ready. It starts with the next managed task; no setup is required.")
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("continuity-readiness-detail")
-                }
+    private var projectList: some View {
+        List(selection: $viewModel.selectedProjectID) {
+            ForEach(viewModel.projectIDs, id: \.self) { projectID in
+                Text(projectID)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .tag(String?.some(projectID))
+                    .accessibilityIdentifier("continuity-project-row-\(projectID)")
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("continuity-project-list")
     }
 
-    private var manualActions: some View {
-        GroupBox("Optional manual actions") {
-            VStack(alignment: .leading, spacing: 10) {
-                if viewModel.runs.isEmpty {
-                    Text("No managed run is available for a manual continuity request.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Picker("Managed run", selection: $viewModel.selectedRunID) {
-                        Text("Select a managed run").tag(String?.none)
-                        ForEach(viewModel.runs) { run in
-                            Text(
-                                "\(run.mission) · "
-                                    + OperatorRunStatePresentation.displayName(run.state)
-                            )
-                                .tag(String?.some(run.runID))
-                        }
-                    }
-                    .accessibilityIdentifier("continuity-run-selection")
-
-                    if let run = viewModel.selectedRun {
-                        LabeledContent("Task state") {
-                            OperatorStateBadge(state: run.state)
-                                .accessibilityIdentifier("continuity-selected-run-state")
-                        }
-                        LabeledContent("Active session") {
-                            OperatorIdentifier(run.activeSessionID)
-                                .accessibilityIdentifier("continuity-active-session-id")
-                        }
-                    }
-                }
-
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 215), spacing: 10)],
-                    alignment: .leading,
-                    spacing: 8
-                ) {
-                    HStack(spacing: 6) {
-                        Button("Save progress now", action: viewModel.requestCheckpoint)
-                            .disabled(!viewModel.canRequestCheckpoint)
-                            .accessibilityIdentifier("checkpoint-command")
-                        GuidedHelpButton(context: .continuitySaveProgress)
-                    }
-                    HStack(spacing: 6) {
-                        Button(
-                            "Start a fresh session and continue",
-                            action: viewModel.requestRollover
-                        )
-                        .disabled(!viewModel.canRequestRollover)
-                        .accessibilityIdentifier("rollover-command")
-                        GuidedHelpButton(context: .continuityFreshSession)
-                    }
-                    if let action = viewModel.controlInFlight {
-                        ProgressView()
-                            .controlSize(.small)
-                            .accessibilityLabel("Persisting \(action.rawValue) command")
-                    }
-                }
-                Text(viewModel.eligibilityMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("continuity-control-eligibility")
-                Text("These optional controls send typed requests only. Eligibility, quiescing, exact observation binding, and durable transitions remain manager-owned.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("continuity-controls-authority")
+    private var actions: some View {
+        HStack(spacing: 10) {
+            Button("Copy Project ID") {
+                guard let projectID = viewModel.selectedProjectID else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(projectID, forType: .string)
             }
-        }
-    }
+            .disabled(viewModel.selectedProjectID == nil)
+            .accessibilityIdentifier("continuity-copy-project-id")
 
-    private var historyActions: some View {
-        GroupBox("Stored continuity data") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Remove old checkpoint and handoff payloads, continuity memories, and derived cache. Stale work owned by a finished task is retired before removal.")
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    Button("Clear Selected…", role: .destructive) {
-                        historyClearConfirmation = .selected
-                    }
-                    .disabled(!viewModel.canClearSelectedHistory)
-                    .accessibilityIdentifier("continuity-clear-selected")
-
-                    Button("Clear All Old…", role: .destructive) {
-                        historyClearConfirmation = .allOld
-                    }
-                    .disabled(!viewModel.canClearAllOldHistory)
-                    .accessibilityIdentifier("continuity-clear-all-old")
-
-                    if let scope = viewModel.historyClearInFlight {
-                        ProgressView()
-                            .controlSize(.small)
-                            .accessibilityLabel(
-                                scope == .operation
-                                    ? "Clearing selected continuity history"
-                                    : "Clearing settled continuity history"
-                            )
-                    }
-                }
-                Text("Clearing continuity history does not delete tasks, run history, or user-created project memory.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("continuity-clear-scope")
-                if let blocker = viewModel.selectedHistoryBlocker {
-                    Text(blocker)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .textSelection(.enabled)
-                        .accessibilityIdentifier("continuity-clear-blocker")
-                    Button("Open Run Details", action: onOpenAutonomy)
-                        .accessibilityIdentifier("continuity-clear-open-run-details")
-                }
+            Button("Delete", role: .destructive) {
+                confirmsDeletion = true
             }
-        }
-    }
+            .disabled(!viewModel.canDeleteSelectedProject)
+            .accessibilityIdentifier("continuity-delete-project")
 
-    private func operationDetail(_ operation: OperatorContinuity) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            GroupBox("Current continuity activity") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Status") {
-                        OperatorStateBadge(state: activityTitle(operation))
-                            .accessibilityIdentifier("rollover-operation-state")
-                    }
-                    LabeledContent("Exact operation state", value: operation.state)
-                        .accessibilityIdentifier("continuity-exact-operation-state")
-                    Text(activityDescription(operation))
-                        .foregroundStyle(.secondary)
-                    if let error = operation.lastError {
-                        Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
-                    }
-                }
+            if let projectID = viewModel.deletingProjectID {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Deleting continuity data for project \(projectID)")
             }
 
-            GroupBox("Operation identity") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Mode", value: modeLabel(operation.mode))
-                    LabeledContent("Manager control state", value: operation.controlState ?? "Unavailable")
-                    LabeledContent("Operation ID") { OperatorIdentifier(operation.operationID) }
-                    LabeledContent("Run ID") { OperatorIdentifier(operation.runID) }
-                    LabeledContent("Project") { OperatorIdentifier(operation.projectID) }
-                    LabeledContent("Generation", value: "\(operation.projectGeneration)")
-                    LabeledContent("Attempt", value: "\(operation.attempt)")
-                    LabeledContent("Next retry", value: operation.retryAt ?? "No retry scheduled")
-                    if let error = operation.lastError {
-                        Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
-                    }
-                }
-            }
-
-            GroupBox("Context budget") {
-                if let budget = operation.budget {
-                    VStack(alignment: .leading, spacing: 10) {
-                        budgetGauge(budget)
-                        LabeledContent("Capacity", value: tokens(budget.capacityTokens))
-                        LabeledContent("Used", value: tokens(budget.usedTokens))
-                        LabeledContent("Response reserve", value: tokens(budget.responseReserveTokens))
-                        LabeledContent("Handoff reserve", value: tokens(budget.handoffReserveTokens))
-                        LabeledContent("Recovery reserve", value: tokens(budget.recoveryReserveTokens))
-                        LabeledContent("Remaining", value: tokens(budget.remainingTokens))
-                        LabeledContent("Source", value: budget.source ?? "Unavailable")
-                        LabeledContent("Confidence", value: budget.confidence ?? "Unavailable")
-                        HStack {
-                            Text("Checkpoint threshold: \(tokens(budget.checkpointThreshold))")
-                            Spacer()
-                            Text("Rollover threshold: \(tokens(budget.rolloverThreshold))")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("context-threshold-labels")
-                    }
-                } else {
-                    Text("No persisted context-budget observation was published.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            GroupBox("Handoff and successor") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Latest checkpoint") { OperatorIdentifier(operation.checkpointID) }
-                    LabeledContent("Handoff ID") { OperatorIdentifier(operation.handoffID) }
-                    LabeledContent("Handoff checksum") { OperatorIdentifier(operation.handoffSHA256) }
-                    LabeledContent("Predecessor") {
-                        OperatorIdentifier(operation.predecessorSessionID)
-                            .accessibilityIdentifier("continuity-predecessor-id")
-                    }
-                    LabeledContent("Accepted successor") {
-                        OperatorIdentifier(operation.successorSessionID)
-                            .accessibilityIdentifier("continuity-successor-id")
-                    }
-                    LabeledContent("Successor provider response") {
-                        OperatorIdentifier(operation.successorProviderResponseID)
-                    }
-                    LabeledContent("Acknowledgment checksum") {
-                        OperatorIdentifier(operation.acknowledgementSHA256)
-                    }
-                    LabeledContent("Automatic continuation issued", value: operation.continuationIssued ? "Yes" : "No")
-                }
-            }
-
-            GroupBox("Ordered event timeline") {
-                if viewModel.selectedEvents.isEmpty {
-                    Text("No bounded events were linked to this operation.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(viewModel.selectedEvents) { event in
-                            HStack(alignment: .top, spacing: 10) {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, 5)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(event.summary)
-                                    Text("\(event.timestamp) · \(event.kind)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .accessibilityIdentifier("continuity-event-metadata-\(event.eventID)")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-        }
-    }
-
-    private func budgetGauge(_ budget: OperatorContextBudget) -> some View {
-        let capacity = max(budget.capacityTokens ?? 0, 1)
-        let used = min(max(budget.usedTokens ?? 0, 0), capacity)
-        return ProgressView(value: Double(used), total: Double(capacity)) {
-            Text(budget.action?.replacingOccurrences(of: "_", with: " ") ?? "Budget")
-        } currentValueLabel: {
-            Text("\(used) of \(capacity) tokens")
-        }
-        .accessibilityIdentifier("context-gauge")
-        .accessibilityValue("\(used) used of \(capacity); \(budget.remainingTokens ?? 0) remaining")
-    }
-
-    private func contextRemaining(_ readiness: ManagerContinuityReadiness) -> String {
-        guard let capacity = readiness.capacityTokens,
-              let remaining = readiness.remainingTokens,
-              capacity > 0 else { return "Waiting for the first usage observation" }
-        let boundedRemaining = min(max(remaining, 0), capacity)
-        let percent = Int((Double(boundedRemaining) / Double(capacity) * 100).rounded())
-        return "\(percent)% available"
-    }
-
-    private func selectedTaskTitle(for readiness: ManagerContinuityReadiness) -> String {
-        guard let runID = readiness.runID?.description,
-              let run = viewModel.runs.first(where: { $0.runID == runID }) else {
-            return "Next managed task"
-        }
-        return run.mission
-    }
-
-    private func mission(for operation: OperatorContinuity) -> String {
-        viewModel.runs.first(where: { $0.runID == operation.runID })?.mission ?? "Managed task"
-    }
-
-    private func progressSaved(_ timestamp: String?) -> String {
-        guard let timestamp else { return "Not needed yet" }
-        guard let date = ISO8601DateFormatter().date(from: timestamp) else { return timestamp }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-
-    private func stateTitle(_ state: ManagedContinuityDisplayState) -> String {
-        switch state {
-        case .ready: "Ready"
-        case .monitoring: "Monitoring"
-        case .savingProgress: "Saving progress"
-        case .rolloverQueued: "Fresh session queued"
-        case .quiescing: "Finishing current work"
-        case .creatingSuccessor: "Creating fresh session"
-        case .restoring: "Restoring task"
-        case .continuing: "Continuing"
-        case .waitingForProvider: "Waiting for model"
-        case .blocked: "Action required"
-        case .externalCompatibilityOnly: "External host limited"
-        case .unavailable: "Unavailable"
-        }
-    }
-
-    private func displayedState(_ operation: OperatorContinuity) -> String {
-        let claimsCompletion = operation.state == "completed" || operation.state == "sealed"
-        let durableCompletion = operation.successorSessionID != nil
-            && operation.acknowledgementSHA256 != nil
-            && operation.continuationIssued
-        if claimsCompletion && !durableCompletion {
-            return "awaiting_durable_acknowledgement"
-        }
-        return operation.state
-    }
-
-    private func activityTitle(_ operation: OperatorContinuity) -> String {
-        switch displayedState(operation) {
-        case "queued": "Preparing continuity"
-        case "claimed", "running": "Protecting task progress"
-        case "retry_wait": "Waiting to retry"
-        case "predecessor_sealed", "completed", "sealed": "Task continued"
-        case "awaiting_durable_acknowledgement": "Confirming fresh session"
-        case "failed": "Action required"
-        default: "Continuity activity"
-        }
-    }
-
-    private func activityDescription(_ operation: OperatorContinuity) -> String {
-        switch displayedState(operation) {
-        case "queued":
-            "Forge has durably queued this continuity action."
-        case "claimed", "running":
-            "Forge is saving or restoring task state through the manager."
-        case "retry_wait":
-            "Forge retained task state and will retry after the bounded delay."
-        case "predecessor_sealed", "completed", "sealed":
-            "A fresh accepted session has continued the task and the predecessor is sealed."
-        case "awaiting_durable_acknowledgement":
-            "Forge is waiting for exact successor acknowledgment before sealing the predecessor."
-        case "failed":
-            "The last continuity operation failed. Review its recorded error below, then use the protection action to open the owning recovery view."
-        default:
-            "Forge is protecting the current task through a durable continuity operation."
-        }
-    }
-
-    private func modeLabel(_ raw: String) -> String {
-        switch raw {
-        case "managedAutonomous", "managed_autonomous":
-            "Managed: automatic successor creation and continuation"
-        case "externalMCPCompatibility", "external_mcp_compatibility":
-            "External: handoff persisted; host session control unavailable"
-        default:
-            "Unavailable"
-        }
-    }
-
-    private func tokens(_ value: Int?) -> String {
-        value.map { "\($0) tokens" } ?? "Unavailable"
-    }
-
-    private func recoveryTitle(_ action: ContinuityRecoveryAction) -> String {
-        switch action {
-        case .none: "No action required"
-        case .retryAutomatically: "Refresh continuity status"
-        case .reviewProvider: "Open Provider"
-        case .reviewRun: "Open Project Runs"
-        }
-    }
-
-    private func performRecovery(_ action: ContinuityRecoveryAction) {
-        switch action {
-        case .none:
-            break
-        case .retryAutomatically:
-            viewModel.load()
-        case .reviewProvider:
-            onOpenProvider()
-        case .reviewRun:
-            onOpenAutonomy()
-        }
-    }
-}
-
-private enum HistoryClearConfirmation: String, Identifiable {
-    case selected
-    case allOld
-
-    var id: String { rawValue }
-
-    var actionTitle: String {
-        switch self {
-        case .selected: "Clear Selected"
-        case .allOld: "Clear All Old"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .selected:
-            "This removes the selected old checkpoint, handoff payload, continuity memory, transition history, and derived cache. If its task is already finished, stale control state is retired first. The task and ordinary project memory remain."
-        case .allOld:
-            "This removes all old continuity payloads, memories, and derived caches across projects. Continuity owned by a live task remains; its exact state and retirement action stay visible. Tasks and ordinary project memory remain."
+            Spacer()
         }
     }
 }

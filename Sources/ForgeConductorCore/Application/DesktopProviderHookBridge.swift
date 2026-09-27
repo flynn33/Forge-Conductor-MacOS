@@ -973,7 +973,7 @@ public struct DesktopProviderHookPolicyService: Sendable {
         providerID: ProviderIntegrationID
     ) -> Bool {
         guard let toolName, !toolName.isEmpty else { return false }
-        if toolName == "forge_status" { return true }
+        if toolName == "forge_status" || toolName == "get_forge_status" { return true }
         switch providerID {
         case .claudeDesktop, .codexDesktop:
             return toolName.hasPrefix("mcp__forge-conductor__")

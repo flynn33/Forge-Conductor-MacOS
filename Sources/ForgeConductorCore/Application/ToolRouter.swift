@@ -796,7 +796,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 "code": "identical_call_loop",
                 "message":
                     "Blocked repeated identical \(tool) (\(loopCount)×). " +
-                    "Auto handoff \(packet.id) written. Start a new chat and call context_get.",
+                    "Auto handoff \(packet.id) written. Forge will bootstrap the successor with get_forge_status(resume=true).",
                 "retryable": false,
                 "handoff_required": true,
                 "handoff_id": packet.id,
@@ -1010,8 +1010,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             "ok": false,
             "code": "context_budget_exceeded",
             "message":
-                "This chat has been handed off. Start a new LM Studio chat with Forge MCP enabled, " +
-                "then call context_get. Further filesystem/shell/git tools are blocked here.",
+                "This chat has been handed off. Forge will start the LM Studio successor and request " +
+                "get_forge_status(resume=true). Further filesystem/shell/git tools are blocked here.",
             "retryable": false,
             "handoff_required": true,
             "handoff_id": prior.handoffID as Any,

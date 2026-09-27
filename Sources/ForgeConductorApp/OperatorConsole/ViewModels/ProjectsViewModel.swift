@@ -164,6 +164,52 @@ final class ProjectsViewModel: ObservableObject {
         )
     }
 
+    func register(paths: [String]) {
+        guard !isLoading else { return }
+        var seen = Set<String>()
+        let normalizedPaths = paths.compactMap { rawPath -> String? in
+            let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !path.isEmpty, (path as NSString).isAbsolutePath,
+                  seen.insert(path).inserted else { return nil }
+            return path
+        }
+        guard !normalizedPaths.isEmpty, normalizedPaths.count <= 100 else {
+            errorMessage = "Choose between 1 and 100 project folders."
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            var committedCount = 0
+            do {
+                for path in normalizedPaths {
+                    let request = OperatorProjectRegistrationRequest(
+                        path: path,
+                        displayName: URL(fileURLWithPath: path, isDirectory: true)
+                            .lastPathComponent,
+                        repositoryIdentity: nil,
+                        authorizeProjectRoot: true
+                    )
+                    let outcome = try await client.registerProject(request)
+                    guard applyRegistrationOutcome(outcome, request: request) else { break }
+                    committedCount += 1
+                }
+                if errorMessage == nil {
+                    notice = "Registered \(committedCount) project folder\(committedCount == 1 ? "" : "s")."
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                if committedCount > 0 {
+                    notice = "Registered \(committedCount) project folder\(committedCount == 1 ? "" : "s") before the reported error."
+                }
+            }
+            isLoading = false
+        }
+    }
+
     func reconcilePendingRegistration() {
         guard !isLoading, let pending = nextPendingRegistration else { return }
         performRegistration(pending.request)
@@ -310,24 +356,43 @@ final class ProjectsViewModel: ObservableObject {
     }
 
     func importInstructionPackage(path: String) {
+        importInstructionPackages(paths: [path])
+    }
+
+    func importInstructionPackages(paths: [String]) {
         guard !isLoading, let project = selectedProject else { return }
+        let normalizedPaths = paths.map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }.filter {
+            !$0.isEmpty && ($0 as NSString).isAbsolutePath
+        }
+        guard !normalizedPaths.isEmpty, normalizedPaths.count <= 100 else {
+            errorMessage = "Choose between 1 and 100 instruction files or folders."
+            return
+        }
         isLoading = true
         errorMessage = nil
         notice = nil
         Task { [weak self] in
             guard let self else { return }
             do {
-                let queue = try await client.importInstructionPackage(
-                    projectID: project.projectID,
-                    generation: project.projectGeneration,
-                    sourcePath: path
-                )
-                acceptInstructionQueue(
-                    queue,
-                    projectID: project.projectID,
-                    generation: project.projectGeneration
-                )
-                notice = "Added the instruction package to \(project.displayName). Use the arrow buttons to set execution order."
+                for path in normalizedPaths {
+                    let queue = try await client.importInstructionPackage(
+                        projectID: project.projectID,
+                        generation: project.projectGeneration,
+                        sourcePath: path
+                    )
+                    guard acceptInstructionQueue(
+                        queue,
+                        projectID: project.projectID,
+                        generation: project.projectGeneration
+                    ) else {
+                        throw OperatorManagerClientError.invalidPayload(
+                            "instruction package import returned a different project identity"
+                        )
+                    }
+                }
+                notice = "Added \(normalizedPaths.count) instruction package\(normalizedPaths.count == 1 ? "" : "s") to \(project.displayName). Drag packages to set their priority."
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -369,6 +434,16 @@ final class ProjectsViewModel: ObservableObject {
         guard let queue = instructionQueue,
               let packageIDs = Self.reorderedPackageIDs(
                   queue.packages.map(\.id), moving: packageID, by: offset
+              ) else { return }
+        reorderInstructionPackages(packageIDs)
+    }
+
+    func moveInstructionPackage(_ packageID: String, to destinationPackageID: String) {
+        guard let queue = instructionQueue,
+              let packageIDs = Self.reorderedPackageIDs(
+                  queue.packages.map(\.id),
+                  moving: packageID,
+                  to: destinationPackageID
               ) else { return }
         reorderInstructionPackages(packageIDs)
     }
@@ -448,6 +523,22 @@ final class ProjectsViewModel: ObservableObject {
         var reordered = packageIDs
         reordered.swapAt(source, destination)
         return reordered
+    }
+
+    static func reorderedPackageIDs(
+        _ packageIDs: [String],
+        moving packageID: String,
+        to destinationPackageID: String
+    ) -> [String]? {
+        guard packageID != destinationPackageID,
+              let source = packageIDs.firstIndex(of: packageID),
+              let destination = packageIDs.firstIndex(of: destinationPackageID) else {
+            return nil
+        }
+        var reordered = packageIDs
+        let value = reordered.remove(at: source)
+        reordered.insert(value, at: min(destination, reordered.endIndex))
+        return reordered == packageIDs ? nil : reordered
     }
 
     static func hasActiveWork(in queue: OperatorInstructionQueue) -> Bool {
@@ -561,6 +652,29 @@ final class ProjectsViewModel: ObservableObject {
     func reconcilePendingContentClear() {
         guard let pendingClearConfirmation, !isLoading else { return }
         clearProjectContent(pendingClearConfirmation)
+    }
+
+    func clearApplicationCache() {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        let operationID = UUID()
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let receipt = try await client.clearApplicationCache(operationID: operationID)
+                guard receipt.operationID == operationID, receipt.removedEntryCount >= 0 else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "cache clear receipt did not match the requested operation"
+                    )
+                }
+                notice = "Cleared the Forge application cache (\(receipt.removedEntryCount) top-level item(s))."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isLoading = false
+        }
     }
 
     func resetProject(_ confirmation: ResetConfirmation) {
@@ -733,47 +847,57 @@ final class ProjectsViewModel: ObservableObject {
             guard let self else { return }
             do {
                 let outcome = try await client.registerProject(request)
-                switch outcome {
-                case .committed(let project, let reconciled):
-                    projects.removeAll { $0.projectID == project.projectID }
-                    projects.append(project)
-                    projects.sort {
-                        $0.displayName.localizedCaseInsensitiveCompare($1.displayName)
-                            == .orderedAscending
-                    }
-                    selectedProjectID = project.projectID
-                    pendingRegistrations = pendingRegistrations.filter { _, pending in
-                        pending.projectID?.caseInsensitiveCompare(project.projectID) != .orderedSame
-                            && pending.request != request
-                    }
-                    notice = reconciled
-                        ? "Reconciled \(project.displayName) at generation \(project.projectGeneration)."
-                        : "Registered \(project.displayName) at generation \(project.projectGeneration)."
-                    lastUpdated = Date()
-                case .reconciliationRequired(let pending):
-                    let retained = PendingRegistration(
-                        request: pending.request,
-                        projectID: pending.projectID,
-                        code: pending.code,
-                        message: pending.message,
-                        durable: pending.projectID != nil
-                    )
-                    pendingRegistrations = pendingRegistrations.filter { _, existing in
-                        existing.request != pending.request
-                    }
-                    pendingRegistrations[retained.key] = retained
-                    if let projectID = pending.projectID {
-                        selectedProjectID = projectID
-                    }
-                    errorMessage = OperatorManagerClientError.reconciliationRequired(
-                        code: pending.code,
-                        message: pending.message
-                    ).localizedDescription
-                }
+                _ = applyRegistrationOutcome(outcome, request: request)
             } catch {
                 errorMessage = error.localizedDescription
             }
             isLoading = false
+        }
+    }
+
+    @discardableResult
+    private func applyRegistrationOutcome(
+        _ outcome: OperatorProjectRegistrationOutcome,
+        request: OperatorProjectRegistrationRequest
+    ) -> Bool {
+        switch outcome {
+        case .committed(let project, let reconciled):
+            projects.removeAll { $0.projectID == project.projectID }
+            projects.append(project)
+            projects.sort {
+                $0.displayName.localizedCaseInsensitiveCompare($1.displayName)
+                    == .orderedAscending
+            }
+            selectedProjectID = project.projectID
+            pendingRegistrations = pendingRegistrations.filter { _, pending in
+                pending.projectID?.caseInsensitiveCompare(project.projectID) != .orderedSame
+                    && pending.request != request
+            }
+            notice = reconciled
+                ? "Reconciled \(project.displayName) at generation \(project.projectGeneration)."
+                : "Registered \(project.displayName) at generation \(project.projectGeneration)."
+            lastUpdated = Date()
+            return true
+        case .reconciliationRequired(let pending):
+            let retained = PendingRegistration(
+                request: pending.request,
+                projectID: pending.projectID,
+                code: pending.code,
+                message: pending.message,
+                durable: pending.projectID != nil
+            )
+            pendingRegistrations = pendingRegistrations.filter { _, existing in
+                existing.request != pending.request
+            }
+            pendingRegistrations[retained.key] = retained
+            if let projectID = pending.projectID {
+                selectedProjectID = projectID
+            }
+            errorMessage = OperatorManagerClientError.reconciliationRequired(
+                code: pending.code,
+                message: pending.message
+            ).localizedDescription
+            return false
         }
     }
 

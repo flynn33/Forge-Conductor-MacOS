@@ -80,7 +80,8 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         providerOperationFailuresBeforeSuccess: Int = 0,
         providerRegistryDelayNanoseconds: UInt64 = 0,
         legacySnapshotDelayNanoseconds: UInt64 = 0,
-        configurationSaved: Bool = false
+        configurationSaved: Bool = false,
+        operatorSnapshotJSON: String = "{}"
     ) throws {
         self.preparationState = preparationState
         self.simulateLostSelectionResponse = simulateLostSelectionResponse
@@ -90,7 +91,7 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         self.configurationSaved = configurationSaved
         operatorSnapshot = try JSONDecoder().decode(
             OperatorSnapshot.self,
-            from: Data("{}".utf8)
+            from: Data(operatorSnapshotJSON.utf8)
         )
         let receipt = try receiptProviderID.map { providerID in
             try ProviderIntegrationReceipt(
@@ -214,7 +215,7 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
             state: preparationState,
             recoveryAction: preparationState == .ready ? .none : .startService,
             detail: preparationState == .ready
-                ? "LM Studio and the selected tool-capable model are ready for managed tasks."
+                ? "LM Studio and the selected tool-capable model are ready for Forge MCP and automatic continuity."
                 : "LM Studio still needs attention.",
             configuration: ProviderConfigurationSnapshot(
                 revision: "legacy-provider-configuration",
@@ -312,6 +313,48 @@ final class ProviderConfigurationAppTests: XCTestCase {
 
     override func tearDownWithError() throws {
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
+    }
+
+    @MainActor
+    func testContinuityListUsesOnlyProjectIDsWithContinuityWithoutManagedOperations() async throws {
+        let first = "34f5856b-b3c0-4135-8fcb-b8680483494f"
+        let second = "3fac0136-f28f-42dd-93fb-c35dbde87bc6"
+        let client = try LegacyLMProviderSelectionClient(operatorSnapshotJSON: """
+        {
+          "projects": [
+            {
+              "project_id":"\(second)","display_name":"Second",
+              "canonical_root":"/tmp/second","project_generation":1,
+              "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+              "continuity":{"state":"ready"},"migration_warnings":[]
+            },
+            {
+              "project_id":"\(first)","display_name":"First",
+              "canonical_root":"/tmp/first","project_generation":1,
+              "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+              "continuity":{"state":"ready"},"migration_warnings":[]
+            },
+            {
+              "project_id":"7c61ac4f-9c5c-493d-8e75-35e67f467ba7","display_name":"No Continuity",
+              "canonical_root":"/tmp/none","project_generation":1,
+              "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+              "continuity":{"state":"unavailable"},"migration_warnings":[]
+            }
+          ],
+          "continuity_operations": []
+        }
+        """)
+        let viewModel = ContinuityViewModel(client: client)
+
+        viewModel.load()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while viewModel.isLoading, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertEqual(viewModel.projectIDs, [first, second])
+        XCTAssertEqual(viewModel.selectedProjectID, first)
     }
 
     func testOperatorCredentialIOLeavesMainActorBeforeAuthenticatedRequests() async {
@@ -435,10 +478,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(selectionRequests, [])
         XCTAssertEqual(
             callOrder,
-            ["connect_without_resume", "repair", "connect_and_check"]
+            ["connect_without_resume", "repair", "connect_without_resume"]
         )
         XCTAssertTrue(
-            viewModel.noticeMessage?.contains("ready for managed tasks") == true,
+            viewModel.noticeMessage?.contains("ready for Forge MCP and automatic continuity") == true,
             "the completed setup message must preserve the provider-ready result after integration activation"
         )
     }
@@ -464,6 +507,28 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(repairRequests, [])
         XCTAssertEqual(callOrder, ["connect_without_resume"])
         XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
+    }
+
+    @MainActor
+    func testAdvancedContractCheckUsesActionablePreparationPath() async throws {
+        let client = try LegacyLMProviderSelectionClient(preparationState: .actionRequired)
+        let viewModel = ProviderViewModel(client: client)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        viewModel.runContractProbe()
+        for _ in 0..<500 {
+            if !viewModel.isProbing { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let callOrder = await client.callOrder
+        XCTAssertEqual(callOrder, ["connect_without_resume"])
+        XCTAssertEqual(viewModel.preparation?.state, .actionRequired)
+        XCTAssertEqual(viewModel.errorMessage, "LM Studio still needs attention.")
     }
 
     @MainActor
@@ -494,7 +559,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(repairRequests, [])
         XCTAssertEqual(
             callOrder,
-            ["connect_without_resume", "selection", "connect_and_check"]
+            ["connect_without_resume", "selection", "connect_without_resume"]
         )
     }
 
@@ -577,7 +642,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(selectionRequests.map(\.providerID), [.lmStudio])
         XCTAssertEqual(
             callOrder,
-            ["connect_without_resume", "selection", "connect_and_check"]
+            ["connect_without_resume", "selection", "connect_without_resume"]
         )
     }
 
@@ -1144,7 +1209,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         )
         XCTAssertEqual(idleContinuity.state, .ready)
         XCTAssertTrue(idleContinuity.automatic)
-        XCTAssertTrue(idleContinuity.detail.contains("no setup is required"))
+        XCTAssertEqual(
+            idleContinuity.detail,
+            "Automatic continuity is ready for this project's LM Studio conversation."
+        )
 
         let mission = "Use the exact prepared source snapshot."
         let prepared = try manager.prepareAutonomousRun(

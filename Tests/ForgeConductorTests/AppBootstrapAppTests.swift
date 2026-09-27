@@ -337,6 +337,37 @@ final class AppBootstrapAppTests: XCTestCase {
 }
 
 final class RigOperationalSnapshotAppTests: XCTestCase {
+    func testInteractiveContinuityCountdownReachesDashboardProjection() throws {
+        let handoffID = UUID().uuidString.lowercased()
+        let projectID = UUID().uuidString.lowercased()
+        let snapshot = try JSONDecoder().decode(
+            OperatorSnapshot.self,
+            from: Data("""
+            {
+              "interactive_continuity": {
+                "handoff_id": "\(handoffID)",
+                "project_id": "\(projectID)",
+                "state": "countdown",
+                "countdown_seconds": 24,
+                "due_at": "2026-09-27T19:00:30.000Z",
+                "detail": "Forge will create the LM Studio successor chat when the countdown reaches zero."
+              }
+            }
+            """.utf8)
+        )
+
+        let result = RigOperationalSnapshot.compose(
+            operatorSnapshot: snapshot,
+            autonomy: nil,
+            runeForge: nil
+        )
+
+        XCTAssertEqual(result.interactiveContinuity?.handoffID, handoffID)
+        XCTAssertEqual(result.interactiveContinuity?.projectID, projectID)
+        XCTAssertEqual(result.interactiveContinuity?.state, "countdown")
+        XCTAssertEqual(result.interactiveContinuity?.countdownSeconds, 24)
+    }
+
     func testDesktopProviderReadinessDoesNotDependOnLMStudioHealth() throws {
         let operatorSnapshot = try JSONDecoder().decode(
             OperatorSnapshot.self,

@@ -666,8 +666,8 @@ final class OperatorProjectContractTests: XCTestCase {
         try await Self.waitUntilIdle(viewModel)
         XCTAssertTrue(viewModel.usesDesktopProviderPreparation)
         XCTAssertNil(viewModel.providerPrerequisiteMessage)
-        XCTAssertEqual(viewModel.guidedHelpState.status, "Ready for a task")
-        XCTAssertFalse(
+        XCTAssertEqual(viewModel.guidedHelpState.status, "Ready for LM Studio")
+        XCTAssertTrue(
             viewModel.guidedHelpState.detail.localizedCaseInsensitiveContains("LM Studio")
         )
         viewModel.mission = mission
@@ -1500,7 +1500,7 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(request["project_generation"] as? UInt64, 3)
     }
 
-    func testContinuityHistoryClearUsesTypedSelectedAndAllSettledScopes() async throws {
+    func testContinuityHistoryClearUsesTypedOperationProjectAndAllSettledScopes() async throws {
         let operationID = UUID()
         let projectID = ProjectID()
         let completedAt = "2026-09-27T12:00:00Z"
@@ -1553,6 +1553,36 @@ final class OperatorProjectContractTests: XCTestCase {
         XCTAssertEqual(selectedBody["operation_id"] as? String, operationID.uuidString.lowercased())
         XCTAssertEqual(selectedBody["project_id"] as? String, projectID.description)
         XCTAssertEqual(selectedBody["project_generation"] as? UInt64, 1)
+
+        OperatorProjectContractURLProtocol.configure(responses: [
+            "/api/manager/continuity/history/clear": try JSONEncoder().encode(
+                ContinuityHistoryClearReceipt(
+                    scope: .project,
+                    requestedOperationID: nil,
+                    requestedProjectID: projectID,
+                    clearedOperationCount: 3,
+                    clearedProjectCount: 1,
+                    deletedRecordCount: 12,
+                    retainedOperationCount: 0,
+                    completedAt: completedAt
+                )
+            ),
+        ])
+        let project = try await client.clearContinuityHistory(
+            ContinuityHistoryClearRequest(scope: .project, projectID: projectID)
+        )
+        XCTAssertEqual(project.requestedProjectID, projectID)
+        XCTAssertEqual(project.clearedOperationCount, 3)
+        let projectBody = try JSONSupport.object(
+            from: try XCTUnwrap(
+                OperatorProjectContractURLProtocol.requestedBodies(
+                    path: "/api/manager/continuity/history/clear"
+                ).first
+            )
+        )
+        XCTAssertEqual(Set(projectBody.keys), ["scope", "project_id"])
+        XCTAssertEqual(projectBody["scope"] as? String, "project")
+        XCTAssertEqual(projectBody["project_id"] as? String, projectID.description)
 
         OperatorProjectContractURLProtocol.configure(responses: [
             "/api/manager/continuity/history/clear": try JSONEncoder().encode(

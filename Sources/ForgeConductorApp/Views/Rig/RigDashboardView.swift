@@ -213,18 +213,40 @@ struct RigDashboardView: View {
 
         let continuityState: String
         let continuityTone: TelemetryStatusTone
-        if runtime.continuityBlockedCount > 0 {
+        let continuityDetail: String
+        if let interactive = runtime.interactiveContinuity,
+           interactive.state == "countdown" {
+            continuityState = "NEXT CHAT \(interactive.countdownSeconds)S"
+            continuityTone = .informational
+            continuityDetail = interactive.projectID.map {
+                "Project \($0) · automatic LM Studio rollover"
+            } ?? "Automatic LM Studio rollover"
+        } else if let interactive = runtime.interactiveContinuity,
+                  interactive.state == "creating_successor" {
+            continuityState = "CREATING CHAT"
+            continuityTone = .informational
+            continuityDetail = interactive.detail
+        } else if let interactive = runtime.interactiveContinuity,
+                  interactive.state == "attention" {
             continuityState = "ATTENTION"
             continuityTone = .caution
+            continuityDetail = interactive.detail
+        } else if runtime.continuityBlockedCount > 0 {
+            continuityState = "ATTENTION"
+            continuityTone = .caution
+            continuityDetail = "Continuity requires attention"
         } else if runtime.continuityAutomaticCount > 0 {
             continuityState = runtime.continuityActiveCount > 0 ? "ACTIVE" : "MONITORING"
             continuityTone = .healthy
+            continuityDetail = "\(runtime.continuityAutomaticCount) monitored · \(runtime.continuityActiveCount) rollover"
         } else if runtime.autonomyStarted == true {
             continuityState = "READY"
             continuityTone = .informational
+            continuityDetail = "Automatic LM Studio continuity ready"
         } else {
             continuityState = "CHECK"
             continuityTone = .unavailable
+            continuityDetail = "Automatic LM Studio continuity status unavailable"
         }
 
         let runeState: String
@@ -259,13 +281,13 @@ struct RigDashboardView: View {
                 tone: providerIndicator.tone
             ),
             OrchestrationCardState(
-                title: "PROJECT RUNS", state: autonomyState,
-                detail: "\(runtime.autonomyActiveCount) active · \(runtime.autonomyDeferredCount) queued",
+                title: "BACKGROUND SERVICES", state: autonomyState,
+                detail: "Forge automation and recovery workers",
                 fraction: min(Double(runtime.autonomyActiveCount) / 4, 1), tone: autonomyTone
             ),
             OrchestrationCardState(
                 title: "CONTINUITY", state: continuityState,
-                detail: "\(runtime.continuityAutomaticCount) monitored · \(runtime.continuityActiveCount) rollover",
+                detail: continuityDetail,
                 fraction: runtime.continuityContextLoad ?? 0, tone: continuityTone
             ),
             OrchestrationCardState(
@@ -347,7 +369,7 @@ struct RigDashboardView: View {
     private var managedActivityFeedPanel: some View {
         let runtime = model.rigOperationalSnapshot
         return panel(
-            "MANAGED ACTIVITY",
+            "FORGE ACTIVITY",
             meta: "\(runtime.activityFeed.count)/\(RigOperationalSnapshot.maximumActivityEntries) · 5 s"
         ) {
             VStack(alignment: .leading, spacing: 10) {
@@ -355,7 +377,7 @@ struct RigDashboardView: View {
                 currentInstructionStatus(runtime)
                 Divider().overlay(Color.cyan.opacity(0.16))
                 if runtime.activityFeed.isEmpty {
-                    Text("Waiting for managed-session, instruction, orchestration, or policy activity.")
+                    Text("Waiting for instruction, continuity, orchestration, or policy activity.")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
@@ -476,7 +498,7 @@ struct RigDashboardView: View {
                 }
                 if let state = runtime.activeRunState {
                     Text(
-                        "ACTIVE MANAGED RUN · "
+                        "BACKGROUND EXECUTION · "
                             + OperatorRunStatePresentation.displayName(state).uppercased()
                     )
                         .foregroundStyle(.mint)

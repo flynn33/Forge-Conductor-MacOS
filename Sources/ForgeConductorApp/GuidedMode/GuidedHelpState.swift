@@ -10,8 +10,8 @@ struct GuidedHelpState: Equatable, Sendable {
         case .continuity, .continuitySaveProgress, .continuityFreshSession:
             Self(
                 status: "Automatic continuity",
-                detail: "Managed tasks are protected without manual identifiers or handoff setup.",
-                recommendedAction: "Open a running task to inspect its current protection state."
+                detail: "LM Studio sessions are protected automatically without controls in the Continuity view.",
+                recommendedAction: "Use Continuity only to copy a project ID or delete its continuity data."
             )
         case .provider, .providerCredential:
             Self(
@@ -41,14 +41,14 @@ extension AutonomyViewModel {
         if isLoading {
             return .init(
                 status: "Checking task readiness",
-                detail: "Forge is loading registered projects, the provider state, and managed runs.",
+                detail: "Forge is loading registered projects and provider state.",
                 recommendedAction: nil
             )
         }
         if projects.isEmpty {
             return .init(
                 status: "A project is required",
-                detail: "No registered project is available for a managed task.",
+                detail: "No registered project is available to the LM Studio model.",
                 recommendedAction: "Register or relink the project in Projects."
             )
         }
@@ -56,7 +56,7 @@ extension AutonomyViewModel {
             return .init(
                 status: "Desktop provider action is required",
                 detail: runPreparation?.detail
-                    ?? "The selected desktop provider integration is not ready for a managed task.",
+                    ?? "The selected desktop provider integration is not ready.",
                 recommendedAction: "Open Provider and choose Repair Integration for the selected desktop provider."
             )
         }
@@ -64,16 +64,14 @@ extension AutonomyViewModel {
            provider?.health != "reachable" && provider?.health != "contract_valid" {
             return .init(
                 status: "Provider action is required",
-                detail: "The saved model provider is not currently ready for a managed task.",
+                detail: "The saved model provider is not currently ready for LM Studio tool use.",
                 recommendedAction: "Open Provider and choose Connect and Check for LM Studio."
             )
         }
         return .init(
-            status: runs.isEmpty ? "Ready for a task" : "Managed tasks available",
-            detail: runs.isEmpty
-                ? "Forge has the project and provider prerequisites needed to prepare a task."
-                : "Forge is tracking \(runs.count) managed task\(runs.count == 1 ? "" : "s").",
-            recommendedAction: runs.isEmpty ? "Start ordered work from Projects." : nil
+            status: "Ready for LM Studio",
+            detail: "Forge has the project and provider prerequisites needed for an ordinary LM Studio chat.",
+            recommendedAction: "Open LM Studio and call get_forge_status."
         )
     }
 }
@@ -84,22 +82,21 @@ extension ContinuityViewModel {
         if isLoading {
             return .init(
                 status: "Checking continuity",
-                detail: "Forge is loading durable checkpoint and successor-session state.",
+                detail: "Forge is loading project identities with saved continuity data.",
                 recommendedAction: nil
             )
         }
-        if operations.isEmpty {
+        if projectIDs.isEmpty {
             return .init(
-                status: "No continuity action is needed",
-                detail: "There is no active or recent rollover operation. Managed tasks are still monitored automatically.",
+                status: "No continuity projects",
+                detail: "Continuity runs automatically; project identities appear after data is saved.",
                 recommendedAction: nil
             )
         }
-        let state = selectedOperation?.state.replacingOccurrences(of: "_", with: " ") ?? "available"
         return .init(
-            status: "Continuity operation \(state)",
-            detail: "Forge has \(operations.count) durable continuity operation\(operations.count == 1 ? "" : "s") to inspect.",
-            recommendedAction: "Review the selected operation and its acknowledgment state."
+            status: "Continuity projects",
+            detail: "Forge has continuity data for \(projectIDs.count) project\(projectIDs.count == 1 ? "" : "s").",
+            recommendedAction: "Select a project ID to copy it or delete its continuity data."
         )
     }
 }
@@ -159,7 +156,7 @@ extension ProviderViewModel {
         if selectedID == nil {
             return .init(
                 status: "An execution provider is required",
-                detail: "No provider is selected for managed tasks.",
+                detail: "No provider is selected for Forge MCP and continuity.",
                 recommendedAction: "Activate LM Studio or a supported desktop provider."
             )
         }
@@ -173,7 +170,7 @@ extension ProviderViewModel {
         if provider?.health == "reachable" || provider?.health == "contract_valid" {
             return .init(
                 status: "Provider is ready",
-                detail: "The saved provider and selected model are available to managed task preparation.",
+                detail: "The saved provider and selected model are available to Forge MCP and continuity.",
                 recommendedAction: nil
             )
         }

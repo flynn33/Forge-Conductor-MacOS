@@ -105,6 +105,15 @@ private final class PreflightRecordingProtocol: URLProtocol, @unchecked Sendable
                 let json = try JSONSerialization.data(withJSONObject: event, options: [.sortedKeys])
                 data = Data("event: response.completed\ndata: ".utf8) + json + Data("\n\ndata: [DONE]\n\n".utf8)
                 contentType = "text/event-stream"
+            } else if request.httpMethod == "POST", url.path == "/api/v1/chat" {
+                data = try JSONSerialization.data(withJSONObject: [
+                    "response_id": "resp_interactive_successor",
+                    "output": [[
+                        "type": "message",
+                        "content": "Loaded saved handoff 7f698dd0-7077-4b53-a085-80e7e9c83676",
+                    ]],
+                ], options: [.sortedKeys])
+                contentType = "application/json"
             } else { throw URLError(.unsupportedURL) }
             let response = try XCTUnwrap(HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": contentType, "X-LM-Studio-Version": "0.3.fixture"]))
@@ -272,6 +281,32 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
         XCTAssertEqual(recorded?.requestID, request.operationID.uuidString.lowercased())
         XCTAssertEqual(recorded?.responseID, rootTurn.responseID)
         XCTAssertEqual(f.capture.snapshot.count, 4)
+    }
+
+    func testInteractiveSuccessorCreatesStoredChatWithForgeResumeBootstrap() async throws {
+        let f = try fixture(); defer { f.close() }
+        let client = try LMStudioRESTClient(
+            configuration: f.configuration,
+            sessionConfiguration: f.session,
+            authorization: f.authorization
+        )
+
+        let responseID = try await client.createInteractiveSuccessor(
+            handoffID: "7f698dd0-7077-4b53-a085-80e7e9c83676"
+        )
+
+        XCTAssertEqual(responseID, "resp_interactive_successor")
+        let request = try XCTUnwrap(f.capture.snapshot.last)
+        XCTAssertEqual(request.method, "POST")
+        XCTAssertEqual(request.path, "/api/v1/chat")
+        let body = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: request.body) as? [String: Any]
+        )
+        XCTAssertEqual(body["model"] as? String, "fixture/tool-model")
+        XCTAssertEqual(body["input"] as? String, "get_forge_status\nresume=true")
+        XCTAssertEqual(body["integrations"] as? [String], ["mcp/forge-conductor"])
+        XCTAssertEqual(body["store"] as? Bool, true)
+        XCTAssertEqual(body["stream"] as? Bool, false)
     }
 
     func testExpiredObservationRejectsRootAndContinuationWithoutHiddenProbe() async throws {

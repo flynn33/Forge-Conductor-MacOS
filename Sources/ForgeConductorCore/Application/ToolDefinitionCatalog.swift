@@ -283,7 +283,9 @@ public enum ManagerToolCategory: String, Codable, Sendable, Equatable, CaseItera
             || toolID.hasPrefix("context_") {
             return .continuity
         }
-        if toolID.hasPrefix("agent_") || toolID == "forge_status" { return .agents }
+        if toolID.hasPrefix("agent_")
+            || toolID == "forge_status"
+            || toolID == "get_forge_status" { return .agents }
         if toolID.hasPrefix("pdf_") { return .documents }
         if toolID.hasPrefix("runtime_") { return .runtime }
         return .other
@@ -650,6 +652,7 @@ private enum ProductionToolDefinitionSource {
 
     private static let baseDescriptions: [String: String] = [
         "forge_status": "Runtime status: home, agents, open sessions, tools.",
+        "get_forge_status": "Runtime and project status. Set resume=true in a successor chat to load the latest resume-ready handoff.",
         "agent_list": "List specialist agent playbooks.",
         "agent_get": "Get a specialist agent playbook by id.",
         "agent_context": "Alias of agent_get — full playbook body.",
@@ -692,6 +695,22 @@ private enum ProductionToolDefinitionSource {
         guard baseDescriptions[name] != nil else { return nil }
         let object: [String: Any] = ["type": "object"]
         switch name {
+        case "get_forge_status":
+            return [
+                "type": "object",
+                "properties": [
+                    "resume": [
+                        "type": "boolean",
+                        "description": "Load the latest resume-ready handoff into this status response.",
+                    ] as [String: Any],
+                    "project_id": [
+                        "type": "string",
+                        "description": "Select one registered project whose file, instruction, and continuity locations should be returned.",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
+                "additionalProperties": false,
+            ]
         case "instruction_catalog":
             return [
                 "type": "object",

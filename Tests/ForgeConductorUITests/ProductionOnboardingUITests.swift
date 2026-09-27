@@ -344,7 +344,11 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(
             element("instruction-package-row-\(package.id)").waitForExistence(timeout: 10)
         )
-        XCTAssertTrue(app.buttons["instruction-queue-toggle"].isEnabled)
+        XCTAssertFalse(
+            app.buttons["instruction-queue-toggle"].exists,
+            "Importing instructions must not expose the obsolete Managed Run action"
+        )
+        XCTAssertTrue(app.buttons["instruction-package-remove-\(package.id)"].isEnabled)
         try click(element("instruction-package-catalog-toggle-\(package.id)"))
         let catalog = element("instruction-document-catalog-\(package.id)")
         XCTAssertTrue(catalog.waitForExistence(timeout: 10))
@@ -875,7 +879,10 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private func assertRealConnection(model: String) async throws {
         try click(app.buttons["provider-test-connection"])
         let reachable = waitUntil(timeout: 40) {
-            self.contains(self.element("provider-probe-notice"), "ready for managed tasks")
+            self.contains(
+                self.element("provider-probe-notice"),
+                "ready for Forge MCP and automatic continuity"
+            )
         }
         if !reachable {
             let notice = element("provider-probe-notice")
@@ -1533,7 +1540,7 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
     private var app: XCUIApplication!
     private var candidatePath = ""
 
-    func testLiveContinuityClearSelectedThenAllOldAndRelaunch() async throws {
+    func testLiveContinuityDeletesSelectedProjectDataAndPersistsAcrossRelaunch() async throws {
         let environment = ProcessInfo.processInfo.environment
         let explicitMarker = "/tmp/forge-run-live-continuity-clear"
         guard environment["FORGE_RUN_LIVE_CONTINUITY_CLEAR"] == "1"
@@ -1549,41 +1556,24 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         try attachToRunningCandidate()
 
         let beforeIDs = try await waitForContinuityIDs(minimumCount: 1, timeout: 20)
-        let selectedID = try XCTUnwrap(beforeIDs.first)
         print("EVIDENCE continuity_before_ids=\(beforeIDs.joined(separator: ","))")
 
         try openContinuity()
-        let selectedRow = app.descendants(matching: .any)["continuity-operation-row-\(selectedID)"]
+        let selectedRow = app.staticTexts["continuity-project-row-\(projectID)"]
         XCTAssertTrue(selectedRow.waitForExistence(timeout: 10))
         try makeHittable(selectedRow)
         selectedRow.click()
-        try clickControl("continuity-clear-selected")
-        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 5))
-        let confirmSelected = app.sheets.buttons["Clear Selected"]
+        try clickControl("continuity-delete-project", expectedLabel: "Delete")
+        XCTAssertTrue(app.staticTexts["Delete continuity data?"].waitForExistence(timeout: 5))
+        let confirmSelected = app.sheets.buttons["Delete"]
         XCTAssertTrue(confirmSelected.waitForExistence(timeout: 5))
         confirmSelected.click()
 
-        let afterSelectedIDs = try await waitForContinuityIDs(
-            expectedCount: beforeIDs.count - 1,
-            excluding: [selectedID],
-            timeout: 20
-        )
+        let afterSelectedIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
         try refreshCurrentView()
         XCTAssertTrue(waitUntil(timeout: 10) { !selectedRow.exists })
-        print("EVIDENCE continuity_button=Clear Selected selected_id=\(selectedID) after_refresh_ids=\(afterSelectedIDs.joined(separator: ","))")
-
-        try clickControl("continuity-clear-all-old")
-        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 5))
-        let confirmAllOld = app.sheets.buttons["Clear All Old"]
-        XCTAssertTrue(confirmAllOld.waitForExistence(timeout: 5))
-        confirmAllOld.click()
-
-        let afterAllIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
-        try refreshCurrentView()
-        XCTAssertTrue(waitUntil(timeout: 10) {
-            !self.app.descendants(matching: .any)["continuity-operation-list"].exists
-        })
-        print("EVIDENCE continuity_button=Clear All Old after_refresh_ids=\(afterAllIDs)")
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].exists)
+        print("EVIDENCE continuity_button=Delete project_id=\(projectID) after_refresh_ids=\(afterSelectedIDs.joined(separator: ","))")
 
         app.terminate()
         for running in NSWorkspace.shared.runningApplications where
@@ -1599,11 +1589,11 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         try attachToRunningCandidate()
         let afterRelaunchIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
         try openContinuity()
-        XCTAssertFalse(app.descendants(matching: .any)["continuity-operation-list"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-projects-empty"].waitForExistence(timeout: 10))
         print("EVIDENCE continuity_after_relaunch_ids=\(afterRelaunchIDs) candidate_path=\(candidatePath)")
     }
 
-    func testLiveLMStudioStopReorderRemoveAndMinimumWindowControls() async throws {
+    func testLiveInstructionReorderDeleteAndProjectMaintenanceControls() async throws {
         let environment = ProcessInfo.processInfo.environment
         let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"]
             ?? "/Users/flynn/Desktop/Forge Conductor 0.14.7 (13)-74ead97.app"
@@ -1629,42 +1619,32 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
             queue = try await postQueue("/api/manager/projects/instruction-packages/stop", body: projectBody())
             print("EVIDENCE cleanup_stop order=\(queue.packageIDs) states=\(queue.packageStates)")
         }
-        XCTAssertEqual(queue.packages.filter { $0.state == "queued" }.count, 1)
-        let normalQueuedID = try XCTUnwrap(queue.packages.first(where: { $0.state == "queued" })?.id)
-        let normalOtherID = try XCTUnwrap(queue.packages.first(where: { $0.id != normalQueuedID })?.id)
-        print("EVIDENCE normal_before_order=\(queue.packageIDs) queued_package=\(normalQueuedID)")
+        XCTAssertGreaterThanOrEqual(queue.packages.count, 2)
+        let firstID = try XCTUnwrap(queue.packages.first?.id)
+        let secondID = try XCTUnwrap(queue.packages.dropFirst().first?.id)
+        print("EVIDENCE normal_before_order=\(queue.packageIDs)")
 
         try openProjects()
-        try clickControl("instruction-queue-toggle", expectedLabel: "Start Ordered Work")
-        let normalActive = try await waitForActivePackage(normalQueuedID, timeout: 90)
-        let normalRunID = try XCTUnwrap(normalActive.packages.first(where: { $0.id == normalQueuedID })?.runID)
-        let normalRun = try await waitForLiveLMStudioRun(normalRunID, timeout: 90)
-        print("EVIDENCE normal_live run_id=\(normalRun.runID) state=\(normalRun.state) provider=\(normalRun.providerID) model=\(normalRun.modelKey) session_id=\(normalRun.activeSessionID ?? "nil") package=\(normalQueuedID)")
-        attachScreenshot("desktop-candidate-normal-live-before-stop")
-
-        try clickControl("instruction-queue-toggle", expectedLabel: "Stop Active Work")
-        let normalStopped = try await waitForPackage(normalQueuedID, state: "cancelled", timeout: 30)
-        let normalTerminalRun = try await waitForRun(normalRunID, state: "cancelled", timeout: 30)
-        let normalRemove = app.buttons["instruction-package-remove-\(normalQueuedID)"]
-        XCTAssertTrue(normalRemove.waitForExistence(timeout: 10))
-        try makeHittable(normalRemove)
-        XCTAssertTrue(normalRemove.isEnabled)
-        print("EVIDENCE normal_stop run_id=\(normalTerminalRun.runID) run_state=\(normalTerminalRun.state) queue_running=\(normalStopped.running) package_state=\(normalStopped.state(of: normalQueuedID) ?? "missing") remove_enabled=\(normalRemove.isEnabled)")
-        attachScreenshot("desktop-candidate-normal-after-stop")
-
-        try clickControl("instruction-package-move-up-\(normalQueuedID)")
-        let normalReordered = try await waitForOrder([normalQueuedID, normalOtherID], timeout: 20)
+        XCTAssertFalse(
+            app.buttons["instruction-queue-toggle"].exists,
+            "The current Projects workflow must not expose Managed Run controls"
+        )
+        try clickControl("instruction-package-move-down-\(firstID)")
+        var expectedOrder = queue.packageIDs
+        expectedOrder.swapAt(0, 1)
+        let normalReordered = try await waitForOrder(expectedOrder, timeout: 20)
         print("EVIDENCE normal_reordered_before_refresh=\(normalReordered.packageIDs)")
         try refreshProjects()
-        let normalRefreshed = try await waitForOrder([normalQueuedID, normalOtherID], timeout: 20)
+        let normalRefreshed = try await waitForOrder(expectedOrder, timeout: 20)
         print("EVIDENCE normal_reordered_after_refresh=\(normalRefreshed.packageIDs)")
 
-        try clickControl("instruction-package-remove-\(normalOtherID)")
-        _ = try await waitForOrder([normalQueuedID], timeout: 20)
+        try clickControl("instruction-package-remove-\(secondID)", expectedLabel: "Delete Package")
+        let expectedAfterDelete = expectedOrder.filter { $0 != secondID }
+        _ = try await waitForOrder(expectedAfterDelete, timeout: 20)
         try refreshProjects()
-        let normalRemoved = try await waitForOrder([normalQueuedID], timeout: 20)
-        XCTAssertFalse(app.buttons["instruction-package-remove-\(normalOtherID)"].exists)
-        print("EVIDENCE normal_removed package_id=\(normalOtherID) after_refresh_order=\(normalRemoved.packageIDs)")
+        let normalRemoved = try await waitForOrder(expectedAfterDelete, timeout: 20)
+        XCTAssertFalse(app.buttons["instruction-package-remove-\(secondID)"].exists)
+        print("EVIDENCE normal_removed package_id=\(secondID) after_refresh_order=\(normalRemoved.packageIDs)")
         attachScreenshot("desktop-candidate-normal-reorder-remove")
 
         let sourcePath = try XCTUnwrap(normalRemoved.packages.first?.sourcePath)
@@ -1685,21 +1665,12 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         resizeMainWindowToMinimum(window)
         print("EVIDENCE minimum_window width=\(Int(window.frame.width)) height=\(Int(window.frame.height)) order=\(secondImport.packageIDs)")
 
-        try clickControl("instruction-queue-toggle", expectedLabel: "Start Ordered Work")
-        let minimumActive = try await waitForActivePackage(minimumFirstID, timeout: 90)
-        let minimumRunID = try XCTUnwrap(minimumActive.packages.first(where: { $0.id == minimumFirstID })?.runID)
-        let minimumRun = try await waitForLiveLMStudioRun(minimumRunID, timeout: 90)
-        print("EVIDENCE minimum_live run_id=\(minimumRun.runID) state=\(minimumRun.state) provider=\(minimumRun.providerID) model=\(minimumRun.modelKey) session_id=\(minimumRun.activeSessionID ?? "nil") package=\(minimumFirstID)")
-
-        try clickControl("instruction-queue-toggle", expectedLabel: "Stop Active Work")
-        let minimumStopped = try await waitForPackage(minimumFirstID, state: "cancelled", timeout: 30)
-        let minimumTerminalRun = try await waitForRun(minimumRunID, state: "cancelled", timeout: 30)
         let minimumRemove = app.buttons["instruction-package-remove-\(minimumFirstID)"]
         try makeHittable(minimumRemove)
         XCTAssertTrue(minimumRemove.isEnabled)
-        print("EVIDENCE minimum_stop run_id=\(minimumTerminalRun.runID) run_state=\(minimumTerminalRun.state) queue_running=\(minimumStopped.running) package_state=\(minimumStopped.state(of: minimumFirstID) ?? "missing") remove_hittable=\(minimumRemove.isHittable)")
+        XCTAssertEqual(minimumRemove.label, "Delete Package")
 
-        let beforeMinimumReorder = minimumStopped.packageIDs
+        let beforeMinimumReorder = secondImport.packageIDs
         try clickControl("instruction-package-move-down-\(minimumFirstID)")
         var expectedMinimumOrder = beforeMinimumReorder
         let minimumFirstIndex = try XCTUnwrap(expectedMinimumOrder.firstIndex(of: minimumFirstID))
@@ -1716,7 +1687,9 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         let minimumRemoved = try await waitForOrder(expectedAfterMinimumRemove, timeout: 20)
         XCTAssertFalse(app.buttons["instruction-package-remove-\(minimumFirstID)"].exists)
         print("EVIDENCE minimum_remove package_id=\(minimumFirstID) after_refresh_order=\(minimumRemoved.packageIDs) retained_package=\(minimumSecondID)")
-        attachScreenshot("desktop-candidate-minimum-stop-reorder-remove")
+        XCTAssertTrue(app.buttons["project-reset"].exists)
+        XCTAssertTrue(app.buttons["project-clear-cache"].exists)
+        attachScreenshot("desktop-candidate-minimum-reorder-delete-maintenance")
     }
 
     private func openProjects() throws {

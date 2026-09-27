@@ -64,6 +64,7 @@ protocol OperatorManagerClientProtocol: Sendable {
         generation: UInt64,
         mode: OperatorProjectContentClearMode
     ) async throws -> OperatorProjectContentClearReceipt
+    func clearApplicationCache(operationID: UUID) async throws -> OperatorCacheClearReceipt
     func clearContinuityHistory(
         _ request: ContinuityHistoryClearRequest
     ) async throws -> ContinuityHistoryClearReceipt
@@ -308,6 +309,12 @@ extension OperatorManagerClientProtocol {
     ) async throws -> OperatorProjectContentClearReceipt {
         throw OperatorManagerClientError.capabilityUnavailable(
             "Project content clearing is unavailable from this manager client."
+        )
+    }
+
+    func clearApplicationCache(operationID: UUID) async throws -> OperatorCacheClearReceipt {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "Application cache clearing is unavailable from this manager client."
         )
     }
 
@@ -1131,6 +1138,20 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         return receipt
     }
 
+    func clearApplicationCache(operationID: UUID) async throws -> OperatorCacheClearReceipt {
+        let receipt: OperatorCacheClearReceipt = try await request(
+            method: "POST",
+            path: "/api/manager/cache/clear",
+            body: ["operation_id": operationID.uuidString.lowercased()]
+        )
+        guard receipt.operationID == operationID, receipt.removedEntryCount >= 0 else {
+            throw OperatorManagerClientError.invalidPayload(
+                "cache clear receipt did not match the requested operation"
+            )
+        }
+        return receipt
+    }
+
     func clearContinuityHistory(
         _ mutation: ContinuityHistoryClearRequest
     ) async throws -> ContinuityHistoryClearReceipt {
@@ -1141,6 +1162,14 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                   mutation.projectGeneration?.rawValue ?? 0 > 0 else {
                 throw OperatorManagerClientError.invalidPayload(
                     "selected continuity clearing requires exact operation, project, and generation identities"
+                )
+            }
+        case .project:
+            guard mutation.operationID == nil,
+                  mutation.projectID != nil,
+                  mutation.projectGeneration == nil else {
+                throw OperatorManagerClientError.invalidPayload(
+                    "project continuity clearing requires one exact project identity"
                 )
             }
         case .allSettled:
@@ -1161,6 +1190,8 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
         )
         guard receipt.scope == mutation.scope,
               receipt.requestedOperationID == mutation.operationID,
+              receipt.requestedProjectID
+                == (mutation.scope == .project ? mutation.projectID : nil),
               receipt.clearedOperationCount >= 0,
               receipt.clearedProjectCount >= 0,
               receipt.deletedRecordCount >= 0,
@@ -1547,6 +1578,9 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
         generation: UInt64,
         mode: OperatorProjectContentClearMode
     ) async throws -> OperatorProjectContentClearReceipt { throw error }
+    func clearApplicationCache(operationID: UUID) async throws -> OperatorCacheClearReceipt {
+        throw error
+    }
     func relinkProject(
         projectID: String,
         generation: UInt64,
@@ -1587,6 +1621,7 @@ final class UnavailableOperatorManagerClient: OperatorManagerClientProtocol, @un
 }
 
 extension UnavailableOperatorManagerClient: RuneForgeManagerClientProtocol {
+    func runeForgeProjectIDs() async throws -> [String] { throw error }
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot { throw error }
 
     func addRuneForgeSource(
@@ -1603,6 +1638,9 @@ extension UnavailableOperatorManagerClient: RuneForgeManagerClientProtocol {
         sourceID: PolicySourceID,
         requestID: UUID
     ) async throws -> DevelopmentPolicySource { throw error }
+    func reorderRuneForgeSources(
+        sourceIDs: [PolicySourceID]
+    ) async throws -> [DevelopmentPolicySource] { throw error }
 
     func runeForgeViolations(
         cursor: Int64,
@@ -1777,6 +1815,10 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         )
     }
 
+    func clearApplicationCache(operationID: UUID) async throws -> OperatorCacheClearReceipt {
+        try await current.clearApplicationCache(operationID: operationID)
+    }
+
     func clearContinuityHistory(
         _ request: ContinuityHistoryClearRequest
     ) async throws -> ContinuityHistoryClearReceipt {
@@ -1913,6 +1955,10 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
 }
 
 extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
+    func runeForgeProjectIDs() async throws -> [String] {
+        try await snapshot(limit: 100, cursor: nil).projects.map(\.projectID)
+    }
+
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
         try await managerClient.stjornarvaldSnapshot(limit: 100, newestFirst: true)
     }
@@ -1959,6 +2005,12 @@ extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
         )
     }
 
+    func reorderRuneForgeSources(
+        sourceIDs: [PolicySourceID]
+    ) async throws -> [DevelopmentPolicySource] {
+        try await managerClient.reorderStjornarvaldSources(sourceIDs: sourceIDs)
+    }
+
     func runeForgeViolations(
         cursor: Int64,
         limit: Int,
@@ -1997,6 +2049,10 @@ extension OperatorManagerHTTPClient: RuneForgeManagerClientProtocol {
 }
 
 extension OperatorManagerClientRouter: RuneForgeManagerClientProtocol {
+    func runeForgeProjectIDs() async throws -> [String] {
+        try await runeForgeClient.runeForgeProjectIDs()
+    }
+
     func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
         try await runeForgeClient.runeForgeSnapshot()
     }
@@ -2036,6 +2092,12 @@ extension OperatorManagerClientRouter: RuneForgeManagerClientProtocol {
             sourceID: sourceID,
             requestID: requestID
         )
+    }
+
+    func reorderRuneForgeSources(
+        sourceIDs: [PolicySourceID]
+    ) async throws -> [DevelopmentPolicySource] {
+        try await runeForgeClient.reorderRuneForgeSources(sourceIDs: sourceIDs)
     }
 
     func runeForgeViolations(
