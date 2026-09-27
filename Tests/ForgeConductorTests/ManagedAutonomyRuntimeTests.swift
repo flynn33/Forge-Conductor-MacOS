@@ -1326,6 +1326,134 @@ final class ManagedAutonomyRuntimeTests: XCTestCase {
         await runtime.shutdown()
     }
 
+    func testManagerStopInstructionQueueCancelsActiveRuntimeJobAndUnlocksPackageForRemoval() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let projectRoot = home.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let fixtureURL = projectRoot.appendingPathComponent("fixture.txt")
+        let instructionURL = projectRoot.appendingPathComponent("instructions.md")
+        try Data("runtime queue cancellation fixture\n".utf8).write(
+            to: fixtureURL, options: .atomic
+        )
+        try Data("Keep working until the operator stops this package.\n".utf8).write(
+            to: instructionURL, options: .atomic
+        )
+        _ = try app.config.update(["allowed_roots": [projectRoot.path]], save: true)
+        let provider = ManagedRuntimeFixtureProvider(
+            fixturePath: fixtureURL.path,
+            rootDelay: .seconds(30)
+        )
+        let node = ManagerNode(app: app) { app in
+            try ManagedAutonomyRuntime(
+                app: app,
+                registry: managedRuntimeFixtureRegistry(provider: provider),
+                managerID: "managed-runtime-instruction-queue-stop",
+                maximumConcurrentRuns: 1
+            )
+        }
+        defer {
+            node.shutdownManagedAutonomy()
+            app.shutdown()
+        }
+
+        let registered = try node.registerProject(path: projectRoot.path)
+        let projectID = try ProjectID(XCTUnwrap(UUID(
+            uuidString: try XCTUnwrap(registered["project_id"] as? String)
+        )))
+        let generation = ProjectGeneration(try projectGeneration(registered))
+        let queueStore = try ProjectInstructionQueueStore(paths: app.paths, clock: app.clock)
+        let imported = try queueStore.importPackage(
+            sourceURL: instructionURL,
+            projectID: projectID,
+            generation: generation
+        )
+        let package = try XCTUnwrap(imported.packages.first)
+        _ = try queueStore.start(projectID: projectID, generation: generation)
+
+        _ = try node.recoverManagedAutonomy()
+        let runID = RunID()
+        _ = try node.startAutonomousRun(
+            runID: runID,
+            projectID: projectID,
+            expectedGeneration: generation,
+            mission: "Remain active until Stop Active Work cancels this queue package",
+            providerID: "fixture-provider",
+            adapterID: "fixture-adapter",
+            modelKey: "fixture-model",
+            allowedTools: ["bash.run", "fs_read"],
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate]
+        )
+        _ = try queueStore.markStarted(packageID: package.id, runID: runID)
+        _ = try await waitForRun(
+            repository: app.projectContexts.repository,
+            runID: runID,
+            state: .running
+        )
+
+        let authorizationScope = ToolAuthorizationScope(
+            canonicalRoots: [projectRoot],
+            allowedTools: ["bash.run", "fs_read"],
+            networkAllowed: false,
+            maximumInlineOutputBytes: 64 * 1_024
+        )
+        let context = ToolInvocationContext(
+            projectID: projectID,
+            projectGeneration: generation,
+            clientID: ClientID("instruction-queue-stop-test"),
+            runID: runID,
+            authorizationScope: authorizationScope
+        )
+        let jobID = try await app.runtimeJobs.service.submit(RuntimeJobRequest(
+            kind: .bash,
+            profile: .bashNoProfile,
+            context: context,
+            script: "sleep 30",
+            canonicalWorkingDirectory: projectRoot,
+            timeout: .seconds(60),
+            replayClass: .reconciled,
+            idempotencyKey: "instruction-queue-stop-runtime-job"
+        ))
+        var observedRunningJob = false
+        for _ in 0..<400 {
+            let status = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+            if status.state == .running {
+                observedRunningJob = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        XCTAssertTrue(observedRunningJob, "The queue run must own an active runtime job before Stop")
+
+        let stopped = try node.stopInstructionQueue(
+            projectID: projectID,
+            expectedGeneration: generation
+        )
+        XCTAssertEqual(stopped["running"] as? Bool, false)
+        let stoppedPackages = try XCTUnwrap(stopped["packages"] as? [[String: Any]])
+        XCTAssertEqual(stoppedPackages.first?["state"] as? String, "cancelled")
+        XCTAssertEqual(stoppedPackages.first?["run_id"] as? String, runID.description)
+
+        let removed = try node.removeInstructionPackage(
+            projectID: projectID,
+            expectedGeneration: generation,
+            packageID: package.id
+        )
+        XCTAssertTrue((removed["packages"] as? [[String: Any]] ?? []).isEmpty)
+
+        let cancelledJob = try await app.runtimeJobs.service.waitForTerminal(
+            jobID: jobID,
+            context: context,
+            maximumWait: .seconds(2)
+        )
+        XCTAssertEqual(cancelledJob.state, .cancelled)
+        let cancelledRun = try await waitForRun(
+            repository: app.projectContexts.repository,
+            runID: runID,
+            state: .cancelled
+        )
+        XCTAssertEqual(cancelledRun.state, .cancelled)
+    }
+
     func testHTTPRunResponsesMatchOperatorSnapshotProjectionAndPreserveCompletionReceipt() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = Int.random(in: 29_000...39_000)

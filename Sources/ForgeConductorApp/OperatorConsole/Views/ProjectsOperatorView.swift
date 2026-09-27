@@ -515,7 +515,6 @@ struct ProjectsOperatorView: View {
                                     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
                             }
                         }
-                        .accessibilityIdentifier("instruction-package-list")
                     }
                 } else {
                     HStack {

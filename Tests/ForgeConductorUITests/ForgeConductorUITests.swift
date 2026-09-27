@@ -918,6 +918,84 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         try assertEveryPrimaryViewContainedAndAligned(in: window)
     }
 
+    func testProjectsStopReorderAndRemoveRemainHittableAtMinimumWindow() throws {
+        let fixture = try OperatorManagerUITestFixture(activeInstructionQueue: true)
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowToMinimum(window)
+
+        let projects = app.buttons["tab-projects"]
+        XCTAssertTrue(projects.waitForExistence(timeout: 5))
+        projects.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["project-instruction-packages"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertEqual(
+            app.outlines.matching(identifier: "instruction-package-list").count,
+            0,
+            "Instruction packages must not use a nested List inside the Projects ScrollView"
+        )
+
+        let stop = app.buttons["instruction-queue-toggle"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        makeHittable(stop)
+        XCTAssertTrue(stop.label.contains("Stop Active Work"))
+        stop.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.instructionQueueStopRequestCount == 1
+                && !fixture.instructionQueueRunning
+                && fixture.instructionPackageStates[fixture.instructionPackageID] == "cancelled"
+        })
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            stop.exists && stop.label.contains("Start Ordered Work")
+        })
+
+        let moveLater = app.buttons[
+            "instruction-package-move-down-\(fixture.instructionPackageID)"
+        ]
+        XCTAssertTrue(moveLater.waitForExistence(timeout: 5))
+        makeHittable(moveLater)
+        XCTAssertTrue(moveLater.isEnabled)
+        moveLater.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.instructionQueueReorderRequestCount == 1
+                && fixture.instructionPackageIDs == [
+                    fixture.secondInstructionPackageID,
+                    fixture.instructionPackageID,
+                ]
+        })
+
+        let reorderRefreshBaseline = fixture.instructionQueueStatusRequestCount
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.instructionQueueStatusRequestCount > reorderRefreshBaseline
+        })
+        let moveEarlier = app.buttons[
+            "instruction-package-move-up-\(fixture.instructionPackageID)"
+        ]
+        XCTAssertTrue(moveEarlier.waitForExistence(timeout: 5))
+        makeHittable(moveEarlier)
+        XCTAssertTrue(moveEarlier.isEnabled)
+
+        let remove = app.buttons[
+            "instruction-package-remove-\(fixture.instructionPackageID)"
+        ]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        makeHittable(remove)
+        XCTAssertTrue(remove.isEnabled)
+        remove.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.instructionQueueRemoveRequestCount == 1
+                && fixture.instructionPackageIDs == [fixture.secondInstructionPackageID]
+        })
+        let removeRefreshBaseline = fixture.instructionQueueStatusRequestCount
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fixture.instructionQueueStatusRequestCount > removeRefreshBaseline
+        })
+        XCTAssertFalse(app.buttons["instruction-package-remove-\(fixture.instructionPackageID)"].exists)
+    }
+
     func testNormalWindowKeepsEveryPrimaryViewContainedAndAligned() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
@@ -2188,6 +2266,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     let runID = "22222222-2222-4222-8222-222222222222"
     let runtimeJobID = "33333333-3333-4333-8333-333333333333"
     let instructionPackageID = "44444444-4444-4444-8444-444444444444"
+    let secondInstructionPackageID = "45454545-4545-4545-8545-454545454545"
     let policyEventID = "55555555-5555-4555-8555-555555555555"
     let continuityOperationID = "99999999-9999-4999-8999-999999999999"
     let continuityEventID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -2249,6 +2328,14 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutablePolicySnapshotRequestCount = 0
     private var mutableScopedPolicySnapshotRequestCount = 0
     private var mutablePolicyViolationRequestCount = 0
+    private var mutableInstructionQueueRevision: UInt64
+    private var mutableInstructionQueueRunning: Bool
+    private var mutableInstructionPackageIDs: [String]
+    private var mutableInstructionPackageStates: [String: String]
+    private var mutableInstructionQueueStopRequestCount = 0
+    private var mutableInstructionQueueReorderRequestCount = 0
+    private var mutableInstructionQueueRemoveRequestCount = 0
+    private var mutableInstructionQueueStatusRequestCount = 0
     private let supportedProviderIntegrationIDs: Set<String> = [
         "lmstudio",
         "claude-desktop",
@@ -2311,6 +2398,23 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         locked { mutableScopedPolicySnapshotRequestCount }
     }
     var policyViolationRequestCount: Int { locked { mutablePolicyViolationRequestCount } }
+    var instructionQueueRunning: Bool { locked { mutableInstructionQueueRunning } }
+    var instructionPackageIDs: [String] { locked { mutableInstructionPackageIDs } }
+    var instructionPackageStates: [String: String] {
+        locked { mutableInstructionPackageStates }
+    }
+    var instructionQueueStopRequestCount: Int {
+        locked { mutableInstructionQueueStopRequestCount }
+    }
+    var instructionQueueReorderRequestCount: Int {
+        locked { mutableInstructionQueueReorderRequestCount }
+    }
+    var instructionQueueRemoveRequestCount: Int {
+        locked { mutableInstructionQueueRemoveRequestCount }
+    }
+    var instructionQueueStatusRequestCount: Int {
+        locked { mutableInstructionQueueStatusRequestCount }
+    }
 
     init(
         failStartResponse: Bool = false,
@@ -2319,7 +2423,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         dropRelinkResponseCount: Int = 0,
         rejectFirstRelinkResponse: Bool = false,
         initialRunState: String = "running",
-        includeContinuityOperation: Bool = false
+        includeContinuityOperation: Bool = false,
+        activeInstructionQueue: Bool = false
     ) throws {
         self.failStartResponse = failStartResponse
         self.failContractProbe = failContractProbe
@@ -2330,6 +2435,20 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
         self.includeContinuityOperation = includeContinuityOperation
         mutableRunState = initialRunState
+        mutableInstructionQueueRevision = 1
+        mutableInstructionQueueRunning = activeInstructionQueue
+        mutableInstructionPackageIDs = activeInstructionQueue
+            ? [
+                "44444444-4444-4444-8444-444444444444",
+                "45454545-4545-4545-8545-454545454545",
+            ]
+            : ["44444444-4444-4444-8444-444444444444"]
+        mutableInstructionPackageStates = activeInstructionQueue
+            ? [
+                "44444444-4444-4444-8444-444444444444": "running",
+                "45454545-4545-4545-8545-454545454545": "queued",
+            ]
+            : ["44444444-4444-4444-8444-444444444444": "queued"]
         listener = try NWListener(using: .tcp, on: .any)
 
         let ready = DispatchSemaphore(value: 0)
@@ -2579,6 +2698,87 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         case "/api/manager/projects/status":
             respond(status: 200, object: project(), to: connection)
         case "/api/manager/projects/instruction-packages":
+            locked { mutableInstructionQueueStatusRequestCount += 1 }
+            respond(status: 200, object: instructionQueue(), to: connection)
+        case "/api/manager/projects/instruction-packages/stop":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body)
+                    as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  (object["project_generation"] as? NSNumber)?.uint64Value
+                    == locked({ mutableProjectGeneration }) else {
+                respond(status: 401, object: ["message": "missing queue-stop authority"], to: connection)
+                return
+            }
+            let stopped = locked { () -> Bool in
+                guard mutableInstructionQueueRunning else { return false }
+                mutableInstructionQueueRunning = false
+                for packageID in mutableInstructionPackageIDs
+                    where mutableInstructionPackageStates[packageID] == "running" {
+                    mutableInstructionPackageStates[packageID] = "cancelled"
+                }
+                mutableInstructionQueueRevision += 1
+                mutableInstructionQueueStopRequestCount += 1
+                mutableMutationAuthorizationCount += 1
+                return true
+            }
+            guard stopped else {
+                respond(status: 409, object: ["message": "instruction queue is not running"], to: connection)
+                return
+            }
+            respond(status: 200, object: instructionQueue(), to: connection)
+        case "/api/manager/projects/instruction-packages/reorder":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body)
+                    as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  (object["project_generation"] as? NSNumber)?.uint64Value
+                    == locked({ mutableProjectGeneration }),
+                  let expectedRevision = (object["expected_revision"] as? NSNumber)?.uint64Value,
+                  let packageIDs = object["package_ids"] as? [String] else {
+                respond(status: 401, object: ["message": "missing queue-reorder authority"], to: connection)
+                return
+            }
+            let reordered = locked { () -> Bool in
+                guard expectedRevision == mutableInstructionQueueRevision,
+                      packageIDs.count == mutableInstructionPackageIDs.count,
+                      Set(packageIDs) == Set(mutableInstructionPackageIDs) else { return false }
+                mutableInstructionPackageIDs = packageIDs
+                mutableInstructionQueueRevision += 1
+                mutableInstructionQueueReorderRequestCount += 1
+                mutableMutationAuthorizationCount += 1
+                return true
+            }
+            guard reordered else {
+                respond(status: 409, object: ["message": "stale queue reorder"], to: connection)
+                return
+            }
+            respond(status: 200, object: instructionQueue(), to: connection)
+        case "/api/manager/projects/instruction-packages/remove":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body)
+                    as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  (object["project_generation"] as? NSNumber)?.uint64Value
+                    == locked({ mutableProjectGeneration }),
+                  let packageID = object["package_id"] as? String else {
+                respond(status: 401, object: ["message": "missing queue-remove authority"], to: connection)
+                return
+            }
+            let removed = locked { () -> Bool in
+                guard mutableInstructionPackageStates[packageID] != nil,
+                      mutableInstructionPackageStates[packageID] != "running" else { return false }
+                mutableInstructionPackageIDs.removeAll { $0 == packageID }
+                mutableInstructionPackageStates.removeValue(forKey: packageID)
+                mutableInstructionQueueRevision += 1
+                mutableInstructionQueueRemoveRequestCount += 1
+                mutableMutationAuthorizationCount += 1
+                return true
+            }
+            guard removed else {
+                respond(status: 409, object: ["message": "active or missing instruction package"], to: connection)
+                return
+            }
             respond(status: 200, object: instructionQueue(), to: connection)
         case "/api/manager/projects/tool-permissions/status":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true else {
@@ -3573,34 +3773,55 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     }
 
     private func instructionQueue() -> [String: Any] {
-        let generation = locked { mutableProjectGeneration }
-        return [
-            "ok": true,
-            "project_id": projectID,
-            "project_generation": generation,
-            "revision": 1,
-            "running": false,
-            "packages": [[
-                "id": instructionPackageID,
+        let state = locked {
+            (
+                mutableProjectGeneration,
+                mutableInstructionQueueRevision,
+                mutableInstructionQueueRunning,
+                mutableInstructionPackageIDs,
+                mutableInstructionPackageStates
+            )
+        }
+        let packages: [[String: Any]] = state.3.enumerated().map { index, packageID in
+            let isFirst = packageID == instructionPackageID
+            let packageState = state.4[packageID] ?? "queued"
+            var package: [String: Any] = [
+                "id": packageID,
                 "project_id": projectID,
-                "project_generation": generation,
-                "package_id": "fixture-package",
+                "project_generation": state.0,
+                "package_id": isFirst ? "fixture-package" : "fixture-package-two",
                 "version": "1",
-                "display_name": "Fixture Instructions",
-                "mission": "Follow the fixture instructions.",
-                "source_path": "/tmp/removed-fixture-source.md",
-                "content_sha256": String(repeating: "c", count: 64),
+                "display_name": isFirst ? "Fixture Instructions" : "Second Fixture Instructions",
+                "mission": isFirst
+                    ? "Follow the fixture instructions."
+                    : "Follow the second fixture instructions.",
+                "source_path": isFirst
+                    ? "/tmp/removed-fixture-source.md"
+                    : "/tmp/second-fixture-source.md",
+                "content_sha256": String(repeating: isFirst ? "c" : "d", count: 64),
                 "allowed_tools": ["project_memory.search"],
                 "completion_gates": ["tests"],
                 "document_count": 1,
                 "instruction_byte_count": 128,
                 "unresolved_document_count": 0,
                 "import_ready": true,
-                "position": 0,
-                "state": "queued",
+                "position": index,
+                "state": packageState,
                 "created_at": "2026-08-31T12:00:00Z",
                 "updated_at": "2026-08-31T12:00:00Z",
-            ]],
+            ]
+            if isFirst, packageState != "queued" {
+                package["run_id"] = runID
+            }
+            return package
+        }
+        return [
+            "ok": true,
+            "project_id": projectID,
+            "project_generation": state.0,
+            "revision": state.1,
+            "running": state.2,
+            "packages": packages,
         ]
     }
 
