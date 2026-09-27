@@ -147,10 +147,12 @@ final class ProjectsViewModelResetTests: XCTestCase {
         private let subsequentStatusProject: OperatorProject?
         private let statusError: OperatorManagerClientError?
         private let clearReceipt: OperatorProjectContentClearReceipt?
+        private let instructionQueue: OperatorInstructionQueue?
         private let failFirstClear: Bool
         private var gateArmed = false
         private var gateReleased = false
         private var snapshotCallCount = 0
+        private var instructionQueueCallCount = 0
 
         private(set) var resetCalls: [ResetCall] = []
         private(set) var statusCalls: [StatusCall] = []
@@ -166,6 +168,7 @@ final class ProjectsViewModelResetTests: XCTestCase {
             subsequentStatusProject: OperatorProject? = nil,
             statusError: OperatorManagerClientError? = nil,
             clearReceipt: OperatorProjectContentClearReceipt? = nil,
+            instructionQueue: OperatorInstructionQueue? = nil,
             failFirstClear: Bool = false
         ) {
             self.snapshot = snapshot
@@ -177,6 +180,7 @@ final class ProjectsViewModelResetTests: XCTestCase {
             self.subsequentStatusProject = subsequentStatusProject
             self.statusError = statusError
             self.clearReceipt = clearReceipt
+            self.instructionQueue = instructionQueue
             self.failFirstClear = failFirstClear
         }
 
@@ -218,6 +222,17 @@ final class ProjectsViewModelResetTests: XCTestCase {
                 )
             }
             return response
+        }
+
+        func instructionQueue(
+            projectID: String,
+            generation: UInt64
+        ) async throws -> OperatorInstructionQueue {
+            instructionQueueCallCount += 1
+            guard let instructionQueue else {
+                throw notInScope
+            }
+            return instructionQueue
         }
 
         func resetProject(
@@ -475,6 +490,70 @@ final class ProjectsViewModelResetTests: XCTestCase {
                 current: staleQueue
             )
         )
+    }
+
+    func testInstructionQueueRefreshDuringMutationKeepsVisiblePackages() async throws {
+        let queue = try Self.fixture(
+            OperatorInstructionQueue.self,
+            from: """
+            {
+              "project_id": "\(Self.projectID)",
+              "project_generation": 1,
+              "revision": 4,
+              "running": true,
+              "packages": [{
+                "id": "11111111-1111-4111-8111-111111111111",
+                "project_id": "\(Self.projectID)",
+                "project_generation": 1,
+                "package_id": "active",
+                "version": "1",
+                "display_name": "Active",
+                "mission": "Complete active work.",
+                "source_path": "/tmp/active.md",
+                "content_sha256": "\(String(repeating: "a", count: 64))",
+                "allowed_tools": [],
+                "completion_gates": [],
+                "position": 0,
+                "state": "running",
+                "run_id": "22222222-2222-4222-8222-222222222222",
+                "created_at": "2026-09-27T00:00:00Z",
+                "updated_at": "2026-09-27T00:00:00Z"
+              }]
+            }
+            """
+        )
+        let client = FakeOperatorClient(
+            snapshot: try Self.fixture(OperatorSnapshot.self, from: Self.snapshotJSON()),
+            resetReceipt: try Self.fixture(OperatorResetReceipt.self, from: Self.resetReceiptJSON),
+            statusProject: try Self.fixture(
+                OperatorProject.self,
+                from: Self.projectJSON(generation: 2, withReceipt: true)
+            ),
+            instructionQueue: queue
+        )
+        let viewModel = await settledViewModel(client: client)
+        viewModel.loadInstructionQueue()
+        let visibleDeadline = Date().addingTimeInterval(10)
+        while viewModel.instructionQueue == nil {
+            if Date() >= visibleDeadline {
+                XCTFail("Instruction queue did not become visible")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(viewModel.instructionQueue?.packages.count, 1)
+
+        await client.armResetGate()
+        viewModel.resetProject(try XCTUnwrap(viewModel.resetConfirmationForSelectedProject()))
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(viewModel.isLoading)
+
+        viewModel.loadInstructionQueue()
+        XCTAssertEqual(viewModel.instructionQueue?.packages.map(\.id), queue.packages.map(\.id))
+        XCTAssertTrue(viewModel.instructionQueueHasActiveWork)
+
+        await client.releaseResetGate()
+        await waitUntilIdle(viewModel)
     }
 
     /// Confirmed success: the action invokes the service once with the selected

@@ -18,10 +18,12 @@ Product versions do not by themselves claim shipment.
   cancellation failure leaves the queue stopped while preserving a retryable
   stop action.
 - Restored usable Projects instruction-package controls in constrained window
-  geometry. Explicit earlier/later buttons and the remove action now occupy a
-  leading action row, drag reordering remains available, and stale background
-  queue snapshots can no longer roll back a newer persisted order or prune its
-  catalog state.
+  geometry. Stop/Add/Run Details now sit above the package rows so a nested
+  list can no longer steal their hits. Explicit earlier/later and Remove
+  buttons are ordinary bordered controls in the detail ScrollView rather than
+  a nested List. A two-second background poll no longer clears the visible
+  queue while a mutation is in flight, and stale snapshots can no longer roll
+  back a newer persisted order.
 - Made **Start Ordered Work** perform a live, no-resume readiness check for the
   selected LM Studio endpoint, pinned model, loaded inventory, and tool contract
   before mutating the instruction queue or creating a run. An unloaded pin now
@@ -40,6 +42,13 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- Follow-up Projects control repair keeps Stop/Add/Remove/Reorder visible and
+  hittable while a mutation is in flight. The two-second queue poll no longer
+  clears packages when `isLoading` is true, and package rows are ordinary
+  ScrollView content rather than a nested List. A focused view-model case
+  covers the in-flight refresh. This host cannot execute the signed macOS
+  application or SwiftPM suite; owner-host rebuild and the existing native
+  Projects UI case remain the runtime proof.
 - Published Projects instruction-control repair
   `b4bf571de822cc463dc69c30f4a10c12033919cd`. A signed native UI test
   imported two real instruction packages through the Manager, clicked the

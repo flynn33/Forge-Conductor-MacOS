@@ -14,7 +14,7 @@ Instruction packages turn a registered local repository into an ordered work que
    registration authorizes that exact canonical root without widening access to
    its parent.
 4. Under **Instruction packages**, choose **Add Instructions…** and arrange
-   packages by dragging rows or using the earlier/later arrow buttons.
+   packages with the earlier/later arrow buttons.
 5. In **Provider**, select and verify exactly one provider. LM Studio requires a
    current saved model/readiness receipt; desktop providers require a verified
    integration and retain their host-selected model.
@@ -114,13 +114,14 @@ invocations.
 
 ## Ordering and execution
 
-The Projects list order is authoritative. Drag rows or use the explicit
-earlier/later buttons before or during ordered execution. New packages can be
+The Projects list order is authoritative. Use the explicit earlier/later
+buttons before or during ordered execution. New packages can be
 added while work is running. Forge preserves the active run identity and
 applies the revised order to pending packages. Every order change carries a
 queue revision so concurrent or stale edits fail instead of silently
 overwriting a newer order. The native view also rejects a background snapshot
-whose revision predates the queue already shown.
+whose revision predates the queue already shown, and it does not hide the
+visible queue while Stop, Remove, or Reorder is in flight.
 
 **Start Ordered Work** requires one selected, verified provider and a
 running managed autonomy service. LM Studio requires a live no-resume readiness

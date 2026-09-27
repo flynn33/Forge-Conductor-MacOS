@@ -1,5 +1,24 @@
 # Version and qualification status
 
+## 0.14.7 Projects instruction controls — hittable follow-up
+
+The previous source repair still left two operator-visible failure modes:
+
+1. Package Stop/Remove/Reorder controls lived in a SwiftUI `List` nested inside
+   the Projects detail `ScrollView`. That composition can keep the controls
+   present in the accessibility tree while stealing their hits, including the
+   **Stop Active Work** button immediately below the list.
+2. `loadInstructionQueue()` treated `isLoading` as "no selected project" and
+   cleared the visible queue. The two-second Projects poll could therefore hide
+   every package control for the duration of stop/remove/reorder.
+
+This follow-up keeps the queue action bar above the rows, renders packages as
+plain ScrollView content with bordered earlier/later/Remove buttons, and skips
+background refresh while a mutation owns the pane. Version remains
+`0.14.7 (13)`. The working installation is not replaced. This is a source
+candidate, not a shipment or notarization claim. Runtime proof still requires
+an owner-host rebuild of the signed app.
+
 ## 0.14.7 Projects instruction controls repair — source candidate verified
 
 Product source `b4bf571de822cc463dc69c30f4a10c12033919cd` repairs the

@@ -12,6 +12,16 @@ Every direct update records its affected row with evidence and limitation. Histo
 
 ## Phases and milestones
 
+September 27 follow-up for N-PROJECT-WORKFLOW-0145: the prior published
+repair still left Projects package controls inside a nested SwiftUI `List`
+and allowed the two-second queue poll to clear the visible pane while
+`isLoading` was true. The follow-up source keeps Stop/Add above the rows,
+uses bordered earlier/later/Remove controls in the detail ScrollView, and
+skips in-flight queue wipes. Version remains `0.14.7 (13)`. The working
+installation is not replaced. Owner-host rebuild and live click review remain
+the runtime evidence; this documentation does not manufacture a signed-test
+pass from a non-macOS host.
+
 September 25 publication checkpoint for N-SHIPPABLE-LM-CODEX-0144: tested
 product source `cdc539ec35d0f19493d6169ddd827e130870b02f`, tree
 `e1291f80f2a2dd87b7cb7df112358706cf89ae61`, is published directly to `main`

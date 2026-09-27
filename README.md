@@ -14,17 +14,14 @@ supported desktop coding hosts.
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.14.7 (13)` is installed locally as an Apple
-> Development-signed repair build. The installed app admitted the owner's same
-> project and instruction package through **Start Ordered Work**, selected the
-> pinned LM Studio model, and executed managed model/tool turns without the
-> reported configuration error. Current source also restores visible,
-> persisted instruction-package reordering/removal and makes **Stop Active
-> Work** cancel the exact active package run before the package becomes
-> removable. Provider selection/reconnection, launch-without-Guided-Setup, and
-> the repaired Projects controls are covered by native UI or installed-state
-> evidence. Developer ID distribution, notarization, and shipment qualification
-> remain required before shipment.
+> **Release status:** `0.14.7 (13)` is a source/build candidate. The owner
+> will ship separately and must rebuild any app used for live Projects
+> review; the working installation is not replaced by this update. Current
+> source keeps **Stop Active Work**, earlier/later reorder, and Remove as
+> hittable Projects controls, cancels the exact active package run before
+> that package becomes removable, and no longer hides the queue while those
+> actions are in flight. Developer ID distribution, notarization, and
+> shipment qualification remain required before shipment.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation

@@ -442,34 +442,11 @@ struct ProjectsOperatorView: View {
     private func instructionPackages(_ project: OperatorProject) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Drag rows or use the arrow buttons to set the order used by autonomous runs.")
+                Text("Add a file, folder, or ZIP in its existing format. Forge preserves every source, converts supported instruction content into an immutable project-scoped artifact, and reports anything it cannot interpret. Use the earlier/later arrows to set the order used by autonomous runs.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if let queue = viewModel.instructionQueue {
-                    if queue.packages.isEmpty {
-                        ContentUnavailableView(
-                            "No Instruction Packages",
-                            systemImage: "list.number",
-                            description: Text("Add package instructions for this repository, then arrange their execution order.")
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 100)
-                    } else {
-                        List {
-                            ForEach(queue.packages) { package in
-                                instructionPackageRow(package, packages: queue.packages)
-                            }
-                            .onMove { offsets, destination in
-                                var packages = queue.packages
-                                packages.move(fromOffsets: offsets, toOffset: destination)
-                                viewModel.reorderInstructionPackages(packages.map(\.id))
-                            }
-                            .moveDisabled(viewModel.isLoading)
-                        }
-                        .frame(height: min(max(CGFloat(queue.packages.count) * 140, 180), 560))
-                        .accessibilityIdentifier("instruction-package-list")
-                    }
-
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Button("Add Instructions…", systemImage: "plus") {
@@ -521,6 +498,25 @@ struct ProjectsOperatorView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+
+                    if queue.packages.isEmpty {
+                        ContentUnavailableView(
+                            "No Instruction Packages",
+                            systemImage: "list.number",
+                            description: Text("Add package instructions for this repository, then arrange their execution order.")
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 100)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(queue.packages) { package in
+                                instructionPackageRow(package, packages: queue.packages)
+                                    .padding(10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                        .accessibilityIdentifier("instruction-package-list")
+                    }
                 } else {
                     HStack {
                         ProgressView().controlSize(.small)
@@ -547,9 +543,6 @@ struct ProjectsOperatorView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "line.3.horizontal")
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(package.displayName)
@@ -590,13 +583,14 @@ struct ProjectsOperatorView: View {
                 OperatorStateBadge(state: package.state)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button {
                     viewModel.moveInstructionPackage(package.id, by: -1)
                 } label: {
                     Image(systemName: "arrow.up")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .disabled(
                     viewModel.isLoading || packages.first?.id == package.id
                 )
@@ -608,19 +602,19 @@ struct ProjectsOperatorView: View {
                 } label: {
                     Image(systemName: "arrow.down")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .disabled(
                     viewModel.isLoading || packages.last?.id == package.id
                 )
                 .help("Move this instruction package later")
                 .accessibilityLabel("Move \(package.displayName) later")
                 .accessibilityIdentifier("instruction-package-move-down-\(package.id)")
-                Button(role: .destructive) {
+                Button("Remove", role: .destructive) {
                     viewModel.removeInstructionPackage(package.id)
-                } label: {
-                    Image(systemName: "trash")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .disabled(viewModel.isLoading || package.state == "running")
                 .help("Remove this instruction package")
                 .accessibilityIdentifier("instruction-package-remove-\(package.id)")

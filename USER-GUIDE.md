@@ -280,8 +280,8 @@ autonomous queue, follow this order:
    authorizes that folder; adding the repository or its parent under Manager
    Allowed Roots is not an ordinary prerequisite.
 4. Under **Instruction packages**, add a Markdown/text file, a folder of
-   instructions, or a `.forgepackage`/`forge-package.json` manifest. Drag rows
-   up or down to establish the execution order.
+   instructions, or a `.forgepackage`/`forge-package.json` manifest. Use the
+   earlier/later arrows to establish the execution order.
 5. Review the package capabilities, completion requirements, failure behavior,
    and automatic continuity. Package-declared requirements remain authoritative
    and read-only; Forge configuration exposes only the built-in checks.
@@ -295,8 +295,9 @@ bound to the selected project UUID and generation. The model's filesystem scope
 is the registered repository, even when the imported instruction file lives
 elsewhere. Unsupported or unreadable sources are retained as attachments and do
 not block readable instructions in the same package. Add and rearrange pending
-packages while work runs. **Stop Ordered Work** prevents the next package from
-starting while leaving an already admitted run visible in **Projects → Run Details**.
+packages while work runs. **Stop Active Work** prevents the next package from
+starting, cancels the exact active package run, and then makes that package
+removable. The cancelled run remains visible in **Projects → Run Details**.
 
 For a direct task, open **Projects → Run Details → Start Task**. **Show completion checks**
 is expanded initially; check or clear the premade evidence that fits the work: Buildable

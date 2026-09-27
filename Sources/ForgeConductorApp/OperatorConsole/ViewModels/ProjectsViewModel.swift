@@ -193,13 +193,17 @@ final class ProjectsViewModel: ObservableObject {
     }
 
     func loadInstructionQueue() {
-        guard !isLoading, let project = selectedProject else {
+        guard let project = selectedProject else {
             instructionQueue = nil
             instructionCatalogs = [:]
             loadingInstructionCatalogs = []
             instructionCatalogErrors = [:]
             return
         }
+        // A mutation already owns the visible queue. Clearing it here made the
+        // two-second Projects poll hide Stop/Remove/Reorder while work was in
+        // flight, which presented as an unusable instruction-package pane.
+        guard !isLoading else { return }
         let identity = project.projectID
         let generation = project.projectGeneration
         Task { [weak self] in
@@ -323,7 +327,7 @@ final class ProjectsViewModel: ObservableObject {
                     projectID: project.projectID,
                     generation: project.projectGeneration
                 )
-                notice = "Added the instruction package to \(project.displayName). Drag packages or use the arrow buttons to set execution order."
+                notice = "Added the instruction package to \(project.displayName). Use the arrow buttons to set execution order."
             } catch {
                 errorMessage = error.localizedDescription
             }
