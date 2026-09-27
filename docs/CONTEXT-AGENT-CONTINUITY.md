@@ -110,13 +110,19 @@ context budget, handoff/successor fields, and event history remain present; the
 layout correction does not remove those capabilities.
 
 The **Stored continuity data** section supports two confirmed retention actions:
-**Clear Selected…** removes the selected operation only, and **Clear All
-Settled…** removes every terminal operation the Manager can prove safe to
-delete. Both remove canonical operation/transition/handoff rows and rebuildable
-JSON/current/latest projections, then tombstone each cleared operation so a
-stale command cannot recreate it. Active or recoverable operations remain
-visible. These actions do not remove project memory, tasks, runs, credentials,
-or unrelated project data.
+**Clear Selected…** removes one selected old item, and **Clear All Old…**
+removes every old item. The control-plane predicate is
+`commandIsTerminal || run == nil || run?.state.isTerminal == true`; the
+project-memory deletion predicate is
+`stored.state == ContinuityState.predecessorSealed.rawValue || stored.quarantined`.
+For an old row whose project operation is still nonterminal, the Manager first
+retires that stale operation, then removes its canonical operation, transition,
+handoff, repair, and schema-2 rows plus rebuildable JSON/current/latest
+projections. It deletes the control-plane list root and writes a payload-free
+tombstone so Refresh or relaunch cannot recreate the item. A genuinely live
+owner remains visible with its exact run/command blocker and **Open Run
+Details** recovery action. Ordinary project memory records, tasks, runs,
+credentials, project files, and unrelated project data remain unchanged.
 
 **Protection** is an operator-facing state, not a generic alarm. The detail and
 next-action text explain the exact transition:

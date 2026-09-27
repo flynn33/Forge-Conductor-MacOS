@@ -14,13 +14,14 @@ supported desktop coding hosts.
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** `0.15.0 (14)` is a source/build candidate. The owner
-> will ship separately; the working installation is not replaced by this
-> update. The Continuity view can delete one selected settled operation or all
-> settled operation history and its rebuildable cache without removing project
-> memory or live/recoverable continuity work. Developer ID distribution,
-> notarization, owner testing, and shipment qualification remain separate; this
-> is not a shipment claim.
+> **Release status:** A Desktop `0.15.0 (14)` candidate and matching archive are
+> staged outside `/Applications` for owner testing. The owner will ship
+> separately; the working installation is not replaced by this update. The
+> Continuity view can delete one selected old item or all old items, including
+> their continuity-specific handoff payloads, transition memory, and rebuildable
+> projection cache. A genuinely live item stays visible with its exact blocking
+> state and the operator action that retires it. Developer ID distribution,
+> notarization, owner acceptance, and shipment remain separate.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
@@ -278,10 +279,15 @@ now** and **Start a fresh session and continue** for administrative recovery or
 an intentionally early rollover.
 
 **Stored continuity data** adds confirmed **Clear Selected…** and **Clear All
-Settled…** actions. They delete terminal operation history and rebuildable
-handoff/projection cache only; active or recoverable operations are retained,
-and project memory, tasks, runs, credentials, and unrelated project data are
-unchanged.
+Old…** actions. An item is old when its Continuity command is terminal or its
+owning run is missing or terminal. Cleanup removes its control-plane list root,
+project-scoped operation, handoff and transition payloads, repair records, and
+rebuildable JSON/current/latest projection cache, then writes a payload-free
+tombstone so Refresh or relaunch cannot restore it. A stale nonterminal
+operation whose owner is already gone or terminal is retired before deletion.
+A genuinely live item remains visible and states both the exact blocker and the
+Projects → Run Details action that retires it. Ordinary project memory, tasks,
+runs, credentials, project files, and unrelated project data are unchanged.
 
 Managed rollover handoffs retain the exact project generation, immutable
 instruction-artifact hashes, bounded document catalog/read coverage, frozen

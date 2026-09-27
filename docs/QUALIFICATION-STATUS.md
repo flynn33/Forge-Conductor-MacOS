@@ -2,34 +2,38 @@
 
 ## 0.15.0 Continuity history retention controls
 
-Published product source `0e81fb80019081c47c1220687b7b6dce339bff1f`, tree
-`7613acde3ef44215943110e2478a0514470ad884`, adds confirmed Continuity controls for clearing one selected
-settled operation or all settled operation history and rebuildable cache.
-Canonical project-memory deletion is the authority: active and recoverable
-operations are refused, terminal control-plane commands are deleted only after
-that check, and a payload-free operation tombstone prevents stale replay.
-Project memory, tasks, runs, credentials, and unrelated project data remain
-unchanged. Full source, native UI, and workspace verification is recorded in
-the current roadmap row. The final local tree passed **1,889 Swift tests with
-12 explicit environment/live skips and zero failures**, **111/111 app-hosted
-tests with no skips or runtime warnings**, and both focused Continuity native UI
-flows with zero failures or skips. Both SwiftPM products and the canonical
-Apple Development-signed Debug app built; the bundle reports `0.15.0 (14)`, the
-CLI reports `0.15.0`, strict deep signature validation passes for team
-`9AQ2C2838M`, and repository hygiene plus whitespace validation pass.
-The retained app-hosted and UI result bundles are
-`Test-ForgeConductorAppTests-2026.09.27_10-55-23--0500.xcresult` and
-`Test-ForgeConductor-2026.09.27_10-49-25--0500.xcresult`.
+Product correction `849b87953b4420f07a629fdcd29ecf0d58216756`
+extends the accepted `0.15.0 (14)` identity with cleanup for every old item the
+Continuity view presents. The exact control-plane predicate is
+`commandIsTerminal || run == nil || run?.state.isTerminal == true`. The
+project-memory removal predicate is
+`stored.state == ContinuityState.predecessorSealed.rawValue || stored.quarantined`.
+For an old list row whose project operation remains nonterminal, the Manager
+first retires that stale operation, then removes its visible command root,
+schema-2 operation, handoff, transition and repair payloads, and rebuildable
+JSON/current/latest projections. A payload-free tombstone prevents stale replay.
+A genuinely live owner remains visible with its exact run/command state and an
+**Open Run Details** action. Ordinary project memory records, tasks, runs,
+credentials, project files, and unrelated project data remain unchanged.
 
-The native UI result retains one Security `SecTrustEvaluate` warning per app
-launch. The same warning reproduces in the unrelated minimal title-launch test
-at its first XCUITest accessibility snapshot. Unified-log backtraces contain
-only Security, libdispatch, and pthread; controlled probes confirmed neither
-Forge code-signature validation site executed. It is therefore recorded as an
-XCUITest/automation-harness diagnostic rather than product-path performance
-evidence. The app-hosted result has an empty structured `runtimeWarnings`
-array. The owner will perform distribution and shipment separately; the
-working installation is not replaced.
+**E0 on the exact Desktop app:** `/Users/flynn/Desktop/Forge Conductor 0.15.0
+(14)-849b879.app` reported bundle identity `0.15.0 (14)`. Its live Continuity
+view began with 24 stored IDs. **Clear Selected** removed
+`c36460fe-05ae-b00c-8aae-100209600137`, leaving 23 after Refresh. **Clear All
+Old** removed the remaining 23; the IDs were still empty after Refresh and
+after termination and exact-path relaunch. The matching archive is
+`/Users/flynn/Desktop/Forge Conductor 0.15.0 (14)-849b879.xcarchive`. Neither
+artifact was installed. The candidate is Apple Development signed, universal
+arm64/x86_64, and passed strict deep signature validation. Its executable
+SHA-256 is
+`f2b89c2e38a3b25119258989b9987a5aee595f0a18b7e90861c035ed1e579ce0`.
+
+The post-correction complete Swift suite executed **1,890 tests with 12
+explicit environment/live skips and zero failures**. The complete app-hosted
+suite executed **111 tests with zero failures**. The separately gated exact-app
+live Continuity case executed one test with zero skips and zero failures. Both
+SwiftPM products built. The owner will perform final acceptance, distribution,
+and shipment separately; `/Applications/Forge Conductor.app` was not replaced.
 
 ## 0.14.7 Projects instruction controls — Desktop candidate
 
@@ -232,9 +236,9 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.15.0, build 14**, supporting **macOS 26+**. The owner is
-preparing a shippable build and will perform shipment separately. The version
-advance and repository changes require fresh product qualification; earlier
+Product identity: **0.15.0, build 14**, supporting **macOS 26+**. The owner will
+test the staged Desktop candidate and perform shipment separately. The version
+advance and repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
 status index; the detailed, source-bound receipts are in the
 [functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) and

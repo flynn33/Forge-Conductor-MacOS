@@ -408,12 +408,18 @@ repeated rollovers and injected recovery transitions. A second live attempt hit
 the provider's bounded deadline and is retained as a nonpass, so the single
 live pass is not described as a broad provider reliability matrix.
 
-The Continuity view's **Stored continuity data** section can remove the
-selected settled operation with **Clear Selected…**, or all settled operations
-with **Clear All Settled…**. Each action asks for confirmation. Active or
-recoverable operations are retained. Cleanup removes only continuity
-operation/history and rebuildable handoff cache; it does not remove project
-memory, tasks, runs, credentials, or other project content.
+The Continuity view's **Stored continuity data** section can remove one visible
+old item with **Clear Selected…**, or every old item with **Clear All Old…**.
+Each action asks for confirmation. Forge classifies an item as old when its
+Continuity command is terminal or its owning run is missing or terminal. It
+retires stale nonterminal state whose owner is already gone or terminal, then
+removes the control-plane row, project-scoped operation, handoff and transition
+payloads, repair records, and rebuildable JSON/current/latest projection cache.
+A payload-free tombstone prevents Refresh or relaunch from recreating the item.
+A genuinely live item remains visible with its exact blocking state and an
+**Open Run Details** action; stop or finish that run, then clear the item.
+Ordinary project memory, tasks, runs, credentials, project files, and unrelated
+project content remain unchanged.
 
 Provider-owned desktop conversations remain separate host-owned modes. Their
 supported integration boundaries do not let Forge create or replace a private

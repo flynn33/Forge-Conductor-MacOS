@@ -12,12 +12,15 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
-- Added confirmed Continuity cleanup controls for deleting one selected settled
-  operation or every settled operation across registered project generations.
-  Cleanup removes the operation's canonical handoff/history rows and rebuildable
-  projection cache, tombstones replay of the cleared operation, retains active
-  or recoverable work, and does not clear project memory, tasks, runs,
-  credentials, or unrelated project data.
+- Added confirmed Continuity cleanup controls for deleting one selected old
+  item or every old item across registered project generations. An item is old
+  when its command is terminal or its owning run is missing or terminal.
+  Cleanup retires stale nonterminal project state, removes its list root,
+  continuity operation/handoff/transition/repair payloads and rebuildable
+  projection cache, and tombstones replay. A genuinely live item remains
+  visible with its exact blocker and **Open Run Details** recovery action.
+  Ordinary project memory, tasks, runs, credentials, project files, and
+  unrelated project data remain unchanged.
 - Advanced the product identity to `0.15.0 (14)` across repository authorities,
   runtime constants, tests, and every Xcode build configuration.
 
@@ -59,14 +62,17 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
-- The final tree passed 1,889 Swift tests with 12 explicit skips and zero
-  failures, 111/111 app-hosted tests with an empty runtime-warning list, and
-  both signed native Continuity cleanup UI flows. Both SwiftPM products and the
-  canonical Apple Development-signed Debug app built. Bundle/CLI identity,
-  strict deep signing, repository hygiene, and whitespace checks passed. The
-  UI runner's Security trust diagnostic reproduces in its unrelated minimal
-  launch case at the first accessibility snapshot and did not enter either
-  Forge signature validator; it is retained as test-harness evidence.
+- Product source `849b87953b4420f07a629fdcd29ecf0d58216756`
+  passed the complete 1,890-test Swift suite with 12 explicit skips and zero
+  failures and the complete 111-test app-hosted suite with zero failures. The
+  exact Desktop app at `/Users/flynn/Desktop/Forge Conductor 0.15.0
+  (14)-849b879.app` reported `0.15.0 (14)`. Against the Mac's stored Continuity
+  data, **Clear Selected** removed
+  `c36460fe-05ae-b00c-8aae-100209600137` from 24 visible IDs; **Clear All Old**
+  then reduced the remaining 23 IDs to none, and none returned after Refresh or
+  exact-app relaunch. The matching `.xcarchive` remains beside the app and the
+  working installation was not replaced. Developer ID distribution,
+  notarization, owner acceptance, and shipment remain separate.
 - Candidate source `74ead97e0b4d2116e80e8482d5736afc94e16372`
   passed all 37 instruction-queue tests and all 18 Projects view-model tests.
   A new integration case started a real run-owned `sleep 30` runtime job,
@@ -116,12 +122,14 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
-- Added confirmed Continuity cleanup controls for deleting one selected settled
-  operation or every settled operation across registered project generations.
-  Cleanup removes the operation's canonical handoff/history rows and rebuildable
-  projection cache, tombstones replay of the cleared operation, retains active
-  or recoverable work, and does not clear project memory, tasks, runs,
-  credentials, or unrelated project data.
+- Added confirmed Continuity cleanup controls for deleting one selected old
+  item or every old item across registered project generations. Old means a
+  terminal command or a missing/terminal owning run. Cleanup retires stale
+  nonterminal project state and removes Continuity operation, handoff,
+  transition, repair, and rebuildable projection data plus its visible list
+  root. A genuinely live item remains visible with its exact blocker and
+  recovery action. Ordinary project memory, tasks, runs, credentials, project
+  files, and unrelated project data remain unchanged.
 
 ### Changed
 
@@ -137,12 +145,14 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
-- The complete Swift regression passed 1,889 tests with 12 explicit skips and
-  zero failures. The complete app-hosted suite passed 111/111 with zero skips
-  and no structured runtime warnings. Both native Continuity cleanup UI flows,
-  both SwiftPM products, the canonical signed Debug app, strict deep signature
-  validation, repository hygiene, version identity, and whitespace checks
-  passed. Distribution and shipment remain owner actions.
+- Product source `849b87953b4420f07a629fdcd29ecf0d58216756`
+  passed the complete 1,890-test Swift suite with 12 explicit skips and zero
+  failures and the complete 111-test app-hosted suite with zero failures. The
+  exact Desktop `0.15.0 (14)` app cleared one of 24 live stored Continuity IDs,
+  cleared the remaining 23, and retained an empty list across Refresh and
+  relaunch. Its matching archive is staged beside it outside `/Applications`.
+  Distribution, notarization, owner acceptance, and shipment remain owner
+  actions.
 
 ## [0.14.7] — 2026-09-26 (build 13 identity correction)
 
