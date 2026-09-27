@@ -1533,6 +1533,76 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
     private var app: XCUIApplication!
     private var candidatePath = ""
 
+    func testLiveContinuityClearSelectedThenAllOldAndRelaunch() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let explicitMarker = "/tmp/forge-run-live-continuity-clear"
+        guard environment["FORGE_RUN_LIVE_CONTINUITY_CLEAR"] == "1"
+                || FileManager.default.fileExists(atPath: explicitMarker) else {
+            throw XCTSkip(
+                "Requires explicit FORGE_RUN_LIVE_CONTINUITY_CLEAR=1 authorization "
+                    + "or the local live-clear marker"
+            )
+        }
+        let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"]
+            ?? "/Users/flynn/Desktop/Forge Conductor 0.15.0 (14)-849b879.app"
+        candidatePath = URL(fileURLWithPath: requestedPath).standardizedFileURL.path
+        try attachToRunningCandidate()
+
+        let beforeIDs = try await waitForContinuityIDs(minimumCount: 1, timeout: 20)
+        let selectedID = try XCTUnwrap(beforeIDs.first)
+        print("EVIDENCE continuity_before_ids=\(beforeIDs.joined(separator: ","))")
+
+        try openContinuity()
+        let selectedRow = app.descendants(matching: .any)["continuity-operation-row-\(selectedID)"]
+        XCTAssertTrue(selectedRow.waitForExistence(timeout: 10))
+        try makeHittable(selectedRow)
+        selectedRow.click()
+        try clickControl("continuity-clear-selected")
+        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 5))
+        let confirmSelected = app.sheets.buttons["Clear Selected"]
+        XCTAssertTrue(confirmSelected.waitForExistence(timeout: 5))
+        confirmSelected.click()
+
+        let afterSelectedIDs = try await waitForContinuityIDs(
+            expectedCount: beforeIDs.count - 1,
+            excluding: [selectedID],
+            timeout: 20
+        )
+        try refreshCurrentView()
+        XCTAssertTrue(waitUntil(timeout: 10) { !selectedRow.exists })
+        print("EVIDENCE continuity_button=Clear Selected selected_id=\(selectedID) after_refresh_ids=\(afterSelectedIDs.joined(separator: ","))")
+
+        try clickControl("continuity-clear-all-old")
+        XCTAssertTrue(app.staticTexts["Clear continuity history?"].waitForExistence(timeout: 5))
+        let confirmAllOld = app.sheets.buttons["Clear All Old"]
+        XCTAssertTrue(confirmAllOld.waitForExistence(timeout: 5))
+        confirmAllOld.click()
+
+        let afterAllIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
+        try refreshCurrentView()
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            !self.app.descendants(matching: .any)["continuity-operation-list"].exists
+        })
+        print("EVIDENCE continuity_button=Clear All Old after_refresh_ids=\(afterAllIDs)")
+
+        app.terminate()
+        for running in NSWorkspace.shared.runningApplications where
+            running.bundleURL?.standardizedFileURL.path == candidatePath {
+            _ = running.terminate()
+        }
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            !NSWorkspace.shared.runningApplications.contains(where: {
+                $0.bundleURL?.standardizedFileURL.path == self.candidatePath
+            })
+        })
+        try await launchCandidateAtExactPath()
+        try attachToRunningCandidate()
+        let afterRelaunchIDs = try await waitForContinuityIDs(expectedCount: 0, timeout: 30)
+        try openContinuity()
+        XCTAssertFalse(app.descendants(matching: .any)["continuity-operation-list"].exists)
+        print("EVIDENCE continuity_after_relaunch_ids=\(afterRelaunchIDs) candidate_path=\(candidatePath)")
+    }
+
     func testLiveLMStudioStopReorderRemoveAndMinimumWindowControls() async throws {
         let environment = ProcessInfo.processInfo.environment
         let requestedPath = environment["FORGE_DESKTOP_CANDIDATE_PATH"]
@@ -1548,7 +1618,7 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         XCTAssertEqual(running.bundleURL?.standardizedFileURL.path, candidatePath)
         XCTAssertFalse(candidatePath.hasPrefix("/Applications/"))
 
-        app = XCUIApplication(bundleIdentifier: "com.forge-conductor.app")
+        app = XCUIApplication(url: URL(fileURLWithPath: candidatePath))
         app.activate()
         XCTAssertTrue(app.windows["forge-main-window"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.windows.firstMatch.title, "Forge Conductor")
@@ -1655,6 +1725,92 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         projects.click()
         XCTAssertTrue(app.descendants(matching: .any)["detail-projects"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["project-instruction-packages"].waitForExistence(timeout: 10))
+    }
+
+    private func attachToRunningCandidate() throws {
+        guard FileManager.default.fileExists(atPath: candidatePath),
+              let running = NSWorkspace.shared.runningApplications.first(where: {
+                  $0.bundleURL?.standardizedFileURL.path == candidatePath
+              }) else {
+            throw XCTSkip("The explicit owner Desktop candidate is not running")
+        }
+        XCTAssertFalse(candidatePath.hasPrefix("/Applications/"))
+        app = XCUIApplication(bundleIdentifier: "com.forge-conductor.app")
+        app.activate()
+        XCTAssertTrue(app.windows["forge-main-window"].waitForExistence(timeout: 15))
+        print("EVIDENCE candidate_path=\(candidatePath) pid=\(running.processIdentifier)")
+    }
+
+    private func launchCandidateAtExactPath() async throws {
+        let expectedPath = candidatePath
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            NSWorkspace.shared.openApplication(
+                at: URL(fileURLWithPath: expectedPath),
+                configuration: configuration
+            ) { application, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if application?.bundleURL?.standardizedFileURL.path == expectedPath {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: LiveProjectsEvidenceError.invalidPayload(
+                        "exact Desktop candidate relaunch"
+                    ))
+                }
+            }
+        }
+    }
+
+    private func openContinuity() throws {
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 15))
+        continuity.click()
+        XCTAssertTrue(app.descendants(matching: .any)["detail-continuity"].waitForExistence(timeout: 15))
+    }
+
+    private func refreshCurrentView() throws {
+        let refresh = app.buttons["toolbar-refresh"]
+        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
+        XCTAssertTrue(refresh.isHittable)
+        refresh.click()
+    }
+
+    private func continuityIDs() async throws -> [String] {
+        let snapshot = try await operatorSnapshot()
+        let operations = snapshot["continuity_operations"] as? [[String: Any]] ?? []
+        return operations.compactMap { $0["operation_id"] as? String }
+    }
+
+    private func waitForContinuityIDs(
+        minimumCount: Int? = nil,
+        expectedCount: Int? = nil,
+        excluding excluded: Set<String> = [],
+        timeout: TimeInterval
+    ) async throws -> [String] {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latest: [String] = []
+        var lastError: Error?
+        while Date() < deadline {
+            do {
+                latest = try await continuityIDs()
+                let satisfiesMinimum = minimumCount.map { latest.count >= $0 } ?? true
+                let satisfiesExpected = expectedCount.map { latest.count == $0 } ?? true
+                if satisfiesMinimum,
+                   satisfiesExpected,
+                   excluded.isDisjoint(with: latest) {
+                    return latest
+                }
+            } catch {
+                lastError = error
+            }
+            try await Task.sleep(for: .milliseconds(250))
+        }
+        if let lastError, latest.isEmpty { throw lastError }
+        throw LiveProjectsEvidenceError.invalidPayload(
+            "continuity IDs did not reach the expected state; latest=\(latest)"
+        )
     }
 
     private func clickControl(_ identifier: String, expectedLabel: String? = nil) throws {
