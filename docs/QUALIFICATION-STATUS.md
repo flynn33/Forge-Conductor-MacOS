@@ -2,7 +2,8 @@
 
 ## 0.15.0 Continuity history retention controls
 
-The current source adds confirmed Continuity controls for clearing one selected
+Published product source `0e81fb80019081c47c1220687b7b6dce339bff1f`, tree
+`7613acde3ef44215943110e2478a0514470ad884`, adds confirmed Continuity controls for clearing one selected
 settled operation or all settled operation history and rebuildable cache.
 Canonical project-memory deletion is the authority: active and recoverable
 operations are refused, terminal control-plane commands are deleted only after
@@ -16,6 +17,9 @@ flows with zero failures or skips. Both SwiftPM products and the canonical
 Apple Development-signed Debug app built; the bundle reports `0.15.0 (14)`, the
 CLI reports `0.15.0`, strict deep signature validation passes for team
 `9AQ2C2838M`, and repository hygiene plus whitespace validation pass.
+The retained app-hosted and UI result bundles are
+`Test-ForgeConductorAppTests-2026.09.27_10-55-23--0500.xcresult` and
+`Test-ForgeConductor-2026.09.27_10-49-25--0500.xcresult`.
 
 The native UI result retains one Security `SecTrustEvaluate` warning per app
 launch. The same warning reproduces in the unrelated minimal title-launch test
