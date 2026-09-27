@@ -12,19 +12,44 @@ failures.
 Same-host LM Studio configuration no longer exposes or accepts an operator
 credential. The build-19 correction removes the obsolete local Forge Keychain
 reference on this host; the persisted local configuration reports no reference
-and the credential journal is a tombstone. Live source-path **Connect and
-Check** returned `ready`, and the advanced contract probe returned
-`contract_valid` for `qwen/qwen3.8-27b`, with
-`credential_configured=false`.
+and the credential journal is a tombstone.
 
 The optimized Release packet decoder now passes its strict scalar/container
 test and the repaired Release helper reads the live durable packet inventory;
 build 17 had returned an empty list for the same valid rows. The build-18
 candidate exposed one additional defect: it hid registered packet projects when
 automatic continuity reported `unavailable`. Build 19 keeps those projects
-visible for packet management. The build-19 Desktop archive, exact-candidate
-UI/runtime reruns, disposable live
-packet deletion, ordinary LM Studio `get_forge_status`, CLU delivery, and the
+visible for packet management.
+
+Candidate revision `868645e85ce44b50b159136f3b56758a4f489c12` produced
+`/Users/flynn/Desktop/Forge Conductor 0.16.0 (19)-868645e.app` and the matching
+`.xcarchive`. Both GUI and embedded CLI are universal arm64/x86_64; strict deep
+signature verification reports Apple Development team `9AQ2C2838M`, and the
+privileged-filesystem bundle check passed.
+
+**E0 on that exact candidate:** the ordinary owner-surface UI case executed one
+test with zero failures and found the Continuity project/packet frames plus
+Copy Project ID, Delete, Reset, and Clear Cache. The real-provider UI case
+executed one test with zero failures, discovered loaded model
+`qwen/qwen3.8-27b`, clicked Connect and Check and Run Advanced Probe before and
+after relaunch, and read back ready/contract-valid with
+`credentialConfigured=false`. It also asserted that the loopback screen has no
+token field or credential action.
+
+The live Continuity inventory began with 75 packets. Two exact-candidate UI
+runs selected, confirmed, and deleted only disposable packet IDs
+`708cbe57-06b4-4cf3-85f8-75c458966b81` and
+`60f7f1be-636c-443d-9cae-2c1fd5a6fc85`. The final inventory contains the 73
+pre-existing IDs, with zero unexpected removals and zero additions. A separate
+focused multi-selection case issued one delete request for exactly two selected
+IDs and retained the third packet. Exported screenshots and accessibility
+dumps are beside the candidate in `Forge Conductor 0.16.0 (19)-868645e
+Evidence`.
+
+The tracked repository, candidate, and Forge support directory contain no
+`LM_API_TOKEN`, `sk-lm-`, or `Bearer sk-lm-` marker. The rejected Forge Keychain
+item is absent, and the local provider JSON contains no credential reference.
+Ordinary LM Studio `get_forge_status` on this exact build, CLU delivery, and the
 complete automatic rollover sequence remain open. This is not shipment
 acceptance, and `/Applications/Forge Conductor.app` has not been replaced.
 

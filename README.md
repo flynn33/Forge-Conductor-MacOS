@@ -9,7 +9,7 @@ continuity. The user does not start project work through a Forge Managed Run.
 | | |
 |---|---|
 | **Version** | **0.16.0** |
-| **Build** | **17** |
+| **Build** | **19** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -20,6 +20,11 @@ continuity. The user does not start project work through a Forge Managed Run.
 > owner-machine runtime acceptance. Source compilation or a historical run is
 > not release evidence. The working installation remains separate from
 > candidates.
+
+The current Apple Development-signed Desktop candidate is `Forge Conductor
+0.16.0 (19)-868645e.app` with its matching `.xcarchive` on the Desktop. It is
+not installed over `/Applications/Forge Conductor.app` and is not a shipment
+claim.
 
 ## What Forge Conductor does
 

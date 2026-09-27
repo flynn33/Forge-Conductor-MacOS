@@ -648,7 +648,20 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
 
         let originalManager = try await launchOrdinaryApplication()
         try openProvider()
+        XCTAssertTrue(
+            element("provider-local-no-auth").exists,
+            "Same-host LM Studio must identify the tokenless loopback path"
+        )
+        XCTAssertFalse(
+            app.secureTextFields["provider-token"].exists,
+            "Same-host LM Studio must not expose an operator token field"
+        )
+        XCTAssertFalse(
+            element("provider-credential-action").exists,
+            "Same-host LM Studio must not expose linked-provider credential controls"
+        )
         let saved = try await saveProvider(endpoint: endpoint, model: model)
+        XCTAssertFalse(saved.credentialConfigured)
         try click(app.buttons["provider-refresh-models"])
         XCTAssertTrue(
             element("provider-model-selection").waitForExistence(timeout: 40),
@@ -1684,9 +1697,11 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         try openContinuity()
         let selectedRow = app.descendants(matching: .any)["continuity-project-row-\(projectID)"]
         XCTAssertTrue(selectedRow.waitForExistence(timeout: 10))
-        try makeHittable(selectedRow)
-        selectedRow.click()
         let packetRow = app.descendants(matching: .any)["continuity-packet-row-\(disposablePacketID)"]
+        if !packetRow.waitForExistence(timeout: 3) {
+            try makeHittable(selectedRow)
+            selectedRow.click()
+        }
         XCTAssertTrue(packetRow.waitForExistence(timeout: 10))
         try makeHittable(packetRow)
         packetRow.click()

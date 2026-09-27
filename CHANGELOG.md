@@ -41,10 +41,15 @@ Product versions do not by themselves claim shipment.
 - Focused tests execute the packet store's list and exact batch-delete behavior,
   packet wire format, populated native packet rows, and confirmed packet-only
   deletion. Provider configuration tests execute local credential migration and
-  rejection. A live source-path check on this host completed same-host Connect
-  and Check plus the advanced contract probe with `credentialConfigured=false`.
-  Exact build-19 Desktop-candidate UI and rollover acceptance remain required
-  before shipment.
+  rejection. The universal Apple Development-signed build-19 Desktop candidate
+  passed its exact-path owner-surface test and real-provider test: same-host
+  Connect and Check plus Run Advanced Probe succeeded before and after relaunch
+  with `credentialConfigured=false`, with no loopback token field or credential
+  action. Two exact-candidate UI runs deleted only two disposable packets from
+  the live 75-packet inventory and retained all 73 pre-existing packet IDs. A
+  focused multi-selection case deleted exactly two selected IDs in one request
+  and retained the unselected row. Automatic LM Studio rollover acceptance
+  remains required before shipment.
 
 ## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)
 

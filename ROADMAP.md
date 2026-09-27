@@ -55,14 +55,14 @@ this workflow.
 
 | Area | Current state | Required acceptance |
 |---|---|---|
-| LM Studio provider | **Build-18 source path passes without a local credential; exact Desktop-candidate acceptance open.** The live Manager removed the obsolete local Forge Keychain reference, then discovered loaded model `qwen/qwen3.8-27b`; Connect and Check and the advanced contract probe returned ready/contract-valid with `credential_configured=false`. | Every native entry point reaches the same live tokenless local LM Studio configuration and contract check, distinguishes Forge Manager failures from LM Studio endpoint/model/tool-contract failures, and succeeds in the exact Desktop candidate. |
+| LM Studio provider | **Exact build-19 Desktop-candidate connection acceptance passed without a local credential.** The signed candidate discovered loaded model `qwen/qwen3.8-27b`; Connect and Check and Run Advanced Probe passed before and after exact-path relaunch. Manager readback was ready/contract-valid with `credential_configured=false`, and the UI exposed neither a token field nor a credential action for the loopback endpoint. | Ordinary LM Studio chat MCP and automatic successor creation must use the same tokenless local path; linked HTTPS provider credentials remain separate. |
 | Project selection | **Implemented and focused-tested.** Projects accepts multiple folders and exposes registered project context without starting a run. | One or more selected project folders remain available to the LM Studio model through project-scoped Forge tools. |
 | Instruction packages | **Implemented and focused-tested.** Multiple packages can be selected, displayed, drag-reordered, removed with **Delete Package**, and discovered through project-scoped tools. | The complete selection, ordering, deletion, persistence, and LM Studio query flow passes in the current candidate. |
 | Rune Forge policy | **Implemented and focused-tested.** Files and folders can be selected, persisted in priority order, drag-reordered, and queried with project isolation. | The complete selection, ordering, persistence, and model-query flow passes in the current candidate. |
 | CLU governance | **Deterministic contract implemented; live-session acceptance open.** Notices carry the violated policy identity and full applicable policy statement; logs are project-isolated, bounded, and exportable. | CLU monitors model activity, preserves a separate log per project, exports it, and sends the active model a notice containing the exact violated policy and policy content. |
 | Continuity automation | **Deterministic host-boundary implementation and tests complete; live LM Studio acceptance open.** A resume-ready handoff starts the 30-second state machine, creates one stored LM Studio chat, submits `get_forge_status` with `resume=true`, requires exact handoff acknowledgement, and handles repeated watchdog ticks idempotently. | A current owner-machine flow proves durable handoff, the visible countdown, exactly one successor chat, bootstrap submission, exact acknowledgement, predecessor sealing, and crash recovery. |
-| Continuity view | **Build-19 source and fixture UI acceptance passed; exact Desktop-candidate acceptance open.** It renders every registered project ID even when automatic continuity is idle/unavailable, plus the selected project's first-class checkpoint/handoff rows with ID, type, source, timestamp, exact selection, and confirmed packet-only delete. Reset and Clear Cache remain visible; instruction packages are absent. | The exact build-19 Desktop candidate shows live packet rows and deletes only disposable selected packets, including multi-selection, while pre-existing packet IDs remain unchanged. |
-| Reset / packet deletion / cache clearing | **Focused source/UI acceptance passed; live disposable proof open.** Exact packet deletion cannot reach project-wide clearing, task-owned ingress, instruction packages, or project files. Continuity Reset uses only project-scoped settled continuity-history clearing and does not advance the project generation; Clear Cache remains bounded to Forge's disposable cache directory. | Owner-machine evidence creates and deletes disposable packets only, verifies unrelated live packets are unchanged, and confirms Reset and Clear Cache scopes. |
+| Continuity view | **Exact build-19 Desktop-candidate packet acceptance passed.** The signed candidate showed project `d2610542-b616-7e8f-ee36-ef902d6060e1` even with automation unavailable and rendered its real checkpoint/handoff rows with ID, type, source, and timestamp. Two disposable packets were selected and deleted through the native UI; all 73 pre-existing packet IDs remained unchanged. The exact-candidate surface test also found Copy, Delete, Reset, and Clear Cache visible and no instruction-package control. | Owner visual acceptance remains separate. Batch selection is deterministic-tested at the exact request boundary; no additional live packets are to be deleted merely to repeat that proof. |
+| Reset / packet deletion / cache clearing | **Focused scope tests and live exact-packet deletion passed.** Exact packet deletion cannot reach project-wide clearing, task-owned ingress, instruction packages, or project files. Continuity Reset uses only project-scoped settled continuity-history clearing and does not advance the project generation; Clear Cache remains bounded to Forge's disposable cache directory. | Owner-machine Reset and Clear Cache mutation acceptance remains open because those controls were intentionally not run against live owner data. |
 | Managed Run removal | **Removed from primary navigation and the current workflow.** Compatibility internals remain only where required to preserve stored data or reusable low-level services. | No current action, guide, status text, or continuity dependency directs the user to start project work through Managed Run. |
 
 ## Release boundary
@@ -98,7 +98,7 @@ handoff/countdown/successor/acknowledgement/sealing/recovery sequence.
 Historical evidence remains available in Git history and dedicated evidence
 documents; it is not part of this roadmap.
 
-Build-18 correction evidence on the current source inputs: the packet store and
+Build-19 correction evidence on the current source inputs: the packet store and
 wire-contract test, populated Continuity packet-row UI test, confirmed exact
 packet-delete UI test, and local-credential migration/rejection test each
 executed with zero failures. A signed build-17 candidate exposed an additional
@@ -106,11 +106,18 @@ Release-only packet decoder defect: its embedded helper wrote valid packets but
 returned an empty inventory. The focused optimized decoder test now passes and
 the repaired Release helper reads all durable packets from the live store.
 `swift build --product forge-conductor-app` and the canonical signed Debug
-workspace build passed. Live same-host Connect and Check returned `ready` and
-the advanced contract probe returned `contract_valid` for `qwen/qwen3.8-27b`,
-both with no configured local Forge credential. Exact build-19 Desktop
-archive/UI, disposable live packet deletion, and automatic successor acceptance
-remain requirements rather than inferred passes.
+workspace build passed. Candidate revision `868645e85ce44b50b159136f3b56758a4f489c12`
+produced the universal Apple Development-signed Desktop app and archive
+`Forge Conductor 0.16.0 (19)-868645e`. Strict deep signature verification and
+the privileged-filesystem bundle check passed. The exact candidate passed the
+ordinary owner-surface UI case, including all required Continuity identifiers,
+and the real-provider connection/probe case with `credentialConfigured=false`.
+Two live disposable packet deletes reduced the inventory from 75 to 73; the
+removed IDs were exactly `708cbe57-06b4-4cf3-85f8-75c458966b81` and
+`60f7f1be-636c-443d-9cae-2c1fd5a6fc85`, with no additions or unexpected
+removals. The focused multi-selection case issued one request for two selected
+IDs and retained the unselected packet. Automatic successor acceptance remains
+open rather than inferred from these results.
 
 Historical build-16 candidate evidence remains available for comparison. Source revision
 `f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple

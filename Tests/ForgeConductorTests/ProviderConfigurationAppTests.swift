@@ -65,6 +65,8 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     private let providerRegistryDelayNanoseconds: UInt64
     private let legacySnapshotDelayNanoseconds: UInt64
     private let configurationSaved: Bool
+    private var mutableContinuityPackets: [OperatorContinuityPacket]
+    private(set) var continuityDeleteRequests: [OperatorContinuityPacketDeleteRequest] = []
     private var acceptedSelectionOperation: ProviderIntegrationOperationSnapshot?
     private(set) var repairRequests: [ProviderIntegrationMutationRequest] = []
     private(set) var removeRequests: [ProviderIntegrationMutationRequest] = []
@@ -81,6 +83,7 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         providerRegistryDelayNanoseconds: UInt64 = 0,
         legacySnapshotDelayNanoseconds: UInt64 = 0,
         configurationSaved: Bool = false,
+        continuityPackets: [OperatorContinuityPacket] = [],
         operatorSnapshotJSON: String = "{}"
     ) throws {
         self.preparationState = preparationState
@@ -89,6 +92,7 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         self.providerRegistryDelayNanoseconds = providerRegistryDelayNanoseconds
         self.legacySnapshotDelayNanoseconds = legacySnapshotDelayNanoseconds
         self.configurationSaved = configurationSaved
+        mutableContinuityPackets = continuityPackets
         operatorSnapshot = try JSONDecoder().decode(
             OperatorSnapshot.self,
             from: Data(operatorSnapshotJSON.utf8)
@@ -302,6 +306,29 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         adapterID: String,
         mode: OperatorProviderProbeMode
     ) async throws -> OperatorProvider { throw notInScope }
+
+    func continuityPackets(projectID: String) async throws -> OperatorContinuityPacketList {
+        guard let identifier = UUID(uuidString: projectID) else { throw notInScope }
+        let projectID = ProjectID(identifier)
+        return OperatorContinuityPacketList(
+            projectID: projectID,
+            packets: mutableContinuityPackets.filter { $0.projectID == projectID }
+        )
+    }
+
+    func deleteContinuityPackets(
+        _ request: OperatorContinuityPacketDeleteRequest
+    ) async throws -> OperatorContinuityPacketDeleteReceipt {
+        let visible = Set(mutableContinuityPackets.map(\.packetID))
+        guard request.packetIDs.allSatisfy(visible.contains) else { throw notInScope }
+        continuityDeleteRequests.append(request)
+        mutableContinuityPackets.removeAll { request.packetIDs.contains($0.packetID) }
+        return OperatorContinuityPacketDeleteReceipt(
+            projectID: request.projectID,
+            deletedPacketIDs: request.packetIDs,
+            completedAt: "2026-09-27T12:01:00Z"
+        )
+    }
 }
 
 final class ProviderConfigurationAppTests: XCTestCase {
@@ -358,6 +385,77 @@ final class ProviderConfigurationAppTests: XCTestCase {
             [first, second, "7c61ac4f-9c5c-493d-8e75-35e67f467ba7"]
         )
         XCTAssertEqual(viewModel.selectedProjectID, first)
+    }
+
+    @MainActor
+    func testContinuityPacketMultiSelectionDeletesOnlyExactSelectedPackets() async throws {
+        let projectUUID = try XCTUnwrap(UUID(uuidString: "34f5856b-b3c0-4135-8fcb-b8680483494f"))
+        let projectID = ProjectID(projectUUID)
+        let packets = [
+            OperatorContinuityPacket(
+                packetID: "checkpoint-one",
+                projectID: projectID,
+                type: "checkpoint",
+                source: .auto,
+                timestamp: "2026-09-27T12:00:00Z",
+                resumeReady: false
+            ),
+            OperatorContinuityPacket(
+                packetID: "handoff-two",
+                projectID: projectID,
+                type: "handoff",
+                source: .model,
+                timestamp: "2026-09-27T12:00:30Z",
+                resumeReady: true
+            ),
+            OperatorContinuityPacket(
+                packetID: "handoff-retained",
+                projectID: projectID,
+                type: "handoff",
+                source: .model,
+                timestamp: "2026-09-27T12:00:45Z",
+                resumeReady: true
+            ),
+        ]
+        let client = try LegacyLMProviderSelectionClient(
+            continuityPackets: packets,
+            operatorSnapshotJSON: """
+            {
+              "projects": [{
+                "project_id":"\(projectID.description)","display_name":"Continuity fixture",
+                "canonical_root":"/tmp/continuity-fixture","project_generation":1,
+                "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+                "continuity":{"state":"unavailable"},"migration_warnings":[]
+              }],
+              "continuity_operations": []
+            }
+            """
+        )
+        let viewModel = ContinuityViewModel(client: client)
+
+        viewModel.load()
+        let loadDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while (viewModel.isLoading || viewModel.isLoadingPackets),
+              ContinuousClock.now < loadDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(Set(viewModel.packets.map(\.packetID)), Set(packets.map(\.packetID)))
+
+        viewModel.selectedPacketIDs = ["checkpoint-one", "handoff-two"]
+        XCTAssertTrue(viewModel.canDeleteSelectedPackets)
+        viewModel.deleteSelectedPackets()
+        let deleteDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+        repeat {
+            try await Task.sleep(for: .milliseconds(10))
+        } while (!viewModel.deletingPacketIDs.isEmpty || viewModel.isLoadingPackets)
+            && ContinuousClock.now < deleteDeadline
+
+        let requests = await client.continuityDeleteRequests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.projectID, projectID)
+        XCTAssertEqual(requests.first?.packetIDs, ["checkpoint-one", "handoff-two"])
+        XCTAssertEqual(viewModel.packets.map(\.packetID), ["handoff-retained"])
+        XCTAssertEqual(viewModel.notice, "Deleted 2 continuity packets.")
     }
 
     func testOperatorCredentialIOLeavesMainActorBeforeAuthenticatedRequests() async {
