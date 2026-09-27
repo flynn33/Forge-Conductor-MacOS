@@ -316,7 +316,7 @@ final class ProviderConfigurationAppTests: XCTestCase {
     }
 
     @MainActor
-    func testContinuityListUsesOnlyProjectIDsWithContinuityWithoutManagedOperations() async throws {
+    func testContinuityListKeepsProjectsWithPacketsWhenAutomationIsUnavailable() async throws {
         let first = "34f5856b-b3c0-4135-8fcb-b8680483494f"
         let second = "3fac0136-f28f-42dd-93fb-c35dbde87bc6"
         let client = try LegacyLMProviderSelectionClient(operatorSnapshotJSON: """
@@ -353,7 +353,10 @@ final class ProviderConfigurationAppTests: XCTestCase {
         }
 
         XCTAssertFalse(viewModel.isLoading)
-        XCTAssertEqual(viewModel.projectIDs, [first, second])
+        XCTAssertEqual(
+            viewModel.projectIDs,
+            [first, second, "7c61ac4f-9c5c-493d-8e75-35e67f467ba7"]
+        )
         XCTAssertEqual(viewModel.selectedProjectID, first)
     }
 

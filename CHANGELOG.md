@@ -22,7 +22,7 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
-- Advanced the candidate identity to `0.16.0 (18)`. Same-host LM Studio now
+- Advanced the candidate identity to `0.16.0 (19)`. Same-host LM Studio now
   rejects new Forge credential values, automatically removes any legacy local
   Keychain reference, and hides credential controls for the local endpoint.
   Linked HTTPS provider credentials remain supported.
@@ -32,6 +32,9 @@ Product versions do not by themselves claim shipment.
   embedded LM Studio MCP helper list the same durable checkpoint/handoff rows
   that Debug builds expose. Packet IDs retain their strict bounded ASCII
   alphabet and malformed JSON scalar/container types remain rejected.
+- Kept registered projects visible on Continuity when automatic continuity is
+  idle or unavailable, because durable packets remain operator-manageable after
+  the automation state that created them is no longer active.
 
 ### Verification
 
@@ -40,7 +43,7 @@ Product versions do not by themselves claim shipment.
   deletion. Provider configuration tests execute local credential migration and
   rejection. A live source-path check on this host completed same-host Connect
   and Check plus the advanced contract probe with `credentialConfigured=false`.
-  Exact build-18 Desktop-candidate UI and rollover acceptance remain required
+  Exact build-19 Desktop-candidate UI and rollover acceptance remain required
   before shipment.
 
 ## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)

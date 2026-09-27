@@ -44,8 +44,11 @@ final class ContinuityViewModel: ObservableObject {
             do {
                 let snapshot = try await client.snapshot(limit: 100)
                 try Task.checkCancellation()
+                // Packet management remains available when automatic continuity
+                // is idle or unavailable. Durable packets outlive the automation
+                // state that created them, so every registered project is a valid
+                // packet-list scope.
                 let loadedProjectIDs = snapshot.projects
-                    .filter { $0.continuity?.state != "unavailable" }
                     .map { $0.projectID.lowercased() }
                     .sorted()
                 projectIDs = loadedProjectIDs

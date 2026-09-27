@@ -1682,7 +1682,7 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         print("EVIDENCE continuity_packet_before_ids=\(beforeIDs.joined(separator: ","))")
 
         try openContinuity()
-        let selectedRow = app.staticTexts["continuity-project-row-\(projectID)"]
+        let selectedRow = app.descendants(matching: .any)["continuity-project-row-\(projectID)"]
         XCTAssertTrue(selectedRow.waitForExistence(timeout: 10))
         try makeHittable(selectedRow)
         selectedRow.click()
@@ -1822,9 +1822,13 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
             throw XCTSkip("The explicit owner Desktop candidate is not running")
         }
         XCTAssertFalse(candidatePath.hasPrefix("/Applications/"))
-        app = XCUIApplication(bundleIdentifier: "com.forge-conductor.app")
+        app = XCUIApplication(url: URL(fileURLWithPath: candidatePath))
         app.activate()
         XCTAssertTrue(app.windows["forge-main-window"].waitForExistence(timeout: 15))
+        XCTAssertEqual(
+            NSWorkspace.shared.frontmostApplication?.bundleURL?.standardizedFileURL.path,
+            candidatePath
+        )
         print("EVIDENCE candidate_path=\(candidatePath) pid=\(running.processIdentifier)")
     }
 
@@ -1965,13 +1969,13 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 20
+        let credentialURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".forge-conductor/manager-control.secret")
+        let credential = try await Task.detached(priority: .userInitiated) {
+            try String(contentsOf: credentialURL, encoding: .utf8)
+        }.value
+        request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
         if method != "GET" {
-            let credentialURL = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".forge-conductor/manager-control.secret")
-            let credential = try await Task.detached(priority: .userInitiated) {
-                try String(contentsOf: credentialURL, encoding: .utf8)
-            }.value
-            request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body ?? [:], options: [.sortedKeys])
         }
