@@ -21,9 +21,11 @@ Product versions do not by themselves claim shipment.
   geometry. Stop/Add/Run Details now sit above the package rows so a nested
   list can no longer steal their hits. Explicit earlier/later and Remove
   buttons are ordinary bordered controls in the detail ScrollView rather than
-  a nested List. A two-second background poll no longer clears the visible
-  queue while a mutation is in flight, and stale snapshots can no longer roll
-  back a newer persisted order.
+  a nested List. Removed the package-container accessibility identifier that
+  SwiftUI propagated over every child button, preserving the exact Stop,
+  earlier/later, and Remove control identities. A two-second background poll
+  no longer clears the visible queue while a mutation is in flight, and stale
+  snapshots can no longer roll back a newer persisted order.
 - Made **Start Ordered Work** perform a live, no-resume readiness check for the
   selected LM Studio endpoint, pinned model, loaded inventory, and tool contract
   before mutating the instruction queue or creating a run. An unloaded pin now
@@ -42,21 +44,18 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
-- Follow-up Projects control repair keeps Stop/Add/Remove/Reorder visible and
-  hittable while a mutation is in flight. The two-second queue poll no longer
-  clears packages when `isLoading` is true, and package rows are ordinary
-  ScrollView content rather than a nested List. A focused view-model case
-  covers the in-flight refresh. This host cannot execute the signed macOS
-  application or SwiftPM suite; owner-host rebuild and the existing native
-  Projects UI case remain the runtime proof.
-- Published Projects instruction-control repair
-  `b4bf571de822cc463dc69c30f4a10c12033919cd`. A signed native UI test
-  imported two real instruction packages through the Manager, clicked the
-  visible move control, verified the persisted reversed order, removed a
-  package, and verified the persisted result. Focused queue, Projects
-  view-model, and authenticated Manager-route regressions passed. The complete
-  regression and product-build evidence is recorded in the roadmap and
-  qualification status for the published repair revision.
+- Candidate source `74ead97e0b4d2116e80e8482d5736afc94e16372`
+  passed all 37 instruction-queue tests and all 18 Projects view-model tests.
+  A new integration case started a real run-owned `sleep 30` runtime job,
+  stopped its queue, verified job/run cancellation and terminal package state,
+  then removed the unlocked package.
+- The Apple Development-signed native minimum-window UI case clicked **Stop
+  Active Work**, Move later, and **Remove**, observed persisted state through a
+  later two-second poll, and passed. The separate signed real-Manager UI case
+  imported two packages, persisted reorder, removed one, and passed. Both
+  SwiftPM products built, and a strict-signature-verified universal Debug app
+  plus `.xcarchive` were created outside `/Applications`. Live LM Studio Stop
+  on that bundle remains an owner check; no shipment claim is made.
 - Published ordered-readiness/receipt repair
   `675d267fdd2f45cd412e5398a04a2321bfe51def`, budget-escalation repair
   `f39c79ad0e60259d7a02ba0361825e5b6940c136`, and cancellation-authority

@@ -1,28 +1,40 @@
 # Version and qualification status
 
-## 0.14.7 Projects instruction controls — hittable follow-up
+## 0.14.7 Projects instruction controls — Desktop candidate
 
-The previous source repair still left two operator-visible failure modes:
+Candidate source `74ead97e0b4d2116e80e8482d5736afc94e16372` closes the
+remaining deterministic control-identity gap after the nested `List` and
+in-flight poll wipe were removed. The plain package `VStack` still had one
+container accessibility identifier; SwiftUI propagated it over every package
+child and replaced the exact earlier/later/Remove identifiers. The candidate
+removes only that parent override. Stop remains in the action bar above the
+rows, and the bordered child buttons retain their individual identities.
 
-1. Package Stop/Remove/Reorder controls lived in a SwiftUI `List` nested inside
-   the Projects detail `ScrollView`. That composition can keep the controls
-   present in the accessibility tree while stealing their hits, including the
-   **Stop Active Work** button immediately below the list.
-2. `loadInstructionQueue()` treated `isLoading` as "no selected project" and
-   cleared the visible queue. The two-second Projects poll could therefore hide
-   every package control for the duration of stop/remove/reorder.
+**E0 on this Mac:** the Apple Development-signed native minimum-window case
+clicked **Stop Active Work**, Move later, and Remove, then observed the saved
+order and absence after later two-second queue polls. The signed real-Manager
+case imported two packages, persisted reorder, removed one, and passed. A new
+runtime integration test started an active run-owned `sleep 30` job, stopped
+its queue, verified job and run cancellation, observed the package terminal and
+unlocked, and removed it. The instruction-queue suite passed 37/37 and the
+Projects view-model suite passed 18/18, including the in-flight refresh case.
+Both SwiftPM products built. A universal Debug app and `.xcarchive` were built
+outside `/Applications`; strict deep signature verification passes and the
+built Info.plist reports `0.14.7 (13)`.
 
-This follow-up keeps the queue action bar above the rows, renders packages as
-plain ScrollView content with bordered earlier/later/Remove buttons, and skips
-background refresh while a mutation owns the pane. Version remains
-`0.14.7 (13)`. The working installation is not replaced. This is a source
-candidate, not a shipment or notarization claim. Runtime proof still requires
-an owner-host rebuild of the signed app.
+The working installation was not replaced. The native Stop test uses an
+authenticated local fixture and the runtime test uses an isolated provider;
+neither is a live LM Studio Stop on the Desktop candidate. That owner check,
+Developer ID signing, notarization, Gatekeeper distribution acceptance, and
+shipment remain open.
 
-## 0.14.7 Projects instruction controls repair — source candidate verified
+## 0.14.7 Projects instruction controls — prior incomplete baseline
 
-Product source `b4bf571de822cc463dc69c30f4a10c12033919cd` repairs the
-reported inability to stop, reorder, or remove project instruction packages.
+Product source `b4bf571de822cc463dc69c30f4a10c12033919cd` addressed the
+manager cancellation and first layout defects but did not close the reported
+inability to stop, reorder, or remove project instruction packages. Its
+package-container identifier still replaced the child Move/Remove identities;
+the current Desktop-candidate section above records the correcting evidence.
 **Stop Active Work** now fences queue advancement, quiesces and durably cancels
 the exact active run, and only then reconciles the package to a removable
 terminal state. A stopped queue with a still-running package retains a

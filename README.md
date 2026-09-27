@@ -15,13 +15,15 @@ supported desktop coding hosts.
 | **Documentation** | [Documentation guide](docs/README.md) |
 
 > **Release status:** `0.14.7 (13)` is a source/build candidate. The owner
-> will ship separately and must rebuild any app used for live Projects
-> review; the working installation is not replaced by this update. Current
-> source keeps **Stop Active Work**, earlier/later reorder, and Remove as
-> hittable Projects controls, cancels the exact active package run before
-> that package becomes removable, and no longer hides the queue while those
-> actions are in flight. Developer ID distribution, notarization, and
-> shipment qualification remain required before shipment.
+> will ship separately; the working installation is not replaced by this
+> update. Candidate source `74ead97e0b4d2116e80e8482d5736afc94e16372`
+> keeps **Stop Active Work**, earlier/later reorder, and Remove independently
+> identifiable and hittable in the minimum Projects window, cancels an exact
+> active package run and its owned runtime job before that package becomes
+> removable, and keeps the queue visible while those actions are in flight.
+> Signed native and real-Manager UI tests pass, but live LM Studio stopping on
+> the candidate bundle remains an owner check. Developer ID distribution,
+> notarization, and shipment qualification remain separate.
 
 Current source also removes the two Swift 6 strict-concurrency diagnostics
 formerly emitted by the desktop MCP descriptor and Provider activation
@@ -310,6 +312,9 @@ The **Projects** tab exposes the complete registration lifecycle:
   to run whenever at least one source contains readable instruction text.
 - Packages can be added and pending packages can be rearranged while ordered
   work is running; the active run keeps its durable identity.
+- **Stop Active Work** cancels the exact active package run and unlocks the
+  terminal package for removal. Explicit earlier/later and **Remove** controls
+  remain available in the detail ScrollView at the minimum window size.
 - **Run Details…** opens direct-task creation, exact run state, completion,
   recovery, and settled-task deletion for the selected project.
 - Both registration actions authorize only the selected canonical folder and

@@ -123,6 +123,12 @@ overwriting a newer order. The native view also rejects a background snapshot
 whose revision predates the queue already shown, and it does not hide the
 visible queue while Stop, Remove, or Reorder is in flight.
 
+The package rows are plain content inside the Projects detail `ScrollView`, not
+a nested list. **Move earlier**, **Move later**, and **Remove** retain separate
+native control identities at the minimum supported window size. The package
+container deliberately has no parent accessibility identifier because SwiftUI
+would otherwise replace those child identities.
+
 **Start Ordered Work** requires one selected, verified provider and a
 running managed autonomy service. LM Studio requires a live no-resume readiness
 check of its exact saved and loaded model before any queue/run mutation; desktop
