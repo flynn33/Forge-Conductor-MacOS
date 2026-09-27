@@ -1,5 +1,69 @@
 # Forge Conductor macOS — project roadmap
 
+## Owner-defined shippable workflow — September 27, 2026
+
+This section is the current roadmap and acceptance authority. It supersedes
+every conflicting workflow, status claim, milestone, managed-run design, and
+historical acceptance statement below. The existing build is **not shippable**.
+Historical material is retained only as implementation evidence and does not
+define current product behavior or select work.
+
+### Required user workflow
+
+1. The user selects one or more project folders.
+2. The user selects one or more instruction packages. The application presents
+   the packages in an ordered frame and supports direct click-and-drag
+   reordering and organization.
+3. The user sets Development Policy in **Rune Forge** with an application
+   control that accepts files or folders. Selected policy sources appear in an
+   ordered frame and support direct click-and-drag priority reordering.
+4. The user starts and conducts the model conversation in the **LM Studio chat
+   interface**. Forge Conductor does not start the project through Managed Run.
+5. In LM Studio the user asks for `get_forge_status`, then gives the model the
+   task instructions. The model can query Forge for the selected instruction,
+   project-file, policy, and continuity locations.
+6. **CLU** is the governance-enforcement agent. It monitors the model against
+   the ordered Development Policy, retains a separate bounded log for each
+   project, allows the user to export those logs, and notifies the model of a
+   violation with the violated policy and the applicable policy content.
+7. Continuity is automatic and is not initiated from the Continuity view. When
+   the model saves a resume-ready handoff at context pressure, Forge starts a
+   visible 30-second countdown. At expiry Forge uses a supported LM Studio host
+   boundary to create a fresh chat, submits `get_forge_status` with
+   `resume=true`, verifies that the successor consumed the exact handoff, and
+   only then seals the predecessor. Crash recovery is idempotent.
+8. The Continuity view is an operator data-management surface only. It shows
+   project IDs in a scrollable frame, supports selecting and copying IDs, and
+   deletes the selected project's continuity data through one clear Delete
+   action. It does not expose manual checkpoint, rollover, run selection, or
+   operation-timeline controls.
+
+### Required repair and acceptance state
+
+| Area | Current state | Required acceptance |
+|---|---|---|
+| LM Studio provider | **Open defect.** Provider selection, Provider **Connect and Check**, the Advanced-menu connection check, and probe can report a misleading `manager unavailable` result. | Each entry point reaches the same live LM Studio configuration and contract check, distinguishes Manager transport/authentication failure from LM Studio endpoint/model/tool-contract failure, and succeeds against the owner-selected loaded model. |
+| Project selection | **Open workflow correction.** The app still centers Managed Run/ordered execution concepts. | One or more project folders can be selected and remain available to LM Studio through project-scoped Forge tools without starting a Forge-managed model run. |
+| Instruction packages | **Partially implemented, wrong interaction model.** Import/order services exist, but the accepted workflow is not the current GUI contract. | One or more packages can be selected, displayed in an ordered frame, reorganized by click-and-drag, removed, and queried by the LM Studio model without Managed Run. |
+| Rune Forge policy | **Partially implemented, incomplete workflow.** Selection and export plumbing exist, but policy priority organization and the required application-level workflow are not accepted. | Files and folders can be added as policy sources, shown in an ordered frame, reordered by click-and-drag priority, and queried with stable project isolation. |
+| CLU governance | **Partially implemented, not accepted.** Existing observation/noticing claims do not prove the owner-defined enforcement loop. | CLU continuously evaluates model actions, preserves a separate bounded project log, exports that log, and sends a structured notice containing the violated policy identity and policy content to the active model session without taking over task execution. |
+| Continuity automation | **Open workflow correction.** Current source exposes manual Managed Run continuity and does not establish the required visible 30-second LM Studio-chat rollover contract. | A resume-ready model handoff durably starts the countdown, creates and bootstraps exactly one fresh LM Studio chat through a supported host boundary, submits `get_forge_status` with `resume=true`, verifies exact-handoff consumption, and recovers from every transition. |
+| Continuity view | **Open UI replacement.** Current view exposes run selection, manual checkpoint/rollover, detailed operation state, and history clearing semantics that do not match the required surface. | The view contains only a scrollable/selectable/copyable project-ID list plus selected-project Delete, with explicit reset/delete-package/clear-cache actions located on their owning project/package/cache surfaces. |
+| Reset / package deletion / cache clearing | **Open acceptance.** Services or prior controls do not constitute the required complete and usable workflow. | Project reset, selected instruction-package deletion, and project-scoped cache clearing are present, discoverable, correctly scoped, confirmed where destructive, durable across relaunch, and independently tested. |
+| Managed Run | **Must be removed from the user workflow.** It is an obsolete automation system created from a prior misinterpretation. | No primary action, guide, status text, or continuity dependency instructs the user to start work through Managed Run. Reusable low-level services may remain only when they support the LM Studio-driven workflow and preserve compatibility. |
+
+### Release boundary
+
+The product remains unshippable until every row above has direct focused tests,
+canonical workspace membership verification, an ordinary signed app build, and
+owner-machine runtime evidence for the installed LM Studio workflow. A passing
+legacy Managed Run test is not acceptance evidence for this roadmap.
+
+## Superseded historical roadmap
+
+Everything below this heading predates the owner-defined workflow above. It is
+retained for forensic context only and has no dispatch or acceptance authority.
+
 Audit baseline: September 12, 2026, source `4750e8ee93aeb7dbbcde6b3408d409cb47ee2be1`; reconciled September 13, 2026 to source `b8e927c76bb13a58e6f161789c162ddac629ef95` after owner PR #45. Remote and local `main` were rechecked September 14, 2026 at `d05e56a1d517dbfbcd971105cf2917cb1f186f34` after owner PR #47. They were safely synchronized again September 15, 2026 at merged PR #48 source `c55509a60d6694ba460b9dbbf92f0ce6f899f0f1` and merged PR #51 source `bea6b5a5ab6cbc387207f7830805fe82288f13cf`. On September 17, the tested production source was published at `b756b243d24d7dd06098dbbafcdfaa77ab7c97e0`, tree `6c03f40e2b04ae6dfd689c9347a84014f7ebe496`; owner-authored local and remote `main` were then verified identical after documentation closeout at `f02abeb8c940c8d998f822fd4f1cad5c20c7765e`, tree `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. These are evidence baselines, not checkout/reset instructions. Confirm newer merged work before updating a row.
 
 The roadmap is the canonical phase/milestone record. The owner now authorizes continuous work toward a fully functional, feature-complete, shippable build, direct updates to GitHub `main` under the owner's account, and no pull requests or stray branches. The owner will ship separately. The earlier [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md) remains historical acceptance evidence. This table tracks outcomes and is not an automatic task selector. Follow [the delivery workflow](docs/DELIVERY-WORKFLOW.md).
