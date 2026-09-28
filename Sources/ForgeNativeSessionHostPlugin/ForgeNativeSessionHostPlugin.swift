@@ -5516,8 +5516,10 @@ public actor LMStudioGUIChatDriver: LMStudioGUIChatDriving {
     }
 
     private func isNewButton(_ element: AXUIElement) -> Bool {
-        string(element, kAXRoleAttribute) == kAXButtonRole
-            && string(element, kAXTitleAttribute) == "New"
+        guard string(element, kAXRoleAttribute) == kAXButtonRole else { return false }
+        return [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute]
+            .compactMap { string(element, $0) }
+            .contains("New")
     }
 
     private func isChatInput(_ element: AXUIElement) -> Bool {

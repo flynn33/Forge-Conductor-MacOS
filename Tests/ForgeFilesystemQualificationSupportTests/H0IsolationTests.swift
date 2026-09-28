@@ -153,7 +153,7 @@ final class H0IsolationTests: XCTestCase {
             12
         )
         XCTAssertEqual(
-            project.components(separatedBy: "CURRENT_PROJECT_VERSION = 20;").count - 1,
+            project.components(separatedBy: "CURRENT_PROJECT_VERSION = 21;").count - 1,
             16
         )
         for identifier in [
