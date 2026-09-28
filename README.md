@@ -80,6 +80,13 @@ use installed MCP integrations. It does not document a guarantee that an
 API-created chat becomes the foreground GUI tab. Forge does not use unsupported
 private UI automation to fabricate that behavior.
 
+Current build-19 host evidence proves the tokenless normal GUI chat path and
+its Forge tool/location lookup. The tokenless automatic API successor is not
+accepted: LM Studio currently returns HTTP 403 when that request attaches the
+local `mcp/forge-conductor` registration. Shipment remains open until Forge can
+complete the owner-defined successor flow without an operator-facing or
+Forge-held LM Studio credential.
+
 ## Projects and instruction packages
 
 The Projects surface supports:

@@ -12,7 +12,9 @@ import XCTest
 /// Only the real-provider test requires FORGE_SHIPPING_PROVIDER_ENDPOINT and
 /// FORGE_SHIPPING_PROVIDER_MODEL in the test runner environment. Use an already
 /// loaded, token-free local LM Studio server; this suite never loads a model,
-/// installs a service, edits an external host configuration, or supplies a token.
+/// installs a service, leaves an external host configuration changed, or supplies
+/// a token. Forge-owned LM Studio registration files are captured before launch
+/// and restored after every test, including assertion failures.
 /// The fresh MCP execution case requires an unsandboxed test runner: an inherited
 /// runner sandbox prevents the product from applying its own shell sandbox.
 @MainActor
@@ -24,6 +26,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private var managerPort: UInt16 = 0
     private var session: URLSession!
     private var guidedSetupDefaultsSuite: String!
+    private var lmStudioRegistrationSnapshot: LMStudioForgeRegistrationSnapshot!
 
     nonisolated override func setUpWithError() throws {
         try MainActor.assumeIsolated {
@@ -39,6 +42,9 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                     attributes: [.posixPermissions: 0o700]
                 )
             }
+            lmStudioRegistrationSnapshot = try LMStudioForgeRegistrationSnapshot.capture(
+                backupRoot: fixture.appendingPathComponent("lmstudio-registration-backup", isDirectory: true)
+            )
 
             // A fresh home does not isolate the default dashboard port. Seed only
             // supported manager transport configuration before ordinary bootstrap.
@@ -96,6 +102,8 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                 return
             }
             app = nil
+            try lmStudioRegistrationSnapshot?.restoreIfChanged()
+            lmStudioRegistrationSnapshot = nil
             if let guidedSetupDefaultsSuite {
                 UserDefaults(suiteName: guidedSetupDefaultsSuite)?
                     .removePersistentDomain(forName: guidedSetupDefaultsSuite)
@@ -2086,6 +2094,73 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+/// Preserves the Forge-owned LM Studio registration inputs used by Connect and
+/// Check. Live-provider UI tests exercise the real deployment transaction, but
+/// they must never leave their disposable FORGE_CONDUCTOR_HOME embedded in the
+/// operator's `~/.lmstudio` configuration or bridge definitions. LM Studio's
+/// own mutable `install-state.json` timestamps are deliberately not restored.
+private struct LMStudioForgeRegistrationSnapshot {
+    private struct Artifact {
+        let target: URL
+        let backup: URL
+        let existed: Bool
+    }
+
+    private let artifacts: [Artifact]
+
+    static func capture(backupRoot: URL) throws -> Self {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: backupRoot,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        let pluginRoot = LMStudioEnvironment.homeDir
+            .appendingPathComponent("extensions/plugins/mcp", isDirectory: true)
+        var targets = [LMStudioEnvironment.mcpConfigURL]
+        for serverID in [
+            LMStudioEnvironment.primaryServerID,
+            LMStudioEnvironment.fallbackServerID,
+            LMStudioEnvironment.continuityServerID,
+        ] {
+            let directory = pluginRoot.appendingPathComponent(serverID, isDirectory: true)
+            targets.append(directory.appendingPathComponent("manifest.json"))
+            targets.append(directory.appendingPathComponent("mcp-bridge-config.json"))
+        }
+        let artifacts = try targets.enumerated().map { index, target in
+            let existed = fileManager.fileExists(atPath: target.path)
+            let backup = backupRoot.appendingPathComponent("artifact-\(index)")
+            if existed {
+                try fileManager.copyItem(at: target, to: backup)
+            }
+            return Artifact(target: target, backup: backup, existed: existed)
+        }
+        return Self(artifacts: artifacts)
+    }
+
+    func restoreIfChanged() throws {
+        let fileManager = FileManager.default
+        for artifact in artifacts {
+            let existsNow = fileManager.fileExists(atPath: artifact.target.path)
+            let unchanged = existsNow == artifact.existed
+                && (!artifact.existed || fileManager.contentsEqual(
+                    atPath: artifact.target.path,
+                    andPath: artifact.backup.path
+                ))
+            guard !unchanged else { continue }
+            if existsNow {
+                try fileManager.removeItem(at: artifact.target)
+            }
+            guard artifact.existed else { continue }
+            try fileManager.createDirectory(
+                at: artifact.target.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try fileManager.copyItem(at: artifact.backup, to: artifact.target)
+        }
     }
 }
 

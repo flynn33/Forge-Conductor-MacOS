@@ -50,9 +50,22 @@ The tracked repository, candidate, and Forge support directory contain no local
 LM Studio token variable, secret prefix, or token-bearing authorization value.
 The rejected Forge Keychain item is absent, and the local provider JSON contains
 no credential reference.
-Ordinary LM Studio `get_forge_status` on this exact build, CLU delivery, and the
-complete automatic rollover sequence remain open. This is not shipment
-acceptance, and `/Applications/Forge Conductor.app` has not been replaced.
+
+A fresh foreground LM Studio GUI chat called `get_forge_status` through the
+candidate's registered fallback MCP process, then called `context_get`,
+`memory_list`, `memory_search`, and `fs_read`. Its visible answer returned Forge
+home `/Users/flynn/.forge-conductor`, project `Jamf-Technician`, project root
+`/Users/flynn/GitHub/Jamf-Technician`, project ID
+`d2610542-b616-7e8f-ee36-ef902d6060e1`, and resume-ready handoff prefix
+`fdb9130a`. The chat was the foreground LM Studio tab.
+
+The automatic API successor is still a failed acceptance item. With LM Studio
+authentication disabled, the exact tokenless `POST /api/v1/chat` request
+returns HTTP 403 when its integrations array contains `mcp/forge-conductor`.
+No successor chat ID, exact handoff acknowledgement, or predecessor seal was
+produced, so none is claimed. CLU delivery and the complete automatic rollover
+sequence remain open. This is not shipment acceptance, and
+`/Applications/Forge Conductor.app` has not been replaced.
 
 The prior build-16 candidate at revision `f2cc6ca` remains historical evidence
 only. Its Continuity package control and project-wide delete do not satisfy the

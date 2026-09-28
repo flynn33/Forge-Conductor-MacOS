@@ -35,6 +35,9 @@ Product versions do not by themselves claim shipment.
 - Kept registered projects visible on Continuity when automatic continuity is
   idle or unavailable, because durable packets remain operator-manageable after
   the automation state that created them is no longer active.
+- Preserved the operator's existing Forge-owned LM Studio `mcp.json`, manifest,
+  and bridge-definition inputs around live-provider UI tests so a disposable
+  test home cannot remain registered after success or assertion failure.
 
 ### Verification
 
@@ -49,7 +52,10 @@ Product versions do not by themselves claim shipment.
   the live 75-packet inventory and retained all 73 pre-existing packet IDs. A
   focused multi-selection case deleted exactly two selected IDs in one request
   and retained the unselected row. Automatic LM Studio rollover acceptance
-  remains required before shipment.
+  remains required before shipment. A fresh foreground LM Studio GUI chat did
+  successfully call `get_forge_status`, `context_get`, and memory tools through
+  the candidate registration without a Forge-held LM Studio credential and
+  returned the live project and continuity locations.
 
 ## [0.16.0] — 2026-09-27 (build 15 owner-workflow correction)
 
