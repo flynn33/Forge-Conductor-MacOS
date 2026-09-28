@@ -346,7 +346,7 @@ final class NativeSessionHostPluginTests: XCTestCase {
         }
     }
 
-    func testConfiguredProductionRegistrationRequiresReachableProviderForInteractiveSession() async throws {
+    func testConfiguredProductionRegistrationCreatesIdempotentGUISessionWithoutRESTDispatch() async throws {
         let root = temporaryRoot("configured-registry")
         defer { try? FileManager.default.removeItem(at: root) }
         let registry = HostAdapterRegistry()
@@ -366,17 +366,17 @@ final class NativeSessionHostPluginTests: XCTestCase {
         )
         XCTAssertFalse(adapter.identifier.lowercased().hasPrefix("native-"))
         XCTAssertFalse(adapter.identifier.lowercased().hasPrefix("forge-logical-session"))
-        do {
-            _ = try await adapter.createSession(SessionCreationRequest(
-                operationID: UUID().uuidString.lowercased(),
-                projectID: UUID().uuidString.lowercased(),
-                predecessorSessionID: "provider-predecessor",
-                idempotencyKey: "configured-production"
-            ))
-            XCTFail("The interactive adapter must not fabricate a provider session")
-        } catch let error as LMStudioProviderError {
-            XCTAssertEqual(error, .providerUnavailable)
-        }
+        let request = SessionCreationRequest(
+            operationID: UUID().uuidString.lowercased(),
+            projectID: UUID().uuidString.lowercased(),
+            predecessorSessionID: "provider-predecessor",
+            idempotencyKey: "configured-production"
+        )
+        let created = try await adapter.createSession(request)
+        let replayed = try await adapter.createSession(request)
+        XCTAssertEqual(replayed, created)
+        XCTAssertTrue(created.providerSessionID?.hasPrefix("lmstudio-gui-") == true)
+        XCTAssertNil(created.model)
     }
 
     func testProductionRegistrationLoadsBoundedProviderFile() throws {

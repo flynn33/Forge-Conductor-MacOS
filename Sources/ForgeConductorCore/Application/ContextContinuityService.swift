@@ -42,6 +42,47 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     // MARK: - Public tool operations
 
+    /// Records proof that an ordinary MCP client consumed the exact resume-ready
+    /// packet through `get_forge_status(resume=true)`. A rollover nonce prevents
+    /// an earlier manual status call from acknowledging a later GUI successor.
+    public func recordInteractiveResumeAcknowledgement(
+        handoffID: String,
+        rolloverNonce: String,
+        clientID: ClientID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any] {
+        guard UUID(uuidString: handoffID) != nil else {
+            throw ProjectMemoryError.invalidRequest("handoff_id must be a UUID")
+        }
+        guard UUID(uuidString: rolloverNonce) != nil else {
+            throw ProjectMemoryError.invalidRequest("rollover_nonce must be a UUID")
+        }
+        try cancellation?.checkCancellation()
+        let acknowledgedAt = ISO8601.string(from: clock.now())
+        let receipt: [String: Any] = [
+            "schema_version": 1,
+            "handoff_id": handoffID.lowercased(),
+            "rollover_nonce": rolloverNonce.lowercased(),
+            "client_id": String(clientID.rawValue.prefix(256)),
+            "tool": "get_forge_status",
+            "resume": true,
+            "acknowledged_at": acknowledgedAt,
+        ]
+        let url = paths.interactiveResumeAcknowledgementsDir
+            .appendingPathComponent("\(handoffID.lowercased()).json")
+        try OwnerOnlyAtomicFile.write(
+            try JSONSupport.data(from: receipt),
+            to: url
+        )
+        diagnostics.info("interactive_resume_acknowledged", [
+            "handoff_id": handoffID.lowercased(),
+            "client_id": String(clientID.rawValue.prefix(256)),
+            "tool": "get_forge_status",
+        ], category: .general)
+        try cancellation?.checkCancellation()
+        return receipt
+    }
+
     /// Performs only exact authorized source reads and packet construction. The
     /// control-plane owner persists the resulting bytes in its request intent
     /// before calling commitPreparedAuthorizedSourceCommit. Retries never build

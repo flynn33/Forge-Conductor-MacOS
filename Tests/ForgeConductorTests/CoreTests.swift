@@ -30,7 +30,7 @@ final class CoreTests: XCTestCase {
             arguments: ["project_path": (projectRoot ?? tempHome).path],
             clientID: clientID
         )
-        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertTrue(result.ok)
         return result
     }
 
@@ -223,7 +223,7 @@ final class CoreTests: XCTestCase {
     func testForgeStatusTool() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         let result = try app.tools.call(name: "forge_status", arguments: [:], clientID: ClientID("t1"))
-        XCTAssertTrue(result.ok)
+        XCTAssertTrue(result.ok, "\(result.payload)")
         XCTAssertEqual(result.payload["runtime"] as? String, "swift")
         XCTAssertEqual(result.payload["version"] as? String, ForgeApp.version)
     }
@@ -1066,6 +1066,47 @@ final class CoreTests: XCTestCase {
         XCTAssertNotNil(result.payload["continuity"])
         let resume = result.payload["resume"] as? [String: Any]
         XCTAssertEqual(resume?["found"] as? Bool, false)
+    }
+
+    func testGetForgeStatusWritesExactNonceBoundInteractiveResumeAcknowledgement() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let handoffID = UUID().uuidString.lowercased()
+        let nonce = UUID().uuidString.lowercased()
+        try app.store.handoffUpsert(HandoffPacket(
+            id: handoffID,
+            resumeReady: true,
+            goal: "Resume in the visible LM Studio successor",
+            status: "ready"
+        ))
+
+        let result = try app.tools.call(
+            name: "get_forge_status",
+            arguments: [
+                "resume": true,
+                "handoff_id": handoffID,
+                "rollover_nonce": nonce,
+            ],
+            clientID: ClientID("lmstudio-gui-successor")
+        )
+
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        let acknowledgement = try XCTUnwrap(
+            result.payload["interactive_resume_acknowledgement"] as? [String: Any]
+        )
+        XCTAssertEqual(acknowledgement["handoff_id"] as? String, handoffID)
+        XCTAssertEqual(acknowledgement["rollover_nonce"] as? String, nonce)
+        XCTAssertEqual(acknowledgement["tool"] as? String, "get_forge_status")
+        XCTAssertEqual(acknowledgement["resume"] as? Bool, true)
+        XCTAssertEqual(acknowledgement["client_id"] as? String, "lmstudio-gui-successor")
+        let receiptURL = app.paths.interactiveResumeAcknowledgementsDir
+            .appendingPathComponent("\(handoffID).json")
+        let persisted = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: OwnerOnlyAtomicFile.read(from: receiptURL, maximumBytes: 8_192)
+            ) as? [String: Any]
+        )
+        XCTAssertEqual(persisted["rollover_nonce"] as? String, nonce)
     }
 
     func testGetForgeStatusReturnsRegisteredProjectAndQueryLocationsWithoutRun() throws {

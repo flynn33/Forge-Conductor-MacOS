@@ -208,11 +208,30 @@ public struct AgentToolPack: ToolPackHandling {
             ]
         }
         if ToolArgHelpers.bool(arguments, "resume") == true {
-            payload["resume"] = try app.continuity.get(
-                id: nil,
+            let requestedHandoffID = ToolArgHelpers.string(arguments, "handoff_id")
+            let resumed = try app.continuity.get(
+                id: requestedHandoffID,
                 preferResumeReady: true,
                 cancellation: cancellation
             )
+            payload["resume"] = resumed
+            if let rolloverNonce = ToolArgHelpers.string(arguments, "rollover_nonce") {
+                guard resumed["found"] as? Bool == true,
+                      resumed["resume_ready"] as? Bool == true,
+                      let actualHandoffID = resumed["handoff_id"] as? String,
+                      requestedHandoffID?.lowercased() == actualHandoffID.lowercased() else {
+                    throw ProjectMemoryError.invalidRequest(
+                        "rollover acknowledgement requires the exact resume-ready handoff"
+                    )
+                }
+                payload["interactive_resume_acknowledgement"] = try app.continuity
+                    .recordInteractiveResumeAcknowledgement(
+                        handoffID: actualHandoffID,
+                        rolloverNonce: rolloverNonce,
+                        clientID: clientID,
+                        cancellation: cancellation
+                    )
+            }
         }
         let result = ToolResult.success(payload)
         try cancellation?.checkCancellation()

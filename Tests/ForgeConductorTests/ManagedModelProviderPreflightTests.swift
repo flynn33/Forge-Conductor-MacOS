@@ -24,6 +24,23 @@ private final class PreflightCapabilityClock: @unchecked Sendable {
     }
 }
 
+private actor PreflightGUIChatDriver: LMStudioGUIChatDriving {
+    private var requests: [LMStudioGUIChatRequest] = []
+
+    func submitSuccessor(_ request: LMStudioGUIChatRequest) async throws
+        -> LMStudioGUIChatReceipt {
+        requests.append(request)
+        return LMStudioGUIChatReceipt(
+            visibleChatTitle: "Forge rollover \(request.handoffID.prefix(8))",
+            mcpTool: "get_forge_status",
+            clientID: "lmstudio-gui-fixture",
+            acknowledgedAt: "2026-09-28T12:00:00Z"
+        )
+    }
+
+    var snapshot: [LMStudioGUIChatRequest] { requests }
+}
+
 private final class PreflightCapture: @unchecked Sendable {
     struct Request: Sendable {
         let method: String
@@ -283,30 +300,56 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
         XCTAssertEqual(f.capture.snapshot.count, 4)
     }
 
-    func testInteractiveSuccessorCreatesStoredChatWithForgeResumeBootstrap() async throws {
+    func testInteractiveSuccessorUsesForegroundGUIAndExactMCPReceiptWithoutChatAPI() async throws {
         let f = try fixture(); defer { f.close() }
-        let client = try LMStudioRESTClient(
-            configuration: f.configuration,
-            sessionConfiguration: f.session,
-            authorization: f.authorization
+        let driver = PreflightGUIChatDriver()
+        let acknowledgements = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-gui-ack-\(UUID().uuidString)", isDirectory: true
         )
+        let transport = LMStudioInteractiveSessionTransport(
+            guiDriver: driver,
+            acknowledgementDirectory: acknowledgements
+        )
+        let operationID = "7f698dd0-7077-4b53-a085-80e7e9c83676"
+        let session = try await transport.createSession(
+            request: SessionCreationRequest(
+                operationID: operationID,
+                projectID: "0fd5055d-ae08-4dda-b577-428accb80ce9",
+                predecessorSessionID: "lmstudio-predecessor",
+                idempotencyKey: "interactive-continuity:\(operationID)"
+            ),
+            deadline: ContinuousClock.now.advanced(by: .seconds(2))
+        )
+        let response = try await transport.bootstrap(NativeBootstrapRequest(
+            operationID: operationID,
+            projectID: "0fd5055d-ae08-4dda-b577-428accb80ce9",
+            successorSessionID: "successor-fixture",
+            providerSessionID: session.providerSessionID,
+            handoffID: operationID,
+            handoffSHA256: String(repeating: "a", count: 64),
+            canonicalHandoff: Data("{}".utf8),
+            deadline: ContinuousClock.now.advanced(by: .seconds(2))
+        ))
 
-        let responseID = try await client.createInteractiveSuccessor(
-            handoffID: "7f698dd0-7077-4b53-a085-80e7e9c83676"
+        let requests = await driver.snapshot
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertTrue(request.prompt.contains("get_forge_status"))
+        XCTAssertTrue(request.prompt.contains("resume=true"))
+        XCTAssertTrue(request.prompt.contains("handoff_id=\(operationID)"))
+        XCTAssertTrue(request.prompt.contains("rollover_nonce=\(request.rolloverNonce)"))
+        XCTAssertEqual(
+            request.rolloverNonce,
+            LMStudioInteractiveSessionTransport.rolloverNonce(operationID: operationID)
         )
-
-        XCTAssertEqual(responseID, "resp_interactive_successor")
-        let request = try XCTUnwrap(f.capture.snapshot.last)
-        XCTAssertEqual(request.method, "POST")
-        XCTAssertEqual(request.path, "/api/v1/chat")
-        let body = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: request.body) as? [String: Any]
+        XCTAssertEqual(request.acknowledgementURL.deletingLastPathComponent(), acknowledgements)
+        let acknowledgement = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: try XCTUnwrap(response.chunks.first))
+                as? [String: Any]
         )
-        XCTAssertEqual(body["model"] as? String, "fixture/tool-model")
-        XCTAssertEqual(body["input"] as? String, "get_forge_status\nresume=true")
-        XCTAssertEqual(body["integrations"] as? [String], ["mcp/forge-conductor"])
-        XCTAssertEqual(body["store"] as? Bool, true)
-        XCTAssertEqual(body["stream"] as? Bool, false)
+        XCTAssertEqual(acknowledgement["handoff_id"] as? String, operationID)
+        XCTAssertEqual(acknowledgement["successor_session_id"] as? String, "successor-fixture")
+        XCTAssertEqual(acknowledgement["mcp_tool"] as? String, "get_forge_status")
+        XCTAssertFalse(f.capture.snapshot.contains { $0.path == "/api/v1/chat" })
     }
 
     func testExpiredObservationRejectsRootAndContinuationWithoutHiddenProbe() async throws {

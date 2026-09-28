@@ -1,9 +1,13 @@
 // ForgeNativeSessionHostPlugin.swift
 // What: Implements the native logical-session host used for autonomous rollover.
 // How: An injected transport performs provider work while a bounded local ledger reconciles retries.
-// Why: Forge can create, bootstrap, acknowledge, cancel, and recover sessions without GUI automation.
+// Why: Forge can create, bootstrap, acknowledge, cancel, and recover sessions through supported native boundaries.
 
 import Foundation
+#if canImport(AppKit)
+import AppKit
+import ApplicationServices
+#endif
 #if canImport(Security)
 import Security
 #endif
@@ -2114,83 +2118,6 @@ public actor LMStudioRESTClient {
             throw LMStudioProviderError.malformedResponse("fresh root unexpectedly references a predecessor")
         }
         return turn
-    }
-
-    /// Creates a stored LM Studio native chat thread and lets the installed Forge
-    /// MCP integration resolve the exact resume-ready handoff. This is the
-    /// supported interactive-session boundary; it does not automate the GUI.
-    public func createInteractiveSuccessor(
-        handoffID: String,
-        modelKey: String? = nil,
-        integrationID: String = "mcp/forge-conductor"
-    ) async throws -> String {
-        try LMStudioProviderConfiguration.validateBoundedString(
-            handoffID, field: "handoff ID", maximumBytes: 64
-        )
-        guard UUID(uuidString: handoffID) != nil else {
-            throw LMStudioProviderError.invalidConfiguration("handoff ID is not a UUID")
-        }
-        try LMStudioProviderConfiguration.validateBoundedString(
-            integrationID, field: "integration ID", maximumBytes: 128
-        )
-        let model = try await resolvedModel(modelKey)
-        let payload: [String: Any] = [
-            "model": model,
-            "input": "get_forge_status\nresume=true",
-            "integrations": [integrationID],
-            "store": true,
-            "stream": false,
-        ]
-        let body = try JSONSerialization.data(
-            withJSONObject: payload,
-            options: [.sortedKeys, .withoutEscapingSlashes]
-        )
-        guard body.count <= configuration.maximumRequestBytes else {
-            throw LMStudioProviderError.limitExceeded("interactive successor request body")
-        }
-        var request = URLRequest(url: try configuration.endpoint("api/v1/chat"))
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.timeoutInterval = min(configuration.totalTimeoutSeconds + 5, 1_200)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(
-            JSONSupport.sha256Hex("interactive-successor:\(handoffID)"),
-            forHTTPHeaderField: "X-Forge-Operation-Key"
-        )
-        try await authorize(&request)
-        let runner = LMStudioBoundedRequest(
-            configuration: sessionConfiguration,
-            providerConfiguration: configuration,
-            mode: .data(maximumBytes: configuration.maximumResponseBytes)
-        )
-        guard case .data(let data, _) = try await runner.run(request),
-              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let responseID = object["response_id"] as? String else {
-            throw LMStudioProviderError.malformedResponse(
-                "interactive successor did not return a stored response ID"
-            )
-        }
-        try LMStudioProviderIdentifier.validate(responseID)
-        guard Self.containsHandoffID(object, handoffID: handoffID) else {
-            throw LMStudioProviderError.malformedResponse(
-                "interactive successor did not acknowledge the saved handoff"
-            )
-        }
-        return responseID
-    }
-
-    private static func containsHandoffID(_ value: Any, handoffID: String) -> Bool {
-        if let string = value as? String {
-            return string == handoffID || string.contains(handoffID)
-        }
-        if let values = value as? [Any] {
-            return values.contains { containsHandoffID($0, handoffID: handoffID) }
-        }
-        if let values = value as? [String: Any] {
-            return values.values.contains { containsHandoffID($0, handoffID: handoffID) }
-        }
-        return false
     }
 
     /// Uses only an already observed capability value. Expiry never triggers a POST.
@@ -5283,6 +5210,26 @@ public struct NativeBootstrapRequest: Sendable {
     public var handoffSHA256: String
     public var canonicalHandoff: Data
     public var deadline: ContinuousClock.Instant
+
+    public init(
+        operationID: String,
+        projectID: String,
+        successorSessionID: String,
+        providerSessionID: String,
+        handoffID: String,
+        handoffSHA256: String,
+        canonicalHandoff: Data,
+        deadline: ContinuousClock.Instant
+    ) {
+        self.operationID = operationID
+        self.projectID = projectID
+        self.successorSessionID = successorSessionID
+        self.providerSessionID = providerSessionID
+        self.handoffID = handoffID
+        self.handoffSHA256 = handoffSHA256
+        self.canonicalHandoff = canonicalHandoff
+        self.deadline = deadline
+    }
 }
 
 public struct NativeBootstrapResponse: Sendable {
@@ -5298,6 +5245,7 @@ public struct NativeBootstrapResponse: Sendable {
 }
 
 public protocol NativeSessionTransport: Sendable {
+    var bootstrapTimeout: Duration { get }
     func createSession(
         request: SessionCreationRequest,
         deadline: ContinuousClock.Instant
@@ -5306,14 +5254,336 @@ public protocol NativeSessionTransport: Sendable {
     func cancel(operationID: String, providerSessionID: String?) async
 }
 
-/// Transport for ordinary LM Studio continuity. The bootstrap call creates a
-/// stored native chat through the documented API and asks the installed Forge
-/// MCP integration to load the exact resume-ready handoff.
+public extension NativeSessionTransport {
+    var bootstrapTimeout: Duration { .seconds(10) }
+}
+
+public struct LMStudioGUIChatRequest: Sendable, Equatable {
+    public let operationID: String
+    public let handoffID: String
+    public let rolloverNonce: String
+    public let prompt: String
+    public let acknowledgementURL: URL
+    public let deadline: ContinuousClock.Instant
+
+    public init(
+        operationID: String,
+        handoffID: String,
+        rolloverNonce: String,
+        prompt: String,
+        acknowledgementURL: URL,
+        deadline: ContinuousClock.Instant
+    ) {
+        self.operationID = operationID
+        self.handoffID = handoffID
+        self.rolloverNonce = rolloverNonce
+        self.prompt = prompt
+        self.acknowledgementURL = acknowledgementURL
+        self.deadline = deadline
+    }
+}
+
+public struct LMStudioGUIChatReceipt: Sendable, Equatable {
+    public let visibleChatTitle: String
+    public let mcpTool: String
+    public let clientID: String
+    public let acknowledgedAt: String
+
+    public init(
+        visibleChatTitle: String,
+        mcpTool: String,
+        clientID: String,
+        acknowledgedAt: String
+    ) {
+        self.visibleChatTitle = visibleChatTitle
+        self.mcpTool = mcpTool
+        self.clientID = clientID
+        self.acknowledgedAt = acknowledgedAt
+    }
+}
+
+public protocol LMStudioGUIChatDriving: Sendable {
+    func submitSuccessor(_ request: LMStudioGUIChatRequest) async throws
+        -> LMStudioGUIChatReceipt
+}
+
+#if canImport(AppKit)
+/// Drives LM Studio's public macOS Accessibility surface: activate the existing
+/// app, press its exposed New button, fill Chat input, and press Send. It never
+/// calls LM Studio's REST chat or integrations endpoints.
+public actor LMStudioGUIChatDriver: LMStudioGUIChatDriving {
+    public static let bundleIdentifier = "ai.elementlabs.lmstudio"
+    public static let maximumElements = 4_096
+    public static let pollInterval = Duration.milliseconds(250)
+
+    public init() {}
+
+    public func submitSuccessor(_ request: LMStudioGUIChatRequest) async throws
+        -> LMStudioGUIChatReceipt {
+        if let receipt = try acknowledgement(for: request) { return receipt }
+        let dispatchState = try loadDispatchState(for: request)
+        guard AXIsProcessTrustedWithOptions([
+            "AXTrustedCheckOptionPrompt": true,
+        ] as CFDictionary) else {
+            throw NativeHostPluginError.malformedResponse(
+                "Forge Conductor requires macOS Accessibility access to create the visible LM Studio successor chat"
+            )
+        }
+        guard let running = NSRunningApplication.runningApplications(
+            withBundleIdentifier: Self.bundleIdentifier
+        ).first else {
+            throw NativeHostPluginError.malformedResponse(
+                "LM Studio must be running before Forge can create its successor chat"
+            )
+        }
+        _ = running.activate(options: [.activateAllWindows])
+        let application = AXUIElementCreateApplication(running.processIdentifier)
+
+        // Recovery first: if the exact nonce is in the current draft or chat,
+        // continue that chat instead of manufacturing a duplicate successor.
+        if dispatchState != "submitted", let input = element(
+            in: application,
+            where: { self.isChatInput($0) && self.string($0, kAXValueAttribute)?.contains(request.rolloverNonce) == true }
+        ) {
+            _ = input
+            let send = try await waitForElement(
+                in: application,
+                deadline: min(request.deadline, ContinuousClock.now.advanced(by: .seconds(10))),
+                where: { self.isSendButton($0) && self.isEnabled($0) }
+            )
+            try perform(kAXPressAction, on: send, label: "Send")
+            try persistDispatchState("submitted", for: request)
+        } else if dispatchState != "submitted"
+                    && containsText(request.rolloverNonce, in: application) {
+            // The exact prompt is already present in the visible chat. Recovery
+            // waits for its matching MCP receipt and never creates a second chat.
+            try persistDispatchState("submitted", for: request)
+        } else if dispatchState != "submitted" {
+            try persistDispatchState("intent", for: request)
+            guard let newButton = element(in: application, where: isNewButton) else {
+                throw NativeHostPluginError.malformedResponse(
+                    "LM Studio did not expose its New chat button"
+                )
+            }
+            try perform(kAXPressAction, on: newButton, label: "New chat")
+            let input = try await waitForElement(
+                in: application,
+                deadline: min(request.deadline, ContinuousClock.now.advanced(by: .seconds(10))),
+                where: isChatInput
+            )
+            let setError = AXUIElementSetAttributeValue(
+                input, kAXValueAttribute as CFString, request.prompt as CFString
+            )
+            guard setError == .success else {
+                throw NativeHostPluginError.malformedResponse(
+                    "LM Studio Chat input rejected the successor prompt (AX error \(setError.rawValue))"
+                )
+            }
+            let send = try await waitForElement(
+                in: application,
+                deadline: min(request.deadline, ContinuousClock.now.advanced(by: .seconds(10))),
+                where: { self.isSendButton($0) && self.isEnabled($0) }
+            )
+            try perform(kAXPressAction, on: send, label: "Send")
+            try persistDispatchState("submitted", for: request)
+        }
+
+        while ContinuousClock.now < request.deadline {
+            try Task.checkCancellation()
+            if let receipt = try acknowledgement(for: request) {
+                return LMStudioGUIChatReceipt(
+                    visibleChatTitle: selectedChatTitle(in: application)
+                        ?? receipt.visibleChatTitle,
+                    mcpTool: receipt.mcpTool,
+                    clientID: receipt.clientID,
+                    acknowledgedAt: receipt.acknowledgedAt
+                )
+            }
+            try await Task.sleep(for: Self.pollInterval)
+        }
+        throw NativeHostPluginError.deadlineExceeded
+    }
+
+    private func acknowledgement(
+        for request: LMStudioGUIChatRequest
+    ) throws -> LMStudioGUIChatReceipt? {
+        guard FileManager.default.fileExists(atPath: request.acknowledgementURL.path) else {
+            return nil
+        }
+        let data = try OwnerOnlyAtomicFile.read(
+            from: request.acknowledgementURL,
+            maximumBytes: 8 * 1_024
+        )
+        guard let value = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              value["schema_version"] as? Int == 1,
+              (value["handoff_id"] as? String)?.lowercased() == request.handoffID.lowercased(),
+              (value["rollover_nonce"] as? String)?.lowercased()
+                == request.rolloverNonce.lowercased(),
+              value["tool"] as? String == "get_forge_status",
+              value["resume"] as? Bool == true,
+              let clientID = value["client_id"] as? String,
+              let acknowledgedAt = value["acknowledged_at"] as? String else {
+            return nil
+        }
+        return LMStudioGUIChatReceipt(
+            visibleChatTitle: "LM Studio successor \(request.handoffID.prefix(8))",
+            mcpTool: "get_forge_status",
+            clientID: clientID,
+            acknowledgedAt: acknowledgedAt
+        )
+    }
+
+    private func dispatchURL(for request: LMStudioGUIChatRequest) -> URL {
+        request.acknowledgementURL.deletingLastPathComponent().appendingPathComponent(
+            "\(request.handoffID.lowercased()).dispatch.json"
+        )
+    }
+
+    private func loadDispatchState(for request: LMStudioGUIChatRequest) throws -> String? {
+        let url = dispatchURL(for: request)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: 8 * 1_024)
+        guard let value = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (value["handoff_id"] as? String)?.lowercased()
+                == request.handoffID.lowercased(),
+              (value["rollover_nonce"] as? String)?.lowercased()
+                == request.rolloverNonce.lowercased() else {
+            throw NativeHostPluginError.malformedResponse(
+                "LM Studio GUI successor dispatch receipt identity differs"
+            )
+        }
+        return value["state"] as? String
+    }
+
+    private func persistDispatchState(
+        _ state: String,
+        for request: LMStudioGUIChatRequest
+    ) throws {
+        guard state == "intent" || state == "submitted" else {
+            throw NativeHostPluginError.malformedResponse(
+                "LM Studio GUI successor dispatch state is invalid"
+            )
+        }
+        try OwnerOnlyAtomicFile.write(try JSONSupport.data(from: [
+            "schema_version": 1,
+            "operation_id": request.operationID,
+            "handoff_id": request.handoffID.lowercased(),
+            "rollover_nonce": request.rolloverNonce.lowercased(),
+            "state": state,
+        ]), to: dispatchURL(for: request))
+    }
+
+    private func waitForElement(
+        in root: AXUIElement,
+        deadline: ContinuousClock.Instant,
+        where predicate: @escaping (AXUIElement) -> Bool
+    ) async throws -> AXUIElement {
+        while ContinuousClock.now < deadline {
+            if let found = element(in: root, where: predicate) { return found }
+            try await Task.sleep(for: Self.pollInterval)
+        }
+        throw NativeHostPluginError.deadlineExceeded
+    }
+
+    private func element(
+        in root: AXUIElement,
+        where predicate: (AXUIElement) -> Bool
+    ) -> AXUIElement? {
+        var pending = [root]
+        var visited = 0
+        while let current = pending.popLast(), visited < Self.maximumElements {
+            visited += 1
+            if predicate(current) { return current }
+            pending.append(contentsOf: children(current).reversed())
+        }
+        return nil
+    }
+
+    private func containsText(_ needle: String, in root: AXUIElement) -> Bool {
+        element(in: root) { element in
+            [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute]
+                .compactMap { self.string(element, $0) }
+                .contains { $0.contains(needle) }
+        } != nil
+    }
+
+    private func selectedChatTitle(in root: AXUIElement) -> String? {
+        guard let tab = element(in: root, where: { element in
+            self.string(element, kAXRoleAttribute) == "AXTab"
+                && self.bool(element, kAXSelectedAttribute) == true
+        }) else { return nil }
+        return string(tab, kAXTitleAttribute) ?? string(tab, kAXValueAttribute)
+    }
+
+    private func isNewButton(_ element: AXUIElement) -> Bool {
+        string(element, kAXRoleAttribute) == kAXButtonRole
+            && string(element, kAXTitleAttribute) == "New"
+    }
+
+    private func isChatInput(_ element: AXUIElement) -> Bool {
+        string(element, kAXDescriptionAttribute) == "Chat input"
+    }
+
+    private func isSendButton(_ element: AXUIElement) -> Bool {
+        string(element, kAXRoleAttribute) == kAXButtonRole
+            && (string(element, kAXTitleAttribute) == "Send"
+                || string(element, kAXDescriptionAttribute) == "Send")
+    }
+
+    private func isEnabled(_ element: AXUIElement) -> Bool {
+        bool(element, kAXEnabledAttribute) ?? false
+    }
+
+    private func children(_ element: AXUIElement) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element, kAXChildrenAttribute as CFString, &value
+        ) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
+    }
+
+    private func string(_ element: AXUIElement, _ attribute: String) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element, attribute as CFString, &value
+        ) == .success else { return nil }
+        return value as? String
+    }
+
+    private func bool(_ element: AXUIElement, _ attribute: String) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element, attribute as CFString, &value
+        ) == .success else { return nil }
+        return value as? Bool
+    }
+
+    private func perform(_ action: String, on element: AXUIElement, label: String) throws {
+        let error = AXUIElementPerformAction(element, action as CFString)
+        guard error == .success else {
+            throw NativeHostPluginError.malformedResponse(
+                "LM Studio \(label) action failed (AX error \(error.rawValue))"
+            )
+        }
+    }
+}
+#endif
+
+/// Transport for ordinary LM Studio continuity. It creates a foreground LM
+/// Studio GUI chat and accepts only the exact MCP resume receipt.
 public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
-    private let client: LMStudioRESTClient
+    public nonisolated let bootstrapTimeout = Duration.seconds(300)
+    private let guiDriver: any LMStudioGUIChatDriving
+    private let acknowledgementDirectory: URL
     private var cancelledOperations: Set<String> = []
 
-    public init(client: LMStudioRESTClient) { self.client = client }
+    public init(
+        guiDriver: any LMStudioGUIChatDriving,
+        acknowledgementDirectory: URL
+    ) {
+        self.guiDriver = guiDriver
+        self.acknowledgementDirectory = acknowledgementDirectory
+    }
 
     public func createSession(
         request: SessionCreationRequest,
@@ -5325,10 +5595,9 @@ public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
         guard ContinuousClock.now < deadline else {
             throw NativeHostPluginError.deadlineExceeded
         }
-        let capabilities = try await client.probe()
         return NativeTransportSession(
-            providerSessionID: "interactive-\(JSONSupport.sha256Hex(request.idempotencyKey).prefix(24))",
-            model: capabilities.modelKey
+            providerSessionID: "lmstudio-gui-\(JSONSupport.sha256Hex(request.idempotencyKey).prefix(24))",
+            model: nil
         )
     }
 
@@ -5340,13 +5609,35 @@ public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
         guard ContinuousClock.now < request.deadline else {
             throw NativeHostPluginError.deadlineExceeded
         }
-        _ = try await client.createInteractiveSuccessor(handoffID: request.handoffID)
+        let nonce = Self.rolloverNonce(operationID: request.operationID)
+        let prompt = """
+        get_forge_status
+        resume=true
+        handoff_id=\(request.handoffID)
+        rollover_nonce=\(nonce)
+
+        Call the enabled Forge Conductor MCP tool get_forge_status exactly once with resume=true, handoff_id, and rollover_nonce as supplied above. Resume only the exact returned handoff.
+        """
+        let receipt = try await guiDriver.submitSuccessor(LMStudioGUIChatRequest(
+            operationID: request.operationID,
+            handoffID: request.handoffID,
+            rolloverNonce: nonce,
+            prompt: prompt,
+            acknowledgementURL: acknowledgementDirectory.appendingPathComponent(
+                "\(request.handoffID.lowercased()).json"
+            ),
+            deadline: request.deadline
+        ))
         guard !cancelledOperations.contains(request.operationID) else {
             throw NativeHostPluginError.cancelled
         }
         return NativeBootstrapResponse(chunks: [try JSONSupport.data(from: [
             "handoff_id": request.handoffID,
             "successor_session_id": request.successorSessionID,
+            "visible_chat_title": receipt.visibleChatTitle,
+            "mcp_tool": receipt.mcpTool,
+            "mcp_client_id": receipt.clientID,
+            "acknowledged_at": receipt.acknowledgedAt,
         ])])
     }
 
@@ -5355,6 +5646,11 @@ public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
             cancelledOperations.remove(oldest)
         }
         cancelledOperations.insert(operationID)
+    }
+
+    public static func rolloverNonce(operationID: String) -> String {
+        let hex = JSONSupport.sha256Hex("lmstudio-gui-rollover:\(operationID)")
+        return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))"
     }
 }
 
@@ -5551,7 +5847,7 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
             handoffID: validated.handoffID,
             handoffSHA256: validated.contentSHA256,
             canonicalHandoff: canonical,
-            deadline: ContinuousClock.now.advanced(by: .seconds(10))
+            deadline: ContinuousClock.now.advanced(by: transport.bootstrapTimeout)
         ))
         let acknowledgement = try decodeBoundedAcknowledgement(response.chunks)
         guard acknowledgement["handoff_id"] as? String == validated.handoffID,
@@ -5749,7 +6045,12 @@ public enum ForgeNativeSessionHostPlugin {
                 storageDirectory: storageDirectory,
                 transport: transport,
                 interactiveTransport: LMStudioInteractiveSessionTransport(
-                    client: transport.client
+                    guiDriver: LMStudioGUIChatDriver(),
+                    acknowledgementDirectory: storageDirectory.deletingLastPathComponent()
+                        .appendingPathComponent(
+                            "interactive-resume-acknowledgements",
+                            isDirectory: true
+                        )
                 )
             )
         }

@@ -707,6 +707,14 @@ private enum ProductionToolDefinitionSource {
                         "type": "string",
                         "description": "Select one registered project whose file, instruction, and continuity locations should be returned.",
                     ] as [String: Any],
+                    "handoff_id": [
+                        "type": "string",
+                        "description": "Load this exact resume-ready handoff.",
+                    ] as [String: Any],
+                    "rollover_nonce": [
+                        "type": "string",
+                        "description": "One-time successor nonce supplied by Forge Conductor.",
+                    ] as [String: Any],
                 ] as [String: Any],
                 "required": [] as [String],
                 "additionalProperties": false,

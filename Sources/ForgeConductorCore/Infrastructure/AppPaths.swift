@@ -79,6 +79,14 @@ public final class AppPaths: @unchecked Sendable {
     public var managedProvidersDir: URL {
         home.appendingPathComponent("managed-providers", isDirectory: true)
     }
+    /// Exact receipts written only by a GUI-hosted `get_forge_status(resume=true)`
+    /// tool call. The native LM Studio successor driver consumes these receipts
+    /// before it seals the predecessor.
+    public var interactiveResumeAcknowledgementsDir: URL {
+        managedProvidersDir.appendingPathComponent(
+            "interactive-resume-acknowledgements", isDirectory: true
+        )
+    }
     /// Mutually exclusive provider selection, bounded setup history, and
     /// redacted Forge-owned integration receipts.
     public var providerIntegrationsLedger: URL {
@@ -136,7 +144,8 @@ public final class AppPaths: @unchecked Sendable {
         for dir in [
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
             memoryDir, memoryHandoffsDir, projectsDir, runtimeArtifactsDir,
-            managedProvidersDir, instructionPackagesDir, instructionPackageStoreDir,
+            managedProvidersDir, interactiveResumeAcknowledgementsDir,
+            instructionPackagesDir, instructionPackageStoreDir,
             configMigrationsDir, stjornarvaldDir, stjornarvaldOutboxDir,
             stjornarvaldClientOutboxDir,
             stjornarvaldSourceStoreDir, stjornarvaldExtractedDir,
@@ -146,7 +155,7 @@ public final class AppPaths: @unchecked Sendable {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         for dir in [
-            managedProvidersDir,
+            managedProvidersDir, interactiveResumeAcknowledgementsDir,
             stjornarvaldDir, stjornarvaldOutboxDir, stjornarvaldClientOutboxDir,
             stjornarvaldSourceStoreDir,
             stjornarvaldExtractedDir, stjornarvaldExportsDir, stjornarvaldStagingDir,
