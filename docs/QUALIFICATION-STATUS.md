@@ -63,7 +63,7 @@ home `/Users/flynn/.forge-conductor`, project `Jamf-Technician`, project root
 `2026-09-28T10:01:08Z`. Manager exposed the due time
 `2026-09-28T10:01:38Z` and was observed at 25 seconds remaining. At expiry the
 candidate used LM Studio's public macOS Accessibility controls to open and
-select foreground tab `Unnamed Chat`, then entered `get_forge_status`,
+select foreground tab `Forge Rollover Successor Proof`, then entered `get_forge_status`,
 `resume=true`, the exact handoff ID, and rollover nonce
 `517cbb4f-f1bd-cc69-e1df-f14ffc7f5f9c`. The visible chat called
 `get_forge_status mcp/forge-conductor-fallback`. Its owner-only receipt records

@@ -55,7 +55,7 @@ Product versions do not by themselves claim shipment.
 - Developer ID-signed Desktop candidate `Forge Conductor 0.16.0
   (21)-a540670.app` completed one live disposable rollover. Handoff
   `79474019-000f-4395-a593-cc74a6da2372` showed the 30-second countdown, opened
-  selected foreground tab `Unnamed Chat`, submitted the exact bootstrap, and
+  selected foreground tab `Forge Rollover Successor Proof`, submitted the exact bootstrap, and
   visibly called `get_forge_status mcp/forge-conductor-fallback`. Exact receipt
   nonce `517cbb4f-f1bd-cc69-e1df-f14ffc7f5f9c` acknowledged at
   `2026-09-28T10:06:48Z`; logical successor
