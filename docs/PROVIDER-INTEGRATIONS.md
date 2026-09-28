@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.16.0**, build **17**. Qualification remains
+Product identity: version **0.16.0**, build **21**. Qualification remains
 evidence-bound per host and candidate.
 
 ## Current provider workflow

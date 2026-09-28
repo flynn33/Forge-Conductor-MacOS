@@ -144,6 +144,12 @@ and zero failures. The signed build-21 candidate then completed handoff
 nonce receipt, logical successor `51a4567d-36f9-4d44-8a54-925f6e14a0f5`, and
 predecessor sealing. No shipment claim is made.
 
+Publication checkpoint: `VERSION`, `BUILD_NUMBER`, the compiled filesystem
+protocol constants, all Xcode build configurations, current README/user/Xcode
+and supporting documentation, the focused version-contract test, and the
+published wiki are aligned at `0.16.0 (21)`. Historical evidence remains bound
+to the version it actually exercised.
+
 Historical build-16 candidate evidence remains available for comparison. Source revision
 `f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple
 Development-signed Desktop app and `.xcarchive` named `Forge Conductor 0.16.0

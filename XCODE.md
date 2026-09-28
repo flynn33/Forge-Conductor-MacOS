@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.16.0**, build **18**. `VERSION` and
+Product identity: marketing version **0.16.0**, build **21**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -74,7 +74,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.16.0 (18)` build keeps the Provider and Guided Setup repair in
+The current `0.16.0 (21)` build keeps the Provider and Guided Setup repair in
 the canonical graph, removes local LM Studio credential controls, and exposes
 first-class continuity packet rows and exact packet deletion. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment

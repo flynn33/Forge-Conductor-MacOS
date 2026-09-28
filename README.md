@@ -26,6 +26,11 @@ The current Developer ID-signed Desktop candidate is `Forge Conductor
 not installed over `/Applications/Forge Conductor.app` and is not a shipment
 claim.
 
+The root version authorities, compiled protocol constants, all Xcode build
+configurations, current repository documentation, and the published wiki use
+the same `0.16.0 (21)` identity. Historical receipts retain the identity they
+actually tested.
+
 ## What Forge Conductor does
 
 - Registers one or more project folders with stable, isolated identities.

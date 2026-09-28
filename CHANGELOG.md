@@ -28,6 +28,10 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Aligned the root version authorities, compiled protocol constants, all Xcode
+  configurations, current user/developer documentation, and the published wiki
+  at `0.16.0 (21)`. Historical evidence retains the version and build it
+  actually tested.
 - Advanced the candidate identity to `0.16.0 (21)`. Durable GUI dispatch state
   records `intent` before any host effect and `submitted` after Send, so retry
   and Manager restart reuse one logical successor instead of opening a stack.

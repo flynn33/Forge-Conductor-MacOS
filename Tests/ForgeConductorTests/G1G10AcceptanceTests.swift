@@ -385,7 +385,7 @@ final class G1G10AcceptanceTests: XCTestCase {
         let version = ForgeApp.version
         let buildVersion = ForgeApp.buildVersion
         XCTAssertEqual(version, "0.16.0")
-        XCTAssertEqual(buildVersion, "16")
+        XCTAssertEqual(buildVersion, "21")
 
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
