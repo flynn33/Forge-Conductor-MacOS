@@ -21,10 +21,13 @@ continuity. The user does not start project work through a Forge Managed Run.
 > not release evidence. The working installation remains separate from
 > candidates.
 
-The most recent retained Developer ID-signed Desktop candidate is `Forge Conductor
-0.16.0 (21)-a540670.app` with its matching `.xcarchive` on the Desktop. It is
-not installed over `/Applications/Forge Conductor.app` and is not a shipment
-claim.
+The most recent retained Developer ID-signed Desktop candidate is
+`~/Desktop/Forge Conductor 0.16.1 (22)-91ad90e-DeveloperID/Export/Forge
+Conductor.app`, with its matching `.xcarchive` and evidence directory beside
+the export. It was built from source revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`.
+It is not installed over `/Applications/Forge Conductor.app` and is not a
+shipment claim. Strict signing passes; notarization, stapling, and Gatekeeper
+acceptance remain open.
 
 The root version authorities, compiled protocol constants, all Xcode build
 configurations, and current repository documentation use the same `0.16.1 (22)`

@@ -98,8 +98,21 @@ Product versions do not by themselves claim shipment.
   outside-project delete/move behavior. The final integrated SwiftPM suite
   executed 1,933 tests with 12 explicit environment-dependent skips and zero
   failures; both SwiftPM products, the app-hosted 23-test Dashboard selection,
-  and the canonical Debug workspace build also passed. Exact signed-candidate
-  and shipment acceptance remain separate.
+  and the canonical Debug workspace build also passed.
+- Exact implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
+  produced the retained universal Developer ID candidate `Forge Conductor
+  0.16.1 (22)-91ad90e-DeveloperID`. Strict nested signature validation passed
+  for the app, CLI, runtime launcher, Core framework, and filesystem daemon;
+  every code object carries team `9AQ2C2838M`, hardened runtime, a secure
+  timestamp, and no App Sandbox entitlement. The candidate MCP helper reported
+  `filesystem_sandbox_mode=none` and
+  `filesystem_path_confinement=false`, read a protected Mail path without
+  disclosing its content, executed `/bin/ps`, Git, outside-project filesystem
+  operations, and a runtime job, and returned the exact bound project from
+  `get_forge_status`. Gatekeeper assessment exited 3 with
+  `source=Unnotarized Developer ID`; notarization, stapling, Gatekeeper
+  acceptance, and shipment therefore remain open. The working installation
+  was not replaced.
 - Developer ID-signed Desktop candidate `Forge Conductor 0.16.0
   (21)-a540670.app` completed one live disposable rollover. Handoff
   `79474019-000f-4395-a593-cc74a6da2372` showed the 30-second countdown, opened

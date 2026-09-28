@@ -5,8 +5,8 @@ Product identity: marketing version **0.16.1**, build **22**. `VERSION` and
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
 
-The current [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
-uses optimized Release configuration with the documented Apple Development
+The historical [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
+used optimized Release configuration with the documented Apple Development
 identity and matching `FORGE_DEVELOPMENT_SIGNING` peer policy. The ordinary
 Release configuration requests Developer ID Application for James Daley's team
 `9AQ2C2838M`. Notarization, stapling, and public distribution require their
@@ -100,6 +100,16 @@ For the build-22 correction, the app-hosted Dashboard selection executed 23
 tests with zero failures and the canonical Debug workspace build succeeded.
 The final SwiftPM run executed 1,933 tests with 12 explicit environment-
 dependent skips and zero failures, and both SwiftPM products built.
+
+Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
+produced the `0.16.1 (22)` universal Developer ID archive and manual export at
+`~/Desktop/Forge Conductor 0.16.1 (22)-91ad90e-DeveloperID`. Strict validation
+passes for the app and all four embedded shipping code objects. The candidate
+MCP helper passed protected-path, `/bin/ps`, inherited Git, outside-project
+filesystem/Git, exact project-binding, and native runtime-job probes. The
+retained `Evidence/gatekeeper-assessment.log` records exit 3 and
+`source=Unnotarized Developer ID`; notarization, stapling, and Gatekeeper
+acceptance remain open.
 
 Xcode 27 schedules its AppIntents metadata processor even though extraction is
 disabled. Both project configurations set `LM_FORCE_LINK_GENERATION = YES` so

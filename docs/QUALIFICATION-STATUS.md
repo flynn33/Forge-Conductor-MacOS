@@ -7,9 +7,9 @@ search, PDF, Git, shell, and runtime paths no longer enter Forge's per-command
 Seatbelt profile or reject absolute paths merely because they are outside a
 selected project folder. Project binding and generation remain mandatory for
 attribution and durable isolation. macOS evaluates TCC access for the
-responsible signed code objects in the actual launch chain; only a live
-protected-path probe through the exact signed candidate establishes Full Disk
-Access. Tool grants, shell enablement, canonicalization, deadlines, output bounds, durable
+responsible signed code objects in the actual launch chain; a live protected-
+path probe establishes protected-path access only for that exact launch chain.
+Tool grants, shell enablement, canonicalization, deadlines, output bounds, durable
 result fencing, and destructive-root protection remain in force. Native jobs
 use a default 16-descendant budget and a 1,024-identity hard cap; overflow is a
 typed failure, and unconfirmed termination becomes bounded identity-fenced
@@ -32,9 +32,31 @@ zero failures in both SwiftPM and the app-hosted Xcode target, including
 live-binding preference and the registered-only negative case. The final
 integrated SwiftPM run executed 1,933 tests with 12 explicit environment-
 dependent skips and zero failures. Both SwiftPM products and the canonical
-Debug workspace build passed. Exact Developer ID candidate, live protected-path
-probe, native multi-project Dashboard observation, notarization, Gatekeeper,
-and shipment acceptance remain separate.
+Debug workspace build passed.
+
+Exact implementation revision
+`91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`, tree
+`08e021b375fb8a998f06d9e81a10e3fffddd21f0`, produced the universal Developer
+ID archive and export under `~/Desktop/Forge Conductor 0.16.1
+(22)-91ad90e-DeveloperID`. Strict validation passes for the app, CLI, runtime
+launcher, Core framework, and filesystem daemon. All five carry James Daley's
+Developer ID Application identity on team `9AQ2C2838M`, hardened runtime,
+secure timestamps, and no App Sandbox entitlement.
+
+The exported candidate's MCP helper passed an isolated end-to-end probe. Its
+project context reports
+`filesystem_access_scope=host_native_inherited_unconfined_by_forge`,
+`filesystem_sandbox_mode=none`, and
+`filesystem_path_confinement=false`. It read one byte from a protected Mail
+path without returning content, ran `/bin/ps`, resolved Apple Git from inherited
+`PATH`, completed filesystem read/write/search and Git commit operations outside
+the selected project, completed a native runtime job, and returned the exact
+bound project from `get_forge_status`. Gatekeeper assessment exits 3 with
+`source=Unnotarized Developer ID`; this is an explicit non-pass. Notarization,
+stapling, Gatekeeper acceptance, a live native multi-project Dashboard UI
+observation, and shipment remain open. The working installation was not
+replaced. Protected-path access through the installed Forge application and
+the LM Studio-hosted launch chain remains to be exercised with this candidate.
 
 ## 0.16.0 foreground successor and packet management (historical)
 

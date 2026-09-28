@@ -538,3 +538,30 @@ acceptance, or the second physical-memory-capacity requirement. No artifact was
 installed, uploaded, or shipped; the only direct execution was the embedded CLI
 version and isolated stopped-manager check. The GUI remained closed and the
 owner installation was not changed.
+
+## September 28, 2026 build-22 Developer ID native-access receipt
+
+Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`, exact
+tree `08e021b375fb8a998f06d9e81a10e3fffddd21f0`, produced the retained archive
+and manual Developer ID export under `~/Desktop/Forge Conductor 0.16.1
+(22)-91ad90e-DeveloperID`. Archive and export completed successfully. The app,
+embedded CLI, runtime launcher, Core framework, and filesystem daemon are each
+universal `x86_64 arm64` code signed by Developer ID Application James Daley on
+team `9AQ2C2838M`, with hardened runtime, secure timestamps, and no App Sandbox
+entitlement. `Evidence/signature-validation-exact.log` contains the corrected
+strict validation transcript; `Evidence/candidate-sha256.log` binds the archive
+metadata and all five executable payloads.
+
+The exact exported MCP helper then served 71 tools from an isolated Forge home.
+`Evidence/candidate-mcp-probe.json` records a clean process exit and successful
+protected Mail-path read without content disclosure, `/bin/ps`, inherited Apple
+Git, outside-project filesystem read/write/search, outside-project Git
+init/add/commit/log, and a native runtime job. Its project context reports
+`host_native_inherited_unconfined_by_forge`, sandbox mode `none`, and no path
+confinement; `get_forge_status` returned the exact durable project binding.
+
+`Evidence/gatekeeper-assessment.log` records Gatekeeper exit 3 and
+`source=Unnotarized Developer ID`. This is not an acceptance result:
+notarization, stapling, Gatekeeper acceptance, public-download acceptance, and
+shipment remain open. The candidate was not installed, and the working
+installation and LM Studio registration were not changed.
