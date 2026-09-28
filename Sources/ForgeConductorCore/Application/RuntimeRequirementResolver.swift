@@ -187,7 +187,7 @@ public enum RuntimeRequirementResolver {
         case .disabledByPolicy:
             return "Enable the application-wide shell policy, then refresh runtime readiness."
         case .notAuthorized:
-            return "Authorize the selected project folder, then refresh runtime readiness."
+            return "Select and register the project folder, then refresh runtime readiness."
         case .probeFailed:
             return "Repair or replace the configured \(displayName(runtime)) executable, then retry its probe."
         case .unknown:

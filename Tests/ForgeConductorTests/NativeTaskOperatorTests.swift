@@ -223,9 +223,8 @@ final class NativeTaskOperatorTests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(String(decoding: try Data(contentsOf: store.fileURL(taskID: taskID)), as: UTF8.self).contains(managerToken))
     }
 
-    func testActualCredentialNamespaceCannotBeReadUnderBroadFilesystemOrProcessGrant() async throws {
-        // Exercise the protected subtree, without failing first on the /var convenience alias.
-        let fixtureRoot = RuntimeProcessSandbox.canonicalExistingURL(try OperatorFixture.home())
+    func testNativeToolsRetainSameUserAccessToCredentialFilesWithoutControlPayloadLeaks() async throws {
+        let fixtureRoot = try OperatorFixture.home().resolvingSymlinksInPath().standardizedFileURL
         defer { try? FileManager.default.removeItem(at: fixtureRoot) }
         let home = fixtureRoot.appendingPathComponent("installation")
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -237,49 +236,42 @@ final class NativeTaskOperatorTests: XCTestCase, @unchecked Sendable {
         let secret = try store.credential(taskID: active.taskID, managerEndpoint: OperatorFixture.endpoint).authorizationValue
         let alias = home.appendingPathComponent("credential-alias")
         try FileManager.default.createSymbolicLink(at: alias,
-            withDestinationURL: RuntimeProcessSandbox.canonicalExistingURL(store.directoryURL))
-        let scope = ToolAuthorizationScope(canonicalRoots: [home], writableRoots: [home], allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536)
-        let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial, clientID: ClientID("credential-isolation"), authorizationScope: scope)
-        let initialized = try app.tools.call(name: "project_memory.initialize", arguments: ["project_path": home.path], clientID: context.clientID)
-        XCTAssertTrue(initialized.ok, "The control fixture must hold an actual broad project binding")
-        let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            withDestinationURL: store.directoryURL.resolvingSymlinksInPath().standardizedFileURL)
+        let clientID = ClientID("credential-native-access")
+        let initialized = try app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": home.path],
+            clientID: clientID
+        )
+        XCTAssertTrue(initialized.ok, "The fixture must hold a durable project binding")
+        XCTAssertFalse(String(describing: initialized.payload).contains(secret))
+
         for path in [active.credentialFile, alias.appendingPathComponent(active.credentialFile.lastPathComponent)] {
-            let decision = authorization.authorize(tool: "fs_read", arguments: ["path": path.path], context: context, clientID: context.clientID, binding: nil)
-            guard case .denied(let code, _) = decision else { XCTFail("Broad grant exposed credential path"); continue }
-            XCTAssertEqual(code, "manager_validation_path_protected")
-            do {
-                let result = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: context.clientID)
-                XCTAssertFalse(result.ok)
-                XCTAssertEqual(result.payload["code"] as? String, "manager_validation_path_protected")
-                XCTAssertFalse(String(describing: result.payload).contains(secret))
-            } catch { /* The actual filesystem pack may reject with a typed error. */ }
+            let result = try app.tools.call(
+                name: "fs_read",
+                arguments: ["path": path.path],
+                clientID: clientID
+            )
+            XCTAssertTrue(result.ok)
+            XCTAssertTrue((result.payload["content"] as? String ?? "").contains(secret))
         }
-        let ordinary = home.appendingPathComponent("ordinary.txt"); try Data("ordinary work".utf8).write(to: ordinary)
-        let readable = try app.tools.call(name: "fs_read", arguments: ["path": ordinary.path], clientID: context.clientID)
-        XCTAssertTrue(readable.ok)
-        let scratch = fixtureRoot.appendingPathComponent("scratch"), artifacts = fixtureRoot.appendingPathComponent("artifacts")
-        for directory in [scratch, artifacts] { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
-        func execute(_ program: String, _ arguments: [String]) throws -> ProcessResult {
-            let plan = try RuntimeProcessSandbox.plan(executable: URL(fileURLWithPath: program), arguments: arguments,
-                workingDirectory: home, environment: [:], canonicalReadRoots: [home], canonicalWritableRoots: [home],
-                managerReadDirectory: artifacts, scratchDirectory: scratch, networkAllowed: false,
-                protectedDirectories: [app.paths.nativeValidationDir])
-            return try ProcessRunner().run(executable: plan.executable.path, arguments: plan.arguments, timeoutSec: 5)
-        }
-        let processControl = try execute("/bin/cat", [ordinary.path])
-        XCTAssertEqual(processControl.exitCode, 0, processControl.stderr)
-        XCTAssertEqual(processControl.stdout, "ordinary work")
-        let ordinaryAlias = home.appendingPathComponent("ordinary-alias")
-        try FileManager.default.createSymbolicLink(at: ordinaryAlias, withDestinationURL: ordinary)
-        let aliasControl = try execute("/bin/cat", [ordinaryAlias.path])
-        XCTAssertEqual(aliasControl.exitCode, 0, aliasControl.stderr)
-        XCTAssertEqual(aliasControl.stdout, "ordinary work")
-        for (program, arguments) in [("/bin/cat", [RuntimeProcessSandbox.canonicalExistingURL(active.credentialFile).path]),
-                                      ("/usr/bin/git", ["--no-pager", "diff", "--no-index", "/dev/null", alias.appendingPathComponent(active.credentialFile.lastPathComponent).path])] {
-            let result = try execute(program, arguments)
-            XCTAssertNotEqual(result.exitCode, 0)
-            XCTAssertFalse(result.stdout.contains(secret)); XCTAssertFalse(result.stderr.contains(secret))
-        }
+
+        let quotedCredential = "'" + active.credentialFile.path.replacingOccurrences(
+            of: "'",
+            with: "'\"'\"'"
+        ) + "'"
+        let shell = try app.tools.call(
+            name: "shell_exec",
+            arguments: [
+                "command": "/bin/cat \(quotedCredential)",
+                "cwd": home.path,
+                "timeout_sec": 5,
+            ],
+            clientID: clientID
+        )
+        XCTAssertTrue(shell.ok)
+        XCTAssertEqual((shell.payload["exit_code"] as? NSNumber)?.int32Value, 0)
+        XCTAssertTrue((shell.payload["stdout"] as? String ?? "").contains(secret))
     }
 
     func testRealCommandLineUsesCustomInstallationWithoutOpeningAnotherStore() async throws {

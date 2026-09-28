@@ -244,7 +244,7 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(transport.deleteCallCount, 0)
     }
 
-    func testProductionLocalMutationsRejectProjectRootSymlinkEscape() throws {
+    func testProductionLocalMutationsUseBoundedNativePathOutsideProjectRoot() throws {
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("app"))
         defer { app.shutdown() }
         let project = root.appendingPathComponent("escape-project", isDirectory: true)
@@ -285,18 +285,114 @@ final class SecureFilesystemMutationTests: XCTestCase {
         )
 
         for result in [delete, move] {
-            XCTAssertFalse(result.ok)
-            XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertEqual(result.payload["protection_mode"] as? String, "local_bounded")
         }
-        XCTAssertEqual(try Data(contentsOf: outsideLeaf), Data("outside".utf8))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: outsideDirectory.path))
-        XCTAssertEqual(try Data(contentsOf: source), Data("source".utf8))
-        XCTAssertFalse(
-            FileManager.default.fileExists(
-                atPath: outside.appendingPathComponent("moved.txt").path
-            )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outsideLeaf.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outsideDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(
+            try Data(contentsOf: outside.appendingPathComponent("moved.txt")),
+            Data("source".utf8)
         )
         XCTAssertEqual(transport.deleteCallCount, 0)
+    }
+
+    func testProductionPackFallsBackLocallyBeforeDispatchWhenHelperIsNonOperational() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("preflight-app"))
+        defer { app.shutdown() }
+        let project = root.appendingPathComponent("preflight-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let deleted = project.appendingPathComponent("delete.txt")
+        let source = project.appendingPathComponent("source.txt")
+        let destination = project.appendingPathComponent("destination.txt")
+        try Data("delete".utf8).write(to: deleted)
+        try Data("move".utf8).write(to: source)
+        let clientID = ClientID("production-preflight-fallback")
+        _ = try bindProductionProject(app: app, project: project, clientID: clientID)
+        let transport = SecureFilesystemTransportStub(
+            status: .enabled,
+            operationalProbe: SecureFilesystemServiceOperationalProbe(
+                operational: false,
+                code: ForgeFilesystemErrorCode.helperUnavailable,
+                message: "registered helper did not answer preflight"
+            )
+        )
+        let router = ToolRouter(
+            app: app,
+            packs: [FilesystemToolPack(
+                secureMutationClient: SecureFilesystemMutationClient(transport: transport)
+            )]
+        )
+
+        let delete = try router.call(
+            name: "fs_delete",
+            arguments: ["path": deleted.path],
+            clientID: clientID,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        )
+        let move = try router.call(
+            name: "fs_move",
+            arguments: ["path": source.path, "dest": destination.path],
+            clientID: clientID,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        )
+
+        for result in [delete, move] {
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertEqual(result.payload["protection_mode"] as? String, "local_bounded")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: deleted.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("move".utf8))
+        XCTAssertEqual(transport.deleteCallCount, 0)
+    }
+
+    func testProductionPackNeverFallsBackAfterUncertainHelperDispatch() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("uncertain-app"))
+        defer { app.shutdown() }
+        let project = root.appendingPathComponent("uncertain-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let leaf = project.appendingPathComponent("preserved.txt")
+        try Data("preserve".utf8).write(to: leaf)
+        let clientID = ClientID("production-uncertain-no-fallback")
+        _ = try bindProductionProject(app: app, project: project, clientID: clientID)
+        let transport = SecureFilesystemTransportStub(
+            status: .enabled,
+            deleteResponseProvider: { request in
+                ForgeFilesystemResponse(
+                    ok: false,
+                    code: ForgeFilesystemErrorCode.helperUnavailable,
+                    message: "reply was lost after dispatch",
+                    recoveryTransactionID: request.transactionID
+                )
+            }
+        )
+        let router = ToolRouter(
+            app: app,
+            packs: [FilesystemToolPack(
+                secureMutationClient: SecureFilesystemMutationClient(transport: transport)
+            )]
+        )
+
+        let result = try router.call(
+            name: "fs_delete",
+            arguments: ["path": leaf.path],
+            clientID: clientID,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        )
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(
+            result.payload["code"] as? String,
+            ForgeFilesystemErrorCode.helperUnavailable
+        )
+        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
+        XCTAssertNotNil(result.payload["filesystem_transaction_id"] as? String)
+        XCTAssertNil(result.payload["protection_mode"])
+        XCTAssertEqual(transport.deleteCallCount, 1)
+        XCTAssertEqual(transport.operationalProbeCallCount, 1)
+        XCTAssertEqual(try Data(contentsOf: leaf), Data("preserve".utf8))
     }
 
     func testProductionDirectoryDeleteDispatchesBoundedBottomUpHelperTransactions() throws {
@@ -360,6 +456,7 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(result.payload["deleted_entries"] as? Int, 3)
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
         XCTAssertEqual(transport.deleteCallCount, 3)
+        XCTAssertEqual(transport.operationalProbeCallCount, 1)
         XCTAssertEqual(transport.acknowledgeCallCount, 3)
         XCTAssertEqual(transport.requests.map(\.access), [
             .deleteLeaf, .deleteLeaf, .deleteEmptyDirectory,
@@ -1353,32 +1450,188 @@ final class SecureFilesystemMutationTests: XCTestCase {
         XCTAssertEqual(try ledger.retainedCount(), 1)
     }
 
-    func testAuthorizedTextWriteCannotFollowParentSwappedToValidationPolicy() throws {
+    func testAuthorizedTextWriteRejectsPostAuthorizationParentSymlinkSwap() throws {
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("write-race-manager"))
         defer { app.shutdown() }
         _ = try app.config.update(["allowed_roots": [root.path]], save: false)
-        let protected = app.paths.nativeValidationDir
-        let policy = protected.appendingPathComponent("policy.json")
-        try OwnerOnlyAtomicFile.write(Data("trusted".utf8), to: policy)
+        let external = root.appendingPathComponent("same-user-external", isDirectory: true)
+        try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+        let target = external.appendingPathComponent("target.txt")
+        try OwnerOnlyAtomicFile.write(Data("trusted".utf8), to: target)
         let workDirectory = root.appendingPathComponent("authorized-parent")
         try FileManager.default.createDirectory(at: workDirectory, withIntermediateDirectories: true)
         let context = makeContext(allowedTools: ["fs_write"])
         let decision = ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
-            tool: "fs_write", arguments: ["path": workDirectory.appendingPathComponent("policy.json").path, "content": "forged"],
+            tool: "fs_write", arguments: ["path": workDirectory.appendingPathComponent("target.txt").path, "content": "forged"],
             context: context, clientID: context.clientID, binding: nil
         )
         guard case let .allowed(arguments) = decision else { return XCTFail("ordinary initial path must be authorized") }
         try FileManager.default.removeItem(at: workDirectory)
-        try FileManager.default.createSymbolicLink(at: workDirectory, withDestinationURL: protected)
+        try FileManager.default.createSymbolicLink(at: workDirectory, withDestinationURL: external)
         do {
             let result = try FilesystemToolPack().handle(name: "fs_write", arguments: arguments, context: context,
                                                         clientID: context.clientID, app: app, cancellation: nil)
             XCTAssertFalse(result?.ok ?? false, "a swapped parent must not be followed after authorization")
         } catch { /* Rejecting the changed path is the required outcome. */ }
-        XCTAssertEqual(try Data(contentsOf: policy), Data("trusted".utf8))
+        XCTAssertEqual(try Data(contentsOf: target), Data("trusted".utf8))
     }
 
-    func testNativeValidationFilesRemainPrivateUnderBroaderProjectGrant() throws {
+    func testAuthorizedDeleteRejectsPostAuthorizationAncestorSwapToWorkspaceRoot() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("delete-race-manager"))
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let workspace = root.appendingPathComponent("delete-protected-workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        let sentinel = workspace.appendingPathComponent("sentinel.txt")
+        try Data("preserve".utf8).write(to: sentinel)
+        let authorizedParent = root.appendingPathComponent("delete-authorized-parent", isDirectory: true)
+        let decoy = authorizedParent.appendingPathComponent(workspace.lastPathComponent, isDirectory: true)
+        try FileManager.default.createDirectory(at: decoy, withIntermediateDirectories: true)
+        let context = makeContext(root: workspace, allowedTools: ["fs_delete"])
+        let decision = ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
+            tool: "fs_delete",
+            arguments: ["path": decoy.path],
+            context: context,
+            clientID: context.clientID,
+            binding: nil
+        )
+        guard case let .allowed(arguments) = decision else {
+            return XCTFail("the ordinary decoy must be authorized before the ancestor swap")
+        }
+
+        try FileManager.default.removeItem(at: authorizedParent)
+        try FileManager.default.createSymbolicLink(at: authorizedParent, withDestinationURL: root)
+        let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
+            name: "fs_delete",
+            arguments: arguments,
+            context: context,
+            clientID: context.clientID,
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "workspace_root_protected")
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("preserve".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.path))
+    }
+
+    func testAuthorizedMoveRejectsPostAuthorizationAncestorSwapToWorkspaceRoot() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("move-race-manager"))
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let workspace = root.appendingPathComponent("move-protected-workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        let sentinel = workspace.appendingPathComponent("sentinel.txt")
+        try Data("preserve".utf8).write(to: sentinel)
+        let authorizedParent = root.appendingPathComponent("move-authorized-parent", isDirectory: true)
+        let decoy = authorizedParent.appendingPathComponent(workspace.lastPathComponent, isDirectory: true)
+        try FileManager.default.createDirectory(at: decoy, withIntermediateDirectories: true)
+        let destination = root.appendingPathComponent("must-not-receive-workspace", isDirectory: true)
+        let context = makeContext(root: workspace, allowedTools: ["fs_move"])
+        let decision = ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
+            tool: "fs_move",
+            arguments: ["path": decoy.path, "dest": destination.path],
+            context: context,
+            clientID: context.clientID,
+            binding: nil
+        )
+        guard case let .allowed(arguments) = decision else {
+            return XCTFail("the ordinary decoy must be authorized before the ancestor swap")
+        }
+
+        try FileManager.default.removeItem(at: authorizedParent)
+        try FileManager.default.createSymbolicLink(at: authorizedParent, withDestinationURL: root)
+        let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
+            name: "fs_move",
+            arguments: arguments,
+            context: context,
+            clientID: context.clientID,
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "workspace_root_protected")
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("preserve".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    func testLocalDestructiveRootFencePreservesSymlinkLeafDeleteAndMove() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("symlink-fence-manager"))
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let workspace = root.appendingPathComponent("symlink-protected-workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        let sentinel = workspace.appendingPathComponent("sentinel.txt")
+        try Data("preserve".utf8).write(to: sentinel)
+        let deleteLink = root.appendingPathComponent("delete-workspace-link")
+        let moveLink = root.appendingPathComponent("move-workspace-link")
+        let movedLink = root.appendingPathComponent("moved-workspace-link")
+        try FileManager.default.createSymbolicLink(at: deleteLink, withDestinationURL: workspace)
+        try FileManager.default.createSymbolicLink(at: moveLink, withDestinationURL: workspace)
+        let context = makeContext(
+            root: workspace,
+            allowedTools: ["fs_delete", "fs_move"]
+        )
+        let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+        let pack = FilesystemToolPack(deletionStepObserver: nil)
+
+        let deleteDecision = authorization.authorize(
+            tool: "fs_delete",
+            arguments: ["path": deleteLink.path],
+            context: context,
+            clientID: context.clientID,
+            binding: nil
+        )
+        guard case let .allowed(deleteArguments) = deleteDecision else {
+            return XCTFail("a symlink leaf must remain a deletable leaf")
+        }
+        let deleteResult = try XCTUnwrap(try pack.handle(
+            name: "fs_delete",
+            arguments: deleteArguments,
+            context: context,
+            clientID: context.clientID,
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+        XCTAssertTrue(deleteResult.ok, String(describing: deleteResult.payload))
+        XCTAssertThrowsError(
+            try FileManager.default.destinationOfSymbolicLink(atPath: deleteLink.path)
+        )
+
+        let moveDecision = authorization.authorize(
+            tool: "fs_move",
+            arguments: ["path": moveLink.path, "dest": movedLink.path],
+            context: context,
+            clientID: context.clientID,
+            binding: nil
+        )
+        guard case let .allowed(moveArguments) = moveDecision else {
+            return XCTFail("a symlink leaf must remain a movable leaf")
+        }
+        let moveResult = try XCTUnwrap(try pack.handle(
+            name: "fs_move",
+            arguments: moveArguments,
+            context: context,
+            clientID: context.clientID,
+            app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)
+        ))
+        XCTAssertTrue(moveResult.ok, String(describing: moveResult.payload))
+        XCTAssertThrowsError(
+            try FileManager.default.destinationOfSymbolicLink(atPath: moveLink.path)
+        )
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: movedLink.path),
+            workspace.path
+        )
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("preserve".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.path))
+    }
+
+    func testManagerStateRemainsNativelyAccessibleWhileWorkspaceRootIsProtected() throws {
         let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("validation-manager"))
         defer { app.shutdown() }
         _ = try app.config.update(["allowed_roots": [root.path]], save: false)
@@ -1390,47 +1643,118 @@ final class SecureFilesystemMutationTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: protected)
         let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
         let context = makeContext(allowedTools: ["*"])
-        let cases: [(String, [String: Any], String)] = [
-            ("fs_read", ["path": policy.path], "manager_validation_path_protected"),
-            ("fs_write", ["path": policy.path], "manager_validation_path_protected"),
+        let nativeCases: [(String, [String: Any])] = [
+            ("fs_read", ["path": policy.path]),
+            ("fs_write", ["path": policy.path, "content": "same-user write"]),
             (
                 "fs_write",
-                ["path": alias.appendingPathComponent("policy.json").path],
-                "manager_validation_path_protected"
-            ),
-            ("fs_delete", ["path": app.paths.home.path], "manager_policy_path_protected"),
-            (
-                "fs_move",
-                ["path": app.paths.home.path, "dest": root.appendingPathComponent("moved").path],
-                "manager_policy_path_protected"
+                ["path": alias.appendingPathComponent("policy.json").path, "content": "same-user alias write"]
             ),
         ]
-        for (tool, arguments, expectedCode) in cases {
+        for (tool, arguments) in nativeCases {
             let decision = authorization.authorize(tool: tool, arguments: arguments,
                                                    context: context, clientID: context.clientID, binding: nil)
-            guard case let .denied(code, _) = decision else {
-                XCTFail("protected validation path was authorized for \(tool)")
+            guard case .allowed = decision else {
+                XCTFail("same-user manager path was unexpectedly denied for \(tool)")
                 continue
             }
-            XCTAssertEqual(code, expectedCode)
         }
+
+        let read = try XCTUnwrap(try FilesystemToolPack().handle(
+            name: "fs_read", arguments: ["path": policy.path], context: context,
+            clientID: context.clientID, app: app, cancellation: nil
+        ))
+        XCTAssertTrue(read.ok)
+        XCTAssertEqual(read.payload["content"] as? String, "trusted policy")
+
         let ordinary = root.appendingPathComponent("ordinary.txt")
         try Data("ordinary searchable work".utf8).write(to: ordinary)
         let listed = try XCTUnwrap(try FilesystemToolPack().handle(
             name: "fs_glob", arguments: ["path": root.path, "pattern": "*.json"], context: context,
             clientID: context.clientID, app: app, cancellation: nil
         ))
-        XCTAssertFalse((listed.payload["matches"] as? [String] ?? []).contains { $0.hasSuffix("policy.json") })
+        XCTAssertTrue((listed.payload["matches"] as? [String] ?? []).contains { $0.hasSuffix("policy.json") })
         let searched = try XCTUnwrap(try SearchToolPack().handle(
             name: "search_text", arguments: ["path": root.path, "pattern": "policy\\|ordinary searchable work"], context: context,
             clientID: context.clientID, app: app, cancellation: nil
         ))
         let matches = searched.payload["matches"] as? [String] ?? []
-        XCTAssertFalse(matches.contains { $0.contains("trusted policy") })
+        XCTAssertTrue(matches.contains { $0.contains("trusted policy") }, String(describing: searched.payload))
         XCTAssertTrue(matches.contains { $0.contains("ordinary searchable work") }, String(describing: searched.payload))
-        guard case .allowed = authorization.authorize(tool: "fs_write", arguments: ["path": ordinary.path],
-                                                      context: context, clientID: context.clientID, binding: nil) else {
-            return XCTFail("ordinary work inside the broader project must remain writable")
+
+        for (tool, arguments) in [
+            ("fs_delete", ["path": root.path]),
+            (
+                "fs_move",
+                ["path": root.path, "dest": root.deletingLastPathComponent().appendingPathComponent("moved-root").path]
+            ),
+        ] {
+            let decision = authorization.authorize(
+                tool: tool,
+                arguments: arguments,
+                context: context,
+                clientID: context.clientID,
+                binding: nil
+            )
+            guard case let .denied(code, _) = decision else {
+                XCTFail("active workspace root was unexpectedly authorized for \(tool)")
+                continue
+            }
+            XCTAssertEqual(code, "workspace_root_protected")
+        }
+    }
+
+    func testAuthorizationRejectsBlankDestructivePathsBeforeNormalization() throws {
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("blank-path-manager"))
+        defer { app.shutdown() }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+        let context = makeContext(allowedTools: ["fs_delete", "fs_move"])
+        let ordinaryDestination = root.appendingPathComponent("ordinary-destination").path
+        let ordinarySource = root.appendingPathComponent("ordinary-source").path
+        let cases: [(tool: String, arguments: [String: Any], blankKey: String)] = [
+            ("fs_delete", ["path": ""], "path"),
+            ("fs_delete", ["path": " \t\n"], "path"),
+            ("fs_move", ["path": "", "dest": ordinaryDestination], "path"),
+            ("fs_move", ["src": "\t", "dest": ordinaryDestination], "src"),
+            ("fs_move", ["source": "\n", "destination": ordinaryDestination], "source"),
+            ("fs_move", ["path": ordinarySource, "dest": ""], "dest"),
+            ("fs_move", ["path": ordinarySource, "destination": "  "], "destination"),
+        ]
+
+        for item in cases {
+            let decision = authorization.authorize(
+                tool: item.tool,
+                arguments: item.arguments,
+                context: context,
+                clientID: context.clientID,
+                binding: nil
+            )
+            guard case let .denied(code, message) = decision else {
+                XCTFail("blank \(item.blankKey) unexpectedly reached destructive dispatch")
+                continue
+            }
+            XCTAssertEqual(code, "invalid_path")
+            XCTAssertTrue(message.contains(item.blankKey), message)
+        }
+
+        let pack = FilesystemToolPack()
+        let directPackCases: [(tool: String, arguments: [String: Any])] = [
+            (tool: "fs_delete", arguments: ["path": "  \n"]),
+            (tool: "fs_move", arguments: ["path": "\t", "dest": ordinaryDestination]),
+            (tool: "fs_move", arguments: ["path": ordinarySource, "dest": ""]),
+        ]
+        for item in directPackCases {
+            let result = try XCTUnwrap(try pack.handle(
+                name: item.tool,
+                arguments: item.arguments,
+                context: context,
+                clientID: context.clientID,
+                app: app,
+                cancellation: ToolCallCancellation(timeoutSeconds: 5)
+            ))
+            XCTAssertFalse(result.ok)
+            XCTAssertEqual(result.payload["code"] as? String, "invalid_path")
         }
     }
 
@@ -4801,6 +5125,7 @@ private final class SecureFilesystemTransportStub: SecureFilesystemServiceTransp
         ((ForgeFilesystemTransactionControlRequest) -> ForgeFilesystemResponse)?
     private let lock = NSLock()
     private var storedDeleteCallCount = 0
+    private var storedOperationalProbeCallCount = 0
     private var storedRequests: [ForgeFilesystemMutationRequest] = []
     private var storedQueryCallCount = 0
     private var storedResumeCallCount = 0
@@ -4846,6 +5171,12 @@ private final class SecureFilesystemTransportStub: SecureFilesystemServiceTransp
         return storedDeleteCallCount
     }
 
+    var operationalProbeCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedOperationalProbeCallCount
+    }
+
     var requests: [ForgeFilesystemMutationRequest] {
         lock.lock()
         defer { lock.unlock() }
@@ -4875,7 +5206,10 @@ private final class SecureFilesystemTransportStub: SecureFilesystemServiceTransp
     }
 
     func operationalProbe(timeout _: TimeInterval) -> SecureFilesystemServiceOperationalProbe {
-        operationalProbeValue ?? SecureFilesystemServiceOperationalProbe(
+        lock.lock()
+        storedOperationalProbeCallCount += 1
+        lock.unlock()
+        return operationalProbeValue ?? SecureFilesystemServiceOperationalProbe(
             operational: status == .enabled,
             code: status == .enabled
                 ? "ok"

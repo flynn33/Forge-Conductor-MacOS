@@ -13,8 +13,9 @@ project UUID and generation; Forge does not require a Managed Run to use it.
    provider card.
 2. In Forge Conductor **Manager**, start the manager if it is stopped.
 3. In **Projects**, register the local repository folder and select it. The
-   registration authorizes that exact canonical root without widening access to
-   its parent.
+   registration records that exact canonical root as the durable project
+   identity and default working directory; it does not confine native access to
+   the folder or hide its parent.
 4. Under **Instruction packages**, choose **Add Instructions…** one or more
    times and arrange packages by drag-and-drop or the earlier/later buttons.
 5. In **Provider**, select and verify exactly one provider. LM Studio requires a
@@ -150,8 +151,10 @@ The durable queue metadata is stored in:
 ```
 
 Editing or deleting the original selected file after import does not change the
-accepted snapshot. Package records retain source provenance, while ordinary
-model filesystem tools remain scoped to the registered project folder.
+accepted snapshot. Package records retain source provenance. The package and
+its catalog remain bound to the exact project identity and generation, while
+ordinary native filesystem tools may address absolute paths outside the
+registered project folder under the launching Forge process's macOS access.
 
 Import inventories the immutable snapshot's documents and records each
 content-addressed reference, byte count, and SHA-256. The package remains bound

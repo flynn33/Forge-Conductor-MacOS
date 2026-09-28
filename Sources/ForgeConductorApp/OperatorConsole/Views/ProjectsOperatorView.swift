@@ -800,7 +800,7 @@ private struct ProjectRegistrationSheet: View {
                 Spacer()
                 GuidedHelpButton(context: .projectRegistration)
             }
-            Text("Registration authorizes this exact folder, resolves its canonical root, and creates or reconnects the manager-owned project identity.")
+            Text("Registration records this exact folder, resolves its canonical root, and creates or reconnects the manager-owned project identity. It does not limit native filesystem access.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if allowsPathEntry {
@@ -820,7 +820,7 @@ private struct ProjectRegistrationSheet: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("project-register-waiting-for-manager")
             }
-            Text("Forge preserves existing authorized folders, adds only this selected folder, resolves its canonical Git repository identity, and checks it before registration.")
+            Text("Forge preserves existing selected folders, adds only this folder, resolves its canonical Git repository identity, and checks it before registration.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField("Display name (optional)", text: $name)

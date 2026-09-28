@@ -16,7 +16,7 @@ import XCTest
 /// a token. Forge-owned LM Studio registration files are captured before launch
 /// and restored after every test, including assertion failures.
 /// The fresh MCP execution case requires an unsandboxed test runner: an inherited
-/// runner sandbox prevents the product from applying its own shell sandbox.
+/// runner sandbox would prevent the child product from exercising native host access.
 @MainActor
 final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private var app: XCUIApplication!
@@ -164,7 +164,10 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         try openFolderPicker()
         try chooseFolderInNativePanel("/")
         XCTAssertTrue(waitUntil {
-            self.contains(self.element("settings-allowed-roots-message"), "The filesystem root cannot be authorized")
+            self.contains(
+                self.element("settings-allowed-roots-message"),
+                "The filesystem root cannot be registered as a project"
+            )
         })
         XCTAssertTrue(contains(element("settings-allowed-root-path-0"), projectRoot.path))
         XCTAssertFalse(element("settings-allowed-root-path-1").exists)
@@ -922,12 +925,15 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private func openFolderPicker() throws {
         try click(app.buttons["settings-allowed-root-add"])
         XCTAssertTrue(folderPanel.waitForExistence(timeout: 10), "The production NSOpenPanel must appear")
-        XCTAssertTrue(folderPanel.buttons["Authorize Folder"].exists)
+        XCTAssertTrue(folderPanel.buttons["Select Project Folder"].exists)
         XCTAssertTrue(folderPanel.buttons["Cancel"].exists)
         attachScreenshot("production-open-panel")
     }
 
-    private func chooseFolderInNativePanel(_ path: String, prompt: String = "Authorize Folder") throws {
+    private func chooseFolderInNativePanel(
+        _ path: String,
+        prompt: String = "Select Project Folder"
+    ) throws {
         app.typeKey("g", modifierFlags: [.command, .shift])
         let goToSheet = folderPanel.sheets["GoToWindow"]
         guard goToSheet.waitForExistence(timeout: 5) else {

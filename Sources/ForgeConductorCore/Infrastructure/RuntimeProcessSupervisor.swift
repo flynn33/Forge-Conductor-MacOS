@@ -30,243 +30,14 @@ struct RuntimeProcessPlan: Sendable {
     }
 }
 
-/// Builds the fail-closed macOS process sandbox used by every durable runtime job.
-/// The child may read immutable system runtime files, but project data is visible
-/// only below the exact read authorization roots. Writes are limited to an
-/// independently granted subset and the job's private scratch directory. Durable
-/// output remains in a manager-only directory that the child can read only when
-/// it must consume a staged request. Network access is an explicit authorization
-/// bit, never an advisory field.
-enum RuntimeProcessSandbox {
-    static let executable = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
-    static let maximumProfileBytes = 64 * 1_024
-    static let maximumRoots = 32
-
-    private static let immutableSystemReadRoots = [
-        "/System",
-        "/usr/bin",
-        "/usr/sbin",
-        "/usr/lib",
-        "/usr/libexec",
-        "/usr/share",
-        "/bin",
-        "/sbin",
-        "/Library/Apple",
-        "/Library/Developer",
-        "/Applications/Xcode.app",
-        "/private/var/db/timezone",
-    ]
-    private static let systemReadFiles = [
-        "/",
-        "/etc",
-        "/etc/bashrc",
-        "/etc/localtime",
-        "/etc/master.passwd",
-        "/etc/passwd",
-        "/etc/profile",
-        "/etc/protocols",
-        "/etc/services",
-        "/etc/zprofile",
-        "/etc/zshrc",
-        "/private",
-        "/private/etc",
-        "/private/etc/bashrc",
-        "/private/etc/localtime",
-        "/private/etc/master.passwd",
-        "/private/etc/passwd",
-        "/private/etc/profile",
-        "/private/etc/protocols",
-        "/private/etc/services",
-        "/private/etc/zprofile",
-        "/private/etc/zshrc",
-        "/private/var/select/sh",
-        "/dev/null",
-        "/dev/random",
-        "/dev/urandom",
-    ]
-
-    static var isAvailable: Bool {
-        FileManager.default.isExecutableFile(atPath: executable.path)
-    }
-
-    static func plan(
-        executable target: URL,
-        arguments: [String],
-        workingDirectory: URL,
-        environment sourceEnvironment: [String: String],
-        canonicalReadRoots: [URL],
-        canonicalWritableRoots: [URL],
-        managerReadDirectory: URL,
-        scratchDirectory: URL,
-        networkAllowed: Bool,
-        protectedDirectories: [URL] = [],
-        readOnlyDirectories: [URL] = [AppPaths.nativeValidationToolchainDirectory]
-    ) throws -> RuntimeProcessPlan {
-        guard isAvailable else {
-            throw RuntimeJobError.executableUnavailable("sandbox-exec")
-        }
-        let readAuthorizationRoots = canonicalReadRoots
-            .map(canonicalExistingURL)
-            .reduce(into: [URL]()) { result, root in
-                if !result.contains(root) { result.append(root) }
-            }
-        let writableAuthorizationRoots = canonicalWritableRoots
-            .map(canonicalExistingURL)
-            .reduce(into: [URL]()) { result, root in
-                if !result.contains(root) { result.append(root) }
-            }
-        guard !readAuthorizationRoots.isEmpty,
-              readAuthorizationRoots.count <= maximumRoots,
-              writableAuthorizationRoots.count <= maximumRoots else {
-            throw RuntimeJobError.invalidRequest(
-                "runtime read or writable roots exceed the sandbox bound"
-            )
-        }
-        guard writableAuthorizationRoots.allSatisfy({ writable in
-            contains(writable, in: readAuthorizationRoots)
-        }) else {
-            throw RuntimeJobError.invalidRequest(
-                "runtime writable roots must be contained by authorized read roots"
-            )
-        }
-        let canonicalManagerRead = canonicalExistingURL(managerReadDirectory)
-        let canonicalScratch = canonicalExistingURL(scratchDirectory)
-        guard !contains(canonicalScratch, root: canonicalManagerRead),
-              !contains(canonicalManagerRead, root: canonicalScratch) else {
-            throw RuntimeJobError.invalidRequest(
-                "runtime durable output and scratch directories must not overlap"
-            )
-        }
-        guard writableAuthorizationRoots.allSatisfy({ writable in
-            !contains(canonicalManagerRead, root: writable)
-                && !contains(writable, root: canonicalManagerRead)
-        }) else {
-            throw RuntimeJobError.invalidRequest(
-                "runtime durable output must not overlap a child-writable root"
-            )
-        }
-        let canonicalTarget = canonicalExistingURL(target)
-        let canonicalWorkingDirectory = canonicalExistingURL(workingDirectory)
-        guard contains(canonicalWorkingDirectory, in: readAuthorizationRoots) else {
-            throw RuntimeJobError.workingDirectoryOutsideProject(canonicalWorkingDirectory.path)
-        }
-        guard contains(canonicalTarget, in: readAuthorizationRoots)
-                || isImmutableSystemRuntime(canonicalTarget) else {
-            throw RuntimeJobError.invalidRequest(
-                "runtime executable is outside authorized project and system runtime roots"
-            )
-        }
-
-        let readRoots = readAuthorizationRoots.map(\.path)
-            + [canonicalManagerRead.path, canonicalScratch.path]
-            + canonicalReadPaths(immutableSystemReadRoots)
-        let writeRoots = writableAuthorizationRoots.map(\.path) + [canonicalScratch.path]
-        // Sandbox path filters need search access to every parent directory in
-        // order for getcwd(3), shell startup, and script opening to reach an
-        // otherwise-authorized nested root. Parent directories are literal-only:
-        // their children do not become readable.
-        let readAncestors = ancestorDirectories(of: readRoots)
-        let readFilters = try filters(
-            subpaths: readRoots,
-            literals: systemReadFiles
-        )
-        let ancestorFilters = try filters(subpaths: [], literals: readAncestors)
-        let writeFilters = try filters(subpaths: writeRoots, literals: [])
-        var profile = """
-        (version 1)
-        (deny default)
-        (allow file-read* (require-any \(readFilters)))
-        (allow file-read-metadata file-test-existence (require-any \(ancestorFilters)))
-        (allow file-write* (require-any \(writeFilters) (literal "/dev/null")))
-        (allow process-exec process-fork)
-        (allow signal (target same-sandbox))
-        (allow sysctl-read)
-        (deny syscall-unix (syscall-number 82 147 244))
-        """
-        guard protectedDirectories.count <= maximumRoots, readOnlyDirectories.count <= maximumRoots else {
-            throw RuntimeJobError.invalidRequest("runtime protected directory count exceeds its bound")
-        }
-        if !protectedDirectories.isEmpty {
-            let protectedPaths = protectedDirectories.map(canonicalURL).map(\.path)
-            let protectedFilters = try filters(subpaths: protectedPaths, literals: [])
-            let protectedAncestors = try filters(subpaths: [], literals: ancestorDirectories(of: protectedPaths))
-            // Explicit denials retain precedence over broader project grants.
-            // Ancestor mutation could rename or replace the protected namespace.
-            profile += "\n(deny file-read* file-write* (require-any \(protectedFilters)))"
-            profile += "\n(deny file-write-unlink file-write-mode file-write-owner (require-any \(protectedAncestors)))"
-        }
-        if !readOnlyDirectories.isEmpty {
-            let paths = readOnlyDirectories.map(canonicalURL).map(\.path)
-            let directories = try filters(subpaths: paths, literals: [])
-            let ancestors = try filters(subpaths: [], literals: ancestorDirectories(of: paths))
-            profile += "\n(deny file-write* (require-any \(directories)))"
-            profile += "\n(deny file-write-unlink file-write-mode file-write-owner (require-any \(ancestors)))"
-        }
-        if networkAllowed {
-            profile += "\n(allow network-outbound (literal \"/private/var/run/mDNSResponder\") (remote tcp \"*:*\") (remote udp \"*:*\"))"
-        }
-        guard profile.utf8.count <= maximumProfileBytes else {
-            throw RuntimeJobError.invalidRequest("runtime sandbox profile exceeds its byte bound")
-        }
-
-        let temporaryDirectory = canonicalScratch.appendingPathComponent("tmp", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: temporaryDirectory,
-            withIntermediateDirectories: true
-        )
-        _ = chmod(temporaryDirectory.path, S_IRWXU)
-        var environment = sourceEnvironment.filter { key, _ in
-            !key.hasPrefix("DYLD_")
-                && !key.hasPrefix("LD_")
-        }
-        environment["HOME"] = canonicalWorkingDirectory.path
-        environment["TMPDIR"] = temporaryDirectory.path + "/"
-        return RuntimeProcessPlan(
-            executable: executable,
-            arguments: ["-p", profile, canonicalTarget.path] + arguments,
-            workingDirectory: canonicalWorkingDirectory,
-            environment: environment,
-            writableRoots: writableAuthorizationRoots + [canonicalScratch]
-        )
-    }
-
-    private static func filters(subpaths: [String], literals: [String]) throws -> String {
-        let uniqueSubpaths = Array(Set(subpaths)).sorted()
-        let uniqueLiterals = Array(Set(literals)).sorted()
-        return try (
-            uniqueSubpaths.map { "(subpath \(try literal($0)))" }
-                + uniqueLiterals.map { "(literal \(try literal($0)))" }
-        ).joined(separator: " ")
-    }
-
-    private static func literal(_ value: String) throws -> String {
-        guard !value.isEmpty,
-              !value.unicodeScalars.contains(where: {
-                  $0.value == 0 || $0.value == 10 || $0.value == 13
-              }) else {
-            throw RuntimeJobError.invalidRequest("runtime sandbox paths contain unsupported control characters")
-        }
-        return "\"" + value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"") + "\""
-    }
-
-    private static func ancestorDirectories(of paths: [String]) -> [String] {
-        var ancestors: Set<String> = ["/"]
-        for path in paths {
-            var candidate = URL(fileURLWithPath: path).deletingLastPathComponent()
-            while candidate.path != "/", !candidate.path.isEmpty {
-                ancestors.insert(candidate.path)
-                candidate.deleteLastPathComponent()
-            }
-        }
-        return ancestors.sorted()
-    }
-
+/// Canonicalizes native paths for durable identity, audit, and replay checks.
+/// It deliberately grants no authority: model subprocesses inherit the host
+/// process's native macOS access, including the exact Full Disk Access state.
+enum RuntimePathCanonicalizer {
     /// Foundation intentionally preserves macOS convenience aliases such as
-    /// `/var`, while sandbox path matching is evaluated against the physical
-    /// `/private/var` vnode path. `realpath(3)` keeps the authorization and the
-    /// kernel's policy subject in the same namespace.
+    /// `/var`, while durable identity checks must use the physical
+    /// `/private/var` vnode path. `realpath(3)` keeps execution and audit records
+    /// in the same namespace.
     static func canonicalExistingURL(_ url: URL) -> URL {
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         if Darwin.realpath(url.path, &buffer) != nil {
@@ -294,38 +65,12 @@ enum RuntimeProcessSandbox {
         return result
     }
 
-    static func isImmutableSystemRuntime(_ url: URL) -> Bool {
-        let canonical = canonicalExistingURL(url)
-        return canonicalReadPaths(immutableSystemReadRoots).contains {
-            contains(canonical, root: URL(fileURLWithPath: $0))
-        }
-    }
-
-    /// Admission and the kernel profile must name the same physical roots.
-    /// Xcode installations may expose Xcode.app as an alias to a versioned app.
-    /// Resolving that existing allowlist does not authorize its parent or siblings.
-    static func canonicalReadPaths(_ paths: [String]) -> [String] {
-        Array(Set(paths.map { canonicalExistingURL(URL(fileURLWithPath: $0)).path })).sorted()
-    }
-
-    private static func contains(_ child: URL, in roots: [URL]) -> Bool {
-        roots.contains { contains(child, root: $0) }
-    }
-
-    private static func contains(_ child: URL, root: URL) -> Bool {
-        // Both URLs were already canonicalized with realpath(3). Foundation's
-        // standardization would undo that for `/private/var`.
-        let childPath = child.path
-        let rootPath = root.path
-        return childPath == rootPath
-            || childPath.hasPrefix(rootPath.hasSuffix("/") ? rootPath : rootPath + "/")
-    }
 }
 
 /// Installs the small native launcher into service-owned storage before any job
 /// is accepted. Request-controlled roots are never used as an executable source,
 /// and every launch rechecks that the installed copy is outside all job-writable
-/// paths before it runs outside the sandbox.
+/// paths before it runs native request-controlled code.
 enum RuntimeLaunchGate {
     static let executableName = "forge-runtime-launcher"
     static let productIdentifier = ForgeFilesystemProtocolConstants.runtimeLauncherIdentifier
@@ -396,7 +141,7 @@ enum RuntimeLaunchGate {
         }
         let data = try readTrustedExecutable(source)
         let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        let canonicalServiceRoot = RuntimeProcessSandbox.canonicalExistingURL(serviceRoot)
+        let canonicalServiceRoot = RuntimePathCanonicalizer.canonicalExistingURL(serviceRoot)
         let support = canonicalServiceRoot.appendingPathComponent(
             ".runtime-support",
             isDirectory: true
@@ -413,17 +158,17 @@ enum RuntimeLaunchGate {
                 matching: validatedSourceIdentity
             )
         }
-        return RuntimeProcessSandbox.canonicalExistingURL(destination)
+        return RuntimePathCanonicalizer.canonicalExistingURL(destination)
     }
 
     static func validate(_ launcher: URL, outside writableRoots: [URL]) throws {
-        let canonicalLauncher = RuntimeProcessSandbox.canonicalExistingURL(launcher)
+        let canonicalLauncher = RuntimePathCanonicalizer.canonicalExistingURL(launcher)
         let data = try readTrustedExecutable(canonicalLauncher)
         let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         guard canonicalLauncher.lastPathComponent == "\(executableName)-\(digest)" else {
             throw RuntimeJobError.storageFailure("installed runtime launch gate digest does not match")
         }
-        for root in writableRoots.map(RuntimeProcessSandbox.canonicalExistingURL) {
+        for root in writableRoots.map(RuntimePathCanonicalizer.canonicalExistingURL) {
             if contains(canonicalLauncher, root: root) {
                 throw RuntimeJobError.invalidRequest(
                     "runtime launch gate overlaps a job-writable authorization root"
@@ -478,7 +223,7 @@ enum RuntimeLaunchGate {
             let standardized = candidate.standardizedFileURL
             guard visited.insert(standardized.path).inserted else { continue }
             if (try? readTrustedExecutable(standardized)) != nil {
-                return RuntimeProcessSandbox.canonicalExistingURL(standardized)
+                return RuntimePathCanonicalizer.canonicalExistingURL(standardized)
             }
         }
         throw RuntimeJobError.executableUnavailable(executableName)
@@ -679,10 +424,10 @@ enum RuntimeLaunchGate {
         let expectedExecutable = appBundle
             .appendingPathComponent("Contents/MacOS", isDirectory: true)
             .appendingPathComponent(ManagerInstaller.appDisplayName)
-        guard RuntimeProcessSandbox.canonicalExistingURL(source)
-                == RuntimeProcessSandbox.canonicalExistingURL(expectedSource),
-              RuntimeProcessSandbox.canonicalExistingURL(currentExecutable)
-                == RuntimeProcessSandbox.canonicalExistingURL(expectedExecutable),
+        guard RuntimePathCanonicalizer.canonicalExistingURL(source)
+                == RuntimePathCanonicalizer.canonicalExistingURL(expectedSource),
+              RuntimePathCanonicalizer.canonicalExistingURL(currentExecutable)
+                == RuntimePathCanonicalizer.canonicalExistingURL(expectedExecutable),
               appIdentity.identifier == ManagerInstaller.bundleIdentifier,
               currentIdentity.identifier == ManagerInstaller.bundleIdentifier,
               sourceIdentity.identifier == productIdentifier else {
@@ -727,11 +472,11 @@ enum RuntimeLaunchGate {
     }
 
     private static func isLoadedTestExecutable(_ executable: URL) -> Bool {
-        let canonicalExecutable = RuntimeProcessSandbox.canonicalExistingURL(executable)
+        let canonicalExecutable = RuntimePathCanonicalizer.canonicalExistingURL(executable)
         return ([Bundle.main] + Bundle.allBundles).contains { bundle in
             guard bundle.bundleURL.pathExtension == "xctest",
                   let testExecutable = bundle.executableURL else { return false }
-            return RuntimeProcessSandbox.canonicalExistingURL(testExecutable)
+            return RuntimePathCanonicalizer.canonicalExistingURL(testExecutable)
                 == canonicalExecutable
         }
     }
@@ -740,24 +485,24 @@ enum RuntimeLaunchGate {
         source: URL,
         currentExecutable: URL
     ) -> Bool {
-        let canonicalSource = RuntimeProcessSandbox.canonicalExistingURL(source)
-        let canonicalExecutable = RuntimeProcessSandbox.canonicalExistingURL(
+        let canonicalSource = RuntimePathCanonicalizer.canonicalExistingURL(source)
+        let canonicalExecutable = RuntimePathCanonicalizer.canonicalExistingURL(
             currentExecutable
         )
         let loadedTestBundles = [Bundle.main] + Bundle.allBundles
         if let testBundle = loadedTestBundles.first(where: { bundle in
             guard bundle.bundleURL.pathExtension == "xctest",
                   let executable = bundle.executableURL else { return false }
-            return RuntimeProcessSandbox.canonicalExistingURL(executable)
+            return RuntimePathCanonicalizer.canonicalExistingURL(executable)
                 == canonicalExecutable
         }) {
             let expected = testBundle.bundleURL.deletingLastPathComponent()
                 .appendingPathComponent(executableName)
-            return RuntimeProcessSandbox.canonicalExistingURL(expected) == canonicalSource
+            return RuntimePathCanonicalizer.canonicalExistingURL(expected) == canonicalSource
         }
         let expected = canonicalExecutable.deletingLastPathComponent()
             .appendingPathComponent(executableName)
-        return RuntimeProcessSandbox.canonicalExistingURL(expected) == canonicalSource
+        return RuntimePathCanonicalizer.canonicalExistingURL(expected) == canonicalSource
     }
 
     private static func validateInstalledIdentity(
@@ -973,7 +718,7 @@ struct RuntimeProcessExit: Sendable, Equatable {
     let terminatingSignal: Int32?
 }
 
-struct RuntimeProcessStartIdentity: Sendable, Equatable {
+struct RuntimeProcessStartIdentity: Sendable, Equatable, Hashable {
     let seconds: Int64
     let microseconds: Int64
 
@@ -992,6 +737,219 @@ struct RuntimePersistedProcessIdentity: Sendable, Equatable {
     var isValidProcessGroupLeader: Bool {
         processIdentifier > 1
             && processGroupIdentifier == processIdentifier
+    }
+}
+
+struct RuntimeObservedProcessIdentity: Sendable, Equatable, Hashable {
+    let processIdentifier: Int32
+    let parentProcessIdentifier: Int32
+    let processGroupIdentifier: Int32
+    let startIdentity: RuntimeProcessStartIdentity
+}
+
+struct RuntimeChildProcessList: Sendable, Equatable {
+    let processIdentifiers: [Int32]
+    let complete: Bool
+}
+
+protocol RuntimeProcessTreeReading: Sendable {
+    func identity(processIdentifier: Int32) -> RuntimeObservedProcessIdentity?
+    func children(
+        of processIdentifier: Int32,
+        maximumCount: Int
+    ) -> RuntimeChildProcessList
+}
+
+protocol RuntimeProcessSignaling: Sendable {
+    /// Returns zero on success, `ESRCH` when the process is already absent, or
+    /// the captured errno value for any other failure.
+    func signal(processIdentifier: Int32, signal: Int32) -> Int32
+}
+
+struct DarwinRuntimeProcessSignaler: RuntimeProcessSignaling, Sendable {
+    func signal(processIdentifier: Int32, signal: Int32) -> Int32 {
+        guard Darwin.kill(processIdentifier, signal) != 0 else { return 0 }
+        return errno
+    }
+}
+
+struct DarwinRuntimeProcessTreeReader: RuntimeProcessTreeReading, Sendable {
+    func identity(processIdentifier: Int32) -> RuntimeObservedProcessIdentity? {
+        RuntimeProcessIdentityReader.observedIdentity(processIdentifier: processIdentifier)
+    }
+
+    func children(
+        of processIdentifier: Int32,
+        maximumCount: Int
+    ) -> RuntimeChildProcessList {
+        guard processIdentifier > 1, maximumCount > 0 else {
+            return RuntimeChildProcessList(processIdentifiers: [], complete: maximumCount > 0)
+        }
+        var identifiers = [pid_t](repeating: 0, count: maximumCount)
+        errno = 0
+        let returned = identifiers.withUnsafeMutableBytes { buffer in
+            proc_listchildpids(
+                processIdentifier,
+                buffer.baseAddress,
+                Int32(buffer.count)
+            )
+        }
+        guard returned >= 0 else {
+            return RuntimeChildProcessList(
+                processIdentifiers: [],
+                complete: errno == ESRCH
+            )
+        }
+        let count = min(Int(returned), identifiers.count)
+        return RuntimeChildProcessList(
+            processIdentifiers: identifiers.prefix(count).filter { $0 > 1 },
+            // A completely filled buffer is conservatively treated as truncated.
+            // Callers request one entry beyond their remaining bounded capacity.
+            complete: count < identifiers.count
+        )
+    }
+}
+
+enum RuntimeDescendantObservation: Sendable, Equatable {
+    case withinLimit(observed: Int)
+    case limitExceeded(observed: Int, trackingCapacityExceeded: Bool)
+
+    var exceededLimit: Bool {
+        if case .limitExceeded = self { return true }
+        return false
+    }
+}
+
+/// Best-effort ownership extension for native descendants that leave the launch
+/// process group with `setsid(2)` or `setpgid(2)`. Before each signal, the PID's
+/// libproc start identity is checked against the captured identity, and storage
+/// is hard-bounded. macOS has no pidfd-style atomic identity-and-signal primitive,
+/// so PID reuse between that check and `kill(2)` remains a narrow native-host risk.
+///
+/// macOS exposes no public cgroup/job-object/subreaper primitive. An unrestricted
+/// child can fork, reparent, and exit between two libproc snapshots; such a child
+/// is outside what an ordinary same-user app can prove it owns without Endpoint
+/// Security or a sandbox. This tracker closes the observable/background-process
+/// gap without changing the product's full-native-shell trust boundary.
+final class RuntimeDescendantTracker: @unchecked Sendable {
+    static let maximumTrackedDescendants = 1_024
+
+    private let rootIdentity: RuntimeObservedProcessIdentity
+    private let maximumDescendants: Int
+    private let reader: any RuntimeProcessTreeReading
+    private let signaler: any RuntimeProcessSignaling
+    private let lock = NSLock()
+    private var tracked: [Int32: RuntimeObservedProcessIdentity] = [:]
+    private var trackingCapacityExceeded = false
+
+    init(
+        rootIdentity: RuntimeObservedProcessIdentity,
+        maximumDescendants: Int,
+        reader: any RuntimeProcessTreeReading = DarwinRuntimeProcessTreeReader(),
+        signaler: any RuntimeProcessSignaling = DarwinRuntimeProcessSignaler()
+    ) {
+        self.rootIdentity = rootIdentity
+        self.maximumDescendants = max(1, maximumDescendants)
+        self.reader = reader
+        self.signaler = signaler
+    }
+
+    func observe() -> RuntimeDescendantObservation {
+        lock.lock()
+        defer { lock.unlock() }
+        refreshLocked()
+        if trackingCapacityExceeded || tracked.count > maximumDescendants {
+            return .limitExceeded(
+                observed: tracked.count,
+                trackingCapacityExceeded: trackingCapacityExceeded
+            )
+        }
+        return .withinLimit(observed: tracked.count)
+    }
+
+    @discardableResult
+    func signalTracked(_ signal: Int32, includeRoot: Bool) -> Bool {
+        lock.lock()
+        refreshLocked()
+        var identities = Array(tracked.values)
+        if includeRoot { identities.append(rootIdentity) }
+        lock.unlock()
+
+        var allSignalsConfirmed = true
+        for identity in identities {
+            guard let current = reader.identity(
+                processIdentifier: identity.processIdentifier
+            ), current.startIdentity == identity.startIdentity else {
+                continue
+            }
+            let result = signaler.signal(
+                processIdentifier: identity.processIdentifier,
+                signal: signal
+            )
+            if result != 0, result != ESRCH { allSignalsConfirmed = false }
+        }
+        return allSignalsConfirmed
+    }
+
+    func hasLiveTrackedProcesses(includeRoot: Bool) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        refreshLocked()
+        // Capacity overflow is durable uncertainty, not a live process identity.
+        // Keeping it in this liveness predicate makes cleanup mathematically
+        // impossible after every recorded identity exits. `observe()` continues
+        // to report the sticky overflow so the job terminates as an explicit
+        // failure without claiming unobserved descendants were absent.
+        if !tracked.isEmpty { return true }
+        guard includeRoot else { return false }
+        return identityStillMatches(rootIdentity)
+    }
+
+    private func refreshLocked() {
+        tracked = tracked.filter { _, identity in identityStillMatches(identity) }
+
+        var queue: [RuntimeObservedProcessIdentity] = []
+        if identityStillMatches(rootIdentity) { queue.append(rootIdentity) }
+        queue.append(contentsOf: tracked.values)
+        var visited = Set<RuntimeObservedProcessIdentity>()
+
+        while let parent = queue.popLast() {
+            guard visited.insert(parent).inserted else { continue }
+            let children = reader.children(
+                of: parent.processIdentifier,
+                // Existing children are returned again on every snapshot, so
+                // always inspect one beyond the hard cap. At exactly the cap,
+                // this distinguishes known leaf identities from a genuinely
+                // untracked child without retaining another identity.
+                maximumCount: Self.maximumTrackedDescendants + 1
+            )
+            if !children.complete { trackingCapacityExceeded = true }
+            for processIdentifier in children.processIdentifiers {
+                guard processIdentifier != rootIdentity.processIdentifier,
+                      let child = reader.identity(processIdentifier: processIdentifier),
+                      child.parentProcessIdentifier == parent.processIdentifier else {
+                    continue
+                }
+                if tracked[processIdentifier]?.startIdentity == child.startIdentity {
+                    tracked[processIdentifier] = child
+                    queue.append(child)
+                    continue
+                }
+                guard tracked.count < Self.maximumTrackedDescendants else {
+                    trackingCapacityExceeded = true
+                    continue
+                }
+                tracked[processIdentifier] = child
+                queue.append(child)
+            }
+        }
+    }
+
+    private func identityStillMatches(_ expected: RuntimeObservedProcessIdentity) -> Bool {
+        guard let current = reader.identity(
+            processIdentifier: expected.processIdentifier
+        ) else { return false }
+        return current.startIdentity == expected.startIdentity
     }
 }
 
@@ -1019,7 +977,10 @@ struct DarwinRuntimeRecoveredProcessController: RuntimeRecoveredProcessControlli
         if let observed = RuntimeProcessIdentityReader.identity(
             processIdentifier: expectedIdentity.processIdentifier
         ) {
-            guard observed == expectedIdentity else { return .identityMismatch }
+            guard observed.processIdentifier == expectedIdentity.processIdentifier,
+                  observed.startIdentity == expectedIdentity.startIdentity else {
+                return .identityMismatch
+            }
         } else {
             let leaderProbe = Darwin.kill(expectedIdentity.processIdentifier, 0)
             if leaderProbe == 0 || errno == EPERM { return .identityUnavailable }
@@ -1034,17 +995,40 @@ struct DarwinRuntimeRecoveredProcessController: RuntimeRecoveredProcessControlli
             }
         }
 
-        let result = Darwin.kill(-expectedIdentity.processGroupIdentifier, signal)
-        guard result == 0 else {
-            let failure = errno
-            return failure == ESRCH ? .processMissing : .signalFailed(failure)
+        var firstFailure: Int32?
+        if Darwin.kill(-expectedIdentity.processGroupIdentifier, signal) != 0,
+           errno != ESRCH {
+            firstFailure = errno
         }
-        return .signaled
+        // The exact root may have called setsid/setpgid and left its launch group.
+        // Its persisted start identity makes direct signaling safe despite that.
+        if RuntimeProcessIdentityReader.identity(
+            processIdentifier: expectedIdentity.processIdentifier
+        )?.startIdentity == expectedIdentity.startIdentity,
+           Darwin.kill(expectedIdentity.processIdentifier, signal) != 0,
+           errno != ESRCH,
+           firstFailure == nil {
+            firstFailure = errno
+        }
+        return firstFailure.map(RuntimeRecoveredProcessSignalResult.signalFailed) ?? .signaled
     }
 }
 
 enum RuntimeProcessIdentityReader {
     static func identity(processIdentifier: Int32) -> RuntimePersistedProcessIdentity? {
+        guard let observed = observedIdentity(processIdentifier: processIdentifier) else {
+            return nil
+        }
+        return RuntimePersistedProcessIdentity(
+            processIdentifier: observed.processIdentifier,
+            processGroupIdentifier: observed.processGroupIdentifier,
+            startIdentity: observed.startIdentity
+        )
+    }
+
+    static func observedIdentity(
+        processIdentifier: Int32
+    ) -> RuntimeObservedProcessIdentity? {
         guard processIdentifier > 1 else { return nil }
         var info = proc_bsdinfo()
         let size = Int32(MemoryLayout<proc_bsdinfo>.stride)
@@ -1058,6 +1042,7 @@ enum RuntimeProcessIdentityReader {
         guard result == size,
               let observedPID = Int32(exactly: info.pbi_pid),
               observedPID == processIdentifier,
+              let observedParent = Int32(exactly: info.pbi_ppid),
               let observedGroup = Int32(exactly: info.pbi_pgid),
               let seconds = Int64(exactly: info.pbi_start_tvsec),
               let microseconds = Int64(exactly: info.pbi_start_tvusec),
@@ -1065,8 +1050,9 @@ enum RuntimeProcessIdentityReader {
                 seconds: seconds,
                 microseconds: microseconds
               ) else { return nil }
-        return RuntimePersistedProcessIdentity(
+        return RuntimeObservedProcessIdentity(
             processIdentifier: observedPID,
+            parentProcessIdentifier: observedParent,
             processGroupIdentifier: observedGroup,
             startIdentity: startIdentity
         )
@@ -1099,13 +1085,13 @@ final class RuntimeOutputSpool: @unchecked Sendable {
     let relativeDirectory: String
 
     var canonicalDirectory: URL {
-        RuntimeProcessSandbox.canonicalExistingURL(
+        RuntimePathCanonicalizer.canonicalExistingURL(
             artifactRoot.appendingPathComponent(relativeDirectory, isDirectory: true)
         )
     }
 
     var canonicalScratchDirectory: URL {
-        RuntimeProcessSandbox.canonicalExistingURL(
+        RuntimePathCanonicalizer.canonicalExistingURL(
             scratchRoot.appendingPathComponent(relativeDirectory, isDirectory: true)
         )
     }
@@ -1127,7 +1113,7 @@ final class RuntimeOutputSpool: @unchecked Sendable {
     ) throws {
         self.jobID = jobID
         self.artifactID = jobID.uuidString.lowercased()
-        self.artifactRoot = RuntimeProcessSandbox.canonicalExistingURL(artifactRoot)
+        self.artifactRoot = RuntimePathCanonicalizer.canonicalExistingURL(artifactRoot)
         let requestedScratchRoot = self.artifactRoot.appendingPathComponent(
             ".runtime-scratch",
             isDirectory: true
@@ -1136,7 +1122,7 @@ final class RuntimeOutputSpool: @unchecked Sendable {
             at: requestedScratchRoot,
             withIntermediateDirectories: true
         )
-        self.scratchRoot = RuntimeProcessSandbox.canonicalExistingURL(requestedScratchRoot)
+        self.scratchRoot = RuntimePathCanonicalizer.canonicalExistingURL(requestedScratchRoot)
         guard self.scratchRoot.path == requestedScratchRoot.path,
               Self.contains(self.scratchRoot, root: self.artifactRoot) else {
             throw RuntimeJobError.storageFailure("runtime scratch root is not canonical")
@@ -1149,7 +1135,7 @@ final class RuntimeOutputSpool: @unchecked Sendable {
         ].joined(separator: "/")
         let directory = self.artifactRoot.appendingPathComponent(relativeDirectory, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let resolvedDirectory = RuntimeProcessSandbox.canonicalExistingURL(directory)
+        let resolvedDirectory = RuntimePathCanonicalizer.canonicalExistingURL(directory)
         guard resolvedDirectory.path == directory.path,
               Self.contains(resolvedDirectory, root: self.artifactRoot) else {
             throw RuntimeJobError.storageFailure("runtime artifact directory is not canonical")
@@ -1163,7 +1149,7 @@ final class RuntimeOutputSpool: @unchecked Sendable {
             at: scratchDirectory,
             withIntermediateDirectories: true
         )
-        let resolvedScratchDirectory = RuntimeProcessSandbox.canonicalExistingURL(scratchDirectory)
+        let resolvedScratchDirectory = RuntimePathCanonicalizer.canonicalExistingURL(scratchDirectory)
         guard resolvedScratchDirectory.path == scratchDirectory.path,
               Self.contains(resolvedScratchDirectory, root: self.scratchRoot),
               !Self.contains(resolvedScratchDirectory, root: resolvedDirectory),
@@ -1391,6 +1377,7 @@ final class RuntimeActiveProcess: @unchecked Sendable {
     private let exitMonitor: RuntimeProcessExitMonitor
     private let stdoutReader: RuntimePipeReader
     private let stderrReader: RuntimePipeReader
+    private let descendantTracker: RuntimeDescendantTracker
     private let signalLock = NSLock()
     private let launchGateLock = NSLock()
     private var sentTerm = false
@@ -1398,7 +1385,14 @@ final class RuntimeActiveProcess: @unchecked Sendable {
     private var launchGateWriteDescriptor: Int32 = -1
     private var launchReleased = false
 
-    init(plan: RuntimeProcessPlan, spool: RuntimeOutputSpool, launcher: URL) throws {
+    init(
+        plan: RuntimeProcessPlan,
+        spool: RuntimeOutputSpool,
+        launcher: URL,
+        maximumDescendants: Int = 16,
+        processTreeReader: any RuntimeProcessTreeReading = DarwinRuntimeProcessTreeReader(),
+        processSignaler: any RuntimeProcessSignaling = DarwinRuntimeProcessSignaler()
+    ) throws {
         try RuntimeLaunchGate.validate(launcher, outside: plan.writableRoots)
         var stdoutDescriptors = [Int32](repeating: -1, count: 2)
         var stderrDescriptors = [Int32](repeating: -1, count: 2)
@@ -1437,13 +1431,21 @@ final class RuntimeActiveProcess: @unchecked Sendable {
             spawnedPID = pid
             processIdentifier = pid
             processGroupIdentifier = pid
-            guard let observedIdentity = RuntimeProcessIdentityReader.identity(processIdentifier: pid),
+            guard let observedIdentity = RuntimeProcessIdentityReader.observedIdentity(
+                processIdentifier: pid
+            ),
                   observedIdentity.processGroupIdentifier == pid else {
                 throw RuntimeJobError.storageFailure(
                     "runtime launch gate did not expose an exact process identity"
                 )
             }
             processStartIdentity = observedIdentity.startIdentity
+            descendantTracker = RuntimeDescendantTracker(
+                rootIdentity: observedIdentity,
+                maximumDescendants: maximumDescendants,
+                reader: processTreeReader,
+                signaler: processSignaler
+            )
             self.spool = spool
             Darwin.close(stdoutDescriptors[1])
             Darwin.close(stderrDescriptors[1])
@@ -1519,6 +1521,10 @@ final class RuntimeActiveProcess: @unchecked Sendable {
 
     func currentExit() -> RuntimeProcessExit? { exitMonitor.current() }
 
+    func observeDescendants() -> RuntimeDescendantObservation {
+        descendantTracker.observe()
+    }
+
     func waitForExit(maximumMilliseconds: Int) async -> RuntimeProcessExit? {
         let clock = ContinuousClock()
         let deadline = clock.now + .milliseconds(max(0, maximumMilliseconds))
@@ -1551,18 +1557,29 @@ final class RuntimeActiveProcess: @unchecked Sendable {
     }
 
     func terminateAndWait(graceMilliseconds: Int, forcedGraceMilliseconds: Int) async throws -> RuntimeProcessExit {
+        _ = descendantTracker.observe()
         _ = signalProcessGroup(SIGTERM)
+        _ = descendantTracker.signalTracked(SIGTERM, includeRoot: true)
         var exit = await waitForExit(maximumMilliseconds: graceMilliseconds)
-        if processGroupExists() {
+        if processGroupExists()
+            || descendantTracker.hasLiveTrackedProcesses(includeRoot: exit == nil) {
             _ = signalProcessGroup(SIGKILL)
-            guard await waitForProcessGroupExit(maximumMilliseconds: forcedGraceMilliseconds) else {
+            let killSignalsConfirmed = descendantTracker.signalTracked(SIGKILL, includeRoot: true)
+            guard killSignalsConfirmed,
+                  await waitForOwnedExit(
+                    maximumMilliseconds: forcedGraceMilliseconds,
+                    includeRoot: exit == nil,
+                    repeatingSignal: SIGKILL
+                  ) else {
                 throw RuntimeJobError.terminationUnconfirmed(processGroupIdentifier)
             }
         }
         if exit == nil {
             exit = await waitForExit(maximumMilliseconds: forcedGraceMilliseconds)
         }
-        guard let exit, !processGroupExists() else {
+        guard let exit,
+              !processGroupExists(),
+              !descendantTracker.hasLiveTrackedProcesses(includeRoot: false) else {
             throw RuntimeJobError.terminationUnconfirmed(processGroupIdentifier)
         }
         return exit
@@ -1572,22 +1589,47 @@ final class RuntimeActiveProcess: @unchecked Sendable {
         graceMilliseconds: Int,
         forcedGraceMilliseconds: Int
     ) async throws {
-        guard processGroupExists() else { return }
+        _ = descendantTracker.observe()
+        guard processGroupExists()
+            || descendantTracker.hasLiveTrackedProcesses(includeRoot: false) else { return }
         _ = Darwin.kill(-processGroupIdentifier, SIGTERM)
-        if await waitForProcessGroupExit(maximumMilliseconds: graceMilliseconds) { return }
+        let termSignalsConfirmed = descendantTracker.signalTracked(SIGTERM, includeRoot: false)
+        if termSignalsConfirmed,
+           await waitForOwnedExit(
+            maximumMilliseconds: graceMilliseconds,
+            includeRoot: false,
+            repeatingSignal: SIGTERM
+           ) { return }
         _ = Darwin.kill(-processGroupIdentifier, SIGKILL)
-        guard await waitForProcessGroupExit(maximumMilliseconds: forcedGraceMilliseconds) else {
+        let killSignalsConfirmed = descendantTracker.signalTracked(SIGKILL, includeRoot: false)
+        guard killSignalsConfirmed,
+              await waitForOwnedExit(
+                maximumMilliseconds: forcedGraceMilliseconds,
+                includeRoot: false,
+                repeatingSignal: SIGKILL
+              ) else {
             throw RuntimeJobError.terminationUnconfirmed(processGroupIdentifier)
         }
     }
 
-    private func waitForProcessGroupExit(maximumMilliseconds: Int) async -> Bool {
+    private func waitForOwnedExit(
+        maximumMilliseconds: Int,
+        includeRoot: Bool,
+        repeatingSignal: Int32
+    ) async -> Bool {
         let clock = ContinuousClock()
         let deadline = clock.now + .milliseconds(max(0, maximumMilliseconds))
-        while clock.now < deadline, processGroupExists() {
+        while clock.now < deadline {
+            _ = descendantTracker.observe()
+            _ = descendantTracker.signalTracked(repeatingSignal, includeRoot: includeRoot)
+            if !processGroupExists(),
+               !descendantTracker.hasLiveTrackedProcesses(includeRoot: includeRoot) {
+                return true
+            }
             try? await Task.sleep(for: .milliseconds(20))
         }
         return !processGroupExists()
+            && !descendantTracker.hasLiveTrackedProcesses(includeRoot: includeRoot)
     }
 
     func waitForReaders(maximumMilliseconds: Int) async -> Bool {

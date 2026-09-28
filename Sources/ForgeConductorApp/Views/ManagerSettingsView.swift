@@ -28,15 +28,15 @@ struct ManagerSettingsView: View {
                     }
                 }
             }
-            Section("Authorized project folders") {
+            Section("Selected project folders") {
                 Text(
-                    "Forge Conductor denies project filesystem access until a folder is explicitly authorized. Choose folders here, then select Save settings."
+                    "These folders establish registered project identities and the default working context. They do not restrict native filesystem, Git, or shell access. Choose folders here, then select Save settings."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
                 if model.setAllowedRoots.isEmpty {
-                    Text("No project folders authorized")
+                    Text("No project folders selected")
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("settings-allowed-roots-empty")
                 } else {
@@ -61,7 +61,7 @@ struct ManagerSettingsView: View {
                             }
                             .buttonStyle(.borderless)
                             .disabled(!model.hasLoadedInitialSettings)
-                            .accessibilityLabel("Remove authorized project folder \(path)")
+                            .accessibilityLabel("Remove selected project folder \(path)")
                             .accessibilityIdentifier("settings-allowed-root-remove-\(index)")
                         }
                     }
@@ -72,7 +72,7 @@ struct ManagerSettingsView: View {
                 } label: {
                     Label("Add Folder…", systemImage: "plus")
                 }
-                .accessibilityLabel("Add authorized project folder")
+                .accessibilityLabel("Add selected project folder")
                 .accessibilityIdentifier("settings-allowed-root-add")
                 .disabled(!model.hasLoadedInitialSettings)
 
@@ -153,7 +153,7 @@ struct ManagerSettingsView: View {
                     .disabled(!model.hasLoadedInitialSettings)
                 Text(
                     model.setShellEnabled
-                        ? "Authorized agent sessions may run project-root commands. Canonical path checks and the 120-second shell_exec ceiling still apply."
+                        ? "Authorized agent sessions may run native host commands. Project context supplies the default working directory; macOS permissions, canonicalization, and the 120-second shell_exec ceiling still apply."
                         : "Project shell tools are explicitly disabled. Filesystem and other independently authorized tools are unchanged."
                 )
                 .font(.caption)
@@ -217,7 +217,7 @@ struct ManagerSettingsView: View {
                 }
 
                 Text(
-                    "Protected regular-file, symbolic-link, empty-directory, move, and bounded recursive-delete operations use the separately signed service. Move refuses replacement and remains within one authorized writable root; recursive delete commits one recoverable leaf or empty-directory transaction at a time. Shell tools remain nonprivileged and are controlled independently above."
+                    "Protected regular-file, symbolic-link, empty-directory, move, and bounded recursive-delete operations inside a registered project may use the separately signed service. Native paths outside it use the bounded local implementation. Move refuses replacement; recursive delete commits one recoverable leaf or empty-directory transaction at a time. Shell tools remain nonprivileged and are controlled independently above."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

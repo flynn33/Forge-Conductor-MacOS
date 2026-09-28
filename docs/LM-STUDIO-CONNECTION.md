@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.16.0**, build **21**. This connection document does
+Product identity: version **0.16.1**, build **22**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -120,6 +120,35 @@ Development Policy sources in **Rune Forge**, then open a normal LM Studio chat
 and call `get_forge_status`. The response lists registered project identities;
 passing `project_id` returns that project's file, instruction, and continuity
 locations. No Managed Run is required.
+
+### Native host access and project context
+
+The selected project supplies durable identity, generation, and the default
+working directory. It is not a filesystem sandbox. After a client has a valid
+project binding, owner-authorized filesystem, search, PDF, Git, shell, and
+runtime tools may use native absolute paths outside the selected project. Forge
+does not insert `/usr/bin/sandbox-exec`. macOS attributes TCC access to the
+responsible signed host and executable in the actual LM Studio → Forge → child
+launch chain; Forge does not infer Full Disk Access from a parent UI grant.
+After a grant or candidate change, quit and relaunch the affected hosts and run
+a live protected-path read through the exact signed candidate without emitting
+file contents. POSIX permissions and SIP continue to apply.
+
+Forge still requires the client binding for attribution and generation
+fencing, applies tool grants and the shell enable switch, canonicalizes paths,
+bounds time and output, and rejects destructive operations against `/`, the
+user or Manager home, a mounted-volume root, an active workspace root, or an
+ancestor whose removal would contain one of those roots. Project memory,
+instructions, policy, and continuity remain isolated through their scoped
+APIs. Because shell access is deliberately native and unrestricted, those API
+boundaries do not claim physical secrecy of same-user backing files.
+
+Native runtime jobs track observed descendants by PID start identity, including
+children that leave the launch process group. The normal budget is 16 and the
+absolute retained-identity cap is 1,024; overflow fails the job rather than
+growing without bound. Local outside-project delete and move rebuild their protected-root set at
+execution and descriptor-recheck the source identity immediately before the
+namespace change, so a rename between authorization and dispatch fails closed.
 
 When the model saves a resume-ready handoff, Manager publishes a visible
 30-second Dashboard countdown. At expiry, the native adapter activates LM

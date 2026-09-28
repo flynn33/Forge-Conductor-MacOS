@@ -75,7 +75,7 @@ handoff, Forge uses the app's public macOS Accessibility controls to create the
 visible successor and the installed GUI MCP tool to acknowledge it; it does not
 use the REST integrations array.
 
-Grok Build remains visible in Provider but is non-selectable in 0.16.0. Its
+Grok Build remains visible in Provider but is non-selectable in 0.16.1. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.

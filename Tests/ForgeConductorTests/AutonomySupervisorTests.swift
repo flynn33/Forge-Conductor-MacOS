@@ -766,7 +766,13 @@ final class AutonomySupervisorTests: XCTestCase {
                 root: root,
                 allowedTools: ["fs_delete"]
             )
-            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            // Reconciliation must use the same native absolute-path semantics as
+            // first dispatch. Keep this target outside the registered project
+            // root so a restart cannot silently reintroduce root confinement.
+            let projectRoot = root.appendingPathComponent(
+                "external-delete-reconciliation",
+                isDirectory: true
+            )
             try FileManager.default.createDirectory(
                 at: projectRoot,
                 withIntermediateDirectories: true
@@ -857,7 +863,12 @@ final class AutonomySupervisorTests: XCTestCase {
                 root: root,
                 allowedTools: ["fs_edit"]
             )
-            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            // Filesystem reconciliation is native host access, not project-root
+            // confinement. The durable run remains bound to root/project.
+            let projectRoot = root.appendingPathComponent(
+                "external-filesystem-reconciliation",
+                isDirectory: true
+            )
             try FileManager.default.createDirectory(
                 at: projectRoot,
                 withIntermediateDirectories: true
@@ -1200,7 +1211,12 @@ final class AutonomySupervisorTests: XCTestCase {
                 root: root,
                 allowedTools: ["git_commit"]
             )
-            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            // Git reconciliation follows the native absolute cwd used by first
+            // dispatch even when it is outside the registered project root.
+            let projectRoot = root.appendingPathComponent(
+                "external-git-reconciliation",
+                isDirectory: true
+            )
             try FileManager.default.createDirectory(
                 at: projectRoot,
                 withIntermediateDirectories: true

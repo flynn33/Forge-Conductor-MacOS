@@ -8,8 +8,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.16.0** |
-| **Build** | **21** |
+| **Version** | **0.16.1** |
+| **Build** | **22** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -21,14 +21,14 @@ continuity. The user does not start project work through a Forge Managed Run.
 > not release evidence. The working installation remains separate from
 > candidates.
 
-The current Developer ID-signed Desktop candidate is `Forge Conductor
+The most recent retained Developer ID-signed Desktop candidate is `Forge Conductor
 0.16.0 (21)-a540670.app` with its matching `.xcarchive` on the Desktop. It is
 not installed over `/Applications/Forge Conductor.app` and is not a shipment
 claim.
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, current repository documentation, and the published wiki use
-the same `0.16.0 (21)` identity. Historical receipts retain the identity they
+configurations, and current repository documentation use the same `0.16.1 (22)`
+identity. Historical candidates and receipts retain the identity they
 actually tested.
 
 ## What Forge Conductor does
@@ -36,8 +36,8 @@ actually tested.
 - Registers one or more project folders with stable, isolated identities.
 - Imports one or more instruction packages and preserves their drag-ordered
   priority.
-- Connects LM Studio models to project-scoped filesystem, Git, memory, shell,
-  instruction, policy, and continuity tools through MCP.
+- Connects LM Studio models to project-bound native filesystem, Git, memory,
+  shell, instruction, policy, and continuity tools through MCP.
 - Lets the user select Development Policy files and folders in Rune Forge and
   drag-order them by importance.
 - Runs CLU as the governance-enforcement agent. CLU reports the exact violated
@@ -51,6 +51,27 @@ actually tested.
 
 Forge Conductor does not run the model itself, replace the working installation
 from a source build, or claim shipment from successful compilation alone.
+
+Selected project folders establish durable project identity, generation, and
+the default working directory; they are not an operating-system filesystem
+sandbox. Owner-authorized filesystem, Git, shell, and runtime tools execute
+natively. macOS determines TCC access from the responsible signed host and
+executable in the actual launch chain; Forge does not manufacture or override a
+Full Disk Access grant. After every grant or candidate change, quit and relaunch
+the affected hosts and verify the exact signed candidate with a live protected-
+path read that does not expose file contents. Forge still enforces project context and generation,
+per-client tool grants, the shell enable switch, timeouts, output bounds,
+durable result fencing, and protection against destructive root operations.
+Project memory, instructions, policy, and continuity remain logically isolated
+through their project-scoped APIs; unrestricted native shell access is not a
+physical secrecy boundary for same-user backing files.
+
+Runtime ownership remains bounded: native jobs have a finite descendant budget
+and hard tracking cap, and unconfirmed termination becomes identity-fenced
+cleanup debt rather than indefinite ownership. Local outside-project delete
+and move independently rebuild protected roots and descriptor-recheck the
+source at the namespace mutation boundary, closing same-user rename races while
+leaving ordinary outside-project paths available.
 
 ## Current LM Studio workflow
 
@@ -138,13 +159,13 @@ connection](docs/LM-STUDIO-CONNECTION.md).
 
 | Surface | Responsibility |
 |---|---|
-| **Dashboard** | Bounded telemetry, Forge activity, policy state, and the visible automatic successor countdown |
+| **Dashboard** | Bounded telemetry and activity for the project bound to the active MCP client, policy state, and the visible automatic successor countdown |
 | **LM Studio MCP** | MCP deployment, role health, and host synchronization |
 | **Projects** | Multi-folder registration, reset, scoped maintenance, and drag-ordered instruction-package selection and deletion |
 | **Rune Forge** | Development Policy selection and ordering, CLU violation delivery, per-project history, and log export |
 | **Continuity** | Scrollable project IDs plus first-class checkpoint/handoff rows, exact single/multi-packet Delete, Copy Project ID, Reset, and Clear Cache |
 | **Provider** | Provider selection, connection verification, provisioning, repair, removal, and advanced LM Studio configuration |
-| **Manager** | Process lifecycle, authorized roots, shell policy, and filesystem service |
+| **Manager** | Process lifecycle, selected project roots, native shell policy, and filesystem service |
 | **Events & Evidence** | Bounded audit events, receipts, diagnostics, and exports |
 
 ## Build and test

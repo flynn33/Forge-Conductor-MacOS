@@ -1,12 +1,48 @@
 # Version and qualification status
 
-## 0.16.0 foreground successor and packet management
+## 0.16.1 native host access and Dashboard project tracking
 
-The current source identity is **0.16.0, build 21**. Continuity lists the
-actual durable checkpoint/handoff packets under each project ID and deletes
-only the exact single or multi-selection after confirmation. Reset and Clear
-Cache remain on Continuity; instruction-package controls are confined to
-Projects. Focused packet store/wire and native UI tests execute with zero
+The current source identity is **0.16.1, build 22**. The native filesystem,
+search, PDF, Git, shell, and runtime paths no longer enter Forge's per-command
+Seatbelt profile or reject absolute paths merely because they are outside a
+selected project folder. Project binding and generation remain mandatory for
+attribution and durable isolation. macOS evaluates TCC access for the
+responsible signed code objects in the actual launch chain; only a live
+protected-path probe through the exact signed candidate establishes Full Disk
+Access. Tool grants, shell enablement, canonicalization, deadlines, output bounds, durable
+result fencing, and destructive-root protection remain in force. Native jobs
+use a default 16-descendant budget and a 1,024-identity hard cap; overflow is a
+typed failure, and unconfirmed termination becomes bounded identity-fenced
+cleanup debt. Local outside-project delete and move independently rebuild the
+protected-root set and descriptor-recheck source identity immediately before
+namespace mutation.
+
+Dashboard now identifies the tracked project from live MCP presence and the
+matching active `mcp_client` binding. It orders multiple live clients by recent
+activity with heartbeat fallback, uses an exact nonterminal run only when no
+live binding resolves, and never treats registration alone as active work.
+
+The complete focused `CoreTests` selection executed 49 tests with zero
+failures. The all-available-runtime profile case exercised an external working
+directory, `/bin/ps`, and inherited environment state. The complete runtime-job
+suite executed 103 tests with zero failures, including bounded cleanup of an
+observed `setsid(2)` child, and the secure-filesystem suite executed 100 tests
+with zero failures. Dashboard operational-snapshot tests executed 23 tests with
+zero failures in both SwiftPM and the app-hosted Xcode target, including
+live-binding preference and the registered-only negative case. The final
+integrated SwiftPM run executed 1,933 tests with 12 explicit environment-
+dependent skips and zero failures. Both SwiftPM products and the canonical
+Debug workspace build passed. Exact Developer ID candidate, live protected-path
+probe, native multi-project Dashboard observation, notarization, Gatekeeper,
+and shipment acceptance remain separate.
+
+## 0.16.0 foreground successor and packet management (historical)
+
+Source identity **0.16.0, build 21** added Continuity lists of the
+actual durable checkpoint/handoff packets under each project ID and enabled
+deletion of only the exact single or multi-selection after confirmation. Reset
+and Clear Cache remain on Continuity; instruction-package controls are confined
+to Projects. Focused packet store/wire and native UI tests execute with zero
 failures.
 
 Same-host LM Studio configuration no longer exposes or accepts an operator
@@ -328,7 +364,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.0, build 21**, supporting **macOS 26+**. The owner will
+Product identity: **0.16.1, build 22**, supporting **macOS 26+**. The owner will
 test the staged Desktop candidate and perform shipment separately. The version
 advance and repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -339,7 +375,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.0, build 21**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.1, build 22**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

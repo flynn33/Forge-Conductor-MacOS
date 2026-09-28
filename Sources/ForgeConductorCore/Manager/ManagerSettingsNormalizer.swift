@@ -126,8 +126,8 @@ public enum ManagerSettingsNormalizer {
         return normalized
     }
 
-    /// Returns an existing, absolute directory path suitable for project-root authority.
-    /// Filesystem root is never a valid configured project root.
+    /// Returns an existing, absolute directory path suitable for project registration.
+    /// Filesystem root is never a valid project identity.
     public static func canonicalAllowedRoot(_ path: String) -> String? {
         let expanded = (path as NSString).expandingTildeInPath
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -152,8 +152,8 @@ public enum ManagerSettingsNormalizer {
     }
 
     /// Returns the exact canonical project root only when it is equal to or
-    /// contained by a root explicitly authorized in Settings. A project root
-    /// narrows configured authority; registration metadata never expands it.
+    /// contained by a folder selected in Settings. This validates the project
+    /// catalog; it does not create a native filesystem boundary.
     static func authorizedProjectRoot(
         _ projectRoot: URL,
         allowedRoots: [String]

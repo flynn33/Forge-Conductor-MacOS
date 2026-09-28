@@ -573,9 +573,35 @@ final class MCPProcessTelemetryRegressionTests: XCTestCase {
         ]
 
         XCTAssertEqual(
-            assembler(alivePIDs: [51, 53]).reconciledPresenceCount(records),
+            assembler(alivePIDs: [51, 52, 53]).reconciledPresenceCount(records),
             1
         )
+    }
+
+    func testStaleHeartbeatCannotBindAReusedLivePID() {
+        let staleID = "native-task:\(UUID().uuidString.lowercased()):primary"
+        let records = [
+            PresenceRecord(
+                clientID: staleID,
+                hostKind: "mcp-stdio",
+                pid: 72,
+                cwd: "/tmp/old-project",
+                lastHeartbeat: ISO8601.string(from: now.addingTimeInterval(-120))
+            ),
+        ]
+
+        let cards = assembler(alivePIDs: [72]).build(
+            presence: records,
+            live: [process(pid: 72, label: "forge-conductor", hostKind: "mcp-stdio")],
+            configured: [],
+            audit: []
+        )
+
+        XCTAssertFalse(cards.contains { $0.id == staleID })
+        XCTAssertEqual(cards.count, 1)
+        XCTAssertEqual(cards[0].id, "proc-forge-conductor-72")
+        XCTAssertTrue(cards[0].live)
+        XCTAssertEqual(cards[0].source, "live-proc")
     }
 
     func testPolicyAndMaintenanceOutcomesAreActivityButNotOperationalMCPErrors() {

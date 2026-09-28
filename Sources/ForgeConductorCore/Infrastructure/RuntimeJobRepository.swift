@@ -36,6 +36,13 @@ struct RuntimeArtifactRetentionCandidate: Sendable, Equatable {
     let retainedBytes: UInt64
 }
 
+struct RuntimeTerminationCleanupDebtRecord: Sendable, Equatable {
+    let jobID: UUID
+    let identity: RuntimePersistedProcessIdentity
+    let retryDeadline: String
+    let errorSummary: String
+}
+
 enum RuntimeJobCommitKind: Sendable, Equatable {
     case submission
     case cancellation
@@ -502,6 +509,106 @@ public actor RuntimeJobRepository {
         }
     }
 
+    func eligibleTerminalCleanupDebts(
+        before deadline: String,
+        limit: Int
+    ) throws -> [RuntimeTerminationCleanupDebtRecord] {
+        guard ISO8601.date(from: deadline) != nil else {
+            throw RuntimeJobError.invalidRequest("cleanup-debt query deadline is invalid")
+        }
+        let boundedLimit = min(max(1, limit), 256)
+        return try queryAll(
+            """
+            SELECT j.job_id,j.process_identifier,j.process_group_identifier,
+                   j.process_start_seconds,j.process_start_microseconds,
+                   d.termination_probe_deadline,d.error_summary
+            FROM execution_jobs j
+            JOIN runtime_job_details d ON d.job_id=j.job_id
+            WHERE j.state='failed'
+              AND d.error_code='runtime_termination_unconfirmed'
+              AND d.termination_phase='unconfirmed'
+              AND d.termination_probe_deadline>?
+              AND instr(d.error_summary,'restart_attempts=0;')>0
+            ORDER BY j.updated_at ASC,j.job_id ASC LIMIT ?
+            """,
+            bindings: [.text(deadline), .int64(Int64(boundedLimit))]
+        ) { statement in
+            guard let jobText = Self.requiredText(statement, column: 0),
+                  let jobID = UUID(uuidString: jobText),
+                  let processIdentifier = Int32(exactly: sqlite3_column_int64(statement, 1)),
+                  let processGroupIdentifier = Int32(exactly: sqlite3_column_int64(statement, 2)),
+                  let startIdentity = RuntimeProcessStartIdentity(
+                    seconds: sqlite3_column_int64(statement, 3),
+                    microseconds: sqlite3_column_int64(statement, 4)
+                  ),
+                  let retryDeadline = Self.requiredText(statement, column: 5),
+                  ISO8601.date(from: retryDeadline) != nil,
+                  let errorSummary = Self.requiredText(statement, column: 6) else {
+                throw RuntimeJobError.storageFailure(
+                    "invalid persisted runtime cleanup-debt record"
+                )
+            }
+            let identity = RuntimePersistedProcessIdentity(
+                processIdentifier: processIdentifier,
+                processGroupIdentifier: processGroupIdentifier,
+                startIdentity: startIdentity
+            )
+            guard identity.isValidProcessGroupLeader else {
+                throw RuntimeJobError.storageFailure(
+                    "invalid persisted runtime cleanup-debt identity"
+                )
+            }
+            return RuntimeTerminationCleanupDebtRecord(
+                jobID: jobID,
+                identity: identity,
+                retryDeadline: retryDeadline,
+                errorSummary: errorSummary
+            )
+        }
+    }
+
+    func recordTerminalCleanupDebtRetry(
+        jobID: UUID,
+        resolved: Bool,
+        errorSummary: String
+    ) throws {
+        let boundedSummary = try Self.bounded(
+            errorSummary,
+            maximumBytes: 2_048,
+            field: "termination cleanup retry summary"
+        )
+        let now = ISO8601.string(from: clock.now())
+        let changed = try execute(
+            """
+            UPDATE runtime_job_details
+            SET termination_phase=?,termination_error_summary=?,error_code=?,
+                error_summary=?,updated_at=?
+            WHERE job_id=?
+              AND error_code='runtime_termination_unconfirmed'
+              AND termination_phase='unconfirmed'
+              AND EXISTS (
+                SELECT 1 FROM execution_jobs j
+                WHERE j.job_id=runtime_job_details.job_id AND j.state='failed'
+              )
+            """,
+            bindings: [
+                .text(resolved
+                    ? RuntimeTerminationPhase.confirmed.rawValue
+                    : RuntimeTerminationPhase.unconfirmed.rawValue),
+                .text(boundedSummary),
+                .text(resolved
+                    ? "runtime_termination_recovered"
+                    : "runtime_termination_unconfirmed"),
+                .text(boundedSummary), .text(now), .text(Self.uuid(jobID)),
+            ]
+        )
+        guard changed == 1 else {
+            throw RuntimeJobError.storageFailure(
+                "terminal runtime cleanup-debt retry could not be persisted"
+            )
+        }
+    }
+
     @discardableResult
     func beginOrResumeTermination(
         jobID: UUID,
@@ -656,6 +763,7 @@ public actor RuntimeJobRepository {
         artifactID: String?,
         errorCode: String? = nil,
         errorSummary: String? = nil,
+        terminationCleanupRetryDeadline: String? = nil,
         expectedContext: ToolInvocationContext? = nil
     ) throws -> RuntimeJobState {
         guard terminalState.isTerminal else {
@@ -677,6 +785,26 @@ public actor RuntimeJobRepository {
         let boundedError = try errorSummary.map {
             try Self.bounded($0, maximumBytes: 2_048, field: "error summary")
         }
+        let boundedCleanupRetryDeadline = try terminationCleanupRetryDeadline.map {
+            let bounded = try Self.bounded(
+                $0,
+                maximumBytes: 128,
+                field: "termination cleanup retry deadline"
+            )
+            guard ISO8601.date(from: bounded) != nil else {
+                throw RuntimeJobError.invalidRequest(
+                    "termination cleanup retry deadline is invalid"
+                )
+            }
+            return bounded
+        }
+        let recordsTerminationCleanupDebt = terminalState == .failed
+            && boundedErrorCode == "runtime_termination_unconfirmed"
+            && boundedError?.contains("cleanup_debt=true") == true
+            && outputs.isEmpty
+            && boundedArtifactID == nil
+            && expectedContext == nil
+            && boundedCleanupRetryDeadline != nil
         let totalBytes = outputs.reduce(UInt64(0)) { partial, output in
             partial.addingReportingOverflow(output.byteCount).overflow ? UInt64.max : partial + output.byteCount
         }
@@ -732,8 +860,27 @@ public actor RuntimeJobRepository {
                 ) { statement in
                     Self.optionalText(statement, column: 0)
                 } ?? nil
-                guard terminationPhase == RuntimeTerminationPhase.confirmed.rawValue else {
+                guard terminationPhase == RuntimeTerminationPhase.confirmed.rawValue
+                    || recordsTerminationCleanupDebt else {
                     throw RuntimeJobError.terminationUnconfirmed(processGroupIdentifier)
+                }
+                if recordsTerminationCleanupDebt {
+                    let changed = try execute(
+                        """
+                        UPDATE runtime_job_details SET termination_phase='unconfirmed',
+                            termination_probe_deadline=?,termination_error_summary=?,
+                            updated_at=? WHERE job_id=?
+                        """,
+                        bindings: [
+                            .optionalText(boundedCleanupRetryDeadline),
+                            .optionalText(boundedError), .text(now), .text(Self.uuid(jobID)),
+                        ]
+                    )
+                    guard changed == 1 else {
+                        throw RuntimeJobError.storageFailure(
+                            "runtime cleanup-debt evidence could not be persisted"
+                        )
+                    }
                 }
             }
             try Self.validateTerminalTransition(from: current.state, to: resolvedState)

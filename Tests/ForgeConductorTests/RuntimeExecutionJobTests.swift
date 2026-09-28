@@ -431,6 +431,159 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
+    func testPersistentTerminationFailureBecomesBoundedCleanupDebtAndReleasesOwnership() async throws {
+        let controller = SwitchableRecoveredProcessController(failing: true)
+        let policy = ExecutionJobService.RuntimeTerminationRecoveryPolicy(
+            maximumAttempts: 2,
+            maximumDurationMilliseconds: 500,
+            initialDelayMilliseconds: 1,
+            maximumDelayMilliseconds: 2
+        )
+        let fixture = try await Fixture.make(
+            recoveredProcessController: controller,
+            terminationRecoveryPolicy: policy
+        )
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let jobID = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: "trap '' TERM; while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let reachedRunning = await fixture.waitForState(jobID, expected: .running)
+        XCTAssertTrue(reachedRunning)
+        let persistedIdentity = try await fixture.runtimeRepository.recoveryProcessIdentity(
+            jobID: jobID
+        )
+        let identity = try XCTUnwrap(persistedIdentity)
+        defer {
+            if RuntimeProcessIdentityReader.observedIdentity(
+                processIdentifier: identity.processIdentifier
+            )?.startIdentity == identity.startIdentity {
+                _ = Darwin.kill(-identity.processGroupIdentifier, SIGKILL)
+                _ = Darwin.kill(identity.processIdentifier, SIGKILL)
+            }
+        }
+
+        try await fixture.service.cancel(jobID: jobID, context: fixture.context)
+        let terminal = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(5)
+        )
+        XCTAssertEqual(terminal.state, .failed)
+        XCTAssertEqual(terminal.errorCode, "runtime_termination_unconfirmed")
+        XCTAssertTrue(terminal.errorSummary?.contains("cleanup_debt=true") == true)
+        XCTAssertTrue(terminal.errorSummary?.contains("attempts=2") == true)
+        XCTAssertTrue(terminal.errorSummary?.contains("maximum_attempts=2") == true)
+        XCTAssertTrue(terminal.errorSummary?.contains("recovery_window_ms=500") == true)
+        XCTAssertLessThanOrEqual(terminal.errorSummary?.utf8.count ?? .max, 2_048)
+        let recoveryPending = await fixture.service.recoveryPendingJobIDs()
+        XCTAssertFalse(recoveryPending.contains(jobID))
+
+        let artifactDirectory = fixture.root
+            .appendingPathComponent("artifacts", isDirectory: true)
+            .appendingPathComponent(fixture.projectID.description, isDirectory: true)
+            .appendingPathComponent(String(fixture.context.projectGeneration.rawValue), isDirectory: true)
+            .appendingPathComponent(jobID.uuidString.lowercased(), isDirectory: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: artifactDirectory.path))
+        let report = await fixture.service.shutdown()
+        XCTAssertTrue(report.completed)
+        XCTAssertTrue(report.unresolvedJobIDs.isEmpty)
+        await fixture.runtimeRepository.close()
+        await fixture.controlRepository.close()
+    }
+
+    func testTerminalCleanupDebtReceivesOnlyOneBoundedStartupRetry() async throws {
+        let liveController = SwitchableRecoveredProcessController(failing: true)
+        let policy = ExecutionJobService.RuntimeTerminationRecoveryPolicy(
+            maximumAttempts: 1,
+            maximumDurationMilliseconds: 500,
+            initialDelayMilliseconds: 1,
+            maximumDelayMilliseconds: 1
+        )
+        let fixture = try await Fixture.make(
+            recoveredProcessController: liveController,
+            terminationRecoveryPolicy: policy
+        )
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let jobID = try await fixture.service.submit(
+            fixture.request(
+                kind: .bash,
+                profile: .bashNoProfile,
+                script: "trap '' TERM; while :; do sleep 1; done",
+                timeout: 30
+            )
+        )
+        let reachedRunning = await fixture.waitForState(jobID, expected: .running)
+        XCTAssertTrue(reachedRunning)
+        let storedIdentity = try await fixture.runtimeRepository.recoveryProcessIdentity(
+            jobID: jobID
+        )
+        let identity = try XCTUnwrap(storedIdentity)
+        defer {
+            if RuntimeProcessIdentityReader.observedIdentity(
+                processIdentifier: identity.processIdentifier
+            )?.startIdentity == identity.startIdentity {
+                _ = Darwin.kill(-identity.processGroupIdentifier, SIGKILL)
+                _ = Darwin.kill(identity.processIdentifier, SIGKILL)
+            }
+        }
+
+        try await fixture.service.cancel(jobID: jobID, context: fixture.context)
+        let debt = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(5)
+        )
+        XCTAssertEqual(debt.errorCode, "runtime_termination_unconfirmed")
+        XCTAssertTrue(debt.errorSummary?.contains("restart_attempts=0") == true)
+        _ = await fixture.service.shutdown()
+        await fixture.runtimeRepository.close()
+
+        let databaseURL = fixture.root.appendingPathComponent("control-plane.sqlite")
+        let retryRepository = try RuntimeJobRepository(databaseURL: databaseURL)
+        let retryProbe = RecoveredSignalProbe(result: .signalFailed(EPERM))
+        let retryService = try ExecutionJobService(
+            repository: retryRepository,
+            contextValidator: ProjectControlPlaneRuntimeJobContextValidator(
+                repository: fixture.controlRepository
+            ),
+            artifactRoot: fixture.root.appendingPathComponent("artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        try await retryService.setRecoveredProcessController(retryProbe)
+        try await retryService.start()
+        let retrySignals = await retryProbe.signals()
+        XCTAssertEqual(retrySignals, [SIGKILL])
+        let attempted = try await retryRepository.job(jobID)
+        XCTAssertEqual(attempted?.errorCode, "runtime_termination_unconfirmed")
+        XCTAssertTrue(attempted?.errorSummary?.contains("restart_attempts=1") == true)
+        XCTAssertTrue(attempted?.errorSummary?.contains("cleanup_debt_resolved=false") == true)
+        _ = await retryService.shutdown()
+        await retryRepository.close()
+
+        let finalRepository = try RuntimeJobRepository(databaseURL: databaseURL)
+        let finalProbe = RecoveredSignalProbe(result: .processMissing)
+        let finalService = try ExecutionJobService(
+            repository: finalRepository,
+            contextValidator: ProjectControlPlaneRuntimeJobContextValidator(
+                repository: fixture.controlRepository
+            ),
+            artifactRoot: fixture.root.appendingPathComponent("artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        try await finalService.setRecoveredProcessController(finalProbe)
+        try await finalService.start()
+        let finalSignals = await finalProbe.signals()
+        XCTAssertTrue(finalSignals.isEmpty)
+        _ = await finalService.shutdown()
+        await finalRepository.close()
+        await fixture.controlRepository.close()
+    }
+
     func testShutdownReportsOwnedProcessUntilPersistedReaperConfirmsDeath() async throws {
         let limits = RuntimeJobLimits(
             maximumConcurrentJobs: 1,
@@ -755,18 +908,18 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
-    func testChildCanReadAuthorizedRootButCannotWriteWhenWritableRootsAreEmpty() async throws {
+    func testWritableRootMetadataDoesNotRestrictNativeRuntimeWrites() async throws {
         let fixture = try await Fixture.make(readOnlyProject: true)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let input = fixture.projectRoot.appendingPathComponent("read-only-input")
-        let deniedOutput = fixture.projectRoot.appendingPathComponent("must-not-write")
+        let nativeOutput = fixture.projectRoot.appendingPathComponent("native-write")
         try Data("read-visible".utf8).write(to: input, options: .atomic)
 
         let jobID = try await fixture.service.submit(
             fixture.request(
                 kind: .bash,
                 profile: .bashNoProfile,
-                script: "cat read-only-input; printf denied > must-not-write",
+                script: "cat read-only-input; printf native > native-write",
                 timeout: 5
             )
         )
@@ -775,8 +928,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
             context: fixture.context,
             maximumWait: .seconds(8)
         )
-        XCTAssertEqual(record.state, .failed)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: deniedOutput.path))
+        XCTAssertEqual(record.state, .completed)
+        XCTAssertEqual(record.exitCode, 0)
+        XCTAssertEqual(try String(contentsOf: nativeOutput, encoding: .utf8), "native")
         let output = try await fixture.service.readOutput(
             jobID: jobID,
             stream: .stdout,
@@ -830,13 +984,12 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertEqual(decoded.writableRoots, [root])
     }
 
-    func testChildCannotUnlinkOrReplaceManagerOwnedOutputFiles() async throws {
+    func testStagedScriptDoesNotRevealManagerOutputDirectory() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let script = """
         output_directory=${0%/*}
-        if rm -f "$output_directory/stdout.log"; then exit 91; fi
-        if printf replaced > "$output_directory/stdout.log"; then exit 92; fi
+        if [ -e "$output_directory/stdout.log" ]; then exit 91; fi
         printf 'manager-owned-output'
         """
         let jobID = try await fixture.service.submit(
@@ -2710,7 +2863,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
-    func testStartupRecoveryKeepsJobNonterminalUntilProcessGroupDeathIsConfirmed() async throws {
+    func testStartupRecoveryPersistsBoundedCleanupDebtWhenProcessGroupDeathIsUnconfirmed() async throws {
         let limits = RuntimeJobLimits(
             maximumConcurrentJobs: 1,
             maximumCPUHeavyJobs: 1,
@@ -2756,18 +2909,15 @@ final class RuntimeExecutionJobTests: XCTestCase {
             limits: limits
         )
         try await recoveringService.setRecoveredProcessController(signalProbe)
-        do {
-            try await recoveringService.start()
-            XCTFail("unconfirmed process-group cleanup unexpectedly passed")
-        } catch let error as RuntimeJobError {
-            XCTAssertEqual(error.code, "runtime_termination_unconfirmed")
-        }
+        try await recoveringService.start()
         let recovered = try await fixture.runtimeRepository.job(jobID)
-        XCTAssertEqual(recovered?.state, .running)
-        XCTAssertNil(recovered?.completedAt)
+        XCTAssertEqual(recovered?.state, .failed)
+        XCTAssertEqual(recovered?.errorCode, "runtime_termination_unconfirmed")
+        XCTAssertTrue(recovered?.errorSummary?.contains("cleanup_debt=true") == true)
+        XCTAssertTrue(recovered?.errorSummary?.contains("attempts=1") == true)
+        XCTAssertNotNil(recovered?.completedAt)
         let termination = try await fixture.runtimeRepository.terminationRecord(jobID: jobID)
-        XCTAssertEqual(termination?.phase, .unconfirmed)
-        XCTAssertNotNil(termination?.probeDeadline)
+        XCTAssertNil(termination)
         let signals = await signalProbe.signals()
         XCTAssertTrue(signals.contains(SIGTERM))
         XCTAssertTrue(signals.contains(SIGKILL))
@@ -3324,7 +3474,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
             configuredPowerShell: URL(fileURLWithPath: "/definitely/missing/pwsh")
         ).discover(limits: limits)
         XCTAssertTrue(configuredShim.python.available)
-        XCTAssertNotEqual(configuredShim.python.executablePath, "/usr/bin/python3")
+        XCTAssertEqual(configuredShim.python.executablePath, "/usr/bin/python3")
 
         let mutableRuntime = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-runtime-mutable-pwsh-\(UUID().uuidString)")
@@ -3354,7 +3504,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertTrue(capabilities.shellAvailable)
     }
 
-    func testAdvertisedPythonProfileExecutesTheRealInterpreterUnderContainment() async throws {
+    func testAdvertisedPythonProfileExecutesTheRealInterpreterNatively() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let capability = await fixture.service.capabilities().python
@@ -3454,7 +3604,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
-    func testOutsideRootIsRejectedBeforeJobPersistence() async throws {
+    func testOutsideProjectWorkingDirectoryRunsAndPersists() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let outside = fixture.root.appendingPathComponent("outside", isDirectory: true)
@@ -3469,18 +3619,20 @@ final class RuntimeExecutionJobTests: XCTestCase {
             maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
             replayClass: .readOnly
         )
-        do {
-            _ = try await fixture.service.submit(request)
-            XCTFail("outside-root submission unexpectedly succeeded")
-        } catch let error as RuntimeJobError {
-            XCTAssertEqual(error.code, "cwd_outside_authorized_roots")
-        }
+        let jobID = try await fixture.service.submit(request)
+        let record = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(5)
+        )
+        XCTAssertEqual(record.state, .completed)
+        XCTAssertEqual(record.exitCode, 0)
         let records = try await fixture.runtimeRepository.list(context: fixture.context)
-        XCTAssertTrue(records.isEmpty)
+        XCTAssertEqual(records.map(\.jobID), [jobID])
         await fixture.close()
     }
 
-    func testRuntimeSandboxDeniesFileAccessOutsideAuthorizedRoots() async throws {
+    func testRuntimeInheritsNativeReadWriteAccessOutsideProjectRoot() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let outside = fixture.root.appendingPathComponent("outside-secret.txt")
@@ -3499,9 +3651,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
             context: fixture.context,
             maximumWait: .seconds(8)
         )
-        XCTAssertEqual(record.state, .failed)
-        XCTAssertNotEqual(record.exitCode, 0)
-        XCTAssertEqual(try Data(contentsOf: outside), Data("outside-secret".utf8))
+        XCTAssertEqual(record.state, .completed)
+        XCTAssertEqual(record.exitCode, 0)
+        XCTAssertEqual(try Data(contentsOf: outside), Data("overwritten".utf8))
         let output = try await fixture.service.readOutput(
             jobID: jobID,
             stream: .stdout,
@@ -3509,7 +3661,110 @@ final class RuntimeExecutionJobTests: XCTestCase {
             limit: 1_024,
             context: fixture.context
         )
-        XCTAssertFalse(String(decoding: output.data, as: UTF8.self).contains("outside-secret"))
+        XCTAssertEqual(String(decoding: output.data, as: UTF8.self), "outside-secret")
+        await fixture.close()
+    }
+
+    func testEveryAvailableRuntimeProfileInheritsNativeAccessOutsideProject() async throws {
+        var environment = ProcessInfo.processInfo.environment
+        environment["FORGE_NATIVE_ACCESS_SENTINEL"] = "inherited"
+        let fixture = try await Fixture.make(environment: environment)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let outside = fixture.root.appendingPathComponent("native-runtime", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let externalFile = outside.appendingPathComponent("external.txt")
+        try Data("all-runtime-native-access".utf8).write(to: externalFile)
+        let shellScript = "test \"$FORGE_NATIVE_ACCESS_SENTINEL\" = inherited && /bin/ps -p $$ -o pid= >/dev/null && /bin/cat '\(externalFile.path)'"
+        let capabilities = await fixture.service.capabilities()
+        XCTAssertTrue(capabilities.directProcess.available)
+        XCTAssertNil(capabilities.directProcess.executablePath)
+
+        var requests: [(String, RuntimeJobRequest)] = [
+            ("process.run", RuntimeJobRequest(
+                kind: .process,
+                profile: .directProcess,
+                context: fixture.context,
+                executable: URL(fileURLWithPath: "/bin/bash"),
+                arguments: ["--noprofile", "--norc", "-c", shellScript],
+                canonicalWorkingDirectory: outside,
+                timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )),
+            ("shell.run", RuntimeJobRequest(
+                kind: .shell,
+                profile: .zshNoProfile,
+                context: fixture.context,
+                script: shellScript,
+                canonicalWorkingDirectory: outside,
+                timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )),
+            ("bash.run", RuntimeJobRequest(
+                kind: .bash,
+                profile: .bashNoProfile,
+                context: fixture.context,
+                script: shellScript,
+                canonicalWorkingDirectory: outside,
+                timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )),
+            ("shell_exec", RuntimeJobRequest(
+                kind: .bash,
+                profile: .legacyBashLogin,
+                context: fixture.context,
+                script: shellScript,
+                canonicalWorkingDirectory: outside,
+                timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )),
+        ]
+        if capabilities.python.available {
+            requests.append(("python.run", RuntimeJobRequest(
+                kind: .python,
+                profile: .pythonIsolated,
+                context: fixture.context,
+                script: "import os,pathlib,subprocess;assert os.environ['FORGE_NATIVE_ACCESS_SENTINEL']=='inherited';subprocess.run(['/bin/ps','-p',str(os.getpid())],check=True,stdout=subprocess.DEVNULL);print(pathlib.Path('\(externalFile.path)').read_text(),end='')",
+                canonicalWorkingDirectory: outside,
+                timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )))
+        }
+        if capabilities.powershell.available {
+            requests.append(("powershell.run", RuntimeJobRequest(
+                kind: .powershell,
+                profile: .powershellNoProfile,
+                context: fixture.context,
+                script: "if ($env:FORGE_NATIVE_ACCESS_SENTINEL -ne 'inherited') { exit 65 }; & /bin/ps -p $PID -o pid= | Out-Null; [Console]::Out.Write([IO.File]::ReadAllText('\(externalFile.path)'))",
+                canonicalWorkingDirectory: outside,
+                timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )))
+        }
+
+        for (tool, request) in requests {
+            let jobID = try await fixture.service.submit(request)
+            let record = try await fixture.service.waitForTerminal(
+                jobID: jobID,
+                context: fixture.context,
+                maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(record.state, .completed, "\(tool): \(record)")
+            XCTAssertEqual(record.exitCode, 0, tool)
+            let output = try await fixture.service.readOutput(
+                jobID: jobID,
+                stream: .stdout,
+                offset: 0,
+                limit: 1_024,
+                context: fixture.context
+            )
+            XCTAssertEqual(String(decoding: output.data, as: UTF8.self), "all-runtime-native-access", tool)
+        }
         await fixture.close()
     }
 
@@ -3561,14 +3816,13 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
-    func testRuntimeSandboxAncestorTraversalDoesNotPermitSiblingEnumeration() async throws {
+    func testRuntimeCanEnumerateSiblingOutsideProjectRoot() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let sibling = fixture.root.appendingPathComponent("sibling-secret")
         try Data("sibling".utf8).write(to: sibling, options: .atomic)
         let script = """
-        if /bin/ls '\(fixture.root.path)' >/dev/null 2>&1; then exit 91; fi
-        printf 'enumeration-denied'
+        /bin/ls '\(fixture.root.path)'
         """
         let jobID = try await fixture.service.submit(
             fixture.request(
@@ -3591,11 +3845,11 @@ final class RuntimeExecutionJobTests: XCTestCase {
             limit: 1_024,
             context: fixture.context
         )
-        XCTAssertEqual(String(decoding: output.data, as: UTF8.self), "enumeration-denied")
+        XCTAssertTrue(String(decoding: output.data, as: UTF8.self).contains("sibling-secret"))
         await fixture.close()
     }
 
-    func testRuntimeSandboxDeniesProcessGroupEscapeSyscalls() async throws {
+    func testNativeRuntimeDoesNotApplySeatbeltSyscallDenials() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let jobID = try await fixture.service.submit(
@@ -3607,7 +3861,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
                 arguments: [
                     "-MPOSIX",
                     "-e",
-                    "exit(POSIX::setsid() == -1 ? 0 : 91)",
+                    "my $pid = fork(); exit 92 unless defined $pid; if ($pid == 0) { exit(POSIX::setsid() == -1 ? 91 : 0); } waitpid($pid, 0); exit($? >> 8);",
                 ],
                 canonicalWorkingDirectory: fixture.projectRoot,
                 timeout: .seconds(5),
@@ -3625,7 +3879,254 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
-    func testRuntimeSandboxDeniesPosixSpawnWithNewProcessGroup() async throws {
+    func testObservedSetsidSleeperIsReapedAfterNativeParentCompletes() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let pidFile = fixture.projectRoot.appendingPathComponent("setsid-sleeper.pid")
+        let program = """
+        my $pid = fork();
+        exit 90 unless defined $pid;
+        if ($pid == 0) {
+          exit 91 if POSIX::setsid() == -1;
+          open(my $fh, '>', 'setsid-sleeper.pid') or exit 92;
+          print $fh "$$\\n";
+          close($fh);
+          sleep 30;
+          exit 0;
+        }
+        select(undef, undef, undef, 0.75);
+        exit 0;
+        """
+        let jobID = try await fixture.service.submit(
+            RuntimeJobRequest(
+                kind: .process,
+                profile: .directProcess,
+                context: fixture.context,
+                executable: URL(fileURLWithPath: "/usr/bin/perl"),
+                arguments: ["-MPOSIX", "-e", program],
+                canonicalWorkingDirectory: fixture.projectRoot,
+                timeout: .seconds(8),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+                replayClass: .readOnly
+            )
+        )
+        let pidFileReady = await Self.waitForFile(pidFile)
+        XCTAssertTrue(pidFileReady)
+        let descendantPID = try Self.readPID(pidFile)
+        let descendantIdentity = try XCTUnwrap(
+            RuntimeProcessIdentityReader.observedIdentity(
+                processIdentifier: descendantPID
+            )
+        )
+        defer {
+            if RuntimeProcessIdentityReader.observedIdentity(
+                processIdentifier: descendantPID
+            )?.startIdentity == descendantIdentity.startIdentity {
+                _ = Darwin.kill(descendantPID, SIGKILL)
+            }
+        }
+
+        let record = try await fixture.service.waitForTerminal(
+            jobID: jobID,
+            context: fixture.context,
+            maximumWait: .seconds(8)
+        )
+        XCTAssertEqual(record.state, .completed)
+        let exactDescendantGone = await Self.waitUntil {
+            RuntimeProcessIdentityReader.observedIdentity(
+                processIdentifier: descendantPID
+            )?.startIdentity != descendantIdentity.startIdentity
+        }
+        XCTAssertTrue(exactDescendantGone, "observed setsid descendant survived terminal cleanup")
+        await fixture.close()
+    }
+
+    func testDescendantTrackerReportsBudgetOverflowAndRetainsObservedIdentitiesForCleanup() throws {
+        let rootIdentity = Self.processIdentity(pid: 101, parent: 1, startMicroseconds: 1)
+        let children = [
+            Self.processIdentity(pid: 102, parent: 101, startMicroseconds: 2),
+            Self.processIdentity(pid: 103, parent: 101, startMicroseconds: 3),
+            Self.processIdentity(pid: 104, parent: 101, startMicroseconds: 4),
+        ]
+        let reader = RuntimeProcessTreeStub(
+            identities: Dictionary(uniqueKeysWithValues: ([rootIdentity] + children).map {
+                ($0.processIdentifier, $0)
+            }),
+            children: [101: children.map(\.processIdentifier)]
+        )
+        let signaler = RuntimeProcessSignalerStub()
+        let tracker = RuntimeDescendantTracker(
+            rootIdentity: rootIdentity,
+            maximumDescendants: 2,
+            reader: reader,
+            signaler: signaler
+        )
+
+        XCTAssertEqual(
+            tracker.observe(),
+            .limitExceeded(observed: 3, trackingCapacityExceeded: false)
+        )
+        XCTAssertTrue(tracker.signalTracked(SIGKILL, includeRoot: false))
+        XCTAssertEqual(
+            signaler.signaledProcessIdentifiers(),
+            Set(children.map(\.processIdentifier))
+        )
+    }
+
+    func testFinalDescendantObservationPreservesHardCapGrowthBetweenCleanupScans() throws {
+        let rootIdentity = Self.processIdentity(pid: 501, parent: 1, startMicroseconds: 1)
+        let initialChildren = (0..<2).map { index in
+            Self.processIdentity(
+                pid: Int32(600 + index),
+                parent: rootIdentity.processIdentifier,
+                startMicroseconds: Int64(index + 2)
+            )
+        }
+        let reader = RuntimeProcessTreeStub(
+            identities: Dictionary(uniqueKeysWithValues: ([rootIdentity] + initialChildren).map {
+                ($0.processIdentifier, $0)
+            }),
+            children: [
+                rootIdentity.processIdentifier: initialChildren.map(\.processIdentifier),
+            ]
+        )
+        let tracker = RuntimeDescendantTracker(
+            rootIdentity: rootIdentity,
+            maximumDescendants: 1,
+            reader: reader,
+            signaler: RuntimeProcessSignalerStub()
+        )
+        var evidence = ExecutionJobService.RuntimeDescendantLimitEvidence()
+        evidence.record(tracker.observe())
+        XCTAssertTrue(evidence.exceededLimit)
+        XCTAssertFalse(evidence.trackingCapacityExceeded)
+
+        let grownChildren = (0...RuntimeDescendantTracker.maximumTrackedDescendants).map { index in
+            Self.processIdentity(
+                pid: Int32(1_000 + index),
+                parent: rootIdentity.processIdentifier,
+                startMicroseconds: Int64(index + 10)
+            )
+        }
+        reader.replace(
+            identities: grownChildren,
+            children: grownChildren.map(\.processIdentifier),
+            of: rootIdentity.processIdentifier
+        )
+        evidence.record(tracker.observe())
+
+        XCTAssertTrue(evidence.exceededLimit)
+        XCTAssertTrue(evidence.trackingCapacityExceeded)
+    }
+
+    func testDescendantTrackerExactHardCapWithoutAdditionalChildrenDoesNotOverflow() throws {
+        let rootIdentity = Self.processIdentity(pid: 801, parent: 1, startMicroseconds: 1)
+        let children = (0..<RuntimeDescendantTracker.maximumTrackedDescendants).map { index in
+            Self.processIdentity(
+                pid: Int32(2_000 + index),
+                parent: rootIdentity.processIdentifier,
+                startMicroseconds: Int64(index + 2)
+            )
+        }
+        let reader = RuntimeProcessTreeStub(
+            identities: Dictionary(uniqueKeysWithValues: ([rootIdentity] + children).map {
+                ($0.processIdentifier, $0)
+            }),
+            children: [rootIdentity.processIdentifier: children.map(\.processIdentifier)]
+        )
+        let tracker = RuntimeDescendantTracker(
+            rootIdentity: rootIdentity,
+            maximumDescendants: RuntimeDescendantTracker.maximumTrackedDescendants,
+            reader: reader,
+            signaler: RuntimeProcessSignalerStub()
+        )
+
+        XCTAssertEqual(
+            tracker.observe(),
+            .withinLimit(observed: RuntimeDescendantTracker.maximumTrackedDescendants)
+        )
+    }
+
+    func testDescendantTrackerHardCapPlusOneRemainsExplicitButCannotCreateImmortalLiveness() throws {
+        let rootIdentity = Self.processIdentity(pid: 901, parent: 1, startMicroseconds: 1)
+        let children = (0..<RuntimeDescendantTracker.maximumTrackedDescendants).map { index in
+            Self.processIdentity(
+                pid: Int32(1_000 + index),
+                parent: rootIdentity.processIdentifier,
+                startMicroseconds: Int64(index + 2)
+            )
+        }
+        let untrackedGrandchild = Self.processIdentity(
+            pid: 10_000,
+            parent: children[0].processIdentifier,
+            startMicroseconds: 900_000
+        )
+        let reader = RuntimeProcessTreeStub(
+            identities: Dictionary(uniqueKeysWithValues:
+                ([rootIdentity] + children + [untrackedGrandchild]).map {
+                ($0.processIdentifier, $0)
+            }),
+            children: [
+                rootIdentity.processIdentifier: children.map(\.processIdentifier),
+                children[0].processIdentifier: [untrackedGrandchild.processIdentifier],
+            ]
+        )
+        let signaler = RuntimeProcessSignalerStub()
+        let tracker = RuntimeDescendantTracker(
+            rootIdentity: rootIdentity,
+            maximumDescendants: RuntimeDescendantTracker.maximumTrackedDescendants,
+            reader: reader,
+            signaler: signaler
+        )
+
+        XCTAssertEqual(
+            tracker.observe(),
+            .limitExceeded(
+                observed: RuntimeDescendantTracker.maximumTrackedDescendants,
+                trackingCapacityExceeded: true
+            )
+        )
+        XCTAssertTrue(tracker.signalTracked(SIGKILL, includeRoot: true))
+        XCTAssertEqual(
+            signaler.signaledProcessIdentifiers().count,
+            RuntimeDescendantTracker.maximumTrackedDescendants + 1
+        )
+
+        reader.removeAllProcesses()
+        XCTAssertEqual(
+            tracker.observe(),
+            .limitExceeded(observed: 0, trackingCapacityExceeded: true)
+        )
+        XCTAssertFalse(tracker.hasLiveTrackedProcesses(includeRoot: true))
+    }
+
+    func testDescendantTrackerNeverSignalsReusedPIDWithMismatchedStartIdentity() throws {
+        let rootIdentity = Self.processIdentity(pid: 201, parent: 1, startMicroseconds: 1)
+        let childIdentity = Self.processIdentity(pid: 202, parent: 201, startMicroseconds: 2)
+        let reader = RuntimeProcessTreeStub(
+            identities: [201: rootIdentity, 202: childIdentity],
+            children: [201: [202]]
+        )
+        let signaler = RuntimeProcessSignalerStub()
+        let tracker = RuntimeDescendantTracker(
+            rootIdentity: rootIdentity,
+            maximumDescendants: 4,
+            reader: reader,
+            signaler: signaler
+        )
+        XCTAssertEqual(tracker.observe(), .withinLimit(observed: 1))
+
+        reader.replace(
+            identity: Self.processIdentity(pid: 202, parent: 1, startMicroseconds: 9),
+            children: [],
+            of: rootIdentity.processIdentifier
+        )
+        XCTAssertTrue(tracker.signalTracked(SIGKILL, includeRoot: false))
+        XCTAssertTrue(signaler.signaledProcessIdentifiers().isEmpty)
+        XCTAssertFalse(tracker.hasLiveTrackedProcesses(includeRoot: false))
+    }
+
+    func testNativeRuntimeAllowsPosixSpawnWithNewProcessGroup() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let source = fixture.projectRoot.appendingPathComponent("spawn-probe.c")
@@ -3655,11 +4156,11 @@ final class RuntimeExecutionJobTests: XCTestCase {
                 environ
             );
             posix_spawnattr_destroy(&attributes);
-            if (result == EPERM) return 0;
+            if (result == EPERM) return 91;
             if (result == 0) {
                 kill(-child, SIGKILL);
                 waitpid(child, NULL, 0);
-                return 91;
+                return 0;
             }
             return 92;
         }
@@ -3695,7 +4196,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
-    func testRuntimeSandboxEnforcesNetworkAuthorizationBit() async throws {
+    func testNativeRuntimeNetworkIsNotRestrictedByLegacyScopeMetadata() async throws {
         let listener = try Self.makeLoopbackListener()
         defer { Darwin.close(listener.descriptor) }
 
@@ -3719,8 +4220,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
             context: denied.context,
             maximumWait: .seconds(6)
         )
-        XCTAssertEqual(deniedRecord.state, .failed)
-        XCTAssertNotEqual(deniedRecord.exitCode, 0)
+        XCTAssertEqual(deniedRecord.state, .completed)
+        XCTAssertEqual(deniedRecord.exitCode, 0)
         await denied.close()
 
         let allowed = try await Fixture.make(networkAllowed: true)
@@ -3748,7 +4249,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await allowed.close()
     }
 
-    func testRuntimeNetworkAuthorizationStillDeniesUnixSocketBrokers() async throws {
+    func testNativeRuntimeCanUseUnixSockets() async throws {
         let token = UUID().uuidString.prefix(12).lowercased()
         let socketURL = URL(fileURLWithPath: "/tmp/fc-unix-\(token).sock")
         let listener = try Self.makeUnixListener(
@@ -3761,13 +4262,39 @@ final class RuntimeExecutionJobTests: XCTestCase {
 
         let fixture = try await Fixture.make(networkAllowed: true)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.projectRoot.appendingPathComponent("unix-connect-probe.c")
+        let executable = fixture.projectRoot.appendingPathComponent("unix-connect-probe")
+        try """
+        #include <sys/socket.h>
+        #include <sys/un.h>
+        #include <string.h>
+        #include <unistd.h>
+
+        int main(int argc, char **argv) {
+            if (argc != 2) return 64;
+            int descriptor = socket(AF_UNIX, SOCK_STREAM, 0);
+            if (descriptor < 0) return 65;
+            struct sockaddr_un address = {0};
+            address.sun_family = AF_UNIX;
+            if (strlcpy(address.sun_path, argv[1], sizeof(address.sun_path)) >= sizeof(address.sun_path)) return 66;
+            int result = connect(descriptor, (struct sockaddr *)&address, sizeof(address));
+            close(descriptor);
+            return result == 0 ? 0 : 67;
+        }
+        """.write(to: source, atomically: true, encoding: .utf8)
+        let compilation = try ProcessRunner().run(
+            executable: "/usr/bin/clang",
+            arguments: ["-Wall", "-Wextra", "-Werror", source.path, "-o", executable.path],
+            timeoutSec: 30
+        )
+        XCTAssertEqual(compilation.exitCode, 0, compilation.stderr)
         let jobID = try await fixture.service.submit(
             RuntimeJobRequest(
                 kind: .process,
                 profile: .directProcess,
                 context: fixture.context,
-                executable: URL(fileURLWithPath: "/usr/bin/nc"),
-                arguments: ["-U", listener.path],
+                executable: executable,
+                arguments: [listener.path],
                 canonicalWorkingDirectory: fixture.projectRoot,
                 timeout: .seconds(2),
                 maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
@@ -3779,12 +4306,12 @@ final class RuntimeExecutionJobTests: XCTestCase {
             context: fixture.context,
             maximumWait: .seconds(5)
         )
-        XCTAssertEqual(record.state, .failed)
-        XCTAssertNotEqual(record.exitCode, 0)
+        XCTAssertEqual(record.state, .completed)
+        XCTAssertEqual(record.exitCode, 0)
         await fixture.close()
     }
 
-    func testRuntimeSandboxBlocksMachBrokerDelegationEvenWhenNetworkIsAllowed() async throws {
+    func testNativeRuntimeCanUseSecurityFrameworkBroker() async throws {
         let fixture = try await Fixture.make(networkAllowed: true)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let jobID = try await fixture.service.submit(
@@ -3805,156 +4332,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
             context: fixture.context,
             maximumWait: .seconds(6)
         )
-        XCTAssertEqual(record.state, .failed)
-        XCTAssertNotEqual(record.exitCode, 0)
+        XCTAssertEqual(record.state, .completed)
+        XCTAssertEqual(record.exitCode, 0)
         await fixture.close()
-    }
-
-    func testRuntimeReadAliasResolvesForKernelWithoutAuthorizingSiblingData() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("forge-runtime-alias-\(UUID().uuidString)", isDirectory: true)
-        let physical = root.appendingPathComponent("Runtime_26.6", isDirectory: true)
-        let alias = root.appendingPathComponent("Runtime", isDirectory: true)
-        let library = physical.appendingPathComponent("library")
-        let sibling = root.appendingPathComponent("private-sibling")
-        try FileManager.default.createDirectory(at: physical, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        try Data("runtime-library".utf8).write(to: library)
-        try Data("private-data".utf8).write(to: sibling)
-        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: physical)
-
-        let paths = RuntimeProcessSandbox.canonicalReadPaths([alias.path])
-        XCTAssertEqual(paths, [RuntimeProcessSandbox.canonicalExistingURL(physical).path])
-        let allowed = try XCTUnwrap(paths.first)
-        let project = root.appendingPathComponent("project", isDirectory: true)
-        let artifacts = root.appendingPathComponent("artifacts", isDirectory: true)
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        for directory in [project, artifacts, scratch] {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        }
-        let plan = try RuntimeProcessSandbox.plan(
-            executable: URL(fileURLWithPath: "/bin/cat"), arguments: [],
-            workingDirectory: project, environment: [:],
-            canonicalReadRoots: [project], canonicalWritableRoots: [],
-            managerReadDirectory: artifacts, scratchDirectory: scratch,
-            networkAllowed: false
-        )
-        let baseProfile = try XCTUnwrap(plan.arguments.dropFirst().first)
-        let profile = baseProfile + "\n(allow file-read* (subpath \"\(allowed)\"))"
-        let runner = ProcessRunner()
-        let libraryPath = RuntimeProcessSandbox.canonicalExistingURL(library).path
-        let siblingPath = RuntimeProcessSandbox.canonicalExistingURL(sibling).path
-        let success = try runner.run(executable: "/usr/bin/sandbox-exec",
-                                     arguments: ["-p", profile, "/bin/cat", libraryPath],
-                                     timeoutSec: 5)
-        XCTAssertEqual(success.exitCode, 0, success.stderr)
-        XCTAssertEqual(success.stdout, "runtime-library")
-        let denied = try runner.run(executable: "/usr/bin/sandbox-exec",
-                                    arguments: ["-p", profile, "/bin/cat", siblingPath],
-                                    timeoutSec: 5)
-        XCTAssertNotEqual(denied.exitCode, 0)
-        XCTAssertFalse(denied.stdout.contains("private-data"))
-    }
-
-    func testRuntimeSandboxProtectsNativeValidationInsideBroaderGrant() throws {
-        let root = RuntimeProcessSandbox.canonicalExistingURL(FileManager.default.temporaryDirectory).appendingPathComponent("validation-sandbox-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let project = root.appendingPathComponent("project")
-        let manager = project.appendingPathComponent("manager")
-        let protected = manager.appendingPathComponent("native-validation")
-        let artifacts = root.appendingPathComponent("artifacts")
-        let scratch = root.appendingPathComponent("scratch")
-        for directory in [protected, artifacts, scratch] {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        }
-        let policy = protected.appendingPathComponent("policy.json")
-        try Data("trusted".utf8).write(to: policy)
-        let alias = project.appendingPathComponent("alias")
-        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: protected)
-        func execute(_ command: String, _ arguments: [String], protect: Bool = true) throws -> ProcessResult {
-            let plan = try RuntimeProcessSandbox.plan(
-                executable: URL(fileURLWithPath: command), arguments: arguments,
-                workingDirectory: project, environment: [:], canonicalReadRoots: [project],
-                canonicalWritableRoots: [project], managerReadDirectory: artifacts,
-                scratchDirectory: scratch, networkAllowed: false, protectedDirectories: protect ? [protected] : []
-            )
-            return try ProcessRunner().run(executable: plan.executable.path, arguments: plan.arguments, timeoutSec: 5)
-        }
-        let baseline = try execute("/bin/cat", [policy.path], protect: false)
-        XCTAssertEqual(baseline.stdout, "trusted", baseline.stderr)
-        for path in [policy.path, alias.appendingPathComponent("policy.json").path] {
-            let read = try execute("/bin/cat", [path])
-            XCTAssertNotEqual(read.exitCode, 0)
-            XCTAssertFalse(read.stdout.contains("trusted"))
-            XCTAssertNotEqual(try execute("/usr/bin/touch", [path]).exitCode, 0)
-        }
-        XCTAssertNotEqual(try execute("/bin/mv", [manager.path, project.appendingPathComponent("renamed").path]).exitCode, 0)
-        XCTAssertEqual(try Data(contentsOf: policy), Data("trusted".utf8))
-        let ordinary = try execute("/usr/bin/touch", [project.appendingPathComponent("ordinary").path])
-        XCTAssertEqual(ordinary.exitCode, 0, ordinary.stderr)
-    }
-
-    func testRuntimeSandboxProfileIsDenyByDefaultAndExcludesMutableUSRPrefix() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("forge-runtime-profile-\(UUID().uuidString)", isDirectory: true)
-        let project = root.appendingPathComponent("project", isDirectory: true)
-        let artifacts = root.appendingPathComponent("artifacts", isDirectory: true)
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: artifacts, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        let plan = try RuntimeProcessSandbox.plan(
-            executable: URL(fileURLWithPath: "/usr/bin/printf"),
-            arguments: ["ok"],
-            workingDirectory: project,
-            environment: [:],
-            canonicalReadRoots: [project],
-            canonicalWritableRoots: [project],
-            managerReadDirectory: artifacts,
-            scratchDirectory: scratch,
-            networkAllowed: false
-        )
-        let profile = try XCTUnwrap(plan.arguments.dropFirst().first)
-        XCTAssertTrue(profile.contains("(deny default)"))
-        XCTAssertFalse(profile.contains("(allow default)"))
-        XCTAssertFalse(profile.contains("(allow mach"))
-        XCTAssertFalse(profile.contains("(subpath \"/usr\")"))
-        XCTAssertTrue(profile.contains("(subpath \"/usr/bin\")"))
-        XCTAssertTrue(profile.contains("(deny syscall-unix (syscall-number 82 147 244))"))
-        XCTAssertTrue(profile.contains("allow file-read-metadata file-test-existence"))
-        XCTAssertFalse(profile.contains("(allow network"))
-        XCTAssertFalse(profile.contains("system-socket"))
-    }
-
-    func testRuntimeSandboxRejectsManagerOutputInsideChildWritableRoot() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("forge-runtime-output-overlap-\(UUID().uuidString)", isDirectory: true)
-        let project = root.appendingPathComponent("project", isDirectory: true)
-        let artifacts = project.appendingPathComponent("runtime-artifacts/job", isDirectory: true)
-        let scratch = root.appendingPathComponent("scratch", isDirectory: true)
-        for directory in [project, artifacts, scratch] {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        }
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        XCTAssertThrowsError(
-            try RuntimeProcessSandbox.plan(
-                executable: URL(fileURLWithPath: "/usr/bin/printf"),
-                arguments: ["blocked"],
-                workingDirectory: project,
-                environment: [:],
-                canonicalReadRoots: [project],
-                canonicalWritableRoots: [project],
-                managerReadDirectory: artifacts,
-                scratchDirectory: scratch,
-                networkAllowed: false
-            )
-        ) { error in
-            XCTAssertEqual((error as? RuntimeJobError)?.code, "invalid_request")
-            XCTAssertTrue(error.localizedDescription.contains("durable output"))
-        }
     }
 
     func testLegacyBashLoginCompatibilityProfileIsExposedWithoutChangingShellToolPack() async throws {
@@ -4487,6 +4867,41 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertEqual(job.state, .completed)
     }
 
+    func testBootstrapRouterLegacyShellExecRetainsNativeAccessOutsideProjectRoot() async throws {
+        let fixture = try ProductionFixture.make(clientName: "runtime-native-legacy-shell")
+        defer { fixture.close() }
+        let context = try fixture.bindProject()
+        let external = fixture.root.appendingPathComponent("owner-authorized-native-shell.txt")
+        try Data("native-shell-access".utf8).write(to: external, options: .atomic)
+        let quotedExternal = "'" + external.path.replacingOccurrences(
+            of: "'",
+            with: "'\"'\"'"
+        ) + "'"
+
+        let result = try fixture.app.tools.call(
+            name: "shell_exec",
+            arguments: [
+                "command": "/bin/ps -p $$ -o pid= >/dev/null && /bin/cat \(quotedExternal)",
+                "cwd": fixture.projectRoot.path,
+                "timeout_sec": 5,
+            ],
+            clientID: fixture.clientID
+        )
+
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(result.payload["stdout"] as? String, "native-shell-access")
+        XCTAssertEqual((result.payload["exit_code"] as? NSNumber)?.int32Value, 0)
+        let jobs = try await fixture.app.runtimeJobs.repository.list(context: context)
+        XCTAssertEqual(
+            jobs.filter { $0.executionProfile == .legacyBashLogin }.count,
+            1
+        )
+        XCTAssertEqual(
+            jobs.first { $0.executionProfile == .legacyBashLogin }?.state,
+            .completed
+        )
+    }
+
     func testBootstrapRouterRunsDurableShellJobAndReadsBoundedOutput() async throws {
         let fixture = try ProductionFixture.make(clientName: "runtime-durable-shell")
         defer { fixture.close() }
@@ -4843,6 +5258,22 @@ final class RuntimeExecutionJobTests: XCTestCase {
         return pid
     }
 
+    private static func processIdentity(
+        pid: Int32,
+        parent: Int32,
+        startMicroseconds: Int64
+    ) -> RuntimeObservedProcessIdentity {
+        RuntimeObservedProcessIdentity(
+            processIdentifier: pid,
+            parentProcessIdentifier: parent,
+            processGroupIdentifier: pid,
+            startIdentity: RuntimeProcessStartIdentity(
+                seconds: 1,
+                microseconds: startMicroseconds
+            )!
+        )
+    }
+
     private static func waitForFile(_ url: URL) async -> Bool {
         for _ in 0..<200 {
             if FileManager.default.fileExists(atPath: url.path) { return true }
@@ -5011,6 +5442,8 @@ final class RuntimeExecutionJobTests: XCTestCase {
             terminalPersistenceHook: any RuntimeJobTerminalPersistenceHook =
                 NoopRuntimeJobTerminalPersistenceHook(),
             recoveredProcessController: (any RuntimeRecoveredProcessControlling)? = nil,
+            terminationRecoveryPolicy:
+                ExecutionJobService.RuntimeTerminationRecoveryPolicy? = nil,
             afterMutationCommitObserver: (@Sendable (RuntimeJobCommitKind) -> Void)? = nil
         ) async throws -> Fixture {
             let root = FileManager.default.temporaryDirectory
@@ -5057,6 +5490,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
             )
             if let recoveredProcessController {
                 try await service.setRecoveredProcessController(recoveredProcessController)
+            }
+            if let terminationRecoveryPolicy {
+                try await service.setTerminationRecoveryPolicy(terminationRecoveryPolicy)
             }
             try await service.start()
             return Fixture(
@@ -5202,6 +5638,88 @@ final class RuntimeExecutionJobTests: XCTestCase {
         func close() {
             app.shutdown()
             try? FileManager.default.removeItem(at: root)
+        }
+    }
+
+    private final class RuntimeProcessTreeStub: RuntimeProcessTreeReading, @unchecked Sendable {
+        private let lock = NSLock()
+        private var identities: [Int32: RuntimeObservedProcessIdentity]
+        private var childrenByParent: [Int32: [Int32]]
+
+        init(
+            identities: [Int32: RuntimeObservedProcessIdentity],
+            children: [Int32: [Int32]]
+        ) {
+            self.identities = identities
+            childrenByParent = children
+        }
+
+        func identity(processIdentifier: Int32) -> RuntimeObservedProcessIdentity? {
+            lock.lock()
+            defer { lock.unlock() }
+            return identities[processIdentifier]
+        }
+
+        func children(
+            of processIdentifier: Int32,
+            maximumCount: Int
+        ) -> RuntimeChildProcessList {
+            lock.lock()
+            defer { lock.unlock() }
+            let all = childrenByParent[processIdentifier] ?? []
+            return RuntimeChildProcessList(
+                processIdentifiers: Array(all.prefix(maximumCount)),
+                complete: all.count < maximumCount
+            )
+        }
+
+        func replace(
+            identity: RuntimeObservedProcessIdentity,
+            children: [Int32],
+            of parentProcessIdentifier: Int32
+        ) {
+            lock.lock()
+            identities[identity.processIdentifier] = identity
+            childrenByParent[parentProcessIdentifier] = children
+            lock.unlock()
+        }
+
+        func replace(
+            identities newIdentities: [RuntimeObservedProcessIdentity],
+            children: [Int32],
+            of parentProcessIdentifier: Int32
+        ) {
+            lock.lock()
+            for identity in newIdentities {
+                identities[identity.processIdentifier] = identity
+            }
+            childrenByParent[parentProcessIdentifier] = children
+            lock.unlock()
+        }
+
+        func removeAllProcesses() {
+            lock.lock()
+            identities.removeAll(keepingCapacity: false)
+            childrenByParent.removeAll(keepingCapacity: false)
+            lock.unlock()
+        }
+    }
+
+    private final class RuntimeProcessSignalerStub: RuntimeProcessSignaling, @unchecked Sendable {
+        private let lock = NSLock()
+        private var processIdentifiers: Set<Int32> = []
+
+        func signal(processIdentifier: Int32, signal _: Int32) -> Int32 {
+            lock.lock()
+            processIdentifiers.insert(processIdentifier)
+            lock.unlock()
+            return 0
+        }
+
+        func signaledProcessIdentifiers() -> Set<Int32> {
+            lock.lock()
+            defer { lock.unlock() }
+            return processIdentifiers
         }
     }
 

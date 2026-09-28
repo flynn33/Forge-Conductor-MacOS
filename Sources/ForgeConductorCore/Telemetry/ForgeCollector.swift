@@ -562,6 +562,8 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
 /// into one MCP card set. Runtime process enumeration stays in `ProcessDiscovery`;
 /// this type owns only the pure merge and presentation-state policy.
 struct MCPServerCardAssembler {
+    private static let maximumPresenceHeartbeatAgeSec = 90
+
     private struct PresenceObservation {
         var record: PresenceRecord
         var processUp: Bool
@@ -763,11 +765,9 @@ struct MCPServerCardAssembler {
                 return nil
             }
 
-            let processUp = record.pid > 0 && isPIDAlive(record.pid)
             let age = heartbeatAgeSec(record.lastHeartbeat)
-            if !processUp && (age == nil || (age ?? 0) > 90) {
-                return nil
-            }
+            guard let age, age <= Self.maximumPresenceHeartbeatAgeSec else { return nil }
+            let processUp = record.pid > 0 && isPIDAlive(record.pid)
             return PresenceObservation(record: record, processUp: processUp)
         }
     }

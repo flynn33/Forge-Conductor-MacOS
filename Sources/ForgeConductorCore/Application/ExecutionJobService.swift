@@ -140,32 +140,31 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
     }
 
     public func discover(limits: RuntimeJobLimits = .current) -> RuntimeCapabilities {
-        let isolationAvailable = RuntimeProcessSandbox.isAvailable
-            && RuntimeLaunchGate.isAvailable
+        let launchAvailable = RuntimeLaunchGate.isAvailable
         let zsh = Self.capability(
             path: "/bin/zsh",
             required: true,
-            isolationAvailable: isolationAvailable
+            launchAvailable: launchAvailable
         )
         let bash = Self.capability(
             path: "/bin/bash",
             required: true,
-            isolationAvailable: isolationAvailable
+            launchAvailable: launchAvailable
         )
         let python = Self.pythonCapability(
             configured: configuredPython,
-            isolationAvailable: isolationAvailable
+            launchAvailable: launchAvailable
         )
         let powershell = Self.powershellCapability(
             configured: configuredPowerShell,
-            isolationAvailable: isolationAvailable
+            launchAvailable: launchAvailable
         )
         return RuntimeCapabilities(
             directProcess: RuntimeExecutableCapability(
-                available: isolationAvailable,
-                executablePath: isolationAvailable ? RuntimeProcessSandbox.executable.path : nil,
+                available: launchAvailable,
+                executablePath: nil,
                 required: true,
-                probeState: isolationAvailable ? .available : .unknown
+                probeState: launchAvailable ? .available : .unknown
             ),
             zsh: zsh,
             bash: bash,
@@ -184,24 +183,12 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
 
     private static func pythonCapability(
         configured: URL?,
-        isolationAvailable: Bool
+        launchAvailable: Bool
     ) -> RuntimeExecutableCapability {
         if let configured {
-            if configured.standardizedFileURL.path == "/usr/bin/python3" {
-                return pythonCapability(configured: nil, isolationAvailable: isolationAvailable)
-            }
-            guard RuntimeProcessSandbox.isImmutableSystemRuntime(configured) else {
-                return RuntimeExecutableCapability(
-                    available: false,
-                    executablePath: nil,
-                    required: false,
-                    probeState: FileManager.default.fileExists(atPath: configured.path)
-                        ? .notAuthorized : .notInstalled
-                )
-            }
             return verifiedPythonCapability(
                 configured,
-                isolationAvailable: isolationAvailable
+                launchAvailable: launchAvailable
             )
         }
         let xcodePython = URL(
@@ -211,7 +198,7 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         if FileManager.default.isExecutableFile(atPath: xcodePython.path) {
             return verifiedPythonCapability(
                 xcodePython,
-                isolationAvailable: isolationAvailable
+                launchAvailable: launchAvailable
             )
         }
         guard let discovered = ProcessRunner.which("python3"),
@@ -219,20 +206,15 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
             return RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
                                                probeState: .notInstalled)
         }
-        let discoveredURL = URL(fileURLWithPath: discovered)
-        guard RuntimeProcessSandbox.isImmutableSystemRuntime(discoveredURL) else {
-            return RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
-                                               probeState: .notAuthorized)
-        }
         return verifiedPythonCapability(
-            discoveredURL,
-            isolationAvailable: isolationAvailable
+            URL(fileURLWithPath: discovered),
+            launchAvailable: launchAvailable
         )
     }
 
     private static func powershellCapability(
         configured: URL?,
-        isolationAvailable: Bool
+        launchAvailable: Bool
     ) -> RuntimeExecutableCapability {
         let candidate: URL?
         if let configured {
@@ -242,51 +224,49 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         } else {
             candidate = nil
         }
-        guard let candidate,
-              RuntimeProcessSandbox.isImmutableSystemRuntime(candidate) else {
+        guard let candidate else {
             return RuntimeExecutableCapability(available: false, executablePath: nil, required: false,
-                                               probeState: candidate == nil ? .notInstalled : .notAuthorized)
+                                               probeState: .notInstalled)
         }
         return verifiedPowerShellCapability(
             candidate,
-            isolationAvailable: isolationAvailable
+            launchAvailable: launchAvailable
         )
     }
 
     private static func verifiedPythonCapability(
         _ candidate: URL,
-        isolationAvailable: Bool
+        launchAvailable: Bool
     ) -> RuntimeExecutableCapability {
         verifiedOptionalCapability(
             candidate,
-            isolationAvailable: isolationAvailable,
+            launchAvailable: launchAvailable,
             probe: probePython
         )
     }
 
     private static func verifiedPowerShellCapability(
         _ candidate: URL,
-        isolationAvailable: Bool
+        launchAvailable: Bool
     ) -> RuntimeExecutableCapability {
         verifiedOptionalCapability(
             candidate,
-            isolationAvailable: isolationAvailable,
+            launchAvailable: launchAvailable,
             probe: probePowerShell
         )
     }
 
     private static func verifiedOptionalCapability(
         _ candidate: URL,
-        isolationAvailable: Bool,
+        launchAvailable: Bool,
         probe: (URL) -> Bool
     ) -> RuntimeExecutableCapability {
-        guard isolationAvailable else { return unavailableOptionalCapability(state: .unknown) }
-        let canonical = RuntimeProcessSandbox.canonicalExistingURL(candidate)
+        guard launchAvailable else { return unavailableOptionalCapability(state: .unknown) }
+        let canonical = RuntimePathCanonicalizer.canonicalExistingURL(candidate)
         guard FileManager.default.fileExists(atPath: canonical.path) else {
             return unavailableOptionalCapability(state: .notInstalled)
         }
-        guard RuntimeProcessSandbox.isImmutableSystemRuntime(canonical),
-              FileManager.default.isExecutableFile(atPath: canonical.path) else {
+        guard FileManager.default.isExecutableFile(atPath: canonical.path) else {
             return RuntimeExecutableCapability(available: false, executablePath: canonical.path,
                                                required: false, probeState: .notAuthorized)
         }
@@ -387,10 +367,10 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
     private static func capability(
         path: String,
         required: Bool,
-        isolationAvailable: Bool
+        launchAvailable: Bool
     ) -> RuntimeExecutableCapability {
         let canonical = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
-        let available = isolationAvailable
+        let available = launchAvailable
             && FileManager.default.isExecutableFile(atPath: canonical.path)
         return RuntimeExecutableCapability(
             available: available,
@@ -398,12 +378,50 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
             required: required,
             probeState: available
                 ? .available
-                : (isolationAvailable ? .notInstalled : .unknown)
+                : (launchAvailable ? .notInstalled : .unknown)
         )
     }
 }
 
 public actor ExecutionJobService: ExecutionJobServicing {
+    private static let maximumStartupCleanupDebtRetries = 1
+    private static let maximumStartupCleanupDebtsPerLaunch = 8
+    private static let maximumStartupCleanupDebtSweepMilliseconds = 10_000
+    private static let cleanupDebtRetryWindowSeconds: TimeInterval = 24 * 60 * 60
+
+    struct RuntimeTerminationRecoveryPolicy: Sendable, Equatable {
+        static let production = RuntimeTerminationRecoveryPolicy(
+            maximumAttempts: 8,
+            maximumDurationMilliseconds: 30_000,
+            initialDelayMilliseconds: 25,
+            maximumDelayMilliseconds: 1_000
+        )
+
+        let maximumAttempts: Int
+        let maximumDurationMilliseconds: Int
+        let initialDelayMilliseconds: Int
+        let maximumDelayMilliseconds: Int
+
+        var isValid: Bool {
+            maximumAttempts > 0
+                && (1...120_000).contains(maximumDurationMilliseconds)
+                && initialDelayMilliseconds >= 0
+                && maximumDelayMilliseconds >= initialDelayMilliseconds
+                && maximumDelayMilliseconds <= maximumDurationMilliseconds
+        }
+    }
+
+    struct RuntimeDescendantLimitEvidence: Sendable, Equatable {
+        private(set) var exceededLimit = false
+        private(set) var trackingCapacityExceeded = false
+
+        mutating func record(_ observation: RuntimeDescendantObservation) {
+            guard case let .limitExceeded(_, capacityExceeded) = observation else { return }
+            exceededLimit = true
+            trackingCapacityExceeded = trackingCapacityExceeded || capacityExceeded
+        }
+    }
+
     private struct JobDirectoryCandidate: Sendable {
         let url: URL
         let root: URL
@@ -466,6 +484,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         let artifactID: String?
         let errorCode: String?
         let errorSummary: String?
+        let terminationCleanupRetryDeadline: String?
         let expectedContext: ToolInvocationContext?
     }
 
@@ -479,7 +498,6 @@ public actor ExecutionJobService: ExecutionJobServicing {
     private let discoveredCapabilities: RuntimeCapabilities
     private let processEnvironment: [String: String]
     private let launcherURL: URL
-    private let protectedDirectories: [URL]
     private var recoveredProcessController: any RuntimeRecoveredProcessControlling =
         DarwinRuntimeRecoveredProcessController()
     private var pending: [UUID: PendingExecution] = [:]
@@ -491,6 +509,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
     private var persistenceRecoveryTasks: [UUID: Task<Void, Never>] = [:]
     private var terminationRecoveryJobs: Set<UUID> = []
     private var terminationRecoveryTasks: [UUID: Task<Void, Never>] = [:]
+    private var terminationRecoveryPolicy = RuntimeTerminationRecoveryPolicy.production
     private var started = false
     private var shuttingDown = false
 
@@ -498,7 +517,6 @@ public actor ExecutionJobService: ExecutionJobServicing {
         repository: RuntimeJobRepository,
         contextValidator: any RuntimeJobContextValidating,
         artifactRoot: URL,
-        protectedDirectories: [URL] = [],
         limits: RuntimeJobLimits = .current,
         capabilityDiscoverer: RuntimeCapabilityDiscoverer = RuntimeCapabilityDiscoverer(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -533,7 +551,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             at: standardizedArtifactRoot,
             withIntermediateDirectories: true
         )
-        let canonicalArtifactRoot = RuntimeProcessSandbox.canonicalExistingURL(
+        let canonicalArtifactRoot = RuntimePathCanonicalizer.canonicalExistingURL(
             standardizedArtifactRoot
         )
         _ = chmod(canonicalArtifactRoot.path, S_IRWXU)
@@ -545,7 +563,6 @@ public actor ExecutionJobService: ExecutionJobServicing {
         self.launchObserver = launchObserver
         self.terminalPersistenceHook = terminalPersistenceHook
         self.artifactRoot = canonicalArtifactRoot
-        self.protectedDirectories = protectedDirectories
         self.limits = limits
         launcherURL = installedLauncher
         discoveredCapabilities = capabilityDiscoverer.discover(limits: limits)
@@ -555,15 +572,26 @@ public actor ExecutionJobService: ExecutionJobServicing {
     public func start() async throws {
         guard !started else { return }
         try await sweepOrphanedJobDirectories()
+        try await retryEligibleTerminalCleanupDebts()
         let interrupted = try await repository.nonterminalJobs()
         for job in interrupted {
             var recoverySummary =
                 "Execution owner restarted before a terminal job result was committed"
             if let identity = try await repository.recoveryProcessIdentity(jobID: job.jobID) {
-                recoverySummary += try await terminateRecoveredProcessGroup(
-                    jobID: job.jobID,
-                    identity: identity
-                )
+                do {
+                    recoverySummary += try await terminateRecoveredProcessGroup(
+                        jobID: job.jobID,
+                        identity: identity
+                    )
+                } catch let error as RuntimeJobError
+                where error.code == "runtime_termination_unconfirmed" {
+                    try await persistStartupCleanupDebt(
+                        job: job,
+                        identity: identity,
+                        error: error
+                    )
+                    continue
+                }
             } else if job.state == .queued {
                 recoverySummary +=
                     "; queued intent had no committed process owner, so its gated launcher could not execute the target"
@@ -586,6 +614,126 @@ public actor ExecutionJobService: ExecutionJobServicing {
         started = true
     }
 
+    private func persistStartupCleanupDebt(
+        job: RuntimeJobRecord,
+        identity: RuntimePersistedProcessIdentity,
+        error: Error
+    ) async throws {
+        let recoveryWindow = limits.terminationGraceMilliseconds
+            + limits.forcedTerminationGraceMilliseconds
+            + 500
+        let retryDeadline = Self.newCleanupDebtRetryDeadline()
+        let summary = Self.cleanupDebtSummary(
+            identity: identity,
+            attempts: 1,
+            maximumAttempts: 1,
+            recoveryWindowMilliseconds: recoveryWindow,
+            restartAttempts: Self.maximumStartupCleanupDebtRetries,
+            restartMaximumAttempts: Self.maximumStartupCleanupDebtRetries,
+            retryDeadline: retryDeadline,
+            resolved: false,
+            descendantTrackingCapacityExceeded: false,
+            lastError: error
+        )
+        try deleteInterruptedArtifacts(job)
+        _ = try await repository.complete(
+            jobID: job.jobID,
+            terminalState: .failed,
+            exitCode: job.exitCode,
+            outputs: [],
+            artifactID: nil,
+            errorCode: "runtime_termination_unconfirmed",
+            errorSummary: summary,
+            terminationCleanupRetryDeadline: retryDeadline,
+            expectedContext: nil
+        )
+    }
+
+    private func retryEligibleTerminalCleanupDebts() async throws {
+        let nowText = ISO8601.string(from: Date())
+        let debts = try await repository.eligibleTerminalCleanupDebts(
+            before: nowText,
+            limit: Self.maximumStartupCleanupDebtsPerLaunch
+        )
+        let clock = ContinuousClock()
+        let sweepDeadline = clock.now
+            + .milliseconds(Self.maximumStartupCleanupDebtSweepMilliseconds)
+        for debt in debts {
+            let sweepRemaining = Self.remainingMilliseconds(
+                before: sweepDeadline,
+                clock: clock
+            )
+            guard sweepRemaining > 0 else { break }
+            guard let persistedDeadline = ISO8601.date(from: debt.retryDeadline),
+                  persistedDeadline > Date() else { continue }
+            let remainingSeconds = max(0, persistedDeadline.timeIntervalSinceNow)
+            let retryMilliseconds = min(
+                limits.forcedTerminationGraceMilliseconds,
+                min(
+                    sweepRemaining,
+                    Int(min(remainingSeconds * 1_000, Double(Int.max)))
+                )
+            )
+            let deadline = clock.now + .milliseconds(max(0, retryMilliseconds))
+            let signal = await signalRecoveredProcessGroup(
+                SIGKILL,
+                identity: debt.identity,
+                before: deadline
+            )
+            let resolved: Bool
+            let evidence: String
+            switch signal {
+            case .processMissing:
+                resolved = true
+                evidence = "exact process group was already absent"
+            case .identityMismatch:
+                // The PID now names a different start identity. Never signal the
+                // replacement; the exact process recorded by the debt is gone.
+                resolved = true
+                evidence = "exact process identity was replaced; reused PID was not signaled"
+            case .signaled:
+                resolved = await recoveredProcessGroupIsGone(
+                    debt.identity,
+                    before: deadline
+                )
+                evidence = resolved
+                    ? "identity-fenced startup SIGKILL confirmed process-group death"
+                    : "process group remained alive after bounded startup SIGKILL"
+            case .identityUnavailable:
+                resolved = false
+                evidence = "exact process identity remained unavailable during bounded startup retry"
+            case .signalFailed(let error):
+                resolved = false
+                evidence = "bounded startup SIGKILL failed with errno \(error)"
+            }
+            let retryError = NSError(
+                domain: "ForgeRuntimeCleanupDebt",
+                code: resolved ? 0 : 1,
+                userInfo: [NSLocalizedDescriptionKey: evidence]
+            )
+            let summary = Self.cleanupDebtSummary(
+                identity: debt.identity,
+                attempts: 1,
+                maximumAttempts: 1,
+                recoveryWindowMilliseconds: retryMilliseconds,
+                restartAttempts: Self.maximumStartupCleanupDebtRetries,
+                restartMaximumAttempts: Self.maximumStartupCleanupDebtRetries,
+                retryDeadline: debt.retryDeadline,
+                resolved: resolved,
+                descendantTrackingCapacityExceeded:
+                    debt.errorSummary.contains(
+                        "descendant_tracking_capacity_exceeded=true"
+                    ),
+                lastError: retryError
+            )
+            try await repository.recordTerminalCleanupDebtRetry(
+                jobID: debt.jobID,
+                resolved: resolved,
+                errorSummary: summary
+            )
+        }
+    }
+
     private func terminateRecoveredProcessGroup(
         jobID: UUID,
         identity: RuntimePersistedProcessIdentity
@@ -599,7 +747,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
 
     private func reapPersistedProcessGroup(
         jobID: UUID,
-        identity: RuntimePersistedProcessIdentity
+        identity: RuntimePersistedProcessIdentity,
+        before overallDeadline: ContinuousClock.Instant? = nil
     ) async throws -> (
         termination: RuntimeRecoveredProcessSignalResult,
         forced: RuntimeRecoveredProcessSignalResult?
@@ -620,8 +769,10 @@ public actor ExecutionJobService: ExecutionJobServicing {
         }
 
         let clock = ContinuousClock()
-        let terminationDeadline = clock.now
-            + .milliseconds(max(0, limits.terminationGraceMilliseconds))
+        let terminationDeadline = Self.earlierDeadline(
+            clock.now + .milliseconds(max(0, limits.terminationGraceMilliseconds)),
+            than: overallDeadline
+        )
         var termination: RuntimeRecoveredProcessSignalResult = .signaled
         if durable.phase == .termPending {
             termination = await signalRecoveredProcessGroup(
@@ -656,8 +807,10 @@ public actor ExecutionJobService: ExecutionJobServicing {
         if durable.phase != .killSent {
             try await repository.recordTerminationPhase(jobID: jobID, phase: .killPending)
         }
-        let forcedDeadline = clock.now
-            + .milliseconds(max(0, limits.forcedTerminationGraceMilliseconds))
+        let forcedDeadline = Self.earlierDeadline(
+            clock.now + .milliseconds(max(0, limits.forcedTerminationGraceMilliseconds)),
+            than: overallDeadline
+        )
         let forced = await signalRecoveredProcessGroup(
             SIGKILL,
             identity: identity,
@@ -718,6 +871,10 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 )
             }
             _ = try await reapPersistedProcessGroup(jobID: jobID, identity: identity)
+            try await process.closeDescendants(
+                graceMilliseconds: limits.terminationGraceMilliseconds,
+                forcedGraceMilliseconds: limits.forcedTerminationGraceMilliseconds
+            )
             return
         }
 
@@ -775,6 +932,20 @@ public actor ExecutionJobService: ExecutionJobServicing {
             )
         }
         recoveredProcessController = controller
+    }
+
+    func setTerminationRecoveryPolicy(
+        _ policy: RuntimeTerminationRecoveryPolicy
+    ) throws {
+        guard !started else {
+            throw RuntimeJobError.invalidRequest(
+                "termination recovery policy must be installed before runtime startup"
+            )
+        }
+        guard policy.isValid else {
+            throw RuntimeJobError.invalidRequest("termination recovery policy is invalid")
+        }
+        terminationRecoveryPolicy = policy
     }
 
     public func capabilities() -> RuntimeCapabilities { discoveredCapabilities }
@@ -1337,7 +1508,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
             let process = try RuntimeActiveProcess(
                 plan: item.plan,
                 spool: item.spool,
-                launcher: launcherURL
+                launcher: launcherURL,
+                maximumDescendants: limits.maximumDescendantProcessesPerJob
             )
             launchedProcess = process
             if var execution = active[jobID] {
@@ -1462,17 +1634,15 @@ public actor ExecutionJobService: ExecutionJobServicing {
         var exit: RuntimeProcessExit?
         var timedOut = false
         var cancellationObserved = false
-        var descendantLimitExceeded = false
+        var descendantEvidence = RuntimeDescendantLimitEvidence()
         var terminationFailure: Error?
         while exit == nil {
             if active[jobID]?.pendingTerminationCompletion != nil {
                 return
             }
-            if Self.processGroupExceedsDescendantLimit(
-                processGroupIdentifier: process.processGroupIdentifier,
-                maximumDescendants: limits.maximumDescendantProcessesPerJob
-            ) {
-                descendantLimitExceeded = true
+            let descendantObservation = process.observeDescendants()
+            descendantEvidence.record(descendantObservation)
+            if descendantObservation.exceededLimit {
                 do {
                     try await terminateLaunchedProcess(jobID: jobID, process: process)
                     exit = process.currentExit()
@@ -1484,6 +1654,11 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 } catch {
                     terminationFailure = error
                 }
+                // Termination performs additional descendant snapshots. Re-read
+                // the sticky tracker outcome so hard-cap growth between the
+                // scheduling observation and cleanup cannot be downgraded to an
+                // ordinary configured-budget failure.
+                descendantEvidence.record(process.observeDescendants())
                 break
             }
             if let current = process.currentExit() {
@@ -1503,6 +1678,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 } catch {
                     terminationFailure = error
                 }
+                descendantEvidence.record(process.observeDescendants())
                 break
             }
             if clock.now >= deadline {
@@ -1518,16 +1694,18 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 } catch {
                     terminationFailure = error
                 }
+                descendantEvidence.record(process.observeDescendants())
                 break
             }
             try? await Task.sleep(for: .milliseconds(20))
         }
-        if !cancellationObserved, !timedOut, !descendantLimitExceeded {
+        if !cancellationObserved, !timedOut, !descendantEvidence.exceededLimit {
             do {
                 try await terminateLaunchedProcess(jobID: jobID, process: process)
             } catch {
                 terminationFailure = error
             }
+            descendantEvidence.record(process.observeDescendants())
         }
         if let terminationFailure {
             let terminalState: RuntimeJobState
@@ -1541,10 +1719,14 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 terminalState = .timedOut
                 errorCode = "runtime_timeout_termination_pending"
                 errorSummary = "Runtime timeout is waiting for owned process-group death"
-            } else if descendantLimitExceeded {
+            } else if descendantEvidence.exceededLimit {
                 terminalState = .failed
-                errorCode = "runtime_descendant_limit_exceeded"
-                errorSummary = "Runtime process group exceeded its descendant-process budget"
+                errorCode = descendantEvidence.trackingCapacityExceeded
+                    ? "runtime_descendant_tracking_capacity_exceeded"
+                    : "runtime_descendant_limit_exceeded"
+                errorSummary = descendantEvidence.trackingCapacityExceeded
+                    ? "Descendant discovery exceeded its hard identity cap; all recorded identities were signaled, but unobserved descendants could not be proven absent"
+                    : "Runtime process group exceeded its descendant-process budget"
             } else {
                 terminalState = .failed
                 errorCode = "runtime_termination_unconfirmed"
@@ -1600,7 +1782,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             state = .cancelled
         } else if timedOut {
             state = .timedOut
-        } else if descendantLimitExceeded {
+        } else if descendantEvidence.exceededLimit {
             state = .failed
         } else if exit?.exitCode == 0 {
             state = .completed
@@ -1625,11 +1807,15 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 outputs: outputs,
                 artifactID: outputs.contains(where: { $0.artifactRelativePath != nil })
                     ? item.spool.artifactID : nil,
-                errorCode: descendantLimitExceeded
-                    ? "runtime_descendant_limit_exceeded"
+                errorCode: descendantEvidence.exceededLimit
+                    ? (descendantEvidence.trackingCapacityExceeded
+                        ? "runtime_descendant_tracking_capacity_exceeded"
+                        : "runtime_descendant_limit_exceeded")
                     : (state == .failed ? "runtime_exit_nonzero" : nil),
-                errorSummary: descendantLimitExceeded
-                    ? "Runtime process group exceeded its descendant-process budget"
+                errorSummary: descendantEvidence.exceededLimit
+                    ? (descendantEvidence.trackingCapacityExceeded
+                        ? "Descendant discovery exceeded its hard identity cap; all recorded identities were signaled, but unobserved descendants could not be proven absent"
+                        : "Runtime process group exceeded its descendant-process budget")
                     : (state == .failed ? "Process exited with code \(exit?.exitCode ?? 255)" : nil),
                 expectedContext: item.jobContext
             )
@@ -1697,6 +1883,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         artifactID: String?,
         errorCode: String?,
         errorSummary: String?,
+        terminationCleanupRetryDeadline: String? = nil,
         expectedContext: ToolInvocationContext?
     ) async -> Bool {
         let payload = TerminalPersistencePayload(
@@ -1707,6 +1894,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             artifactID: artifactID,
             errorCode: errorCode,
             errorSummary: errorSummary,
+            terminationCleanupRetryDeadline: terminationCleanupRetryDeadline,
             expectedContext: expectedContext
         )
         var lastError: Error?
@@ -1737,6 +1925,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 artifactID: payload.artifactID,
                 errorCode: payload.errorCode,
                 errorSummary: payload.errorSummary,
+                terminationCleanupRetryDeadline:
+                    payload.terminationCleanupRetryDeadline,
                 expectedContext: payload.expectedContext
             )
             await settleArtifactReservation(jobID: payload.jobID)
@@ -1778,47 +1968,156 @@ public actor ExecutionJobService: ExecutionJobServicing {
         scheduleTerminationRecovery(jobID: jobID)
     }
 
-    private func scheduleTerminationRecovery(jobID: UUID, delayMilliseconds: Int = 0) {
+    private func scheduleTerminationRecovery(jobID: UUID) {
         guard terminationRecoveryTasks[jobID] == nil else { return }
         terminationRecoveryTasks[jobID] = Task {
-            if delayMilliseconds > 0 {
-                try? await Task.sleep(for: .milliseconds(delayMilliseconds))
-            }
             await self.runTerminationRecovery(jobID: jobID)
         }
     }
 
     private func runTerminationRecovery(jobID: UUID) async {
+        let policy = terminationRecoveryPolicy
         let clock = ContinuousClock()
-        let deadline = clock.now + .seconds(30)
-        var delay = 25
-        while clock.now < deadline {
-            if Task.isCancelled { break }
-            try? await Task.sleep(for: .milliseconds(delay))
+        let deadline = clock.now + .milliseconds(policy.maximumDurationMilliseconds)
+        var delay = policy.initialDelayMilliseconds
+        var attempts = 0
+        var lastError: Error?
+        while attempts < policy.maximumAttempts, clock.now < deadline {
+            if delay > 0 {
+                try? await Task.sleep(for: .milliseconds(delay))
+            }
+            if Task.isCancelled || clock.now >= deadline { break }
             guard let execution = active[jobID],
                   let process = execution.process,
                   let completion = execution.pendingTerminationCompletion,
                   let identity = Self.persistedIdentity(for: process) else { break }
+            attempts += 1
             do {
-                _ = try await reapPersistedProcessGroup(jobID: jobID, identity: identity)
+                _ = try await reapPersistedProcessGroup(
+                    jobID: jobID,
+                    identity: identity,
+                    before: deadline
+                )
+                let remaining = Self.remainingMilliseconds(before: deadline, clock: clock)
+                guard remaining > 0 else {
+                    throw RuntimeJobError.terminationUnconfirmed(
+                        identity.processGroupIdentifier
+                    )
+                }
+                let descendantGrace = min(
+                    limits.terminationGraceMilliseconds,
+                    remaining
+                )
+                let descendantForcedGrace = min(
+                    limits.forcedTerminationGraceMilliseconds,
+                    max(0, remaining - descendantGrace)
+                )
+                try await process.closeDescendants(
+                    graceMilliseconds: descendantGrace,
+                    forcedGraceMilliseconds: descendantForcedGrace
+                )
                 _ = await process.waitForExit(
-                    maximumMilliseconds: limits.forcedTerminationGraceMilliseconds
+                    maximumMilliseconds: min(
+                        limits.forcedTerminationGraceMilliseconds,
+                        Self.remainingMilliseconds(before: deadline, clock: clock)
+                    )
                 )
                 await completeTerminationRecovery(
                     jobID: jobID,
                     process: process,
                     completion: completion
                 )
-                break
+                terminationRecoveryTasks.removeValue(forKey: jobID)
+                return
             } catch {
+                lastError = error
                 updateTerminationRecoveryError(jobID: jobID, error: error)
             }
-            delay = min(1_000, delay * 2)
+            delay = min(policy.maximumDelayMilliseconds, max(1, delay * 2))
+        }
+        if let execution = active[jobID],
+           let process = execution.process,
+           let completion = execution.pendingTerminationCompletion,
+           let identity = Self.persistedIdentity(for: process) {
+            do {
+                try await attemptFinalTerminationRecovery(
+                    jobID: jobID,
+                    process: process,
+                    identity: identity,
+                    before: deadline
+                )
+                await completeTerminationRecovery(
+                    jobID: jobID,
+                    process: process,
+                    completion: completion
+                )
+                terminationRecoveryTasks.removeValue(forKey: jobID)
+                return
+            } catch {
+                lastError = error
+                updateTerminationRecoveryError(jobID: jobID, error: error)
+            }
+            await completeUnconfirmedTerminationRecovery(
+                jobID: jobID,
+                process: process,
+                identity: identity,
+                completion: completion,
+                attempts: attempts,
+                lastError: lastError
+            )
         }
         terminationRecoveryTasks.removeValue(forKey: jobID)
-        if terminationRecoveryJobs.contains(jobID), active[jobID] != nil {
-            scheduleTerminationRecovery(jobID: jobID, delayMilliseconds: 1_000)
+    }
+
+    private func attemptFinalTerminationRecovery(
+        jobID: UUID,
+        process: RuntimeActiveProcess,
+        identity: RuntimePersistedProcessIdentity,
+        before overallDeadline: ContinuousClock.Instant
+    ) async throws {
+        try await repository.recordTerminationPhase(jobID: jobID, phase: .killPending)
+        let clock = ContinuousClock()
+        let signalDeadline = Self.earlierDeadline(
+            clock.now + .milliseconds(limits.forcedTerminationGraceMilliseconds),
+            than: overallDeadline
+        )
+        let result = await signalRecoveredProcessGroup(
+            SIGKILL,
+            identity: identity,
+            before: signalDeadline
+        )
+        if result == .processMissing {
+            try await repository.recordTerminationPhase(jobID: jobID, phase: .confirmed)
+        } else {
+            guard result == .signaled else {
+                try await persistUnconfirmedTermination(
+                    jobID: jobID,
+                    identity: identity,
+                    reason: "final SIGKILL could not be delivered: \(Self.signalDescription(result))"
+                )
+            }
+            try await repository.recordTerminationPhase(jobID: jobID, phase: .killSent)
+            guard await recoveredProcessGroupIsGone(identity, before: signalDeadline) else {
+                try await persistUnconfirmedTermination(
+                    jobID: jobID,
+                    identity: identity,
+                    reason: "process group remained alive after final identity-fenced SIGKILL"
+                )
+            }
+            try await repository.recordTerminationPhase(jobID: jobID, phase: .confirmed)
         }
+
+        let remaining = Self.remainingMilliseconds(before: overallDeadline, clock: clock)
+        let descendantGrace = min(limits.terminationGraceMilliseconds, remaining)
+        let descendantForcedGrace = min(
+            limits.forcedTerminationGraceMilliseconds,
+            max(0, remaining - descendantGrace)
+        )
+        try await process.closeDescendants(
+            graceMilliseconds: descendantGrace,
+            forcedGraceMilliseconds: descendantForcedGrace
+        )
+        _ = await process.waitForExit(maximumMilliseconds: descendantForcedGrace)
     }
 
     private func updateTerminationRecoveryError(jobID: UUID, error: Error) {
@@ -1895,6 +2194,73 @@ public actor ExecutionJobService: ExecutionJobServicing {
             expectedContext: completion.item.jobContext
         )
         if persisted { finish(jobID: jobID) }
+    }
+
+    private func completeUnconfirmedTerminationRecovery(
+        jobID: UUID,
+        process: RuntimeActiveProcess,
+        identity: RuntimePersistedProcessIdentity,
+        completion: PendingTerminationCompletion,
+        attempts: Int,
+        lastError: Error?
+    ) async {
+        var descendantEvidence = RuntimeDescendantLimitEvidence()
+        descendantEvidence.record(process.observeDescendants())
+        let retryDeadline = Self.newCleanupDebtRetryDeadline()
+        let summary = Self.cleanupDebtSummary(
+            identity: identity,
+            attempts: attempts,
+            maximumAttempts: terminationRecoveryPolicy.maximumAttempts,
+            recoveryWindowMilliseconds:
+                terminationRecoveryPolicy.maximumDurationMilliseconds,
+            restartAttempts: 0,
+            restartMaximumAttempts: Self.maximumStartupCleanupDebtRetries,
+            retryDeadline: retryDeadline,
+            resolved: false,
+            descendantTrackingCapacityExceeded:
+                descendantEvidence.trackingCapacityExceeded,
+            lastError: lastError
+                ?? RuntimeJobError.terminationUnconfirmed(identity.processGroupIdentifier)
+        )
+
+        // The bounded recovery budget is exhausted. The process may still be
+        // alive, so retain durable cleanup-debt evidence rather than pretending
+        // cleanup succeeded. Output is intentionally discarded: it can still be
+        // changing, and retaining the spool would keep an unbounded live-owner
+        // edge after the terminal failure is visible to the operator.
+        process.forceCloseReaders()
+        completion.item.spool.discard()
+        deleteRequestArtifact(completion.item.requestArtifactRelativePath)
+        if var execution = active[jobID] {
+            execution.process = nil
+            execution.pendingTerminationCompletion = nil
+            execution.terminalPersistenceFailure = nil
+            active[jobID] = execution
+        }
+        terminationRecoveryJobs.remove(jobID)
+        let persisted = await persistTerminal(
+            jobID: jobID,
+            state: .failed,
+            exitCode: completion.exitCode ?? process.currentExit()?.exitCode,
+            outputs: [],
+            artifactID: nil,
+            errorCode: "runtime_termination_unconfirmed",
+            errorSummary: summary,
+            terminationCleanupRetryDeadline: retryDeadline,
+            // Cleanup debt is owner-lifecycle evidence, not a model result. The
+            // job's durable project identity was already fenced at launch, and
+            // no output is accepted here after a later generation change.
+            expectedContext: nil
+        )
+        releaseArtifactReservation(jobID: jobID)
+        if !persisted {
+            // `persistTerminal` retained only its bounded value payload. Drop
+            // process/task/spool ownership even when storage recovery remains.
+            active.removeValue(forKey: jobID)
+            pumpQueue()
+        } else {
+            finish(jobID: jobID)
+        }
     }
 
     private func schedulePersistenceRecovery(jobID: UUID) {
@@ -2106,28 +2472,66 @@ public actor ExecutionJobService: ExecutionJobServicing {
         )
     }
 
-    private static func processGroupExceedsDescendantLimit(
-        processGroupIdentifier: Int32,
-        maximumDescendants: Int
-    ) -> Bool {
-        guard processGroupIdentifier > 1, maximumDescendants > 0 else { return true }
-        let maximumMembers = maximumDescendants + 1
-        var processIdentifiers = [pid_t](repeating: 0, count: maximumMembers + 1)
-        let byteCount = processIdentifiers.withUnsafeMutableBytes { buffer in
-            proc_listpids(
-                UInt32(PROC_PGRP_ONLY),
-                UInt32(bitPattern: processGroupIdentifier),
-                buffer.baseAddress,
-                Int32(buffer.count)
-            )
-        }
-        guard byteCount > 0 else { return false }
-        let returnedCount = min(
-            processIdentifiers.count,
-            Int(byteCount) / MemoryLayout<pid_t>.stride
+    private static func earlierDeadline(
+        _ proposed: ContinuousClock.Instant,
+        than limit: ContinuousClock.Instant?
+    ) -> ContinuousClock.Instant {
+        guard let limit, limit < proposed else { return proposed }
+        return limit
+    }
+
+    private static func remainingMilliseconds(
+        before deadline: ContinuousClock.Instant,
+        clock: ContinuousClock
+    ) -> Int {
+        let components = clock.now.duration(to: deadline).components
+        guard components.seconds >= 0, components.attoseconds >= 0 else { return 0 }
+        let maximumSeconds = Int64(Int.max / 1_000)
+        guard components.seconds <= maximumSeconds else { return Int.max }
+        let whole = Int(components.seconds) * 1_000
+        let fractional = Int(
+            (components.attoseconds + 999_999_999_999_999) / 1_000_000_000_000_000
         )
-        return processIdentifiers.prefix(returnedCount).lazy.filter { $0 > 0 }.count
-            > maximumMembers
+        return whole + fractional
+    }
+
+    private static func cleanupDebtSummary(
+        identity: RuntimePersistedProcessIdentity,
+        attempts: Int,
+        maximumAttempts: Int,
+        recoveryWindowMilliseconds: Int,
+        restartAttempts: Int,
+        restartMaximumAttempts: Int,
+        retryDeadline: String,
+        resolved: Bool,
+        descendantTrackingCapacityExceeded: Bool,
+        lastError: Error
+    ) -> String {
+        let boundedError = String(lastError.localizedDescription.unicodeScalars.prefix(256))
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+        return [
+            "cleanup_debt=true",
+            "attempts=\(attempts)",
+            "maximum_attempts=\(maximumAttempts)",
+            "recovery_window_ms=\(recoveryWindowMilliseconds)",
+            "restart_attempts=\(restartAttempts)",
+            "restart_maximum_attempts=\(restartMaximumAttempts)",
+            "retry_deadline=\(retryDeadline)",
+            "cleanup_debt_resolved=\(resolved)",
+            "pid=\(identity.processIdentifier)",
+            "process_group=\(identity.processGroupIdentifier)",
+            "start_seconds=\(identity.startIdentity.seconds)",
+            "start_microseconds=\(identity.startIdentity.microseconds)",
+            "descendant_tracking_capacity_exceeded=\(descendantTrackingCapacityExceeded)",
+            "last_error=\(boundedError)",
+        ].joined(separator: "; ")
+    }
+
+    private static func newCleanupDebtRetryDeadline() -> String {
+        ISO8601.string(
+            from: Date().addingTimeInterval(cleanupDebtRetryWindowSeconds)
+        )
     }
 
     private func finish(jobID: UUID) {
@@ -2171,10 +2575,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             max(1, request.maximumInlineOutputBytes),
             min(limits.maximumInlineOutputBytes, request.context.authorizationScope.maximumInlineOutputBytes)
         )
-        let cwd = try Self.authorizedWorkingDirectory(
-            request.canonicalWorkingDirectory,
-            roots: request.context.authorizationScope.canonicalRoots
-        )
+        let cwd = try Self.validatedWorkingDirectory(request.canonicalWorkingDirectory)
         try validateCapability(for: request.profile)
         return (cwd, timeoutSeconds, inlineBytes)
     }
@@ -2243,20 +2644,20 @@ public actor ExecutionJobService: ExecutionJobServicing {
             ]
         }
         let summary = "\(request.profile.rawValue):\(executable.lastPathComponent):argv=\(arguments.count):script_bytes=\(request.script?.utf8.count ?? 0)"
-        let sandboxedPlan = try RuntimeProcessSandbox.plan(
+        // Every model runtime is an owner-authorized native process. Project
+        // context selects durable ownership and the default working directory;
+        // it is not a Seatbelt or filesystem boundary. The launch gate,
+        // process-group ownership, resource limits, timeouts, output caps, and
+        // durable result fencing remain in force while macOS privacy grants
+        // (including Full Disk Access) reach the child unchanged.
+        let executionPlan = RuntimeProcessPlan(
             executable: executable,
             arguments: arguments,
             workingDirectory: canonicalWorkingDirectory,
-            environment: environment,
-            canonicalReadRoots: request.context.authorizationScope.canonicalRoots,
-            canonicalWritableRoots: request.context.authorizationScope.writableRoots,
-            managerReadDirectory: spool.canonicalDirectory,
-            scratchDirectory: spool.canonicalScratchDirectory,
-            networkAllowed: request.context.authorizationScope.networkAllowed,
-            protectedDirectories: protectedDirectories
+            environment: environment
         )
         return (
-            sandboxedPlan,
+            executionPlan,
             summary,
             requestArtifact
         )
@@ -2267,7 +2668,11 @@ public actor ExecutionJobService: ExecutionJobServicing {
         extension fileExtension: String,
         spool: RuntimeOutputSpool
     ) throws -> String {
-        let relative = spool.relativeDirectory + "/request." + fileExtension
+        // Keep request programs in the disposable scratch tree. Passing a
+        // durable output-directory pathname as `$0` would unnecessarily reveal
+        // the manager's spool location to an otherwise native child.
+        let relative = ".runtime-scratch/" + spool.relativeDirectory
+            + "/request." + fileExtension
         let url = try artifactURL(relative)
         try Data(script.utf8).write(to: url, options: .atomic)
         _ = chmod(url.path, S_IRUSR | S_IWUSR | S_IXUSR)
@@ -2327,7 +2732,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             let isDurableIntent = record?.projectID == candidate.projectID
                 && record?.projectGeneration == candidate.generation
             guard !isDurableIntent else { continue }
-            let resolved = RuntimeProcessSandbox.canonicalExistingURL(candidate.url)
+            let resolved = RuntimePathCanonicalizer.canonicalExistingURL(candidate.url)
             guard resolved.path == candidate.url.path,
                   Self.contains(resolved, root: candidate.root) else {
                 continue
@@ -2489,7 +2894,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             throw RuntimeJobError.invalidRequest("artifact path must remain relative")
         }
         let url = artifactRoot.appendingPathComponent(relativePath)
-        let resolved = RuntimeProcessSandbox.canonicalURL(url)
+        let resolved = RuntimePathCanonicalizer.canonicalURL(url)
         guard resolved.path == url.path, Self.contains(resolved, root: artifactRoot) else {
             throw RuntimeJobError.invalidRequest("artifact path is not canonical")
         }
@@ -2510,7 +2915,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         switch profile {
         case .directProcess:
             guard discoveredCapabilities.directProcess.available else {
-                throw RuntimeJobError.executableUnavailable("sandbox-exec")
+                throw RuntimeJobError.executableUnavailable("runtime launch gate")
             }
         case .zshNoProfile:
             guard discoveredCapabilities.zsh.available else {
@@ -2569,18 +2974,12 @@ public actor ExecutionJobService: ExecutionJobServicing {
         return seconds
     }
 
-    private static func authorizedWorkingDirectory(_ requested: URL, roots: [URL]) throws -> URL {
+    private static func validatedWorkingDirectory(_ requested: URL) throws -> URL {
         var isDirectory: ObjCBool = false
         let canonical = requested.resolvingSymlinksInPath().standardizedFileURL
         guard FileManager.default.fileExists(atPath: canonical.path, isDirectory: &isDirectory),
               isDirectory.boolValue else {
             throw RuntimeJobError.invalidRequest("working directory does not exist")
-        }
-        let authorized = roots
-            .map { $0.resolvingSymlinksInPath().standardizedFileURL }
-            .contains { contains(canonical, root: $0) }
-        guard authorized else {
-            throw RuntimeJobError.workingDirectoryOutsideProject(canonical.path)
         }
         return canonical
     }
@@ -2603,11 +3002,30 @@ public actor ExecutionJobService: ExecutionJobServicing {
     }
 
     private static func sanitizedEnvironment(_ source: [String: String]) -> [String: String] {
-        let allowed = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SHELL", "USER", "LOGNAME", "TERM"]
+        let maximumEntries = 512
+        let maximumKeyBytes = 256
+        let maximumValueBytes = 64 * 1_024
+        let maximumTotalBytes = 1 * 1_024 * 1_024
+        let startupInjectionKeys: Set<String> = [
+            "BASH_ENV", "BASHOPTS", "CDPATH", "ENV", "SHELLOPTS", "ZDOTDIR",
+        ]
         var result: [String: String] = [:]
-        for key in allowed {
-            guard let value = source[key], value.utf8.count <= 8 * 1_024, !value.contains("\0") else { continue }
+        var retainedBytes = 0
+        for key in source.keys.sorted().prefix(maximumEntries) {
+            guard !startupInjectionKeys.contains(key),
+                  !key.hasPrefix("DYLD_"),
+                  !key.hasPrefix("LD_"),
+                  !key.isEmpty,
+                  key.utf8.count <= maximumKeyBytes,
+                  !key.contains("="),
+                  !key.contains("\0"),
+                  let value = source[key],
+                  value.utf8.count <= maximumValueBytes,
+                  !value.contains("\0") else { continue }
+            let entryBytes = key.utf8.count + value.utf8.count + 2
+            guard retainedBytes <= maximumTotalBytes - entryBytes else { break }
             result[key] = value
+            retainedBytes += entryBytes
         }
         if result["PATH"] == nil { result["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin" }
         return result

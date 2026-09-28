@@ -173,38 +173,10 @@ final class ManagedSourceActivationRuntimeTests: XCTestCase {
         }
     }
 
-    func testMissingHostRootRejectsReadWithoutProducingResumptionProof() async throws {
+    func testSelectedRootRemovalDoesNotConfineBoundSourceRead() async throws {
         try await withFixture(automatic: true) { fixture in
             _ = try fixture.app.config.update(["allowed_roots": [] as [String]])
-            let repository = fixture.app.projectContexts.repository
-            let lease = try await repository.acquireRunLease(runID: fixture.acceptance.runID, ownerID: "source-host-root-denial")
-            let (worker, broker, activated) = try await activateForOrdinaryStep(fixture, lease: lease)
-            let stepper = try ordinaryStepper(fixture, worker: worker, broker: broker)
-            let intent = try sourceContinuationUnwrap(try await stepper.prepareNextStep(for: activated))
-            let pending = try await repository.persistRunSideEffectIntent(runID: activated.runID, lease: lease,
-                expectedRevision: activated.revision, intent: intent)
-            let context = try await repository.invocationContext(for: .init(kind: .providerSession,
-                id: XCTUnwrap(pending.activeSessionID)))
-            do {
-                _ = try await stepper.execute(intent, run: pending, context: context, lease: lease)
-                XCTFail("The fixture must refuse a denied file result")
-            } catch let error as ContinuityIngressError {
-                guard case .integrityFailure = error else { throw error }
-            }
-            let observed = await fixture.transport.snapshot()
-            guard let input = observed.followups.last?.input.first,
-                  case .functionCallOutput(let callID, let output) = input else {
-                return XCTFail("The actual denial must be returned through the ordinary provider path")
-            }
-            XCTAssertEqual(callID, "source-activation-file-call")
-            let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: Any])
-            XCTAssertEqual(payload["ok"] as? Bool, false)
-            XCTAssertEqual(payload["code"] as? String, "path_outside_allowed_roots")
-            XCTAssertFalse(observed.consumedMarker)
-            XCTAssertFalse(try fixture.operation().isResumed)
-            let run = try await repository.autonomousRun(fixture.acceptance.runID)
-            XCTAssertEqual(run?.activeOperationID, fixture.acceptance.operationID)
-            _ = try await repository.releaseRunLease(lease)
+            try await runThroughConsumption(fixture)
         }
     }
 

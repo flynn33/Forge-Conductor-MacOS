@@ -2878,10 +2878,21 @@ final class ManagerTests: XCTestCase {
             ]
         )
         XCTAssertEqual(approvedBindingResponse.statusCode, 200)
+        let approvedBinding = try JSONSupport.object(from: approvedBindingData)
         XCTAssertEqual(
-            try JSONSupport.object(from: approvedBindingData)["authorization_roots"] as? [String],
+            approvedBinding["authorization_roots"] as? [String],
             [approvedProject.resolvingSymlinksInPath().standardizedFileURL.path]
         )
+        XCTAssertEqual(
+            approvedBinding["authorization_roots_role"] as? String,
+            "project_identity_and_default_working_directory_only"
+        )
+        XCTAssertEqual(
+            approvedBinding["filesystem_access_scope"] as? String,
+            "host_native_inherited_unconfined_by_forge"
+        )
+        XCTAssertEqual(approvedBinding["filesystem_sandbox_mode"] as? String, "none")
+        XCTAssertEqual(approvedBinding["filesystem_path_confinement"] as? Bool, false)
     }
 
     func testHTTPProjectRegistrationCanAuthorizeOnlyTheSelectedCanonicalRoot() async throws {

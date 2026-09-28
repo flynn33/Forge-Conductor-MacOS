@@ -40,8 +40,13 @@ Desktop integration does not widen host permission policy. Forge never emits an
 automatic allow decision for tool use or a permission request. If a desktop
 provider is inactive, or the local orchestration policy is unavailable, the
 hook denies only a recognized Forge MCP `PreToolUse` call; unrelated host tools
-and events remain under the host's own policy. MCP still enforces the existing
-project root, shell, filesystem, completion, memory, and continuity boundaries.
+and events remain under the host's own policy. MCP still enforces project
+identity and generation, per-tool grants, shell enablement, completion, memory,
+and continuity boundaries. Selected project roots establish durable identity
+and default working paths; they do not confine native filesystem, Git, shell,
+PDF, search, or runtime paths. Those operations inherit the host process's macOS
+permissions, while destructive delete and move operations retain filesystem,
+volume, home, manager, and active-workspace root protections.
 Generated hook and MCP entries receive the same explicit canonical Forge home;
 the MCP command uses
 `serve --home <forge-home> --desktop-provider <provider-id>` rather than relying

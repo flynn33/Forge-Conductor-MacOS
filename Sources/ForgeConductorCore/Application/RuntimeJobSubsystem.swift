@@ -13,7 +13,6 @@ public struct RuntimeJobSubsystem: Sendable {
         controlPlaneRepository: ProjectControlPlaneRepository,
         databaseURL: URL,
         artifactRoot: URL,
-        protectedDirectories: [URL] = [],
         limits: RuntimeJobLimits = .current,
         capabilityDiscoverer: RuntimeCapabilityDiscoverer = RuntimeCapabilityDiscoverer()
     ) throws {
@@ -24,7 +23,6 @@ public struct RuntimeJobSubsystem: Sendable {
                 repository: controlPlaneRepository
             ),
             artifactRoot: artifactRoot,
-            protectedDirectories: protectedDirectories,
             limits: limits,
             capabilityDiscoverer: capabilityDiscoverer
         )

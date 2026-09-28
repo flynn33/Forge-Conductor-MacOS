@@ -1105,9 +1105,13 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         public let sha256: String
     }
     public static let ordinaryDefaultAllowedTools = [
-        "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_move",
+        "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir",
+        "fs_delete", "fs_delete_recovery", "fs_move",
         "search_text", "instruction_catalog", "instruction_read", "shell_exec",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
+        "pdf_write", "pdf_from_file",
+        "runtime.capabilities", "process.run", "shell.run", "bash.run", "python.run",
+        "powershell.run", "job.status", "job.read_output", "job.cancel", "job.list",
         "project_memory.remember", "project_memory.search", "project_memory.get",
         "project_memory.update", "project_memory.list_recent", "project_memory.status",
     ]

@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.16.0**, build **21**. `VERSION` and
+Product identity: marketing version **0.16.1**, build **22**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -19,6 +19,17 @@ configuration does not enable testability; Release app-hosted tests must supply
 their documented per-invocation instrumentation override and remain separate
 from candidate products. `ProductPathReliabilityTests` enforces these settings
 for every shipped Release target.
+
+Full Disk Access is granted by macOS Privacy & Security to the responsible
+signed application or executable; it is not supplied by an entitlement in this
+project. The production app and helpers are intentionally not App Sandbox
+processes, and Forge does not add a per-command Seatbelt profile. macOS TCC
+attributes access according to the responsible signed host and executable in
+the actual launch chain; a parent grant alone is not treated as candidate proof.
+After a TCC change, quit and relaunch LM Studio and Forge, then run a live
+protected-path read through the exact signed candidate without emitting file
+contents. TCC, POSIX permissions, SIP, tool grants, timeouts, output bounds, and
+destructive-root protections remain independent controls.
 
 ## Open
 
@@ -74,7 +85,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.16.0 (21)` build keeps the Provider and Guided Setup repair in
+The current `0.16.1 (22)` build keeps the Provider and Guided Setup repair in
 the canonical graph, removes local LM Studio credential controls, and exposes
 first-class continuity packet rows and exact packet deletion. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
@@ -85,6 +96,10 @@ no compiler warnings, including neither the prior shared `[String: Any]`
 static-state diagnostic nor the non-Sendable callback diagnostic.
 Four focused app-hosted regressions and two focused signed native UI cases pass;
 the Provider UI case verifies the exact no-resume/repair/resume transaction.
+For the build-22 correction, the app-hosted Dashboard selection executed 23
+tests with zero failures and the canonical Debug workspace build succeeded.
+The final SwiftPM run executed 1,933 tests with 12 explicit environment-
+dependent skips and zero failures, and both SwiftPM products built.
 
 Xcode 27 schedules its AppIntents metadata processor even though extraction is
 disabled. Both project configurations set `LM_FORCE_LINK_GENERATION = YES` so
@@ -609,7 +624,9 @@ GUI and app-hosted tests serially.
 Address Sanitizer and Thread Sanitizer use separate DerivedData and result
 bundles. Process-runner regressions exercise large output on both streams,
 continuous output with timeout, termination-handler output, cancellation and
-process-group reaping. A sanitizer pass is not a clean performance profile;
+process-group reaping, escaped-descendant identity tracking, the finite
+descendant cap, and bounded cleanup debt. A sanitizer pass is not a clean
+performance profile;
 runtime diagnostics still need their own assessment. The `0.16.0 (16)`
 app-hosted suite has an empty structured runtime-warning list after the bounded
 QoS and main-actor credential-I/O repairs. Native XCUITest runs retain a
@@ -621,18 +638,23 @@ evidence.
 The UI test runner explicitly sets `com.apple.security.app-sandbox` to false,
 matching the ordinary product. Removing the key alone does not work: Xcode
 merges a true default from its XCTRunner RunnerEntitlements.plist. The explicit
-false preserves all other injected automation permissions. This is a test-target entitlement choice: it lets native Settings tests
-launch the signed MCP executable, whose shell policy creates its own sandbox.
-A sandboxed runner prevented that nested sandbox with `sandbox_apply` exit 71,
-so it could not measure the ordinary product path. Production entitlements and
-shell authorization remain unchanged; disabled-policy denial and post-Settings
-reenablement both retain their full executable assertions.
+false preserves all other injected automation permissions. This is a
+test-target entitlement choice: it lets native Settings tests launch the signed
+MCP executable and measure the ordinary product path. Production entitlements
+and shell authorization remain unchanged; disabled-policy denial and
+post-Settings re-enablement both retain their full executable assertions.
 
 ## SwiftPM runtime and result paths
 
 The SwiftPM CI lanes use the test worker runner with one worker so XCTest
 produces the requested xUnit file while cases remain sequential. Both XCTest
-and Swift Testing stay enabled, and warnings remain errors. Runtime Python
-admission and the process sandbox resolve the existing system runtime roots
-to physical paths, including versioned Xcode app aliases. This does not grant
-read access to sibling applications or user data.
+and Swift Testing stay enabled, and warnings remain errors. Runtime discovery
+resolves executable paths physically, including versioned Xcode app aliases.
+Native runtime children are not wrapped in a Forge Seatbelt profile: they
+execute as native processes in the actual host launch chain. macOS determines
+their TCC access from the responsible signed code objects in that chain, so a
+live protected-path read through the exact signed candidate is required to
+prove Full Disk Access. Forge retains its launch gate, process ownership,
+timeouts, output caps, durable result fencing, finite descendant tracking, and
+tool authorization. Native local delete/move also descriptor-rechecks protected
+roots at the mutation boundary; Full Disk Access does not disable that guard.

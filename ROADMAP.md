@@ -56,7 +56,9 @@ this workflow.
 | Area | Current state | Required acceptance |
 |---|---|---|
 | LM Studio provider | **Exact build-19 Desktop-candidate connection and ordinary-chat acceptance passed without a local credential; build-21 automatic successor acceptance uses the same GUI-hosted MCP channel.** The signed candidate discovered loaded model `qwen/qwen3.8-27b`; Connect and Check and Run Advanced Probe passed before and after exact-path relaunch. Manager readback was ready/contract-valid with `credential_configured=false`, and the UI exposed neither a token field nor a credential action for the loopback endpoint. A fresh foreground LM Studio GUI chat called the candidate's `get_forge_status`, `context_get`, and memory tools and returned the live Forge home, project root, project ID, and handoff ID. | Linked HTTPS provider credentials remain separate; the same-host path retains no operator-facing or Forge-held LM Studio credential. |
-| Project selection | **Implemented and focused-tested.** Projects accepts multiple folders and exposes registered project context without starting a run. | One or more selected project folders remain available to the LM Studio model through project-scoped Forge tools. |
+| Project selection | **Implemented and focused-tested.** Projects accepts multiple folders and exposes registered project context without starting a run. Selection establishes stable identity, generation, and the default working directory; it is not a filesystem access sandbox. | One or more selected project folders remain available to the LM Studio model through project-bound Forge tools without hiding native host paths. |
+| Native tool access | **Build-22 source correction focused-tested.** Filesystem, search, PDF, Git, shell, and runtime paths are canonicalized but no longer confined to selected project roots or wrapped in Forge's per-command Seatbelt profile. macOS evaluates access for the responsible signed code objects in the actual launch chain; a parent grant alone is not proof. Runtime jobs retain a default 16-descendant budget, a 1,024-identity hard cap, typed overflow, and bounded cleanup debt. Local outside-project delete/move independently reconstructs protected roots and descriptor-rechecks the source identity at the mutation boundary. Tool grants, shell enablement, project binding/generation, time and output bounds, and durable result fencing remain. | An exact signed build-22 candidate must prove `/bin/ps`, protected-data access without content disclosure, external filesystem/Git work, every available runtime profile, descendant cleanup, and destructive-root refusal under the intended Full Disk Access grant. |
+| Dashboard active project | **Build-22 source correction focused-tested.** Dashboard correlates live MCP presence with the active durable `mcp_client` binding, ordered by recent activity with heartbeat fallback. An exact nonterminal run is secondary evidence; registration alone is not active-project evidence. | The exact candidate must show the same project used by the active LM Studio MCP client, including a multi-project configuration. |
 | Instruction packages | **Implemented and focused-tested.** Multiple packages can be selected, displayed, drag-reordered, removed with **Delete Package**, and discovered through project-scoped tools. | The complete selection, ordering, deletion, persistence, and LM Studio query flow passes in the current candidate. |
 | Rune Forge policy | **Implemented and focused-tested.** Files and folders can be selected, persisted in priority order, drag-reordered, and queried with project isolation. | The complete selection, ordering, persistence, and model-query flow passes in the current candidate. |
 | CLU governance | **Deterministic contract implemented; live-session acceptance open.** Notices carry the violated policy identity and full applicable policy statement; logs are project-isolated, bounded, and exportable. | CLU monitors model activity, preserves a separate log per project, exports it, and sends the active model a notice containing the exact violated policy and policy content. |
@@ -74,13 +76,35 @@ passing legacy Managed Run test is not acceptance evidence for this roadmap.
 
 ## Current correction evidence
 
+Build-22 source removes the internal Seatbelt wrapper that denied native
+commands such as `/bin/ps` even when macOS Full Disk Access was granted. The
+complete focused `CoreTests` selection passed 49/49; the focused all-available-
+runtime profile case passed with an external working directory, `/bin/ps`, and
+inherited environment state. The complete runtime-job suite passed 103/103,
+including an observed `setsid(2)` child, and secure-filesystem coverage passed
+100/100. Dashboard operational-snapshot tests passed 23/23 in both SwiftPM and
+the app-hosted Xcode target,
+including live MCP binding preference and the requirement that registration
+alone is not active-project evidence. Exact signed build-22 runtime and native
+Dashboard acceptance remain open and are not inferred from these source tests.
+
+Native runtime ownership is finite rather than open-ended: the normal
+descendant budget is 16, retained start identities are capped at 1,024, and an
+overflow produces a typed failed job. Sticky capacity evidence does not create
+immortal liveness after all retained identities exit. Persistent termination
+failure becomes bounded cleanup debt with one identity-fenced startup retry.
+Local outside-project delete/move reconstructs the protected-root set independently at
+execution and compares descriptor-pinned source identity against each protected
+root and ancestor again immediately before mutation, closing the authorization-
+to-dispatch rename window without reintroducing project-path confinement.
+
 Focused deterministic tests cover provider preparation convergence,
 `get_forge_status`, registered-project and location discovery, multi-folder and
 multi-package selection, drag ordering, package deletion, project reset,
 disposable-cache clearing, ordered Development Policy sources, CLU notice
 content, per-project log export, the Continuity project-ID and packet-management
 surface, exact packet batch deletion, and the 30-second LM Studio successor state
-machine. The complete Swift suite passed 1,902 tests with zero failures and 12
+machine. The complete Swift suite passed 1,933 tests with zero failures and 12
 explicit environment-dependent skips. The current source also passed a native
 LM Studio connection test before and after app relaunch against
 `qwen/qwen3.8-27b` without `operator-unavailable`. A new ordinary-launch native
@@ -144,11 +168,12 @@ and zero failures. The signed build-21 candidate then completed handoff
 nonce receipt, logical successor `51a4567d-36f9-4d44-8a54-925f6e14a0f5`, and
 predecessor sealing. No shipment claim is made.
 
-Publication checkpoint: `VERSION`, `BUILD_NUMBER`, the compiled filesystem
+Build-22 publication inputs: `VERSION`, `BUILD_NUMBER`, the compiled filesystem
 protocol constants, all Xcode build configurations, current README/user/Xcode
-and supporting documentation, the focused version-contract test, and the
-published wiki are aligned at `0.16.0 (21)`. Historical evidence remains bound
-to the version it actually exercised.
+and supporting documentation, and the focused version-contract assertion are
+aligned at `0.16.1 (22)`. The wiki and published revision must be verified as
+part of direct publication. Historical evidence remains bound to the version it
+actually exercised.
 
 Historical build-16 candidate evidence remains available for comparison. Source revision
 `f2cc6ca1dd70c5837f318cfb86381d5fcb8785dd` produced the universal Apple

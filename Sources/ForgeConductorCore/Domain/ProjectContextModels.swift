@@ -65,9 +65,10 @@ public struct ProjectBindingOwner: Hashable, Codable, Sendable {
 }
 
 public struct ToolAuthorizationScope: Codable, Sendable, Equatable {
-    /// Canonical roots visible to a tool invocation. These roots do not imply
-    /// write authority; callers may grant a read-only scope by passing an empty
-    /// `writableRoots` collection.
+    /// Canonical roots that identify the project and provide default paths.
+    /// Native model tools inherit host access and are not confined to these
+    /// locations. `writableRoots` remains compatibility and signed-helper
+    /// routing metadata rather than an operating-system access boundary.
     public let canonicalRoots: [URL]
     public let writableRoots: [URL]
     public let allowedTools: Set<String>

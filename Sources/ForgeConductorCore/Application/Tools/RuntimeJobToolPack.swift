@@ -271,7 +271,13 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             guard let rawExecutable = ToolArgHelpers.string(arguments, "executable") else {
                 throw RuntimeJobError.invalidRequest("executable is required")
             }
-            executable = ToolArgHelpers.resolvePath(rawExecutable)
+            if rawExecutable.contains("/") {
+                executable = ToolArgHelpers.resolvePath(rawExecutable)
+            } else if let resolved = ProcessRunner.which(rawExecutable) {
+                executable = URL(fileURLWithPath: resolved)
+            } else {
+                throw RuntimeJobError.executableUnavailable(rawExecutable)
+            }
             argv = try stringArray(arguments, key: "arguments")
             script = nil
         case "shell.run":

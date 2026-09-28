@@ -111,8 +111,10 @@ The implementation now provides:
 - a SHA-256-linked canonical JSONL mirror rebuilt atomically from SQLite after
   a partial append, missing mirror, or restart;
 - owner-only directories and database, sidecar, mirror, and outbox files;
-- direct-tool and subprocess/runtime-sandbox exclusion for the entire
-  manager-owned policy namespace, including ancestor move/delete attempts;
+- project-scoped policy APIs, owner-only storage permissions, and destructive
+  root protection for Manager-owned policy state; unrestricted same-user native
+  shell and Git remain an explicit host trust boundary rather than a physical
+  secrecy boundary;
 - pre-write schema validation, bounded event queries and candidates, a
   10,000-item disk outbox, and a 32-item emergency-memory ceiling; and
 - a non-throwing service facade that reports a persisted or deferred result and
@@ -511,7 +513,7 @@ Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
 destinations, all guide routes, immediate opaque-source acceptance during
 Manager outage, the native source picker, and four-format native export.
 
-The current authority is version `0.16.0`, build `21`. No release archive,
+The current authority is version `0.16.1`, build `22`. No release archive,
 installer, notarized artifact, installation replacement, or shipment candidate
 was created; those remain separate owner-directed release work. See the
 [acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) and

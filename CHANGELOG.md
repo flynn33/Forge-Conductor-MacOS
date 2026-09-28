@@ -28,10 +28,42 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Restored native host access for filesystem, search, PDF, Git, shell, and
+  runtime tools by removing Forge's per-command Seatbelt wrapper and
+  project-root path confinement. Selected project folders now provide durable
+  identity, generation, and the default working directory. macOS evaluates
+  TCC, POSIX, and SIP access for the responsible signed code objects in the
+  actual launch chain; an exact signed-candidate protected-path probe is the
+  required Full Disk Access proof. Tool grants, the shell enable switch, canonicalization, deadlines,
+  output bounds, durable result fencing, and destructive-root protections
+  remain enforced.
+- Added a bounded, start-identity-fenced descendant tracker for native runtime
+  jobs. It observes and terminates children that leave the launch process group
+  with `setsid(2)` or `setpgid(2)`, while retaining the existing launch gate,
+  process-group cleanup, deadline, and output limits. The ordinary per-job
+  descendant budget is 16 and retained identities have an absolute 1,024-entry
+  cap; either budget overflow becomes a typed terminal failure. Capacity
+  overflow remains explicit evidence but cannot keep a job artificially live
+  after every retained identity exits. An unconfirmed termination persists a
+  bounded cleanup debt with one identity-fenced startup retry, and PID reuse is
+  never treated as authority to signal the replacement process. Public macOS
+  process snapshots are not atomic, so adversarial same-user code that forks,
+  reparents, and exits entirely between observations remains part of the
+  explicit native shell trust boundary rather than a claimed sandbox guarantee.
+- Hardened native local `fs_delete` and `fs_move` root protection against same-user
+  rename races. The execution boundary independently rebuilds the protected
+  filesystem, mounted-volume, user-home, Manager-home, and workspace-root set,
+  pins the source by descriptor identity, and rechecks that identity against
+  every protected root and ancestor immediately before namespace mutation.
+  Blank operands, case aliases, changed parents, and inspection failure all
+  fail closed without turning ordinary outside-project paths into a sandbox.
+- Corrected Dashboard project tracking to resolve live MCP presence through its
+  active durable `mcp_client` binding. Recent live activity wins when more than
+  one client is connected, a matching nonterminal run is only a fallback, and
+  a merely registered project is no longer presented as active.
 - Aligned the root version authorities, compiled protocol constants, all Xcode
-  configurations, current user/developer documentation, and the published wiki
-  at `0.16.0 (21)`. Historical evidence retains the version and build it
-  actually tested.
+  configurations, and current user/developer documentation at `0.16.1 (22)`.
+  Historical evidence retains the version and build it actually tested.
 - Advanced the candidate identity to `0.16.0 (21)`. Durable GUI dispatch state
   records `intent` before any host effect and `submitted` after Send, so retry
   and Manager restart reuse one logical successor instead of opening a stack.
@@ -56,6 +88,18 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- The complete focused `CoreTests` selection executed 49 tests with zero
+  failures. Dashboard operational-snapshot tests executed 23 tests with zero
+  failures, including live-binding preference and the registered-only negative
+  case. The 103-test runtime-job suite exercised every available runtime profile
+  with an external working directory, `/bin/ps`, inherited environment state,
+  and cleanup of an observed `setsid(2)` child. The 100-test secure-filesystem
+  suite also passed, including blank destructive-path rejection and native
+  outside-project delete/move behavior. The final integrated SwiftPM suite
+  executed 1,933 tests with 12 explicit environment-dependent skips and zero
+  failures; both SwiftPM products, the app-hosted 23-test Dashboard selection,
+  and the canonical Debug workspace build also passed. Exact signed-candidate
+  and shipment acceptance remain separate.
 - Developer ID-signed Desktop candidate `Forge Conductor 0.16.0
   (21)-a540670.app` completed one live disposable rollover. Handoff
   `79474019-000f-4395-a593-cc74a6da2372` showed the 30-second countdown, opened

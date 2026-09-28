@@ -944,7 +944,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
 
     private static let contextRequiredTools: Set<String> = [
         "instruction_catalog", "instruction_read",
-        "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
+        "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir",
+        "fs_delete", "fs_delete_recovery", "fs_move", "search_text",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "shell_exec", "pdf_write", "pdf_from_file",
         "project_memory.remember", "project_memory.remember_batch",
@@ -1362,6 +1363,10 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             "project_generation": context.projectGeneration.rawValue,
             "client_id": context.clientID.rawValue,
             "authorization_roots": context.authorizationScope.canonicalRoots.map(\.path),
+            "authorization_roots_role": "project_identity_and_default_working_directory_only",
+            "filesystem_access_scope": "host_native_inherited_unconfined_by_forge",
+            "filesystem_sandbox_mode": "none",
+            "filesystem_path_confinement": false,
             "maximum_inline_output_bytes": context.authorizationScope.maximumInlineOutputBytes,
         ]
     }

@@ -179,6 +179,40 @@ struct RigProviderProjection: Sendable, Equatable {
     }
 }
 
+struct RigTrackedProjectIdentity: Sendable, Equatable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let runID: String?
+
+    init(projectID: String, projectGeneration: UInt64, runID: String? = nil) {
+        self.projectID = projectID
+        self.projectGeneration = projectGeneration
+        self.runID = runID
+    }
+}
+
+enum RigBoundProjectResolution: Sendable, Equatable {
+    case unbound
+    case resolved(RigTrackedProjectIdentity)
+    case unavailable
+
+    var identity: RigTrackedProjectIdentity? {
+        guard case let .resolved(identity) = self else { return nil }
+        return identity
+    }
+
+    func allowsRunFallback(hasResolvedProject: Bool) -> Bool {
+        switch self {
+        case .unbound:
+            return true
+        case .resolved:
+            return hasResolvedProject
+        case .unavailable:
+            return false
+        }
+    }
+}
+
 struct RigOperationalSnapshot: Sendable, Equatable {
     static let maximumActivityEntries = 100
     static let maximumActivityMessageBytes = 8 * 1_024
@@ -272,6 +306,8 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         providerIntegrations: ProviderIntegrationsSnapshot? = nil,
         instructionQueue: OperatorInstructionQueue? = nil,
         progressProject: OperatorProject? = nil,
+        preferredRunID: String? = nil,
+        allowUnboundRunFallback: Bool = true,
         operatorEvidenceAvailable: Bool? = nil,
         instructionEvidenceAvailable: Bool? = nil,
         policyEvidenceAvailable: Bool? = nil,
@@ -305,7 +341,9 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         let activeRun = monitoredRun(
             operatorSnapshot: operatorSnapshot,
             instructionQueue: instructionQueue,
-            progressProject: progressProject
+            progressProject: progressProject,
+            preferredRunID: preferredRunID,
+            allowUnboundRunFallback: allowUnboundRunFallback
         )
         let activePackage = activeRun.flatMap { run in
             packages.first {
@@ -453,12 +491,16 @@ struct RigOperationalSnapshot: Sendable, Equatable {
     static func monitoredRun(
         operatorSnapshot: OperatorSnapshot?,
         instructionQueue: OperatorInstructionQueue?,
-        progressProject: OperatorProject?
+        progressProject: OperatorProject?,
+        preferredRunID: String? = nil,
+        allowUnboundRunFallback: Bool = true
     ) -> OperatorRun? {
         guard let monitoredRunID = monitoredRunID(
             operatorSnapshot: operatorSnapshot,
             instructionQueue: instructionQueue,
-            progressProject: progressProject
+            progressProject: progressProject,
+            preferredRunID: preferredRunID,
+            allowUnboundRunFallback: allowUnboundRunFallback
         ) else {
             return nil
         }
@@ -470,10 +512,59 @@ struct RigOperationalSnapshot: Sendable, Equatable {
         }
     }
 
+    /// Selects the project that Dashboard is actually observing. A currently
+    /// connected MCP client and its durable project binding are stronger evidence
+    /// than an unrelated background run. A registered project alone is not active.
+    static func trackedProject(
+        operatorSnapshot: OperatorSnapshot?,
+        liveMCPClientIDs: [String],
+        boundProjectIdentity: RigTrackedProjectIdentity? = nil
+    ) -> OperatorProject? {
+        guard let operatorSnapshot else { return nil }
+
+        if let boundProjectIdentity {
+            // The direct control-plane binding is authoritative. If its project
+            // fell outside the bounded operator page, return nil so the caller
+            // fetches that exact project instead of selecting another live
+            // client or unrelated run from the partial snapshot.
+            return operatorSnapshot.projects.first(where: {
+                $0.projectID.caseInsensitiveCompare(boundProjectIdentity.projectID) == .orderedSame
+                    && $0.projectGeneration == boundProjectIdentity.projectGeneration
+            })
+        }
+
+        var observedClientIDs = Set<String>()
+        for clientID in liveMCPClientIDs {
+            guard observedClientIDs.insert(clientID).inserted else { continue }
+            if let boundProject = operatorSnapshot.projects.first(where: { project in
+                project.bindings.contains { binding in
+                    binding.active
+                        && binding.ownerKind == ProjectBindingOwnerKind.mcpClient.rawValue
+                        && binding.ownerID == clientID
+                }
+            }) {
+                return boundProject
+            }
+        }
+
+        let terminalStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
+        for run in operatorSnapshot.runs where !terminalStates.contains(run.state) {
+            if let runProject = operatorSnapshot.projects.first(where: {
+                $0.projectID == run.projectID
+                    && $0.projectGeneration == run.projectGeneration
+            }) {
+                return runProject
+            }
+        }
+        return nil
+    }
+
     static func monitoredRunID(
         operatorSnapshot: OperatorSnapshot?,
         instructionQueue: OperatorInstructionQueue?,
-        progressProject: OperatorProject?
+        progressProject: OperatorProject?,
+        preferredRunID: String? = nil,
+        allowUnboundRunFallback: Bool = true
     ) -> String? {
         let terminalRunStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
         let terminalPackageStates: Set<String> = ["completed", "cancelled", "failed"]
@@ -482,6 +573,20 @@ struct RigOperationalSnapshot: Sendable, Equatable {
             return run.projectID == progressProject.projectID
                 && run.projectGeneration == progressProject.projectGeneration
         } ?? []
+        if let preferredRunID, let progressProject {
+            if let visible = operatorSnapshot?.runs.first(where: { $0.runID == preferredRunID }) {
+                if visible.projectID == progressProject.projectID,
+                   visible.projectGeneration == progressProject.projectGeneration,
+                   !terminalRunStates.contains(visible.state) {
+                    return preferredRunID
+                }
+            } else {
+                // The durable binding remains authoritative when a bounded
+                // operator page omits its run; the caller can fetch it by ID.
+                return preferredRunID
+            }
+        }
+        guard allowUnboundRunFallback else { return nil }
         let activeRuns = projectRuns.filter { !terminalRunStates.contains($0.state) }
         for package in instructionQueue?.packages ?? []
             where !terminalPackageStates.contains(package.state) {
@@ -1183,21 +1288,47 @@ public final class AppModel: ObservableObject {
     }
 
     private func refreshRigOperationalSnapshot() async {
+        let liveMCPClientIDs = liveMCPClientIDsForDashboard()
         async let operatorRequest: OperatorSnapshot? = try? operatorManagerClient.snapshot(limit: 100)
         async let autonomyRequest: OperatorAutonomySummary? = try? operatorManagerClient.autonomyStatus()
         async let providerIntegrationsRequest: ProviderIntegrationsSnapshot? = try?
             operatorManagerClient.providerIntegrations()
-        let (operatorSnapshot, autonomy, providerIntegrations) = await (
+        async let boundProjectResolutionRequest = boundProjectResolution(
+            forLiveMCPClientIDs: liveMCPClientIDs
+        )
+        let (operatorSnapshot, autonomy, providerIntegrations, boundProjectResolution) = await (
             operatorRequest,
             autonomyRequest,
-            providerIntegrationsRequest
+            providerIntegrationsRequest,
+            boundProjectResolutionRequest
         )
-        let terminalStates: Set<String> = ["completed", "cancelled", "failed_terminal"]
-        let activeRun = operatorSnapshot?.runs.first { !terminalStates.contains($0.state) }
-        let progressProject = operatorSnapshot?.projects.first {
-            $0.projectID == activeRun?.projectID
-                && $0.projectGeneration == activeRun?.projectGeneration
-        } ?? operatorSnapshot?.projects.first
+        let boundProjectIdentity = boundProjectResolution.identity
+        let trackedProject = boundProjectResolution != .unavailable
+            ? RigOperationalSnapshot.trackedProject(
+                operatorSnapshot: operatorSnapshot,
+                liveMCPClientIDs: liveMCPClientIDs,
+                boundProjectIdentity: boundProjectIdentity
+            )
+            : nil
+        let exactBoundProject: OperatorProject? = if trackedProject == nil,
+                                                     let boundProjectIdentity,
+                                                     let project = try? await operatorManagerClient
+                                                         .projectStatus(
+                                                             projectID: boundProjectIdentity.projectID
+                                                         ),
+                                                     project.projectGeneration
+                                                         == boundProjectIdentity.projectGeneration {
+            project
+        } else {
+            nil
+        }
+        let progressProject = trackedProject ?? exactBoundProject
+        // Once a durable MCP binding resolves, only that exact project may
+        // supply Dashboard progress. If its bounded-page fallback fetch fails,
+        // fail closed instead of selecting an unrelated global run.
+        let allowRunFallback = boundProjectResolution.allowsRunFallback(
+            hasResolvedProject: progressProject != nil
+        )
         async let runeForgeRequest: StjornarvaldManagerSnapshot? = try? operatorManagerClient
             .runeForgeSnapshot(
                 projectID: progressProject?.projectID,
@@ -1210,7 +1341,9 @@ public final class AppModel: ObservableObject {
         let monitoredRunID = RigOperationalSnapshot.monitoredRunID(
             operatorSnapshot: operatorSnapshot,
             instructionQueue: instructionResult.queue,
-            progressProject: progressProject
+            progressProject: progressProject,
+            preferredRunID: boundProjectIdentity?.runID,
+            allowUnboundRunFallback: allowRunFallback
         )
         async let activityRequest = rigActivitySnapshot(
             publicSnapshot: operatorSnapshot,
@@ -1226,11 +1359,103 @@ public final class AppModel: ObservableObject {
             providerIntegrations: providerIntegrations,
             instructionQueue: instructionResult.queue,
             progressProject: progressProject,
+            preferredRunID: boundProjectIdentity?.runID,
+            allowUnboundRunFallback: allowRunFallback,
             operatorEvidenceAvailable: activityResult.available,
             instructionEvidenceAvailable: instructionResult.available,
             policyEvidenceAvailable: runeForge != nil,
             priorActivity: rigOperationalSnapshot.activityFeed
         )
+    }
+
+    /// Correlates the newest live MCP telemetry with the bare client identifiers
+    /// persisted in project bindings. Recent tool activity wins when more than one
+    /// connector is live; heartbeat order is the deterministic fallback.
+    private func liveMCPClientIDsForDashboard() -> [String] {
+        guard let forge else { return [] }
+        let liveClientIDs = forge.mcpServers
+            .filter(\.live)
+            .compactMap { Self.boundClientID(fromPresenceID: $0.id) }
+        let liveClientIDSet = Set(liveClientIDs)
+        guard !liveClientIDSet.isEmpty else { return [] }
+
+        var result: [String] = []
+        var included = Set<String>()
+        func append(_ clientID: String?) {
+            guard let clientID,
+                  liveClientIDSet.contains(clientID),
+                  included.insert(clientID).inserted else { return }
+            result.append(clientID)
+        }
+        for event in forge.auditRecent { append(event.clientID) }
+        for presence in forge.presence {
+            append(Self.boundClientID(fromPresenceID: presence.clientID))
+        }
+        for clientID in liveClientIDs { append(clientID) }
+        return result
+    }
+
+    /// Resolves the live client's exact durable binding directly from the local
+    /// control plane. This remains reliable when a project's bounded operator
+    /// binding list contains many newer runtime-job bindings.
+    private func boundProjectResolution(
+        forLiveMCPClientIDs clientIDs: [String]
+    ) async -> RigBoundProjectResolution {
+        guard let repository = app?.projectContexts.repository else { return .unavailable }
+        return await Self.resolveBoundProjectIdentity(
+            forLiveMCPClientIDs: clientIDs
+        ) { clientID in
+            try await repository.invocationContext(
+                for: ProjectBindingOwner(kind: .mcpClient, id: clientID),
+                clientID: ClientID(clientID)
+            )
+        }
+    }
+
+    /// Exact binding lookup is ordered by live activity. Only a missing binding
+    /// may fall through to the next client; repository failures make project
+    /// selection unavailable so Dashboard cannot silently choose unrelated work.
+    nonisolated static func resolveBoundProjectIdentity(
+        forLiveMCPClientIDs clientIDs: [String],
+        lookup: @escaping @Sendable (String) async throws -> ToolInvocationContext
+    ) async -> RigBoundProjectResolution {
+        for clientID in clientIDs {
+            do {
+                let context = try await lookup(clientID)
+                return .resolved(RigTrackedProjectIdentity(
+                    projectID: context.projectID.description,
+                    projectGeneration: context.projectGeneration.rawValue,
+                    runID: context.runID?.description
+                ))
+            } catch let error as ProjectContextError {
+                if case .projectContextRequired = error { continue }
+                return .unavailable
+            } catch {
+                return .unavailable
+            }
+        }
+        return .unbound
+    }
+
+    /// Presence identities append a known connector role to an otherwise opaque
+    /// client ID. Strip the suffix from the end and preserve the binding's exact
+    /// case; client IDs are not restricted to UUID-only strings.
+    nonisolated static func boundClientID(fromPresenceID presenceID: String) -> String? {
+        let candidate = presenceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !candidate.isEmpty else { return nil }
+        for role in LMStudioConnectorRole.allCases {
+            let suffix = ":\(role.rawValue)"
+            if candidate.hasSuffix(suffix), candidate.count > suffix.count {
+                return String(candidate.dropLast(suffix.count))
+            }
+        }
+        for provider in ProviderIntegrationID.allCases {
+            let suffix = ":desktop-provider:\(provider.rawValue)"
+            if candidate.hasSuffix(suffix), candidate.count > suffix.count {
+                return String(candidate.dropLast(suffix.count))
+            }
+        }
+        return candidate
     }
 
     private func rigActivitySnapshot(
@@ -2344,8 +2569,8 @@ public final class AppModel: ObservableObject {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Authorize Folder"
-        panel.message = "Choose one project folder Forge Conductor may access."
+        panel.prompt = "Select Project Folder"
+        panel.message = "Choose a folder to register as a project identity and default working context."
         guard panel.runModal() == .OK, let selected = panel.url else {
             allowedRootsMessage = "No project folder was added"
             return
@@ -2363,12 +2588,12 @@ public final class AppModel: ObservableObject {
         guard url.isFileURL,
               let canonical = ManagerSettingsNormalizer.canonicalAllowedRoot(url.path) else {
             allowedRootsMessage = url.standardizedFileURL.path == "/"
-                ? "The filesystem root cannot be authorized"
+                ? "The filesystem root cannot be registered as a project"
                 : "Choose an existing folder"
             return false
         }
         guard !setAllowedRoots.contains(canonical) else {
-            allowedRootsMessage = "That project folder is already authorized"
+            allowedRootsMessage = "That project folder is already selected"
             return true
         }
         setAllowedRoots = ManagerSettingsNormalizer.canonicalAllowedRoots(

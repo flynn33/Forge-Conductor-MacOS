@@ -3,21 +3,52 @@ import Darwin
 @testable import ForgeConductorCore
 
 final class FilesystemCancellationTests: XCTestCase {
+    private var fixtureRoot: URL!
     private var home: URL!
     private var app: ForgeApp!
+    private var invocationContext: ToolInvocationContext!
 
     override func setUpWithError() throws {
-        home = FileManager.default.temporaryDirectory.appendingPathComponent(
+        fixtureRoot = FileManager.default.temporaryDirectory.appendingPathComponent(
             "filesystem-cancellation-\(UUID().uuidString.lowercased())",
             isDirectory: true
         )
-        app = try ForgeApp.bootstrap(home: home)
+        home = fixtureRoot.appendingPathComponent("workspace", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: home,
+            withIntermediateDirectories: true
+        )
+        app = try ForgeApp.bootstrap(
+            home: fixtureRoot.appendingPathComponent("app-home", isDirectory: true)
+        )
+        _ = try app.config.update(["allowed_roots": [home.path]], save: false)
+
+        let clientID = ClientID("filesystem-cancellation")
+        let manager = ManagerNode(app: app)
+        let registered = try manager.registerProject(
+            path: home.path,
+            displayName: "Filesystem Cancellation Fixture"
+        )
+        let projectID = ProjectID(try XCTUnwrap(
+            UUID(uuidString: try XCTUnwrap(registered["project_id"] as? String))
+        ))
+        let generation = ProjectGeneration(try XCTUnwrap(
+            registered["project_generation"] as? UInt64
+        ))
+        _ = try manager.bindProject(
+            projectID: projectID,
+            expectedGeneration: generation,
+            owner: ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue),
+            allowedTools: ["fs_delete", "fs_move"]
+        )
+        invocationContext = try app.projectContexts.invocationContext(for: clientID)
     }
 
     override func tearDownWithError() throws {
+        invocationContext = nil
         app.shutdown()
         app = nil
-        try? FileManager.default.removeItem(at: home)
+        try? FileManager.default.removeItem(at: fixtureRoot)
     }
 
     func testRecursiveDeleteReportsPartialMutationAfterCancellation() throws {
@@ -36,8 +67,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": root.path],
-            context: nil,
-            clientID: ClientID("partial-delete"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         ))
@@ -61,8 +92,8 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertThrowsError(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": root.path],
-            context: nil,
-            clientID: ClientID("pre-cancelled-delete"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         )) { error in
@@ -82,8 +113,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": root.path],
-            context: nil,
-            clientID: ClientID("symlink-delete"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -114,8 +145,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": root.path],
-            context: nil,
-            clientID: ClientID("pinned-delete-parent"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -146,8 +177,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": root.path],
-            context: nil,
-            clientID: ClientID("delete-leaf-race"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -187,8 +218,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("final-window-delete-swap"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -229,8 +260,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("quarantine-sync-failure"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -269,8 +300,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("unknown-presence-delete"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -300,8 +331,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("rollback-refuses-substitution"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -342,8 +373,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("final-window-rollback-swap"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -380,8 +411,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("ledger-unavailable"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -519,8 +550,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("delete-quarantine-capacity"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -545,8 +576,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let retry = try XCTUnwrap(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_delete",
             arguments: ["path": victim.path],
-            context: nil,
-            clientID: ClientID("delete-after-quarantine-recovery"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -887,8 +918,8 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertThrowsError(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("exclusive-same-volume-move"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -922,8 +953,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("pinned-same-volume-parent"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -964,8 +995,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("rebound-same-volume-destination"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -995,8 +1026,8 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertThrowsError(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cancel-before-same-volume-rename"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         )) { error in
@@ -1025,8 +1056,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("same-volume-leaf-race"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1034,17 +1065,19 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertNil(mutation.error)
         XCTAssertFalse(result.ok)
         XCTAssertEqual(result.payload["code"] as? String, "source_changed")
-        XCTAssertEqual(result.payload["committed"] as? Bool, false)
-        XCTAssertEqual(result.payload["rollback_attempted"] as? Bool, true)
-        XCTAssertEqual(result.payload["rollback_confirmed"] as? Bool, false)
-        XCTAssertEqual(result.payload["recovery_required"] as? Bool, true)
-        let recoveryPath = try XCTUnwrap(result.payload["recovery_path"] as? String)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryPath))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
-        let quarantine = try XCTUnwrap(retainedQuarantineURL(in: home))
-        XCTAssertEqual(try Data(contentsOf: quarantine), Data("replacement".utf8))
+        // The final descriptor identity check now detects this substitution
+        // before Forge quarantines the leaf. No Forge-owned mutation occurred,
+        // so there is nothing to roll back or recover.
+        XCTAssertNotEqual(result.payload["committed"] as? Bool, true)
+        XCTAssertNotEqual(result.payload["namespace_mutated"] as? Bool, true)
+        XCTAssertNil(result.payload["rollback_attempted"])
+        XCTAssertNil(result.payload["rollback_confirmed"])
+        XCTAssertNotEqual(result.payload["recovery_required"] as? Bool, true)
+        XCTAssertNil(result.payload["recovery_path"])
+        XCTAssertEqual(try Data(contentsOf: source), Data("replacement".utf8))
         XCTAssertEqual(try Data(contentsOf: peer), Data("original".utf8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertNil(try retainedQuarantineURL(in: home))
     }
 
     func testFinalWindowSameVolumePublishSwapNeverReportsSuccessAndRetainsRecovery() throws {
@@ -1068,8 +1101,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("final-window-same-volume-publish"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1116,8 +1149,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("same-volume-unstable-durability"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1149,8 +1182,8 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertThrowsError(try FilesystemToolPack(deletionStepObserver: nil).handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("missing-source-preflight"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1173,8 +1206,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("exact-cross-volume-move"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1206,8 +1239,8 @@ final class FilesystemCancellationTests: XCTestCase {
         XCTAssertThrowsError(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("exclusive-cross-volume-move"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1237,8 +1270,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("pre-fence-source-replacement"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1268,8 +1301,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("staging-leaf-race"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1311,8 +1344,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("final-window-cross-volume-publish"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1359,8 +1392,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-unstable-durability"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1411,8 +1444,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-two-receipt-recovery"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1466,8 +1499,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("rebound-cross-volume-destination"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1505,8 +1538,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cancel-before-cross-volume-install"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         ))
@@ -1538,8 +1571,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("installed-cross-volume-cancellation"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         ))
@@ -1571,8 +1604,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-source-replacement"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1607,8 +1640,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("source-removal-leaf-race"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1654,8 +1687,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("final-window-source-cleanup"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1702,8 +1735,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-metadata-change"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1751,8 +1784,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("pinned-cross-volume-parent"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1785,8 +1818,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-hard-link-metadata"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1823,8 +1856,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-unique-scaling"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 20)
         ))
@@ -1854,8 +1887,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("cross-volume-staging-deadline"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         ))
@@ -1894,8 +1927,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("post-removal-staging-deadline"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: cancellation
         ))
@@ -1929,8 +1962,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("post-publication-cleanup-recovery"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -1983,8 +2016,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("absent-staging-recovery"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2026,8 +2059,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("rename-race-created-parents"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2062,8 +2095,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("install-race-created-parents"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2101,8 +2134,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("durable-move-parents"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2139,8 +2172,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("durable-hierarchy-failure"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2169,8 +2202,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("deduplicated-move-parent"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2198,8 +2231,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("committed-move-sync-failure"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))
@@ -2237,8 +2270,8 @@ final class FilesystemCancellationTests: XCTestCase {
         let result = try XCTUnwrap(try pack.handle(
             name: "fs_move",
             arguments: ["path": source.path, "dest": destination.path],
-            context: nil,
-            clientID: ClientID("committed-cross-volume-sync-failure"),
+            context: invocationContext,
+            clientID: invocationContext.clientID,
             app: app,
             cancellation: ToolCallCancellation(timeoutSeconds: 5)
         ))

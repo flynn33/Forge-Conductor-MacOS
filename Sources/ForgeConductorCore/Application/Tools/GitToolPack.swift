@@ -6,6 +6,20 @@
 
 import Foundation
 
+enum GitExecutableResolver {
+    static let executable: URL = {
+        if let hostGit = ProcessRunner.which("git") {
+            return URL(fileURLWithPath: hostGit)
+        }
+        let candidates = [
+            AppPaths.nativeValidationDeveloperDirectory.appendingPathComponent("usr/bin/git"),
+            URL(fileURLWithPath: "/Library/Developer/CommandLineTools/usr/bin/git"),
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+            ?? URL(fileURLWithPath: "/usr/bin/git")
+    }()
+}
+
 private final class GitMutationLockTable: @unchecked Sendable {
     private let locks = (0..<64).map { _ in NSLock() }
 
@@ -60,23 +74,14 @@ public struct GitToolPack: ToolPackHandling {
     private let commandTimeoutSeconds: TimeInterval
     private let gitExecutable: URL
 
-    private static var defaultGitExecutable: URL {
-        let candidates = [
-            AppPaths.nativeValidationDeveloperDirectory.appendingPathComponent("usr/bin/git"),
-            URL(fileURLWithPath: "/Library/Developer/CommandLineTools/usr/bin/git"),
-        ]
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
-            ?? URL(fileURLWithPath: "/usr/bin/git")
-    }
-
     public init() {
         runner = ProcessRunner()
-        gitExecutable = Self.defaultGitExecutable
+        gitExecutable = GitExecutableResolver.executable
         commandTimeoutSeconds = 30
     }
 
     init(runner: ProcessRunner, commandTimeoutSeconds: TimeInterval, gitExecutable: URL? = nil) {
-        self.gitExecutable = gitExecutable ?? Self.defaultGitExecutable
+        self.gitExecutable = gitExecutable ?? GitExecutableResolver.executable
         self.runner = runner
         self.commandTimeoutSeconds = max(0, commandTimeoutSeconds)
     }
@@ -96,10 +101,12 @@ public struct GitToolPack: ToolPackHandling {
         guard toolNames.contains(name) else { return nil }
         try cancellation?.checkCancellation()
         let cwd = ToolArgHelpers.string(arguments, "cwd") ?? FileManager.default.currentDirectoryPath
-        let scoped = GitToolPack(runner: try runner.scopedForTool(
-            context: context, workingDirectory: URL(fileURLWithPath: cwd), paths: app.paths
-        ), commandTimeoutSeconds: commandTimeoutSeconds, gitExecutable: gitExecutable)
-        return try scoped.handleScoped(name: name, arguments: arguments, cwd: cwd, cancellation: cancellation)
+        return try handleScoped(
+            name: name,
+            arguments: arguments,
+            cwd: cwd,
+            cancellation: cancellation
+        )
     }
 
     private func handleScoped(name: String, arguments: [String: Any], cwd: String, cancellation: ToolCallCancellation?) throws -> ToolResult? {
@@ -263,7 +270,7 @@ public struct GitToolPack: ToolPackHandling {
         let indexPath = rawPath.hasPrefix("/")
             ? rawPath
             : URL(fileURLWithPath: cwd).appendingPathComponent(rawPath).standardizedFileURL.path
-        let temporaryDirectory = (runner.toolScratchDirectory ?? FileManager.default.temporaryDirectory).appendingPathComponent(
+        let temporaryDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "forge-git-index-\(UUID().uuidString.lowercased())",
             isDirectory: true
         )
@@ -273,11 +280,11 @@ public struct GitToolPack: ToolPackHandling {
             attributes: [.posixPermissions: 0o700]
         )
         defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
-        let expectedIndex = RuntimeProcessSandbox.canonicalURL(temporaryDirectory).appendingPathComponent("index").path
+        let expectedIndex = RuntimePathCanonicalizer.canonicalURL(temporaryDirectory).appendingPathComponent("index").path
         if FileManager.default.fileExists(atPath: indexPath) {
             let copy = try runner.run(
                 executable: "/bin/cp",
-                arguments: ["-p", RuntimeProcessSandbox.canonicalURL(URL(fileURLWithPath: indexPath)).path, expectedIndex],
+                arguments: ["-p", RuntimePathCanonicalizer.canonicalURL(URL(fileURLWithPath: indexPath)).path, expectedIndex],
                 currentDirectory: cwd,
                 timeoutSec: 5,
                 cancellation: cancellation
@@ -388,7 +395,7 @@ public struct GitToolPack: ToolPackHandling {
     ) throws -> String? {
         let result = try runner.run(
             executable: gitExecutable.path,
-            arguments: ["hash-object", "--no-filters", "--", RuntimeProcessSandbox.canonicalURL(URL(fileURLWithPath: path)).path],
+            arguments: ["hash-object", "--no-filters", "--", RuntimePathCanonicalizer.canonicalURL(URL(fileURLWithPath: path)).path],
             currentDirectory: cwd,
             timeoutSec: 5,
             cancellation: cancellation
@@ -409,7 +416,7 @@ public struct GitToolPack: ToolPackHandling {
                 executable: gitExecutable.path,
                 arguments: ["ls-files", "--stage", "-z", "--", pathspec],
                 currentDirectory: cwd,
-                environment: ["GIT_INDEX_FILE": RuntimeProcessSandbox.canonicalURL(URL(fileURLWithPath: indexPath)).path],
+                environment: ["GIT_INDEX_FILE": RuntimePathCanonicalizer.canonicalURL(URL(fileURLWithPath: indexPath)).path],
                 timeoutSec: 5,
                 maximumOutputBytes: Self.maximumProofBytes,
                 cancellation: cancellation

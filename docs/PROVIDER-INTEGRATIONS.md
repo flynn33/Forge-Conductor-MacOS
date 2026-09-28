@@ -1,6 +1,6 @@
 # Provider integrations
 
-Product identity: version **0.16.0**, build **21**. Qualification remains
+Product identity: version **0.16.1**, build **22**. Qualification remains
 evidence-bound per host and candidate.
 
 ## Current provider workflow
@@ -60,6 +60,12 @@ Claude Code Desktop and Codex Desktop own their model and conversation
 sessions. Forge provisions only its supported plugin, hook, MCP, and
 project-scoped authorization artifacts. The host remains responsible for model
 selection, permission prompts, activation, and any required reload.
+
+Project scope identifies and generation-fences the durable work; it does not
+confine native filesystem, Git, or shell paths. Each provider-launched Forge
+process receives only the macOS access granted to its responsible signed host
+and executable. Full Disk Access is a macOS TCC grant, not a Forge entitlement,
+and the affected applications must be relaunched after that grant changes.
 
 Forge never treats installation-file presence alone as proof that a desktop
 integration is active. Provisioning and repair are transactional for

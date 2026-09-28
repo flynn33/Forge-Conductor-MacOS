@@ -452,7 +452,7 @@ final class CoreTests: XCTestCase {
         XCTAssertGreaterThan(size?.intValue ?? 0, 100)
     }
 
-    func testFilesystemToolRejectsPathOutsideWorkspaceRoots() throws {
+    func testFilesystemToolWritesOutsideSelectedProjectRoot() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let outside = tempHome.deletingLastPathComponent()
@@ -462,16 +462,16 @@ final class CoreTests: XCTestCase {
 
         let result = try app.tools.call(
             name: "fs_write",
-            arguments: ["path": outside.path, "content": "must not write"],
+            arguments: ["path": outside.path, "content": "native-access"],
             clientID: client
         )
 
-        XCTAssertFalse(result.ok)
-        XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path))
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(try String(contentsOf: outside, encoding: .utf8), "native-access")
+        try? FileManager.default.removeItem(at: outside)
     }
 
-    func testUnboundFilesystemAndSearchToolsCannotReadForgeControlState() throws {
+    func testBoundNativeFilesystemAndSearchToolsCanReadOutsideProjectRoot() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let providerState = app.paths.managedProvidersDir.appendingPathComponent("provider-state.json")
@@ -480,42 +480,22 @@ final class CoreTests: XCTestCase {
             to: app.paths.managerControlCredential,
             options: .atomic
         )
-        let sensitivePaths = [
-            app.paths.configJSON,
-            app.paths.managerControlCredential,
-            app.paths.controlPlaneSQLite,
-            providerState,
-        ]
         let clientID = ClientID("unbound-control-state")
-
-        for sensitivePath in sensitivePaths {
-            for (tool, arguments) in [
-                ("fs_read", ["path": sensitivePath.path]),
-                ("fs_list", ["path": sensitivePath.path]),
-                ("fs_glob", ["path": sensitivePath.path, "pattern": "*"]),
-                ("search_text", ["path": sensitivePath.path, "pattern": "sentinel"]),
-            ] {
-                let result = try app.tools.call(
-                    name: tool,
-                    arguments: arguments,
-                    clientID: clientID
-                )
-                XCTAssertFalse(result.ok, "\(tool) unexpectedly accessed \(sensitivePath.path)")
-                XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
-                XCTAssertFalse("\(result.payload)".contains("provider-secret-sentinel"))
-                XCTAssertFalse("\(result.payload)".contains("manager-secret-sentinel"))
-            }
-        }
-
-        for (tool, arguments) in [
-            ("fs_list", [String: Any]()),
-            ("fs_glob", ["pattern": "*"] as [String: Any]),
-            ("search_text", ["pattern": "sentinel"] as [String: Any]),
-        ] {
-            let result = try app.tools.call(name: tool, arguments: arguments, clientID: clientID)
-            XCTAssertFalse(result.ok, "\(tool) defaulted to the Forge control directory")
-            XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
-        }
+        try bindProjectContext(app: app, clientID: clientID)
+        let read = try app.tools.call(
+            name: "fs_read",
+            arguments: ["path": providerState.path],
+            clientID: clientID
+        )
+        XCTAssertTrue(read.ok, "\(read.payload)")
+        XCTAssertEqual(read.payload["content"] as? String, "provider-secret-sentinel")
+        let search = try app.tools.call(
+            name: "search_text",
+            arguments: ["path": app.paths.managedProvidersDir.path, "pattern": "provider-secret-sentinel"],
+            clientID: clientID
+        )
+        XCTAssertTrue(search.ok, "\(search.payload)")
+        XCTAssertEqual(search.payload["count"] as? Int, 1)
     }
 
     func testConfiguredWorkspaceRootAllowsFilesystemTool() throws {
@@ -546,7 +526,7 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: output, encoding: .utf8), "allowed")
     }
 
-    func testFilesystemToolRejectsSymlinkEscape() throws {
+    func testFilesystemToolFollowsNativeSymlinkOutsideProjectRoot() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let outside = tempHome.deletingLastPathComponent()
@@ -560,13 +540,179 @@ final class CoreTests: XCTestCase {
 
         let result = try app.tools.call(
             name: "fs_write",
-            arguments: ["path": link.appendingPathComponent("secret.txt").path, "content": "blocked"],
+            arguments: ["path": link.appendingPathComponent("secret.txt").path, "content": "native"],
             clientID: client
         )
 
-        XCTAssertFalse(result.ok)
-        XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("secret.txt").path))
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(
+            try String(contentsOf: outside.appendingPathComponent("secret.txt"), encoding: .utf8),
+            "native"
+        )
+    }
+
+    func testNativeToolMatrixWorksOutsideSelectedProjectRoot() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("native-host-access-matrix")
+        try bindProjectContext(app: app, clientID: client)
+        let external = tempHome.deletingLastPathComponent()
+            .appendingPathComponent("forge-native-matrix-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: external) }
+
+        func call(_ name: String, _ arguments: [String: Any]) throws -> ToolResult {
+            let result = try app.tools.call(name: name, arguments: arguments, clientID: client)
+            XCTAssertTrue(result.ok, "\(name): \(result.payload)")
+            return result
+        }
+
+        _ = try call("fs_mkdir", ["path": external.path])
+        let text = external.appendingPathComponent("notes.txt")
+        _ = try call("fs_write", ["path": text.path, "content": "alpha native marker"])
+        _ = try call("fs_edit", ["path": text.path, "old": "alpha", "new": "beta"])
+        let read = try call("fs_read", ["path": text.path])
+        XCTAssertEqual(read.payload["content"] as? String, "beta native marker")
+        let list = try call("fs_list", ["path": external.path])
+        XCTAssertTrue((list.payload["entries"] as? [String])?.contains("notes.txt") == true)
+        let glob = try call("fs_glob", ["path": external.path, "pattern": "*.txt"])
+        XCTAssertTrue("\(glob.payload)".contains("notes.txt"))
+        let search = try call(
+            "search_text",
+            ["path": external.path, "pattern": "native marker"]
+        )
+        XCTAssertEqual(search.payload["count"] as? Int, 1)
+
+        let writtenPDF = external.appendingPathComponent("written.pdf")
+        _ = try call(
+            "pdf_write",
+            ["path": writtenPDF.path, "content": "# Native PDF", "title": "Native PDF"]
+        )
+        let convertedPDF = external.appendingPathComponent("converted.pdf")
+        _ = try call(
+            "pdf_from_file",
+            ["source_path": text.path, "dest_path": convertedPDF.path]
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: writtenPDF.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: convertedPDF.path))
+
+        let repository = external.appendingPathComponent("repository", isDirectory: true)
+        try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+        let initialized = try ProcessRunner().run(
+            executable: "/usr/bin/git",
+            arguments: ["init", "-q"],
+            currentDirectory: repository.path,
+            timeoutSec: 5
+        )
+        XCTAssertEqual(initialized.exitCode, 0, initialized.stderr)
+        let tracked = repository.appendingPathComponent("tracked.txt")
+        _ = try call("fs_write", ["path": tracked.path, "content": "tracked"])
+        let hookMarker = external.appendingPathComponent("git-hook-ps.txt")
+        let hook = repository.appendingPathComponent(".git/hooks/pre-commit")
+        try "#!/bin/sh\n/bin/ps -p $$ -o pid= > '\(hookMarker.path)'\n"
+            .write(to: hook, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: hook.path
+        )
+        _ = try call("git_status", ["cwd": repository.path])
+        _ = try call("git_diff", ["cwd": repository.path])
+        _ = try call("git_add", ["cwd": repository.path, "path": "tracked.txt"])
+        _ = try call("git_commit", ["cwd": repository.path, "message": "test: native access"])
+        _ = try call("git_log", ["cwd": repository.path])
+        XCTAssertFalse((try String(contentsOf: hookMarker, encoding: .utf8))
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        let shell = try call(
+            "shell_exec",
+            ["command": "/bin/ps -p $$ -o pid= >/dev/null && /bin/pwd", "cwd": external.path]
+        )
+        XCTAssertEqual(
+            (shell.payload["stdout"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+            RuntimePathCanonicalizer.canonicalExistingURL(external).path
+        )
+
+        let moved = external.appendingPathComponent("moved.txt")
+        let move = try call("fs_move", ["path": text.path, "dest": moved.path])
+        XCTAssertEqual(move.payload["protection_mode"] as? String, "local_bounded")
+        let delete = try call("fs_delete", ["path": moved.path])
+        XCTAssertEqual(delete.payload["protection_mode"] as? String, "local_bounded")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: moved.path))
+    }
+
+    func testNativeDeletionProtectsHomeVolumeAndWorkspaceRoots() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("native-destructive-root-guard")
+        try bindProjectContext(app: app, clientID: client)
+
+        var protectedTargets = [
+            FileManager.default.homeDirectoryForCurrentUser,
+            FileManager.default.homeDirectoryForCurrentUser.deletingLastPathComponent(),
+            tempHome!,
+            tempHome.deletingLastPathComponent(),
+        ]
+        if let mounted = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: nil,
+            options: []
+        )?.first(where: { $0.path != "/" }) {
+            protectedTargets.append(mounted)
+        }
+
+        for (index, target) in protectedTargets.enumerated() {
+            let result = try app.tools.call(
+                name: "fs_delete",
+                arguments: ["path": target.path],
+                clientID: client
+            )
+            XCTAssertFalse(result.ok, "target[\(index)]=\(target.path)")
+            XCTAssertEqual(
+                result.payload["code"] as? String,
+                "workspace_root_protected",
+                "target[\(index)]=\(target.path)"
+            )
+        }
+    }
+
+    func testNativeDeletionProtectsCaseAliasOfWorkspaceRoot() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let workspace = tempHome.appendingPathComponent(
+            "CaseAliasWorkspace-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        let client = ClientID("native-case-alias-root-guard")
+        try bindProjectContext(app: app, clientID: client, projectRoot: workspace)
+
+        let aliasedWorkspace = workspace.deletingLastPathComponent().appendingPathComponent(
+            workspace.lastPathComponent.lowercased(),
+            isDirectory: true
+        )
+        guard aliasedWorkspace.path != workspace.path,
+              FileManager.default.fileExists(atPath: aliasedWorkspace.path) else {
+            throw XCTSkip("The test volume is case-sensitive and has no case alias")
+        }
+
+        for (tool, arguments) in [
+            ("fs_delete", ["path": aliasedWorkspace.path]),
+            (
+                "fs_move",
+                [
+                    "path": aliasedWorkspace.path,
+                    "dest": workspace.deletingLastPathComponent()
+                        .appendingPathComponent("moved-workspace").path,
+                ]
+            ),
+        ] {
+            let result = try app.tools.call(
+                name: tool,
+                arguments: arguments,
+                clientID: client
+            )
+            XCTAssertFalse(result.ok, tool)
+            XCTAssertEqual(result.payload["code"] as? String, "workspace_root_protected", tool)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.path), tool)
+        }
     }
 
     func testActiveAgentForbiddenToolsAreEnforcedAtRouter() throws {
@@ -716,6 +862,17 @@ final class CoreTests: XCTestCase {
 
         XCTAssertTrue(result.ok, "\(result.payload)")
         XCTAssertEqual(result.payload["project_context_attached"] as? Bool, true)
+        let returnedContext = try XCTUnwrap(result.payload["project_context"] as? [String: Any])
+        XCTAssertEqual(
+            returnedContext["authorization_roots_role"] as? String,
+            "project_identity_and_default_working_directory_only"
+        )
+        XCTAssertEqual(
+            returnedContext["filesystem_access_scope"] as? String,
+            "host_native_inherited_unconfined_by_forge"
+        )
+        XCTAssertEqual(returnedContext["filesystem_sandbox_mode"] as? String, "none")
+        XCTAssertEqual(returnedContext["filesystem_path_confinement"] as? Bool, false)
         let context = try app.projectContexts.invocationContext(for: clientID)
         XCTAssertEqual(
             context.authorizationScope.canonicalRoots,

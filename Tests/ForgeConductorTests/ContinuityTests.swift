@@ -764,6 +764,8 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("budget-owner")
+        try configureAllowedProjectRoot(app)
+        try bindProjectContext(app, clientID: client)
         let checkpoint = try app.tools.call(
             name: "session_checkpoint",
             arguments: [
@@ -3651,19 +3653,28 @@ final class ContinuityTests: XCTestCase {
         }
     }
 
-    func testAuthorizationDeniedLoopSignalsExactlyAtSoftAndHardThresholds() throws {
+    func testToolGrantDenialLoopSignalsExactlyAtSoftAndHardThresholds() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("denied-exact-loop-thresholds")
-        try bindProjectContext(app, clientID: client)
-        let outside = tempHome.deletingLastPathComponent()
-            .appendingPathComponent("forge-denied-loop-\(UUID().uuidString).txt")
+        try configureAllowedProjectRoot(app)
+        let start = try app.tools.call(
+            name: "agent_run_start",
+            arguments: [
+                "agent_id": "explore",
+                "goal": "Exercise a stable tool-grant denial",
+                "cwd": tempHome.path,
+            ],
+            clientID: client
+        )
+        XCTAssertTrue(start.ok, "\(start.payload)")
+        let deniedPath = tempHome.appendingPathComponent("grant-denied-loop.txt")
 
         var softHandoffID: String?
         for count in 1...9 {
             let result = try app.tools.call(
                 name: "fs_write",
-                arguments: ["path": outside.path, "content": "must remain denied"],
+                arguments: ["path": deniedPath.path, "content": "must not dispatch"],
                 clientID: client
             )
 
@@ -3671,12 +3682,12 @@ final class ContinuityTests: XCTestCase {
             case 1...3, 5...8:
                 XCTAssertFalse(result.ok, "call \(count)")
                 XCTAssertTrue(result.isError, "call \(count)")
-                XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+                XCTAssertEqual(result.payload["code"] as? String, "tool_forbidden")
                 XCTAssertNil(result.payload["handoff_required"], "call \(count)")
             case 4:
                 XCTAssertFalse(result.ok)
                 XCTAssertTrue(result.isError)
-                XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+                XCTAssertEqual(result.payload["code"] as? String, "tool_forbidden")
                 XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
                 softHandoffID = result.payload["handoff_id"] as? String
                 XCTAssertNotNil(softHandoffID)
@@ -3685,14 +3696,14 @@ final class ContinuityTests: XCTestCase {
                 XCTAssertFalse(result.ok)
                 XCTAssertTrue(result.isError)
                 XCTAssertEqual(result.payload["code"] as? String, "identical_call_loop")
-                XCTAssertEqual(result.payload["blocked_call_code"] as? String, "path_outside_allowed_roots")
+                XCTAssertEqual(result.payload["blocked_call_code"] as? String, "tool_forbidden")
                 XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
                 XCTAssertEqual(result.payload["handoff_id"] as? String, softHandoffID)
                 XCTAssertFalse((result.payload["resume_seed"] as? String ?? "").isEmpty)
             default:
                 XCTFail("unexpected count")
             }
-            XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path), "call \(count) dispatched")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: deniedPath.path), "call \(count) dispatched")
         }
 
         let handoffID = try XCTUnwrap(softHandoffID)
@@ -3701,7 +3712,7 @@ final class ContinuityTests: XCTestCase {
         XCTAssertTrue(packet.resumeReady)
         XCTAssertFalse(packet.resumeSeed.isEmpty)
         XCTAssertTrue(packet.narrative.contains("identical_call_loop tool=fs_write count=9"), packet.narrative)
-        XCTAssertTrue(packet.narrative.contains("authorization_denial=path_outside_allowed_roots"), packet.narrative)
+        XCTAssertTrue(packet.narrative.contains("authorization_denial=tool_forbidden"), packet.narrative)
 
         let audits = try app.audit.recent(limit: 20).filter {
             $0.tool == "fs_write" && $0.clientID == client.rawValue
@@ -3714,9 +3725,19 @@ final class ContinuityTests: XCTestCase {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let client = ClientID("denied-failed-loop-persistence")
-        try bindProjectContext(app, clientID: client)
-        let outside = tempHome.deletingLastPathComponent()
-            .appendingPathComponent("forge-denied-failed-loop-\(UUID().uuidString).txt")
+        try configureAllowedProjectRoot(app)
+        let start = try app.tools.call(
+            name: "agent_run_start",
+            arguments: [
+                "agent_id": "explore",
+                "goal": "Exercise denial persistence failure",
+                "cwd": tempHome.path,
+            ],
+            clientID: client
+        )
+        XCTAssertTrue(start.ok, "\(start.payload)")
+        let deniedPath = tempHome.appendingPathComponent("grant-denied-failed-loop.txt")
+        let preexistingHandoffs = try app.store.handoffList(limit: 10)
         try withSQLiteFixture(at: app.paths.storeSQLite) { database in
             try executeSQLiteFixture(
                 database,
@@ -3733,28 +3754,32 @@ final class ContinuityTests: XCTestCase {
         for count in 1...9 {
             let result = try app.tools.call(
                 name: "fs_write",
-                arguments: ["path": outside.path, "content": "must remain denied"],
+                arguments: ["path": deniedPath.path, "content": "must not dispatch"],
                 clientID: client
             )
             if count < 9 {
                 XCTAssertFalse(result.ok, "call \(count)")
-                XCTAssertEqual(result.payload["code"] as? String, "path_outside_allowed_roots")
+                XCTAssertEqual(result.payload["code"] as? String, "tool_forbidden")
                 XCTAssertNil(result.payload["handoff_required"], "call \(count)")
             } else {
                 XCTAssertFalse(result.ok)
                 XCTAssertTrue(result.isError)
                 XCTAssertEqual(result.payload["code"] as? String, "continuity_persistence_failed")
                 XCTAssertEqual(result.payload["loop_code"] as? String, "identical_call_loop")
-                XCTAssertEqual(result.payload["blocked_call_code"] as? String, "path_outside_allowed_roots")
+                XCTAssertEqual(result.payload["blocked_call_code"] as? String, "tool_forbidden")
                 XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
                 XCTAssertEqual(result.payload["handoff_persisted"] as? Bool, false)
                 XCTAssertNil(result.payload["handoff_id"])
                 XCTAssertNil(result.payload["resume_seed"])
             }
-            XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path), "call \(count) dispatched")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: deniedPath.path), "call \(count) dispatched")
         }
 
-        XCTAssertEqual(try app.store.handoffList(limit: 10), [])
+        XCTAssertEqual(
+            try app.store.handoffList(limit: 10),
+            preexistingHandoffs,
+            "failed persistence must not manufacture a resume-ready handoff"
+        )
         let audits = try app.audit.recent(limit: 20).filter {
             $0.tool == "fs_write" && $0.clientID == client.rawValue
         }
@@ -4049,21 +4074,26 @@ final class ContinuityTests: XCTestCase {
         XCTAssertTrue(after.ok, "\(after.payload)")
     }
 
-    func testReadOnlyPathRequiresExplicitAllowedRootWithoutAgentSession() throws {
+    func testBoundReadOnlyPathDoesNotRequireSelectedProjectContainment() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let projects = tempHome.appendingPathComponent("local-projects", isDirectory: true)
         try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
 
-        let denied = try app.tools.call(
+        try bindProjectContext(app, clientID: ClientID("home-read"))
+        let native = try app.tools.call(
             name: "fs_list",
             arguments: ["path": projects.path],
             clientID: ClientID("home-read")
         )
-        XCTAssertFalse(denied.ok)
-        XCTAssertEqual(denied.payload["code"] as? String, "path_outside_allowed_roots")
+        XCTAssertTrue(native.ok, "\(native.payload)")
 
         try configureAllowedProjectRoot(app, root: projects)
+        try bindProjectContext(
+            app,
+            clientID: ClientID("configured-read"),
+            root: projects
+        )
         let allowed = try app.tools.call(
             name: "fs_list",
             arguments: ["path": projects.path],

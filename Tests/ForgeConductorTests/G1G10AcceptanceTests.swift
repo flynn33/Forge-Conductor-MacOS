@@ -384,8 +384,8 @@ final class G1G10AcceptanceTests: XCTestCase {
     func testG3_VersionAndReleaseDocumentsAreAligned() throws {
         let version = ForgeApp.version
         let buildVersion = ForgeApp.buildVersion
-        XCTAssertEqual(version, "0.16.0")
-        XCTAssertEqual(buildVersion, "21")
+        XCTAssertEqual(version, "0.16.1")
+        XCTAssertEqual(buildVersion, "22")
 
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -404,7 +404,7 @@ final class G1G10AcceptanceTests: XCTestCase {
 
         let expectedReferences = [
             ("README.md", "**Version** | **\(version)**"),
-            ("CHANGELOG.md", "## [\(version)]"),
+            ("CHANGELOG.md", "`\(version) (\(buildVersion))`"),
             ("USER-GUIDE.md", "Version **\(version)**"),
             ("XCODE.md", "version **\(version)**, build **\(buildVersion)**"),
             ("docs/ARCHITECTURE.md", "Version: `\(version)`"),

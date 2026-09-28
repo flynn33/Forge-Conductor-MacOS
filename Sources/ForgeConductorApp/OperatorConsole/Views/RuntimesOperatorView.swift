@@ -241,7 +241,7 @@ struct RuntimesOperatorView: View {
 
     private var effectivePolicy: String {
         guard let settings = viewModel.settings else { return "Unavailable" }
-        return settings.shellEnabled ? "Enabled for authorized project bindings" : "Disabled by persisted policy"
+        return settings.shellEnabled ? "Enabled for bound project sessions" : "Disabled by persisted policy"
     }
 
     private var timeoutLabel: String {

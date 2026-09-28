@@ -38,7 +38,7 @@ public enum ProcessRunnerError: Error, Equatable, Sendable, LocalizedError {
     }
 }
 
-/// Runs allowlisted processes with timeout (no shell injection — argv array).
+/// Runs native processes with timeout (no implicit shell injection — argv array).
 ///
 /// Multiplexes nonblocking stdout/stderr reads so large or chatty children cannot
 /// deadlock on full pipe buffers while control checks retain a bounded cadence.
@@ -47,11 +47,9 @@ public final class ProcessRunner: @unchecked Sendable {
     private let forcedTerminationGraceSec: TimeInterval
     private let maximumRetainedOutputBytes: Int
     private let inheritEnvironment: Bool
-    private let toolSandbox: ToolSandbox?
 
     public init(inheritEnvironment: Bool = true) {
         self.inheritEnvironment = inheritEnvironment
-        toolSandbox = nil
         terminationGraceSec = 0.5
         forcedTerminationGraceSec = 1.0
         maximumRetainedOutputBytes = ResourcePolicy.current.nominalLimits.processOutputBytesPerStream
@@ -64,63 +62,9 @@ public final class ProcessRunner: @unchecked Sendable {
         maximumRetainedOutputBytes: Int = ResourcePolicy.current.nominalLimits.processOutputBytesPerStream
     ) {
         inheritEnvironment = true
-        toolSandbox = nil
         self.terminationGraceSec = max(0, terminationGraceSec)
         self.forcedTerminationGraceSec = max(0, forcedTerminationGraceSec)
         self.maximumRetainedOutputBytes = max(0, maximumRetainedOutputBytes)
-    }
-
-    private init(copying other: ProcessRunner, sandbox: ToolSandbox) {
-        terminationGraceSec = other.terminationGraceSec
-        forcedTerminationGraceSec = other.forcedTerminationGraceSec
-        maximumRetainedOutputBytes = other.maximumRetainedOutputBytes
-        inheritEnvironment = false
-        toolSandbox = sandbox
-    }
-
-    var toolScratchDirectory: URL? { toolSandbox?.directory.appendingPathComponent("scratch") }
-
-    /// Applies the same project sandbox used by durable shell jobs to tool-owned
-    /// subprocesses, including Git hooks and reconciliation probes.
-    func scopedForTool(context: ToolInvocationContext?, workingDirectory: URL, paths: AppPaths) throws -> ProcessRunner {
-        try ProcessRunner(copying: self, sandbox: ToolSandbox(context: context, workingDirectory: workingDirectory, paths: paths))
-    }
-
-    private final class ToolSandbox: @unchecked Sendable {
-        let directory: URL
-        let scope: ToolAuthorizationScope
-        let protectedDirectories: [URL]
-        let workingDirectory: URL
-
-        init(context: ToolInvocationContext?, workingDirectory: URL, paths: AppPaths) throws {
-            self.workingDirectory = RuntimeProcessSandbox.canonicalURL(workingDirectory)
-            scope = context?.authorizationScope ?? ToolAuthorizationScope(
-                canonicalRoots: [self.workingDirectory], writableRoots: [self.workingDirectory],
-                allowedTools: [], networkAllowed: false, maximumInlineOutputBytes: 1_048_576
-            )
-            protectedDirectories = [paths.nativeValidationDir, paths.stjornarvaldDir]
-            directory = FileManager.default.temporaryDirectory.appendingPathComponent("forge-tool-\(UUID().uuidString.lowercased())")
-            try FileManager.default.createDirectory(at: directory.appendingPathComponent("readonly"), withIntermediateDirectories: true,
-                                                    attributes: [.posixPermissions: 0o700])
-            try FileManager.default.createDirectory(at: directory.appendingPathComponent("scratch"), withIntermediateDirectories: true,
-                                                    attributes: [.posixPermissions: 0o700])
-        }
-
-        deinit { try? FileManager.default.removeItem(at: directory) }
-
-        func plan(executable: URL, arguments: [String], currentDirectory: String?, environment: [String: String]?) throws -> RuntimeProcessPlan {
-            var toolEnvironment = environment ?? [:]
-            toolEnvironment["PATH"] = AppPaths.nativeValidationDeveloperDirectory.appendingPathComponent("usr/bin").path + ":/Library/Developer/CommandLineTools/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-            toolEnvironment["DEVELOPER_DIR"] = AppPaths.nativeValidationDeveloperDirectory.path
-            return try RuntimeProcessSandbox.plan(
-                executable: executable, arguments: arguments,
-                workingDirectory: currentDirectory.map { URL(fileURLWithPath: $0) } ?? workingDirectory,
-                environment: toolEnvironment, canonicalReadRoots: scope.canonicalRoots,
-                canonicalWritableRoots: scope.writableRoots,
-                managerReadDirectory: directory.appendingPathComponent("readonly"), scratchDirectory: directory.appendingPathComponent("scratch"),
-                networkAllowed: scope.networkAllowed, protectedDirectories: protectedDirectories
-            )
-        }
     }
 
     public func run(
@@ -146,17 +90,9 @@ public final class ProcessRunner: @unchecked Sendable {
             )
         }
 
-        var effectiveArguments = arguments
-        var effectiveDirectory = currentDirectory
-        var effectiveEnvironment = environment
-        if let toolSandbox {
-            let plan = try toolSandbox.plan(executable: exeURL, arguments: arguments,
-                                            currentDirectory: currentDirectory, environment: environment)
-            exeURL = plan.executable
-            effectiveArguments = plan.arguments
-            effectiveDirectory = plan.workingDirectory.path
-            effectiveEnvironment = plan.environment
-        }
+        let effectiveArguments = arguments
+        let effectiveDirectory = currentDirectory
+        let effectiveEnvironment = environment
 
         let outPipe = Pipe()
         let errPipe = Pipe()

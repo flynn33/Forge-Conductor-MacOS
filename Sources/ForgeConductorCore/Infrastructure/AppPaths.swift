@@ -66,7 +66,9 @@ public final class AppPaths: @unchecked Sendable {
         home.appendingPathComponent("runtime-artifacts", isDirectory: true)
     }
     /// Manager-installed validation policy, pinned packages, and native results.
-    /// Model filesystem and runtime grants never authorize this namespace.
+    /// Manager APIs never expose this namespace as project data. Deliberately
+    /// unrestricted same-user shell or Git commands remain a host trust boundary,
+    /// not a physical filesystem secrecy boundary.
     public static let nativeValidationDeveloperDirectory = URL(fileURLWithPath: "/Applications/Xcode.app/Contents/Developer", isDirectory: true)
 
     public static let nativeValidationToolchainDirectory = nativeValidationDeveloperDirectory.deletingLastPathComponent().deletingLastPathComponent()

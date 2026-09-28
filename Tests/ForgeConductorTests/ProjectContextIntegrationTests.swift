@@ -7,7 +7,7 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ProjectContextIntegrationTests: XCTestCase {
-    func testProjectMemoryInitializationBindsClientAndRejectsUnboundOrCrossProjectCalls() throws {
+    func testProjectMemoryStaysScopedWhileNativeToolsCanCrossProjectPaths() throws {
         try withApplication { app, root in
             let clientA = ClientID("context-client-a")
             let clientB = ClientID("context-client-b")
@@ -63,21 +63,27 @@ final class ProjectContextIntegrationTests: XCTestCase {
             XCTAssertEqual(crossedWrite.payload["code"] as? String, "project_scope_mismatch")
 
             let contextA = try app.projectContexts.invocationContext(for: clientA)
+            let projectBFile = projectB.appendingPathComponent("private.txt")
+            try Data("project-b-native-access".utf8).write(to: projectBFile)
             let crossedRead = try app.tools.call(
                 name: "fs_read",
-                arguments: ["path": projectB.appendingPathComponent("private.txt").path],
+                arguments: ["path": projectBFile.path],
                 context: contextA
             )
-            XCTAssertFalse(crossedRead.ok)
-            XCTAssertEqual(crossedRead.payload["code"] as? String, "path_outside_allowed_roots")
+            XCTAssertTrue(crossedRead.ok, "\(crossedRead.payload)")
+            XCTAssertEqual(crossedRead.payload["content"] as? String, "project-b-native-access")
 
             let crossedShell = try app.tools.call(
                 name: "shell_exec",
                 arguments: ["command": "pwd", "cwd": projectB.path],
                 context: contextA
             )
-            XCTAssertFalse(crossedShell.ok)
-            XCTAssertEqual(crossedShell.payload["code"] as? String, "path_outside_allowed_roots")
+            XCTAssertTrue(crossedShell.ok, "\(crossedShell.payload)")
+            XCTAssertEqual(
+                (crossedShell.payload["stdout"] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                RuntimePathCanonicalizer.canonicalExistingURL(projectB).path
+            )
 
             let isolated = try app.tools.call(
                 name: "project_memory.search",
@@ -89,7 +95,7 @@ final class ProjectContextIntegrationTests: XCTestCase {
         }
     }
 
-    func testFCProjectBootstrapAuthorityContextCannotBroadenSettingsRoots() throws {
+    func testProjectContextRootsSelectDefaultsWithoutRestrictingNativePaths() throws {
         try withApplication { app, configuredRoot in
             let approvedProject = try makeProject(
                 root: configuredRoot,
@@ -133,24 +139,30 @@ final class ProjectContextIntegrationTests: XCTestCase {
                 )
             }
 
-            for unauthorizedRoot in [outsideProject, escapeAlias] {
+            for nativeRoot in [outsideProject, escapeAlias] {
                 for (tool, arguments) in [
-                    ("fs_read", ["path": unauthorizedRoot.appendingPathComponent("leaf").path]),
-                    ("shell_exec", ["command": "pwd", "cwd": unauthorizedRoot.path]),
+                    ("fs_read", ["path": nativeRoot.appendingPathComponent("leaf").path]),
+                    ("shell_exec", ["command": "pwd", "cwd": nativeRoot.path]),
                 ] {
                     let decision = authorization.authorize(
                         tool: tool,
                         arguments: arguments,
-                        context: context(root: unauthorizedRoot),
+                        context: context(root: nativeRoot),
                         clientID: clientID,
                         binding: nil
                     )
-                    guard case let .denied(code, _) = decision else {
-                        return XCTFail(
-                            "A durable context outside Settings authority must be denied"
-                        )
+                    guard case let .allowed(normalized) = decision else {
+                        return XCTFail("Settings roots must not confine \(tool)")
                     }
-                    XCTAssertEqual(code, "path_outside_allowed_roots")
+                    let key = tool == "shell_exec" ? "cwd" : "path"
+                    let canonicalRoot = nativeRoot == escapeAlias ? outsideProject : nativeRoot
+                    let requested = tool == "fs_read"
+                        ? canonicalRoot.appendingPathComponent("leaf")
+                        : canonicalRoot
+                    XCTAssertEqual(
+                        normalized[key] as? String,
+                        requested.resolvingSymlinksInPath().standardizedFileURL.path
+                    )
                 }
             }
 
@@ -162,7 +174,7 @@ final class ProjectContextIntegrationTests: XCTestCase {
                 binding: nil
             )
             guard case let .allowed(arguments) = approved else {
-                return XCTFail("A project contained by a Settings root must remain authorized")
+                return XCTFail("The selected project root must remain a valid default")
             }
             XCTAssertEqual(
                 arguments["cwd"] as? String,
@@ -257,7 +269,7 @@ final class ProjectContextIntegrationTests: XCTestCase {
         }
     }
 
-    func testReadOnlyProjectScopeRejectsEveryFilesystemMutation() throws {
+    func testProjectWritableRootsDoNotRestrictNativeFilesystemMutations() throws {
         try withApplication { app, root in
             let project = try makeProject(root: root, name: "read-only-project")
             let existing = project.appendingPathComponent("existing.txt")
@@ -294,12 +306,15 @@ final class ProjectContextIntegrationTests: XCTestCase {
             )
             XCTAssertTrue(read.ok, "\(read.payload)")
 
+            let created = project.appendingPathComponent("new.txt")
+            let moved = project.appendingPathComponent("moved.txt")
+            let directory = project.appendingPathComponent("directory")
             let mutations: [(String, [String: Any])] = [
-                ("fs_write", ["path": project.appendingPathComponent("new.txt").path, "content": "blocked"]),
+                ("fs_write", ["path": created.path, "content": "native"]),
                 ("fs_edit", ["path": existing.path, "old": "preserve", "new": "changed"]),
-                ("fs_mkdir", ["path": project.appendingPathComponent("directory").path]),
-                ("fs_delete", ["path": existing.path]),
-                ("fs_move", ["path": existing.path, "dest": project.appendingPathComponent("moved.txt").path]),
+                ("fs_mkdir", ["path": directory.path]),
+                ("fs_move", ["path": existing.path, "dest": moved.path]),
+                ("fs_delete", ["path": moved.path]),
             ]
             for (tool, arguments) in mutations {
                 let result = try app.tools.call(
@@ -307,13 +322,12 @@ final class ProjectContextIntegrationTests: XCTestCase {
                     arguments: arguments,
                     clientID: client
                 )
-                XCTAssertFalse(result.ok, "\(tool) unexpectedly succeeded")
-                XCTAssertEqual(result.payload["code"] as? String, "path_outside_writable_roots")
+                XCTAssertTrue(result.ok, "\(tool): \(result.payload)")
             }
-            XCTAssertEqual(try String(contentsOf: existing, encoding: .utf8), "preserve")
-            XCTAssertFalse(
-                FileManager.default.fileExists(atPath: project.appendingPathComponent("new.txt").path)
-            )
+            XCTAssertEqual(try String(contentsOf: created, encoding: .utf8), "native")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: directory.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: existing.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: moved.path))
         }
     }
 

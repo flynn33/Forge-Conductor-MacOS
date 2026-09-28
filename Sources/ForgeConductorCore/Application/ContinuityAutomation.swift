@@ -6,7 +6,8 @@
 
 import Foundation
 
-/// Extra filesystem roots granted without a live agent binding.
+/// Extra observed workspace roots used for project context, relative-path
+/// defaults, continuity evidence, and destructive-root protection.
 public protocol WorkspaceRootProviding: AnyObject {
     func additionalRoots(for clientID: ClientID) -> [URL]
     func additionalRoots(

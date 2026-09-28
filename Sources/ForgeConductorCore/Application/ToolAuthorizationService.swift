@@ -1,7 +1,7 @@
 // ToolAuthorizationService.swift
-// What: Enforces agent grants, denials, and filesystem workspace boundaries.
+// What: Enforces agent grants and normalizes native filesystem paths.
 // How: It canonicalizes requested paths before dispatch, evaluates the active agent's
-// policy, blocks symlink escapes, and sanitizes arguments before audit persistence.
+// policy, and sanitizes arguments before audit persistence.
 // Why: Authorization must be centralized so no connector can bypass safety rules.
 
 import Darwin
@@ -107,13 +107,10 @@ public extension ToolAuthorizing {
 
 /// Final authorization boundary for every tool adapter.
 ///
-/// Agent tool grants and workspace roots are enforced here so a new tool pack
-/// cannot accidentally bypass policy by forgetting a local check.
+/// Agent tool grants are enforced here so a new tool pack cannot accidentally
+/// bypass policy by forgetting a local check. Workspace roots select project
+/// identity and default paths; they do not confine native model tools.
 public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendable {
-    private enum AuthorizationPolicyError: Error {
-        case contextRootOutsideConfiguredAuthority
-    }
-
     private let paths: AppPaths
     private let config: ConfigStore
     private let fileManager: FileManager
@@ -234,29 +231,32 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             )
         }
 
-        let readRoots: [URL]
-        do {
-            readRoots = try authorizedRoots(
-                binding: binding,
-                context: context,
-                clientID: clientID,
-                excludeFilesystemRoot: tool == "project_memory.initialize",
-                cancellation: cancellation
-            )
-        } catch AuthorizationPolicyError.contextRootOutsideConfiguredAuthority {
+        if let blankPathKey = Self.blankDestructivePathKey(
+            tool: tool,
+            arguments: arguments
+        ) {
             return .denied(
-                code: "path_outside_allowed_roots",
-                message: "The durable project root is not authorized in Settings"
+                code: "invalid_path",
+                message: "Destructive filesystem path '\(blankPathKey)' cannot be empty or whitespace"
             )
         }
-        let writeRoots = try authorizedWriteRoots(
-            readRoots: readRoots,
+
+        let base = try defaultBase(
+            binding: binding,
             context: context,
+            clientID: clientID,
             cancellation: cancellation
         )
-        let base = binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)
-            ?? readRoots.first
-            ?? paths.home
+        let protectedWorkspaceRoots = try workspaceRoots(
+            binding: binding,
+            context: context,
+            clientID: clientID,
+            cancellation: cancellation
+        )
+        let protectedDestructiveRoots = try destructiveRootProtections(
+            workspaceRoots: protectedWorkspaceRoots,
+            cancellation: cancellation
+        )
         var normalized = arguments
 
         for access in pathAccesses(tool: tool, arguments: arguments, base: base) {
@@ -278,50 +278,25 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     message: "The filesystem root cannot become a project authorization root"
                 )
             }
-            let containingReadRoot = readRoots.first(where: { contains(candidate, root: $0) })
-            guard containingReadRoot != nil else {
-                return .denied(
-                    code: "path_outside_allowed_roots",
-                    message: "Path is outside the active workspace roots: \(candidate.path)"
-                )
+            if Self.projectRegistrationTools.contains(tool) {
+                let selectableRoots = try configuredProjectRoots(cancellation: cancellation)
+                guard selectableRoots.contains(where: { contains(candidate, root: $0) }) else {
+                    return .denied(
+                        code: "path_outside_allowed_roots",
+                        message: "Project registration requires a folder selected in Settings"
+                    )
+                }
             }
-            let containingRoot: URL?
-            if access.requiresWrite {
-                containingRoot = writeRoots.first(where: { contains(candidate, root: $0) })
-            } else {
-                containingRoot = containingReadRoot
-            }
-            if containingRoot == nil, access.requiresWrite {
-                return .denied(
-                    code: "path_outside_writable_roots",
-                    message: "Path is outside the active writable workspace roots: \(candidate.path)"
-                )
-            }
-            if access.protectRoot, let containingRoot, candidate == containingRoot {
+            if access.protectRoot,
+               try destructiveTargetIsProtected(
+                   candidate,
+                   protectedRoots: protectedDestructiveRoots,
+                   cancellation: cancellation
+               ) {
                 return .denied(
                     code: "workspace_root_protected",
-                    message: "The workspace root itself cannot be deleted or moved: \(candidate.path)"
+                    message: "A filesystem, volume, home, manager, or active workspace root cannot be deleted or moved: \(candidate.path)"
                 )
-            }
-            let policyRoot = try canonicalURL(paths.stjornarvaldDir, cancellation: cancellation)
-            if reservedContains(candidate, root: policyRoot)
-                || (access.protectRoot && reservedContains(policyRoot, root: candidate)) {
-                return .denied(
-                    code: "manager_policy_path_protected",
-                    message: "Development Policy state and evidence are owned by the manager"
-                )
-            }
-            let validationRoot = try canonicalURL(paths.nativeValidationDir, cancellation: cancellation)
-            if reservedContains(candidate, root: validationRoot)
-                || (access.protectRoot && reservedContains(validationRoot, root: candidate)) {
-                return .denied(
-                    code: "manager_validation_path_protected",
-                    message: "Native validation policy and evidence are owned by the manager"
-                )
-            }
-            let developerRoot = try canonicalURL(AppPaths.nativeValidationToolchainDirectory, cancellation: cancellation)
-            if access.requiresWrite && (reservedContains(candidate, root: developerRoot) || (access.protectRoot && reservedContains(developerRoot, root: candidate))) {
-                return .denied(code: "native_validation_toolchain_protected", message: "The installed native validation toolchain is read-only to project tools")
             }
             normalized[access.key] = candidate.path
         }
@@ -341,8 +316,35 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         var key: String
         var url: URL
         var protectRoot: Bool
-        var requiresWrite: Bool
         var preservesFinalComponent: Bool
+    }
+
+    /// An empty file URL resolves to the process working directory. Reject blank
+    /// destructive operands before path normalization so they can never alias a
+    /// protected workspace, home, manager, filesystem, or mounted-volume root.
+    private static func blankDestructivePathKey(
+        tool: String,
+        arguments: [String: Any]
+    ) -> String? {
+        func firstBlankValue(for keys: [String]) -> String? {
+            for key in keys {
+                guard let value = ToolArgHelpers.string(arguments, key) else { continue }
+                return value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? key
+                    : nil
+            }
+            return nil
+        }
+
+        switch tool {
+        case "fs_delete":
+            return firstBlankValue(for: ["path"])
+        case "fs_move":
+            return firstBlankValue(for: ["path", "src", "source"])
+                ?? firstBlankValue(for: ["dest", "destination"])
+        default:
+            return nil
+        }
     }
 
     private func pathAccesses(
@@ -353,7 +355,6 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         func access(
             _ key: String,
             protectRoot: Bool = false,
-            requiresWrite: Bool = false,
             preservesFinalComponent: Bool = false
         ) -> PathAccess? {
             guard let raw = ToolArgHelpers.string(arguments, key), !raw.isEmpty else { return nil }
@@ -361,7 +362,6 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 key: key,
                 url: resolve(raw, relativeTo: base),
                 protectRoot: protectRoot,
-                requiresWrite: requiresWrite,
                 preservesFinalComponent: preservesFinalComponent
             )
         }
@@ -374,19 +374,18 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                 ToolArgHelpers.string(arguments, $0) != nil
             }
             return [
-                projectPathKey.flatMap { access($0, requiresWrite: true) },
+                projectPathKey.flatMap { access($0) },
             ].compactMap { $0 }
         case "fs_read":
             return [access("path")].compactMap { $0 }
         case "fs_write", "fs_edit", "fs_mkdir":
-            return [access("path", requiresWrite: true)].compactMap { $0 }
+            return [access("path")].compactMap { $0 }
         case "fs_list", "fs_glob", "search_text":
             return [
                 access("path") ?? PathAccess(
                     key: "path",
                     url: base,
                     protectRoot: false,
-                    requiresWrite: false,
                     preservesFinalComponent: false
                 ),
             ]
@@ -394,7 +393,6 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             return [access(
                 "path",
                 protectRoot: true,
-                requiresWrite: true,
                 preservesFinalComponent: true
             )].compactMap { $0 }
         case "fs_move":
@@ -409,26 +407,24 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     access(
                         $0,
                         protectRoot: true,
-                        requiresWrite: true,
                         preservesFinalComponent: true
                     )
                 },
                 destinationKey.flatMap {
-                    access($0, requiresWrite: true, preservesFinalComponent: true)
+                    access($0, preservesFinalComponent: true)
                 },
             ].compactMap { $0 }
         case "pdf_write":
-            return [access("path", requiresWrite: true)].compactMap { $0 }
+            return [access("path")].compactMap { $0 }
         case "pdf_from_file":
             var accesses = [access("source_path")].compactMap { $0 }
-            if let destination = access("dest_path", requiresWrite: true) {
+            if let destination = access("dest_path") {
                 accesses.append(destination)
             } else if let source = accesses.first {
                 accesses.append(PathAccess(
                     key: "dest_path",
                     url: source.url.deletingPathExtension().appendingPathExtension("pdf"),
                     protectRoot: false,
-                    requiresWrite: true,
                     preservesFinalComponent: false
                 ))
             }
@@ -439,18 +435,16 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     key: "cwd",
                     url: base,
                     protectRoot: false,
-                    requiresWrite: false,
                     preservesFinalComponent: false
                 ),
             ]
         case "git_add", "git_commit", "shell_exec", "process.run", "shell.run", "bash.run",
              "python.run", "powershell.run":
             return [
-                access("cwd", requiresWrite: true) ?? PathAccess(
+                access("cwd") ?? PathAccess(
                     key: "cwd",
                     url: base,
                     protectRoot: false,
-                    requiresWrite: true,
                     preservesFinalComponent: false
                 ),
             ]
@@ -459,71 +453,114 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         }
     }
 
-    private func authorizedRoots(
+    private func defaultBase(
         binding: ActiveBinding?,
         context: ToolInvocationContext?,
         clientID: ClientID,
-        excludeFilesystemRoot: Bool = false,
         cancellation: ToolCallCancellation?
-    ) throws -> [URL] {
+    ) throws -> URL {
         try cancellation?.checkCancellation()
-        if let context {
-            let contextualRoots = try canonicalizedUnique(
-                context.authorizationScope.canonicalRoots,
+        let candidates = [binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)]
+            + [context?.authorizationScope.canonicalRoots.first]
+            + [try workspace?.additionalRoots(
+                for: clientID,
                 cancellation: cancellation
-            )
-            let configuredRoots = try canonicalizedUnique(
-                ManagerSettingsNormalizer.canonicalAllowedRoots(
-                    config.model.allowedRoots
-                ).map(ToolArgHelpers.resolvePath),
-                cancellation: cancellation
-            )
-            guard !contextualRoots.isEmpty,
-                  contextualRoots.allSatisfy({ candidate in
-                      configuredRoots.contains { contains(candidate, root: $0) }
-                  }) else {
-                throw AuthorizationPolicyError.contextRootOutsideConfiguredAuthority
-            }
-            return excludeFilesystemRoot
-                ? contextualRoots.filter { $0.path != "/" }
-                : contextualRoots
+            ).first]
+            + [config.model.allowedRoots.first.map(ToolArgHelpers.resolvePath)]
+            + [paths.home]
+        for candidate in candidates.compactMap({ $0 }) {
+            return try canonicalURL(candidate, cancellation: cancellation)
         }
-        var trusted = try canonicalizedUnique(
-            config.model.allowedRoots.map(ToolArgHelpers.resolvePath),
-            cancellation: cancellation
-        )
-        if excludeFilesystemRoot {
-            trusted.removeAll { $0.path == "/" }
-        }
-        let claimed = [binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)].compactMap { $0 }
-            + (try workspace?.additionalRoots(for: clientID, cancellation: cancellation) ?? [])
-        guard !claimed.isEmpty else { return trusted }
-        var canonicalClaims: [URL] = []
-        canonicalClaims.reserveCapacity(claimed.count)
-        for claim in claimed {
-            try cancellation?.checkCancellation()
-            canonicalClaims.append(try canonicalURL(claim, cancellation: cancellation))
-        }
-        return canonicalClaims.filter { candidate in
-            trusted.contains { contains(candidate, root: $0) }
-        }.reduce(into: [URL]()) { roots, root in
-            if !roots.contains(root) { roots.append(root) }
-        }
+        return paths.home.standardizedFileURL
     }
 
-    private func authorizedWriteRoots(
-        readRoots: [URL],
+    private func workspaceRoots(
+        binding: ActiveBinding?,
         context: ToolInvocationContext?,
+        clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> [URL] {
-        guard let context else { return readRoots }
-        let requested = try canonicalizedUnique(
-            context.authorizationScope.writableRoots,
-            cancellation: cancellation
-        )
-        return requested.filter { candidate in
-            readRoots.contains { contains(candidate, root: $0) }
+        let candidates = [binding.flatMap(\.cwd).map(ToolArgHelpers.resolvePath)]
+            + (context?.authorizationScope.canonicalRoots ?? [])
+            + (try workspace?.additionalRoots(for: clientID, cancellation: cancellation) ?? [])
+        var roots: [URL] = []
+        for candidate in candidates.compactMap({ $0 }) {
+            let canonical = try canonicalURL(candidate, cancellation: cancellation)
+            if !roots.contains(canonical) { roots.append(canonical) }
         }
+        return roots
+    }
+
+    private func destructiveRootProtections(
+        workspaceRoots: [URL],
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        var candidates = workspaceRoots + [
+            fileManager.homeDirectoryForCurrentUser,
+            paths.home,
+            URL(fileURLWithPath: "/", isDirectory: true),
+        ]
+        candidates.append(contentsOf: fileManager.mountedVolumeURLs(
+            includingResourceValuesForKeys: nil,
+            options: []
+        ) ?? [])
+        var protected: [URL] = []
+        for candidate in candidates {
+            try cancellation?.checkCancellation()
+            let canonical = try canonicalURL(candidate, cancellation: cancellation)
+            if !protected.contains(canonical) { protected.append(canonical) }
+        }
+        return protected
+    }
+
+    /// Destructive source operands preserve their final path component so a
+    /// symlink is removed or moved rather than its target. String comparison is
+    /// insufficient on case-insensitive volumes because a differently-cased
+    /// final component can still name the protected directory. Compare the
+    /// existing leaf's lstat identity with every protected root and ancestor;
+    /// lstat deliberately keeps a symlink leaf distinct from its destination.
+    private func destructiveTargetIsProtected(
+        _ candidate: URL,
+        protectedRoots: [URL],
+        cancellation: ToolCallCancellation?
+    ) throws -> Bool {
+        if candidate.path == "/"
+            || protectedRoots.contains(where: {
+                candidate == $0 || contains($0, root: candidate)
+            }) {
+            return true
+        }
+        guard let candidateIdentity = fileIdentity(at: candidate) else { return false }
+
+        var inspectedAncestors = Set<URL>()
+        for protectedRoot in protectedRoots {
+            var ancestor = protectedRoot.standardizedFileURL
+            while inspectedAncestors.insert(ancestor).inserted {
+                try cancellation?.checkCancellation()
+                if fileIdentity(at: ancestor) == candidateIdentity { return true }
+                guard ancestor.path != "/" else { break }
+                ancestor = ancestor.deletingLastPathComponent().standardizedFileURL
+            }
+        }
+        return false
+    }
+
+    private struct FileIdentity: Equatable {
+        let device: UInt64
+        let inode: UInt64
+    }
+
+    private func fileIdentity(at url: URL) -> FileIdentity? {
+        var information = stat()
+        guard url.path.withCString({ Darwin.lstat($0, &information) }) == 0,
+              information.st_dev >= 0,
+              information.st_ino > 0 else {
+            return nil
+        }
+        return FileIdentity(
+            device: UInt64(information.st_dev),
+            inode: UInt64(information.st_ino)
+        )
     }
 
     private func resolve(_ raw: String, relativeTo base: URL) -> URL {
@@ -534,23 +571,23 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         return base.appendingPathComponent(expanded).standardizedFileURL
     }
 
-    /// Resolve symlinks in the deepest existing ancestor, then append any
-    /// not-yet-created path suffix. This prevents writes through a symlink that
-    /// points outside an allowed root.
-    private func canonicalizedUnique(
-        _ urls: [URL],
+    private func configuredProjectRoots(
         cancellation: ToolCallCancellation?
     ) throws -> [URL] {
         var roots: [URL] = []
-        roots.reserveCapacity(urls.count)
-        for url in urls {
+        for raw in ManagerSettingsNormalizer.canonicalAllowedRoots(config.model.allowedRoots) {
             try cancellation?.checkCancellation()
-            let root = try canonicalURL(url, cancellation: cancellation)
+            let root = try canonicalURL(
+                ToolArgHelpers.resolvePath(raw),
+                cancellation: cancellation
+            )
             if !roots.contains(root) { roots.append(root) }
         }
         return roots
     }
 
+    /// Resolve symlinks in the deepest existing ancestor, then append any
+    /// not-yet-created path suffix so execution and audit use one stable path.
     private func canonicalURL(
         _ url: URL,
         preservingFinalComponent: Bool = false,
@@ -584,14 +621,6 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
         return resolved.standardizedFileURL
     }
 
-    // Reserve spelling variants as well on case-insensitive APFS. This narrow
-    // namespace rule does not alter general project-root matching semantics.
-    private func reservedContains(_ candidate: URL, root: URL) -> Bool {
-        let value = candidate.standardizedFileURL.path.lowercased()
-        let prefix = root.standardizedFileURL.path.lowercased()
-        return value == prefix || prefix == "/" || value.hasPrefix(prefix + "/")
-    }
-
     private func contains(_ candidate: URL, root: URL) -> Bool {
         let candidateComponents = candidate.standardizedFileURL.pathComponents
         let rootComponents = root.standardizedFileURL.pathComponents
@@ -617,6 +646,10 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
 
     private static let requiresActiveSession: Set<String> = [
         "shell_exec", "git_add", "git_commit",
+    ]
+
+    private static let projectRegistrationTools: Set<String> = [
+        "agent_run_start", "project_memory.initialize",
     ]
 
     private static let cwdTools: Set<String> = [

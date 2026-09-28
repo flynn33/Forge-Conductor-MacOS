@@ -942,7 +942,7 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
         arguments: [String]
     ) -> ProcessResult? {
         try? ProcessRunner().run(
-            executable: "/usr/bin/git",
+            executable: GitExecutableResolver.executable.path,
             arguments: arguments,
             currentDirectory: cwd.path,
             timeoutSec: 5,
@@ -1010,15 +1010,11 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
         }
         var candidate = existing.resolvingSymlinksInPath().standardizedFileURL
         for component in suffix { candidate.appendPathComponent(component) }
-        candidate = candidate.standardizedFileURL
-        let candidateComponents = candidate.pathComponents
-        let authorized = context.authorizationScope.canonicalRoots.contains { rawRoot in
-            let root = rawRoot.resolvingSymlinksInPath().standardizedFileURL
-            let rootComponents = root.pathComponents
-            return candidateComponents.count >= rootComponents.count
-                && Array(candidateComponents.prefix(rootComponents.count)) == rootComponents
-        }
-        return authorized ? candidate : nil
+        // Project roots supply the base for relative paths and durable replay
+        // ownership. Absolute native paths are intentionally not confined to
+        // those roots; macOS evaluates access for the responsible code objects
+        // in the actual launch chain.
+        return candidate.standardizedFileURL
     }
 
     private static func string(_ arguments: [String: Any], _ key: String) -> String? {

@@ -1,6 +1,6 @@
 // ShellToolPack.swift
 // What: Implements the explicitly granted shell-execution capability.
-// How: It requires an active authorized workspace, applies timeout/output limits,
+// How: It requires an active bound project context, applies timeout/output limits,
 // and delegates process mechanics to ProcessRunner before returning structured status.
 // Why: The most powerful tool needs a narrow, independently reviewable boundary.
 
@@ -39,7 +39,7 @@ public struct ShellToolPack: ToolPackHandling {
             )
         }
         let timeout = min(requestedTimeout, Self.maximumTimeoutSec)
-        let result = try runner.scopedForTool(context: context, workingDirectory: URL(fileURLWithPath: cwd ?? FileManager.default.currentDirectoryPath), paths: app.paths).run(
+        let result = try runner.run(
             executable: "/bin/bash",
             arguments: ["-lc", command],
             currentDirectory: cwd,

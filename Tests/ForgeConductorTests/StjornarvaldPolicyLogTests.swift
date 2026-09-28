@@ -291,7 +291,7 @@ final class StjornarvaldPolicyLogTests: XCTestCase {
         XCTAssertEqual(try mode(paths.stjornarvaldPolicyLogJSONL), 0o600)
     }
 
-    func testModelFacingFilesystemToolsCannotAccessPolicyState() throws {
+    func testNativeFilesystemAuthorizationDoesNotTreatPolicyStateAsAHiddenNamespace() throws {
         let fixture = try Fixture()
         let paths = AppPaths(home: fixture.root.appendingPathComponent("home", isDirectory: true))
         try paths.ensureLayout()
@@ -310,14 +310,34 @@ final class StjornarvaldPolicyLogTests: XCTestCase {
                 maximumInlineOutputBytes: 64 * 1_024
             )
         )
-        let cases: [(String, [String: Any])] = [
+        let nativeCases: [(String, [String: Any])] = [
             ("fs_read", ["path": paths.stjornarvaldPolicyLogJSONL.path]),
             ("fs_write", ["path": paths.stjornarvaldPolicyLogJSONL.path, "content": "forged"]),
-            ("fs_delete", ["path": paths.home.path]),
+            ("fs_delete", ["path": paths.stjornarvaldPolicyLogJSONL.path]),
             ("search_text", ["path": paths.stjornarvaldDir.path, "pattern": "violation"]),
         ]
 
-        for (tool, arguments) in cases {
+        for (tool, arguments) in nativeCases {
+            let decision = authorization.authorize(
+                tool: tool,
+                arguments: arguments,
+                context: context,
+                clientID: context.clientID,
+                binding: nil
+            )
+            guard case .allowed = decision else {
+                XCTFail("same-user native path was unexpectedly denied for \(tool)")
+                continue
+            }
+        }
+
+        for (tool, arguments) in [
+            ("fs_delete", ["path": fixture.root.path]),
+            (
+                "fs_move",
+                ["path": fixture.root.path, "dest": fixture.root.deletingLastPathComponent().appendingPathComponent("moved").path]
+            ),
+        ] {
             let decision = authorization.authorize(
                 tool: tool,
                 arguments: arguments,
@@ -326,10 +346,10 @@ final class StjornarvaldPolicyLogTests: XCTestCase {
                 binding: nil
             )
             guard case let .denied(code, _) = decision else {
-                XCTFail("protected policy path was authorized for \(tool)")
+                XCTFail("active workspace root was unexpectedly authorized for \(tool)")
                 continue
             }
-            XCTAssertEqual(code, "manager_policy_path_protected")
+            XCTAssertEqual(code, "workspace_root_protected")
         }
     }
 

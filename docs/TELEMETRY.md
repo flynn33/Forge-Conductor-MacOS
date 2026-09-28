@@ -60,8 +60,10 @@ five-second, view-owned Manager refresh:
 - **Rune Forge** reports selected/indexed policy-source and observation state.
   It remains an additive observer and never claims authorization enforcement.
 - **Project** reports exact delivered instruction-document steps and completed
-  instruction packages for the active project. Failed or blocked packages
-  surface an attention state.
+  instruction packages for the project bound to the active MCP client. It
+  correlates live presence with the durable `mcp_client` binding, uses an exact
+  nonterminal run only as a fallback, and does not call a merely registered
+  project active. Failed or blocked packages surface an attention state.
 
 The Manager refresh starts only while Dashboard is visible, owns one cancellable
 task, coalesces each response into one value snapshot, and stops on detach. The
@@ -135,6 +137,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.16.0`
+`0.16.1`
 
-Build: `15`
+Build: `22`

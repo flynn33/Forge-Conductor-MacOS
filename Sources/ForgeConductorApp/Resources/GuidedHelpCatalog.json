@@ -133,7 +133,7 @@
     {
       "id": "tools",
       "title": "Tools guide",
-      "purpose": "Explain the registered tool catalog, availability, project permissions, and frozen run grants.",
+      "purpose": "Explain the registered tool catalog, availability, project context, and frozen run grants.",
       "forge_handles_automatically": [
         "Discover authoritative tool catalog",
         "Reconcile project preferences with availability",
@@ -214,7 +214,7 @@
       "title": "Projects guide",
       "purpose": "Register project folders, manage exact project identity, add instruction packages, and inspect memory/continuity health.",
       "forge_handles_automatically": [
-        "Authorize the selected folder during registration",
+        "Record the selected folder as the project identity and default working context",
         "Create durable project identity and generation",
         "Initialize memory and instruction queue"
       ],
@@ -265,10 +265,10 @@
     {
       "id": "projectRegistration",
       "title": "Register Project guide",
-      "purpose": "Select a repository folder and let Forge authorize and register it in one operation.",
+      "purpose": "Select a repository folder and let Forge establish its durable project identity in one operation.",
       "forge_handles_automatically": [
         "Canonicalize path",
-        "Preserve existing authorized roots",
+        "Preserve existing selected project roots",
         "Detect repository identity",
         "Create/reconcile durable registration"
       ],
@@ -299,7 +299,7 @@
       ],
       "advanced_details": [
         "Canonical path",
-        "bookmark/authorization",
+        "bookmark/registration",
         "fingerprint",
         "project UUID"
       ],
@@ -955,7 +955,7 @@
       ],
       "controls": [
         "Start/stop/restart",
-        "Allowed roots",
+        "Selected project roots",
         "Shell policy",
         "Budgets",
         "Watchdog",
@@ -976,7 +976,7 @@
       "troubleshooting": [
         "Port held by other Forge manager",
         "restart loop",
-        "allowed root missing"
+        "selected project root missing"
       ],
       "advanced_details": [
         "PID",

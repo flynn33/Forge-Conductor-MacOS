@@ -1,4 +1,4 @@
-# Context and agent continuity (v0.16.0)
+# Context and agent continuity (v0.16.1)
 
 ## Current workflow
 

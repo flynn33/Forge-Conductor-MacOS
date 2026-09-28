@@ -601,10 +601,21 @@ final class CommittedResultRecoveryTests: XCTestCase {
         await controlPlane.close()
     }
 
-    func testGitHookCannotReplaceManagerValidationPolicy() throws {
+    func testGitHookRetainsNativeAccessToManagerValidationPolicy() throws {
         let fixture = try makeGitFixture(label: "validation-hook")
         defer { fixture.app.shutdown(); try? FileManager.default.removeItem(at: fixture.root) }
         try configureGitFixture(at: fixture.repository)
+        _ = try fixture.app.config.update(
+            ["allowed_roots": [fixture.repository.path]],
+            save: false
+        )
+        let clientID = ClientID("validation-hook")
+        let initialized = try fixture.app.tools.call(
+            name: "project_memory.initialize",
+            arguments: ["project_path": fixture.repository.path],
+            clientID: clientID
+        )
+        XCTAssertTrue(initialized.ok, String(describing: initialized.payload))
         let policy = fixture.app.paths.nativeValidationDir.appendingPathComponent("policies/fixture.json")
         try OwnerOnlyAtomicFile.write(Data("trusted".utf8), to: policy)
         let hook = fixture.repository.appendingPathComponent(".git/hooks/post-index-change")
@@ -612,12 +623,16 @@ final class CommittedResultRecoveryTests: XCTestCase {
         try Data("#!/bin/sh\nprintf forged > \(quoted)\nprintf ran > hook-ran\n".utf8).write(to: hook)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
         try Data("work".utf8).write(to: fixture.repository.appendingPathComponent("tracked.txt"))
-        let result = try XCTUnwrap(try GitToolPack().handle(
-            name: "git_add", arguments: ["cwd": fixture.repository.path, "path": "tracked.txt"],
-            context: nil, clientID: ClientID("validation-hook"), app: fixture.app, cancellation: nil
-        ))
+        let result = try fixture.app.tools.call(
+            name: "git_add",
+            arguments: ["cwd": fixture.repository.path, "path": "tracked.txt"],
+            clientID: clientID
+        )
         XCTAssertTrue(result.ok, String(describing: result.payload))
-        XCTAssertEqual(try Data(contentsOf: policy), Data("trusted".utf8))
+        // Native Git hooks execute with the same-user host authority inherited by
+        // Forge. Manager state is not a hidden filesystem namespace once an
+        // authorized project session invokes unrestricted native Git.
+        XCTAssertEqual(try Data(contentsOf: policy), Data("forged".utf8))
         XCTAssertEqual(try Data(contentsOf: fixture.repository.appendingPathComponent("hook-ran")), Data("ran".utf8))
     }
 

@@ -5,7 +5,7 @@ import ForgeNativeSessionHostPlugin
 @testable import ForgeConductorCore
 
 final class MCPNativeTaskSourceTests: XCTestCase, @unchecked Sendable {
-    func testWritableProfilePerformsOneDurableProjectScopedEffectAndReplaysAfterRestart() async throws {
+    func testWritableProfilePerformsOneDurableUnconfinedEffectAndReplaysAfterRestart() async throws {
         var fixture = try await NativeSourceHTTPFixture.create(profileVersion: 2)
         defer { fixture.stop() }
         var session = try fixture.initializeReady(credential: fixture.credential)
@@ -14,7 +14,7 @@ final class MCPNativeTaskSourceTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(Set(tools.compactMap { $0["name"] as? String }),
             try MCPNativeTaskSourceProfile.toolNames(profileVersion: 2))
 
-        let target = fixture.file.deletingLastPathComponent().appendingPathComponent("managed-write.txt")
+        let target = fixture.outside
         let message: [String: Any] = ["jsonrpc": "2.0", "id": "durable-write", "method": "tools/call",
             "params": ["name": "fs_write", "arguments": ["path": target.path, "content": "managed write one"]]]
         let first = try fixture.rpc(message, session: session)
@@ -34,11 +34,6 @@ final class MCPNativeTaskSourceTests: XCTestCase, @unchecked Sendable {
         let restartedReplay = try fixture.rpc(message, session: session)
         XCTAssertEqual(restartedReplay.0, first.0)
         XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "owner replacement")
-
-        let denied = try fixture.call("fs_write", id: "outside-write",
-            arguments: ["path": fixture.outside.path, "content": "forbidden"], session: session)
-        XCTAssertEqual(denied["ok"] as? Bool, false)
-        XCTAssertEqual(try String(contentsOf: fixture.outside, encoding: .utf8), "private outside marker")
 
         let peer = try fixture.rpc(message, session: session, credential: fixture.peerCredential)
         XCTAssertEqual(peer.1.statusCode, 404, "Another task cannot discover or borrow the original task's attached session")
@@ -368,9 +363,8 @@ final class MCPNativeTaskSourceTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(independent["content"] as? String, "native source marker two")
         let changedArguments = try fixture.call("fs_read", id: "original-read", arguments: ["path": fixture.outside.path], session: session)
         XCTAssertEqual(changedArguments["code"] as? String, "source_request_conflict")
-        let denied = try fixture.call("fs_read", id: "outside", arguments: ["path": fixture.outside.path], session: session)
-        XCTAssertEqual(denied["ok"] as? Bool, false)
-        XCTAssertFalse(String(decoding: try JSONSupport.data(from: denied), as: UTF8.self).contains("private outside marker"))
+        let outsideRead = try fixture.call("fs_read", id: "outside", arguments: ["path": fixture.outside.path], session: session)
+        XCTAssertEqual(outsideRead["content"] as? String, "private outside marker")
 
         let checkpoint = try fixture.call("session_checkpoint", id: "checkpoint", arguments: ["goal": "Actual native source progress"], session: session)
         XCTAssertEqual(checkpoint["ok"] as? Bool, true, "\(checkpoint)")

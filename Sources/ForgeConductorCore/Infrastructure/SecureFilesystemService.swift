@@ -2860,11 +2860,29 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         self.transport = transport
     }
 
+    /// Returns true only while the helper is known to be available before any
+    /// transaction is retained or mutation is dispatched. Callers may choose a
+    /// native bounded implementation when this preflight is false, but must
+    /// never fall back after a helper request has started because its outcome
+    /// could be uncertain or require recovery.
+    func canBeginProtectedMutation(
+        cancellation: ToolCallCancellation?
+    ) throws -> Bool {
+        try cancellation?.checkCancellation()
+        guard transport.serviceStatus() == .enabled else { return false }
+        let probe = transport.operationalProbe(
+            timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
+        )
+        try cancellation?.checkCancellation()
+        return probe.operational
+    }
+
     func deleteLeaf(
         at url: URL,
         context: ToolInvocationContext?,
         cancellation: ToolCallCancellation?,
         recoveryLedger: SecureFilesystemRecoveryLedger,
+        availabilityPreflightSatisfied: Bool = false,
         expectedIdentity: ForgeFilesystemIdentity? = nil,
         allowEmptyDirectory: Bool = false,
         authorityValidator: @Sendable (ToolInvocationContext) throws -> Void = { _ in },
@@ -2876,32 +2894,34 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
                 message: "Protected filesystem mutation requires a durable project context"
             )
         }
-        switch transport.serviceStatus() {
-        case .enabled:
-            break
-        case .requiresApproval:
-            return .failure(
-                code: ForgeFilesystemErrorCode.helperNotApproved,
-                message: "Secure filesystem service requires approval in System Settings",
-                retryable: true
+        if !availabilityPreflightSatisfied {
+            switch transport.serviceStatus() {
+            case .enabled:
+                break
+            case .requiresApproval:
+                return .failure(
+                    code: ForgeFilesystemErrorCode.helperNotApproved,
+                    message: "Secure filesystem service requires approval in System Settings",
+                    retryable: true
+                )
+            case .notRegistered, .notFound:
+                return .failure(
+                    code: ForgeFilesystemErrorCode.helperUnavailable,
+                    message: "Secure filesystem service is unavailable",
+                    retryable: true
+                )
+            }
+            try cancellation?.checkCancellation()
+            let operationalProbe = transport.operationalProbe(
+                timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
             )
-        case .notRegistered, .notFound:
-            return .failure(
-                code: ForgeFilesystemErrorCode.helperUnavailable,
-                message: "Secure filesystem service is unavailable",
-                retryable: true
-            )
-        }
-        try cancellation?.checkCancellation()
-        let operationalProbe = transport.operationalProbe(
-            timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
-        )
-        guard operationalProbe.operational else {
-            return .failure(
-                code: operationalProbe.code,
-                message: operationalProbe.message,
-                retryable: operationalProbe.code == ForgeFilesystemErrorCode.helperUnavailable
-            )
+            guard operationalProbe.operational else {
+                return .failure(
+                    code: operationalProbe.code,
+                    message: operationalProbe.message,
+                    retryable: operationalProbe.code == ForgeFilesystemErrorCode.helperUnavailable
+                )
+            }
         }
         retentionAttemptObserver?()
         let reconciliation = reconcileRecoveryLedger(
@@ -3102,6 +3122,7 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
         context: ToolInvocationContext?,
         cancellation: ToolCallCancellation?,
         recoveryLedger: SecureFilesystemRecoveryLedger,
+        availabilityPreflightSatisfied: Bool = false,
         authorityValidator: @Sendable (ToolInvocationContext) throws -> Void = { _ in }
     ) throws -> ToolResult {
         guard let context else {
@@ -3110,32 +3131,34 @@ final class SecureFilesystemMutationClient: @unchecked Sendable {
                 message: "Protected filesystem move requires a durable project context"
             )
         }
-        switch transport.serviceStatus() {
-        case .enabled:
-            break
-        case .requiresApproval:
-            return .failure(
-                code: ForgeFilesystemErrorCode.helperNotApproved,
-                message: "Secure filesystem service requires approval in System Settings",
-                retryable: true
+        if !availabilityPreflightSatisfied {
+            switch transport.serviceStatus() {
+            case .enabled:
+                break
+            case .requiresApproval:
+                return .failure(
+                    code: ForgeFilesystemErrorCode.helperNotApproved,
+                    message: "Secure filesystem service requires approval in System Settings",
+                    retryable: true
+                )
+            case .notRegistered, .notFound:
+                return .failure(
+                    code: ForgeFilesystemErrorCode.helperUnavailable,
+                    message: "Secure filesystem service is unavailable",
+                    retryable: true
+                )
+            }
+            try cancellation?.checkCancellation()
+            let operationalProbe = transport.operationalProbe(
+                timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
             )
-        case .notRegistered, .notFound:
-            return .failure(
-                code: ForgeFilesystemErrorCode.helperUnavailable,
-                message: "Secure filesystem service is unavailable",
-                retryable: true
-            )
-        }
-        try cancellation?.checkCancellation()
-        let operationalProbe = transport.operationalProbe(
-            timeout: min(2, max(0.001, cancellation?.remainingTimeInterval ?? 2))
-        )
-        guard operationalProbe.operational else {
-            return .failure(
-                code: operationalProbe.code,
-                message: operationalProbe.message,
-                retryable: operationalProbe.code == ForgeFilesystemErrorCode.helperUnavailable
-            )
+            guard operationalProbe.operational else {
+                return .failure(
+                    code: operationalProbe.code,
+                    message: operationalProbe.message,
+                    retryable: operationalProbe.code == ForgeFilesystemErrorCode.helperUnavailable
+                )
+            }
         }
         let reconciliation = reconcileRecoveryLedger(
             recoveryLedger: recoveryLedger,

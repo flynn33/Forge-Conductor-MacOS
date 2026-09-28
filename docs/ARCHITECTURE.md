@@ -1,6 +1,6 @@
 # Forge Conductor architecture
 
-Version: `0.16.0`; build: `21`.
+Version: `0.16.1`; build: `22`.
 
 Forge Conductor is a native macOS control plane and MCP server for work carried
 out in externally owned model conversations. The current LM Studio workflow
@@ -53,8 +53,10 @@ Studio only through supported CLI, REST, and MCP boundaries.
 ## Project and instruction ownership
 
 Project registration canonicalizes a selected folder, establishes stable
-identity, and advances a generation on reset. Multiple projects may be active,
-but their memory, tools, policy logs, and continuity remain isolated.
+identity and a default working directory, and advances a generation on reset.
+Multiple projects may be active, but their memory, instruction artifacts,
+policy logs, continuity, and durable activity remain isolated by identity and
+generation. Registration does not create a filesystem access boundary.
 
 `ProjectInstructionQueueStore` imports files, folders, archives, and supported
 documents into immutable content-addressed snapshots. The durable order shown
@@ -72,8 +74,43 @@ locations. `resume=true` requests the latest resume-ready handoff.
 
 Filesystem, Git, shell, memory, instruction, policy, and continuity tools pass
 through the same authorization layer. Project-bound calls require a valid
-project identity and generation. Paths outside the authorized project roots and
-Forge control-state namespaces are rejected before dispatch.
+project identity and generation, and tool grants and the shell enable switch
+still gate dispatch. For native filesystem, Git, shell, PDF, search, and
+runtime calls, an absolute path may be outside the selected project folder.
+Forge canonicalizes the path but does not wrap the command in a Seatbelt
+profile. macOS attributes TCC access to the responsible signed host and
+executable in the actual launch chain; Forge does not infer Full Disk Access
+from a parent UI grant. The exact signed candidate must pass a live protected-
+path read after relaunch, without exposing file contents. Ordinary POSIX and SIP
+constraints remain in force.
+Selected project roots supply registration identity and the default base for
+relative paths, not access confinement.
+
+Runtime jobs retain the signed launch gate, process-group ownership, deadlines,
+output and environment bounds, cancellation, and durable result fencing. A
+bounded libproc tracker records start identities and cleans up observed children
+that leave the process group with `setsid(2)` or `setpgid(2)`. The normal
+per-job descendant budget is 16, with an absolute 1,024 retained-identity cap.
+Crossing either boundary produces a typed terminal failure; sticky capacity
+evidence does not prevent terminalization after every retained identity exits.
+If termination cannot be confirmed, the job releases live ownership as a
+bounded cleanup debt with a retry deadline and one identity-fenced startup
+retry. A reused PID is never signaled. Public macOS process snapshots are not
+atomic and the out-of-group tracker is not durable across a Manager crash;
+unrestricted same-user code that escapes entirely between observations remains
+an explicit native-shell trust boundary.
+Filesystem delete and move retain explicit protection against `/`, user and
+Manager homes, mounted-volume roots, active workspace roots, and any ancestor
+whose removal would contain one of those roots. Authorization performs the
+first check; local execution independently reconstructs that set, pins the
+source by descriptor identity, and compares it against every protected root and
+ancestor again immediately before delete or move. Changed parents, case aliases,
+blank operands, and an uninspectable protected identity fail closed. In-project
+delete and move may use the signed generation-fenced filesystem helper; paths
+outside a declared project root use the bounded local implementation. Memory,
+instruction, policy, and continuity APIs remain project/generation scoped, but
+an owner-authorized unrestricted shell is not a physical secrecy boundary for
+same-user files backing those services.
 
 ## Provider ownership
 
@@ -135,6 +172,12 @@ Telemetry producers use one bounded delivery boundary: at most one in-flight
 main-actor delivery and one replaceable latest snapshot. Sequence numbers and
 coalescing counters expose stale or dropped delivery.
 
+Dashboard resolves its tracked project from current live MCP presence and the
+matching active durable `mcp_client` binding. Recent activity orders multiple
+live clients; heartbeat order is the deterministic fallback. An exact
+nonterminal run is used only when no live binding resolves, and registration
+alone is never presented as an active project.
+
 Hidden or detached gauges perform no recurring render work. Visible gauges use
 a bounded cadence and shared immutable Metal resources. Mutable buffers are
 reused and shutdown cancels all recurring work.
@@ -169,6 +212,8 @@ navigation, and cannot serve as acceptance evidence for the roadmap.
 - Provider and desktop-host installation changes are revision-fenced and
   limited to Forge-owned artifacts.
 - Privileged filesystem operations use the versioned signed helper contract.
+- Native model tools deliberately inherit host access; project selection is not
+  represented as a security sandbox.
 - No private desktop UI automation is used.
 
 ## Qualification boundary

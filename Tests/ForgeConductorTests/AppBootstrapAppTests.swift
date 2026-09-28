@@ -38,6 +38,23 @@ private final class BootstrapProbe: @unchecked Sendable {
 
 private enum BootstrapFixtureError: Error { case expectedFailure, gateDeadline }
 
+private final class DashboardBindingClock: Clock, @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Date
+
+    init(_ value: Date) {
+        self.value = value
+    }
+
+    func now() -> Date {
+        lock.withLock { value }
+    }
+
+    func advance() {
+        lock.withLock { value = value.addingTimeInterval(1) }
+    }
+}
+
 @MainActor
 final class OperatorStartupContentAppTests: XCTestCase {
     func testOperatorScreenConstructionWaitsThroughStartupAndFailureUntilReady() {
@@ -337,6 +354,357 @@ final class AppBootstrapAppTests: XCTestCase {
 }
 
 final class RigOperationalSnapshotAppTests: XCTestCase {
+    func testTrackedProjectPrefersLiveBoundMCPClientOverUnrelatedManagedRun() throws {
+        let runProjectID = UUID().uuidString.lowercased()
+        let boundProjectID = UUID().uuidString.lowercased()
+        let liveClientID = UUID().uuidString
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {
+          "projects":[
+            {
+              "project_id":"\(runProjectID)","display_name":"Background Project",
+              "canonical_root":"/tmp/background","project_generation":2,
+              "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+              "continuity":{"state":"ready"},"migration_warnings":[]
+            },
+            {
+              "project_id":"\(boundProjectID)","display_name":"Live Project",
+              "canonical_root":"/tmp/live","project_generation":7,
+              "lifecycle_state":"active","bindings":[{
+                "binding_id":"\(UUID().uuidString)","owner_kind":"mcp_client",
+                "owner_id":"\(liveClientID)","active":true
+              }],"memory":{"state":"ready"},
+              "continuity":{"state":"ready"},"migration_warnings":[]
+            }
+          ],
+          "runs":[{
+            "run_id":"\(UUID().uuidString)","project_id":"\(runProjectID)",
+            "project_generation":2,"mission":"Background work","state":"running",
+            "continuity_mode":"automatic"
+          }]
+        }
+        """.utf8))
+
+        let projectedSelection = RigOperationalSnapshot.trackedProject(
+            operatorSnapshot: snapshot,
+            liveMCPClientIDs: [liveClientID]
+        )
+        let exactSelection = RigOperationalSnapshot.trackedProject(
+            operatorSnapshot: snapshot,
+            liveMCPClientIDs: [],
+            boundProjectIdentity: RigTrackedProjectIdentity(
+                projectID: boundProjectID,
+                projectGeneration: 7
+            )
+        )
+
+        XCTAssertEqual(projectedSelection?.projectID, boundProjectID)
+        XCTAssertEqual(exactSelection?.projectID, boundProjectID)
+        XCTAssertEqual(exactSelection?.displayName, "Live Project")
+    }
+
+    func testTrackedProjectDoesNotTreatRegistrationAloneAsActive() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {
+          "projects":[{
+            "project_id":"\(projectID)","display_name":"Registered Only",
+            "canonical_root":"/tmp/registered","project_generation":1,
+            "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+            "continuity":{"state":"ready"},"migration_warnings":[]
+          }]
+        }
+        """.utf8))
+
+        XCTAssertNil(RigOperationalSnapshot.trackedProject(
+            operatorSnapshot: snapshot,
+            liveMCPClientIDs: []
+        ))
+    }
+
+    func testTrackedProjectDoesNotSubstituteAnotherClientWhenExactBindingIsOutsidePage() throws {
+        let visibleProjectID = UUID().uuidString.lowercased()
+        let omittedProjectID = UUID().uuidString.lowercased()
+        let visibleClientID = UUID().uuidString.lowercased()
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {
+          "projects":[{
+            "project_id":"\(visibleProjectID)","display_name":"Visible Other Client",
+            "canonical_root":"/tmp/visible-other","project_generation":3,
+            "lifecycle_state":"active","bindings":[{
+              "binding_id":"\(UUID().uuidString)","owner_kind":"mcp_client",
+              "owner_id":"\(visibleClientID)","active":true
+            }],"memory":{"state":"ready"},
+            "continuity":{"state":"ready"},"migration_warnings":[]
+          }]
+        }
+        """.utf8))
+
+        XCTAssertNil(RigOperationalSnapshot.trackedProject(
+            operatorSnapshot: snapshot,
+            liveMCPClientIDs: [visibleClientID],
+            boundProjectIdentity: RigTrackedProjectIdentity(
+                projectID: omittedProjectID,
+                projectGeneration: 9
+            )
+        ))
+    }
+
+    func testDashboardPresenceIdentityPreservesExactOpaqueBindingID() throws {
+        let clientID = UUID().uuidString
+        XCTAssertEqual(
+            AppModel.boundClientID(fromPresenceID: "\(clientID):primary"),
+            clientID
+        )
+        XCTAssertEqual(
+            AppModel.boundClientID(fromPresenceID: "\(clientID):desktop-provider:codex-desktop"),
+            clientID
+        )
+        let nativeTaskID = "native-task:\(UUID().uuidString.lowercased())"
+        XCTAssertEqual(
+            AppModel.boundClientID(fromPresenceID: "\(nativeTaskID):primary"),
+            nativeTaskID
+        )
+        XCTAssertEqual(
+            AppModel.boundClientID(fromPresenceID: "opaque:client:unknown-role"),
+            "opaque:client:unknown-role"
+        )
+    }
+
+    func testBoundProjectResolutionFailsClosedOnRepositoryErrorBeforeLowerPriorityClient() async {
+        let firstClient = "ACTIVE-CLIENT"
+        let secondClient = "active-client"
+        let secondContext = ToolInvocationContext(
+            projectID: ProjectID(),
+            projectGeneration: ProjectGeneration(4),
+            clientID: ClientID(secondClient),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [URL(fileURLWithPath: "/tmp/second")],
+                allowedTools: ["fs_read"],
+                networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+        )
+
+        let result = await AppModel.resolveBoundProjectIdentity(
+            forLiveMCPClientIDs: [firstClient, secondClient]
+        ) { clientID in
+            if clientID == firstClient {
+                throw ProjectContextError.databaseFailure("fixture")
+            }
+            return secondContext
+        }
+
+        XCTAssertEqual(result, .unavailable)
+        XCTAssertFalse(result.allowsRunFallback(hasResolvedProject: false))
+    }
+
+    func testBoundProjectResolutionKeepsCaseCollidingOpaqueClientsDistinct() async {
+        let firstClient = "Case-Sensitive-Client"
+        let secondClient = "case-sensitive-client"
+        let projectID = ProjectID()
+        let runID = RunID()
+        let expected = RigTrackedProjectIdentity(
+            projectID: projectID.description,
+            projectGeneration: 8,
+            runID: runID.description
+        )
+        let context = ToolInvocationContext(
+            projectID: projectID,
+            projectGeneration: ProjectGeneration(8),
+            clientID: ClientID(secondClient),
+            runID: runID,
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [URL(fileURLWithPath: "/tmp/case-sensitive")],
+                allowedTools: ["fs_read"],
+                networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+        )
+
+        let result = await AppModel.resolveBoundProjectIdentity(
+            forLiveMCPClientIDs: [firstClient, secondClient]
+        ) { clientID in
+            if clientID == firstClient {
+                throw ProjectContextError.projectContextRequired(
+                    ProjectBindingOwner(kind: .mcpClient, id: clientID)
+                )
+            }
+            return context
+        }
+
+        XCTAssertEqual(result, .resolved(expected))
+    }
+
+    func testExactUppercaseClientBindingSurvivesBoundedProjectAndBindingPages() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-binding-\(UUID().uuidString)", isDirectory: true)
+        let clock = DashboardBindingClock(Date(timeIntervalSince1970: 1_000))
+        let repository = try ProjectControlPlaneRepository(
+            databaseURL: root.appendingPathComponent("control-plane.sqlite3"),
+            clock: clock
+        )
+        do {
+            let targetID = ProjectID(try XCTUnwrap(UUID(
+                uuidString: "00000000-0000-0000-0000-000000000001"
+            )))
+            let originalRoot = root.appendingPathComponent("target-v1", isDirectory: true)
+            let currentRoot = root.appendingPathComponent("target-v2", isDirectory: true)
+            _ = try await repository.registerProjectUnchecked(
+                projectID: targetID,
+                displayName: "Bound target",
+                canonicalRoot: originalRoot,
+                repositoryFingerprint: "fixture-target"
+            )
+            let relink = try await repository.relinkProjectUnchecked(
+                projectID: targetID,
+                expectedGeneration: .initial,
+                newCanonicalRoot: currentRoot,
+                repositoryFingerprint: "fixture-target"
+            )
+
+            for index in 0..<101 {
+                _ = try await repository.registerProjectUnchecked(
+                    projectID: ProjectID(),
+                    displayName: "Newer project \(index)",
+                    canonicalRoot: root.appendingPathComponent("project-\(index)", isDirectory: true)
+                )
+            }
+            let page = try await repository.operatorProjects(limit: 100)
+            XCTAssertFalse(page.contains { $0.projectID == targetID })
+
+            let liveClient = ClientID()
+            XCTAssertEqual(liveClient.rawValue, liveClient.rawValue.uppercased())
+            XCTAssertNotEqual(liveClient.rawValue, liveClient.rawValue.lowercased())
+            let scope = ToolAuthorizationScope(
+                canonicalRoots: [currentRoot],
+                allowedTools: ["fs_read"],
+                networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+            _ = try await repository.bind(
+                owner: ProjectBindingOwner(kind: .mcpClient, id: liveClient.rawValue),
+                projectID: targetID,
+                generation: relink.newGeneration,
+                authorizationScope: scope
+            )
+            for index in 0..<17 {
+                clock.advance()
+                _ = try await repository.bind(
+                    owner: ProjectBindingOwner(kind: .runtimeJob, id: "newer-job-\(index)"),
+                    projectID: targetID,
+                    generation: relink.newGeneration,
+                    authorizationScope: scope
+                )
+            }
+            let bindingPage = try await repository.operatorBindings(
+                projectIDs: [targetID],
+                limitPerProject: 16
+            )
+            XCTAssertFalse(bindingPage[targetID, default: []].contains {
+                $0.owner == ProjectBindingOwner(kind: .mcpClient, id: liveClient.rawValue)
+            })
+
+            let resolution = await AppModel.resolveBoundProjectIdentity(
+                forLiveMCPClientIDs: [liveClient.rawValue]
+            ) { clientID in
+                try await repository.invocationContext(
+                    for: ProjectBindingOwner(kind: .mcpClient, id: clientID),
+                    clientID: ClientID(clientID)
+                )
+            }
+            XCTAssertEqual(
+                resolution,
+                .resolved(RigTrackedProjectIdentity(
+                    projectID: targetID.description,
+                    projectGeneration: relink.newGeneration.rawValue
+                ))
+            )
+        } catch {
+            await repository.close()
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
+        await repository.close()
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testBoundRunWinsAmongTwoActiveRunsAndWhenOmittedFromBoundedPage() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let firstRunID = UUID().uuidString.lowercased()
+        let boundRunID = UUID().uuidString.lowercased()
+        let omittedRunID = UUID().uuidString.lowercased()
+        let project = try JSONDecoder().decode(OperatorProject.self, from: Data("""
+        {
+          "project_id":"\(projectID)","display_name":"Bound Run Project",
+          "canonical_root":"/tmp/bound-run","project_generation":5,
+          "lifecycle_state":"active","bindings":[],"memory":{"state":"ready"},
+          "continuity":{"state":"ready"},"migration_warnings":[]
+        }
+        """.utf8))
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {"runs":[
+          {"run_id":"\(firstRunID)","project_id":"\(projectID)",
+           "project_generation":5,"mission":"First","state":"running",
+           "continuity_mode":"automatic"},
+          {"run_id":"\(boundRunID)","project_id":"\(projectID)",
+           "project_generation":5,"mission":"Bound","state":"running",
+           "continuity_mode":"automatic"}
+        ]}
+        """.utf8))
+
+        XCTAssertEqual(
+            RigOperationalSnapshot.monitoredRunID(
+                operatorSnapshot: snapshot,
+                instructionQueue: nil,
+                progressProject: project,
+                preferredRunID: boundRunID
+            ),
+            boundRunID
+        )
+        XCTAssertEqual(
+            RigOperationalSnapshot.monitoredRunID(
+                operatorSnapshot: snapshot,
+                instructionQueue: nil,
+                progressProject: project,
+                preferredRunID: omittedRunID
+            ),
+            omittedRunID
+        )
+    }
+
+    func testResolvedBindingWithoutExactProjectFailsClosedBeforeGlobalRunFallback() throws {
+        let boundProjectID = "BOUND-\(UUID().uuidString)"
+        let unrelatedProjectID = "UNRELATED-\(UUID().uuidString)"
+        let unrelatedRunID = UUID().uuidString
+        let resolution = RigBoundProjectResolution.resolved(
+            RigTrackedProjectIdentity(
+                projectID: boundProjectID,
+                projectGeneration: 9,
+                runID: UUID().uuidString
+            )
+        )
+        let snapshot = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("""
+        {"runs":[{
+          "run_id":"\(unrelatedRunID)","project_id":"\(unrelatedProjectID)",
+          "project_generation":1,"mission":"Unrelated work","state":"running",
+          "continuity_mode":"automatic"
+        }]}
+        """.utf8))
+
+        let allowRunFallback = resolution.allowsRunFallback(hasResolvedProject: false)
+        XCTAssertFalse(allowRunFallback)
+        XCTAssertNil(
+            RigOperationalSnapshot.monitoredRunID(
+                operatorSnapshot: snapshot,
+                instructionQueue: nil,
+                progressProject: nil,
+                preferredRunID: resolution.identity?.runID,
+                allowUnboundRunFallback: allowRunFallback
+            )
+        )
+    }
+
     func testInteractiveContinuityCountdownReachesDashboardProjection() throws {
         let handoffID = UUID().uuidString.lowercased()
         let projectID = UUID().uuidString.lowercased()

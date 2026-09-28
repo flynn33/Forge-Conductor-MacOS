@@ -473,11 +473,11 @@ private struct GuidedSetupWizardView: View {
             kind: .project,
             title: "Register the project",
             symbol: "folder.badge.gearshape",
-            purpose: "A registered project gives LM Studio a stable identity and an exact authorized working folder.",
+            purpose: "A registered project gives LM Studio a stable identity and an exact default working folder.",
             readyWhen: "Projects shows the repository as Active with its current generation.",
             actions: [
                 "Open Projects and choose Register Project.",
-                "Select the repository itself. Registration authorizes that exact folder; adding its parent in Manager is not a normal prerequisite.",
+                "Select the repository itself. Registration records that exact project identity and default working folder; it does not confine native filesystem access.",
                 "Wait for the durable registration result before importing instructions.",
             ],
             recovery: [

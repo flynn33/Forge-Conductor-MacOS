@@ -170,22 +170,50 @@ public struct FilesystemToolPack: ToolPackHandling {
         case "fs_edit": return try fsEdit(arguments, cancellation: cancellation)
         case "fs_list": return try fsList(arguments, cancellation: cancellation)
         case "fs_glob":
-            let directory = URL(fileURLWithPath: ToolArgHelpers.string(arguments, "path") ?? FileManager.default.currentDirectoryPath)
-            return try fsGlob(arguments, runner: ProcessRunner().scopedForTool(context: context, workingDirectory: directory, paths: app.paths), cancellation: cancellation)
+            return try fsGlob(
+                arguments,
+                runner: ProcessRunner(),
+                cancellation: cancellation
+            )
         case "fs_mkdir": return try fsMkdir(arguments, cancellation: cancellation)
         case "fs_delete":
-            if let secureMutationClient {
-                guard let path = ToolArgHelpers.string(arguments, "path") else {
-                    return .failure(code: "missing_path", message: "path required")
-                }
-                return try secureRecursiveDelete(at: ToolArgHelpers.resolvePath(path), client: secureMutationClient,
+            guard context != nil else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                    message: "A durable project context is required for filesystem deletion"
+                )
+            }
+            guard let deletePath = ToolArgHelpers.string(arguments, "path") else {
+                return .failure(code: "missing_path", message: "path required")
+            }
+            guard Self.isNonblankDestructivePath(deletePath) else {
+                return .failure(
+                    code: "invalid_path",
+                    message: "delete path cannot be empty or whitespace"
+                )
+            }
+            let deleteURL = ToolArgHelpers.resolvePath(deletePath)
+            if let secureMutationClient,
+               Self.declaredWritableRoot(containing: [deleteURL], context: context) != nil,
+               try secureMutationClient.canBeginProtectedMutation(
+                   cancellation: cancellation
+               ) {
+                return try secureRecursiveDelete(at: deleteURL, client: secureMutationClient,
                     context: context, app: app, cancellation: cancellation)
             }
-            return try fsDelete(
+            var result = try fsDelete(
                 arguments,
+                protectedRoots: try Self.destructiveProtectedRoots(
+                    app: app,
+                    context: context,
+                    clientID: clientID,
+                    cancellation: cancellation
+                ),
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
                 cancellation: cancellation
             )
+            result.payload["protection_mode"] = "local_bounded"
+            return result
         case "fs_delete_recovery":
             guard let secureMutationClient else {
                 return .failure(
@@ -208,20 +236,44 @@ public struct FilesystemToolPack: ToolPackHandling {
                 recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths)
             )
         case "fs_move":
-            if let secureMutationClient {
-                guard let source = ToolArgHelpers.string(arguments, "path")
-                        ?? ToolArgHelpers.string(arguments, "src")
-                        ?? ToolArgHelpers.string(arguments, "source"),
-                      let destination = ToolArgHelpers.string(arguments, "dest")
-                        ?? ToolArgHelpers.string(arguments, "destination") else {
-                    return .failure(code: "missing_args", message: "path/src and dest required")
-                }
+            guard context != nil else {
+                return .failure(
+                    code: ForgeFilesystemErrorCode.capabilityUnavailable,
+                    message: "A durable project context is required for filesystem moves"
+                )
+            }
+            guard let source = ToolArgHelpers.string(arguments, "path")
+                    ?? ToolArgHelpers.string(arguments, "src")
+                    ?? ToolArgHelpers.string(arguments, "source"),
+                  let destination = ToolArgHelpers.string(arguments, "dest")
+                    ?? ToolArgHelpers.string(arguments, "destination") else {
+                return .failure(code: "missing_args", message: "path/src and dest required")
+            }
+            guard Self.isNonblankDestructivePath(source),
+                  Self.isNonblankDestructivePath(destination) else {
+                return .failure(
+                    code: "invalid_path",
+                    message: "move source and destination paths cannot be empty or whitespace"
+                )
+            }
+            if let secureMutationClient,
+               Self.declaredWritableRoot(
+                   containing: [
+                       ToolArgHelpers.resolvePath(source),
+                       ToolArgHelpers.resolvePath(destination),
+                   ],
+                   context: context
+               ) != nil,
+               try secureMutationClient.canBeginProtectedMutation(
+                   cancellation: cancellation
+               ) {
                 return try secureMutationClient.moveEntry(
                     from: ToolArgHelpers.resolvePath(source),
                     to: ToolArgHelpers.resolvePath(destination),
                     context: context,
                     cancellation: cancellation,
                     recoveryLedger: SecureFilesystemRecoveryLedger(paths: app.paths),
+                    availabilityPreflightSatisfied: true,
                     authorityValidator: { currentContext in
                         try app.projectContexts.validate(
                             currentContext,
@@ -230,13 +282,93 @@ public struct FilesystemToolPack: ToolPackHandling {
                     }
                 )
             }
-            return try fsMove(
+            var result = try fsMove(
                 arguments,
+                protectedRoots: try Self.destructiveProtectedRoots(
+                    app: app,
+                    context: context,
+                    clientID: clientID,
+                    cancellation: cancellation
+                ),
                 quarantineLedger: FilesystemQuarantineLedger(paths: app.paths),
                 cancellation: cancellation
             )
+            result.payload["protection_mode"] = "local_bounded"
+            return result
         default: return nil
         }
+    }
+
+    /// The signed helper retains its project-generation recovery protocol for
+    /// mutations inside a declared project root. Native paths outside that root
+    /// use the same bounded, crash-aware in-process implementation rather than
+    /// turning project identity into a filesystem access restriction.
+    private static func declaredWritableRoot(
+        containing targets: [URL],
+        context: ToolInvocationContext?
+    ) -> URL? {
+        guard let context, !targets.isEmpty else { return nil }
+        let canonicalTargets = targets.map {
+            let target = $0.standardizedFileURL
+            guard target.path != "/" else { return target }
+            let parent = RuntimePathCanonicalizer.canonicalExistingURL(
+                target.deletingLastPathComponent()
+            )
+            return parent.appendingPathComponent(target.lastPathComponent)
+                .standardizedFileURL
+        }
+        return context.authorizationScope.writableRoots
+            .map { $0.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL }
+            .filter { root in
+                canonicalTargets.allSatisfy { target in
+                    target != root && path(target, isContainedBy: root)
+                }
+            }
+            .max { lhs, rhs in lhs.pathComponents.count < rhs.pathComponents.count }
+    }
+
+    private static func path(_ candidate: URL, isContainedBy root: URL) -> Bool {
+        let candidateComponents = candidate.pathComponents
+        let rootComponents = root.pathComponents
+        guard candidateComponents.count >= rootComponents.count else { return false }
+        return Array(candidateComponents.prefix(rootComponents.count)) == rootComponents
+    }
+
+    private static func isNonblankDestructivePath(_ value: String) -> Bool {
+        !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Reconstructs the destructive-root set at the execution boundary. The
+    /// authorization service performs the first check, but a same-user process
+    /// may rename an ancestor before dispatch. Local mutation therefore compares
+    /// the descriptor-pinned source identity with this independently resolved set
+    /// immediately before any namespace change.
+    private static func destructiveProtectedRoots(
+        app: ForgeApp,
+        context: ToolInvocationContext?,
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> [URL] {
+        var candidates = context?.authorizationScope.canonicalRoots ?? []
+        candidates.append(contentsOf: try app.continuityAutomation.additionalRoots(
+            for: clientID,
+            cancellation: cancellation
+        ))
+        candidates.append(FileManager.default.homeDirectoryForCurrentUser)
+        candidates.append(app.paths.home)
+        candidates.append(URL(fileURLWithPath: "/", isDirectory: true))
+        candidates.append(contentsOf: FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: nil,
+            options: []
+        ) ?? [])
+
+        var roots: [URL] = []
+        for candidate in candidates {
+            try cancellation?.checkCancellation()
+            let canonical = RuntimePathCanonicalizer.canonicalExistingURL(candidate)
+            if !roots.contains(canonical) { roots.append(canonical) }
+        }
+        return roots
     }
 
     private func fsRead(
@@ -481,7 +613,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         let rootURL = ToolArgHelpers.resolvePath(root)
         let result = try runner.run(
             executable: "/usr/bin/find",
-            arguments: [RuntimeProcessSandbox.canonicalURL(rootURL).path, "-name", pattern],
+            arguments: [RuntimePathCanonicalizer.canonicalURL(rootURL).path, "-name", pattern],
             timeoutSec: 15,
             cancellation: cancellation
         )
@@ -504,14 +636,34 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private func fsDelete(
         _ args: [String: Any],
+        protectedRoots: [URL],
         quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard let path = ToolArgHelpers.string(args, "path") else {
             return .failure(code: "missing_path", message: "path required")
         }
+        guard Self.isNonblankDestructivePath(path) else {
+            return .failure(
+                code: "invalid_path",
+                message: "delete path cannot be empty or whitespace"
+            )
+        }
         let url = ToolArgHelpers.resolvePath(path)
         try cancellation?.checkCancellation()
+        guard let initialInformation = try Self.lstatInformationIfExists(at: url) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        do {
+            try Self.requireUnprotectedDestructiveIdentity(
+                PathIdentity(initialInformation),
+                target: url,
+                protectedRoots: protectedRoots,
+                cancellation: cancellation
+            )
+        } catch let error as SourceFenceError {
+            return Self.sourceChangedFailure(error)
+        }
         let plan: [DeletionEntry]
         do {
             plan = try Self.recursiveDeletionPlan(at: url, cancellation: cancellation)
@@ -532,6 +684,16 @@ public struct FilesystemToolPack: ToolPackHandling {
             at: url,
             expectedIdentity: rootEntry.identity
         )
+        do {
+            try Self.requireUnprotectedDestructiveIdentity(
+                rootEntry.identity,
+                target: url,
+                protectedRoots: protectedRoots,
+                cancellation: cancellation
+            )
+        } catch let error as SourceFenceError {
+            return Self.sourceChangedFailure(error)
+        }
 
         var removedCount = 0
         for entry in plan {
@@ -643,10 +805,11 @@ public struct FilesystemToolPack: ToolPackHandling {
         ])
     }
 
-    /// Production deletion is a bounded bottom-up sequence of exact-entry
-    /// transactions owned by the signed helper. Each entry is atomically
+    /// When the signed helper is operational, in-project deletion is a bounded
+    /// bottom-up sequence of exact-entry transactions. Each entry is atomically
     /// captured into the helper's protected same-volume namespace before its
-    /// terminal mutation; no same-user quarantine substitutes for that proof.
+    /// terminal mutation. A helper that fails before dispatch is handled by the
+    /// caller's native bounded path; no fallback occurs after this method starts.
     private func secureRecursiveDelete(
         at url: URL,
         client: SecureFilesystemMutationClient,
@@ -690,7 +853,8 @@ public struct FilesystemToolPack: ToolPackHandling {
                 linkCount: UInt64(currentInformation.st_nlink)
             )
             let result = try client.deleteLeaf(at: entry.url, context: context, cancellation: cancellation,
-                recoveryLedger: ledger, expectedIdentity: identity, allowEmptyDirectory: entry.isDirectory,
+                recoveryLedger: ledger, availabilityPreflightSatisfied: true,
+                expectedIdentity: identity, allowEmptyDirectory: entry.isDirectory,
                 authorityValidator: { currentContext in
                     try app.projectContexts.validate(currentContext, cancellation: cancellation)
                 })
@@ -746,6 +910,7 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private func fsMove(
         _ args: [String: Any],
+        protectedRoots: [URL],
         quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
@@ -755,6 +920,13 @@ public struct FilesystemToolPack: ToolPackHandling {
               let dest = ToolArgHelpers.string(args, "dest")
                 ?? ToolArgHelpers.string(args, "destination") else {
             return .failure(code: "missing_args", message: "path/src and dest required")
+        }
+        guard Self.isNonblankDestructivePath(src),
+              Self.isNonblankDestructivePath(dest) else {
+            return .failure(
+                code: "invalid_path",
+                message: "move source and destination paths cannot be empty or whitespace"
+            )
         }
         let s = ToolArgHelpers.resolvePath(src)
         let d = ToolArgHelpers.resolvePath(dest)
@@ -767,6 +939,16 @@ public struct FilesystemToolPack: ToolPackHandling {
             )
         }
         let sourceIdentity = PathIdentity(sourceInformation)
+        do {
+            try Self.requireUnprotectedDestructiveIdentity(
+                sourceIdentity,
+                target: s,
+                protectedRoots: protectedRoots,
+                cancellation: cancellation
+            )
+        } catch let error as SourceFenceError {
+            return Self.sourceChangedFailure(error)
+        }
         let createdDestinationDirectories: [URL]
         do {
             createdDestinationDirectories = try createDurableDirectoryHierarchy(
@@ -806,6 +988,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                     source: s,
                     destination: d,
                     expectedSourceIdentity: sourceIdentity,
+                    protectedSourceRoots: protectedRoots,
                     quarantineLedger: quarantineLedger,
                     directorySynchronizer: directorySynchronizer,
                     beforeRename: {
@@ -885,6 +1068,7 @@ public struct FilesystemToolPack: ToolPackHandling {
             source: s,
             destination: d,
             expectedSourceIdentity: sourceIdentity,
+            protectedSourceRoots: protectedRoots,
             createdDestinationDirectories: createdDestinationDirectories,
             quarantineLedger: quarantineLedger,
             cancellation: cancellation
@@ -895,6 +1079,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         source: URL,
         destination: URL,
         expectedSourceIdentity: PathIdentity,
+        protectedSourceRoots: [URL],
         createdDestinationDirectories: [URL],
         quarantineLedger: FilesystemQuarantineLedger,
         cancellation: ToolCallCancellation?
@@ -929,6 +1114,12 @@ public struct FilesystemToolPack: ToolPackHandling {
             guard sourceFence.entriesByRelativePath["."]?.pathIdentity == expectedSourceIdentity else {
                 throw SourceFenceError.changed
             }
+            try Self.requireUnprotectedDestructiveIdentity(
+                expectedSourceIdentity,
+                target: source,
+                protectedRoots: protectedSourceRoots,
+                cancellation: cancellation
+            )
         } catch {
             return try prepublicationMoveFailureResult(
                 source: source,
@@ -1366,6 +1557,12 @@ public struct FilesystemToolPack: ToolPackHandling {
                 at: source,
                 expectedIdentity: expectedRoot.pathIdentity
             )
+            try Self.requireUnprotectedDestructiveIdentity(
+                expectedRoot.pathIdentity,
+                target: source,
+                protectedRoots: protectedSourceRoots,
+                cancellation: cancellation
+            )
         } catch {
             return Self.sourceFencePartialResult(
                 source: source,
@@ -1508,6 +1705,11 @@ public struct FilesystemToolPack: ToolPackHandling {
                 && mode == UInt32(information.st_mode)
                 && owner == UInt32(information.st_uid)
                 && group == UInt32(information.st_gid)
+        }
+
+        func identifiesSameEntry(as information: stat) -> Bool {
+            device == Int64(information.st_dev)
+                && inode == UInt64(information.st_ino)
         }
     }
 
@@ -1706,6 +1908,7 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private enum SourceFenceError: Error, LocalizedError {
         case changed
+        case protectedRoot(String)
         case quarantineBusy
         case quarantineCapacityExhausted([String])
         case quarantineTransitionRetained(String)
@@ -1735,7 +1938,7 @@ public struct FilesystemToolPack: ToolPackHandling {
                 return [path]
             case .quarantineUnavailable(_, let recoveryPath):
                 return recoveryPath.map { [$0] } ?? []
-            case .changed, .quarantineBusy, .unsupported:
+            case .changed, .protectedRoot, .quarantineBusy, .unsupported:
                 return []
             }
         }
@@ -1744,6 +1947,8 @@ public struct FilesystemToolPack: ToolPackHandling {
             switch self {
             case .changed:
                 return "The filesystem entry changed before the requested mutation could be reconciled"
+            case .protectedRoot(let path):
+                return "A filesystem, volume, home, manager, or active workspace root cannot be deleted or moved: \(path)"
             case .quarantineBusy:
                 return "The filesystem quarantine ledger is busy"
             case .quarantineCapacityExhausted:
@@ -1924,6 +2129,38 @@ public struct FilesystemToolPack: ToolPackHandling {
             current = PinnedFileDescriptor(nextDescriptor)
         }
         return current
+    }
+
+    /// Rechecks the descriptor identity of every protected root and ancestor at
+    /// the mutation boundary. The source identity comes from lstat/fstatat, so a
+    /// final-component symlink remains distinct from the directory it targets.
+    /// Any inability to inspect a protected identity is an error and therefore
+    /// fails closed before the requested namespace mutation.
+    private static func requireUnprotectedDestructiveIdentity(
+        _ targetIdentity: PathIdentity,
+        target: URL,
+        protectedRoots: [URL],
+        cancellation: ToolCallCancellation?
+    ) throws {
+        var inspectedPaths = Set<String>()
+        for protectedRoot in protectedRoots {
+            var ancestor = protectedRoot.standardizedFileURL
+            while true {
+                try cancellation?.checkCancellation()
+                if inspectedPaths.insert(ancestor.path).inserted {
+                    let descriptor = try pinnedDirectory(at: ancestor)
+                    var information = stat()
+                    guard Darwin.fstat(descriptor.rawValue, &information) == 0 else {
+                        throw posixError(errno, path: ancestor.path)
+                    }
+                    if targetIdentity.identifiesSameEntry(as: information) {
+                        throw SourceFenceError.protectedRoot(target.path)
+                    }
+                }
+                guard ancestor.path != "/" else { break }
+                ancestor = ancestor.deletingLastPathComponent().standardizedFileURL
+            }
+        }
     }
 
     private static func pinnedParent(of url: URL) throws -> PinnedPathParent {
@@ -2877,6 +3114,9 @@ public struct FilesystemToolPack: ToolPackHandling {
         let code: String
         let retryable: Bool
         switch error as? SourceFenceError {
+        case .protectedRoot:
+            code = "workspace_root_protected"
+            retryable = false
         case .quarantineBusy:
             code = "quarantine_busy"
             retryable = true
@@ -3236,6 +3476,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         source: URL,
         destination: URL,
         expectedSourceIdentity: PathIdentity,
+        protectedSourceRoots: [URL] = [],
         quarantineLedger: FilesystemQuarantineLedger,
         directorySynchronizer: (URL) throws -> Void,
         beforeRename: () throws -> Void,
@@ -3260,11 +3501,26 @@ public struct FilesystemToolPack: ToolPackHandling {
                 throw SourceFenceError.changed
             }
             afterVerification()
+            let finalSourceInformation = try fstatatInformation(
+                parentDescriptor: sourceParent.directory.rawValue,
+                entryName: sourceParent.entryName
+            )
+            guard expectedSourceIdentity.matches(finalSourceInformation) else {
+                throw SourceFenceError.changed
+            }
+            if !protectedSourceRoots.isEmpty {
+                try requireUnprotectedDestructiveIdentity(
+                    PathIdentity(finalSourceInformation),
+                    target: source,
+                    protectedRoots: protectedSourceRoots,
+                    cancellation: nil
+                )
+            }
             let reservation = try quarantineEntry(
                 parentDescriptor: sourceParent.directory.rawValue,
                 parentPath: sourceParent.path,
                 entryName: sourceParent.entryName,
-                leafIdentity: FilesystemQuarantineIdentity(sourceInformation),
+                leafIdentity: FilesystemQuarantineIdentity(finalSourceInformation),
                 operation: "move_publish",
                 quarantineLedger: quarantineLedger
             )
@@ -3935,6 +4191,8 @@ public struct FilesystemToolPack: ToolPackHandling {
             controlCode = "request_cancelled"
         } else if error is ToolCallDeadlineExceeded {
             controlCode = "deadline_exceeded"
+        } else if case .protectedRoot = error as? SourceFenceError {
+            controlCode = "workspace_root_protected"
         } else if case .quarantineBusy = error as? SourceFenceError {
             controlCode = "quarantine_busy"
         } else if case .quarantineCapacityExhausted = error as? SourceFenceError {

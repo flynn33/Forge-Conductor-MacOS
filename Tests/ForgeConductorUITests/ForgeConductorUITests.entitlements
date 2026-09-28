@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<!-- Override XCTRunner's injected true value so fresh MCP children can
-	     apply the product's shell sandbox. Omitting this key retains true. -->
+	     exercise the product's native host access. Omitting this key retains true. -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
 	<key>com.apple.security.network.client</key>

@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.16.0**, build **21**.
+Version **0.16.1**, build **22**.
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -40,8 +40,22 @@ while LM Studio is offline; live readiness still requires **Connect and Check**.
 
 Open **Projects** and use the folder picker to select one or more project
 folders. Each registered folder receives a stable project ID and generation.
-Project files, memory, instructions, policy observations, and continuity remain
-isolated by that identity.
+Memory, instructions, policy observations, continuity, and durable activity
+remain isolated by that identity. The selected folder also supplies the default
+working directory; it is not a filesystem sandbox. Native filesystem, Git, and
+shell tools use only the access macOS attributes to the responsible signed host
+and executable in the actual launch chain. Full Disk Access is not a Forge
+entitlement. After changing a grant or candidate, quit and relaunch the affected
+hosts and verify that exact signed candidate with a live protected-path read
+that emits no file contents. POSIX permissions, SIP, tool grants,
+project-generation fencing, timeouts, output limits, and destructive-root
+protections still apply.
+
+Native runtime jobs have a finite descendant budget and fail explicitly on
+overflow. Local outside-project delete and move recheck the source's filesystem
+identity against the filesystem, mounted-volume, home, Manager, and active-
+workspace roots at the actual mutation boundary; a changed or uninspectable
+identity fails closed.
 
 Available maintenance actions include:
 
@@ -155,8 +169,11 @@ deletion remains on Projects.
 
 Dashboard presents bounded system telemetry, Forge service health, policy
 state, and the automatic continuity countdown. Hidden gauges stop recurring
-render work. Events & Evidence provides bounded diagnostics and exports; it
-does not replace live provider or rollover acceptance.
+render work. Its Project status follows the project bound to the active MCP
+client, preferring the client with the newest activity when several are live.
+A matching nonterminal run is a fallback; a project is not shown as active just
+because it is registered. Events & Evidence provides bounded diagnostics and
+exports; it does not replace live provider or rollover acceptance.
 
 ## 10. Verification boundary
 
