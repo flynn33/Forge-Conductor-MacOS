@@ -9,7 +9,7 @@ continuity. The user does not start project work through a Forge Managed Run.
 | | |
 |---|---|
 | **Version** | **0.16.0** |
-| **Build** | **19** |
+| **Build** | **21** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -21,8 +21,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 > not release evidence. The working installation remains separate from
 > candidates.
 
-The current Apple Development-signed Desktop candidate is `Forge Conductor
-0.16.0 (19)-868645e.app` with its matching `.xcarchive` on the Desktop. It is
+The current Developer ID-signed Desktop candidate is `Forge Conductor
+0.16.0 (21)-a540670.app` with its matching `.xcarchive` on the Desktop. It is
 not installed over `/Applications/Forge Conductor.app` and is not a shipment
 claim.
 
@@ -65,7 +65,7 @@ from a source build, or claim shipment from successful compilation alone.
 7. CLU monitors the model, delivers policy violations with the exact applicable
    policy content, and records an exportable log for that project.
 8. At context pressure the model saves a resume-ready handoff. Forge displays a
-   30-second Dashboard countdown, creates exactly one stored LM Studio
+   30-second Dashboard countdown, creates exactly one foreground LM Studio
    successor chat, submits `get_forge_status` with `resume=true`, verifies the
    exact handoff acknowledgement, and then seals the predecessor.
 9. **Continuity** contains a scrollable project-ID list and, under the selected
@@ -75,17 +75,19 @@ from a source build, or claim shipment from successful compilation alone.
    **Clear Cache** remain on this surface; instruction packages remain on
    Projects.
 
-LM Studio documents that `/api/v1/chat` creates a stored stateful chat and can
-use installed MCP integrations. It does not document a guarantee that an
-API-created chat becomes the foreground GUI tab. Forge does not use unsupported
-private UI automation to fabricate that behavior.
+Forge does not use LM Studio's `/api/v1/chat` integrations array for automatic
+continuity. The native host adapter uses the public macOS Accessibility surface
+to activate LM Studio, press **New**, fill **Chat input**, and press **Send**.
+The visible GUI-hosted model then calls the already-installed Forge MCP tool.
+A deterministic nonce binds that exact tool receipt to the handoff, and durable
+intent/submitted state prevents duplicate successor tabs after retry. This
+requires macOS Accessibility access for the signed Forge Conductor candidate;
+it does not require a Forge-held LM Studio credential.
 
-Current build-19 host evidence proves the tokenless normal GUI chat path and
-its Forge tool/location lookup. The tokenless automatic API successor is not
-accepted: LM Studio currently returns HTTP 403 when that request attaches the
-local `mcp/forge-conductor` registration. Shipment remains open until Forge can
-complete the owner-defined successor flow without an operator-facing or
-Forge-held LM Studio credential.
+Build-21 host evidence completed this foreground flow through
+`mcp/forge-conductor-fallback`, exact handoff acknowledgement, and predecessor
+sealing. Owner inspection, CLU live delivery acceptance, and shipment remain
+separate.
 
 ## Projects and instruction packages
 

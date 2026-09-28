@@ -12,6 +12,12 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Replaced automatic LM Studio REST successor creation with a visible
+  foreground-chat driver. After the existing 30-second countdown, Forge uses
+  LM Studio's public macOS Accessibility controls to open **New**, fill
+  **Chat input** with `get_forge_status`, `resume=true`, the exact handoff ID,
+  and a deterministic nonce, then press **Send**. The installed GUI MCP tool
+  must write the exact nonce-bound receipt before the predecessor is sealed.
 - Added first-class Continuity packet inventory grouped by project ID. Packet
   rows expose the durable checkpoint/handoff ID, type, source, and timestamp,
   and support exact single or multi-selection deletion after one confirmation.
@@ -22,6 +28,11 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Advanced the candidate identity to `0.16.0 (21)`. Durable GUI dispatch state
+  records `intent` before any host effect and `submitted` after Send, so retry
+  and Manager restart reuse one logical successor instead of opening a stack.
+  Electron accessibility-name mapping accepts the observed New button through
+  title, description, or value.
 - Advanced the candidate identity to `0.16.0 (19)`. Same-host LM Studio now
   rejects new Forge credential values, automatically removes any legacy local
   Keychain reference, and hides credential controls for the local endpoint.
@@ -41,6 +52,19 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- Developer ID-signed Desktop candidate `Forge Conductor 0.16.0
+  (21)-a540670.app` completed one live disposable rollover. Handoff
+  `79474019-000f-4395-a593-cc74a6da2372` showed the 30-second countdown, opened
+  selected foreground tab `Unnamed Chat`, submitted the exact bootstrap, and
+  visibly called `get_forge_status mcp/forge-conductor-fallback`. Exact receipt
+  nonce `517cbb4f-f1bd-cc69-e1df-f14ffc7f5f9c` acknowledged at
+  `2026-09-28T10:06:48Z`; logical successor
+  `51a4567d-36f9-4d44-8a54-925f6e14a0f5` reached `acknowledged`, and the seal
+  ledger then recorded the handoff once. A delayed watchdog check retained one
+  successor record. No `/api/v1/chat` integrations request participated.
+  The live chat's already-running fallback MCP child came from the compatible
+  build-20 registration; after the proof, the supported installer synchronized
+  primary, fallback, and CLU registrations to the exact build-21 candidate.
 - Focused tests execute the packet store's list and exact batch-delete behavior,
   packet wire format, populated native packet rows, and confirmed packet-only
   deletion. Provider configuration tests execute local credential migration and

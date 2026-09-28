@@ -14,8 +14,9 @@ is not started from the Forge Conductor Continuity view.
    it saves a resume-ready handoff.
 4. After the durable handoff commit, Forge shows a 30-second countdown on the
    Dashboard.
-5. At expiry the Manager creates exactly one stored successor chat through LM
-   Studio's supported stateful-chat API and submits the exact bootstrap input:
+5. At expiry the Manager activates LM Studio and creates exactly one foreground
+   successor through its public macOS Accessibility controls, then submits the
+   exact bootstrap input:
 
    ```text
    get_forge_status
@@ -26,10 +27,13 @@ is not started from the Forge Conductor Continuity view.
    Forge seal the predecessor. Repeated watchdog ticks and restart recovery are
    idempotent.
 
-LM Studio documents that `POST /api/v1/chat` creates a stored stateful chat and
-supports installed MCP integrations. Its public API does not promise that an
-API-created chat becomes the foreground GUI tab. Forge does not use unsupported
-private UI automation to make that claim.
+Forge presses LM Studio's exposed **New** control, fills its exposed **Chat
+input**, and presses **Send**. The visible chat uses the installed MCP tools in
+the same way as an ordinary user-created chat. A deterministic nonce binds the
+exact `get_forge_status` receipt to the handoff, while durable intent/submitted
+state makes retry idempotent. This host action requires macOS Accessibility
+permission and uses no `/api/v1/chat` integrations array or Forge-held LM Studio
+credential.
 
 ## MCP surfaces
 

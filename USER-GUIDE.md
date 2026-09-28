@@ -110,8 +110,8 @@ action in the Continuity view:
 
 1. Forge durably commits the exact handoff.
 2. Dashboard shows a 30-second countdown.
-3. At expiry Manager creates exactly one stored successor chat through LM
-   Studio's supported stateful-chat API.
+3. At expiry Manager activates LM Studio and creates exactly one foreground
+   successor through the app's public macOS Accessibility controls.
 4. Forge submits:
 
    ```text
@@ -123,12 +123,11 @@ action in the Continuity view:
 6. Forge records the predecessor as sealed only after that acknowledgement.
 
 The operation is idempotent across watchdog ticks and Manager restart. A
-failure retains the handoff and reports the exact endpoint, authentication,
-model, MCP, bootstrap, or acknowledgement problem.
-
-LM Studio's public API supports stored stateful chats but does not promise that
-an API-created chat becomes the foreground GUI tab. Forge does not use private
-UI automation.
+failure retains the handoff and reports the exact Accessibility, model, MCP,
+bootstrap, or acknowledgement problem. Forge records durable intent before the
+GUI action and submitted state after Send, so retry does not open another chat.
+The signed Forge Conductor app requires macOS Accessibility access for this host
+action; no Forge-held LM Studio token or integrations API request is used.
 
 ## 8. Manage continuity data
 

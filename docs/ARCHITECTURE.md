@@ -97,17 +97,18 @@ effect. Manager then exposes a 30-second Dashboard countdown.
 At expiry, the statically registered LM Studio host adapter:
 
 1. resolves or creates one successor identity from a stable idempotency key;
-2. creates a stored LM Studio chat through `POST /api/v1/chat`;
-3. enables `mcp/forge-conductor`;
-4. submits `get_forge_status` with `resume=true`;
-5. validates the exact handoff identifier in the response;
+2. activates LM Studio and presses its public Accessibility **New** control;
+3. fills the visible Chat input with `get_forge_status`, `resume=true`, the
+   exact handoff ID, and a deterministic nonce, then presses Send;
+4. observes the installed GUI MCP tool's exact nonce-bound receipt;
+5. validates the exact handoff identifier in that receipt;
 6. durably records acknowledgement and predecessor sealing; and
 7. reuses the same identity after retry or Manager restart.
 
-The adapter ledger is bounded and owner-only. A host failure retains the same
-handoff and publishes a bounded redacted diagnostic. LM Studio does not promise
-foreground GUI-tab activation for API-created chats, so Forge does not claim or
-simulate it.
+The adapter ledger and GUI intent/submitted records are bounded and owner-only.
+A host failure retains the same handoff and publishes a bounded redacted
+diagnostic. The adapter uses no REST integrations array and does not store a
+same-host LM Studio credential.
 
 The Continuity UI does not drive this state machine. It is limited to a
 scrollable project-ID list, Copy, and confirmed project-scoped Delete.

@@ -51,7 +51,7 @@ order:
 7. **Monitor governance and continuity** — use Dashboard for the automatic
    rollover countdown, Rune Forge for CLU policy observations/log export, and
    Events & Evidence for durable audit detail. Continuity manages project-ID
-   copy/deletion plus reset, selected-package deletion, and disposable-cache
+   copy plus exact packet deletion, reset, and disposable-cache
    clearing without initiating rollover.
 8. **Resolve issues and continue** — follow the current provider, package,
    policy, or continuity action without switching to Managed Run.
@@ -69,10 +69,11 @@ configuration and remain part of the bound instruction artifact.
 Only one provider can be selected. Desktop-host activation may transactionally
 install or update Forge-owned plugin, hook, skill, and MCP files, but the wizard
 does not approve host permissions. Claude and Codex can require a user trust
-review; any remaining host action stays visible in Provider. LM Studio work
-begins and remains in the ordinary LM Studio interface. Forge uses the supported
-stateful chat API only for automatic successor creation after a durable handoff;
-it does not use private GUI automation.
+    review; any remaining host action stays visible in Provider. LM Studio work
+begins and remains in the ordinary LM Studio interface. After a durable
+handoff, Forge uses the app's public macOS Accessibility controls to create the
+visible successor and the installed GUI MCP tool to acknowledge it; it does not
+use the REST integrations array.
 
 Grok Build remains visible in Provider but is non-selectable in 0.16.0. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
@@ -101,8 +102,8 @@ product controls rather than hidden guide side effects.
 ## State-aware guidance
 
 Project guidance distinguishes loading, missing project, provider action, and
-LM Studio-ready states. Continuity explains project-ID copying/deletion, reset,
-selected-package deletion, and cache clearing; it exposes no manual checkpoint
+LM Studio-ready states. Continuity explains project-ID copying, exact packet
+deletion, reset, and cache clearing; it exposes no manual checkpoint
 or rollover action. Provider guidance distinguishes the durable selection,
 provisioning operation, remaining desktop-host action, verified deployment,
 repair/removal availability, and LM Studio's unsaved or unverified advanced

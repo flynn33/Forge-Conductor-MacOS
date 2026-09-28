@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.16.0**, build **19**. This connection document does
+Product identity: version **0.16.0**, build **21**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## What the product is
@@ -15,10 +15,10 @@ not authorize release; the qualification boundary below remains controlling.
 | **CLI `forge-conductor serve`** | Same MCP server (default registration target) |
 
 There is **no** in-process link from the GUI into LM Studio’s address space.
-The statically registered native session-host plugin uses LM Studio's documented
-Foundation-accessible REST boundary for automatic successor chats. Ordinary
+The statically registered native session-host plugin uses LM Studio's public
+macOS Accessibility surface for automatic foreground successor chats. Ordinary
 work remains in the user's LM Studio interface; the stdio registration below
-serves those externally owned chats.
+serves both user-created and successor chats.
 
 ## Forge Link implementation boundary
 
@@ -122,24 +122,20 @@ passing `project_id` returns that project's file, instruction, and continuity
 locations. No Managed Run is required.
 
 When the model saves a resume-ready handoff, Manager publishes a visible
-30-second Dashboard countdown. At expiry, the native adapter calls LM Studio's
-documented `POST /api/v1/chat` with `store=true`, enables the installed
-`mcp/forge-conductor` integration, and submits `get_forge_status` with
-`resume=true`. Forge requires the response to contain the exact handoff ID and
-uses its durable idempotency ledger to prevent duplicate successor creation.
-LM Studio documents stored stateful chat creation and MCP integrations, but it
-does not document foreground GUI-tab activation for API-created chats; Forge
-does not use private UI automation.
+30-second Dashboard countdown. At expiry, the native adapter activates LM
+Studio, presses its exposed **New** control, fills **Chat input** with
+`get_forge_status`, `resume=true`, the exact handoff ID, and a deterministic
+rollover nonce, then presses **Send**. The visible GUI-hosted model calls the
+already-installed `mcp/forge-conductor` or fallback tool. Forge accepts only the
+owner-only receipt containing that exact handoff and nonce, then seals the
+predecessor. Durable intent/submitted state and the native idempotency ledger
+prevent duplicate successor chats across retries or Manager restart.
 
-Current owner-host qualification distinguishes the two tokenless paths. A
-normal foreground LM Studio GUI chat can load the candidate's `mcp.json`
-registration and call `get_forge_status` plus project-memory tools without a
-Forge-held LM Studio credential. The server API currently rejects the otherwise
-identical tokenless stored-chat request with HTTP 403 when
-`mcp/forge-conductor` is attached. LM Studio's documented server settings make
-calling `mcp.json` servers from API clients conditional on server
-authentication. That observed API path is therefore not accepted as the
-required tokenless automatic successor; the rollover gate remains open.
+This path requires macOS Accessibility access for the signed Forge Conductor
+app. It does not use `POST /api/v1/chat`, an integrations array, an
+operator-facing LM Studio token, or a Forge-held same-host credential. Build 21
+completed this live path in a selected foreground LM Studio tab through
+`mcp/forge-conductor-fallback`.
 
 ## Authoritative connection path (stable)
 

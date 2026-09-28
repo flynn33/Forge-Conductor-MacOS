@@ -1,8 +1,8 @@
 # Version and qualification status
 
-## 0.16.0 packet management and tokenless-local correction
+## 0.16.0 foreground successor and packet management
 
-The current source identity is **0.16.0, build 19**. Continuity now lists the
+The current source identity is **0.16.0, build 21**. Continuity lists the
 actual durable checkpoint/handoff packets under each project ID and deletes
 only the exact single or multi-selection after confirmation. Reset and Clear
 Cache remain on Continuity; instruction-package controls are confined to
@@ -21,13 +21,12 @@ candidate exposed one additional defect: it hid registered packet projects when
 automatic continuity reported `unavailable`. Build 19 keeps those projects
 visible for packet management.
 
-Candidate revision `868645e85ce44b50b159136f3b56758a4f489c12` produced
-`/Users/flynn/Desktop/Forge Conductor 0.16.0 (19)-868645e.app` and the matching
-`.xcarchive`. Both GUI and embedded CLI are universal arm64/x86_64; strict deep
-signature verification reports Apple Development team `9AQ2C2838M`, and the
-privileged-filesystem bundle check passed.
+Candidate revision `a540670b54e78aeff1793848a9cc16e0be6fe438`
+produced `/Users/flynn/Desktop/Forge Conductor 0.16.0 (21)-a540670.app` and the
+matching `.xcarchive`. The GUI is universal arm64/x86_64; strict deep signature
+verification reports Developer ID Application team `9AQ2C2838M`.
 
-**E0 on that exact candidate:** the ordinary owner-surface UI case executed one
+**Prior build-19 E0 retained by build 21:** the ordinary owner-surface UI case executed one
 test with zero failures and found the Continuity project/packet frames plus
 Copy Project ID, Delete, Reset, and Clear Cache. The real-provider UI case
 executed one test with zero failures, discovered loaded model
@@ -59,13 +58,35 @@ home `/Users/flynn/.forge-conductor`, project `Jamf-Technician`, project root
 `d2610542-b616-7e8f-ee36-ef902d6060e1`, and resume-ready handoff prefix
 `fdb9130a`. The chat was the foreground LM Studio tab.
 
-The automatic API successor is still a failed acceptance item. With LM Studio
-authentication disabled, the exact tokenless `POST /api/v1/chat` request
-returns HTTP 403 when its integrations array contains `mcp/forge-conductor`.
-No successor chat ID, exact handoff acknowledgement, or predecessor seal was
-produced, so none is claimed. CLU delivery and the complete automatic rollover
-sequence remain open. This is not shipment acceptance, and
-`/Applications/Forge Conductor.app` has not been replaced.
+**E0 on the build-21 Desktop candidate:** disposable handoff
+`79474019-000f-4395-a593-cc74a6da2372` committed at
+`2026-09-28T10:01:08Z`. Manager exposed the due time
+`2026-09-28T10:01:38Z` and was observed at 25 seconds remaining. At expiry the
+candidate used LM Studio's public macOS Accessibility controls to open and
+select foreground tab `Unnamed Chat`, then entered `get_forge_status`,
+`resume=true`, the exact handoff ID, and rollover nonce
+`517cbb4f-f1bd-cc69-e1df-f14ffc7f5f9c`. The visible chat called
+`get_forge_status mcp/forge-conductor-fallback`. Its owner-only receipt records
+the same handoff and nonce, `resume: true`, and acknowledgement time
+`2026-09-28T10:06:48Z`.
+
+The native ledger has exactly one record for that handoff: logical successor
+`51a4567d-36f9-4d44-8a54-925f6e14a0f5`, provider identity
+`lmstudio-gui-877df47abf1e5782aea37f27`, status `acknowledged`. Only after that
+receipt did Manager append the exact handoff once to
+`interactive-continuity-sealed.json`; the operator snapshot then reported
+`completed`. A delayed watchdog check retained one successor record. The driver
+contains no `/api/v1/chat` call or integrations array and stores no same-host LM
+Studio credential. CLU live delivery and owner acceptance remain open. This is
+not shipment acceptance, and `/Applications/Forge Conductor.app` has not been
+replaced.
+
+The live chat's fallback MCP child used the compatible build-20 registration
+that was active when the chat started; build 21's app process supplied the
+corrected foreground GUI driver. After the receipt and seal were captured, the
+supported installer synchronized primary, fallback, and CLU commands in
+`~/.lmstudio/mcp.json` to the exact build-21 candidate. The resulting
+registration contains no token, Authorization, or credential field.
 
 The prior build-16 candidate at revision `f2cc6ca` remains historical evidence
 only. Its Continuity package control and project-wide delete do not satisfy the
@@ -307,7 +328,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.0, build 19**, supporting **macOS 26+**. The owner will
+Product identity: **0.16.0, build 21**, supporting **macOS 26+**. The owner will
 test the staged Desktop candidate and perform shipment separately. The version
 advance and repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -318,7 +339,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.0, build 19**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.0, build 21**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

@@ -39,18 +39,20 @@ policy, continuity, and tools through its installed MCP integration. Forge does
 not expose a primary Managed Run action for this workflow.
 
 When a model commits a resume-ready handoff, the Forge Manager owns the durable
-30-second successor state machine. At expiry it uses LM Studio's supported
-stateful-chat API to create one stored successor chat, enables the installed
-`mcp/forge-conductor` integration, and submits:
+30-second successor state machine. At expiry it activates LM Studio and uses
+the app's public macOS Accessibility controls to create one visible foreground
+successor, then submits:
 
 ```text
 get_forge_status
 resume=true
 ```
 
-Completion requires acknowledgement of the exact handoff identifier. LM
-Studio's public API does not guarantee that this stored chat becomes the
-foreground GUI tab, and Forge does not use private UI automation.
+Completion requires an exact nonce-bound acknowledgement from
+`get_forge_status` in that GUI chat. Durable intent/submitted state prevents a
+retry from opening another successor. The GUI uses the installed MCP
+registration directly; Forge sends no `/api/v1/chat` integrations array and
+stores no same-host LM Studio credential.
 
 ## Desktop-provider integrations
 
