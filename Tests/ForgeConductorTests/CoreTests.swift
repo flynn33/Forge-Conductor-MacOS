@@ -236,6 +236,46 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(instruction.contains("If no active source is listed"))
     }
 
+    func testForgeStatusKeepsPolicyLocationWhenProjectSelectionIsAmbiguous() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let policyRoot = tempHome.appendingPathComponent("global-policy", isDirectory: true)
+        try FileManager.default.createDirectory(at: policyRoot, withIntermediateDirectories: true)
+        try Data("# Policy\n".utf8).write(to: policyRoot.appendingPathComponent("AGENTS.md"))
+        let source = try await StjornarvaldPolicySourceCatalog(paths: app.paths).add(
+            selectedURL: policyRoot,
+            requestID: UUID()
+        )
+        for index in 1...2 {
+            let root = tempHome.appendingPathComponent("project-\(index)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            _ = try app.projectContexts.registerProjectUnchecked(
+                descriptor: ProjectMemoryDescriptor(
+                    id: UUID().uuidString.lowercased(),
+                    displayName: "Project \(index)",
+                    repositoryIdentity: nil,
+                    aliases: []
+                ),
+                canonicalRoot: root
+            )
+        }
+
+        let result = try app.tools.call(
+            name: "get_forge_status",
+            arguments: [:],
+            clientID: ClientID("ambiguous-project-status")
+        )
+
+        XCTAssertNil(result.payload["project"])
+        let locations = try XCTUnwrap(result.payload["locations"] as? [String: String])
+        XCTAssertEqual(locations["development_policy"], policyRoot.path)
+        let policy = try XCTUnwrap(result.payload["development_policy"] as? [String: Any])
+        let sources = try XCTUnwrap(policy["sources"] as? [[String: Any]])
+        XCTAssertEqual(sources.first?["source_id"] as? String, source.id.description)
+        let actions = try XCTUnwrap(result.payload["required_actions"] as? [[String: Any]])
+        XCTAssertEqual(actions.first?["required"] as? Bool, true)
+    }
+
     func testFSWriteRead() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         let client = ClientID("t2")
@@ -1199,6 +1239,12 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(names.contains("get_forge_status"))
         XCTAssertTrue(names.contains("agent_run_start"))
         XCTAssertTrue(names.contains("pdf_write"))
+        let statusDescription = try XCTUnwrap(
+            tools.first { $0["name"] as? String == "get_forge_status" }?["description"] as? String
+        )
+        XCTAssertTrue(statusDescription.contains("required Development Policy"))
+        XCTAssertTrue(statusDescription.contains("ordered instruction-package execution"))
+        XCTAssertTrue(statusDescription.contains("Read and follow every ordered active"))
     }
 
     func testMCPToolCall() throws {
@@ -1305,7 +1351,7 @@ final class CoreTests: XCTestCase {
             sourceIDs: [secondaryPolicySource.id, policySource.id]
         )
         let projectID = UUID()
-        _ = try app.projectContexts.registerProjectUnchecked(
+        let registeredProject = try app.projectContexts.registerProjectUnchecked(
             descriptor: ProjectMemoryDescriptor(
                 id: projectID.uuidString.lowercased(),
                 displayName: "Ordinary LM Studio Project",
@@ -1313,6 +1359,37 @@ final class CoreTests: XCTestCase {
                 aliases: []
             ),
             canonicalRoot: root
+        )
+        let firstPackage = tempHome.appendingPathComponent("first-package", isDirectory: true)
+        let secondPackage = tempHome.appendingPathComponent("second-package", isDirectory: true)
+        for (url, packageID, mission) in [
+            (firstPackage, "first-package", "Execute first"),
+            (secondPackage, "second-package", "Execute second"),
+        ] {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            try Data("# \(mission)\n".utf8).write(to: url.appendingPathComponent("AGENTS.md"))
+            let manifest: [String: Any] = [
+                "schema_version": 1,
+                "package_id": packageID,
+                "version": "1.0.0",
+                "mission": mission,
+                "entry_documents": ["AGENTS.md"],
+                "requested_capabilities": ["fs_read"],
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+            ]
+            try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+                .write(to: url.appendingPathComponent("forge-package.json"))
+        }
+        let queue = try ProjectInstructionQueueStore(paths: app.paths)
+        _ = try queue.importPackage(
+            sourceURL: firstPackage,
+            projectID: registeredProject.projectID,
+            generation: registeredProject.generation
+        )
+        _ = try queue.importPackage(
+            sourceURL: secondPackage,
+            projectID: registeredProject.projectID,
+            generation: registeredProject.generation
         )
 
         let result = try app.tools.call(
@@ -1332,6 +1409,22 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(locations["instruction_store"], app.paths.instructionPackageStoreDir.path)
         XCTAssertEqual(locations["development_policy"], secondaryPolicyRoot.path)
         XCTAssertTrue(locations["continuity_store"]?.contains(projectID.uuidString.lowercased()) == true)
+        let instructionPackages = try XCTUnwrap(
+            result.payload["instruction_packages"] as? [String: Any]
+        )
+        XCTAssertEqual(instructionPackages["total_packages"] as? Int, 2)
+        let executionOrder = try XCTUnwrap(
+            instructionPackages["execution_order"] as? [[String: Any]]
+        )
+        XCTAssertEqual(executionOrder.map { $0["package_id"] as? String }, [
+            "first-package", "second-package",
+        ])
+        XCTAssertEqual(executionOrder.map { $0["position"] as? Int }, [0, 1])
+        XCTAssertTrue(executionOrder.allSatisfy {
+            ($0["display_name"] as? String)?.isEmpty == false
+                && ($0["source_path"] as? String)?.isEmpty == false
+                && ($0["snapshot_sha256"] as? String)?.count == 64
+        })
         let tools = try XCTUnwrap(result.payload["query_tools"] as? [String: [String]])
         XCTAssertEqual(tools["instructions"], ["instruction_catalog", "instruction_read"])
         XCTAssertTrue(tools["project_files"]?.contains("fs_read") == true)

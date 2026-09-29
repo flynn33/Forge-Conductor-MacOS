@@ -233,6 +233,10 @@ public struct AgentToolPack: ToolPackHandling {
             developmentPolicy["error"] = policyCatalogError
         }
         payload["development_policy"] = developmentPolicy
+        var locations: [String: String] = [:]
+        if let primaryPolicySource = policySources.first {
+            locations["development_policy"] = primaryPolicySource.selectedPath
+        }
         let requestedProjectID: ProjectID?
         if let raw = ToolArgHelpers.string(arguments, "project_id") {
             guard let uuid = UUID(uuidString: raw) else {
@@ -267,15 +271,48 @@ public struct AgentToolPack: ToolPackHandling {
                 "canonical_root": project.canonicalRoot.path,
                 "run_id": context?.runID?.description as Any,
             ] as [String: Any]
-            var locations = [
+            locations.merge([
                 "project_files": project.canonicalRoot.path,
                 "instruction_store": app.paths.instructionPackageStoreDir.path,
                 "continuity_store": projectStateDirectory
                     .appendingPathComponent("continuity", isDirectory: true).path,
-            ]
-            if let primaryPolicySource = policySources.first {
-                locations["development_policy"] = primaryPolicySource.selectedPath
+            ]) { _, new in new }
+            do {
+                let queue = try ProjectInstructionQueueStore(paths: app.paths, clock: app.clock)
+                let page = try queue.snapshotPage(
+                    projectID: project.projectID,
+                    generation: project.generation,
+                    cursor: 0,
+                    limit: 128
+                )
+                payload["instruction_packages"] = [
+                    "project_id": project.projectID.description,
+                    "project_generation": project.generation.rawValue,
+                    "instruction": "Execute instruction packages in ascending position order. Use instruction_catalog and instruction_read to read each immutable snapshot before executing it.",
+                    "total_packages": page.totalPackages,
+                    "returned_packages": page.packages.count,
+                    "next_cursor": page.nextCursor as Any,
+                    "execution_order": page.packages.map { package in
+                        [
+                            "position": package.position,
+                            "package_id": package.packageID,
+                            "display_name": package.displayName,
+                            "source_path": package.sourcePath,
+                            "snapshot_sha256": package.contentSHA256,
+                            "state": package.state.rawValue,
+                        ] as [String: Any]
+                    },
+                ].compactNSNull()
+            } catch {
+                payload["instruction_packages"] = [
+                    "project_id": project.projectID.description,
+                    "project_generation": project.generation.rawValue,
+                    "error": String(error.localizedDescription.prefix(1_024)),
+                    "execution_order": [],
+                ] as [String: Any]
             }
+        }
+        if !locations.isEmpty {
             payload["locations"] = locations
         }
         if ToolArgHelpers.bool(arguments, "resume") == true {
