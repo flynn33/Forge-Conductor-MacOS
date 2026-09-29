@@ -12,11 +12,11 @@ The retained Developer ID candidate is `/Users/flynn/Desktop/Forge Conductor
 helper is `Contents/Helpers/forge-conductor`. LM Studio registration revision
 `32b3c0a3-c621-4e1e-bfe2-75838c5ea86d` binds primary, fallback, and CLU to that
 exact helper. After LM Studio restart, the open Jamf-Technician chat called
-`get_forge_status` through fallback PID `11219`, which reported version
+`get_forge_status` through final repeated fallback PID `12436`, which reported version
 `0.16.2`. The raw result includes the Development Policy location, ordered
 sources and mandatory read/follow action, policy read tools, durable ordered
 instruction packages, project and store locations, continuity, and resume
-state. Primary PID `11220` and CLU PID `11221` are the restored standby roles
+state. Primary PID `12434` and CLU PID `12435` are the restored standby roles
 from the same candidate. `/Applications/Forge Conductor.app` was not replaced.
 
 The published `get_forge_status` tool description is:

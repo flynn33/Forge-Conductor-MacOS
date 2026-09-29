@@ -28,10 +28,10 @@ LM Studio primary, fallback, and CLU registration revision
 After an LM Studio quit/relaunch, the existing Jamf-Technician chat called
 `get_forge_status(project_id: d2610542-b616-7e8f-ee36-ef902d6060e1,
 resume: true)` through `mcp/forge-conductor-fallback`. Its persisted raw tool
-result reports PID `11219`, version `0.16.2`, the priority-1 policy source and
+result reports final repeated PID `12436`, version `0.16.2`, the priority-1 policy source and
 read/follow requirement, package `Jamf-Technician-Continuation-Package-R1` at
 position 0, project/instruction/continuity locations, and resume data. Primary
-PID `11220` and CLU PID `11221` use the same candidate and deployment revision.
+PID `12434` and CLU PID `12435` use the same candidate and deployment revision.
 The working `/Applications/Forge Conductor.app` was not replaced. Notarization,
 stapling, Gatekeeper acceptance, and shipment remain open.
 

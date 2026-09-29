@@ -579,11 +579,11 @@ LM Studio primary, fallback, and CLU were transactionally synchronized to the
 candidate helper under deployment revision
 `32b3c0a3-c621-4e1e-bfe2-75838c5ea86d`. After LM Studio quit and relaunch, the
 existing Jamf-Technician chat invoked `get_forge_status` through candidate
-fallback PID `11219`. The persisted raw result contains the policy location,
+fallback PID `12436`. The final repeated persisted raw result contains the policy location,
 priority-1 source identity/path, mandatory read/follow action and query tools,
 package `Jamf-Technician-Continuation-Package-R1` at position 0 with its source
 path and snapshot hash, prior project/store/continuity fields, and resume data.
-Primary PID `11220` and CLU PID `11221` are active from the same candidate. The
+Primary PID `12434` and CLU PID `12435` are active from the same candidate. The
 working `/Applications/Forge Conductor.app` was not replaced and no live
 Continuity packet was deleted. Notarization, stapling, Gatekeeper acceptance,
 and shipment remain open.
