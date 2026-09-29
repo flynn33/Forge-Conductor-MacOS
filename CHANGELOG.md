@@ -12,6 +12,15 @@ Product versions do not by themselves claim shipment.
 
 ### Added
 
+- Prepared the retained `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
+  universal Developer ID Release archive and export as the shippable
+  `0.16.2 (23)` owner-notarization set. The Desktop set now includes the app,
+  `.xcarchive`, notary-submission ZIP, Developer ID Installer package,
+  `HASHES.txt`, and command-only `OWNER-NOTARIZE.txt`. All five shipping code
+  objects passed strict signing, hardened-runtime, secure-timestamp,
+  architecture, entitlement, and Release privileged-bundle checks. The set is
+  ready for owner notarization and Apple upload; it is not notarized, stapled,
+  installed, shipped, or released.
 - Replaced automatic LM Studio REST successor creation with a visible
   foreground-chat driver. After the existing 30-second countdown, Forge uses
   LM Studio's public macOS Accessibility controls to open **New**, fill

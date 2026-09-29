@@ -1,5 +1,22 @@
 # Version and qualification status
 
+## 0.16.2 owner-notarization artifact set
+
+The shippable universal Developer ID build `0.16.2 (23)` from product source
+revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4` is ready for owner
+notarization and Apple upload. The retained Desktop directory contains the
+canonical `ForgeConductor` archive, manual `developer-id` export, app ZIP,
+Developer ID Installer package, hashes, and command-only owner notarization
+file. The archive and all five shipping objects pass strict signing, hardened
+runtime, secure timestamp, exact team and role identity, universal-architecture,
+no-App-Sandbox, and Release privileged-filesystem-bundle checks. Extracted ZIP
+and PKG payloads passed the same Release checks.
+
+No notarization, stapling, installation, Apple upload, shipment, or release was
+performed. Gatekeeper correctly reports `source=Unnotarized Developer ID` for
+the pre-notarization app and package. `/Applications/Forge Conductor.app`, live
+LM Studio registration, and Continuity packets were not changed.
+
 ## 0.16.2 Development Policy bootstrap
 
 The current source and retained Desktop candidate identity is **0.16.2, build

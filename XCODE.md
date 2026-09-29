@@ -114,6 +114,16 @@ embedded helper are signed by `Developer ID Application: James Daley
 (9AQ2C2838M)` on team `9AQ2C2838M`. The Xcode graph was unchanged: the edited
 Core sources and regression test already belong to their canonical targets.
 
+That retained archive and manual export now form the shippable `0.16.2 (23)`
+owner-notarization set with an app ZIP, trusted-timestamp Developer ID Installer
+package, hashes, and command-only owner notarization file. The product source
+remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
+do not change the binary identity. The set is ready for owner notarization and
+Apple upload, but is not notarized, stapled, installed, shipped, or released.
+Existing Xcode `MARKETING_VERSION = 0.16.2`,
+`CURRENT_PROJECT_VERSION = 23`, Release signing, and graph membership were
+already aligned, so packaging required no project-file edit.
+
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
 produced the `0.16.1 (22)` universal Developer ID archive and manual export at
 `~/Desktop/Forge Conductor 0.16.1 (22)-91ad90e-DeveloperID`. Strict validation

@@ -587,3 +587,25 @@ Primary PID `12434` and CLU PID `12435` are active from the same candidate. The
 working `/Applications/Forge Conductor.app` was not replaced and no live
 Continuity packet was deleted. Notarization, stapling, Gatekeeper acceptance,
 and shipment remain open.
+
+## September 29, 2026 — 0.16.2 (23) owner-notarization artifact set
+
+Product source `22e7443d13496b3cc08b6e98366bb6d2332e3fd4` produced the retained
+universal Release archive and manual Developer ID export under
+`/Users/flynn/Desktop/Forge Conductor 0.16.2 (23)-22e7443-DeveloperID`.
+The archive identifies scheme `ForgeConductor`, bundle
+`com.forge-conductor.app`, team `9AQ2C2838M`, version `0.16.2`, and build `23`.
+Its app, embedded CLI, Core framework, runtime launcher, and filesystem daemon
+all carry James Daley's Developer ID Application identity, hardened runtime,
+secure timestamps, universal `x86_64` and `arm64` slices, and no App Sandbox
+entitlement. Strict deep verification and the Release privileged-filesystem
+bundle checker pass.
+
+The owner-notarization set adds a validated app ZIP, a trusted-timestamp
+Developer ID Installer package whose expanded payload passes the same Release
+checks, `HASHES.txt`, and command-only `OWNER-NOTARIZE.txt`. This shippable
+Developer ID build is ready for owner notarization and Apple upload. It is not
+notarized, stapled, installed, shipped, or released. Gatekeeper's current
+`source=Unnotarized Developer ID` rejection is the expected pre-notarization
+result. The working `/Applications` app, live LM Studio registration, and
+Continuity packets were not changed.

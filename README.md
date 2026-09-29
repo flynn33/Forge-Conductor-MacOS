@@ -15,19 +15,21 @@ continuity. The user does not start project work through a Forge Managed Run.
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** the current build remains unshippable until the
-> owner-defined workflow in [ROADMAP.md](ROADMAP.md) passes current-candidate
-> owner-machine runtime acceptance. Source compilation or a historical run is
-> not release evidence. The working installation remains separate from
-> candidates.
+> **Release status:** the shippable universal Developer ID build `0.16.2 (23)`
+> from product source revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
+> is ready for owner notarization and Apple upload. It is not notarized,
+> stapled, installed, shipped, or released. The working installation remains
+> separate from the candidate.
 
 The most recent retained Developer ID-signed Desktop candidate is
 `~/Desktop/Forge Conductor 0.16.2 (23)-22e7443-DeveloperID/Export/Forge
-Conductor.app`, with its matching `.xcarchive` and evidence directory beside
+Conductor.app`, with its matching `.xcarchive`, notary-submission ZIP, signed
+Developer ID Installer package, hashes, and owner notarization commands beside
 the export. It was built from source revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`.
 It is not installed over `/Applications/Forge Conductor.app` and is not a
-shipment claim. Strict signing passes; notarization, stapling, and Gatekeeper
-acceptance remain open.
+shipment claim. Strict signing and Release privileged-bundle validation pass;
+notarization, stapling, Gatekeeper acceptance, and owner installation remain
+open.
 
 The root version authorities, compiled protocol constants, all Xcode build
 configurations, current repository documentation, and the retained Desktop

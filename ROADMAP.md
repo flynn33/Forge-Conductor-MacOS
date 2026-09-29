@@ -66,13 +66,15 @@ this workflow.
 | Continuity view | **Exact build-19 Desktop-candidate packet acceptance passed.** The signed candidate showed project `d2610542-b616-7e8f-ee36-ef902d6060e1` even with automation unavailable and rendered its real checkpoint/handoff rows with ID, type, source, and timestamp. Two disposable packets were selected and deleted through the native UI; all 73 pre-existing packet IDs remained unchanged. The exact-candidate surface test also found Copy, Delete, Reset, and Clear Cache visible and no instruction-package control. | Owner visual acceptance remains separate. Batch selection is deterministic-tested at the exact request boundary; no additional live packets are to be deleted merely to repeat that proof. |
 | Reset / packet deletion / cache clearing | **Focused scope tests and live exact-packet deletion passed.** Exact packet deletion cannot reach project-wide clearing, task-owned ingress, instruction packages, or project files. Continuity Reset uses only project-scoped settled continuity-history clearing and does not advance the project generation; Clear Cache remains bounded to Forge's disposable cache directory. | Owner-machine Reset and Clear Cache mutation acceptance remains open because those controls were intentionally not run against live owner data. |
 | Managed Run removal | **Removed from primary navigation and the current workflow.** Compatibility internals remain only where required to preserve stored data or reusable low-level services. | No current action, guide, status text, or continuity dependency directs the user to start project work through Managed Run. |
+| Distribution artifact | **Shippable Developer ID build `0.16.2 (23)` from product source `22e7443d13496b3cc08b6e98366bb6d2332e3fd4` is ready for owner notarization and Apple upload.** The retained universal Release archive, manual export, ZIP, signed Installer package, hashes, and owner command file passed strict nested signing, hardened-runtime, secure-timestamp, no-App-Sandbox, architecture, payload, and Release privileged-bundle checks. | Notarization, stapling, Gatekeeper acceptance, owner installation, Apple upload, and shipment remain owner actions. This artifact is not shipped or released. |
 
 ## Release boundary
 
-The product remains unshippable until every row above has direct focused tests,
-canonical workspace membership verification, an ordinary signed app build, and
-current owner-machine runtime evidence for the installed LM Studio workflow. A
-passing legacy Managed Run test is not acceptance evidence for this roadmap.
+The retained build-23 Developer ID artifact set is shippable for owner
+notarization and Apple upload. This artifact boundary does not mark open runtime
+or owner-review rows complete and does not claim notarization, installation,
+shipment, or release. A passing legacy Managed Run test is not acceptance
+evidence for this roadmap.
 
 ## Current correction evidence
 
