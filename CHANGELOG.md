@@ -33,8 +33,13 @@ Product versions do not by themselves claim shipment.
   durable priority order, the supported read tools, and an explicit required
   action to read and follow all applicable policy requirements before making
   development changes. The additive response preserves existing project,
-  instruction, continuity, and resume fields. Current source identity is
-  `0.16.2 (23)`; the most recent retained signed candidate remains build 22.
+  instruction, continuity, and resume fields. The status now also returns the
+  bound project's durable instruction-package execution order with package
+  IDs, display names, source paths, positions, and immutable snapshot hashes.
+  Policy location and the mandatory action remain visible when project
+  selection is ambiguous. The live Jamf-Technician LM Studio chat consumed the
+  Developer ID build-23 candidate through fallback PID `11219` and returned
+  the complete contract. Current source and candidate identity is `0.16.2 (23)`.
 - Restored native host access for filesystem, search, PDF, Git, shell, and
   runtime tools by removing Forge's per-command Seatbelt wrapper and
   project-root path confinement. Selected project folders now provide durable

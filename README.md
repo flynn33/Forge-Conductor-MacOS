@@ -22,17 +22,17 @@ continuity. The user does not start project work through a Forge Managed Run.
 > candidates.
 
 The most recent retained Developer ID-signed Desktop candidate is
-`~/Desktop/Forge Conductor 0.16.1 (22)-91ad90e-DeveloperID/Export/Forge
+`~/Desktop/Forge Conductor 0.16.2 (23)-22e7443-DeveloperID/Export/Forge
 Conductor.app`, with its matching `.xcarchive` and evidence directory beside
-the export. It was built from source revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`.
+the export. It was built from source revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`.
 It is not installed over `/Applications/Forge Conductor.app` and is not a
 shipment claim. Strict signing passes; notarization, stapling, and Gatekeeper
 acceptance remain open.
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, and current repository documentation use the same `0.16.2 (23)`
-source identity. The most recent retained signed candidate remains build 22;
-historical candidates and receipts retain the identity they actually tested.
+configurations, current repository documentation, and the retained Desktop
+candidate use the same `0.16.2 (23)` identity. Historical candidates and
+receipts retain the identity they actually tested.
 
 ## What Forge Conductor does
 
@@ -91,9 +91,11 @@ leaving ordinary outside-project paths available.
    `get_forge_status`. With multiple projects, use the returned `project_id` to
    query the applicable project-file, instruction, and continuity locations.
    The response also names every active Development Policy source in priority
-   order, identifies the governing policy revision, and requires the model to
-   read and follow those sources before development changes. Then give the
-   model the task normally.
+   order, identifies the governing policy revision, requires the model to read
+   and follow those sources before development changes, and returns the bound
+   project's instruction packages in durable execution order with their IDs,
+   names, paths, and immutable snapshot hashes. Then give the model the task
+   normally.
 7. CLU monitors the model, delivers policy violations with the exact applicable
    policy content, and records an exportable log for that project.
 8. At context pressure the model saves a resume-ready handoff. Forge displays a

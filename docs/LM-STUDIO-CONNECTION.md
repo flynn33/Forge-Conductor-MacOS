@@ -5,6 +5,28 @@ This document is derived from **this Xcode project’s source** and **on-disk / 
 Product identity: version **0.16.2**, build **23**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
+## Build-23 live bootstrap receipt
+
+The retained Developer ID candidate is `/Users/flynn/Desktop/Forge Conductor
+0.16.2 (23)-22e7443-DeveloperID/Export/Forge Conductor.app`; its embedded MCP
+helper is `Contents/Helpers/forge-conductor`. LM Studio registration revision
+`32b3c0a3-c621-4e1e-bfe2-75838c5ea86d` binds primary, fallback, and CLU to that
+exact helper. After LM Studio restart, the open Jamf-Technician chat called
+`get_forge_status` through fallback PID `11219`, which reported version
+`0.16.2`. The raw result includes the Development Policy location, ordered
+sources and mandatory read/follow action, policy read tools, durable ordered
+instruction packages, project and store locations, continuity, and resume
+state. Primary PID `11220` and CLU PID `11221` are the restored standby roles
+from the same candidate. `/Applications/Forge Conductor.app` was not replaced.
+
+The published `get_forge_status` tool description is:
+
+> Runtime, project, ordered instruction-package execution, and required
+> Development Policy bootstrap status. Read and follow every ordered active
+> Development Policy source before development work, then read instruction
+> packages in the returned execution order. Set resume=true in a successor
+> chat to load the latest resume-ready handoff.
+
 ## What the product is
 
 | Component | Role |

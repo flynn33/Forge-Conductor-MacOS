@@ -565,3 +565,25 @@ confinement; `get_forge_status` returned the exact durable project binding.
 notarization, stapling, Gatekeeper acceptance, public-download acceptance, and
 shipment remain open. The candidate was not installed, and the working
 installation and LM Studio registration were not changed.
+
+## September 29, 2026 build-23 live bootstrap receipt
+
+Implementation revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
+produced the universal Developer ID candidate under `~/Desktop/Forge Conductor
+0.16.2 (23)-22e7443-DeveloperID`. The archive and export completed successfully;
+strict deep validation passes, and the app and embedded MCP helper carry James
+Daley's Developer ID Application identity on team `9AQ2C2838M`. The app reports
+`0.16.2 (23)` and the helper reports `0.16.2`.
+
+LM Studio primary, fallback, and CLU were transactionally synchronized to the
+candidate helper under deployment revision
+`32b3c0a3-c621-4e1e-bfe2-75838c5ea86d`. After LM Studio quit and relaunch, the
+existing Jamf-Technician chat invoked `get_forge_status` through candidate
+fallback PID `11219`. The persisted raw result contains the policy location,
+priority-1 source identity/path, mandatory read/follow action and query tools,
+package `Jamf-Technician-Continuation-Package-R1` at position 0 with its source
+path and snapshot hash, prior project/store/continuity fields, and resume data.
+Primary PID `11220` and CLU PID `11221` are active from the same candidate. The
+working `/Applications/Forge Conductor.app` was not replaced and no live
+Continuity packet was deleted. Notarization, stapling, Gatekeeper acceptance,
+and shipment remain open.

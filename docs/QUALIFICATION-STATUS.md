@@ -2,21 +2,38 @@
 
 ## 0.16.2 Development Policy bootstrap
 
-The current source identity is **0.16.2, build 23**. `get_forge_status` now
+The current source and retained Desktop candidate identity is **0.16.2, build
+23**. `get_forge_status` now
 returns the pinned governing Development Policy identity, every active Rune
 Forge policy source path in durable priority order, the supported filesystem
 read tools, and a required action directing the LM Studio model to read and
 follow all applicable policy requirements before development changes. The
 additive contract preserves all prior project, instruction, continuity, and
-resume fields. The affected SwiftPM selection executed 86 Forge tests plus one
-filesystem version-contract test with zero failures. The canonical Xcode Core
-target then executed the exact regression 1/1, both SwiftPM products built, and
-the ordinary signed Debug app build passed. A first app-hosted filter selected
-zero tests and is explicitly not evidence. The separate current-source Debug
-candidate helper queried the live Jamf Technician binding and returned active
-priority-1 source `/Users/flynn/Projects/raven-forge-development-main`, the
-governing revision, policy read tools, and the required read/follow action. A
-published build-23 candidate and fresh LM Studio model acceptance remain open.
+resume fields. It also returns the bound project's durable instruction-package
+execution order with IDs, names, positions, source paths, and snapshot hashes;
+policy location and the required action remain present when project selection
+is ambiguous. Focused SwiftPM regressions for the ordered project response,
+ambiguous-project response, and MCP tool description each executed with zero
+failures. Both SwiftPM products and the canonical Debug workspace build passed.
+
+Implementation revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
+produced the universal Developer ID archive and export under `~/Desktop/Forge
+Conductor 0.16.2 (23)-22e7443-DeveloperID`. Strict deep signature verification
+passes. The app and embedded MCP helper report Developer ID Application James
+Daley, team `9AQ2C2838M`; the app reports `0.16.2 (23)` and the helper reports
+`0.16.2`.
+
+LM Studio primary, fallback, and CLU registration revision
+`32b3c0a3-c621-4e1e-bfe2-75838c5ea86d` points to that exact candidate helper.
+After an LM Studio quit/relaunch, the existing Jamf-Technician chat called
+`get_forge_status(project_id: d2610542-b616-7e8f-ee36-ef902d6060e1,
+resume: true)` through `mcp/forge-conductor-fallback`. Its persisted raw tool
+result reports PID `11219`, version `0.16.2`, the priority-1 policy source and
+read/follow requirement, package `Jamf-Technician-Continuation-Package-R1` at
+position 0, project/instruction/continuity locations, and resume data. Primary
+PID `11220` and CLU PID `11221` use the same candidate and deployment revision.
+The working `/Applications/Forge Conductor.app` was not replaced. Notarization,
+stapling, Gatekeeper acceptance, and shipment remain open.
 
 ## 0.16.1 native host access and Dashboard project tracking (historical)
 

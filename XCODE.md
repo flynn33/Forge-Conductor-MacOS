@@ -102,9 +102,17 @@ The final SwiftPM run executed 1,933 tests with 12 explicit environment-
 dependent skips and zero failures, and both SwiftPM products built.
 
 Build 23 adds the Development Policy bootstrap contract to `get_forge_status`.
-The response exposes ordered active source paths and explicitly directs the
-model to read and follow them. A signed build-23 candidate has not yet been
-created; the retained archive below remains build 22 evidence.
+The response exposes ordered active source paths, explicitly directs the model
+to read and follow them, and publishes the bound project's durable instruction
+package execution order. Implementation revision
+`22e7443d13496b3cc08b6e98366bb6d2332e3fd4` produced the universal Developer ID
+archive and manual export under `~/Desktop/Forge Conductor 0.16.2
+(23)-22e7443-DeveloperID`. The exact archive is `Forge Conductor 0.16.2
+(23)-22e7443.xcarchive`; the exact exported app is `Export/Forge Conductor.app`.
+Both architectures are present, strict deep validation passes, and the app and
+embedded helper are signed by `Developer ID Application: James Daley
+(9AQ2C2838M)` on team `9AQ2C2838M`. The Xcode graph was unchanged: the edited
+Core sources and regression test already belong to their canonical targets.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
 produced the `0.16.1 (22)` universal Developer ID archive and manual export at
