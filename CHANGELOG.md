@@ -28,6 +28,13 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Corrected ordinary LM Studio bootstrap so `get_forge_status` returns the
+  pinned Development Policy identity, every active Rune Forge source path in
+  durable priority order, the supported read tools, and an explicit required
+  action to read and follow all applicable policy requirements before making
+  development changes. The additive response preserves existing project,
+  instruction, continuity, and resume fields. Current source identity is
+  `0.16.2 (23)`; the most recent retained signed candidate remains build 22.
 - Restored native host access for filesystem, search, PDF, Git, shell, and
   runtime tools by removing Forge's per-command Seatbelt wrapper and
   project-root path confinement. Selected project folders now provide durable
@@ -88,6 +95,16 @@ Product versions do not by themselves claim shipment.
 
 ### Verification
 
+- The Development Policy bootstrap selection executed 86 Forge tests plus one
+  filesystem version-contract test with zero failures. The canonical Xcode
+  Core target executed the exact status regression 1/1; both SwiftPM products
+  and the ordinary signed Debug app build passed. A direct build-23 Debug
+  candidate-helper probe against the live Jamf Technician binding returned the
+  active priority-1 policy path
+  `/Users/flynn/Projects/raven-forge-development-main`, governing revision,
+  supported read tools, and required read/follow instruction. A prior
+  app-hosted filter selected zero tests and is not counted. Fresh LM Studio
+  model acceptance with the published build-23 helper remains open.
 - The complete focused `CoreTests` selection executed 49 tests with zero
   failures. Dashboard operational-snapshot tests executed 23 tests with zero
   failures, including live-binding preference and the registered-only negative

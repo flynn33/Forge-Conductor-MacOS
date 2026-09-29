@@ -8,8 +8,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.16.1** |
-| **Build** | **22** |
+| **Version** | **0.16.2** |
+| **Build** | **23** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -30,9 +30,9 @@ shipment claim. Strict signing passes; notarization, stapling, and Gatekeeper
 acceptance remain open.
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, and current repository documentation use the same `0.16.1 (22)`
-identity. Historical candidates and receipts retain the identity they
-actually tested.
+configurations, and current repository documentation use the same `0.16.2 (23)`
+source identity. The most recent retained signed candidate remains build 22;
+historical candidates and receipts retain the identity they actually tested.
 
 ## What Forge Conductor does
 
@@ -90,7 +90,10 @@ leaving ordinary outside-project paths available.
 6. Open a normal LM Studio chat and ask the model to call
    `get_forge_status`. With multiple projects, use the returned `project_id` to
    query the applicable project-file, instruction, and continuity locations.
-   Then give the model the task normally.
+   The response also names every active Development Policy source in priority
+   order, identifies the governing policy revision, and requires the model to
+   read and follow those sources before development changes. Then give the
+   model the task normally.
 7. CLU monitors the model, delivers policy violations with the exact applicable
    policy content, and records an exportable log for that project.
 8. At context pressure the model saves a resume-ready handoff. Forge displays a

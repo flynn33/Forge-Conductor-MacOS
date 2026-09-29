@@ -68,7 +68,11 @@ public final class PolicySourceAccessGrant: @unchecked Sendable {
     }
 }
 
-public final class StjornarvaldPolicySourceCatalog: DevelopmentPolicySourceCataloging, @unchecked Sendable {
+public final class StjornarvaldPolicySourceCatalog:
+    DevelopmentPolicySourceCataloging,
+    DevelopmentPolicySourceReading,
+    @unchecked Sendable
+{
     public static let schemaVersion = 1
     public static let maximumWorkItemsPerBatch = 256
     public static let maximumBytesPerBatch = 4 * 1_048_576

@@ -1,6 +1,6 @@
 # Forge Conductor architecture
 
-Version: `0.16.1`; build: `22`.
+Version: `0.16.2`; build: `23`.
 
 Forge Conductor is a native macOS control plane and MCP server for work carried
 out in externally owned model conversations. The current LM Studio workflow
@@ -69,8 +69,11 @@ start a model conversation.
 
 LM Studio starts Forge's versioned stdio MCP registration. `get_forge_status`
 is available without a Managed Run and returns registered project identities,
-query tools, and the selected project's file, instruction, and continuity
-locations. `resume=true` requests the latest resume-ready handoff.
+query tools, the selected project's file, instruction, and continuity
+locations, and the ordered active Development Policy source paths. Its required
+bootstrap action directs the model to read those sources in priority order and
+follow their applicable requirements before development changes. `resume=true`
+requests the latest resume-ready handoff.
 
 Filesystem, Git, shell, memory, instruction, policy, and continuity tools pass
 through the same authorization layer. Project-bound calls require a valid

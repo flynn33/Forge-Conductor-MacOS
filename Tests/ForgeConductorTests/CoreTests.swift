@@ -226,6 +226,14 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(result.ok, "\(result.payload)")
         XCTAssertEqual(result.payload["runtime"] as? String, "swift")
         XCTAssertEqual(result.payload["version"] as? String, ForgeApp.version)
+        let policy = try XCTUnwrap(result.payload["development_policy"] as? [String: Any])
+        XCTAssertEqual(policy["required"] as? Bool, true)
+        XCTAssertEqual(policy["catalog_available"] as? Bool, true)
+        XCTAssertEqual(policy["configured"] as? Bool, false)
+        XCTAssertEqual(policy["source_count"] as? Int, 0)
+        let actions = try XCTUnwrap(result.payload["required_actions"] as? [[String: Any]])
+        let instruction = try XCTUnwrap(actions.first?["instruction"] as? String)
+        XCTAssertTrue(instruction.contains("If no active source is listed"))
     }
 
     func testFSWriteRead() throws {
@@ -1266,11 +1274,36 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(persisted["rollover_nonce"] as? String, nonce)
     }
 
-    func testGetForgeStatusReturnsRegisteredProjectAndQueryLocationsWithoutRun() throws {
+    func testGetForgeStatusReturnsRegisteredProjectPolicyAndQueryLocationsWithoutRun() async throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let root = tempHome.appendingPathComponent("ordinary-lmstudio-project", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let policyRoot = tempHome.appendingPathComponent("development-policy", isDirectory: true)
+        try FileManager.default.createDirectory(at: policyRoot, withIntermediateDirectories: true)
+        try Data("# Development Policy\nFollow this policy.\n".utf8).write(
+            to: policyRoot.appendingPathComponent("POLICY.md")
+        )
+        let secondaryPolicyRoot = tempHome.appendingPathComponent(
+            "project-development-policy",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: secondaryPolicyRoot,
+            withIntermediateDirectories: true
+        )
+        let policyCatalog = try StjornarvaldPolicySourceCatalog(paths: app.paths)
+        let policySource = try await policyCatalog.add(
+            selectedURL: policyRoot,
+            requestID: UUID()
+        )
+        let secondaryPolicySource = try await policyCatalog.add(
+            selectedURL: secondaryPolicyRoot,
+            requestID: UUID()
+        )
+        _ = try policyCatalog.reorder(
+            sourceIDs: [secondaryPolicySource.id, policySource.id]
+        )
         let projectID = UUID()
         _ = try app.projectContexts.registerProjectUnchecked(
             descriptor: ProjectMemoryDescriptor(
@@ -1297,11 +1330,42 @@ final class CoreTests: XCTestCase {
         let locations = try XCTUnwrap(result.payload["locations"] as? [String: String])
         XCTAssertEqual(locations["project_files"], root.path)
         XCTAssertEqual(locations["instruction_store"], app.paths.instructionPackageStoreDir.path)
+        XCTAssertEqual(locations["development_policy"], secondaryPolicyRoot.path)
         XCTAssertTrue(locations["continuity_store"]?.contains(projectID.uuidString.lowercased()) == true)
         let tools = try XCTUnwrap(result.payload["query_tools"] as? [String: [String]])
         XCTAssertEqual(tools["instructions"], ["instruction_catalog", "instruction_read"])
         XCTAssertTrue(tools["project_files"]?.contains("fs_read") == true)
+        XCTAssertEqual(tools["development_policy"], ["fs_list", "fs_read", "fs_glob", "search_text"])
         XCTAssertTrue(tools["continuity"]?.contains("context_get") == true)
+        let policy = try XCTUnwrap(result.payload["development_policy"] as? [String: Any])
+        XCTAssertEqual(policy["required"] as? Bool, true)
+        XCTAssertEqual(policy["catalog_available"] as? Bool, true)
+        XCTAssertEqual(policy["configured"] as? Bool, true)
+        XCTAssertEqual(policy["source_count"] as? Int, 2)
+        let governing = try XCTUnwrap(policy["governing_policy"] as? [String: Any])
+        XCTAssertEqual(
+            governing["binding_id"] as? String,
+            RavenForgeDevelopmentPolicyAdapter.identity.bindingID
+        )
+        let sources = try XCTUnwrap(policy["sources"] as? [[String: Any]])
+        XCTAssertEqual(sources.count, 2)
+        XCTAssertEqual(sources[0]["priority"] as? Int, 1)
+        XCTAssertEqual(sources[0]["source_id"] as? String, secondaryPolicySource.id.description)
+        XCTAssertEqual(sources[0]["selected_path"] as? String, secondaryPolicyRoot.path)
+        XCTAssertEqual(sources[0]["active"] as? Bool, true)
+        XCTAssertEqual(sources[1]["priority"] as? Int, 2)
+        XCTAssertEqual(sources[1]["source_id"] as? String, policySource.id.description)
+        XCTAssertEqual(sources[1]["selected_path"] as? String, policyRoot.path)
+        let requiredActions = try XCTUnwrap(result.payload["required_actions"] as? [[String: Any]])
+        let policyAction = try XCTUnwrap(requiredActions.first {
+            $0["action"] as? String == "read_and_follow_development_policy"
+        })
+        XCTAssertEqual(policyAction["required"] as? Bool, true)
+        let instruction = try XCTUnwrap(policyAction["instruction"] as? String)
+        XCTAssertTrue(instruction.contains("read every active Development Policy source"))
+        XCTAssertTrue(instruction.contains("priority order"))
+        XCTAssertTrue(instruction.contains("follow all applicable requirements"))
+        XCTAssertTrue(instruction.contains("start with AGENTS.md when present"))
     }
 
     // MARK: - JSON / domain

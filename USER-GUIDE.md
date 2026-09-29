@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.16.1**, build **22**.
+Version **0.16.2**, build **23**.
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -110,9 +110,12 @@ get_forge_status
 ```
 
 The result lists registered project IDs and the query tools and locations for
-project files, ordered instructions, and continuity. If more
-than one project is registered, have the model pass the applicable
-`project_id` on later calls. Then give the model the task in LM Studio as usual.
+project files, ordered instructions, Development Policy, and continuity. Its
+required action tells the model to read every active Development Policy source
+in the returned priority order and follow all applicable requirements before
+making development changes. If more than one project is registered, have the
+model pass the applicable `project_id` on later calls. Then give the model the
+task in LM Studio as usual.
 
 Forge Conductor does not start this work through a Managed Run.
 

@@ -28,6 +28,9 @@ public final class ForgeApp: @unchecked Sendable {
     public let projectContexts: ProjectContextService
     public let continuityControl: ContinuityControlService
     public let runtimeJobs: RuntimeJobSubsystem
+    /// Read-side access to the ordered Development Policy sources selected in
+    /// Rune Forge. The manager remains the mutation and indexing owner.
+    public let developmentPolicySources: (any DevelopmentPolicySourceReading)?
     public let stjornarvaldObservations: StjornarvaldObservationEmitter
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
@@ -65,6 +68,7 @@ public final class ForgeApp: @unchecked Sendable {
         projectContexts: ProjectContextService,
         continuityControl: ContinuityControlService,
         runtimeJobs: RuntimeJobSubsystem,
+        developmentPolicySources: (any DevelopmentPolicySourceReading)?,
         stjornarvaldObservations: StjornarvaldObservationEmitter,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
@@ -83,6 +87,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.projectContexts = projectContexts
         self.continuityControl = continuityControl
         self.runtimeJobs = runtimeJobs
+        self.developmentPolicySources = developmentPolicySources
         self.stjornarvaldObservations = stjornarvaldObservations
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
@@ -169,6 +174,26 @@ public final class ForgeApp: @unchecked Sendable {
         )
 
         let deploy = LMStudioDeployService(paths: paths, diagnostics: diagnostics, store: store)
+        let developmentPolicySources: StjornarvaldPolicySourceCatalog?
+        do {
+            developmentPolicySources = try StjornarvaldPolicySourceCatalog(
+                paths: paths,
+                diagnostics: { detail in
+                    diagnostics.warn(
+                        "development_policy_source_read_degraded",
+                        ["detail": detail],
+                        category: .tools
+                    )
+                }
+            )
+        } catch {
+            developmentPolicySources = nil
+            diagnostics.warn(
+                "development_policy_source_catalog_unavailable",
+                ["reason": error.localizedDescription],
+                category: .bootstrap
+            )
+        }
         let observationClient = StjornarvaldObservationClient(
             transport: StjornarvaldConfiguredObservationTransport(config: config, paths: paths),
             outboxDirectory: paths.stjornarvaldClientOutboxDir,
@@ -208,6 +233,7 @@ public final class ForgeApp: @unchecked Sendable {
             projectContexts: projectContexts,
             continuityControl: continuityControl,
             runtimeJobs: runtimeJobs,
+            developmentPolicySources: developmentPolicySources,
             stjornarvaldObservations: stjornarvaldObservations,
             clock: clock,
             lmStudioDeploy: deploy

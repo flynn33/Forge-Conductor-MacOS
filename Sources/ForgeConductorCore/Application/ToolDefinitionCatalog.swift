@@ -652,7 +652,7 @@ private enum ProductionToolDefinitionSource {
 
     private static let baseDescriptions: [String: String] = [
         "forge_status": "Runtime status: home, agents, open sessions, tools.",
-        "get_forge_status": "Runtime and project status. Set resume=true in a successor chat to load the latest resume-ready handoff.",
+        "get_forge_status": "Runtime, project, and required Development Policy bootstrap status. Read and follow every ordered active policy source before development work. Set resume=true in a successor chat to load the latest resume-ready handoff.",
         "agent_list": "List specialist agent playbooks.",
         "agent_get": "Get a specialist agent playbook by id.",
         "agent_context": "Alias of agent_get — full playbook body.",

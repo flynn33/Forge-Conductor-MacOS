@@ -1,4 +1,4 @@
-# Context and agent continuity (v0.16.1)
+# Context and agent continuity (v0.16.2)
 
 ## Current workflow
 
@@ -8,7 +8,9 @@ is not started from the Forge Conductor Continuity view.
 1. The user opens a normal LM Studio chat and asks the model to call
    `get_forge_status`.
 2. Forge returns the registered project identity plus the project-file,
-   instruction-package, and continuity locations and query tools.
+   instruction-package, Development Policy, and continuity locations and query
+   tools. It requires the model to read every active policy source in priority
+   order and follow applicable requirements before development changes.
    `resume=true` requests the latest resume-ready handoff.
 3. While working, the model can save compact checkpoints. At context pressure
    it saves a resume-ready handoff.

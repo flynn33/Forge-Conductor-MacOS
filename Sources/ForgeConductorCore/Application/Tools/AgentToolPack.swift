@@ -8,6 +8,15 @@ import Foundation
 
 /// Agent lifecycle and catalog tools.
 public struct AgentToolPack: ToolPackHandling {
+    private static let developmentPolicyInstruction =
+        "Before making development changes, read every active Development Policy source "
+        + "listed below in priority order with the development_policy query tools, then "
+        + "follow all applicable requirements throughout the task. For a directory source, "
+        + "start with AGENTS.md when present and follow the source's declared reading order. "
+        + "Catalog or index status does not replace reading the source content. If no active "
+        + "source is listed or a source cannot be read, report that exact condition before "
+        + "making development changes."
+
     public init() {}
 
     public var toolNames: [String] {
@@ -159,13 +168,71 @@ public struct AgentToolPack: ToolPackHandling {
             "query_tools": [
                 "instructions": ["instruction_catalog", "instruction_read"],
                 "project_files": ["fs_list", "fs_read", "fs_glob", "search_text"],
+                "development_policy": ["fs_list", "fs_read", "fs_glob", "search_text"],
                 "continuity": [
                     "continuity.status", "continuity.get_pending_handoff",
                     "context_get",
                 ],
             ],
+            "required_actions": [[
+                "action": "read_and_follow_development_policy",
+                "required": true,
+                "instruction": Self.developmentPolicyInstruction,
+            ] as [String: Any]],
             "pid": ProcessInfo.processInfo.processIdentifier,
         ]
+        var policySources: [DevelopmentPolicySource] = []
+        var policyCatalogError: String?
+        if let catalog = app.developmentPolicySources {
+            do {
+                policySources = try catalog.sources(includeRemoved: false, limit: 100)
+            } catch {
+                policyCatalogError = String(error.localizedDescription.prefix(1_024))
+            }
+        } else {
+            policyCatalogError = "Development Policy source catalog is unavailable."
+        }
+        let governingPolicy = RavenForgeDevelopmentPolicyAdapter.identity
+        let orderedPolicySources: [[String: Any]] = policySources.enumerated().map { index, source in
+            var item: [String: Any] = [
+                "priority": index + 1,
+                "source_id": source.id.description,
+                "origin": source.origin.rawValue,
+                "display_name": source.displayName,
+                "selected_path": source.selectedPath,
+                "standardized_path": source.standardizedPath,
+                "root_kind": source.rootKind.rawValue,
+                "active": source.active,
+                "interpretation_state": source.interpretationState.rawValue,
+            ]
+            if let revisionID = source.latestRevisionID {
+                item["latest_revision_id"] = revisionID.description
+            }
+            if let observation = source.latestObservation {
+                item["latest_observation"] = observation
+            }
+            return item
+        }
+        var developmentPolicy: [String: Any] = [
+            "required": true,
+            "catalog_available": policyCatalogError == nil,
+            "configured": !orderedPolicySources.isEmpty,
+            "instruction": Self.developmentPolicyInstruction,
+            "source_count": orderedPolicySources.count,
+            "sources": orderedPolicySources,
+            "governing_policy": [
+                "binding_id": governingPolicy.bindingID,
+                "authority": governingPolicy.authority,
+                "repository_url": governingPolicy.repositoryURL,
+                "version": governingPolicy.version,
+                "revision": governingPolicy.revision,
+                "source_id": governingPolicy.sourceID.description,
+            ] as [String: Any],
+        ]
+        if let policyCatalogError {
+            developmentPolicy["error"] = policyCatalogError
+        }
+        payload["development_policy"] = developmentPolicy
         let requestedProjectID: ProjectID?
         if let raw = ToolArgHelpers.string(arguments, "project_id") {
             guard let uuid = UUID(uuidString: raw) else {
@@ -200,12 +267,16 @@ public struct AgentToolPack: ToolPackHandling {
                 "canonical_root": project.canonicalRoot.path,
                 "run_id": context?.runID?.description as Any,
             ] as [String: Any]
-            payload["locations"] = [
+            var locations = [
                 "project_files": project.canonicalRoot.path,
                 "instruction_store": app.paths.instructionPackageStoreDir.path,
                 "continuity_store": projectStateDirectory
                     .appendingPathComponent("continuity", isDirectory: true).path,
             ]
+            if let primaryPolicySource = policySources.first {
+                locations["development_policy"] = primaryPolicySource.selectedPath
+            }
+            payload["locations"] = locations
         }
         if ToolArgHelpers.bool(arguments, "resume") == true {
             let requestedHandoffID = ToolArgHelpers.string(arguments, "handoff_id")

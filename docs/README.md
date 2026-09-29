@@ -2,7 +2,7 @@
 
 Start with the shortest document that answers the question. Historical evidence
 is retained for auditability, but it is not current operating guidance. Current
-operating documents describe repository identity **0.16.1, build 22** unless a
+operating documents describe repository identity **0.16.2, build 23** unless a
 source-bound historical receipt says otherwise.
 
 ## Use and setup

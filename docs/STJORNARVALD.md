@@ -513,7 +513,7 @@ Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
 destinations, all guide routes, immediate opaque-source acceptance during
 Manager outage, the native source picker, and four-format native export.
 
-The current authority is version `0.16.1`, build `22`. No release archive,
+The current authority is version `0.16.2`, build `23`. No release archive,
 installer, notarized artifact, installation replacement, or shipment candidate
 was created; those remain separate owner-directed release work. See the
 [acceptance record](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) and
@@ -541,6 +541,17 @@ policy source is accepted; Raven Forge Development is continuously applied;
 detected violations are reported to the coding agent and retained in the
 exportable policy log; and fault-injection evidence shows Stjornarvald does not
 interfere with development.
+
+`get_forge_status` now exposes the pinned governing identity and every active
+selected source path in durable priority order. A required bootstrap action
+directs the LM Studio model to read those sources with the listed filesystem
+query tools and follow every applicable requirement before development changes.
+Catalog or indexing status is explicitly not presented as a substitute for
+reading the policy content. The isolated ordered two-source regression, the
+complete affected SwiftPM selection, the exact canonical Xcode Core test, and a
+direct current-source candidate-helper query against the live Jamf Technician
+binding pass. Fresh LM Studio model consumption of the published build-23
+response remains an open acceptance boundary.
 
 ## Delivery sequence
 

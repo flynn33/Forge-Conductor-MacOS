@@ -1,8 +1,26 @@
 # Version and qualification status
 
-## 0.16.1 native host access and Dashboard project tracking
+## 0.16.2 Development Policy bootstrap
 
-The current source identity is **0.16.1, build 22**. The native filesystem,
+The current source identity is **0.16.2, build 23**. `get_forge_status` now
+returns the pinned governing Development Policy identity, every active Rune
+Forge policy source path in durable priority order, the supported filesystem
+read tools, and a required action directing the LM Studio model to read and
+follow all applicable policy requirements before development changes. The
+additive contract preserves all prior project, instruction, continuity, and
+resume fields. The affected SwiftPM selection executed 86 Forge tests plus one
+filesystem version-contract test with zero failures. The canonical Xcode Core
+target then executed the exact regression 1/1, both SwiftPM products built, and
+the ordinary signed Debug app build passed. A first app-hosted filter selected
+zero tests and is explicitly not evidence. The separate current-source Debug
+candidate helper queried the live Jamf Technician binding and returned active
+priority-1 source `/Users/flynn/Projects/raven-forge-development-main`, the
+governing revision, policy read tools, and the required read/follow action. A
+published build-23 candidate and fresh LM Studio model acceptance remain open.
+
+## 0.16.1 native host access and Dashboard project tracking (historical)
+
+Source identity **0.16.1, build 22** changed the native filesystem,
 search, PDF, Git, shell, and runtime paths no longer enter Forge's per-command
 Seatbelt profile or reject absolute paths merely because they are outside a
 selected project folder. Project binding and generation remain mandatory for
@@ -386,7 +404,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.1, build 22**, supporting **macOS 26+**. The owner will
+Product identity: **0.16.2, build 23**, supporting **macOS 26+**. The owner will
 test the staged Desktop candidate and perform shipment separately. The version
 advance and repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
@@ -397,7 +415,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.1, build 22**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.2, build 23**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

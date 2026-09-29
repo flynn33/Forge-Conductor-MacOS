@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.16.1**, build **22**. `VERSION` and
+Product identity: marketing version **0.16.2**, build **23**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -85,7 +85,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.16.1 (22)` build keeps the Provider and Guided Setup repair in
+The current `0.16.2 (23)` source keeps the Provider and Guided Setup repair in
 the canonical graph, removes local LM Studio credential controls, and exposes
 first-class continuity packet rows and exact packet deletion. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
@@ -100,6 +100,11 @@ For the build-22 correction, the app-hosted Dashboard selection executed 23
 tests with zero failures and the canonical Debug workspace build succeeded.
 The final SwiftPM run executed 1,933 tests with 12 explicit environment-
 dependent skips and zero failures, and both SwiftPM products built.
+
+Build 23 adds the Development Policy bootstrap contract to `get_forge_status`.
+The response exposes ordered active source paths and explicitly directs the
+model to read and follow them. A signed build-23 candidate has not yet been
+created; the retained archive below remains build 22 evidence.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
 produced the `0.16.1 (22)` universal Developer ID archive and manual export at

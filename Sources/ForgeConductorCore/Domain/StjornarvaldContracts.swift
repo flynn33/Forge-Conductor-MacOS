@@ -595,6 +595,13 @@ public protocol DevelopmentPolicySourceCataloging: Sendable {
     func remove(sourceID: PolicySourceID, requestID: UUID) async throws
 }
 
+public protocol DevelopmentPolicySourceReading: Sendable {
+    func sources(
+        includeRemoved: Bool,
+        limit: Int
+    ) throws -> [DevelopmentPolicySource]
+}
+
 public protocol PolicyContentIndexing: Sendable {
     func schedule(sourceID: PolicySourceID) async
 }
