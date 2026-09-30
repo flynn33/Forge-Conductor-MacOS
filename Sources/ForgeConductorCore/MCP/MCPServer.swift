@@ -59,6 +59,8 @@ public final class MCPServer: @unchecked Sendable {
             environmentValue: ProcessInfo.processInfo.environment["FORGE_MCP_ROLE"]
         ),
         desktopProviderID: ProviderIntegrationID? = nil,
+        deploymentIDOverride: String? = nil,
+        processClientID: ClientID = ClientID(),
         maximumConcurrentRequests: Int = MCPServer.defaultMaximumConcurrentRequests,
         shutdownWaitSeconds: TimeInterval = MCPServer.defaultShutdownWaitSeconds,
         requestTimeoutSeconds: TimeInterval = MCPServer.defaultRequestTimeoutSeconds,
@@ -79,13 +81,15 @@ public final class MCPServer: @unchecked Sendable {
             ? max(0.01, min(responseWriteTimeoutSeconds, 30))
             : Self.defaultResponseWriteTimeoutSeconds
         self.didCloseResponseDeliveryObserver = didCloseResponseDeliveryObserver
-        let deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let environmentDeploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"] ?? ""
+        let deploymentID = (deploymentIDOverride ?? environmentDeploymentID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         self.deploymentID = deploymentID
         let resolvedClientID = clientID ?? Self.defaultClientID(
             deploymentID: deploymentID,
             role: role,
-            desktopProviderID: desktopProviderID
+            desktopProviderID: desktopProviderID,
+            fallbackClientID: processClientID
         )
         self.clientID = resolvedClientID
         self.policyNoticeProvider = policyNoticeProvider ?? StjornarvaldInteractivePolicyNoticeCache(
@@ -105,10 +109,11 @@ public final class MCPServer: @unchecked Sendable {
     static func defaultClientID(
         deploymentID: String,
         role: LMStudioConnectorRole,
-        desktopProviderID: ProviderIntegrationID?
+        desktopProviderID: ProviderIntegrationID?,
+        fallbackClientID: ClientID = ClientID()
     ) -> ClientID {
         let deployment = deploymentID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !deployment.isEmpty, desktopProviderID == nil else { return ClientID() }
+        guard !deployment.isEmpty, desktopProviderID == nil else { return fallbackClientID }
         _ = role // All three registrations represent one deployment-scoped client.
         return ClientID("lm-studio:\(JSONSupport.sha256Hex(deployment))")
     }

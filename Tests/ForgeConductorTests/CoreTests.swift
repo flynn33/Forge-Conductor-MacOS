@@ -63,6 +63,53 @@ final class CoreTests: XCTestCase {
         _ = try app.config.update(["allowed_roots": roots], save: false)
     }
 
+    private func mcpToolPayload(
+        _ server: MCPServer,
+        name: String,
+        arguments: [String: Any]
+    ) throws -> [String: Any] {
+        let response = try XCTUnwrap(server.handle([
+            "jsonrpc": "2.0",
+            "id": UUID().uuidString.lowercased(),
+            "method": "tools/call",
+            "params": [
+                "name": name,
+                "arguments": arguments,
+            ] as [String: Any],
+        ]))
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        return try XCTUnwrap(result["structuredContent"] as? [String: Any])
+    }
+
+    private func importInstructionPackage(
+        app: ForgeApp,
+        projectID: ProjectID,
+        generation: ProjectGeneration,
+        name: String
+    ) throws -> String {
+        let packageRoot = tempHome.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true)
+        try Data("# Binding regression instructions\n".utf8)
+            .write(to: packageRoot.appendingPathComponent("AGENTS.md"))
+        let manifest: [String: Any] = [
+            "schema_version": 1,
+            "package_id": name,
+            "version": "1.0.0",
+            "mission": "Exercise project-bound instruction access.",
+            "entry_documents": ["AGENTS.md"],
+            "requested_capabilities": ["fs_read"],
+            "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+        ]
+        try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+            .write(to: packageRoot.appendingPathComponent("forge-package.json"))
+        let snapshot = try ProjectInstructionQueueStore(paths: app.paths).importPackage(
+            sourceURL: packageRoot,
+            projectID: projectID,
+            generation: generation
+        )
+        return try XCTUnwrap(snapshot.packages.first?.contentSHA256)
+    }
+
     // MARK: - Bootstrap / paths
 
     func testBootstrapCreatesLayout() throws {
@@ -246,10 +293,12 @@ final class CoreTests: XCTestCase {
             selectedURL: policyRoot,
             requestID: UUID()
         )
+        var explicitProjectID: ProjectID?
+        var explicitProjectRoot: URL?
         for index in 1...2 {
             let root = tempHome.appendingPathComponent("project-\(index)", isDirectory: true)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            _ = try app.projectContexts.registerProjectUnchecked(
+            let registered = try app.projectContexts.registerProjectUnchecked(
                 descriptor: ProjectMemoryDescriptor(
                     id: UUID().uuidString.lowercased(),
                     displayName: "Project \(index)",
@@ -258,12 +307,17 @@ final class CoreTests: XCTestCase {
                 ),
                 canonicalRoot: root
             )
+            if index == 2 {
+                explicitProjectID = registered.projectID
+                explicitProjectRoot = root
+            }
         }
+        let clientID = ClientID("ambiguous-project-status")
 
         let result = try app.tools.call(
             name: "get_forge_status",
             arguments: [:],
-            clientID: ClientID("ambiguous-project-status")
+            clientID: clientID
         )
 
         XCTAssertNil(result.payload["project"])
@@ -277,6 +331,30 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(sources.first?["source_id"] as? String, source.id.description)
         let actions = try XCTUnwrap(result.payload["required_actions"] as? [[String: Any]])
         XCTAssertEqual(actions.first?["required"] as? Bool, true)
+
+        let unboundList = try app.tools.call(
+            name: "fs_list",
+            arguments: ["path": try XCTUnwrap(explicitProjectRoot).path],
+            clientID: clientID
+        )
+        XCTAssertFalse(unboundList.ok)
+        XCTAssertEqual(unboundList.payload["code"] as? String, "project_context_required")
+
+        let explicitStatus = try app.tools.call(
+            name: "get_forge_status",
+            arguments: ["project_id": try XCTUnwrap(explicitProjectID).description],
+            clientID: clientID
+        )
+        XCTAssertTrue(explicitStatus.ok, "\(explicitStatus.payload)")
+        let explicitAttachment = try XCTUnwrap(
+            explicitStatus.payload["project_context"] as? [String: Any]
+        )
+        XCTAssertEqual(explicitAttachment["attached"] as? Bool, true)
+        XCTAssertTrue(try app.tools.call(
+            name: "fs_list",
+            arguments: ["path": try XCTUnwrap(explicitProjectRoot).path],
+            clientID: clientID
+        ).ok)
     }
 
     func testFSWriteRead() throws {
@@ -1282,46 +1360,66 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(resume?["found"] as? Bool, false)
     }
 
-    func testGetForgeStatusBindsSoleActiveProjectForSubsequentProjectTools() throws {
+    func testStatusBootstrapUnblocksAllReportedProjectScopedToolsOnSameClient() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
         let projectRoot = tempHome.appendingPathComponent("status-bound-project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
-        let marker = projectRoot.appendingPathComponent("marker.txt")
-        try Data("status-bound".utf8).write(to: marker)
-        let projectID = UUID()
-        _ = try app.projectContexts.registerProjectUnchecked(
-            descriptor: ProjectMemoryDescriptor(
-                id: projectID.uuidString.lowercased(),
-                displayName: "Status Bound Project",
-                repositoryIdentity: nil,
-                aliases: []
-            ),
-            canonicalRoot: projectRoot
+        let initialized = try bindProjectContext(
+            app: app,
+            clientID: ClientID("status-bootstrap-setup"),
+            projectRoot: projectRoot
         )
-        let clientID = ClientID("reconnected-status-client")
+        let rawProjectID = try XCTUnwrap(initialized.payload["project_id"] as? String)
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: rawProjectID)))
+        let snapshotSHA256 = try importInstructionPackage(
+            app: app,
+            projectID: projectID,
+            generation: .initial,
+            name: "status-bootstrap-package"
+        )
+        let clientID = ClientID("A800AC6E-8B31-4E64-A0CE-9B9DA192CADA")
+        let gatedCalls: [(String, [String: Any])] = [
+            ("fs_list", ["path": projectRoot.path]),
+            ("instruction_catalog", ["snapshot_sha256": snapshotSHA256]),
+            ("shell_exec", ["command": "printf status-bound", "cwd": projectRoot.path]),
+            ("continuity.status", ["project_id": rawProjectID]),
+        ]
+
+        for (name, arguments) in gatedCalls {
+            let beforeStatus = try app.tools.call(
+                name: name,
+                arguments: arguments,
+                clientID: clientID
+            )
+            XCTAssertFalse(beforeStatus.ok, "\(name) unexpectedly succeeded before status binding")
+            XCTAssertEqual(
+                beforeStatus.payload["code"] as? String,
+                "project_context_required",
+                "\(name) did not fail at the project binding boundary before status"
+            )
+        }
 
         let status = try app.tools.call(
             name: "get_forge_status",
-            arguments: [:],
+            arguments: ["project_id": rawProjectID],
             clientID: clientID
         )
 
         XCTAssertTrue(status.ok, "\(status.payload)")
         let attachment = try XCTUnwrap(status.payload["project_context"] as? [String: Any])
         XCTAssertEqual(attachment["attached"] as? Bool, true)
-        XCTAssertEqual(attachment["project_id"] as? String, projectID.uuidString.lowercased())
+        XCTAssertEqual(attachment["project_id"] as? String, rawProjectID)
         XCTAssertEqual(attachment["client_id"] as? String, clientID.rawValue)
 
-        let context = try app.projectContexts.invocationContext(for: clientID)
-        XCTAssertEqual(context.projectID.description, projectID.uuidString.lowercased())
-        let read = try app.tools.call(
-            name: "fs_read",
-            arguments: ["path": marker.path],
-            clientID: clientID
-        )
-        XCTAssertTrue(read.ok, "\(read.payload)")
-        XCTAssertEqual(read.payload["content"] as? String, "status-bound")
+        for (name, arguments) in gatedCalls {
+            let afterStatus = try app.tools.call(
+                name: name,
+                arguments: arguments,
+                clientID: clientID
+            )
+            XCTAssertTrue(afterStatus.ok, "\(name) stayed blocked after status: \(afterStatus.payload)")
+        }
     }
 
     func testGetForgeStatusDoesNotReactivateBindingInvalidatedByGenerationReset() throws {
@@ -1365,83 +1463,154 @@ final class CoreTests: XCTestCase {
     }
 
     func testMCPDefaultClientIdentityIsStableAcrossDeploymentReconnectsAndRoles() {
+        let firstProcessIdentity = ClientID("process-\(UUID().uuidString)")
+        let secondProcessIdentity = ClientID("process-\(UUID().uuidString)")
         let first = MCPServer.defaultClientID(
             deploymentID: "deployment-reconnect-fixture",
             role: .fallback,
-            desktopProviderID: nil
+            desktopProviderID: nil,
+            fallbackClientID: firstProcessIdentity
         )
         let second = MCPServer.defaultClientID(
             deploymentID: "deployment-reconnect-fixture",
             role: .fallback,
-            desktopProviderID: nil
+            desktopProviderID: nil,
+            fallbackClientID: secondProcessIdentity
         )
         let primary = MCPServer.defaultClientID(
             deploymentID: "deployment-reconnect-fixture",
             role: .primary,
-            desktopProviderID: nil
+            desktopProviderID: nil,
+            fallbackClientID: firstProcessIdentity
         )
 
+        XCTAssertNotEqual(firstProcessIdentity, secondProcessIdentity)
         XCTAssertEqual(first, second)
         XCTAssertEqual(first, primary)
+        XCTAssertNotEqual(first, firstProcessIdentity)
+        XCTAssertNotEqual(first, secondProcessIdentity)
         XCTAssertTrue(first.rawValue.hasPrefix("lm-studio:"))
     }
 
-    func testExplicitStatusBindingSurvivesDeploymentScopedMCPReconnect() throws {
+    func testDeploymentScopedMCPReconnectUsesExistingBindingWithoutSecondStatusCall() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
-        var selectedProjectID: UUID?
-        var selectedMarker: URL?
-        for index in 1...2 {
-            let projectRoot = tempHome.appendingPathComponent("reconnect-project-\(index)", isDirectory: true)
-            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
-            let projectID = UUID()
-            _ = try app.projectContexts.registerProjectUnchecked(
-                descriptor: ProjectMemoryDescriptor(
-                    id: projectID.uuidString.lowercased(),
-                    displayName: "Reconnect Project \(index)",
-                    repositoryIdentity: nil,
-                    aliases: []
-                ),
-                canonicalRoot: projectRoot
-            )
-            if index == 2 {
-                let marker = projectRoot.appendingPathComponent("selected.txt")
-                try Data("reconnected".utf8).write(to: marker)
-                selectedProjectID = projectID
-                selectedMarker = marker
-            }
-        }
-        let projectID = try XCTUnwrap(selectedProjectID)
-        let marker = try XCTUnwrap(selectedMarker)
-        let firstConnection = MCPServer.defaultClientID(
-            deploymentID: "explicit-status-reconnect",
-            role: .fallback,
-            desktopProviderID: nil
+        let projectRoot = tempHome.appendingPathComponent("reconnect-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let initialized = try bindProjectContext(
+            app: app,
+            clientID: ClientID("reconnect-setup"),
+            projectRoot: projectRoot
         )
-
-        let status = try app.tools.call(
-            name: "get_forge_status",
-            arguments: ["project_id": projectID.uuidString.lowercased()],
-            clientID: firstConnection
+        let projectID = try XCTUnwrap(initialized.payload["project_id"] as? String)
+        let parsedProjectID = ProjectID(try XCTUnwrap(UUID(uuidString: projectID)))
+        let snapshotSHA256 = try importInstructionPackage(
+            app: app,
+            projectID: parsedProjectID,
+            generation: .initial,
+            name: "reconnect-package"
         )
-        XCTAssertTrue(status.ok, "\(status.payload)")
-
-        let reconnectedClient = MCPServer.defaultClientID(
-            deploymentID: "explicit-status-reconnect",
+        let deploymentID = "deployment-\(UUID().uuidString)"
+        let firstProcessIdentity = ClientID("process-\(UUID().uuidString)")
+        let secondProcessIdentity = ClientID("process-\(UUID().uuidString)")
+        let primaryServer = MCPServer(
+            app: app,
             role: .primary,
-            desktopProviderID: nil
-        )
-        XCTAssertEqual(firstConnection, reconnectedClient)
-        let read = try app.tools.call(
-            name: "fs_read",
-            arguments: ["path": marker.path],
-            clientID: reconnectedClient
+            deploymentIDOverride: deploymentID,
+            processClientID: firstProcessIdentity
         )
 
-        XCTAssertTrue(read.ok, "\(read.payload)")
-        XCTAssertEqual(read.payload["content"] as? String, "reconnected")
+        let status = try mcpToolPayload(
+            primaryServer,
+            name: "get_forge_status",
+            arguments: ["project_id": projectID]
+        )
+        XCTAssertEqual(status["ok"] as? Bool, true)
+        let attachment = try XCTUnwrap(status["project_context"] as? [String: Any])
+        XCTAssertEqual(attachment["attached"] as? Bool, true)
+        let boundClientID = try XCTUnwrap(attachment["client_id"] as? String)
+        XCTAssertNotEqual(boundClientID, firstProcessIdentity.rawValue)
+
+        let fallbackServer = MCPServer(
+            app: app,
+            role: .fallback,
+            deploymentIDOverride: deploymentID,
+            processClientID: secondProcessIdentity
+        )
+        let reconnectedClient = MCPServer.defaultClientID(
+            deploymentID: deploymentID,
+            role: .fallback,
+            desktopProviderID: nil,
+            fallbackClientID: secondProcessIdentity
+        )
+        XCTAssertNotEqual(firstProcessIdentity, secondProcessIdentity)
+        XCTAssertEqual(boundClientID, reconnectedClient.rawValue)
+        XCTAssertNotEqual(reconnectedClient, secondProcessIdentity)
+
+        let callsWithoutSecondBind: [(String, [String: Any])] = [
+            ("fs_list", ["path": projectRoot.path]),
+            ("instruction_catalog", ["snapshot_sha256": snapshotSHA256]),
+            ("shell_exec", ["command": "printf reconnected", "cwd": projectRoot.path]),
+            ("continuity.status", ["project_id": projectID]),
+        ]
+        for (name, arguments) in callsWithoutSecondBind {
+            let result = try mcpToolPayload(
+                fallbackServer,
+                name: name,
+                arguments: arguments
+            )
+            XCTAssertEqual(
+                result["ok"] as? Bool,
+                true,
+                "\(name) did not reuse the deployment-scoped binding: \(result)"
+            )
+        }
         let context = try app.projectContexts.invocationContext(for: reconnectedClient)
-        XCTAssertEqual(context.projectID.description, projectID.uuidString.lowercased())
+        XCTAssertEqual(context.projectID.description, projectID)
+    }
+
+    func testEmptyDeploymentMCPStatusAttachesFreshRandomClient() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let projectRoot = tempHome.appendingPathComponent("empty-deployment-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let initialized = try bindProjectContext(
+            app: app,
+            clientID: ClientID("empty-deployment-setup"),
+            projectRoot: projectRoot
+        )
+        let projectID = try XCTUnwrap(initialized.payload["project_id"] as? String)
+        let randomProcessIdentity = ClientID("process-\(UUID().uuidString)")
+        let server = MCPServer(
+            app: app,
+            role: .fallback,
+            deploymentIDOverride: "",
+            processClientID: randomProcessIdentity
+        )
+
+        let beforeStatus = try mcpToolPayload(
+            server,
+            name: "fs_list",
+            arguments: ["path": projectRoot.path]
+        )
+        XCTAssertEqual(beforeStatus["ok"] as? Bool, false)
+        XCTAssertEqual(beforeStatus["code"] as? String, "project_context_required")
+
+        let status = try mcpToolPayload(
+            server,
+            name: "get_forge_status",
+            arguments: ["project_id": projectID]
+        )
+        let attachment = try XCTUnwrap(status["project_context"] as? [String: Any])
+        XCTAssertEqual(attachment["attached"] as? Bool, true)
+        XCTAssertEqual(attachment["client_id"] as? String, randomProcessIdentity.rawValue)
+
+        let afterStatus = try mcpToolPayload(
+            server,
+            name: "fs_list",
+            arguments: ["path": projectRoot.path]
+        )
+        XCTAssertEqual(afterStatus["ok"] as? Bool, true)
     }
 
     func testGetForgeStatusWritesExactNonceBoundInteractiveResumeAcknowledgement() throws {

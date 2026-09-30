@@ -354,7 +354,7 @@ final class AppBootstrapAppTests: XCTestCase {
 }
 
 final class RigOperationalSnapshotAppTests: XCTestCase {
-    func testStatusBootstrapBindingMakesReconnectedClientTrackable() async throws {
+    func testRegisteredProjectBecomesTrackableOnlyAfterStatusBindingSurvivesReconnect() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("dashboard-status-binding-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -373,17 +373,18 @@ final class RigOperationalSnapshotAppTests: XCTestCase {
                 ),
                 canonicalRoot: projectRoot
             )
-            let clientID = ClientID("reconnected-dashboard-client")
-
-            let status = try app.tools.call(
-                name: "get_forge_status",
-                arguments: [:],
-                clientID: clientID
+            let deploymentID = "dashboard-deployment-\(UUID().uuidString)"
+            let firstProcessIdentity = ClientID("dashboard-process-\(UUID().uuidString)")
+            let secondProcessIdentity = ClientID("dashboard-process-\(UUID().uuidString)")
+            let primaryClient = MCPServer.defaultClientID(
+                deploymentID: deploymentID,
+                role: .primary,
+                desktopProviderID: nil,
+                fallbackClientID: firstProcessIdentity
             )
-            XCTAssertTrue(status.ok, "\(status.payload)")
 
-            let resolution = await AppModel.resolveBoundProjectIdentity(
-                forLiveMCPClientIDs: [clientID.rawValue]
+            let beforeStatus = await AppModel.resolveBoundProjectIdentity(
+                forLiveMCPClientIDs: [primaryClient.rawValue]
             ) { candidate in
                 try await app.projectContexts.repository.invocationContext(
                     for: ProjectBindingOwner(kind: .mcpClient, id: candidate),
@@ -391,7 +392,51 @@ final class RigOperationalSnapshotAppTests: XCTestCase {
                 )
             }
             XCTAssertEqual(
-                resolution,
+                beforeStatus,
+                .unbound,
+                "A registered-only project must not be presented as the active tracked project"
+            )
+
+            let primaryServer = MCPServer(
+                app: app,
+                role: .primary,
+                deploymentIDOverride: deploymentID,
+                processClientID: firstProcessIdentity
+            )
+            let statusResponse = try XCTUnwrap(primaryServer.handle([
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": [
+                    "name": "get_forge_status",
+                    "arguments": ["project_id": projectID.description],
+                ] as [String: Any],
+            ]))
+            let statusResult = try XCTUnwrap(statusResponse["result"] as? [String: Any])
+            let status = try XCTUnwrap(statusResult["structuredContent"] as? [String: Any])
+            XCTAssertEqual(status["ok"] as? Bool, true)
+            let attachment = try XCTUnwrap(status["project_context"] as? [String: Any])
+            XCTAssertEqual(attachment["attached"] as? Bool, true)
+
+            let reconnectedClient = MCPServer.defaultClientID(
+                deploymentID: deploymentID,
+                role: .fallback,
+                desktopProviderID: nil,
+                fallbackClientID: secondProcessIdentity
+            )
+            XCTAssertNotEqual(firstProcessIdentity, secondProcessIdentity)
+            XCTAssertEqual(primaryClient, reconnectedClient)
+
+            let afterReconnect = await AppModel.resolveBoundProjectIdentity(
+                forLiveMCPClientIDs: [reconnectedClient.rawValue]
+            ) { candidate in
+                try await app.projectContexts.repository.invocationContext(
+                    for: ProjectBindingOwner(kind: .mcpClient, id: candidate),
+                    clientID: ClientID(candidate)
+                )
+            }
+            XCTAssertEqual(
+                afterReconnect,
                 .resolved(RigTrackedProjectIdentity(
                     projectID: projectID.description,
                     projectGeneration: ProjectGeneration.initial.rawValue

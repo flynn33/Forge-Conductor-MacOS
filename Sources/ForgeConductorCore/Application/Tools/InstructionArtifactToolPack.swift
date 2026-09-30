@@ -22,10 +22,10 @@ public struct InstructionArtifactToolPack: ToolPackHandling {
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult? {
         guard Self.names.contains(name) else { return nil }
-        guard let context, context.runID != nil else {
+        guard let context else {
             return .failure(
                 code: "instruction_scope_required",
-                message: "Instruction artifacts require an active project-bound run.",
+                message: "Instruction artifacts require an active project context.",
                 retryable: false
             )
         }
