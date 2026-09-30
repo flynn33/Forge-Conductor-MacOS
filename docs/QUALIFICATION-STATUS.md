@@ -10,23 +10,50 @@ random MCP client UUID, after which project-scoped tools returned
 without establishing the binding required by `fs_list`, `instruction_catalog`,
 or `shell_exec`.
 
-The source correction gives ordinary LM Studio primary, fallback, and CLU
-helpers one bounded deployment-scoped client identity across process restart,
-and makes `forge_status` / `get_forge_status` idempotently attach an unseen
-deployment to an explicit project or the sole active project. The additive
-`project_context` response reports attachment. Existing inactive bindings from
-a project generation reset are not reactivated, and ambiguous multi-project
-selection still requires `project_id`. Implementation revision
-`9852732894e3c5ec11a6765a664568fe4f028b69` contains the correction and its
-tests. The complete Core selection passed
-54/54, including the six focused status and reconnect cases; ten project-context
-integration cases, twenty MCP protocol and diagnostics cases, the replay
-catalog case, two version-alignment cases, and the Dashboard resolver case also
-passed. The Dashboard case also passed in the signed app-hosted
-Xcode test target. Both SwiftPM products and the canonical Debug workspace app
-build succeeded; repository hygiene and whitespace checks passed. A signed
-candidate, exact LM Studio restart reproduction, installation, and distribution
-qualification remain open.
+The correction gives ordinary LM Studio primary, fallback, and CLU helpers one
+bounded deployment-scoped client identity across process restart, and makes
+`forge_status` / `get_forge_status` idempotently attach an unseen deployment to
+an explicit project or the sole active project. Instruction catalog/read now
+accept the resulting project-generation context without requiring a Managed
+Run. Existing inactive bindings from a generation reset are not reactivated,
+and ambiguous multi-project selection still requires `project_id`.
+
+Implementation revision `a54100b453ba8b1c1489ff09ac64dd6193fc1597`
+contains the completed correction and exact replays:
+
+- `testStatusBootstrapUnblocksAllReportedProjectScopedToolsOnSameClient`
+  asserts `fs_list`, `instruction_catalog`, `shell_exec`, and
+  `continuity.status` each fail with `project_context_required`, then asserts
+  `get_forge_status(project_id)` returns `project_context.attached == true`,
+  and finally asserts the same four calls succeed on client
+  `A800AC6E-8B31-4E64-A0CE-9B9DA192CADA`.
+- `testDeploymentScopedMCPReconnectUsesExistingBindingWithoutSecondStatusCall`
+  creates primary and fallback `MCPServer` objects with different random process
+  identities and one deployment ID, calls status only through the primary, and
+  asserts all four gated tools succeed through the fallback.
+- `testEmptyDeploymentMCPStatusAttachesFreshRandomClient`,
+  `testForgeStatusKeepsPolicyLocationWhenProjectSelectionIsAmbiguous`, and
+  `testGetForgeStatusDoesNotReactivateBindingInvalidatedByGenerationReset`
+  cover the empty deployment, explicit two-project selection, readable status,
+  and reset fence.
+- App-hosted
+  `testRegisteredProjectBecomesTrackableOnlyAfterStatusBindingSurvivesReconnect`
+  asserts `.unbound` before status and the exact durable project/generation
+  after reconnect with a different process identity.
+
+The complete Core selection passed 55/55, project-context integration passed
+10/10, MCP protocol and diagnostics passed 20/20, both SwiftPM products built,
+the canonical Debug workspace build succeeded, and the focused Dashboard case
+passed in `ForgeConductorAppTests`.
+
+The universal Developer ID app and archive are at `/Users/flynn/Desktop/Forge
+Conductor 0.16.3 (24)-a54100b-DeveloperID`. Both report `0.16.3 (24)` and the
+app is `x86_64 arm64`; strict Release validation passed for the app, Core
+framework, embedded CLI, runtime launcher, and filesystem daemon. The installed
+`/Applications/Forge Conductor.app` remained `0.16.2 (23)` with executable
+SHA-256 `fc29b8006af141cfc7c5c99f219eb22faca593b430b6adadd6a8581e3243e542`.
+The wiki is published at `38104a3a0e4c6d37ec48a64f7212df265db6a698`.
+Notarization, installation, Gatekeeper acceptance, and shipment remain open.
 
 ## 0.16.2 owner-notarization artifact set (historical)
 
@@ -466,12 +493,11 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.3, build 24**, supporting **macOS 26+**. No candidate
-has been produced from this correction; the owner will build, qualify, and test
-that candidate and perform shipment separately. The version advance and
-repository changes require owner acceptance; earlier
-`0.9.0 (1)` receipts remain historical evidence only. This page is a concise
-status index; the detailed, source-bound receipts are in the
+Product identity: **0.16.3, build 24**, supporting **macOS 26+**. The current
+Developer ID app and archive are recorded in the opening build-24 section;
+they remain unnotarized, uninstalled, and unshipped. Earlier `0.9.0 (1)`
+receipts remain historical evidence only. This page is a concise status index;
+the detailed, source-bound receipts are in the
 [functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) and
 [roadmap](../ROADMAP.md).
 

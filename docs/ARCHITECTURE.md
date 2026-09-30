@@ -63,7 +63,8 @@ documents into immutable content-addressed snapshots. The durable order shown
 in Projects is authoritative. Drag reordering is revision-checked so stale UI
 snapshots cannot overwrite newer state. The model queries bounded catalog and
 content pages after calling `get_forge_status`; package selection does not
-start a model conversation.
+start a model conversation, and artifact reads require the attached project and
+generation rather than a Managed Run.
 
 ## MCP and tool authorization
 

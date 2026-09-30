@@ -14,6 +14,19 @@ configuration and signed with the available legitimate Apple Development
 identity. This scope changes delivery qualification, not required product
 features.
 
+## September 30, 2026 MCP binding candidate
+
+Source `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced the universal
+Developer ID app and archive at `/Users/flynn/Desktop/Forge Conductor 0.16.3
+(24)-a54100b-DeveloperID`. Both report `0.16.3 (24)`. The app, Core framework,
+embedded CLI, runtime launcher, and filesystem daemon passed strict Release
+signature and privileged-bundle checks. The exact same-client status sequence,
+two-server deployment reconnect, empty-deployment fallback, multi-project
+selection, generation reset, and app-hosted Dashboard tracking regressions
+passed. The installed `/Applications/Forge Conductor.app` remains byte-for-byte
+the preexisting `0.16.2 (23)` build. No notarization, installation, LM Studio
+registration change, or shipment was performed.
+
 ## Historical development acceptance scope
 
 | Gate | Functional development build requirement |

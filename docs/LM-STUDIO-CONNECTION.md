@@ -19,6 +19,23 @@ instruction packages, project and store locations, continuity, and resume
 state. Primary PID `12434` and CLU PID `12435` are the restored standby roles
 from the same candidate. `/Applications/Forge Conductor.app` was not replaced.
 
+## Build-24 deterministic reconnect receipt
+
+Source `a54100b453ba8b1c1489ff09ac64dd6193fc1597` contains the executable replay
+for the reported stable client `A800AC6E-8B31-4E64-A0CE-9B9DA192CADA`.
+`fs_list`, `instruction_catalog`, `shell_exec`, and `continuity.status` first
+assert `project_context_required`; `get_forge_status(project_id)` then asserts
+`project_context.attached == true`; the same four calls immediately assert
+success on the same client.
+
+A separate restart replay constructs a primary and fallback `MCPServer` with
+different random process identities and the same non-empty deployment ID. The
+derived client IDs are identical, only the first server calls status, and all
+four gated tools succeed through the second server without another bind call.
+Empty deployment IDs retain a fresh random client that status can attach.
+Two-project selection remains explicit and generation-reset invalidation stays
+fenced while status remains readable.
+
 The published `get_forge_status` tool description is:
 
 > Runtime, project, ordered instruction-package execution, and required

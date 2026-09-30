@@ -16,25 +16,24 @@ continuity. The user does not start project work through a Forge Managed Run.
 | **Documentation** | [Documentation guide](docs/README.md) |
 
 > **Release status:** current source is `0.16.3 (24)` and includes the MCP
-> reconnect/project-binding correction. It is not yet archived, signed as a
-> distribution candidate, notarized, installed, shipped, or released. The
-> retained `0.16.2 (23)` artifact predates this correction and remains
-> historical evidence rather than the current shipment candidate.
+> reconnect/project-binding correction. Source
+> `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer
+> ID app and `.xcarchive`; both report `0.16.3 (24)` and the Release bundle
+> inspection passes. The candidate is not notarized, installed, shipped, or
+> released.
 
-The most recent retained Developer ID-signed Desktop candidate is
-`~/Desktop/Forge Conductor 0.16.2 (23)-22e7443-DeveloperID/Export/Forge
-Conductor.app`, with its matching `.xcarchive`, notary-submission ZIP, signed
-Developer ID Installer package, hashes, and owner notarization commands beside
-the export. It was built from source revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`.
-It is not installed over `/Applications/Forge Conductor.app` and is not a
-shipment claim. Strict signing and Release privileged-bundle validation pass;
-notarization, stapling, Gatekeeper acceptance, and owner installation remain
-open.
+The current Developer ID-signed Desktop candidate is
+`~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID/Forge Conductor.app`,
+with its matching `.xcarchive` in the same directory. It is not installed over
+`/Applications/Forge Conductor.app` and is not a shipment claim. Strict signing
+and Release privileged-bundle validation pass; notarization, stapling,
+Gatekeeper acceptance, and owner installation remain open. The installed app
+remains `0.16.2 (23)`.
 
 The root version authorities, compiled protocol constants, all Xcode build
 configurations, and current repository documentation use `0.16.3 (24)`.
-Historical candidates and receipts, including the retained `0.16.2 (23)`
-Developer ID set, retain the identity they actually tested.
+Historical candidate receipts, including the `0.16.2 (23)` Developer ID
+record, retain the identity they actually tested.
 
 ## What Forge Conductor does
 

@@ -105,9 +105,14 @@ Build 24 repairs LM Studio reconnect binding without changing Xcode graph
 membership. `get_forge_status` and `forge_status` attach an unbound deployment
 to an explicit or sole active project, while a deployment-derived MCP client
 identity survives helper restart and primary/fallback role changes. Existing
-generation-reset fences remain intact. The edited Core and test sources already
-belong to their canonical targets; the project-file changes only advance the
-marketing version and build number.
+generation-reset fences remain intact. The exact same-client, two-server
+reconnect, empty-deployment, multi-project, reset-fence, and app-hosted
+Dashboard regressions pass. Source
+`a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced the universal Developer ID
+app and archive under `~/Desktop/Forge Conductor 0.16.3
+(24)-a54100b-DeveloperID`; both report `0.16.3 (24)` and the Release
+privileged-bundle inspection passes. The edited Core and test sources already
+belong to their canonical targets; no graph edit was required for this repair.
 
 Build 23 adds the Development Policy bootstrap contract to `get_forge_status`.
 The response exposes ordered active source paths, explicitly directs the model
@@ -129,8 +134,8 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.16.3 (24)`; a new
-candidate still requires the separate owner packaging and qualification flow.
+`CURRENT_PROJECT_VERSION = 23`. Current source and the build-24 app/archive use
+`0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
 produced the `0.16.1 (22)` universal Developer ID archive and manual export at

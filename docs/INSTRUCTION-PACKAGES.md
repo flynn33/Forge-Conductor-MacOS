@@ -129,7 +129,8 @@ opens an ordinary LM Studio chat and asks the model to call
 `get_forge_status`. The returned project-scoped locations and query tools let
 the model discover the ordered instruction catalog and fetch bounded content.
 With multiple registered projects, the model passes the applicable
-`project_id` on later calls.
+`project_id` on status. A successful status attachment is sufficient for
+`instruction_catalog` and `instruction_read`; no Managed Run is required.
 
 Package changes remain durable while the LM Studio conversation is active. A
 subsequent catalog query observes the newest committed order. **Delete

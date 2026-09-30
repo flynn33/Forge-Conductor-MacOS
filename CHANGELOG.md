@@ -10,11 +10,17 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-Current source identity: `0.16.3 (24)`. No distribution candidate has been
-produced from this correction.
+Current source identity: `0.16.3 (24)`. Source
+`a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer ID
+app and `.xcarchive`; neither is notarized, installed, shipped, or released.
 
 ### Added
 
+- Produced the `0.16.3 (24)` universal Developer ID app and `.xcarchive` under
+  `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID`. The app,
+  framework, CLI, runtime launcher, and filesystem daemon pass the strict
+  Release privileged-bundle inspection. `/Applications` remains on
+  `0.16.2 (23)`.
 - Prepared the retained `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
   universal Developer ID Release archive and export as the shippable
   `0.16.2 (23)` owner-notarization set. The Desktop set now includes the app,
@@ -49,7 +55,9 @@ produced from this correction.
   instruction, shell, Git, runtime, memory, and continuity tools retain their
   durable binding across reconnects. Deliberately invalidated generation-reset
   bindings remain fenced and multi-project selection remains explicit. The
-  Dashboard tracker consumes the same restored binding.
+  Dashboard tracker consumes the same restored binding. Instruction catalog
+  and read access now accept that project-generation binding directly instead
+  of incorrectly requiring an unrelated Managed Run.
 - Corrected ordinary LM Studio bootstrap so `get_forge_status` returns the
   pinned Development Policy identity, every active Rune Forge source path in
   durable priority order, the supported read tools, and an explicit required
