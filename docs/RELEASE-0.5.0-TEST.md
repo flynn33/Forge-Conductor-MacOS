@@ -1,7 +1,7 @@
 # Forge Conductor 0.5.1 — operator test plan (G1–G7 gap close)
 
 > **Historical record:** this plan applies only to the 0.5.x source line. The
-> current product identity is **0.16.2**, build **23**; use the README, user guide,
+> current product identity is **0.16.3**, build **24**; use the README, user guide,
 > changelog, and current qualification material for present behavior and release
 > status.
 

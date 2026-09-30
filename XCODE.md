@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.16.2**, build **23**. `VERSION` and
+Product identity: marketing version **0.16.3**, build **24**. `VERSION` and
 `BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
@@ -85,7 +85,7 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   test
 ```
 
-The current `0.16.2 (23)` source keeps the Provider and Guided Setup repair in
+The current `0.16.3 (24)` source keeps the Provider and Guided Setup repair in
 the canonical graph, removes local LM Studio credential controls, and exposes
 first-class continuity packet rows and exact packet deletion. The
 existing `MCPServer.swift` member creates its heterogeneous desktop-attachment
@@ -100,6 +100,14 @@ For the build-22 correction, the app-hosted Dashboard selection executed 23
 tests with zero failures and the canonical Debug workspace build succeeded.
 The final SwiftPM run executed 1,933 tests with 12 explicit environment-
 dependent skips and zero failures, and both SwiftPM products built.
+
+Build 24 repairs LM Studio reconnect binding without changing Xcode graph
+membership. `get_forge_status` and `forge_status` attach an unbound deployment
+to an explicit or sole active project, while a deployment-derived MCP client
+identity survives helper restart and primary/fallback role changes. Existing
+generation-reset fences remain intact. The edited Core and test sources already
+belong to their canonical targets; the project-file changes only advance the
+marketing version and build number.
 
 Build 23 adds the Development Policy bootstrap contract to `get_forge_status`.
 The response exposes ordered active source paths, explicitly directs the model
@@ -120,9 +128,9 @@ package, hashes, and command-only owner notarization file. The product source
 remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
-Existing Xcode `MARKETING_VERSION = 0.16.2`,
-`CURRENT_PROJECT_VERSION = 23`, Release signing, and graph membership were
-already aligned, so packaging required no project-file edit.
+That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
+`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.16.3 (24)`; a new
+candidate still requires the separate owner packaging and qualification flow.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
 produced the `0.16.1 (22)` universal Developer ID archive and manual export at

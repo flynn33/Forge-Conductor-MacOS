@@ -354,6 +354,53 @@ final class AppBootstrapAppTests: XCTestCase {
 }
 
 final class RigOperationalSnapshotAppTests: XCTestCase {
+    func testStatusBootstrapBindingMakesReconnectedClientTrackable() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dashboard-status-binding-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        do {
+            let app = try ForgeApp.bootstrap(home: root)
+            defer { app.shutdown() }
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            let projectID = ProjectID()
+            _ = try app.projectContexts.registerProjectUnchecked(
+                descriptor: ProjectMemoryDescriptor(
+                    id: projectID.description,
+                    displayName: "Tracked Reconnected Project",
+                    repositoryIdentity: nil,
+                    aliases: []
+                ),
+                canonicalRoot: projectRoot
+            )
+            let clientID = ClientID("reconnected-dashboard-client")
+
+            let status = try app.tools.call(
+                name: "get_forge_status",
+                arguments: [:],
+                clientID: clientID
+            )
+            XCTAssertTrue(status.ok, "\(status.payload)")
+
+            let resolution = await AppModel.resolveBoundProjectIdentity(
+                forLiveMCPClientIDs: [clientID.rawValue]
+            ) { candidate in
+                try await app.projectContexts.repository.invocationContext(
+                    for: ProjectBindingOwner(kind: .mcpClient, id: candidate),
+                    clientID: ClientID(candidate)
+                )
+            }
+            XCTAssertEqual(
+                resolution,
+                .resolved(RigTrackedProjectIdentity(
+                    projectID: projectID.description,
+                    projectGeneration: ProjectGeneration.initial.rawValue
+                ))
+            )
+        }
+        try? FileManager.default.removeItem(at: root)
+    }
+
     func testTrackedProjectPrefersLiveBoundMCPClientOverUnrelatedManagedRun() throws {
         let runProjectID = UUID().uuidString.lowercased()
         let boundProjectID = UUID().uuidString.lowercased()

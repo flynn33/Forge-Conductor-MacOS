@@ -10,6 +10,9 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+Current source identity: `0.16.3 (24)`. No distribution candidate has been
+produced from this correction.
+
 ### Added
 
 - Prepared the retained `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
@@ -37,6 +40,16 @@ Product versions do not by themselves claim shipment.
 
 ### Fixed
 
+- Fixed LM Studio project tools becoming unusable after an MCP helper restart.
+  `forge_status` and `get_forge_status` now idempotently attach an unseen MCP
+  deployment to an explicit `project_id`, or to the sole active project when
+  selection is unambiguous, and report the result in `project_context`.
+  Primary, fallback, and CLU helpers share a bounded deployment-scoped client
+  identity instead of minting an unbounded UUID per process, so filesystem,
+  instruction, shell, Git, runtime, memory, and continuity tools retain their
+  durable binding across reconnects. Deliberately invalidated generation-reset
+  bindings remain fenced and multi-project selection remains explicit. The
+  Dashboard tracker consumes the same restored binding.
 - Corrected ordinary LM Studio bootstrap so `get_forge_status` returns the
   pinned Development Policy identity, every active Rune Forge source path in
   durable priority order, the supported read tools, and an explicit required
@@ -48,7 +61,7 @@ Product versions do not by themselves claim shipment.
   Policy location and the mandatory action remain visible when project
   selection is ambiguous. The live Jamf-Technician LM Studio chat consumed the
   Developer ID build-23 candidate through final repeated fallback PID `12436` and returned
-  the complete contract. Current source and candidate identity is `0.16.2 (23)`.
+  the complete contract. That retained candidate identity is `0.16.2 (23)`.
 - Restored native host access for filesystem, search, PDF, Git, shell, and
   runtime tools by removing Forge's per-command Seatbelt wrapper and
   project-root path confinement. Selected project folders now provide durable

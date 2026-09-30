@@ -57,15 +57,19 @@ The Dashboard's project tracker resolves current live MCP presence to the
 matching active durable `mcp_client` binding. Recent audit activity orders
 multiple live clients and heartbeat order is the deterministic fallback. A
 matching nonterminal run is used only when no live binding resolves; the first
-registered project is never used as an activity substitute.
+registered project is never used as an activity substitute. Current status
+bootstrap creates the exact durable binding for an explicit project or the sole
+active project, and deployment-scoped MCP identity preserves it across helper
+restart and primary/fallback/CLU failover, so the tracker does not lose the
+active project merely because LM Studio relaunched the helper.
 
 ## Manager console
 `ManagerSettingsView`: **Start / Stop / Restart**, settings form (host/port/refresh/watchdog/TTL/shell/auto-restart), prune, doctor. It uses an in-process `ManagerNode` only when the GUI owns the service; with the normal LaunchAgent topology it uses the typed native `ManagerDashboardClient` and does not compete for the dashboard port.
 
 ## Tests
 The [qualification status](QUALIFICATION-STATUS.md) records the exact local and
-CI counts, source bindings, and current development version **0.16.2**, build
-**23** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
+CI counts, source bindings, and current development version **0.16.3**, build
+**24** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
 explicitly historical.
 The retained local app-hosted tests and four production onboarding scenarios passed;
 the installed-app qualifier remains partial because its own System Events

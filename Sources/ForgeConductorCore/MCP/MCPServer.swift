@@ -54,7 +54,7 @@ public final class MCPServer: @unchecked Sendable {
 
     public init(
         app: ForgeApp,
-        clientID: ClientID = ClientID(),
+        clientID: ClientID? = nil,
         role: LMStudioConnectorRole = LMStudioConnectorRole(
             environmentValue: ProcessInfo.processInfo.environment["FORGE_MCP_ROLE"]
         ),
@@ -67,7 +67,6 @@ public final class MCPServer: @unchecked Sendable {
         policyNoticeProvider: (any InteractivePolicyNoticeProviding)? = nil
     ) {
         self.app = app
-        self.clientID = clientID
         self.role = role
         self.desktopProviderID = desktopProviderID
         self.maximumConcurrentRequests = max(1, min(maximumConcurrentRequests, 64))
@@ -80,15 +79,38 @@ public final class MCPServer: @unchecked Sendable {
             ? max(0.01, min(responseWriteTimeoutSeconds, 30))
             : Self.defaultResponseWriteTimeoutSeconds
         self.didCloseResponseDeliveryObserver = didCloseResponseDeliveryObserver
+        let deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.deploymentID = deploymentID
+        let resolvedClientID = clientID ?? Self.defaultClientID(
+            deploymentID: deploymentID,
+            role: role,
+            desktopProviderID: desktopProviderID
+        )
+        self.clientID = resolvedClientID
         self.policyNoticeProvider = policyNoticeProvider ?? StjornarvaldInteractivePolicyNoticeCache(
             paths: app.paths,
-            clientID: clientID.rawValue
+            clientID: resolvedClientID.rawValue
         )
-        self.deploymentID = ProcessInfo.processInfo.environment["FORGE_DEPLOYMENT_ID"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.toolDefinitionCatalog = Result {
             try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
         }
+    }
+
+    /// LM Studio may restart a stdio helper or switch between its primary,
+    /// fallback, and CLU registrations between calls. Their deployment ID is
+    /// stable, so use its digest as the durable client identity instead of
+    /// minting an unbounded UUID per process or connector role.
+    /// Provider-specific attachment launches remain session-bound and random.
+    static func defaultClientID(
+        deploymentID: String,
+        role: LMStudioConnectorRole,
+        desktopProviderID: ProviderIntegrationID?
+    ) -> ClientID {
+        let deployment = deploymentID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !deployment.isEmpty, desktopProviderID == nil else { return ClientID() }
+        _ = role // All three registrations represent one deployment-scoped client.
+        return ClientID("lm-studio:\(JSONSupport.sha256Hex(deployment))")
     }
 
     /// Only native composition can attach this task identity. Shared stdio

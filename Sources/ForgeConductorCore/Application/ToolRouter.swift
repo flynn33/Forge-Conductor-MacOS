@@ -924,6 +924,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     }
 
     private static let mutatingTools: Set<String> = [
+        "forge_status", "get_forge_status",
         "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
         "git_add", "git_commit", "pdf_write", "pdf_from_file",
         "agent_run_start", "agent_run_status", "agent_run_complete", "shell_exec",

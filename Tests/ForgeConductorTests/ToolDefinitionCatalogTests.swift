@@ -202,6 +202,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
                 )
             }
             XCTAssertEqual(try classifier.replayClass(for: "fs_read"), .readOnly)
+            XCTAssertEqual(try classifier.replayClass(for: "get_forge_status"), .idempotent)
             XCTAssertEqual(try classifier.replayClass(for: "fs_write"), .idempotent)
             XCTAssertEqual(
                 try classifier.replayClass(for: "fs_delete_recovery"),

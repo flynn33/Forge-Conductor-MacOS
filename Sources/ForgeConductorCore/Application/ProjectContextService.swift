@@ -99,6 +99,7 @@ public final class ProjectContextService: @unchecked Sendable {
         clientID: ClientID,
         allowedTools: Set<String> = ["*"],
         maximumInlineOutputBytes: Int = ProjectContextService.defaultInlineOutputLimit,
+        reactivateInactiveBinding: Bool = true,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ToolInvocationContext {
         let owner = ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue)
@@ -114,6 +115,7 @@ public final class ProjectContextService: @unchecked Sendable {
                 projectID: project.projectID,
                 generation: project.generation,
                 authorizationScope: scope,
+                reactivateInactiveBinding: reactivateInactiveBinding,
                 cancellation: control
             )
         }

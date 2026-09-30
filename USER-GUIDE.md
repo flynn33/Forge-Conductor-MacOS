@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.16.2**, build **23**.
+Version **0.16.3**, build **24**.
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -110,12 +110,16 @@ get_forge_status
 ```
 
 The result lists registered project IDs and the query tools and locations for
-project files, ordered instructions, Development Policy, and continuity. Its
+project files, ordered instructions, Development Policy, and continuity. With
+one active project, this call attaches the MCP deployment to it. With multiple
+active projects, repeat `get_forge_status` with the applicable `project_id`;
+the explicit selection creates the durable attachment. Primary, fallback, and
+CLU reconnects reuse one deployment identity, so a helper restart does not
+discard the attachment. The response's `project_context.attached` field reports
+whether attachment succeeded. Its
 required action tells the model to read every active Development Policy source
 in the returned priority order and follow all applicable requirements before
-making development changes. If more than one project is registered, have the
-model pass the applicable `project_id` on later calls. Then give the model the
-task in LM Studio as usual.
+making development changes. Then give the model the task in LM Studio as usual.
 
 Forge Conductor does not start this work through a Managed Run.
 

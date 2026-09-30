@@ -260,6 +260,36 @@ public struct AgentToolPack: ToolPackHandling {
         } else {
             selectedProject = projects.count == 1 ? projects[0] : nil
         }
+        var effectiveContext = context
+        if effectiveContext == nil, let selectedProject {
+            do {
+                effectiveContext = try app.projectContexts.bindMCPClient(
+                    project: selectedProject,
+                    clientID: clientID,
+                    reactivateInactiveBinding: false,
+                    cancellation: cancellation
+                )
+            } catch let error as ProjectContextError {
+                // A reset or archive intentionally fences the prior client row.
+                // Status remains readable, but only project_memory.initialize may
+                // reactivate that deliberately invalidated binding.
+                guard case .projectContextRequired = error else { throw error }
+            }
+        }
+        if let effectiveContext {
+            payload["project_context"] = [
+                "attached": true,
+                "project_id": effectiveContext.projectID.description,
+                "project_generation": effectiveContext.projectGeneration.rawValue,
+                "client_id": effectiveContext.clientID.rawValue,
+            ] as [String: Any]
+        } else {
+            payload["project_context"] = [
+                "attached": false,
+                "selection_required": selectedProject == nil,
+                "reinitialization_required": selectedProject != nil,
+            ] as [String: Any]
+        }
         if let project = selectedProject {
             let projectStateDirectory = app.paths.projectsDir.appendingPathComponent(
                 project.projectID.description,
@@ -269,7 +299,7 @@ public struct AgentToolPack: ToolPackHandling {
                 "project_id": project.projectID.description,
                 "project_generation": project.generation.rawValue,
                 "canonical_root": project.canonicalRoot.path,
-                "run_id": context?.runID?.description as Any,
+                "run_id": effectiveContext?.runID?.description as Any,
             ] as [String: Any]
             locations.merge([
                 "project_files": project.canonicalRoot.path,

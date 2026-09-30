@@ -651,8 +651,8 @@ private enum ProductionToolDefinitionSource {
     }
 
     private static let baseDescriptions: [String: String] = [
-        "forge_status": "Runtime status: home, agents, open sessions, tools.",
-        "get_forge_status": "Runtime, project, ordered instruction-package execution, and required Development Policy bootstrap status. Read and follow every ordered active Development Policy source before development work, then read instruction packages in the returned execution order. Set resume=true in a successor chat to load the latest resume-ready handoff.",
+        "forge_status": "Runtime status: home, agents, open sessions, tools. Attaches a new MCP deployment to its explicit or sole active project.",
+        "get_forge_status": "Runtime, project, ordered instruction-package execution, and required Development Policy bootstrap status. Attaches a new MCP deployment to project_id, or to the sole active project when selection is unambiguous. Read and follow every ordered active Development Policy source before development work, then read instruction packages in the returned execution order. Set resume=true in a successor chat to load the latest resume-ready handoff.",
         "agent_list": "List specialist agent playbooks.",
         "agent_get": "Get a specialist agent playbook by id.",
         "agent_context": "Alias of agent_get — full playbook body.",

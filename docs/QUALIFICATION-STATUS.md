@@ -1,6 +1,32 @@
 # Version and qualification status
 
-## 0.16.2 owner-notarization artifact set
+## 0.16.3 MCP reconnect and Dashboard binding correction
+
+Current source identity is **0.16.3, build 24**. Installed `0.16.2 (23)`
+diagnostics reproduced an LM Studio fallback helper restart that changed PID and
+random MCP client UUID, after which project-scoped tools returned
+`project_context_required`. A second live transcript showed that even
+`get_forge_status(project_id)` on the replacement client returned success
+without establishing the binding required by `fs_list`, `instruction_catalog`,
+or `shell_exec`.
+
+The source correction gives ordinary LM Studio primary, fallback, and CLU
+helpers one bounded deployment-scoped client identity across process restart,
+and makes `forge_status` / `get_forge_status` idempotently attach an unseen
+deployment to an explicit project or the sole active project. The additive
+`project_context` response reports attachment. Existing inactive bindings from
+a project generation reset are not reactivated, and ambiguous multi-project
+selection still requires `project_id`. The complete Core selection passed
+54/54, including the six focused status and reconnect cases; ten project-context
+integration cases, twenty MCP protocol and diagnostics cases, the replay
+catalog case, two version-alignment cases, and the Dashboard resolver case also
+passed. The Dashboard case also passed in the signed app-hosted
+Xcode test target. Both SwiftPM products and the canonical Debug workspace app
+build succeeded; repository hygiene and whitespace checks passed. A signed
+candidate, exact LM Studio restart reproduction, installation, and distribution
+qualification remain open.
+
+## 0.16.2 owner-notarization artifact set (historical)
 
 The shippable universal Developer ID build `0.16.2 (23)` from product source
 revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4` is ready for owner
@@ -19,8 +45,8 @@ LM Studio registration, and Continuity packets were not changed.
 
 ## 0.16.2 Development Policy bootstrap
 
-The current source and retained Desktop candidate identity is **0.16.2, build
-23**. `get_forge_status` now
+The retained Desktop candidate identity is **0.16.2, build 23**.
+`get_forge_status` in that source
 returns the pinned governing Development Policy identity, every active Rune
 Forge policy source path in durable priority order, the supported filesystem
 read tools, and a required action directing the LM Studio model to read and
@@ -438,9 +464,10 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.2, build 23**, supporting **macOS 26+**. The owner will
-test the staged Desktop candidate and perform shipment separately. The version
-advance and repository changes require owner acceptance; earlier
+Product identity: **0.16.3, build 24**, supporting **macOS 26+**. No candidate
+has been produced from this correction; the owner will build, qualify, and test
+that candidate and perform shipment separately. The version advance and
+repository changes require owner acceptance; earlier
 `0.9.0 (1)` receipts remain historical evidence only. This page is a concise
 status index; the detailed, source-bound receipts are in the
 [functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) and
@@ -449,7 +476,7 @@ status index; the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.2, build 23**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.3, build 24**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

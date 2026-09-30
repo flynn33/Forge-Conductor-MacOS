@@ -8,18 +8,18 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.16.2** |
-| **Build** | **23** |
+| **Version** | **0.16.3** |
+| **Build** | **24** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** the shippable universal Developer ID build `0.16.2 (23)`
-> from product source revision `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
-> is ready for owner notarization and Apple upload. It is not notarized,
-> stapled, installed, shipped, or released. The working installation remains
-> separate from the candidate.
+> **Release status:** current source is `0.16.3 (24)` and includes the MCP
+> reconnect/project-binding correction. It is not yet archived, signed as a
+> distribution candidate, notarized, installed, shipped, or released. The
+> retained `0.16.2 (23)` artifact predates this correction and remains
+> historical evidence rather than the current shipment candidate.
 
 The most recent retained Developer ID-signed Desktop candidate is
 `~/Desktop/Forge Conductor 0.16.2 (23)-22e7443-DeveloperID/Export/Forge
@@ -32,9 +32,9 @@ notarization, stapling, Gatekeeper acceptance, and owner installation remain
 open.
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, current repository documentation, and the retained Desktop
-candidate use the same `0.16.2 (23)` identity. Historical candidates and
-receipts retain the identity they actually tested.
+configurations, and current repository documentation use `0.16.3 (24)`.
+Historical candidates and receipts, including the retained `0.16.2 (23)`
+Developer ID set, retain the identity they actually tested.
 
 ## What Forge Conductor does
 
@@ -90,8 +90,11 @@ leaving ordinary outside-project paths available.
 5. In **Rune Forge**, choose **Add Development Policy…** and select one or more
    files or folders. Drag sources to set policy priority.
 6. Open a normal LM Studio chat and ask the model to call
-   `get_forge_status`. With multiple projects, use the returned `project_id` to
-   query the applicable project-file, instruction, and continuity locations.
+   `get_forge_status`. The call durably attaches a new MCP deployment to the
+   sole active project. With multiple projects, call it again with the returned
+   applicable `project_id`; that explicit selection attaches the deployment.
+   Primary, fallback, and CLU helper restarts reuse the same deployment-scoped
+   client identity, so the attachment survives reconnects.
    The response also names every active Development Policy source in priority
    order, identifies the governing policy revision, requires the model to read
    and follow those sources before development changes, and returns the bound

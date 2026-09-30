@@ -6116,6 +6116,7 @@ public actor ProjectControlPlaneRepository {
         authorizationScope: ToolAuthorizationScope,
         leaseOwner: String? = nil,
         leaseExpiresAt: String? = nil,
+        reactivateInactiveBinding: Bool = true,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectContextBinding {
         try cancellation?.checkCancellation()
@@ -6145,6 +6146,9 @@ public actor ProjectControlPlaneRepository {
                         throw ProjectContextError.ownerAlreadyBound(owner)
                     }
                     return existing
+                }
+                guard reactivateInactiveBinding else {
+                    throw ProjectContextError.projectContextRequired(owner)
                 }
                 try connection.execute(
                     """

@@ -1,6 +1,6 @@
 # Forge Conductor architecture
 
-Version: `0.16.2`; build: `23`.
+Version: `0.16.3`; build: `24`.
 
 Forge Conductor is a native macOS control plane and MCP server for work carried
 out in externally owned model conversations. The current LM Studio workflow

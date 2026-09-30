@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.16.2**, build **23**. This connection document does
+Product identity: version **0.16.3**, build **24**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## Build-23 live bootstrap receipt
@@ -22,7 +22,9 @@ from the same candidate. `/Applications/Forge Conductor.app` was not replaced.
 The published `get_forge_status` tool description is:
 
 > Runtime, project, ordered instruction-package execution, and required
-> Development Policy bootstrap status. Read and follow every ordered active
+> Development Policy bootstrap status. Attaches a new MCP deployment to
+> project_id, or to the sole active project when selection is unambiguous. Read
+> and follow every ordered active
 > Development Policy source before development work, then read instruction
 > packages in the returned execution order. Set resume=true in a successor
 > chat to load the latest resume-ready handoff.
@@ -139,9 +141,13 @@ historical connection evidence bound to that source and host.
 Register one or more repositories in **Projects** with the native picker or
 **Enter Project Path…**. Add and order instruction packages there, add and order
 Development Policy sources in **Rune Forge**, then open a normal LM Studio chat
-and call `get_forge_status`. The response lists registered project identities;
-passing `project_id` returns that project's file, instruction, and continuity
-locations. No Managed Run is required.
+and call `get_forge_status`. The response lists registered project identities
+and reports attachment in `project_context`. A sole active project is attached
+automatically; when multiple projects are active, pass the applicable
+`project_id` to attach it and return its file, instruction, and continuity
+locations. No Managed Run is required. LM Studio's primary, fallback, and CLU
+helpers derive one client identity from the installed deployment ID, so process
+restart or role failover does not discard the durable binding.
 
 ### Native host access and project context
 
@@ -157,7 +163,9 @@ a live protected-path read through the exact signed candidate without emitting
 file contents. POSIX permissions and SIP continue to apply.
 
 Forge still requires the client binding for attribution and generation
-fencing, applies tool grants and the shell enable switch, canonicalizes paths,
+fencing. Status bootstrap creates that binding only for a new deployment and
+does not reactivate a row deliberately fenced by project reset. Forge applies
+tool grants and the shell enable switch, canonicalizes paths,
 bounds time and output, and rejects destructive operations against `/`, the
 user or Manager home, a mounted-volume root, an active workspace root, or an
 ancestor whose removal would contain one of those roots. Project memory,
