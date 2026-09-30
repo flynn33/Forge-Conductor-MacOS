@@ -89,7 +89,9 @@ client, `get_forge_status` completed successfully, but the immediately following
 `get_forge_status(project_id)` did not attach the stable replacement client.
 The 0.16.3 source correction makes status attachment idempotent, derives one
 client ID per deployment across primary/fallback/CLU restarts, refuses to
-reactivate reset-fenced rows, and exposes attachment state. The complete Core
+reactivate reset-fenced rows, and exposes attachment state. Implementation
+revision `9852732894e3c5ec11a6765a664568fe4f028b69` contains the correction and
+its tests. The complete Core
 selection passed 54/54, including the six focused status and reconnect cases;
 ten project-context integration cases, twenty MCP protocol and diagnostics
 cases, the replay catalog case, two version-alignment cases, and the Dashboard

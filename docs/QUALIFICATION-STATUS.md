@@ -16,7 +16,9 @@ and makes `forge_status` / `get_forge_status` idempotently attach an unseen
 deployment to an explicit project or the sole active project. The additive
 `project_context` response reports attachment. Existing inactive bindings from
 a project generation reset are not reactivated, and ambiguous multi-project
-selection still requires `project_id`. The complete Core selection passed
+selection still requires `project_id`. Implementation revision
+`9852732894e3c5ec11a6765a664568fe4f028b69` contains the correction and its
+tests. The complete Core selection passed
 54/54, including the six focused status and reconnect cases; ten project-context
 integration cases, twenty MCP protocol and diagnostics cases, the replay
 catalog case, two version-alignment cases, and the Dashboard resolver case also
