@@ -16,32 +16,36 @@ continuity. The user does not start project work through a Forge Managed Run.
 | **Documentation** | [Documentation guide](docs/README.md) |
 
 > **Release status:** current source is `0.16.3 (24)` and includes the MCP
-> reconnect/project-binding correction. Source
-> `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer
-> ID app and `.xcarchive`; both report `0.16.3 (24)` and the Release bundle
-> inspection passes. The candidate is not notarized, installed, shipped, or
-> released.
+> reconnect/project-binding correction from product code
+> `a54100b453ba8b1c1489ff09ac64dd6193fc1597`. A fresh universal Developer ID
+> archive was locally installed and cold-started through the product CLI
+> installer and LM Studio deploy path on October 1. This is an installed-candidate
+> proof, not notarization, stapling, Gatekeeper acceptance, public shipment, or
+> release.
 
-The current Developer ID-signed Desktop candidate is
+The retained Developer ID-signed Desktop candidate is
 `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID/Forge Conductor.app`,
-with its matching `.xcarchive` in the same directory. It is not installed over
-`/Applications/Forge Conductor.app` and is not a shipment claim. Strict signing
-and Release privileged-bundle validation pass; notarization, stapling,
-Gatekeeper acceptance, and owner installation remain open. The installed app
-remains `0.16.2 (23)`.
+with its matching `.xcarchive` in the same directory. For the product-path
+acceptance run, a fresh archive was built from synchronized `main`; its
+`Contents/Helpers/forge-conductor` was installed by `forge-conductor install`
+into `~/.forge-conductor/bin`, then `install-lmstudio-plugin` wrote all three
+MCP entries. The stopped `0.16.2 (23)` `/Applications` app was backed up and
+replaced with the same signed `0.16.3 (24)` candidate for GUI cold-start proof.
+The signed `.pkg` was built but the macOS package installer required root and
+did not install it; no package-install pass is claimed.
 
-The working LM Studio MCP deployment is separately active on the installed
-`~/.forge-conductor/bin/forge-conductor` v0.16.3 helper under synchronized
-primary, fallback, and CLU revision
-`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. After Forge and LM Studio were both
-cold-restarted, a new LM Studio chat launched hosted fallback PID `33715` from
-that exact path. Its first `get_forge_status(project_id)` reported v0.16.3,
-attached deployment-scoped client `lm-studio:12ec4eaf…`, and returned the
-canonical Jamf-Technician root. The following `fs_list`, `git_status`,
-`instruction_catalog`, and `continuity.status` calls all succeeded without a
-second bind. The registered alias and Git both resolve the project root to
-`/Users/flynn/GitHub/Jamf-Technician`. This operational activation does not
-replace or qualify the `/Applications` GUI installation.
+The product installer/deploy run created synchronized primary, fallback, and
+CLU revision `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. The configured helper,
+the archive's embedded helper, and the replacement `/Applications` app's
+embedded helper all have SHA-256
+`49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
+After the candidate app and LM Studio were cold-started, ordinary LM Studio
+fallback PID `38508` reported an attached Jamf-Technician context. A later
+replacement PID `38964` reported the same deployment-scoped client ID and
+attached context; `fs_list`, `git_status`, `instruction_catalog`, and
+`continuity.status` then returned `ok: true` without a manual rebind. The
+`mcp.json` SHA was unchanged across GUI launches. The full scope and remaining
+distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The root version authorities, compiled protocol constants, all Xcode build
 configurations, and current repository documentation use `0.16.3 (24)`.

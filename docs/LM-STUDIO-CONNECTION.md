@@ -5,6 +5,38 @@ This document is derived from **this Xcode project’s source** and **on-disk / 
 Product identity: version **0.16.3**, build **24**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
+## Build-24 installed-product reconnect receipt — October 1, 2026
+
+A fresh synchronized-main universal Developer ID archive retained product code
+`a54100b453ba8b1c1489ff09ac64dd6193fc1597` and identity `0.16.3 (24)`.
+The archive's own `Contents/Helpers/forge-conductor install` completed and
+installed `~/.forge-conductor/bin/forge-conductor` and the support app. The
+installed helper's `install-lmstudio-plugin` command then wrote primary,
+fallback, and CLU entries in `~/.lmstudio/mcp.json` under deployment
+`7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. Each entry launches
+`/Users/flynn/.forge-conductor/bin/forge-conductor serve`; no entry has a
+`cwd`. The installed helper, archive-embedded helper, and locally replaced
+`/Applications` candidate helper all match SHA-256
+`49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
+The old v0.16.2 GUI and desktop-provider process were stopped, and the signed
+candidate replaced `/Applications/Forge Conductor.app` for this local product
+proof. Cold-starting that app and LM Studio left the registration file
+unchanged at SHA-256
+`7663a4f6ae3bee266eb7cefe7edc18056ff1f34c72d72ae8265dbb4e1398b7a3`.
+
+The ordinary LM Studio Jamf-Technician chat launched fallback PID `38508`;
+its `get_forge_status(project_id)` reported v0.16.3 and attached project
+generation 7. After that helper exited, fallback PID `38964` reported the
+same deployment-scoped client
+`lm-studio:faf23139c06a39f92a71bf3bcdb267154717cd7e623e4d326188093f6f96d54a`
+with `project_context.attached: true`. The next four project calls—`fs_list`,
+`git_status`, `instruction_catalog`, and `continuity.status`—all returned
+`ok: true` without a manual rebind. The chat transcript is
+`~/.lmstudio/conversations/Jamf-Technician/1790852478591.conversation.json`.
+The signed `.pkg` build succeeded but macOS declined package installation
+without root; this receipt is the product CLI installer and installed-candidate
+GUI proof, not a signed-package-install or public-release qualification.
+
 ## Build-23 live bootstrap receipt
 
 The retained Developer ID candidate is `/Users/flynn/Desktop/Forge Conductor
@@ -56,8 +88,9 @@ Without a second bind or initialization call, `fs_list`, `git_status`,
 The registration record, status `canonical_root`, and
 `git rev-parse --show-toplevel` agree on
 `/Users/flynn/GitHub/Jamf-Technician`; the Documents-path variant is absent.
-`/Applications/Forge Conductor.app` was not replaced and remains the separate
-v0.16.2 GUI installation. The matching wiki receipt is revision
+At that earlier hand-deployment checkpoint, `/Applications/Forge
+Conductor.app` was not replaced and remained the separate v0.16.2 GUI
+installation. The matching wiki receipt for that checkpoint is revision
 `e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
 
 The published `get_forge_status` tool description is:

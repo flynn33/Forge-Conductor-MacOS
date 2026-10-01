@@ -14,6 +14,24 @@ configuration and signed with the available legitimate Apple Development
 identity. This scope changes delivery qualification, not required product
 features.
 
+## October 1, 2026 installed-product MCP candidate
+
+The synchronized-main `0.16.3 (24)` Developer ID Release archive passed strict
+deep signature verification. Its own CLI installer staged the matching helper
+and app into `~/.forge-conductor`; the installed CLI's LM Studio deploy command
+wrote primary, fallback, and CLU revision
+`7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. The staged helper and archive
+helper have identical SHA-256
+`49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
+The stopped v0.16.2 `/Applications` app was backed up and replaced with the
+signed v0.16.3 candidate for a local GUI cold start. LM Studio hosted fallback
+PIDs `38508` and `38964` reported the same deployment client and an attached
+Jamf-Technician context; the replacement's filesystem, Git, instruction, and
+Continuity calls all succeeded. The signed package was built but not installed
+because macOS required root. No notarization, Gatekeeper, public release, or
+broader roadmap acceptance is inferred. No source, resource, test, or Xcode
+project graph input changed in this documentation-only closeout.
+
 ## September 30, 2026 MCP binding candidate
 
 Source `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced the universal
@@ -23,9 +41,10 @@ embedded CLI, runtime launcher, and filesystem daemon passed strict Release
 signature and privileged-bundle checks. The exact same-client status sequence,
 two-server deployment reconnect, empty-deployment fallback, multi-project
 selection, generation reset, and app-hosted Dashboard tracking regressions
-passed. The installed `/Applications/Forge Conductor.app` remains byte-for-byte
-the preexisting `0.16.2 (23)` build. No notarization, installation, LM Studio
-registration change, or shipment was performed.
+passed. At that September 30 checkpoint, the installed `/Applications/Forge
+Conductor.app` remained byte-for-byte the preexisting `0.16.2 (23)` build. No
+notarization, installation, LM Studio registration change, or shipment was
+performed in that checkpoint; the later product-path acceptance is above.
 
 ## Historical development acceptance scope
 
@@ -622,8 +641,9 @@ and `continuity.status` calls all succeeded without another bind; none returned
 Git top level all identify `/Users/flynn/GitHub/Jamf-Technician`; the prior
 Documents-path claim is not a live checkout. This changes no Xcode source,
 resource, test, or project membership; the canonical project graph is
-unchanged. The separate `/Applications` GUI remains v0.16.2 and was not
-replaced, notarized, stapled, or shipped. The wiki receipt is revision
+unchanged. At this earlier hand-deployed-helper checkpoint, the separate
+`/Applications` GUI was still v0.16.2 and had not been replaced, notarized,
+stapled, or shipped. The wiki receipt for that checkpoint is revision
 `e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
 
 ## September 29, 2026 — 0.16.2 (23) owner-notarization artifact set

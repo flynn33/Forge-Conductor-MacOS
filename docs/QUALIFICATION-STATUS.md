@@ -1,5 +1,56 @@
 # Version and qualification status
 
+## 0.16.3 installed-product MCP acceptance — October 1, 2026
+
+A fresh universal Developer ID archive from synchronized `main` retained the
+`a54100b453ba8b1c1489ff09ac64dd6193fc1597` product code and `0.16.3
+(24)` identity. The archive app was strictly deep-signature verified and its
+embedded helper reported `0.16.3`. The candidate's own
+`Contents/Helpers/forge-conductor install` completed with CLI binary and app
+under `~/.forge-conductor`; its output correctly said LM Studio is not changed
+by that command. Running the installed `forge-conductor
+install-lmstudio-plugin` then completed deployment revision
+`7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`, reported at least 71 primary and
+fallback tools and all four CLU controls, and wrote primary, fallback, and CLU
+entries to `~/.lmstudio/mcp.json`. No manual edit followed the installer.
+
+Each entry has command `/Users/flynn/.forge-conductor/bin/forge-conductor`,
+argument `serve`, the same deployment ID, its respective role, and no `cwd`.
+The archive-embedded helper, installed support helper, installed support app's
+embedded helper, and replacement `/Applications` app's embedded helper all
+have SHA-256
+`49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
+The `0.16.2 (23)` `/Applications` app and its desktop-provider helper were
+stopped; the app was backed up and the signed `0.16.3 (24)` candidate was
+copied over it only for this product GUI proof. Forge and LM Studio then
+cold-started. `mcp.json` remained SHA-256
+`7663a4f6ae3bee266eb7cefe7edc18056ff1f34c72d72ae8265dbb4e1398b7a3`
+before and after both launches, so neither launch reverted the registration.
+
+In the ordinary LM Studio Jamf-Technician chat, hosted fallback PID `38508`
+returned `get_forge_status` v0.16.3, client
+`lm-studio:faf23139c06a39f92a71bf3bcdb267154717cd7e623e4d326188093f6f96d54a`,
+and `project_context.attached: true`. After that PID exited, hosted fallback PID
+`38964` returned the identical client ID and attached project/generation. Its
+subsequent `fs_list`, `git_status`, `instruction_catalog`, and
+`continuity.status` results each had `ok: true`, without another manual bind
+or `project_context_required`. A separate paged catalog call with `limit: 1`
+also returned `ok: true`. The transcript is
+`~/.lmstudio/conversations/Jamf-Technician/1790852478591.conversation.json`;
+the first post-install model turn claimed five calls but recorded only four,
+so Continuity was explicitly called and verified in the next turn. The later
+replacement-PID sequence recorded all four gated calls.
+
+The signed package `ForgeConductor-0.16.3-24.pkg` was produced and its
+Developer ID Installer signature and timestamp verified, but `installer`
+returned `Must be run as root to install this package`; `sudo -n` was not
+available. This is **not** a package-install pass. The product CLI installer,
+GUI candidate, and hosted MCP path were exercised. Notarization, stapling,
+Gatekeeper acceptance, Apple upload, public shipment, and other roadmap gates
+remain open. No product code, version, build number, or Xcode graph was
+changed, and no Continuity clear, reset, or delete was invoked. The existing installer test class
+`LMStudioConnectorReliabilityTests` executed 9/9 without failures.
+
 ## 0.16.3 MCP reconnect and Dashboard binding correction
 
 Current source identity is **0.16.3, build 24**. Installed `0.16.2 (23)`
@@ -62,17 +113,18 @@ The next `fs_list`, `git_status`, `instruction_catalog`, and
 `continuity.status` calls all succeeded without another bind or initialization
 call. The registration record, status root, and Git top level all identify
 `/Users/flynn/GitHub/Jamf-Technician`; the Documents-path variant is absent.
-This is cold LM Studio-hosted evidence; it does not qualify the separate GUI
-installation or distribution.
+This was the earlier hand-deployed-helper evidence; it did not at that time
+qualify the separate GUI installation or distribution.
 
 The universal Developer ID app and archive are at `/Users/flynn/Desktop/Forge
 Conductor 0.16.3 (24)-a54100b-DeveloperID`. Both report `0.16.3 (24)` and the
 app is `x86_64 arm64`; strict Release validation passed for the app, Core
-framework, embedded CLI, runtime launcher, and filesystem daemon. The installed
-`/Applications/Forge Conductor.app` remains `0.16.2 (23)` with executable
-SHA-256 `fc29b8006af141cfc7c5c99f219eb22faca593b430b6adadd6a8581e3243e542`.
-The wiki is published at `e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
-Notarization, installation, Gatekeeper acceptance, and shipment remain open.
+framework, embedded CLI, runtime launcher, and filesystem daemon. At the time
+of that receipt, `/Applications/Forge Conductor.app` remained `0.16.2 (23)`
+with executable SHA-256
+`fc29b8006af141cfc7c5c99f219eb22faca593b430b6adadd6a8581e3243e542`.
+The earlier wiki receipt was `e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
+The installed-product proof and present limitations are recorded above.
 
 ## 0.16.2 owner-notarization artifact set (historical)
 
