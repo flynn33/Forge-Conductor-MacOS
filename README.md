@@ -30,6 +30,17 @@ and Release privileged-bundle validation pass; notarization, stapling,
 Gatekeeper acceptance, and owner installation remain open. The installed app
 remains `0.16.2 (23)`.
 
+The working LM Studio MCP deployment is separately active on the installed
+`~/.forge-conductor/bin/forge-conductor` v0.16.3 helper under synchronized
+primary, fallback, and CLU revision
+`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. An October 1 live replay attached
+Jamf-Technician through a primary process, exited it, and then used a fresh
+fallback process to run filesystem, Git, instruction-catalog, and continuity
+calls without another bind. The open LM Studio chat then repeated those calls
+through hosted fallback PID `29513`, reported v0.16.3 and the same attached
+client, and observed no `project_context_required` result. This operational
+activation does not replace or qualify the `/Applications` GUI installation.
+
 The root version authorities, compiled protocol constants, all Xcode build
 configurations, and current repository documentation use `0.16.3 (24)`.
 Historical candidate receipts, including the `0.16.2 (23)` Developer ID

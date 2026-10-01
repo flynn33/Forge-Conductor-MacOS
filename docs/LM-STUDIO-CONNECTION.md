@@ -36,6 +36,27 @@ Empty deployment IDs retain a fresh random client that status can attach.
 Two-project selection remains explicit and generation-reset invalidation stays
 fenced while status remains readable.
 
+## Build-24 live deployed-helper reconnect receipt
+
+On October 1, 2026, the supported installer placed the v0.16.3 build-24 helper
+at `/Users/flynn/.forge-conductor/bin/forge-conductor` and synchronized all
+three LM Studio registrations under revision
+`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. Deployment verified at least 71 tools
+for primary and fallback plus the four CLU controls. Doctor subsequently
+reported the current-build executable and every LM Studio plugin check healthy.
+
+The exact deployed configuration was then exercised against the live Forge
+home. A primary process called `get_forge_status` for Jamf-Technician and
+reported v0.16.3 with attached deployment-scoped client `lm-studio:12ec4eaf…`.
+After that process exited, a new fallback process reused the same binding and
+succeeded at `fs_list`, `git_status`, `instruction_catalog`, and
+`continuity.status` without calling status again. No call returned
+`project_context_required`. The existing LM Studio chat independently repeated
+the same status plus four project-scoped calls through hosted fallback PID
+`29513`, reported v0.16.3 with the same attached client, and observed no
+`project_context_required` response. `/Applications/Forge Conductor.app` was not
+replaced; it remains the separate v0.16.2 GUI installation.
+
 The published `get_forge_status` tool description is:
 
 > Runtime, project, ordered instruction-package execution, and required

@@ -57,7 +57,15 @@ app and `.xcarchive`; neither is notarized, installed, shipped, or released.
   bindings remain fenced and multi-project selection remains explicit. The
   Dashboard tracker consumes the same restored binding. Instruction catalog
   and read access now accept that project-generation binding directly instead
-  of incorrectly requiring an unrelated Managed Run.
+  of incorrectly requiring an unrelated Managed Run. The working LM Studio
+  primary, fallback, and CLU registrations now target the installed v0.16.3
+  helper under revision `6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. A live
+  Jamf-Technician replay attached through primary, replaced that process with
+  fallback, and passed `fs_list`, `git_status`, `instruction_catalog`, and
+  `continuity.status` without another status call or
+  `project_context_required` response. The existing LM Studio chat independently
+  repeated all five calls through hosted fallback PID `29513`, reported
+  v0.16.3 with `project_context.attached == true`, and observed no binding error.
 - Corrected ordinary LM Studio bootstrap so `get_forge_status` returns the
   pinned Development Policy identity, every active Rune Forge source path in
   durable priority order, the supported read tools, and an explicit required

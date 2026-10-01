@@ -601,6 +601,31 @@ working `/Applications/Forge Conductor.app` was not replaced and no live
 Continuity packet was deleted. Notarization, stapling, Gatekeeper acceptance,
 and shipment remain open.
 
+## October 1, 2026 build-24 live reconnect activation
+
+The supported v0.16.3 CLI installer placed the build-24 helper at
+`~/.forge-conductor/bin/forge-conductor`, then transactionally synchronized LM
+Studio primary, fallback, and CLU under revision
+`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. The deployment enumerated at least 71
+tools for primary and fallback and all four CLU controls. A subsequent Doctor
+run reported `state: healthy`, exact v0.16.3/build-24 executable identity, and
+all current-build/plugin checks passing.
+
+An exact live-store process replacement replay attached Jamf-Technician through
+a primary process, which reported v0.16.3 and stable deployment-scoped client
+`lm-studio:12ec4eaf…`. After the primary exited, a fresh fallback process
+without a second status call passed `fs_list`, `git_status`,
+`instruction_catalog` for snapshot `fbb039e341ced62ec05bd45b2ca87476af60b5d3a0bcce4c2e3e590fdba55f30`,
+and `continuity.status`. None returned `project_context_required`. Both narrow
+source regressions were rerun from unchanged source `a54100b` and each executed
+one test with zero failures. The open LM Studio chat then called status and the
+same four project-scoped tools through hosted fallback PID `29513`; all five
+succeeded, status reported v0.16.3 with the attached stable client, and no call
+returned `project_context_required`. This changes no Xcode source/resource
+membership; the canonical project graph is unchanged. The separate
+`/Applications` GUI remains v0.16.2 and was not replaced, notarized, stapled,
+or shipped.
+
 ## September 29, 2026 — 0.16.2 (23) owner-notarization artifact set
 
 Product source `22e7443d13496b3cc08b6e98366bb6d2332e3fd4` produced the retained
