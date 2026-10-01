@@ -38,24 +38,27 @@ fenced while status remains readable.
 
 ## Build-24 live deployed-helper reconnect receipt
 
-On October 1, 2026, the supported installer placed the v0.16.3 build-24 helper
-at `/Users/flynn/.forge-conductor/bin/forge-conductor` and synchronized all
-three LM Studio registrations under revision
-`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. Deployment verified at least 71 tools
-for primary and fallback plus the four CLU controls. Doctor subsequently
-reported the current-build executable and every LM Studio plugin check healthy.
+On October 1, 2026, the reloaded `~/.lmstudio/mcp.json` primary, fallback, and
+CLU registrations all named `/Users/flynn/.forge-conductor/bin/forge-conductor`
+with argument `serve`, no `cwd`, and deployment revision
+`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. That helper reported `0.16.3`; SHA-256
+`41a0a94fe247a2ea4718f43b1dd32a19bc7414e4d202f37d8c32e09312046387`
+exactly matched the helper embedded in the source-`a54100b` build-24 candidate.
 
-The exact deployed configuration was then exercised against the live Forge
-home. A primary process called `get_forge_status` for Jamf-Technician and
-reported v0.16.3 with attached deployment-scoped client `lm-studio:12ec4eaf…`.
-After that process exited, a new fallback process reused the same binding and
-succeeded at `fs_list`, `git_status`, `instruction_catalog`, and
-`continuity.status` without calling status again. No call returned
-`project_context_required`. The existing LM Studio chat independently repeated
-the same status plus four project-scoped calls through hosted fallback PID
-`29513`, reported v0.16.3 with the same attached client, and observed no
-`project_context_required` response. `/Applications/Forge Conductor.app` was not
-replaced; it remains the separate v0.16.2 GUI installation.
+Forge and LM Studio were both terminated and relaunched before a new ordinary
+LM Studio chat made any tool call. The fresh chat used the fallback
+registration and hosted PID `33715`. Its first
+`get_forge_status(project_id)` reported v0.16.3 and attached project
+`d2610542-b616-7e8f-ee36-ef902d6060e1` generation 7 to deployment-scoped
+client `lm-studio:12ec4eaf781d85b33f4dde7e180dbbd44367c93155660ec486c1b4cb2d21a6fc`.
+Without a second bind or initialization call, `fs_list`, `git_status`,
+`instruction_catalog`, and `continuity.status` all returned successful JSON.
+The registration record, status `canonical_root`, and
+`git rev-parse --show-toplevel` agree on
+`/Users/flynn/GitHub/Jamf-Technician`; the Documents-path variant is absent.
+`/Applications/Forge Conductor.app` was not replaced and remains the separate
+v0.16.2 GUI installation. The matching wiki receipt is revision
+`e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
 
 The published `get_forge_status` tool description is:
 

@@ -59,13 +59,15 @@ app and `.xcarchive`; neither is notarized, installed, shipped, or released.
   and read access now accept that project-generation binding directly instead
   of incorrectly requiring an unrelated Managed Run. The working LM Studio
   primary, fallback, and CLU registrations now target the installed v0.16.3
-  helper under revision `6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. A live
-  Jamf-Technician replay attached through primary, replaced that process with
-  fallback, and passed `fs_list`, `git_status`, `instruction_catalog`, and
-  `continuity.status` without another status call or
-  `project_context_required` response. The existing LM Studio chat independently
-  repeated all five calls through hosted fallback PID `29513`, reported
-  v0.16.3 with `project_context.attached == true`, and observed no binding error.
+  helper under revision `6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. After a cold
+  Forge and LM Studio restart, a new LM Studio chat launched hosted fallback
+  PID `33715`; its first `get_forge_status(project_id)` reported v0.16.3 and
+  `project_context.attached == true` for deployment-scoped client
+  `lm-studio:12ec4eaf…`. Its next four calls—`fs_list`, `git_status`,
+  `instruction_catalog`, and `continuity.status`—all succeeded without a
+  second bind or `project_context_required` response. The registered project
+  alias and Git both resolve Jamf-Technician to
+  `/Users/flynn/GitHub/Jamf-Technician`.
 - Corrected ordinary LM Studio bootstrap so `get_forge_status` returns the
   pinned Development Policy identity, every active Rune Forge source path in
   durable priority order, the supported read tools, and an explicit required

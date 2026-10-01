@@ -46,26 +46,24 @@ The complete Core selection passed 55/55, project-context integration passed
 the canonical Debug workspace build succeeded, and the focused Dashboard case
 passed in `ForgeConductorAppTests`.
 
-On October 1, the supported installer copied the v0.16.3 helper to
-`/Users/flynn/.forge-conductor/bin/forge-conductor` and transactionally
-synchronized LM Studio primary, fallback, and CLU registration revision
-`6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. Deployment enumerated at least 71
-tools through each ordinary role and all four CLU controls; Doctor then
-reported the current executable and all LM Studio checks healthy.
+On October 1, the reloaded LM Studio primary, fallback, and CLU entries all
+named `/Users/flynn/.forge-conductor/bin/forge-conductor serve`, supplied
+deployment revision `6b6aa0b4-c3bd-454b-96e4-1273abf390f1`, and supplied no
+`cwd`. The helper reported `0.16.3`, and SHA-256
+`41a0a94fe247a2ea4718f43b1dd32a19bc7414e4d202f37d8c32e09312046387`
+matched the source-`a54100b` build-24 candidate helper.
 
-An exact live-store replay used that revision and the real Jamf-Technician
-project. A primary process reported v0.16.3, attached project
+Forge and LM Studio were both terminated and relaunched. A new ordinary LM
+Studio chat then used the fallback registration and hosted PID `33715`. Its
+first `get_forge_status(project_id)` attached project
 `d2610542-b616-7e8f-ee36-ef902d6060e1` generation 7 to stable client
-`lm-studio:12ec4eaf781d85b33f4dde7e180dbbd44367c93155660ec486c1b4cb2d21a6fc`,
-and then exited. A new fallback process with no second status call succeeded at
-`fs_list`, `git_status`, `instruction_catalog`, and `continuity.status`; none
-returned `project_context_required`. The two narrow source regressions were
-rerun from published `main` and each executed one test with zero failures. This
-was then repeated by the existing LM Studio conversation through hosted
-fallback PID `29513`: status reported v0.16.3 and the attached stable client,
-and all four project-scoped calls succeeded without a binding error. This is
-live deployed-helper, process-restart, and LM Studio-hosted evidence; it does
-not qualify the separate GUI installation or distribution.
+`lm-studio:12ec4eaf781d85b33f4dde7e180dbbd44367c93155660ec486c1b4cb2d21a6fc`.
+The next `fs_list`, `git_status`, `instruction_catalog`, and
+`continuity.status` calls all succeeded without another bind or initialization
+call. The registration record, status root, and Git top level all identify
+`/Users/flynn/GitHub/Jamf-Technician`; the Documents-path variant is absent.
+This is cold LM Studio-hosted evidence; it does not qualify the separate GUI
+installation or distribution.
 
 The universal Developer ID app and archive are at `/Users/flynn/Desktop/Forge
 Conductor 0.16.3 (24)-a54100b-DeveloperID`. Both report `0.16.3 (24)` and the
@@ -73,7 +71,7 @@ app is `x86_64 arm64`; strict Release validation passed for the app, Core
 framework, embedded CLI, runtime launcher, and filesystem daemon. The installed
 `/Applications/Forge Conductor.app` remains `0.16.2 (23)` with executable
 SHA-256 `fc29b8006af141cfc7c5c99f219eb22faca593b430b6adadd6a8581e3243e542`.
-The wiki is published at `38104a3a0e4c6d37ec48a64f7212df265db6a698`.
+The wiki is published at `e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
 Notarization, installation, Gatekeeper acceptance, and shipment remain open.
 
 ## 0.16.2 owner-notarization artifact set (historical)
