@@ -14,22 +14,27 @@ configuration and signed with the available legitimate Apple Development
 identity. This scope changes delivery qualification, not required product
 features.
 
-## October 1, 2026 installed-product MCP candidate
+## October 1, 2026 CLI staging/deploy MCP candidate
 
-The synchronized-main `0.16.3 (24)` Developer ID Release archive passed strict
-deep signature verification. Its own CLI installer staged the matching helper
-and app into `~/.forge-conductor`; the installed CLI's LM Studio deploy command
+The `0.16.3 (24)` Developer ID Release archive was created while Git HEAD was
+`b8a2c5dee546dff8d914405c2169a075bd0187e2` and passed strict deep
+signature verification. Its own CLI `install` command copied the matching
+helper and app into `~/.forge-conductor`, not `/Applications`; the staged
+helper's LM Studio deploy command
 wrote primary, fallback, and CLU revision
 `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. The staged helper and archive
 helper have identical SHA-256
 `49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
-The stopped v0.16.2 `/Applications` app was backed up and replaced with the
-signed v0.16.3 candidate for a local GUI cold start. LM Studio hosted fallback
+The stopped v0.16.2 `/Applications` app was backed up and manually replaced
+with a copy of the signed v0.16.3 candidate for a local GUI cold start; this
+was not package installation. LM Studio hosted fallback
 PIDs `38508` and `38964` reported the same deployment client and an attached
 Jamf-Technician context; the replacement's filesystem, Git, instruction, and
 Continuity calls all succeeded. The signed package was built but not installed
-because macOS required root. No notarization, Gatekeeper, public release, or
-broader roadmap acceptance is inferred. No source, resource, test, or Xcode
+because macOS required root. GUI Deploy was not exercised and selects the
+running app executable in source; the CLI deployment does not qualify it.
+No notarization, Gatekeeper, public release, or broader roadmap acceptance is
+inferred. No source, resource, test, or Xcode
 project graph input changed in this documentation-only closeout.
 
 ## September 30, 2026 MCP binding candidate
@@ -44,7 +49,7 @@ selection, generation reset, and app-hosted Dashboard tracking regressions
 passed. At that September 30 checkpoint, the installed `/Applications/Forge
 Conductor.app` remained byte-for-byte the preexisting `0.16.2 (23)` build. No
 notarization, installation, LM Studio registration change, or shipment was
-performed in that checkpoint; the later product-path acceptance is above.
+performed in that checkpoint; the later CLI staging/deploy observation is above.
 
 ## Historical development acceptance scope
 

@@ -12,10 +12,12 @@ Product versions do not by themselves claim shipment.
 
 Current source identity: `0.16.3 (24)`. Source
 `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer ID
-app and `.xcarchive`. A fresh signed candidate was installed locally for the
-product MCP acceptance run; it is not notarized, stapled, publicly shipped, or
-released. The signed package was built but not package-installed because macOS
-required root.
+app and `.xcarchive`. A fresh archive was built from HEAD
+`b8a2c5dee546dff8d914405c2169a075bd0187e2` for a CLI staging and LM
+Studio deploy check. The signed package was built but **not installed** because
+macOS required root. The `/Applications` app is a manual copy of the candidate,
+not a package installation; notarization, stapling, shipment, and release
+remain open.
 
 ### Added
 
@@ -24,9 +26,11 @@ required root.
   framework, CLI, runtime launcher, and filesystem daemon pass the strict
   Release privileged-bundle inspection. On October 1 a fresh candidate from
   synchronized `main` was installed by its own `forge-conductor install` and
-  `install-lmstudio-plugin` commands. The stopped `/Applications` `0.16.2 (23)`
-  copy was backed up and replaced with this signed `0.16.3 (24)` candidate for
-  the GUI cold-start check. The installer-created primary, fallback, and CLU
+  `install-lmstudio-plugin` commands. The former copied the helper and app to
+  `~/.forge-conductor`, not `/Applications`; the latter wrote LM Studio's
+  registration. The stopped `/Applications` `0.16.2 (23)` copy was backed up
+  and manually replaced with a copy of the signed `0.16.3 (24)` candidate for
+  the cold-start check. The CLI-deployed primary, fallback, and CLU
   entries all name the helper that matches the candidate's embedded helper at
   SHA-256 `49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
 - Prepared the retained `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`
@@ -76,14 +80,16 @@ required root.
   second bind or `project_context_required` response. The registered project
   alias and Git both resolve Jamf-Technician to
   `/Users/flynn/GitHub/Jamf-Technician`.
-  A subsequent product-install run, not a hand registration, produced revision
-  `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. After the installed candidate app
+  A subsequent CLI staging/deploy run, not a `.pkg` installation, produced revision
+  `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. After the copied candidate app
   and LM Studio cold-started, hosted fallback PIDs `38508` and `38964`
   reported the same client `lm-studio:faf23139…` with an attached project.
   The replacement process's filesystem, Git, instruction, and Continuity calls
   each returned `ok: true` without a manual rebind. The registration file was
-  unchanged by either GUI launch. The signed `.pkg` was not installed; no
-  notarization or public-release acceptance is implied.
+  unchanged by either GUI launch. GUI Deploy was not exercised and its source
+  prefers the running app executable; the signed `.pkg` was not installed.
+  Neither path is qualified by the CLI receipt, and no notarization or
+  public-release acceptance is implied.
 - Corrected ordinary LM Studio bootstrap so `get_forge_status` returns the
   pinned Development Policy identity, every active Rune Forge source path in
   durable priority order, the supported read tools, and an explicit required

@@ -18,33 +18,36 @@ continuity. The user does not start project work through a Forge Managed Run.
 > **Release status:** current source is `0.16.3 (24)` and includes the MCP
 > reconnect/project-binding correction from product code
 > `a54100b453ba8b1c1489ff09ac64dd6193fc1597`. A fresh universal Developer ID
-> archive was locally installed and cold-started through the product CLI
-> installer and LM Studio deploy path on October 1. This is an installed-candidate
-> proof, not notarization, stapling, Gatekeeper acceptance, public shipment, or
-> release.
+> archive was built while HEAD was
+> `b8a2c5dee546dff8d914405c2169a075bd0187e2`. The October 1 check
+> exercised CLI staging and LM Studio deployment, **not** installation of the
+> signed `.pkg`. `/Applications/Forge Conductor.app` was manually copied from
+> the candidate after the old app was stopped. Package installation,
+> notarization, stapling, Gatekeeper acceptance, and shipment remain open.
 
 The retained Developer ID-signed Desktop candidate is
 `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID/Forge Conductor.app`,
 with its matching `.xcarchive` in the same directory. For the product-path
-acceptance run, a fresh archive was built from synchronized `main`; its
-`Contents/Helpers/forge-conductor` was installed by `forge-conductor install`
-into `~/.forge-conductor/bin`, then `install-lmstudio-plugin` wrote all three
-MCP entries. The stopped `0.16.2 (23)` `/Applications` app was backed up and
-replaced with the same signed `0.16.3 (24)` candidate for GUI cold-start proof.
-The signed `.pkg` was built but the macOS package installer required root and
-did not install it; no package-install pass is claimed.
+check, the archive helper's `forge-conductor install` command copied artifacts
+into `~/.forge-conductor`; its `install-lmstudio-plugin` command then wrote all
+three MCP entries. Neither command installed the app into `/Applications`.
+The stopped `0.16.2 (23)` app was backed up and the signed `0.16.3 (24)`
+candidate was copied into `/Applications` separately. The signed `.pkg` was
+built, but `installer` required root and did not install it.
 
-The product installer/deploy run created synchronized primary, fallback, and
+The CLI staging/deploy run created synchronized primary, fallback, and
 CLU revision `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. The configured helper,
-the archive's embedded helper, and the replacement `/Applications` app's
+the archive's embedded helper, and the copied `/Applications` app's
 embedded helper all have SHA-256
 `49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
-After the candidate app and LM Studio were cold-started, ordinary LM Studio
+After the copied candidate app and LM Studio were cold-started, ordinary LM Studio
 fallback PID `38508` reported an attached Jamf-Technician context. A later
 replacement PID `38964` reported the same deployment-scoped client ID and
 attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 `continuity.status` then returned `ok: true` without a manual rebind. The
-`mcp.json` SHA was unchanged across GUI launches. The full scope and remaining
+`mcp.json` SHA was unchanged across GUI launches. GUI **Deploy to LM Studio**
+was not exercised; its source selects the running app executable, so the CLI
+receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The root version authorities, compiled protocol constants, all Xcode build

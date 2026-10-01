@@ -1,28 +1,44 @@
 # Version and qualification status
 
-## 0.16.3 installed-product MCP acceptance — October 1, 2026
+## 0.16.3 CLI staging and LM Studio deploy receipt — October 1, 2026
 
-A fresh universal Developer ID archive from synchronized `main` retained the
-`a54100b453ba8b1c1489ff09ac64dd6193fc1597` product code and `0.16.3
+A fresh universal Developer ID archive was created at 2026-10-01 11:49:05 UTC
+while Git HEAD was `b8a2c5dee546dff8d914405c2169a075bd0187e2` (verified
+by the archive `Info.plist` creation time and Git reflog). That tree retains
+product code `a54100b453ba8b1c1489ff09ac64dd6193fc1597` and `0.16.3
 (24)` identity. The archive app was strictly deep-signature verified and its
 embedded helper reported `0.16.3`. The candidate's own
-`Contents/Helpers/forge-conductor install` completed with CLI binary and app
-under `~/.forge-conductor`; its output correctly said LM Studio is not changed
-by that command. Running the installed `forge-conductor
+`Contents/Helpers/forge-conductor install` copied the CLI binary and app
+under `~/.forge-conductor`; it did **not** install into `/Applications`, and
+its output correctly said LM Studio is not changed by that command. Running
+that staged helper's `forge-conductor
 install-lmstudio-plugin` then completed deployment revision
 `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`, reported at least 71 primary and
 fallback tools and all four CLU controls, and wrote primary, fallback, and CLU
 entries to `~/.lmstudio/mcp.json`. No manual edit followed the installer.
 
+Source boundary: `ManagerInstaller.installedBinaryURL` is
+`paths.home/bin/forge-conductor`; `stageInstalledArtifacts` executes
+`artifactCopier.copyItem(at: binarySource, to: binaryStage)` and commits that
+staged copy to the home target. The default copier delegates to
+`FileManager.default.copyItem`. Separately,
+`LMStudioMCPPluginInstaller.install` builds
+`mergedMCPRegistrationData(binaryURL: binary, deploymentID: deploymentID)`
+and commits it with `mergedMCPConfig.write(to: configURL, options: .atomic)`.
+Neither function installs a `.pkg` into `/Applications`. GUI Deploy uses
+`Bundle.main.executableURL` through `AppModel.deployToLMStudio`, not the CLI
+helper used in this receipt.
+
 Each entry has command `/Users/flynn/.forge-conductor/bin/forge-conductor`,
 argument `serve`, the same deployment ID, its respective role, and no `cwd`.
-The archive-embedded helper, installed support helper, installed support app's
-embedded helper, and replacement `/Applications` app's embedded helper all
+The archive-embedded helper, staged support helper, support app's embedded
+helper, and manually copied `/Applications` app's embedded helper all
 have SHA-256
 `49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
 The `0.16.2 (23)` `/Applications` app and its desktop-provider helper were
 stopped; the app was backed up and the signed `0.16.3 (24)` candidate was
-copied over it only for this product GUI proof. Forge and LM Studio then
+manually copied over it for a cold-start observation. This was not a package
+installation. Forge and LM Studio then
 cold-started. `mcp.json` remained SHA-256
 `7663a4f6ae3bee266eb7cefe7edc18056ff1f34c72d72ae8265dbb4e1398b7a3`
 before and after both launches, so neither launch reverted the registration.
@@ -44,8 +60,12 @@ replacement-PID sequence recorded all four gated calls.
 The signed package `ForgeConductor-0.16.3-24.pkg` was produced and its
 Developer ID Installer signature and timestamp verified, but `installer`
 returned `Must be run as root to install this package`; `sudo -n` was not
-available. This is **not** a package-install pass. The product CLI installer,
-GUI candidate, and hosted MCP path were exercised. Notarization, stapling,
+available. This is **not** a package-install pass. The CLI staging/deploy,
+copied GUI candidate launch, and hosted MCP path were exercised. GUI **Deploy
+to LM Studio** was not exercised: `AppModel.deployToLMStudio` passes the
+running app executable, while the CLI run passed its staged helper. Its
+registration behavior is therefore not qualified by this receipt.
+Notarization, stapling,
 Gatekeeper acceptance, Apple upload, public shipment, and other roadmap gates
 remain open. No product code, version, build number, or Xcode graph was
 changed, and no Continuity clear, reset, or delete was invoked. The existing installer test class
@@ -124,7 +144,8 @@ of that receipt, `/Applications/Forge Conductor.app` remained `0.16.2 (23)`
 with executable SHA-256
 `fc29b8006af141cfc7c5c99f219eb22faca593b430b6adadd6a8581e3243e542`.
 The earlier wiki receipt was `e615c2405a094b43f9ebb4794ba0676c86ae38bd`.
-The installed-product proof and present limitations are recorded above.
+The later CLI staging/deploy receipt and its package-install limitation are
+recorded above.
 
 ## 0.16.2 owner-notarization artifact set (historical)
 
