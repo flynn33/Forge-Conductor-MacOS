@@ -14,6 +14,18 @@ configuration and signed with the available legitimate Apple Development
 identity. This scope changes delivery qualification, not required product
 features.
 
+## October 3, 2026 corrected project — 0.16.5 (26)
+
+The later installed `0.16.4 (25)` bootstrap signing rejection and unavailable
+startup export were reproduced. The corrected project uses Developer ID
+signing and distribution peer policy for Release before daemon sealing.
+Canonical Debug build, universal Release archive/export, signing policy and
+daemon identity checks, and isolated native GUI bootstrap/export were exercised.
+[Qualification status](QUALIFICATION-STATUS.md) records the exact commands,
+results, and failed UI XCTest initialization. The owner retains notarization,
+installation, and distribution; the installed application and LM Studio
+registration were preserved. The earlier receipts below retain their own scope.
+
 ## October 1, 2026 CLI staging/deploy MCP candidate
 
 The `0.16.3 (24)` Developer ID Release archive was created while Git HEAD was

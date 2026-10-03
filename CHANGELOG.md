@@ -64,6 +64,12 @@ Installation, notarization, and shipment of this correction remain separate gate
 
 ### Fixed
 
+- Aligned active repository guides and wiki pages with `0.16.5 (26)`, including
+  the October 3 bootstrap/export qualification and Developer ID archive workflow.
+  Historical versions, artifacts, and test receipts retain their tested identity.
+  The existing Xcode project already has the corrected signing and matching
+  version/build settings; this documentation update preserves its graph.
+
 - Corrected Release archiving to use Developer ID signing and distribution peer
   policy throughout the app, framework, CLI, runtime launcher, and filesystem
   daemon. Re-signing the prior development archive changed daemon hashes while
@@ -91,8 +97,8 @@ Installation, notarization, and shipment of this correction remain separate gate
   bindings remain fenced and multi-project selection remains explicit. The
   Dashboard tracker consumes the same restored binding. Instruction catalog
   and read access now accept that project-generation binding directly instead
-  of incorrectly requiring an unrelated Managed Run. The working LM Studio
-  primary, fallback, and CLU registrations now target the installed v0.16.3
+  of incorrectly requiring an unrelated Managed Run. At that historical checkpoint, LM Studio
+  primary, fallback, and CLU registrations targeted the staged v0.16.3
   helper under revision `6b6aa0b4-c3bd-454b-96e4-1273abf390f1`. After a cold
   Forge and LM Studio restart, a new LM Studio chat launched hosted fallback
   PID `33715`; its first `get_forge_status(project_id)` reported v0.16.3 and

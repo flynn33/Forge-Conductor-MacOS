@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Current source identity: version **0.16.4**, build **25**. This connection document does
+Current source identity: version **0.16.5**, build **26**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## Build-24 CLI staging/deploy reconnect receipt — October 1, 2026
@@ -492,8 +492,13 @@ provider discovery/connection. The historical 100-cycle navigation result and
 later native gauge component tests retain their distinct source and fixture
 scopes; see [qualification status](QUALIFICATION-STATUS.md).
 
-P10, filesystem E2, current G09-G12, Developer ID Release signing, the complete
-installed/native UI and service-lifecycle matrix, archive/notarization/Gatekeeper,
+The October 3 `0.16.5 (26)` repair completed a universal Developer ID archive/export
+and isolated native bootstrap and folder-picker export checks, recorded in
+[qualification status](QUALIFICATION-STATUS.md). That candidate evidence does
+not qualify installation, notarization, distribution, or a full LM Studio workflow.
+
+P10, filesystem E2, current G09-G12, the complete
+installed/native UI and service-lifecycle matrix, notarization/Gatekeeper,
 manager-owned real-provider forced rollover, and owner-deferred representative
 physical-hardware qualification remain open. Focused connector or onboarding
 passes do not replace those release-blocking runs.

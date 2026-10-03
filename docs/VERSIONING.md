@@ -33,6 +33,16 @@ the changelog and qualification documents.
 Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
+## Current identity
+
+The current product version is `0.16.5`, build `26`. `VERSION`, `BUILD_NUMBER`,
+compiled protocol constants, all 12 Xcode marketing-version settings, all 16
+Xcode build-number settings, active guides, and wiki pages use this identity.
+The documentation/wiki alignment does not create a new product version or
+change the existing project graph. Installed apps and historical evidence keep
+their actual identities; the current candidate qualification is recorded in
+[qualification status](QUALIFICATION-STATUS.md).
+
 ## Release checklist
 
 1. Choose the next version from the rules above.

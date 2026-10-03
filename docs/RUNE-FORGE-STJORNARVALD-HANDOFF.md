@@ -79,11 +79,13 @@ The accepted and limited rows are recorded individually in
 
 README, User Guide, Unreleased changelog, roadmap, architecture, documentation
 index, Guided Mode, qualification status, product record, acceptance, and this
-handoff describe the current behavior. `VERSION` is now `0.16.4` and
-`BUILD_NUMBER` is `25`, matching the current authority. No release archive,
-installer, notarized artifact, installation replacement, or shipment candidate
-was created because the owner workflow reserves release qualification and
-shipment for separate work.
+handoff describe the current behavior. `VERSION` is now `0.16.5` and
+`BUILD_NUMBER` is `26`, matching the current authority. RF-SJ-10 created no
+release archive or shipment artifact. The later October 3 bootstrap repair
+completed a universal Developer ID archive/export and isolated native candidate
+checks; [qualification status](QUALIFICATION-STATUS.md) records that evidence.
+It did not install, notarize, or distribute the candidate, or qualify a full
+LM Studio workflow. The owner retains those shipping steps.
 
 ## Open matters
 
@@ -92,9 +94,8 @@ shipment for separate work.
   native controls, keyboard dismissal, and accessibility queries passed.
 - **Existing bounded diagnostics:** `ProjectContextService` priority-inversion
   warnings and one managed-test SQLite teardown diagnostic remain visible.
-- **Separate release work:** current-source Developer ID archive/export,
-  notarization, Installer and Gatekeeper acceptance, root-service qualification,
-  a second physical-memory host, public-download acceptance, and shipment are
+- **Separate release work:** notarization, Installer and Gatekeeper acceptance,
+  root-service qualification, a second physical-memory host, public-download acceptance, and shipment are
   outside this implementation handoff and remain governed by current release
   records.
 

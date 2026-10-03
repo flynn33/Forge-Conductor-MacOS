@@ -68,8 +68,8 @@ active project merely because LM Studio relaunched the helper.
 
 ## Tests
 The [qualification status](QUALIFICATION-STATUS.md) records the exact local and
-CI counts, source bindings, and current source version **0.16.4**, build
-**25** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
+CI counts, source bindings, and current source version **0.16.5**, build
+**26** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
 explicitly historical.
 The retained local app-hosted tests and four production onboarding scenarios passed;
 the installed-app qualifier remains partial because its own System Events

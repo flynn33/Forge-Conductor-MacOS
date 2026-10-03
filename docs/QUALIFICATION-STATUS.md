@@ -696,8 +696,10 @@ universal policy enforcement, and distribution qualification remain open.
 
 Current source identity: **0.16.5, build 26**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the opening build-24 section;
-they remain unnotarized, uninstalled, and unshipped. Earlier `0.9.0 (1)`
-receipts remain historical evidence only. This page is a concise status index;
+that workflow staged the CLI under `~/.forge-conductor` and manually copied the
+app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
+or shipment. Earlier `0.9.0 (1)` receipts remain historical evidence only. This
+page is a concise status index;
 the detailed, source-bound receipts are in the
 [functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) and
 [roadmap](../ROADMAP.md).
@@ -716,7 +718,11 @@ The canonical native project is `ForgeConductor.xcworkspace`, using the
 the Core framework, manager CLI, runtime launcher, filesystem daemon, resources,
 and icon. A standalone SwiftPM CLI is not a substitute for that signed bundle.
 
-## Current source and functional evidence
+## Historical source and functional evidence
+
+These records retain their named source revisions and checkpoint boundaries.
+They do not qualify the current `0.16.5 (26)` candidate. Its October 3 evidence
+and unperformed shipping paths are recorded in the opening section.
 
 The September 20 adversarial pre-release audit corrected scoped dashboard
 mutation authorization, a misclassified state-changing Stjornarvald route, an
@@ -762,7 +768,7 @@ Continuity title-bar clearance with no unused split, and LM Studio
 **Connect and Check**. Existing Thread Performance Checker diagnostics in
 `ProjectContextService` wait/shutdown paths were observed again, so this is not
 a clean whole-application performance claim for that historical source. The
-current `0.15.0 (14)` source repairs those product paths and passes 111/111
+later `0.15.0 (14)` source repaired those product paths and passed 111/111
 app-hosted cases with no structured runtime warnings. The owner installation
 was not replaced. Claude Code Desktop and Codex Desktop were not exercised as live
 external hosts; Grok remains non-selectable.
@@ -794,7 +800,7 @@ discovery/start/readiness polling, unifies selectable-provider **Connect and
 Check**, and corrects Codex/Grok desktop package details and strict activation
 outcome handling. Focused deterministic suites for those surfaces pass in the
 shared tree, including Provider configuration with one explicit
-Keychain-environment skip. The exact current tree passed the full SwiftPM suite
+Keychain-environment skip. The exact `0.14.1 (7)` tree passed the full SwiftPM suite
 with **1,844 tests, 13 explicit skips, and zero failures**; both SwiftPM products
 and a fresh canonical arm64 Apple Development-signed Debug workspace build also
 passed. The workspace build reported no compiler warnings, including neither of
@@ -819,33 +825,37 @@ remote `main` were then synchronized at documentation closeout revision
 `f02abeb8c940c8d998f822fd4f1cad5c20c7765e`, tree
 `c6475126b54c8ff8de1465940e3ecc3c702a00eb`. That closeout changes
 documentation only and leaves that historical native graph unchanged. These
-revisions remain distribution evidence for the source they name; they are not
-the current `0.14.4 (10)` source result.
+revisions remain distribution evidence for the source they name. They did not
+establish the then-current `0.14.4 (10)` source result and do not qualify the
+current `0.16.5 (26)` candidate.
 
-| Surface | Current result | Boundary |
+| Surface | Recorded checkpoint result | Boundary |
 |---|---|---|
-| 0.14.1 operability correction | Published source `8ca3f24d9a81adce56e1a5232a6181edd08cf00b`, tree `9bc840d7fdfe47bd552c4b8e095091502fecc3b6`, passed **1,844 tests with 13 explicit skips and zero failures**. Both SwiftPM products and a clean canonical arm64 Apple Development-signed Debug workspace build passed with no warning or error lines. Native UI coverage passed the eight-step Guided Setup, Autonomy recovery, complete Continuity detail/title-bar geometry, Provider Connect and Check plus contract-failure presentation, compact Dashboard Storage/Managed Activity geometry, and every primary view at minimum and normal window sizes. Version/build constants and all Xcode configurations are aligned to `0.14.1 (7)`. | One Provider configuration case is an explicit Keychain-environment skip, and the UI runner retains a nonfailing main-thread runtime diagnostic. No fresh live loaded-model LM Studio or live Claude/Codex host result is claimed; installed-build and distribution-artifact evidence remain separate. |
-| Historical Swift/Core provider baseline | The `0.14.0 (6)` provider baseline `65af43e31aa2b818ccd2f915aa7f89c34b7c821d`, tree `945cdb9d6adaf17c85845fe846910ece527288fd`, passed both SwiftPM product builds and a direct full-suite terminal run with **1,849 XCTest cases**, **13 explicit environment/live skips, and zero failures**. The warning-repair source `117aa95f982bccb4c1ef0d0acc8b92666127be70`, tree `00344bd6a1ce72f278e1a832a1d6e9f3a27f2d9f`, separately passed both SwiftPM product builds, a fresh canonical Apple Development-signed Debug workspace build, and the focused **3/3** MCP attachment plus **20/20** Provider configuration cases without either reported Swift diagnostic. | The 1,849-case regression remains bound to its exact baseline revision and is not claimed for the current patch. Declared skips remain distinct from passes. Live desktop-host, installed-build, distribution-artifact, and shipment qualification remain separate. |
-| Projects and Manager | The published-tree Xcode **My Mac** product registered picker-selected and absolute-path projects, authorized and saved canonical roots, rejected filesystem root, and retained state across relaunch. | The installed protected filesystem service still requires distinct-process qualification. |
-| Provider integrations | The 0.14.0 source implements mutually exclusive LM Studio, Claude Code Desktop, and Codex Desktop selection; transactional Forge-owned desktop package installation, rollback, repair, and removal; a bounded durable operation ledger; revision-bound run admission; authenticated loopback hooks; and selected-provider readiness on Dashboard and Guided Setup. Desktop sessions receive a provider-specific MCP launch command and a five-minute, single-use capability bound to provider, session, run, project generation, selection revision, deployment, and frozen authorization scope. Project tools stay unavailable until `desktop_run_attach` atomically consumes that capability. Deterministic focused coverage passed **100/100**; canonical Xcode passed **83/83 Core**, **40/40 app-hosted**, and **6/6 native UI** cases; the full SwiftPM regression passed **1,849 cases with 13 explicit skips and zero failures**. Grok Build remains visible but non-selectable for owned-artifact cleanup and forward compatibility. | Deterministic tests and an installation receipt do not prove that a selectable desktop host is open, has reloaded the package, has accepted hook trust, or has completed a live session. Claude and Codex require separate live acceptance; neither qualifies the other. Grok's documented startup/prompt hook outputs do not deliver Forge's initial assignment context, so no ready, run, or live-support claim is made for Grok in 0.14.0. The Thread Performance Checker limitation belongs to that historical source; `0.15.0 (14)` repairs the product paths and passes 111/111 app-hosted cases with no structured runtime warnings. |
-| LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Current deterministic recovery coverage verifies bounded discovery across system, per-user, Homebrew, and `PATH` CLI locations; wrapped status JSON and string ports; server start; delayed readiness; reported-port fallback; cancellation; and fail-closed malformed, timed-out, or truncated results. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. The current host had no loaded model during this patch's qualification, so no fresh live contract-probe pass is claimed. |
+| 0.14.1 operability correction | Published source `8ca3f24d9a81adce56e1a5232a6181edd08cf00b`, tree `9bc840d7fdfe47bd552c4b8e095091502fecc3b6`, passed **1,844 tests with 13 explicit skips and zero failures**. Both SwiftPM products and a clean canonical arm64 Apple Development-signed Debug workspace build passed with no warning or error lines. Native UI coverage passed the eight-step Guided Setup, Autonomy recovery, complete Continuity detail/title-bar geometry, Provider Connect and Check plus contract-failure presentation, compact Dashboard Storage/Managed Activity geometry, and every primary view at minimum and normal window sizes. The checkpoint version/build constants and all Xcode configurations were aligned to `0.14.1 (7)`. | One Provider configuration case is an explicit Keychain-environment skip, and the UI runner retains a nonfailing main-thread runtime diagnostic. No fresh live loaded-model LM Studio or live Claude/Codex host result is claimed; installed-build and distribution-artifact evidence remain separate. |
+| Historical Swift/Core provider baseline | The `0.14.0 (6)` provider baseline `65af43e31aa2b818ccd2f915aa7f89c34b7c821d`, tree `945cdb9d6adaf17c85845fe846910ece527288fd`, passed both SwiftPM product builds and a direct full-suite terminal run with **1,849 XCTest cases**, **13 explicit environment/live skips, and zero failures**. The warning-repair source `117aa95f982bccb4c1ef0d0acc8b92666127be70`, tree `00344bd6a1ce72f278e1a832a1d6e9f3a27f2d9f`, separately passed both SwiftPM product builds, a fresh canonical Apple Development-signed Debug workspace build, and the focused **3/3** MCP attachment plus **20/20** Provider configuration cases without either reported Swift diagnostic. | The 1,849-case regression remains bound to its exact baseline revision and is not claimed for the current `0.16.5 (26)` candidate. Declared skips remain distinct from passes. Live desktop-host, installed-build, distribution-artifact, and shipment qualification remain separate. |
+| Projects and Manager | The published-tree Xcode **My Mac** product registered picker-selected and absolute-path projects, authorized and saved canonical roots, rejected filesystem root, and retained state across relaunch. | That project-registration flow did not qualify the installed protected filesystem service as a distinct process. |
+| Provider integrations | The 0.14.0 source implements mutually exclusive LM Studio, Claude Code Desktop, and Codex Desktop selection; transactional Forge-owned desktop package installation, rollback, repair, and removal; a bounded durable operation ledger; revision-bound run admission; authenticated loopback hooks; and selected-provider readiness on Dashboard and Guided Setup. Desktop sessions receive a provider-specific MCP launch command and a five-minute, single-use capability bound to provider, session, run, project generation, selection revision, deployment, and frozen authorization scope. Project tools stay unavailable until `desktop_run_attach` atomically consumes that capability. Deterministic focused coverage passed **100/100**; canonical Xcode passed **83/83 Core**, **40/40 app-hosted**, and **6/6 native UI** cases; the full SwiftPM regression passed **1,849 cases with 13 explicit skips and zero failures**. Grok Build remains visible but non-selectable for owned-artifact cleanup and forward compatibility. | Deterministic tests and an installation receipt do not prove that a selectable desktop host is open, has reloaded the package, has accepted hook trust, or has completed a live session. Claude and Codex require separate live acceptance; neither qualifies the other. Grok's documented startup/prompt hook outputs do not deliver Forge's initial assignment context, so no ready, run, or live-support claim is made for Grok in 0.14.0. The Thread Performance Checker limitation belongs to that historical source; `0.15.0 (14)` repaired the product paths and passed 111/111 app-hosted cases with no structured runtime warnings. |
+| LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Checkpoint deterministic recovery coverage verifies bounded discovery across system, per-user, Homebrew, and `PATH` CLI locations; wrapped status JSON and string ports; server start; delayed readiness; reported-port fallback; cancellation; and fail-closed malformed, timed-out, or truncated results. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. The host had no loaded model during that checkpoint qualification, so the record claims no fresh live contract-probe pass. |
 | Revision-3 Provider preparation | Published source `01c874e17c9a26c8f3111981748ed1bd3bdc1f81` passed seven deterministic preparation cases with one explicit live-only skip plus a separately enabled 1/1 live LM Studio `openai/gpt-oss-20b` case. The live operation preserved the pin, verified the contract, wrote the revision-bound readiness receipt, and reused that exact receipt idempotently. Provider configuration passed 14/14 with one explicit disposable-Keychain skip; app provider contracts passed 11/11, operator contracts 10/10, and dashboard security 7/7. | External service start and model load remain typed operator actions when the provider offers no supported authenticated lifecycle API. A focused native UI run timed out while enabling automation before test execution and is a non-pass. |
 | Revision-3 runtime readiness | Published source `01c874e17c9a26c8f3111981748ed1bd3bdc1f81` passed focused checks proving an unavailable optional Python runtime does not disable the shell, an explicitly required Python runtime produces exactly one recovery action, nil-path legacy state remains `unknown`, and application-wide shell denial is reported at its true policy scope. Both SwiftPM products, the signed canonical Debug app build, and the universal Xcode Core test target build passed with the new resolver and test in their canonical targets. | Runtime necessity is derived only from explicit structured evidence; task prose is intentionally not interpreted as authority. A zero-selected app-test filter was a non-pass and is not test evidence. |
-| Managed Autonomy | Current source exposes selectable built-in completion checks and preserves additional requirements only from the exact bound instruction package. Package requirements are read-only in the prepared and running task; unknown configuration-owned identifiers are rejected. Durable Manager evidence, retained completion requests, provider wait/resume, and state-derived recovery guidance have focused deterministic coverage. The embedded watchdog, settled-task deletion, pause/bounded-retry/terminal-stop behavior, and custom model instructions remain available. | Completion remains fail closed without exact durable evidence. The current source has deterministic focused evidence; it is not an installed-build claim. |
+| Managed Autonomy | The checkpoint source exposes selectable built-in completion checks and preserves additional requirements only from the exact bound instruction package. Package requirements are read-only in the prepared and running task; unknown configuration-owned identifiers are rejected. Durable Manager evidence, retained completion requests, provider wait/resume, and state-derived recovery guidance have focused deterministic coverage. The embedded watchdog, settled-task deletion, pause/bounded-retry/terminal-stop behavior, and custom model instructions remain available. | Completion remains fail closed without exact durable evidence. That checkpoint has deterministic focused evidence; it is not an installed-build claim. |
 | Dashboard operability | Published implementation `2319db359f28fba9cf350694ff8f66a7ecc70491` shortens Load Trace and pairs it with bounded status/load cards for headless LM Studio, Autonomy, Continuity, and Rune Forge plus project progress. Directly below, Managed Activity combines the current package, inferred current step, durable delivered count, and run work with bounded operator-redacted assistant/model-error/tool summaries, orchestration events, and exact project/generation policy events. Exact run lookup survives the public recent-100 boundary and returns continuity for that same project/generation/run. Durable storage is capped at 2 KiB per summary and 128 assistant plus 128 tool rows per run; rows are independently content-hashed outside the append-only non-activity audit lineage. Both clients enforce a streamed 4 MiB response ceiling. The view-owned five-second refresh exists only while Dashboard is visible; presentation retains at most 100 app-local rows and caps each displayed activity message at 8 KiB. The retained native UI evidence covers all-primary-view containment/alignment, populated compact equal-height Storage/Managed Activity geometry/content, the Dashboard Guided Setup button, and the populated Rune Forge Policy Feed. | This is a bounded, coalesced latest-state monitor, not token streaming or persisted full-transcript evidence. Rune Forge remains an additive observer and does not control task outcomes. The working installation was not replaced; installed-build qualification remains separate. |
-| Continuity | The r3 deterministic crash matrix recovers every managed transition with one accepted successor and one continuation. A source-bound live LM Studio `openai/gpt-oss-20b` run at an observed 65,536-token context triggered on exact provider usage, fenced predecessor tools, survived a post-bootstrap-response manager restart, accepted and consumed one fresh-root successor, performed the successor-only read, then preserved the same receipt/session/turn/tool set across another restart. Current UI coverage preserves manual actions, exact operation identity, budget, handoff/successor detail, and history while keeping the title/Refresh control below the toolbar and eliminating the unused empty frame. | The live run injects one in-process post-commit crash boundary; the other transitions are covered deterministically rather than by real SIGKILL. LM Studio still exposes no supported authenticated API for replacing an existing desktop GUI chat, so Forge-managed native host mode is the supported automatic path. Current installed-build qualification remains separate. |
-| Resource policy | Focused Debug and final-source, Xcode-compiled signed Release Core stress each passed on this **128 GiB Apple M5 Max** host while also executing the injected **8 GiB constrained policy**. The final Release report refuses to write `passed` after a recorded XCTest failure. | A second physical-memory-capacity execution is not yet recorded. |
+| Continuity | The r3 deterministic crash matrix recovers every managed transition with one accepted successor and one continuation. A source-bound live LM Studio `openai/gpt-oss-20b` run at an observed 65,536-token context triggered on exact provider usage, fenced predecessor tools, survived a post-bootstrap-response manager restart, accepted and consumed one fresh-root successor, performed the successor-only read, then preserved the same receipt/session/turn/tool set across another restart. Retained UI coverage preserves manual actions, exact operation identity, budget, handoff/successor detail, and history while keeping the title/Refresh control below the toolbar and eliminating the unused empty frame. | The live run injects one in-process post-commit crash boundary; the other transitions are covered deterministically rather than by real SIGKILL. At that checkpoint, LM Studio exposed no supported authenticated API for replacing an existing desktop GUI chat; the recorded automatic path used Forge-managed native host mode. Those runs did not qualify the installed build. |
+| Resource policy | Focused Debug and final-source, Xcode-compiled signed Release Core stress each passed on the recorded **128 GiB Apple M5 Max** host while also executing the injected **8 GiB constrained policy**. The final Release report refuses to write `passed` after a recorded XCTest failure. | That checkpoint did not record a second physical-memory-capacity execution. |
 | Native GUI | The published-tree production-onboarding surface passed all seven cases: five in the class run and the two live LM Studio cases in an exact zero-skip rerun after correcting Xcode environment inheritance. | The initial two explicit skips, earlier runner timeouts, and one retained transient live Provider failure remain nonpasses, not hidden passes. |
-| Rune Forge and Stjornarvald | RF-SJ-00 through RF-SJ-10 are implemented. The full SwiftPM rerun passed 1,687 tests with 12 explicit skips; app-hosted Rune Forge/Guided Mode passed 9/9; native UI passed 5/5; prior focused non-interference, fault, restart, privacy, Thread Sanitizer, Xcode membership, signed Debug build, and strict signature evidence remains current. All 40 acceptance rows are individually recorded. | Thirty-nine rows are accepted. AC-032 remains limited because automated accessibility semantics and keyboard behavior passed but a human physical VoiceOver listening session was not performed. This is implementation acceptance, not current-source Developer ID, notarization, installation, or shipment acceptance. |
+| Rune Forge and Stjornarvald | RF-SJ-00 through RF-SJ-10 are implemented. The full SwiftPM rerun passed 1,687 tests with 12 explicit skips; app-hosted Rune Forge/Guided Mode passed 9/9; native UI passed 5/5; prior focused non-interference, fault, restart, privacy, Thread Sanitizer, Xcode membership, signed Debug build, and strict signature evidence remains bound to the RF-SJ checkpoint. All 40 acceptance rows are individually recorded. | Thirty-nine rows are accepted. AC-032 remains limited because automated accessibility semantics and keyboard behavior passed but a human physical VoiceOver listening session was not performed. This is RF-SJ implementation acceptance; it does not qualify the current candidate for Developer ID distribution, notarization, installation, or shipment. |
 
-## Current distribution evidence
+## Historical 0.9.0 (1) distribution evidence — September 17
+
+This receipt retains the September 17 artifacts and assessment results. It is
+separate from the October 3 `0.16.5 (26)` archive/export evidence above.
 
 The exact owner-authored published tree at `f02abeb8`, including the tested
 production source and documentation-only closeout, produced a universal
 Developer ID Release archive and manual export. The archive has one canonical
 `com.forge-conductor.app` product, version `0.9.0` build `1`, both `x86_64` and
 `arm64` architectures, the required icon assets, and all four nested products.
-Strict deep signing and the Release privileged-bundle checker pass on the
+Strict deep signing and the Release privileged-bundle checker passed on the
 archive, export, ZIP extraction, and expanded Installer payload.
 
 The unshipped source-bound app ZIP is:
@@ -856,7 +866,7 @@ The unshipped source-bound app ZIP is:
 
 The matching Installer was signed through Apple's `productbuild` path with
 James Daley's Developer ID Installer identity and a trusted timestamp. Its
-expanded payload retains the exact exported signatures and bundle contents.
+expanded payload retained the exact exported signatures and bundle contents.
 
 The unshipped source-bound Installer is:
 
@@ -864,30 +874,32 @@ The unshipped source-bound Installer is:
 - 22,099,582 bytes
 - SHA-256 `21a0dc3d68dfbd410408c38cb8e3ce1ee9a395269a30bbeba89d94ab13a16d28`
 
-Neither exact published-tree artifact is notarized. Gatekeeper correctly
-rejects the app and Installer as `source=Unnotarized Developer ID`. Earlier
-notarized app receipts remain valid for their recorded source, but they do not
+Neither exact published-tree artifact was notarized at this checkpoint.
+Gatekeeper rejected the app and Installer as `source=Unnotarized Developer ID`.
+Earlier notarized app receipts belong to their recorded source and do not
 replace notarization of these exact artifacts.
 
-## Distribution checks outside the local shippability scope
+## Historical distribution follow-up — September 17
 
-These checks are not part of the owner's definition of shippable for this
-version. They remain documented only for a later public distribution workflow.
-
-The following results are still required before declaring the owner target
-complete:
+This checklist records the unperformed distribution work for the `0.9.0 (1)`
+artifacts above. It does not redefine the current assignment: deliver a buildable
+Xcode project that allows the owner to build, sign, notarize, and distribute.
+The October 3 checks qualify the corrected project and the isolated candidate
+paths in the opening section; the owner retains installation, notarization,
+distribution, and final shipping qualification.
 
 1. Install the final candidate under a controlled owner-approved transition,
    then enable and qualify its Developer ID protected filesystem service as a
    distinct process, including successful authorized mutation and recovery
-   behavior. The current System Settings readback shows Forge background
-   activity off and Manager reports **Approval required**; read-only hashes
-   prove that registered installation contains an older daemon.
+   behavior. At that checkpoint, System Settings readback showed Forge background
+   activity off and Manager reported **Approval required**; read-only hashes
+   identified an older daemon in the registered installation.
 2. Notarize the exact published-tree archive/app and signed outer Installer,
    staple both artifacts, then pass local Gatekeeper execution and installation
    assessments. Existing Notary credentials are required; none are created by
    this workflow. No local `notarytool` profile/API key or repository Actions
-   secret is currently available for a command-line submission.
+   secret was available for command-line submission at that checkpoint; this
+   historical receipt is not a current credential inventory.
 3. Record the resource/stress case on another representative physical-memory
    capacity. The injected constrained policy is valuable coverage but is not a
    second physical host. The published revision's macOS CI Release lane passed
@@ -896,8 +908,8 @@ complete:
 4. Pass public-download acceptance on the notarized artifacts. Shipment remains
    the owner's separate action after qualification.
 
-The owner installation has not been replaced, and neither the app ZIP nor the
-Installer has been shipped or publicly published.
+The owner installation was not replaced at that checkpoint, and neither the
+app ZIP nor the Installer was shipped or publicly published by that workflow.
 
 ## Setup entry points
 

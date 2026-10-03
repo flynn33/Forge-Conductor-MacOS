@@ -5,6 +5,13 @@ Product identity: marketing version **0.16.5**, build **26**. `VERSION` and
 from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
 
+The corrected project is published in owner-authored revision
+`354c695842a4dde00d79f4ee946f35152de9d8df`. The current documentation/wiki
+alignment changes no project, source, resource, or test input. All 12 marketing
+version settings are `0.16.5`; all 16 build-number settings are `26`. The
+[qualification record](docs/QUALIFICATION-STATUS.md) retains the exact Debug,
+archive, export, and native startup/export evidence for those inputs.
+
 Debug builds use automatic Apple Development signing and the exact development
 peer policy. Release archives use manual Developer ID Application signing for
 team `9AQ2C2838M` and compile the exact distribution peer policy. This is a

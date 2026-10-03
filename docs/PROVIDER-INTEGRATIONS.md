@@ -1,6 +1,6 @@
 # Provider integrations
 
-Current source identity: version **0.16.4**, build **25**. Qualification remains
+Current source identity: version **0.16.5**, build **26**. Qualification remains
 evidence-bound per host and candidate.
 
 ## Current provider workflow

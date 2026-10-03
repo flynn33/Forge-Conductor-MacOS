@@ -3,7 +3,9 @@
 Start with the shortest document that answers the question. Historical evidence
 is retained for auditability, but it is not current operating guidance. Current
 operating documents describe repository identity **0.16.5, build 26** unless a
-source-bound historical receipt says otherwise.
+source-bound historical receipt says otherwise. The
+[GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) follows the
+same identity and evidence boundaries.
 
 ## Use and setup
 
@@ -34,7 +36,7 @@ source-bound historical receipt says otherwise.
 | [Telemetry](TELEMETRY.md) | Metrics, delivery, and gauge invariants |
 | [Budget policy](BUDGET-POLICY.md) | Persisted defaults and project overrides |
 | [Versioning](VERSIONING.md) | Product-version and build-number rules |
-| [Diagnostic capture contract](DIAGNOSTIC-CAPTURE-CONTRACT.md) | October 2 report sections A–H, source writers, and regression tests |
+| [Diagnostic capture contract](DIAGNOSTIC-CAPTURE-CONTRACT.md) | October 2 report sections A–H, source writers, regression tests, and failed-startup export |
 
 ## Delivery and current status
 

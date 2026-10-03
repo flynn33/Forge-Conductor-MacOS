@@ -56,8 +56,10 @@ distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.
 
 The root version authorities, compiled protocol constants, all Xcode build
 configurations, and current repository documentation use `0.16.5 (26)`.
-Historical candidate receipts, including the `0.16.2 (23)` Developer ID
-record, retain the identity they actually tested.
+The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) uses
+the same current source identity and qualification boundaries. Historical
+candidate receipts, including the `0.16.2 (23)` Developer ID record, retain the
+identity they actually tested.
 
 ## What Forge Conductor does
 
