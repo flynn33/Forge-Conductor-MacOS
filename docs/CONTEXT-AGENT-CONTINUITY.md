@@ -1,6 +1,7 @@
-# Context and agent continuity (v0.16.4)
+# Context and agent continuity (v0.16.5)
 
-This describes the current source identity; the installed alpha remains 0.16.3.
+This describes the current source identity. The owner-installed 0.16.4 startup
+failure and corrected Xcode project are recorded in the qualification status.
 
 ## Current workflow
 

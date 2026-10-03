@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.16.4**, build **25** (current source; not installed).
+Version **0.16.5**, build **26** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -191,8 +191,13 @@ sanitized stderr, while shell job records retain the durable job ID and
 terminal state without changing the tool response. JSON exports contain the
 selected records. Markdown renders at most the latest 2,000 and states the
 included range and omitted count. The export reads the current master log and
-live ring, not rotated files. These changes are not present in the installed
-alpha until a later owner-controlled installation.
+live ring, not rotated files. Startup failures are captured before the application graph exists. **Diagnostics**
+can export JSON and Markdown even after a bootstrap failure. If Forge home or
+persisted history is unavailable, select a writable export folder; the export
+contains bounded live records and explicitly states that persisted history is
+omitted. The default-folder action reports its actual write failure and can be
+retried with the folder picker. Candidate tests and the installed build are
+tracked separately in the qualification record.
 
 ## 10. Verification boundary
 

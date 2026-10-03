@@ -138,6 +138,90 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         )
     }
 
+    func testBootstrapFailureCanExportDiagnosticsToChosenFolder() throws {
+        let brokenHome = fixture.appendingPathComponent("broken-home")
+        try Data("home obstruction".utf8).write(to: brokenHome)
+        app.launchEnvironment["FORGE_CONDUCTOR_HOME"] = brokenHome.path
+        XCTAssertFalse(app.launchArguments.contains("--uitesting"))
+        app.launch()
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            self.contains(self.element("app-error"), "Bootstrap failed:")
+        }, "The ordinary product must expose the actual home-layout failure")
+        if let candidatePath = ProcessInfo.processInfo.environment["FORGE_DESKTOP_CANDIDATE_PATH"],
+           !candidatePath.isEmpty {
+            let expectedPath = URL(fileURLWithPath: candidatePath).standardizedFileURL.path
+            let runningCandidate = NSWorkspace.shared.runningApplications.first {
+                $0.bundleURL?.standardizedFileURL.path == expectedPath
+            }
+            XCTAssertNotNil(runningCandidate, "The failure must come from the exact requested candidate")
+            print("EVIDENCE exact_candidate_path=\(expectedPath) pid=\(runningCandidate?.processIdentifier ?? -1)")
+        }
+        attachNativeSurface("bootstrap-failed-before-diagnostic-export")
+
+        let exported = try exportDiagnosticsThroughNativePanel(
+            to: fixture.appendingPathComponent("failure-exports", isDirectory: true)
+        )
+        XCTAssertEqual(exported.payload["history_scope"] as? String, "live_ring_only")
+        XCTAssertEqual(exported.payload["persisted_history_available"] as? Bool, false)
+        let historyError = try XCTUnwrap(exported.payload["persisted_history_error"] as? String)
+        XCTAssertFalse(historyError.isEmpty)
+        let records = try XCTUnwrap(exported.payload["records"] as? [[String: Any]])
+        let failures = records.filter { $0["event"] as? String == "gui_bootstrap_failed" }
+        XCTAssertEqual(failures.count, 1)
+        let failure = try XCTUnwrap(failures.first)
+        XCTAssertEqual(failure["category"] as? String, "bootstrap")
+        XCTAssertEqual(failure["severity"] as? String, "error")
+        let recordID = try XCTUnwrap(failure["record_id"] as? String)
+        XCTAssertFalse(recordID.isEmpty)
+        let fields = try XCTUnwrap(failure["fields"] as? [String: String])
+        XCTAssertEqual(fields["bootstrap_stage"], "application_graph")
+        for key in ["error", "error_type", "error_domain", "error_code"] {
+            XCTAssertFalse(try XCTUnwrap(fields[key]).isEmpty, key)
+        }
+        XCTAssertNotEqual(try XCTUnwrap(Int(try XCTUnwrap(fields["error_code"]))), 0)
+        XCTAssertTrue(records.contains {
+            $0["event"] as? String == "diagnostics_persisted_history_unavailable"
+        })
+        XCTAssertEqual(exported.payload["json_omitted_count"] as? Int, 0)
+        XCTAssertEqual(exported.payload["record_count"] as? Int, records.count)
+        XCTAssertEqual(exported.payload["markdown_omitted_count"] as? Int, 0)
+        XCTAssertTrue(exported.markdown.contains("gui_bootstrap_failed"))
+        XCTAssertTrue(exported.markdown.contains(recordID))
+        XCTAssertTrue(exported.markdown.contains("persisted history was unavailable and is omitted"))
+        XCTAssertTrue(exported.markdown.contains("error_domain="))
+        XCTAssertTrue(exported.markdown.contains("error_code="))
+        for text in [exported.json, exported.markdown] {
+            XCTAssertFalse(text.contains(brokenHome.path))
+            XCTAssertFalse(text.contains(fixture.path))
+            XCTAssertNil(text.range(of: #"(?i)authorization:\s*(bearer|basic)\s+[A-Za-z0-9._~+\-/=]+"#,
+                                    options: .regularExpression))
+        }
+        attachNativeSurface("bootstrap-failure-diagnostics-exported")
+    }
+
+    func testHealthyBootstrapCanExportDiagnosticsToChosenFolder() async throws {
+        _ = try await launchOrdinaryApplication()
+        let exported = try exportDiagnosticsThroughNativePanel(
+            to: fixture.appendingPathComponent("healthy-exports", isDirectory: true)
+        )
+        XCTAssertEqual(exported.payload["history_scope"] as? String,
+                       "current_master_log_latest_50000_lines_plus_live_ring")
+        XCTAssertEqual(exported.payload["persisted_history_available"] as? Bool, true)
+        XCTAssertTrue(exported.payload["persisted_history_error"] is NSNull)
+        let records = try XCTUnwrap(exported.payload["records"] as? [[String: Any]])
+        XCTAssertTrue(records.contains { $0["event"] as? String == "gui_bootstrap" })
+        XCTAssertFalse(records.contains { $0["event"] as? String == "gui_bootstrap_failed" })
+        XCTAssertEqual(exported.payload["record_count"] as? Int, records.count)
+        XCTAssertEqual(exported.payload["json_omitted_count"] as? Int, 0)
+        XCTAssertTrue(exported.markdown.contains("gui_bootstrap"))
+        XCTAssertTrue(exported.markdown.contains("Current master log"))
+        for text in [exported.json, exported.markdown] {
+            XCTAssertFalse(text.contains(forgeHome.path))
+            XCTAssertFalse(text.contains(fixture.path))
+        }
+        attachNativeSurface("healthy-bootstrap-diagnostics-exported")
+    }
+
     func testNativeFolderAuthorizationCancellationAndInvalidRootPreserveSavedSettings() async throws {
         _ = try await launchOrdinaryApplication()
         let baseline: OnboardingManagerSettings = try await read("/api/manager/settings")
@@ -921,6 +1005,47 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     }
 
     private var folderPanel: XCUIElement { app.dialogs["open-panel"] }
+
+    private func exportDiagnosticsThroughNativePanel(
+        to directory: URL
+    ) throws -> (payload: [String: Any], json: String, markdown: String) {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        try click(app.buttons["tab-diagnostics"])
+        XCTAssertTrue(element("detail-diagnostics").waitForExistence(timeout: 8))
+        try click(app.buttons["diagnostics-export"])
+        XCTAssertTrue(folderPanel.waitForExistence(timeout: 10), "The production export picker must appear")
+        XCTAssertTrue(folderPanel.buttons["Export Here"].exists)
+        attachScreenshot("diagnostics-native-export-folder-picker")
+        try chooseFolderInNativePanel(directory.path, prompt: "Export Here")
+        let completion = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Exported ")
+        ).firstMatch
+        XCTAssertTrue(completion.waitForExistence(timeout: 20), "The native export must report completion")
+        XCTAssertTrue(waitUntil { self.app.buttons["diagnostics-export"].isEnabled })
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let jsonFiles = files.filter { $0.pathExtension == "json" }
+        let markdownFiles = files.filter { $0.pathExtension == "md" }
+        XCTAssertEqual(jsonFiles.count, 1)
+        XCTAssertEqual(markdownFiles.count, 1)
+        let jsonURL = try XCTUnwrap(jsonFiles.first)
+        let markdownURL = try XCTUnwrap(markdownFiles.first)
+        XCTAssertEqual(jsonURL.deletingPathExtension().lastPathComponent,
+                       markdownURL.deletingPathExtension().lastPathComponent)
+        let data = try Data(contentsOf: jsonURL)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
+        let markdown = try String(contentsOf: markdownURL, encoding: .utf8)
+        let jsonAttachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        jsonAttachment.name = "native-diagnostics-export-json"
+        jsonAttachment.lifetime = .keepAlways
+        add(jsonAttachment)
+        let markdownAttachment = XCTAttachment(string: markdown)
+        markdownAttachment.name = "native-diagnostics-export-markdown"
+        markdownAttachment.lifetime = .keepAlways
+        add(markdownAttachment)
+        return (payload, json, markdown)
+    }
 
     private func openFolderPicker() throws {
         try click(app.buttons["settings-allowed-root-add"])

@@ -2,7 +2,8 @@
 
 This table maps sections A–H of the October 2 installed-alpha analysis to the
 source writer and a test that exercises the boundary. It describes the source
-tree only. The installed 0.16.3 alpha has not run these changes.
+tree only. The prior source tests did not qualify the later installed 0.16.4 signing path.
+The 0.16.5 startup/export correction is recorded below.
 
 | Report section | Writer and captured distinction | Regression test |
 | --- | --- | --- |
@@ -19,3 +20,20 @@ The old archive cannot reveal the discarded exceptions behind R11618 or
 R11636, R11458's exact failure cause, R11579's process exit, or R11640's
 terminal job state. Those facts remain unknowable from that archive. The
 source tests above do not establish an installed-alpha repair.
+
+## Startup and export after failed bootstrap
+
+`AppBootstrapOperation.start` creates a separately owned `DiagnosticLog` on its
+existing background worker before constructing the application graph. It records
+startup, cancellation, and failures with error identity and the observed stage.
+`AppModel` owns this log across retries and uses it for Diagnostics preview
+and both export actions while `app` is unavailable. The production graph reuses
+the same log after startup and borrows its lifetime; graph shutdown drains it,
+while AppModel closes it off the main actor after its background operations end.
+
+Startup export does not require the full app directory layout. When the master
+history cannot be read, its bounded sanitized live ring remains exportable to a
+writable selected folder; JSON and Markdown explicitly disclose the omitted
+persisted history. An unwritable destination still fails and permits retry.
+Regression names and exact native candidate evidence are recorded in
+[qualification status](QUALIFICATION-STATUS.md).

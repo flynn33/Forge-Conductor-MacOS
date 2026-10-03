@@ -19,6 +19,7 @@ public final class ForgeApp: @unchecked Sendable {
     public let store: SQLiteStore
     public let audit: AuditService
     public let diagnostics: DiagnosticLog
+    private let ownsDiagnostics: Bool
     public let runtimeDiagnostics: RuntimeDiagnostics
     public let catalog: AgentCatalog
     public let sessions: AgentSessionService
@@ -59,6 +60,7 @@ public final class ForgeApp: @unchecked Sendable {
         store: SQLiteStore,
         audit: AuditService,
         diagnostics: DiagnosticLog,
+        ownsDiagnostics: Bool,
         runtimeDiagnostics: RuntimeDiagnostics,
         catalog: AgentCatalog,
         sessions: AgentSessionService,
@@ -78,6 +80,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.store = store
         self.audit = audit
         self.diagnostics = diagnostics
+        self.ownsDiagnostics = ownsDiagnostics
         self.runtimeDiagnostics = runtimeDiagnostics
         self.catalog = catalog
         self.sessions = sessions
@@ -94,8 +97,15 @@ public final class ForgeApp: @unchecked Sendable {
     }
 
     /// Bootstrap durable layout, SQLite, and services under the given home (or default).
-    public static func bootstrap(home: URL? = nil, clock: any Clock = SystemClock()) throws -> ForgeApp {
+    public static func bootstrap(
+        home: URL? = nil,
+        clock: any Clock = SystemClock(),
+        diagnostics startupDiagnostics: DiagnosticLog? = nil
+    ) throws -> ForgeApp {
         let paths = AppPaths(home: home)
+        if let startupDiagnostics, startupDiagnostics.homeURL.standardizedFileURL != paths.home.standardizedFileURL {
+            throw ForgeBootstrapError.diagnosticHomeMismatch
+        }
         try paths.ensureLayout()
         _ = try? FilesystemQuarantineLedger(paths: paths).reconcile()
         let config = ConfigStore(paths: paths)
@@ -107,10 +117,11 @@ public final class ForgeApp: @unchecked Sendable {
         let mcpRole = (envRole?.isEmpty == false)
             ? envRole!
             : config.string("mcp", "role", default: "primary")
-        let diagnostics = DiagnosticLog(
+        let diagnostics = startupDiagnostics ?? DiagnosticLog(
             paths: paths,
             role: mcpRole
         )
+        diagnostics.configureRole(mcpRole)
         let shellMigration = config.shellMigrationStatus
         if shellMigration.diagnosticPending {
             diagnostics.info(
@@ -224,6 +235,7 @@ public final class ForgeApp: @unchecked Sendable {
             store: store,
             audit: audit,
             diagnostics: diagnostics,
+            ownsDiagnostics: startupDiagnostics == nil,
             runtimeDiagnostics: runtimeDiagnostics,
             catalog: catalog,
             sessions: sessions,
@@ -291,7 +303,11 @@ public final class ForgeApp: @unchecked Sendable {
             )
         }
         store.close()
-        guard diagnostics.shutdown(timeout: 2) else {
+        // GUI startup owns an injected log across failed/cancelled attempts.
+        // This graph drains its writes; only that caller closes the shared owner.
+        let diagnosticsDrained = ownsDiagnostics
+            ? diagnostics.shutdown(timeout: 2) : diagnostics.flush(timeout: 2)
+        guard diagnosticsDrained else {
             return RuntimeJobShutdownReport(
                 completed: false,
                 unresolvedJobIDs: report.unresolvedJobIDs,
@@ -504,6 +520,14 @@ public final class ForgeApp: @unchecked Sendable {
     /// HTTP / CLI edge.
     public func doctor() throws -> [String: Any] {
         try doctorModel().asDictionary()
+    }
+}
+
+enum ForgeBootstrapError: Error, LocalizedError {
+    case diagnosticHomeMismatch
+
+    var errorDescription: String? {
+        "Startup diagnostics belong to a different Forge home."
     }
 }
 

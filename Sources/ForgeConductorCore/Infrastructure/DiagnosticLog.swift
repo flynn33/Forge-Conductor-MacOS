@@ -160,7 +160,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     public static let maxMasterLogBytes: UInt64 = 8 * 1024 * 1024
 
     private let paths: AppPaths
-    private let role: String
+    private let roleState: Mutex<String>
+    private var role: String { roleState.withLock { $0 } }
     private let ringLimit: Int
     private let maximumLogBytes: UInt64
     private let retainedArchives: Int
@@ -170,7 +171,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
 
     public init(paths: AppPaths, role: String = "primary") {
         self.paths = paths
-        self.role = role
+        self.roleState = Mutex(role)
         let limits = ResourcePolicy.current.nominalLimits
         self.ringLimit = min(Self.ringCapacity, limits.diagnosticRingRecords)
         self.maximumLogBytes = min(Self.maxMasterLogBytes, limits.logFileBytes)
@@ -199,7 +200,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         beforePersistence: (@Sendable () -> Void)? = nil
     ) {
         self.paths = paths
-        self.role = role
+        self.roleState = Mutex(role)
         self.ringLimit = max(1, ringLimit)
         self.maximumLogBytes = max(1, maximumLogBytes)
         self.retainedArchives = max(0, retainedArchives)
@@ -219,6 +220,13 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
 
     deinit {
         _ = persistenceQueue.shutdown(timeout: 0.25)
+    }
+
+    var homeURL: URL { paths.home }
+
+    /// Bootstrap resolves the configured role before publishing its services.
+    func configureRole(_ role: String) {
+        roleState.withLock { $0 = role }
     }
 
     // MARK: - Write
@@ -282,7 +290,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             do {
                 try writer.persist(envelope)
             } catch {
-                fputs("diagnostic log error: \(error)\n", stderr)
+                fputs("diagnostic log error: \(DiagnosticRedaction.sanitizedError(String(describing: error)))\n", stderr)
             }
         }
     }
@@ -359,11 +367,36 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         to directory: URL? = nil,
         basename: String? = nil
     ) throws -> ExportResult {
-        try paths.ensureLayout()
+        try export(to: directory, basename: basename, allowPartialHistory: false)
+    }
+
+    public func export(
+        to directory: URL? = nil,
+        basename: String? = nil,
+        allowPartialHistory: Bool
+    ) throws -> ExportResult {
+        // A failed startup may itself be caused by the home layout. A selected
+        // writable destination can still receive its sanitized live records.
+        if !allowPartialHistory { try paths.ensureLayout() }
         let dir = directory ?? paths.exportsDir
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
-        var merged = try loadPersisted()
+        var persistedHistoryError: String?
+        var merged: [DiagnosticEnvelope]
+        do {
+            if allowPartialHistory {
+                try FileManager.default.createDirectory(at: paths.logsDir, withIntermediateDirectories: true)
+            }
+            merged = try loadPersisted()
+        } catch {
+            guard allowPartialHistory else { throw error }
+            persistedHistoryError = DiagnosticRedaction.sanitizedError(String(describing: error))
+            self.error("diagnostics_persisted_history_unavailable", [
+                "error": String(describing: error),
+                "history_scope": "live_ring_only",
+            ], category: .diagnostics)
+            merged = []
+        }
         let live = ringState.snapshot(limit: .max)
         // Prefer disk order; append any ring entries not already present by (ts,event,pid)
         var seen = Set(merged.map(\.identityKey))
@@ -393,7 +426,10 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             "last_record_id": merged.last?.recordID as Any? ?? NSNull(),
             "first_record_at": merged.first?.tsISO as Any? ?? NSNull(),
             "last_record_at": merged.last?.tsISO as Any? ?? NSNull(),
-            "history_scope": "current_master_log_latest_50000_lines_plus_live_ring",
+            "history_scope": persistedHistoryError == nil
+                ? "current_master_log_latest_50000_lines_plus_live_ring" : "live_ring_only",
+            "persisted_history_available": persistedHistoryError == nil,
+            "persisted_history_error": persistedHistoryError as Any? ?? NSNull(),
             "dropped_persistence_records_this_process": droppedPersistenceCount,
             "records": merged.map { $0.asDictionary() },
         ]
@@ -405,7 +441,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             version: ForgeApp.version,
             home: DiagnosticRedaction.redactedValue(paths.home.path, forKey: "home"),
             records: merged,
-            droppedPersistenceRecords: droppedPersistenceCount
+            droppedPersistenceRecords: droppedPersistenceCount,
+            persistedHistoryError: persistedHistoryError
         )
         try md.write(to: mdURL, atomically: true, encoding: .utf8)
 
@@ -437,7 +474,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         version: String,
         home: String,
         records: [DiagnosticEnvelope],
-        droppedPersistenceRecords: Int
+        droppedPersistenceRecords: Int,
+        persistedHistoryError: String?
     ) -> String {
         var lines: [String] = []
         lines.append("# \(product) Diagnostic Export")
@@ -446,7 +484,12 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         lines.append("- **Home:** `\(home)`")
         lines.append("- **Exported:** \(ISO8601.string(from: Date()))")
         lines.append("- **Records:** \(records.count)")
-        lines.append("- **History scope:** Current master log (latest 50,000 lines) plus live ring; rotated files are not read.")
+        if let persistedHistoryError {
+            lines.append("- **History scope:** Live ring only; persisted history was unavailable and is omitted.")
+            lines.append("- **Persisted history error:** \(persistedHistoryError)")
+        } else {
+            lines.append("- **History scope:** Current master log (latest 50,000 lines) plus live ring; rotated files are not read.")
+        }
         lines.append("- **Dropped persistence records in this process:** \(droppedPersistenceRecords)")
         let rendered = Array(records.suffix(2_000))
         lines.append("- **JSON records:** \(records.count) of \(records.count) selected; 0 omitted")
@@ -554,7 +597,7 @@ private final class DiagnosticPersistenceWriter: @unchecked Sendable {
 
     func persist(_ envelope: DiagnosticEnvelope) throws {
         beforePersistence?()
-        try paths.ensureLayout()
+        try FileManager.default.createDirectory(at: paths.logsDir, withIntermediateDirectories: true)
         let data = try envelope.jsonLine()
         try append(data, to: paths.masterDiagnostics)
         try append(data, to: paths.toolDiagnostics)

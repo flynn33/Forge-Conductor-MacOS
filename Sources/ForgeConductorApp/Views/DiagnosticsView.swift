@@ -29,9 +29,12 @@ struct DiagnosticsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("diagnostics-export")
+                .disabled(model.isExportingDiagnostics)
                 Button("Export to ~/…/exports") {
                     model.exportDiagnosticsToDefaultFolder()
                 }
+                .accessibilityIdentifier("diagnostics-export-default")
+                .disabled(model.isExportingDiagnostics)
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -48,6 +51,14 @@ struct DiagnosticsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
+
+            if model.app == nil {
+                Text("Startup diagnostics remain available before the app starts. If log storage is unavailable, choose another export folder; the export identifies any omitted history.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .accessibilityIdentifier("diagnostics-startup-status")
+            }
 
             if let runtime = model.runtimeDiagnosticSnapshot {
                 runtimeSummary(runtime)

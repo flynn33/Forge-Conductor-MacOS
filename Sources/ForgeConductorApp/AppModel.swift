@@ -991,20 +991,25 @@ final class AppBackgroundOperation {
 @MainActor
 final class AppBootstrapOperation {
     typealias Factory = @Sendable () throws -> ForgeApp
+    private typealias FactoryWithDiagnostics = @Sendable (DiagnosticLog?) throws -> ForgeApp
     typealias PluginStatus = @Sendable (ForgeApp) -> LMStudioMCPPluginInstaller.PluginStatus?
-    private let factory: Factory
+    private let factory: FactoryWithDiagnostics
     private let pluginStatus: PluginStatus
     private var task: Task<Void, Never>?
 
     init(
-        factory: @escaping Factory = { try ForgeApp.bootstrap() },
+        home: URL? = nil,
+        factory: Factory? = nil,
         pluginStatus: @escaping PluginStatus = { app in
             app.lmStudioDeploy.status(
                 preferredBinary: app.lmStudioDeploy.resolveServeBinary(preferred: Bundle.main.executableURL)
             )
         }
     ) {
-        self.factory = factory
+        self.factory = { diagnostics in
+            if let factory { return try factory() }
+            return try ForgeApp.bootstrap(home: home, diagnostics: diagnostics)
+        }
         self.pluginStatus = pluginStatus
     }
 
@@ -1013,21 +1018,50 @@ final class AppBootstrapOperation {
     var isRunning: Bool { task != nil }
 
     @discardableResult
-    func start(completion: @escaping @MainActor (Result<AppBootstrapSnapshot, Error>) -> Void) -> Bool {
+    func start(
+        diagnosticsFactory: (@Sendable () -> DiagnosticLog)? = nil,
+        diagnosticsPrepared: @escaping @MainActor @Sendable (DiagnosticLog) -> Void = { _ in },
+        completion: @escaping @MainActor (Result<AppBootstrapSnapshot, Error>) -> Void
+    ) -> Bool {
         guard task == nil else { return false }
         let factory = self.factory
         let pluginStatus = self.pluginStatus
         let worker = Task.detached(priority: .userInitiated) {
-            try Task.checkCancellation()
-            let app = try factory()
+            let diagnostics = diagnosticsFactory?()
+            if let diagnostics {
+                diagnostics.info("gui_bootstrap_started", category: .bootstrap)
+                await diagnosticsPrepared(diagnostics)
+            }
+            var stage = "application_graph"
+            var constructedApp: ForgeApp?
             do {
                 try Task.checkCancellation()
+                let app = try factory(diagnostics)
+                constructedApp = app
+                stage = "plugin_status"
+                try Task.checkCancellation()
                 let status = pluginStatus(app)
+                stage = "settings_snapshot"
                 let settings = Self.settingsSnapshot(app)
+                stage = "publication"
                 try Task.checkCancellation()
                 return AppBootstrapSnapshot(app: app, pluginStatus: status, settings: settings)
             } catch {
-                _ = app.shutdown()
+                let nativeError = error as NSError
+                let fields = [
+                    "error": String(describing: error),
+                    "error_type": String(reflecting: type(of: error)),
+                    "error_domain": nativeError.domain,
+                    "error_code": String(nativeError.code),
+                    "bootstrap_stage": stage,
+                ]
+                if error is CancellationError {
+                    diagnostics?.warn("gui_bootstrap_cancelled", fields, category: .bootstrap)
+                } else {
+                    diagnostics?.error("gui_bootstrap_failed", fields, category: .bootstrap)
+                }
+                _ = diagnostics?.flush(timeout: 2)
+                if let constructedApp { _ = constructedApp.shutdown() }
                 throw error
             }
         }
@@ -1155,11 +1189,15 @@ public final class AppModel: ObservableObject {
     private var rigOperationalTask: Task<Void, Never>?
     private var remoteManagerLastError: String?
     private let bootstrapOperation: AppBootstrapOperation
+    private let startupDiagnosticPaths: AppPaths
+    private var startupDiagnostics: DiagnosticLog?
+    private let revealDiagnosticExport: ([URL]) -> Void
     private let settingsOperation = AppBackgroundOperation()
     private let pluginStatusOperation = AppBackgroundOperation()
     private var pluginStatusRefreshPending = false
     private let deploymentOperation = AppBackgroundOperation()
     private let diagnosticsExportOperation = AppBackgroundOperation()
+    private let diagnosticsShutdownOperation = AppBackgroundOperation()
     private var preferredServeBinaryURL: URL?
     private let secureFilesystemService = SecureFilesystemServiceController()
     private var secureFilesystemOperationTask: Task<Void, Never>?
@@ -1225,8 +1263,16 @@ public final class AppModel: ObservableObject {
         self.init(bootstrapOperation: AppBootstrapOperation())
     }
 
-    init(bootstrapOperation: AppBootstrapOperation) {
+    init(
+        bootstrapOperation: AppBootstrapOperation,
+        diagnosticPaths: AppPaths = AppPaths(),
+        revealDiagnosticExport: @escaping ([URL]) -> Void = {
+            NSWorkspace.shared.activateFileViewerSelecting($0)
+        }
+    ) {
         self.bootstrapOperation = bootstrapOperation
+        self.startupDiagnosticPaths = diagnosticPaths
+        self.revealDiagnosticExport = revealDiagnosticExport
         secureFilesystemService.setLifecycleStateObserver { [weak self] observation in
             self?.applySecureFilesystemLifecycleObservation(observation)
         }
@@ -1240,7 +1286,15 @@ public final class AppModel: ObservableObject {
         isBootstrapping = true
         isLoading = true
         lastError = nil
-        bootstrapOperation.start { [weak self] result in
+        let paths = startupDiagnosticPaths
+        let previousDiagnostics = startupDiagnostics
+        bootstrapOperation.start(
+            diagnosticsFactory: { previousDiagnostics ?? DiagnosticLog(paths: paths) },
+            diagnosticsPrepared: { [weak self] diagnostics in
+                self?.startupDiagnostics = diagnostics
+                self?.refreshDiagnosticsPreview()
+            }
+        ) { [weak self] result in
             guard let self else { return }
             self.isBootstrapping = false
             switch result {
@@ -1253,6 +1307,7 @@ public final class AppModel: ObservableObject {
                 self.isLoading = false
                 self.lastError = "Bootstrap failed: \(error)"
             }
+            self.refreshDiagnosticsPreview()
         }
     }
 
@@ -1267,6 +1322,16 @@ public final class AppModel: ObservableObject {
         pluginStatusOperation.cancel()
         deploymentOperation.cancel()
         diagnosticsExportOperation.cancel()
+        if let diagnostics = startupDiagnostics {
+            let bootstrap = bootstrapOperation
+            let export = diagnosticsExportOperation
+            startupDiagnostics = nil
+            diagnosticsShutdownOperation.start {
+                await bootstrap.stop()
+                await export.stop()
+                return diagnostics.shutdown(timeout: 2)
+            } completion: { _ in }
+        }
         stopRigOperationalMonitoring()
     }
 
@@ -1500,6 +1565,9 @@ public final class AppModel: ObservableObject {
 
     func stopBootstrap() async {
         await bootstrapOperation.stop()
+        if let startupDiagnostics {
+            _ = await Task.detached { startupDiagnostics.shutdown(timeout: 2) }.value
+        }
     }
 
     private func applyBootstrap(_ snapshot: AppBootstrapSnapshot) {
@@ -1755,16 +1823,14 @@ public final class AppModel: ObservableObject {
     // MARK: - Diagnostics
 
     public func refreshDiagnosticsPreview() {
-        diagnosticPreview = app?.diagnostics.recent(limit: 200) ?? []
+        let startup = startupDiagnostics?.recent(limit: 200) ?? []
+        let running = app?.diagnostics === startupDiagnostics ? [] : app?.diagnostics.recent(limit: 200) ?? []
+        diagnosticPreview = Array((startup + running).sorted { $0.ts < $1.ts }.suffix(200))
         runtimeDiagnosticSnapshot = app?.runtimeDiagnosticSnapshot()
     }
 
     public func exportDiagnostics() {
         guard !isExportingDiagnostics else { return }
-        guard app != nil else {
-            lastExportMessage = "App not bootstrapped"
-            return
-        }
         isExportingDiagnostics = true
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -1772,7 +1838,7 @@ public final class AppModel: ObservableObject {
         panel.canCreateDirectories = true
         panel.prompt = "Export Here"
         panel.message = "Choose a folder for Forge Conductor diagnostics (.json + .md)"
-        panel.directoryURL = app?.paths.exportsDir
+        panel.directoryURL = app?.paths.exportsDir ?? startupDiagnosticPaths.exportsDir
         guard panel.runModal() == .OK, let directory = panel.url else {
             isExportingDiagnostics = false
             lastExportMessage = "Export cancelled"
@@ -1782,19 +1848,23 @@ public final class AppModel: ObservableObject {
     }
 
     public func exportDiagnosticsToDefaultFolder() {
-        guard !isExportingDiagnostics, let directory = app?.paths.exportsDir else { return }
-        isExportingDiagnostics = true
+        guard !isExportingDiagnostics else { return }
+        let directory = app?.paths.exportsDir ?? startupDiagnosticPaths.exportsDir
         beginDiagnosticsExport(to: directory, reveal: true)
     }
 
-    private func beginDiagnosticsExport(to directory: URL, reveal: Bool) {
-        guard let diagnostics = app?.diagnostics else {
+    func beginDiagnosticsExport(to directory: URL, reveal: Bool) {
+        guard !diagnosticsExportOperation.isRunning else { return }
+        guard let diagnostics = app?.diagnostics ?? startupDiagnostics else {
             isExportingDiagnostics = false
+            lastExportMessage = "Startup diagnostics are being prepared. Try exporting again."
             return
         }
+        isExportingDiagnostics = true
+        let allowPartialHistory = app == nil
         lastExportMessage = "Exporting diagnostics…"
         diagnosticsExportOperation.start {
-            try diagnostics.export(to: directory, basename: nil)
+            try diagnostics.export(to: directory, basename: nil, allowPartialHistory: allowPartialHistory)
         } completion: { [weak self] result in
             guard let self else { return }
             self.isExportingDiagnostics = false
@@ -1803,7 +1873,7 @@ public final class AppModel: ObservableObject {
                 self.lastExportMessage =
                     "Exported \(exported.recordCount) records →\n\(exported.jsonURL.path)\n\(exported.markdownURL.path)"
                 if reveal {
-                    NSWorkspace.shared.activateFileViewerSelecting([exported.jsonURL, exported.markdownURL])
+                    self.revealDiagnosticExport([exported.jsonURL, exported.markdownURL])
                 }
                 self.refreshDiagnosticsPreview()
             case .failure(is CancellationError): self.lastExportMessage = "Export cancelled"

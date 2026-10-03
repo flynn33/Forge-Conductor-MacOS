@@ -898,7 +898,7 @@ final class ProductPathReliabilityTests: XCTestCase {
         )
     }
 
-    func testXcodeShippedTargetsUseDevelopmentSigningForAlphaArchive() throws {
+    func testXcodeShippedTargetsSeparateDevelopmentAndDistributionSigningPolicies() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -942,24 +942,26 @@ final class ProductPathReliabilityTests: XCTestCase {
             XCTAssertFalse(
                 settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#)
             )
+            XCTAssertTrue(settings.contains("CODE_SIGN_STYLE = Automatic;"))
+            XCTAssertTrue(settings.contains("DEVELOPMENT_TEAM = 9AQ2C2838M;"))
         }
 
         for identifier in releaseConfigurations {
             let settings = try configuration(identifier)
             XCTAssertTrue(
-                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#),
-                "Alpha archive target \(identifier) must use development signing"
+                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
+                "Distribution target \(identifier) must be signed before daemon hashes are sealed"
             )
             XCTAssertTrue(
                 settings.contains("DEVELOPMENT_TEAM = 9AQ2C2838M;"),
                 "Release shipped target \(identifier) must use James Daley's team"
             )
             XCTAssertTrue(
-                settings.contains("CODE_SIGN_STYLE = Automatic;"),
-                "Alpha archive target \(identifier) must allow automatic development signing"
+                settings.contains("CODE_SIGN_STYLE = Manual;"),
+                "Distribution target \(identifier) must retain its exact Developer ID identity"
             )
             XCTAssertFalse(
-                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#)
+                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#)
             )
             XCTAssertFalse(
                 settings.contains("CODE_SIGN_IDENTITY[sdk=macosx*]"),
@@ -975,16 +977,14 @@ final class ProductPathReliabilityTests: XCTestCase {
             )
         }
         let releaseProjectSettings = try configuration("CEFEFE9428CD4B5F869BE9F3")
-        XCTAssertTrue(
-            releaseProjectSettings.contains(
-                #"SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) FORGE_DEVELOPMENT_SIGNING";"#
-            ),
-            "Optimized alpha archives must compile the matching development peer policy"
-        )
-        XCTAssertFalse(
-            project.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
-            "The downloadable alpha project must not require release signing"
-        )
+        XCTAssertFalse(releaseProjectSettings.contains("FORGE_DEVELOPMENT_SIGNING"),
+                       "Developer ID export changes signatures, not compiled peer policy")
+        XCTAssertFalse(releaseProjectSettings.contains("SWIFT_ACTIVE_COMPILATION_CONDITIONS"),
+                       "Release must inherit the distribution policy without development conditions")
+        let debugProjectSettings = try configuration("63739DAB5B654C0B846F75C1")
+        XCTAssertTrue(debugProjectSettings.contains(
+            #"SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";"#
+        ), "Ordinary Debug execution must retain its matching Apple Development peer policy")
         XCTAssertFalse(
             project.contains(#"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";"#),
             "An SDK-specific ad hoc override must not replace team signing"

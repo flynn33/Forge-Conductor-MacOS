@@ -10,21 +10,10 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-- Restored the downloadable Xcode project's alpha archive path to automatic
-  Apple Development signing on team `9AQ2C2838M`. The optimized archive
-  configuration now compiles the matching development peer policy. Resolved
-  build settings and a focused project regression are the current evidence;
-  no new archive, package, installation, or distribution was produced.
-
-Current source identity: `0.16.4 (25)`; the diagnostic source correction is
-not installed or deployed. Historical source
-`a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer ID
-app and `.xcarchive`. A fresh archive was built from HEAD
-`b8a2c5dee546dff8d914405c2169a075bd0187e2` for a CLI staging and LM
-Studio deploy check. The signed package was built but **not installed** because
-macOS required root. The `/Applications` app is a manual copy of the candidate,
-not a package installation; notarization, stapling, shipment, and release
-remain open.
+Current source identity: `0.16.5 (26)`. The installed `0.16.4 (25)` startup and
+export failures were reproduced on October 3; candidate evidence and remaining
+qualification boundaries are recorded in [qualification status](docs/QUALIFICATION-STATUS.md).
+Installation, notarization, and shipment of this correction remain separate gates.
 
 ### Added
 
@@ -37,8 +26,7 @@ remain open.
   paths each retain their own attempt or pass ID, actual stage, handoff identity
   when created, and successor-request state. The
   [capture contract](docs/DIAGNOSTIC-CAPTURE-CONTRACT.md) maps report sections
-  A–H to exact writers and regression tests. The installed alpha has not
-  exercised this source.
+  A–H to exact writers and regression tests. The earlier source tests did not exercise the later installed signing path.
 - Produced the `0.16.3 (24)` universal Developer ID app and `.xcarchive` under
   `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID`. The app,
   framework, CLI, runtime launcher, and filesystem daemon pass the strict
@@ -75,6 +63,16 @@ remain open.
   selection and deletion remain on Projects.
 
 ### Fixed
+
+- Corrected Release archiving to use Developer ID signing and distribution peer
+  policy throughout the app, framework, CLI, runtime launcher, and filesystem
+  daemon. Re-signing the prior development archive changed daemon hashes while
+  preserving its development-only policy and pre-export seals, causing the
+  observed bootstrap rejection and stale seals incompatible with the filesystem
+  identity validator.
+- Added independently owned startup diagnostics and export after bootstrap
+  failure. A writable selected folder can receive sanitized live records when
+  Forge home is inaccessible; JSON and Markdown disclose unavailable history.
 
 - Corrected `fs_read` so only an observed missing-file POSIX error returns
   `not_found`; permission, nonregular-file, invalid-text, and unclassified

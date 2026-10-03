@@ -277,6 +277,50 @@ final class AppBootstrapAppTests: XCTestCase {
         XCTAssertEqual(probe.startCount, 2)
     }
 
+    func testCancelledSharedBootstrapKeepsCallerDiagnosticsAliveForRetry() async throws {
+        let directory = home()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let diagnostics = DiagnosticLog(paths: AppPaths(home: directory))
+        defer { _ = diagnostics.shutdown(timeout: 2) }
+        let probe = BootstrapProbe()
+        defer { probe.release.signal() }
+        let operation = AppBootstrapOperation(home: directory, pluginStatus: { app in
+            probe.observe(app)
+            if probe.started() == 1 {
+                XCTAssertEqual(probe.release.wait(timeout: .now() + 10), .success)
+            }
+            return nil
+        })
+        var cancellations = 0
+        XCTAssertTrue(operation.start(diagnosticsFactory: { diagnostics }) { result in
+            guard case .failure(is CancellationError) = result else {
+                return XCTFail("Cancelled shared bootstrap published an application")
+            }
+            cancellations += 1
+        })
+        try await waitUntil { probe.startCount == 1 }
+        operation.cancel()
+        probe.release.signal()
+        await operation.stop()
+        XCTAssertEqual(cancellations, 1)
+        XCTAssertNil(probe.application, "The cancelled graph must be released without closing its caller-owned log")
+
+        var retried: Result<AppBootstrapSnapshot, Error>?
+        XCTAssertTrue(operation.start(diagnosticsFactory: { diagnostics }) { retried = $0 })
+        try await waitUntil { retried != nil }
+        let snapshot = try XCTUnwrap(retried).get()
+        XCTAssertTrue(snapshot.app.diagnostics === diagnostics)
+        diagnostics.info("retry_has_live_diagnostics", category: .bootstrap)
+        XCTAssertTrue(diagnostics.flush(timeout: 2))
+        let exported = try diagnostics.export(to: snapshot.app.paths.exportsDir)
+        let text = try String(contentsOf: exported.jsonURL, encoding: .utf8)
+        XCTAssertTrue(text.contains("gui_bootstrap_cancelled"))
+        XCTAssertTrue(text.contains("retry_has_live_diagnostics"))
+        XCTAssertTrue(try String(contentsOf: snapshot.app.paths.masterDiagnostics, encoding: .utf8).contains("retry_has_live_diagnostics"))
+        let shutdown = await Task.detached { snapshot.app.shutdown() }.value
+        XCTAssertTrue(shutdown.completed)
+    }
+
     func testOwnerReleaseCancelsWorkerWithoutRetainingApplication() async throws {
         let directory = home()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -301,22 +345,111 @@ final class AppBootstrapAppTests: XCTestCase {
     }
 
     func testNativeModelFailureAndRetryKeepPublishedStateOnMainActor() async throws {
+        let directory = home()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let probe = BootstrapProbe()
         let operation = AppBootstrapOperation(factory: {
             _ = probe.started()
             throw BootstrapFixtureError.expectedFailure
         }, pluginStatus: { _ in nil })
-        let model = AppModel(bootstrapOperation: operation)
+        let model = AppModel(bootstrapOperation: operation, diagnosticPaths: AppPaths(home: directory))
         model.autoRefresh = false
         try await waitUntil { !model.isBootstrapping }
         XCTAssertNil(model.app)
         XCTAssertTrue(model.lastError?.hasPrefix("Bootstrap failed:") == true)
         XCTAssertFalse(model.autoRefresh)
+        XCTAssertEqual(model.diagnosticPreview.filter { $0.event == "gui_bootstrap_failed" }.count, 1)
         model.bootstrap()
         try await waitUntil { !model.isBootstrapping }
         XCTAssertEqual(probe.startCount, 2)
         XCTAssertFalse(probe.ranOnMain)
         XCTAssertFalse(model.autoRefresh)
+        XCTAssertEqual(model.diagnosticPreview.filter { $0.event == "gui_bootstrap_failed" }.count, 2)
+        await model.stopBootstrap()
+    }
+
+    func testBootstrapFailureExportsSanitizedEvidenceToDefaultFolderWithoutApplication() async throws {
+        let directory = home()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let paths = AppPaths(home: directory)
+        let failure = NSError(domain: NSOSStatusErrorDomain, code: -67050, userInfo: [
+            NSLocalizedDescriptionKey:
+                "runtime product signing status -67050 at /Users/bootstrap-private/runtime; authorization: bearer bootstrap-private-secret",
+        ])
+        let operation = AppBootstrapOperation(factory: { throw failure }, pluginStatus: { _ in nil })
+        var revealed: [URL] = []
+        let model = AppModel(
+            bootstrapOperation: operation,
+            diagnosticPaths: paths,
+            revealDiagnosticExport: { revealed = $0 }
+        )
+        try await waitUntil { !model.isBootstrapping }
+        XCTAssertNil(model.app)
+        let captured = try XCTUnwrap(model.diagnosticPreview.first { $0.event == "gui_bootstrap_failed" })
+        XCTAssertEqual(captured.category, .bootstrap)
+        XCTAssertEqual(captured.severity, .error)
+        XCTAssertEqual(captured.fields["bootstrap_stage"], "application_graph")
+        XCTAssertEqual(captured.fields["error_domain"], NSOSStatusErrorDomain)
+        XCTAssertEqual(captured.fields["error_code"], "-67050")
+        XCTAssertNotNil(captured.fields["error_type"])
+        XCTAssertNotNil(captured.recordID)
+        XCTAssertFalse(captured.fields["error"]?.contains("bootstrap-private") == true)
+
+        model.exportDiagnosticsToDefaultFolder()
+        XCTAssertTrue(model.isExportingDiagnostics)
+        model.exportDiagnosticsToDefaultFolder() // A second action must not overwrite the active operation.
+        try await waitUntil { !model.isExportingDiagnostics }
+        XCTAssertTrue(model.lastExportMessage?.hasPrefix("Exported ") == true)
+        XCTAssertEqual(revealed.count, 2)
+        XCTAssertTrue(revealed.allSatisfy { $0.deletingLastPathComponent() == paths.exportsDir })
+        let jsonURL = try XCTUnwrap(revealed.first { $0.pathExtension == "json" })
+        let markdownURL = try XCTUnwrap(revealed.first { $0.pathExtension == "md" })
+        let text = try String(contentsOf: jsonURL, encoding: .utf8)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: jsonURL)) as? [String: Any])
+        let records = try XCTUnwrap(payload["records"] as? [[String: Any]])
+        XCTAssertEqual(records.filter { $0["event"] as? String == "gui_bootstrap_failed" }.count, 1)
+        XCTAssertTrue(records.contains { $0["record_id"] as? String == captured.recordID })
+        XCTAssertFalse(text.contains("bootstrap-private"))
+        let markdown = try String(contentsOf: markdownURL, encoding: .utf8)
+        XCTAssertTrue(markdown.contains("gui_bootstrap_failed"))
+        XCTAssertFalse(markdown.contains("bootstrap-private"))
+        let persisted = try String(contentsOf: paths.masterDiagnostics, encoding: .utf8)
+        XCTAssertTrue(persisted.contains("gui_bootstrap_failed"))
+        XCTAssertFalse(persisted.contains("bootstrap-private"))
+        await model.stopBootstrap()
+    }
+
+    func testBootstrapFailureWithUnavailableHomeExportsLiveEvidenceToSelectedFolder() async throws {
+        let directory = home()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let invalidHome = directory.appendingPathComponent("home-is-a-file")
+        try Data("not a directory".utf8).write(to: invalidHome)
+        let paths = AppPaths(home: invalidHome)
+        let operation = AppBootstrapOperation(factory: {
+            try ForgeApp.bootstrap(home: invalidHome)
+        }, pluginStatus: { _ in nil })
+        let model = AppModel(bootstrapOperation: operation, diagnosticPaths: paths)
+        try await waitUntil { !model.isBootstrapping }
+        XCTAssertNil(model.app)
+        XCTAssertTrue(model.diagnosticPreview.contains { $0.event == "gui_bootstrap_failed" })
+        let selectedFolder = directory.appendingPathComponent("chosen-export", isDirectory: true)
+        model.beginDiagnosticsExport(to: selectedFolder, reveal: false)
+        try await waitUntil { !model.isExportingDiagnostics }
+        XCTAssertTrue(model.lastExportMessage?.hasPrefix("Exported ") == true)
+        let files = try FileManager.default.contentsOfDirectory(at: selectedFolder, includingPropertiesForKeys: nil)
+        let jsonURL = try XCTUnwrap(files.first { $0.pathExtension == "json" })
+        let markdownURL = try XCTUnwrap(files.first { $0.pathExtension == "md" })
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: jsonURL)) as? [String: Any])
+        XCTAssertEqual(payload["history_scope"] as? String, "live_ring_only")
+        XCTAssertEqual(payload["persisted_history_available"] as? Bool, false)
+        XCTAssertNotNil(payload["persisted_history_error"] as? String)
+        let records = try XCTUnwrap(payload["records"] as? [[String: Any]])
+        XCTAssertTrue(records.contains { $0["event"] as? String == "gui_bootstrap_failed" })
+        XCTAssertTrue(records.contains { $0["event"] as? String == "diagnostics_persisted_history_unavailable" })
+        let markdown = try String(contentsOf: markdownURL, encoding: .utf8)
+        XCTAssertTrue(markdown.contains("persisted history was unavailable and is omitted"))
+        XCTAssertFalse(try String(contentsOf: jsonURL, encoding: .utf8).contains(invalidHome.path))
         await model.stopBootstrap()
     }
 
@@ -330,7 +463,7 @@ final class AppBootstrapAppTests: XCTestCase {
             try probe.waitForRelease()
             throw BootstrapFixtureError.expectedFailure
         }, pluginStatus: { _ in nil })
-        let model = AppModel(bootstrapOperation: operation)
+        let model = AppModel(bootstrapOperation: operation, diagnosticPaths: AppPaths(home: directory))
         try await waitUntil { probe.startCount == 1 }
         XCTAssertTrue(model.isBootstrapping)
         XCTAssertFalse(model.hasLoadedInitialSettings)

@@ -5,6 +5,78 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class DiagnosticBoundaryTests: XCTestCase {
+    func testBootstrapSharesPreparedDiagnosticOwnerAndPreservesConfiguredRole() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-diagnostic-owner-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        _ = try ConfigStore(paths: paths).update(["mcp": ["role": "fallback"]])
+        let diagnostics = DiagnosticLog(paths: paths, role: "startup")
+        defer { _ = diagnostics.shutdown(timeout: 2) }
+        diagnostics.info("gui_bootstrap_started", category: .bootstrap)
+        let app = try ForgeApp.bootstrap(home: home, diagnostics: diagnostics)
+        defer { app.shutdown() }
+        XCTAssertTrue(app.diagnostics === diagnostics, "Startup and runtime must have one diagnostic persistence owner")
+        XCTAssertEqual(diagnostics.recent().first?.role, "startup")
+        diagnostics.info("shared_owner_runtime_event", category: .diagnostics)
+        XCTAssertEqual(diagnostics.recent(limit: 1).first?.role, "fallback")
+        let exported = try app.diagnostics.export(to: paths.exportsDir)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: exported.jsonURL)) as? [String: Any])
+        let records = try XCTUnwrap(payload["records"] as? [[String: Any]])
+        XCTAssertEqual(records.filter { $0["event"] as? String == "gui_bootstrap_started" }.count, 1)
+        XCTAssertEqual(records.filter { $0["event"] as? String == "shared_owner_runtime_event" }.count, 1)
+
+        XCTAssertTrue(app.shutdown().completed)
+        diagnostics.warn("caller_owned_after_graph_shutdown", category: .bootstrap)
+        XCTAssertTrue(diagnostics.flush(timeout: 2))
+        let afterShutdown = try diagnostics.export(to: paths.exportsDir, basename: "after-graph-shutdown")
+        XCTAssertTrue(try String(contentsOf: afterShutdown.jsonURL, encoding: .utf8).contains("caller_owned_after_graph_shutdown"))
+        XCTAssertTrue(try String(contentsOf: paths.masterDiagnostics, encoding: .utf8).contains("caller_owned_after_graph_shutdown"))
+    }
+
+    func testBootstrapRejectsDiagnosticOwnerFromAnotherHomeBeforeCreatingLayout() throws {
+        let first = FileManager.default.temporaryDirectory.appendingPathComponent("forge-diagnostic-first-\(UUID().uuidString)")
+        let second = FileManager.default.temporaryDirectory.appendingPathComponent("forge-diagnostic-second-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        let diagnostics = DiagnosticLog(paths: AppPaths(home: first))
+        defer { _ = diagnostics.shutdown(timeout: 2) }
+        XCTAssertThrowsError(try ForgeApp.bootstrap(home: second, diagnostics: diagnostics)) { error in
+            guard case ForgeBootstrapError.diagnosticHomeMismatch = error else {
+                return XCTFail("Unexpected home isolation error: \(error)")
+            }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: second.path))
+    }
+
+    func testDiagnosticsPersistAndExportWhenUnrelatedApplicationLayoutCannotBeCreated() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-diagnostic-layout-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let paths = AppPaths(home: home)
+        try Data("not a directory".utf8).write(to: home.appendingPathComponent("agents"))
+        XCTAssertThrowsError(try paths.ensureLayout())
+
+        let log = DiagnosticLog(paths: paths, role: "gui")
+        defer { _ = log.shutdown(timeout: 2) }
+        log.error("gui_bootstrap_failed", ["error": "application layout unavailable"], category: .bootstrap)
+        XCTAssertTrue(log.flush(timeout: 2))
+        XCTAssertTrue(try String(contentsOf: paths.masterDiagnostics, encoding: .utf8).contains("gui_bootstrap_failed"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: paths.configJSON.path),
+                       "Diagnostic persistence must not depend on or create application configuration")
+        let exported = try log.export(to: home.appendingPathComponent("chosen-export"), allowPartialHistory: true)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: exported.jsonURL)) as? [String: Any])
+        XCTAssertEqual(payload["persisted_history_available"] as? Bool, true)
+        XCTAssertEqual(payload["history_scope"] as? String, "current_master_log_latest_50000_lines_plus_live_ring")
+        XCTAssertEqual(exported.recordCount, 1)
+        XCTAssertTrue(try String(contentsOf: exported.markdownURL, encoding: .utf8).contains("gui_bootstrap_failed"))
+    }
+
     func testContendedPersistenceDoesNotHoldResponsePathAndRingRemainsBounded() throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-diagnostic-boundary-\(UUID().uuidString)", isDirectory: true)

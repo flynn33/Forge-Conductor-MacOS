@@ -1,8 +1,99 @@
 # Version and qualification status
 
-## October 3 diagnostic source correction — installation pending
+## October 3 installed bootstrap and export repair — 0.16.5 (26)
 
-Current repository source identity is `0.16.4 (25)`. The October 2 alpha
+The corrected Xcode project identifies the candidate as `0.16.5 (26)`. The
+installed `/Applications/Forge Conductor.app` remains `0.16.4 (25)`. Its GUI
+and embedded CLI failed bootstrap with runtime launch-gate status `-67050`
+while strict deep signature verification passed. The installed-framework
+probe required Apple Development certificate extension
+`1.2.840.113635.100.6.1.12` for all four product roles, although the exported
+installation was Developer ID signed. The original Apple Development archive
+and installed/exported daemon also had different CDHashes; the installed app
+and CLI retained the archive hashes (`installed-signing-policy-probe.log` and
+`archive-export-daemon-seal-evidence.json`). The stale seals are a separate
+identity defect; the observed bootstrap failure occurred at the earlier
+product-signing check.
+
+The mechanisms and corrections are:
+
+- `ForgeConductor.xcodeproj/project.pbxproj` restores manual Developer ID
+  signing for the five shipping Release targets and removes the global Release
+  `FORGE_DEVELOPMENT_SIGNING` flag. Debug retains automatic Apple Development
+  signing. `ForgeFilesystemProtocolConstants.requiredProductCodeSigningRequirement`
+  in `Sources/ForgeFilesystemProtocol/ForgeFilesystemProtocol.swift` selects
+  the build's exact certificate class; `RuntimeLaunchGate.codeIdentity`
+  in `Sources/ForgeConductorCore/Infrastructure/RuntimeProcessSupervisor.swift`
+  enforces it. `script/seal_filesystem_daemon_identity.sh` seals the signed
+  daemon hashes, checked by
+  `SecurityManagerPrivilegedApplicationIdentityValidator.validateSealedDaemonHashes`
+  in `Sources/ForgeConductorCore/Manager/ManagerInstaller.swift`.
+- Both export controls previously required a completed `AppModel.app` graph.
+  `AppBootstrapOperation.start`, `AppModel.bootstrap`, and
+  `AppModel.beginDiagnosticsExport` in
+  `Sources/ForgeConductorApp/AppModel.swift` now prepare diagnostics off the
+  main actor before graph construction and retain the sanitized startup error.
+  `ForgeApp.bootstrap(home:clock:diagnostics:)` and `shutdown` in
+  `Sources/ForgeConductorCore/Application/ForgeApp.swift` borrow that same
+  logger; graph shutdown flushes it, and AppModel owns its off-main close.
+  `DiagnosticLog.export` in
+  `Sources/ForgeConductorCore/Infrastructure/DiagnosticLog.swift` permits an
+  explicit failed-startup export of the bounded live ring when persisted
+  history is unavailable, disclosing that omission in JSON and Markdown.
+  Existing bootstrap calls and the two-argument `DiagnosticRecording.export`
+  source contract remain available; exact identifier, team, certificate, and
+  daemon-hash protections remain enforced.
+
+For the commands below, `E` is
+`/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-03-bootstrap-export`;
+commands run from `/Users/flynn/GitHub/Forge-Conductor-MacOS`. The named receipts
+contain full argument arrays and terminal results.
+
+| Exercise | Command or retained execution receipt | Actual result |
+| --- | --- | --- |
+| Native Debug build | `xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Debug -destination 'platform=macOS' -derivedDataPath "$E/DebugBuild" build` | Exit 0, `BUILD SUCCEEDED`; `native-debug-build-final-result.json` and `.log`. |
+| App-hosted bootstrap tests | `xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductorAppTests -configuration Debug -destination 'platform=macOS' -derivedDataPath "$E/AppTestBuild" -resultBundlePath "$E/AppTests.xcresult" -parallel-testing-enabled NO '-only-testing:ForgeConductorAppTests/AppBootstrapAppTests' test` | Exit 0; 8 executed, 0 failures; `native-app-hosted-result.json` and `.log`. |
+| Universal Release archive | `xcodebuild -workspace ForgeConductor.xcworkspace -scheme ForgeConductor -configuration Release -destination 'platform=macOS' -derivedDataPath "$E/ReleaseBuild" -archivePath "$E/Validation.xcarchive" ONLY_ACTIVE_ARCH=NO archive` | Exit 0, `ARCHIVE SUCCEEDED`; `native-release-archive-result.json` and `.log`. |
+| Developer ID export | `xcodebuild -exportArchive -archivePath "$E/Validation.xcarchive" -exportPath "$E/Export" -exportOptionsPlist "$E/ExportOptions.plist"` | Exit 0, `EXPORT SUCCEEDED`; `native-release-export-result.json` and `.log`. Manual Developer ID export uses existing owner team `9AQ2C2838M`. |
+| Compiled export signing policy and artifact identities | `"$E/exported-signing-policy-probe"`; `/usr/bin/python3 "$E/verify_distribution_identity.py"` | Probe exit 0: app, launcher, CLI, and daemon require Developer ID extension `1.2.840.113635.100.6.1.13` and each satisfies it. Artifact verification: 215 checks, 0 failures (`exported-policy-probe.log`, `distribution-identity-verification.json`). Both architectures' daemon seals match before and after export. Bytes outside `LC_CODE_SIGNATURE` are identical for all five compared binaries; whole-file SHA-256 values differ. |
+| Exported CLI bootstrap | `"$E/Export/Forge Conductor.app/Contents/Helpers/forge-conductor" status --home "$E/exported-cli-fixture"` | Exit 0; `exported-cli-bootstrap-result.json` and `.log`. |
+| Native GUI bootstrap and folder-picker export | Direct CUA exercise of `"$E/Export/Forge Conductor.app/Contents/MacOS/Forge Conductor"`; `native-gui-fixture/failure-launch.json` and `healthy-launch.json` | Failed home PID 13256 and healthy home PID 13459 both exported actual paired JSON/Markdown through the native folder picker. Failure export has 3 records with startup error and unavailable-history disclosure; healthy export has 8 records. `native-gui-fixture/export-verification.json`: 23 assertions passed; `healthy-manager-status.json`: version 0.16.5, HTTP listening on isolated loopback port 49844. Files are retained under `failure-exports/` and `healthy-exports/`. |
+| Native UI XCTest attempt | `xcodebuild` selecting the two `ProductionOnboardingUITests` folder-export methods; full command in `native-export-ui-result.json` | Exit 65: timed out enabling automation mode during runner initialization; **0 tests executed**. No automation permission changes. The separate CUA exercise above is observed native evidence, not an XCTest pass. |
+| Focused source regressions | `swift test --filter` selection recorded in `focused-swift-final-result.json` | Exit 0; 61 executed, 0 failures, before the final callback `@Sendable` annotation and version-literal correction below. |
+| Final source regression | `swift test` | Exit 0 (`full-swift-regression-final-result.json` and `.log`): qualification-support selected 30, skipped 0, failed 0; Core selected 1,961, skipped 12, failed 0. Across both targets: 1,991 selected, 1,979 passed, 12 skipped. Skips are unperformed checks. The earlier full run exited 1 on the stale H0 version literals; the corrected `H0IsolationTests` selection passed 7/7 before this final full rerun. |
+| SwiftPM products | `swift build --product forge-conductor`; `swift build --product forge-conductor-app` | Both exit 0 on final inputs; `cli-build-final-result.json`, `app-product-build-final-result.json`, and matching logs. These are compilation receipts, separate from the native archive above. |
+
+The full rerun emitted a sanitized missing-log-file diagnostic while
+`RigParityTests/testManagerNodeStartStopInProcess` was executing; that test passed.
+The redacted stderr line does not establish the writer or fixture path, and no
+production cause is assigned. The 12 skipped checks cover live provider work,
+disposable Keychain use, prepared signed-peer/job fixtures, child-only harness
+cases, and the runtime PowerShell capability check; their exact reasons remain
+in the full log. The run does not qualify those paths.
+
+`xcode-membership.json` compares the canonical workspace/project with baseline
+`3a00c9e4f08a3951d7db3aa6814b6eb8bef61044`: all non-build-configuration graph
+objects, workspace references, shared schemes, resources, and embedding are
+unchanged. Only 17 configuration objects changed for signing/version settings;
+the 10 inspected native source/test files have their existing membership.
+`H0IsolationTests.swift` remains in the existing SwiftPM-only
+`ForgeFilesystemQualificationSupportTests` target; it has no Xcode file reference
+or test target, and this edit does not add one.
+The final H0 change is test-only and does not change the archived application
+inputs.
+
+The original installation was restored and reopened with its existing
+0.16.4 failure. Its executable SHA-256 and strict signature remain preserved;
+`~/.lmstudio/mcp.json` remains
+`7663a4f6ae3bee266eb7cefe7edc18056ff1f34c72d72ae8265dbb4e1398b7a3`
+(`native-gui-fixture/export-verification.json`). These checks qualify the
+corrected source project and the isolated native candidate paths described
+above. They do not qualify installation, notarization, distribution, or a full
+LM Studio workflow. The owner retains those shipping steps.
+
+## Prior 0.16.4 diagnostic source correction — historical test boundary
+
+The prior repository source identity was `0.16.4 (25)`. The October 2 alpha
 archive exposed six evidence gaps. Current
 source changes preserve sanitized error identity, distinguish returned tool
 failures from exceptions, classify `fs_read` errors by observed cause, retain
@@ -13,9 +104,9 @@ source writers and regression tests. On the final `0.16.4 (25)` source tree,
 Debug workspace build succeeded, and the complete app-hosted target passed
 127 tests with no failures. The exact commands and terminal lines are in the
 [roadmap](../ROADMAP.md).
-The `/Applications` app and running helper remain the earlier 0.16.3 alpha;
-this correction has not been packaged, installed, deployed to LM Studio, or
-verified against the original live failure sequence. Discarded historical
+At that earlier source-test boundary the installed app was still 0.16.3.
+The later owner-installed 0.16.4 exposed the signing and startup-export failures
+recorded above; those prior tests did not qualify that installed path. Discarded historical
 exceptions cannot be recovered from that archive.
 
 ## 0.16.3 CLI staging and LM Studio deploy receipt — October 1, 2026
@@ -603,7 +694,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.16.4, build 25**, supporting **macOS 26+**. The earlier
+Current source identity: **0.16.5, build 26**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the opening build-24 section;
 they remain unnotarized, uninstalled, and unshipped. Earlier `0.9.0 (1)`
 receipts remain historical evidence only. This page is a concise status index;
@@ -614,7 +705,7 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.4, build 25**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.5, build 26**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

@@ -8,30 +8,28 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.16.4** |
-| **Build** | **25** |
+| **Version** | **0.16.5** |
+| **Build** | **26** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
 For a fresh download, open `ForgeConductor.xcworkspace` and select the
-`ForgeConductor` scheme. Its Archive action uses the optimized Release build
-configuration with automatic **Apple Development** signing for team
-`9AQ2C2838M` and the matching development peer policy. The name of the Xcode
-configuration does not indicate a shipped release. Current-source archive,
-installation, and distribution have not been exercised for `0.16.4 (25)`.
+`ForgeConductor` scheme. Debug runs use automatic **Apple Development** signing
+for team `9AQ2C2838M`. Release archives use **Developer ID Application** signing
+on that same team and compile the distribution peer policy. The daemon's exact
+signed hashes are sealed into the app and CLI before export; changing signing
+classes after archiving invalidates that trust relationship. See [Xcode](XCODE.md).
 
-> **Release status:** current source is `0.16.4 (25)` with diagnostic capture
-> corrections. It has not been packaged, installed, deployed, or exercised
-> against the installed alpha. The earlier `0.16.3 (24)` Developer ID archive
-> was built from source `a54100b453ba8b1c1489ff09ac64dd6193fc1597` while
-> HEAD was `b8a2c5dee546dff8d914405c2169a075bd0187e2`. Its October 1 CLI
-> staging and LM Studio deploy receipt remains historical evidence; it was
-> not a signed `.pkg` installation. Notarization, Gatekeeper acceptance, and
-> shipment remain open.
+> **Release status:** current source is `0.16.5 (26)`, repairing the observed
+> installed `0.16.4 (25)` bootstrap signing rejection and unavailable diagnostic
+> export. The installed bundle passed strict signature validation but compiled
+> an Apple Development peer requirement and retained pre-export daemon hashes.
+> Candidate validation is recorded in the [qualification record](docs/QUALIFICATION-STATUS.md).
+> The owner's installation and shipment remain separate from candidate testing.
 
-The retained Developer ID-signed Desktop candidate is
+The historical October 1 Developer ID-signed Desktop candidate was
 `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID/Forge Conductor.app`,
 with its matching `.xcarchive` in the same directory. For the product-path
 check, the archive helper's `forge-conductor install` command copied artifacts
@@ -43,8 +41,8 @@ built, but `installer` required root and did not install it.
 
 The CLI staging/deploy run created synchronized primary, fallback, and
 CLU revision `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db`. The configured helper,
-the archive's embedded helper, and the copied `/Applications` app's
-embedded helper all have SHA-256
+the archive's embedded helper, and the then-copied `/Applications` app's
+embedded helper all had SHA-256
 `49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`.
 After the copied candidate app and LM Studio were cold-started, ordinary LM Studio
 fallback PID `38508` reported an attached Jamf-Technician context. A later
@@ -57,7 +55,7 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, and current repository documentation use `0.16.4 (25)`.
+configurations, and current repository documentation use `0.16.5 (26)`.
 Historical candidate receipts, including the `0.16.2 (23)` Developer ID
 record, retain the identity they actually tested.
 
@@ -208,8 +206,8 @@ connection](docs/LM-STUDIO-CONNECTION.md).
 
 The current source records sanitized error identity and returned execution details
 for failed tools. Diagnostic exports identify their selected history and disclose
-when the Markdown timeline omits earlier rows. These source changes have not
-been installed into the running 0.16.3 alpha.
+when the Markdown timeline omits earlier rows. The owner-installed 0.16.4 startup failure is recorded separately; 0.16.5 adds
+startup capture and export even when the graph cannot be constructed.
 
 ## Build and test
 
