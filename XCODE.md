@@ -6,11 +6,11 @@ from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
 the matching constants in `ForgeFilesystemProtocolConstants`.
 
 The historical [functional development build](docs/FUNCTIONAL-DEVELOPMENT-BUILD.md)
-used optimized Release configuration with the documented Apple Development
-identity and matching `FORGE_DEVELOPMENT_SIGNING` peer policy. The ordinary
-Release configuration requests Developer ID Application for James Daley's team
-`9AQ2C2838M`. Notarization, stapling, and public distribution require their
-own completed checks and owner release decision.
+used an optimized configuration with Apple Development signing and the matching
+`FORGE_DEVELOPMENT_SIGNING` peer policy. The current Archive action uses that
+same development signing class by default for team `9AQ2C2838M`. The Xcode
+configuration is named Release because it is optimized; this source is still
+an alpha and no release or distribution action has been completed.
 
 The shipped app, Core framework, and runtime launcher Release configurations
 set `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`. Clean Release products therefore
@@ -168,8 +168,10 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
 The app and `ForgeConductorCore` enable **Hardened Runtime**
 (`ENABLE_HARDENED_RUNTIME = YES`). Debug app, CLI, runtime-launcher, filesystem-
 daemon, and UI-test targets use the valid **Apple Development: James Daley**
-identity on team `9AQ2C2838M`. Release configurations request **Developer ID
-Application** on that same team. Xcode's account has already cloud-signed an
+identity on team `9AQ2C2838M`. The current optimized Archive configuration
+also uses automatic **Apple Development** signing and compiles the matching
+development peer policy. Historically, the Release configuration requested
+Developer ID Application on that same team. Xcode's account had cloud-signed an
 earlier, different product as `Developer ID Application: James Daley
 (9AQ2C2838M)`. The archive host subsequently had usable local Developer ID
 Application and Installer identities for the same team in its login keychain.
@@ -202,17 +204,13 @@ no approved notarization profile was identified. This is historical host invento
 only; it is not a signed build or hardware-matrix result.
 
 For a local optimized build signed with James Daley's Apple Development
-certificate, select the signing identity and compiled peer-trust policy
-together:
+certificate, use the current project settings without signing overrides:
 
 ```bash
 xcodebuild -workspace ForgeConductor.xcworkspace \
   -scheme ForgeConductor \
   -configuration Release \
   -destination 'platform=macOS,arch=arm64' \
-  DEVELOPMENT_TEAM=9AQ2C2838M \
-  CODE_SIGN_IDENTITY='Apple Development' \
-  SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) FORGE_DEVELOPMENT_SIGNING' \
   build
 
 ./.forge-codex/scripts/check_privileged_filesystem_bundle.sh \
@@ -220,34 +218,25 @@ xcodebuild -workspace ForgeConductor.xcworkspace \
   DevelopmentRelease
 ```
 
-The ordinary workspace Release settings now resolve Developer ID Application
-and team `9AQ2C2838M` for all five shipping targets. This explicit development
-invocation resolves Apple Development and team `9AQ2C2838M` for the app and its
-dependencies. A previously present SDK-specific identity override made the
-ordinary Release setting resolve to Apple Development despite the displayed
-Developer ID value; that mismatch has been removed.
+The ordinary workspace Release settings now resolve Apple Development,
+automatic signing, and team `9AQ2C2838M` for the app and four embedded code
+targets. The project-level `FORGE_DEVELOPMENT_SIGNING` flag makes the compiled
+peer requirement agree with those signatures. An SDK-specific `-` identity
+override would instead select ad hoc signing and must not be added.
 
-For a distribution candidate, choose **Product → Archive** with the
-**ForgeConductor** scheme and inspect the resulting archive before choosing
-**Distribute App**. The archive's `Info.plist` must identify scheme
+For an owner-built alpha archive, choose **Product → Archive** with the
+**ForgeConductor** scheme. The archive's `Info.plist` must identify scheme
 `ForgeConductor` and application `com.forge-conductor.app`. Its app bundle must
 contain `Contents/Resources/AppIcon.icns` and `Contents/Resources/Assets.car`,
 and its generated `CFBundleIconFile` and `CFBundleIconName` must both be
 `AppIcon`. The embedded CLI has `SKIP_INSTALL = YES` for Release, so it stays in
 `Contents/Helpers` without becoming a separate top-level archive product. The
-archive `Info.plist` must include `ApplicationProperties`; a generic archive
-cannot use the Developer ID export method. Verify the app and embedded products
-with the existing `check_privileged_filesystem_bundle.sh` checker in `Release`
-mode. The five shipping Release targets use manual signing because Xcode rejects
-automatic development signing paired with an explicit Developer ID identity.
-Before those local identities were installed, the ordinary archive reported no
-Developer ID Application certificate for James Daley's team with a private key.
-The cloud-managed certificate used for another product did not supply that
-build-time private key. The explicit development-signed archive is local qualification evidence;
-its compiled peer policy requires Apple Development and cannot be treated as a
-Developer ID product merely by re-signing it at export. Notarization, stapling,
-and Gatekeeper acceptance are distinct checks after an exact Developer ID
-archive and export.
+archive `Info.plist` must include `ApplicationProperties`, team `9AQ2C2838M`,
+and an Apple Development signing identity. Verify the app and embedded products
+with the existing `check_privileged_filesystem_bundle.sh` checker in
+`DevelopmentRelease` mode. The current project source has not been archived or
+exported. Earlier Developer ID archives below are historical and do not set
+the signing requirement for this alpha.
 
 On September 15, the ordinary Release configuration produced a universal
 `0.9.0 (1)` Developer ID app archive with one installable app product. A
@@ -391,11 +380,9 @@ retained non-app bundle. The installed application's signature remained valid;
 the owner installation was not replaced. The installed root service still has
 a category-3 launch constraint and is not qualified by this smoke.
 
-Omitting `FORGE_DEVELOPMENT_SIGNING` from an Apple Development-signed Release
-build intentionally fails the exact installer or peer-identity checks. The
-ordinary Release configuration remains pinned to Developer ID team
-`9AQ2C2838M`; this local override is qualification support, not distribution
-authority.
+Omitting `FORGE_DEVELOPMENT_SIGNING` from an Apple Development-signed optimized
+build fails the exact installer or peer-identity checks. The current ordinary
+Release configuration includes that condition and uses development signing.
 
 Do not set `CODE_SIGN_IDENTITY[sdk=macosx*] = -` on the app target: that forces
 ad-hoc signing and Notary/App Store reject the archive as missing Hardened Runtime.
@@ -524,8 +511,9 @@ and [completion evidence](docs/NATIVE-COMPLETION.md) for built-in checks and
 instruction-package requirement ownership. Completion is evaluated from
 durable Manager evidence; an unsigned app compilation is build evidence only.
 
-Use the canonical Release archive/export path for distribution, with matching
-Developer ID team policy and secure timestamps. The shipping
+The current canonical Archive action is development-signed. Public distribution
+would require a separate owner-directed release signing and qualification step;
+this source change does not perform one. The historical shipping
 [validation runbook](.forge-codex/shipping/MACOS-VALIDATION-RUNBOOK.md) describes
 artifact checks, notarization and installation proof. The owner performs
 shipping manually after the required release checks pass.

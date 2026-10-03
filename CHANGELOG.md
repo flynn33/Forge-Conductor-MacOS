@@ -10,6 +10,12 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+- Restored the downloadable Xcode project's alpha archive path to automatic
+  Apple Development signing on team `9AQ2C2838M`. The optimized archive
+  configuration now compiles the matching development peer policy. Resolved
+  build settings and a focused project regression are the current evidence;
+  no new archive, package, installation, or distribution was produced.
+
 Current source identity: `0.16.4 (25)`; the diagnostic source correction is
 not installed or deployed. Historical source
 `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer ID

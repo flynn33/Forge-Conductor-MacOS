@@ -15,6 +15,13 @@ continuity. The user does not start project work through a Forge Managed Run.
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
+For a fresh download, open `ForgeConductor.xcworkspace` and select the
+`ForgeConductor` scheme. Its Archive action uses the optimized Release build
+configuration with automatic **Apple Development** signing for team
+`9AQ2C2838M` and the matching development peer policy. The name of the Xcode
+configuration does not indicate a shipped release. Current-source archive,
+installation, and distribution have not been exercised for `0.16.4 (25)`.
+
 > **Release status:** current source is `0.16.4 (25)` with diagnostic capture
 > corrections. It has not been packaged, installed, deployed, or exercised
 > against the installed alpha. The earlier `0.16.3 (24)` Developer ID archive

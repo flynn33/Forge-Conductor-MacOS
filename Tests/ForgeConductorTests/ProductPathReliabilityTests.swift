@@ -898,7 +898,7 @@ final class ProductPathReliabilityTests: XCTestCase {
         )
     }
 
-    func testXcodeShippedTargetsKeepDebugAndReleaseSigningClassesDistinct() throws {
+    func testXcodeShippedTargetsUseDevelopmentSigningForAlphaArchive() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -947,19 +947,19 @@ final class ProductPathReliabilityTests: XCTestCase {
         for identifier in releaseConfigurations {
             let settings = try configuration(identifier)
             XCTAssertTrue(
-                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
-                "Release shipped target \(identifier) must require Developer ID signing"
+                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#),
+                "Alpha archive target \(identifier) must use development signing"
             )
             XCTAssertTrue(
                 settings.contains("DEVELOPMENT_TEAM = 9AQ2C2838M;"),
                 "Release shipped target \(identifier) must use James Daley's team"
             )
             XCTAssertTrue(
-                settings.contains("CODE_SIGN_STYLE = Manual;"),
-                "Release shipped target \(identifier) must not combine automatic development signing with a manually specified Developer ID identity"
+                settings.contains("CODE_SIGN_STYLE = Automatic;"),
+                "Alpha archive target \(identifier) must allow automatic development signing"
             )
             XCTAssertFalse(
-                settings.contains(#"CODE_SIGN_IDENTITY = "Apple Development";"#)
+                settings.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#)
             )
             XCTAssertFalse(
                 settings.contains("CODE_SIGN_IDENTITY[sdk=macosx*]"),
@@ -974,6 +974,21 @@ final class ProductPathReliabilityTests: XCTestCase {
                 "Release shipped target \(identifier) must not export testable internals"
             )
         }
+        let releaseProjectSettings = try configuration("CEFEFE9428CD4B5F869BE9F3")
+        XCTAssertTrue(
+            releaseProjectSettings.contains(
+                #"SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) FORGE_DEVELOPMENT_SIGNING";"#
+            ),
+            "Optimized alpha archives must compile the matching development peer policy"
+        )
+        XCTAssertFalse(
+            project.contains(#"CODE_SIGN_IDENTITY = "Developer ID Application";"#),
+            "The downloadable alpha project must not require release signing"
+        )
+        XCTAssertFalse(
+            project.contains(#"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";"#),
+            "An SDK-specific ad hoc override must not replace team signing"
+        )
     }
 
     func testXcodeReleaseArchiveKeepsManagerCLIEmbeddedWithoutInstallingItSeparately() throws {
