@@ -881,7 +881,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         outcomeOverride: String? = nil,
         cancellation: ToolCallCancellation? = nil
     ) -> ToolResult {
-        let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+        let finishedAt = Date()
+        let durationMs = Int(finishedAt.timeIntervalSince(start) * 1000)
         let auditArguments = ToolAuditSanitizer.sanitize(arguments)
         if status == "cancelled" || status == "deadline_exceeded" {
             // The request token is already terminal. Submit evidence with its own
@@ -918,9 +919,9 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 "code": (result.payload["code"] as? String) ?? "denied",
             ], category: .tools)
         } else if result.ok {
-            app.diagnostics.info("tool_call", Self.resultDiagnosticFields(result, tool: tool, clientID: clientID, durationMs: durationMs, mutating: mutating, arguments: arguments, invocationID: cancellation?.requestID, outcomeOverride: outcomeOverride), category: .tools)
+            app.diagnostics.info("tool_call", Self.resultDiagnosticFields(result, tool: tool, clientID: clientID, durationMs: durationMs, mutating: mutating, arguments: arguments, invocationID: cancellation?.requestID, outcomeOverride: outcomeOverride, startedAt: start, finishedAt: finishedAt), category: .tools)
         } else {
-            app.diagnostics.warn("tool_call_failed", Self.resultDiagnosticFields(result, tool: tool, clientID: clientID, durationMs: durationMs, mutating: mutating, arguments: arguments, invocationID: cancellation?.requestID, outcomeOverride: outcomeOverride ?? (status == "cancelled" ? "cancelled" : (status == "deadline_exceeded" ? "deadline_exceeded" : nil))), category: .tools)
+            app.diagnostics.warn("tool_call_failed", Self.resultDiagnosticFields(result, tool: tool, clientID: clientID, durationMs: durationMs, mutating: mutating, arguments: arguments, invocationID: cancellation?.requestID, outcomeOverride: outcomeOverride ?? (status == "cancelled" ? "cancelled" : (status == "deadline_exceeded" ? "deadline_exceeded" : nil)), startedAt: start, finishedAt: finishedAt), category: .tools)
         }
         return result
     }
@@ -928,7 +929,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     static func resultDiagnosticFields(
         _ result: ToolResult, tool: String, clientID: ClientID,
         durationMs: Int, mutating: Bool, arguments: [String: Any] = [:],
-        invocationID: UUID? = nil, outcomeOverride: String? = nil
+        invocationID: UUID? = nil, outcomeOverride: String? = nil,
+        startedAt: Date? = nil, finishedAt: Date? = nil
     ) -> [String: String] {
         var fields = [
             "invocation_id": (invocationID ?? UUID()).uuidString,
@@ -936,6 +938,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             "client_id": clientID.rawValue,
             "duration_ms": "\(durationMs)",
             "duration_kind": "tool_invocation",
+            "started_at": startedAt.map(ISO8601.string(from:)) ?? "unavailable_in_direct_field_builder",
+            "finished_at": finishedAt.map(ISO8601.string(from:)) ?? "unavailable_in_direct_field_builder",
             "mutating": mutating ? "true" : "false",
             "outcome": outcomeOverride ?? (result.ok ? "returned_success" : "returned_failure"),
             "ok": result.ok ? "true" : "false",

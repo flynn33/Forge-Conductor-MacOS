@@ -10,7 +10,8 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-Current source identity: `0.16.3 (24)`. Source
+Current source identity: `0.16.4 (25)`; the diagnostic source correction is
+not installed or deployed. Historical source
 `a54100b453ba8b1c1489ff09ac64dd6193fc1597` produced a universal Developer ID
 app and `.xcarchive`. A fresh archive was built from HEAD
 `b8a2c5dee546dff8d914405c2169a075bd0187e2` for a CLI staging and LM
@@ -26,7 +27,12 @@ remain open.
   and Markdown export counts, history scope, and timeline omission notices.
   Failed search and shell diagnostics now retain returned execution or durable
   job outcomes; continuity and Dashboard failures retain available operation
-  and connection identities. The installed alpha has not exercised this source.
+  and connection identities. Checkpoint, ingress-drain, and interactive-successor
+  paths each retain their own attempt or pass ID, actual stage, handoff identity
+  when created, and successor-request state. The
+  [capture contract](docs/DIAGNOSTIC-CAPTURE-CONTRACT.md) maps report sections
+  A–H to exact writers and regression tests. The installed alpha has not
+  exercised this source.
 - Produced the `0.16.3 (24)` universal Developer ID app and `.xcarchive` under
   `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID`. The app,
   framework, CLI, runtime launcher, and filesystem daemon pass the strict

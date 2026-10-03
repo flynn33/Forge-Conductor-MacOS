@@ -491,67 +491,100 @@ public final class ContextContinuityService: @unchecked Sendable {
         reason: String,
         finalize: Bool,
         inferred: [String: Any],
+        attemptID: UUID? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket {
-        let persisted = try mutateAndPersist(cancellation: cancellation) {
-            var args = inferred
-            if let latest = try store.handoffLegacyLatest(
-                clientID: clientID.rawValue,
-                cancellation: cancellation
-            ) ?? store.handoffLegacyLatest(
-                resumeReadyOnly: false,
-                cancellation: cancellation
-            ) {
-                args["handoff_id"] = latest.id
-                // Runtime inference fills blanks only. A model/budget packet already
-                // has the structured task; overwriting it would drop operator state.
-                if !latest.goal.isEmpty { args.removeValue(forKey: "goal") }
-                if latest.cwd?.isEmpty == false { args.removeValue(forKey: "cwd") }
-                if !latest.nextActions.isEmpty { args.removeValue(forKey: "next_actions") }
-                if !latest.blockers.isEmpty { args.removeValue(forKey: "blockers") }
-                if !latest.keyFiles.isEmpty { args.removeValue(forKey: "key_files") }
-                if !latest.decisions.isEmpty { args.removeValue(forKey: "decisions") }
-                if !latest.narrative.isEmpty { args.removeValue(forKey: "narrative") }
-                if latest.projectSlug?.isEmpty == false { args.removeValue(forKey: "project_slug") }
-            }
-            // Soft auto-checkpoints must not invent a status. Forcing
-            // "in_progress" is what made an exploration packet look like a live resume.
-            if finalize, args["status"] == nil {
-                args["status"] = "handoff_ready"
-            }
-            var packet = try buildPacket(
-                arguments: args,
-                clientID: clientID,
-                source: .auto,
-                finalize: finalize,
-                preserveAuthorIdentity: true,
-                cancellation: cancellation
-            )
-            if packet.goal.isEmpty {
-                packet.goal = finalize ? "Auto-handoff: \(reason)" : "Auto-checkpoint: \(reason)"
-            }
-            if finalize {
-                let note = "Runtime continuity: \(reason)"
-                if packet.narrative.isEmpty {
-                    packet.narrative = note
-                } else if !packet.narrative.contains(note) {
-                    packet.narrative = String(
-                        "\(packet.narrative)\n\n\(note)".prefix(HandoffPacket.maxNarrativeChars)
-                    )
+        var candidateID: String?
+        var failureStage = "continuity_lock"
+        let persisted: PersistenceOutcome
+        do {
+            persisted = try mutateAndPersist(cancellation: cancellation, stageObserver: { failureStage = $0 }) {
+                failureStage = "latest_packet_lookup"
+                var args = inferred
+                if let latest = try store.handoffLegacyLatest(
+                    clientID: clientID.rawValue,
+                    cancellation: cancellation
+                ) ?? store.handoffLegacyLatest(
+                    resumeReadyOnly: false,
+                    cancellation: cancellation
+                ) {
+                    args["handoff_id"] = latest.id
+                    // Runtime inference fills blanks only. A model/budget packet already
+                    // has the structured task; overwriting it would drop operator state.
+                    if !latest.goal.isEmpty { args.removeValue(forKey: "goal") }
+                    if latest.cwd?.isEmpty == false { args.removeValue(forKey: "cwd") }
+                    if !latest.nextActions.isEmpty { args.removeValue(forKey: "next_actions") }
+                    if !latest.blockers.isEmpty { args.removeValue(forKey: "blockers") }
+                    if !latest.keyFiles.isEmpty { args.removeValue(forKey: "key_files") }
+                    if !latest.decisions.isEmpty { args.removeValue(forKey: "decisions") }
+                    if !latest.narrative.isEmpty { args.removeValue(forKey: "narrative") }
+                    if latest.projectSlug?.isEmpty == false { args.removeValue(forKey: "project_slug") }
                 }
-            }
-            if finalize {
-                packet.resumeReady = true
-                if !packet.resumeSeedIsCustom {
-                    packet.resumeSeed = packet.defaultResumeSeed()
+                // Soft auto-checkpoints must not invent a status. Forcing
+                // "in_progress" is what made an exploration packet look like a live resume.
+                if finalize, args["status"] == nil {
+                    args["status"] = "handoff_ready"
                 }
+                failureStage = "packet_build"
+                var packet = try buildPacket(
+                    arguments: args,
+                    clientID: clientID,
+                    source: .auto,
+                    finalize: finalize,
+                    preserveAuthorIdentity: true,
+                    cancellation: cancellation
+                )
+                if packet.goal.isEmpty {
+                    packet.goal = finalize ? "Auto-handoff: \(reason)" : "Auto-checkpoint: \(reason)"
+                }
+                if finalize {
+                    let note = "Runtime continuity: \(reason)"
+                    if packet.narrative.isEmpty {
+                        packet.narrative = note
+                    } else if !packet.narrative.contains(note) {
+                        packet.narrative = String(
+                            "\(packet.narrative)\n\n\(note)".prefix(HandoffPacket.maxNarrativeChars)
+                        )
+                    }
+                }
+                if finalize {
+                    packet.resumeReady = true
+                    if !packet.resumeSeedIsCustom {
+                        packet.resumeSeed = packet.defaultResumeSeed()
+                    }
+                }
+                candidateID = packet.id
+                return packet
             }
-            return packet
+        } catch {
+            diagnostics.warn("auto_persist_failed", [
+                "attempt_id": attemptID?.uuidString ?? "unavailable_for_direct_call",
+                "handoff_id": candidateID ?? "unavailable_before_packet_build",
+                "client_id": clientID.rawValue,
+                "operation": finalize ? "handoff" : "checkpoint",
+                "finalize": finalize ? "true" : "false",
+                "failure_stage": failureStage,
+                "save_outcome": "not_confirmed",
+                "successor_request_state": "not_requested_by_persistence",
+                "error": error.localizedDescription,
+                "error_type": String(reflecting: type(of: error)),
+                "error_domain": (error as NSError).domain,
+                "error_numeric_code": "\((error as NSError).code)",
+            ], category: .general)
+            throw error
         }
         diagnostics.info(finalize ? "auto_handoff_persist" : "auto_checkpoint_persist", [
             "handoff_id": persisted.packet.id,
+            "attempt_id": attemptID?.uuidString ?? "unavailable_for_direct_call",
             "client_id": clientID.rawValue,
             "reason": reason,
+            "operation": finalize ? "handoff" : "checkpoint",
+            "finalize": finalize ? "true" : "false",
+            "resume_ready": persisted.packet.resumeReady ? "true" : "false",
+            "source": persisted.packet.source.rawValue,
+            "save_outcome": "committed",
+            "successor_request_state": finalize
+                ? "deferred_to_interactive_successor" : "not_applicable_checkpoint",
         ], category: .general)
         if finalize {
             try? writeNextChatHint(persisted.packet)
@@ -883,8 +916,10 @@ public final class ContextContinuityService: @unchecked Sendable {
         authorization: ContinuityIngressAuthorization? = nil,
         automaticHandoffEnabled: Bool = false,
         cancellation: ToolCallCancellation?,
+        stageObserver: ((String) -> Void)? = nil,
         _ mutation: () throws -> HandoffPacket
     ) throws -> PersistenceOutcome {
+        stageObserver?("continuity_lock")
         try lockContinuityMutex(
             lock,
             operation: "lock continuity service",
@@ -892,18 +927,23 @@ public final class ContextContinuityService: @unchecked Sendable {
         )
         defer { lock.unlock() }
         try cancellation?.checkCancellation()
+        stageObserver?("storage_layout")
         try paths.ensureLayout()
+        stageObserver?("persistence_file_lock")
         return try withPersistenceFileLock(cancellation: cancellation) {
             try cancellation?.checkCancellation()
+            stageObserver?("packet_mutation")
             let packet = try mutation()
             let ingress: ContinuityHandoffCommit?
             if let authorization {
+                stageObserver?("authorized_handoff_commit")
                 ingress = try store.handoffCommit(
                     packet, authorization: authorization,
                     automaticHandoffEnabled: automaticHandoffEnabled,
                     cancellation: cancellation
                 )
             } else {
+                stageObserver?("handoff_upsert")
                 try store.handoffUpsert(packet, cancellation: cancellation)
                 ingress = nil
             }

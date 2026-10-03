@@ -547,6 +547,11 @@ private actor ManagerInteractiveContinuityAdapter: SessionHostAdapter {
     nonisolated let version = "interactive-fixture"
     private var creations: [SessionCreationRequest] = []
     private var bootstraps: [(sessionID: String, handoffID: String, projectID: String)] = []
+    private let failCreation: Bool
+
+    init(failCreation: Bool = false) {
+        self.failCreation = failCreation
+    }
 
     func capabilities() async throws -> HostCapabilities {
         managerProviderHostCapabilities()
@@ -554,6 +559,7 @@ private actor ManagerInteractiveContinuityAdapter: SessionHostAdapter {
 
     func createSession(_ request: SessionCreationRequest) async throws -> HostSession {
         creations.append(request)
+        if failCreation { throw NSError(domain: "InteractiveCreateFixture", code: 41) }
         return HostSession(
             id: "interactive-successor-session",
             providerSessionID: "resp_interactive_successor",
@@ -1164,6 +1170,16 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(observed.bootstrapCount, 1)
         XCTAssertEqual(observed.bootstrappedHandoffID, handoffID)
         XCTAssertEqual(observed.bootstrappedProjectID, projectID)
+        let request = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "manager_interactive_successor_request"
+        })
+        let completion = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "manager_interactive_continuity_completed"
+        })
+        XCTAssertEqual(request.fields["handoff_id"], handoffID)
+        XCTAssertEqual(request.fields["attempt_id"], completion.fields["attempt_id"])
+        XCTAssertEqual(completion.fields["creation_attempted"], "true")
+        XCTAssertEqual(completion.fields["successor_request_state"], "created")
         let completed = try XCTUnwrap(node.operatorSnapshot().interactiveContinuity)
         XCTAssertEqual(completed.state, "completed")
         XCTAssertEqual(completed.countdownSeconds, countdown.countdownSeconds)
@@ -1201,6 +1217,7 @@ final class ManagerTests: XCTestCase {
             XCTAssertEqual(failure.fields["handoff_id"], handoffID)
             XCTAssertEqual(failure.fields["failure_stage"], "project_resolution")
             XCTAssertEqual(failure.fields["creation_attempted"], "false")
+            XCTAssertEqual(failure.fields["successor_request_state"], "not_requested")
             XCTAssertEqual(failure.fields["completion_committed"], "false")
             XCTAssertNotNil(failure.fields["error_type"])
             XCTAssertNotNil(failure.fields["error"])
@@ -1209,6 +1226,51 @@ final class ManagerTests: XCTestCase {
             })
             XCTAssertEqual(started.fields["handoff_id"], handoffID)
             XCTAssertEqual(started.fields["attempt_id"], failure.fields["attempt_id"])
+        }
+    }
+
+    func testInteractiveCreateFailureRetainsRequestedStageAndHandoff() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent("failed-interactive-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let adapter = ManagerInteractiveContinuityAdapter(failCreation: true)
+        let registry = HostAdapterRegistry()
+        registry.register(
+            manifest: HostPluginManifest(
+                identifier: ManagerNode.nativeSessionHostAdapterID,
+                version: "interactive-fixture", minimumContractVersion: 1,
+                hostType: "lmstudio-interactive-fixture",
+                capabilities: managerProviderHostCapabilities(),
+                configurationKeys: [], privacyRequirements: [], migrationVersion: 1
+            ), factory: { _ in adapter }
+        )
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        _ = try node.registerProject(path: projectRoot.path, displayName: "Failed Interactive Project")
+        let handoffID = UUID().uuidString
+        try app.store.handoffUpsert(HandoffPacket(
+            id: handoffID, resumeReady: true, clientID: "lmstudio-predecessor",
+            goal: "Continue", status: "ready", projectSlug: "Failed Interactive Project",
+            cwd: projectRoot.path, nextActions: ["Resume"]
+        ))
+        do {
+            _ = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+            XCTFail("The fixture create call unexpectedly succeeded")
+        } catch {
+            let requested = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+                $0.event == "manager_interactive_successor_request"
+            })
+            let failure = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+                $0.event == "manager_interactive_continuity_deferred"
+            })
+            XCTAssertEqual(requested.fields["handoff_id"], handoffID)
+            XCTAssertEqual(failure.fields["handoff_id"], handoffID)
+            XCTAssertEqual(requested.fields["attempt_id"], failure.fields["attempt_id"])
+            XCTAssertEqual(failure.fields["failure_stage"], "successor_creation")
+            XCTAssertEqual(failure.fields["creation_attempted"], "true")
+            XCTAssertEqual(failure.fields["successor_request_state"], "create_call_started")
+            XCTAssertEqual(failure.fields["error_domain"], "InteractiveCreateFixture")
+            XCTAssertEqual(failure.fields["completion_committed"], "false")
         }
     }
 

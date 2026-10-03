@@ -2,7 +2,7 @@
 
 Start with the shortest document that answers the question. Historical evidence
 is retained for auditability, but it is not current operating guidance. Current
-operating documents describe repository identity **0.16.3, build 24** unless a
+operating documents describe repository identity **0.16.4, build 25** unless a
 source-bound historical receipt says otherwise.
 
 ## Use and setup
@@ -34,6 +34,7 @@ source-bound historical receipt says otherwise.
 | [Telemetry](TELEMETRY.md) | Metrics, delivery, and gauge invariants |
 | [Budget policy](BUDGET-POLICY.md) | Persisted defaults and project overrides |
 | [Versioning](VERSIONING.md) | Product-version and build-number rules |
+| [Diagnostic capture contract](DIAGNOSTIC-CAPTURE-CONTRACT.md) | October 2 report sections A–H, source writers, and regression tests |
 
 ## Delivery and current status
 

@@ -2,7 +2,7 @@
 
 This document is derived from **this Xcode project’s source** and **on-disk / runtime checks**, not from the retired Python stack.
 
-Product identity: version **0.16.3**, build **24**. This connection document does
+Current source identity: version **0.16.4**, build **25**. This connection document does
 not authorize release; the qualification boundary below remains controlling.
 
 ## Build-24 CLI staging/deploy reconnect receipt — October 1, 2026

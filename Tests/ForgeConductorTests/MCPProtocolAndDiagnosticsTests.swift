@@ -994,6 +994,36 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertTrue(md.contains("unit_test_event") || md.contains("Timeline"))
     }
 
+    func testMCPToolRequestAndRouterResultShareInvocationIdentity() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-mcp-correlation-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let server = MCPServer(app: app, clientID: ClientID("correlation-fixture"))
+        _ = try XCTUnwrap(server.handle([
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": ["protocolVersion": "2025-11-25"],
+        ]))
+        let call = try XCTUnwrap(server.handle([
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": ["name": "forge_status", "arguments": [:]] as [String: Any],
+        ]))
+        XCTAssertNotNil(call["result"])
+        let records = app.diagnostics.recent(limit: 100)
+        let request = try XCTUnwrap(records.last {
+            $0.event == "mcp_tools_call" && $0.fields["tool"] == "forge_status"
+        })
+        let result = try XCTUnwrap(records.last {
+            ($0.event == "tool_call" || $0.event == "tool_call_failed")
+                && $0.fields["tool"] == "forge_status"
+        })
+        let invocationID = try XCTUnwrap(request.fields["invocation_id"])
+        XCTAssertNotNil(UUID(uuidString: invocationID))
+        XCTAssertEqual(result.fields["invocation_id"], invocationID)
+        XCTAssertEqual(result.fields["client_id"], request.fields["client_id"])
+    }
+
     func testDiagnosticErrorIdentitySurvivesPersistenceAndExport() throws {
         XCTAssertEqual(DiagnosticRedaction.redactedValue("<redacted:14b>", forKey: "error"),
                        "<redacted:14b>")
@@ -1008,20 +1038,46 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         let original = try XCTUnwrap(log.recent(limit: 1).first)
         XCTAssertNotNil(original.recordID)
         XCTAssertNotNil(original.processInstanceID)
+        XCTAssertEqual(original.appVersion, ForgeApp.version)
+        XCTAssertEqual(original.buildIdentity, ForgeApp.buildVersion)
+        XCTAssertEqual(original.pid, ProcessInfo.processInfo.processIdentifier)
+        XCTAssertEqual(original.category, .tools)
+        XCTAssertEqual(original.role, "primary")
+        XCTAssertFalse(original.tsISO.isEmpty)
+        XCTAssertEqual(original.component, DiagnosticCategory.tools.rawValue)
         XCTAssertEqual(original.fields["error"], "Permission denied at <redacted:path>")
         XCTAssertEqual(original.fields["redacted_fields"], "error")
+        XCTAssertEqual(original.fields["sanitization_reasons"], "error=path")
         let loaded = try XCTUnwrap(log.loadPersisted().first)
         XCTAssertEqual(loaded.recordID, original.recordID)
         XCTAssertEqual(loaded.fields, original.fields)
+        log.warn("already_redacted", ["path": "<redacted:14b>"], category: .tools)
+        let reloadedMarker = try XCTUnwrap(log.loadPersisted().last)
+        XCTAssertEqual(reloadedMarker.fields["path"], "<redacted:14b>")
         let exported = try log.export(to: home.appendingPathComponent("export"))
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: exported.jsonURL)) as? [String: Any])
         let records = try XCTUnwrap(json["records"] as? [[String: Any]])
         XCTAssertEqual(records.first?["record_id"] as? String, original.recordID)
+        XCTAssertEqual(records.first?["component"] as? String, DiagnosticCategory.tools.rawValue)
         XCTAssertFalse(try String(contentsOf: exported.jsonURL, encoding: .utf8).contains("/Users/private/secret.txt"))
         log.warn("long_failure", ["message": String(repeating: "x", count: 600)], category: .tools)
         let truncated = try XCTUnwrap(log.recent(limit: 1).first)
         XCTAssertEqual(truncated.fields["message"]?.count, 512)
         XCTAssertEqual(truncated.fields["truncated_fields"], "message")
+        XCTAssertEqual(truncated.fields["sanitization_reasons"], "message=length_limit")
+        log.warn("distinct_capture_states", [
+            "path": "/Users/private/secret.txt",
+            "handoff_id": "unavailable_before_packet_build",
+            "message": String(repeating: "a", count: 600),
+        ], category: .tools)
+        let states = try XCTUnwrap(log.recent(limit: 1).first)
+        XCTAssertTrue(states.fields["path"]?.hasPrefix("<redacted:") == true)
+        XCTAssertEqual(states.fields["handoff_id"], "unavailable_before_packet_build")
+        XCTAssertEqual(states.fields["redacted_fields"], "path")
+        XCTAssertEqual(states.fields["truncated_fields"], "message")
+        XCTAssertEqual(states.fields["unavailable_fields"], "handoff_id")
+        XCTAssertNotEqual(states.fields["path"], states.fields["handoff_id"])
+        XCTAssertNotEqual(states.fields["message"], states.fields["handoff_id"])
     }
 
     func testDiagnosticTimelineDisclosesItsLimit() throws {
@@ -1041,7 +1097,16 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertTrue(markdown.contains("| row_2000 |"))
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: exported.jsonURL)) as? [String: Any])
         XCTAssertEqual(json["json_record_count"] as? Int, 2_001)
+        XCTAssertEqual(json["json_omitted_count"] as? Int, 0)
+        XCTAssertEqual(json["markdown_record_count"] as? Int, 2_000)
         XCTAssertEqual(json["markdown_omitted_count"] as? Int, 1)
+        let records = try XCTUnwrap(json["records"] as? [[String: Any]])
+        let firstIncluded = try XCTUnwrap(records[1]["record_id"] as? String)
+        let lastIncluded = try XCTUnwrap(records.last?["record_id"] as? String)
+        XCTAssertTrue(markdown.contains("**Included timeline range:** \(firstIncluded)"))
+        XCTAssertTrue(markdown.contains("to \(lastIncluded)"))
+        XCTAssertEqual(json["first_record_id"] as? String, records.first?["record_id"] as? String)
+        XCTAssertEqual(json["last_record_id"] as? String, lastIncluded)
     }
 
     func testFailedToolDiagnosticUsesReturnedExecutionFields() {

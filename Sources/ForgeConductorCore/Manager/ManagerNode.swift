@@ -6503,6 +6503,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         var projectID = "unavailable"
         var successorSessionID = "unavailable"
         var creationAttempted = false
+        var existingSessionReused = false
         var acknowledgementReceived = false
         do {
             guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true) else {
@@ -6515,6 +6516,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 "attempt_id": attemptID,
                 "handoff_id": handoffID,
                 "stage": "handoff_selected",
+                "successor_request_state": "not_requested_before_lookup",
             ], category: .manager)
 
             stage = "handoff_timestamp_validation"
@@ -6560,9 +6562,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             stage = "successor_lookup"
             if let existing = try await adapter.session(forIdempotencyKey: idempotencyKey) {
                 session = existing
+                existingSessionReused = true
             } else {
                 stage = "successor_creation"
                 creationAttempted = true
+                app.diagnostics.info("manager_interactive_successor_request", [
+                    "attempt_id": attemptID,
+                    "handoff_id": packet.id,
+                    "project_id": project.projectID.description,
+                    "stage": stage,
+                    "successor_request_state": "create_call_started",
+                ], category: .manager)
                 session = try await adapter.createSession(SessionCreationRequest(
                     operationID: packet.id,
                     projectID: project.projectID.description,
@@ -6595,6 +6605,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     "handoff_id": packet.id,
                     "project_id": project.projectID.description,
                     "successor_session_id": session.id,
+                    "creation_attempted": creationAttempted ? "true" : "false",
+                    "existing_session_reused": existingSessionReused ? "true" : "false",
+                    "successor_request_state": creationAttempted ? "created" : "existing_session_reused",
                     "delay_seconds": "\(Int(Self.interactiveRolloverDelaySeconds))",
                     "bootstrap": "get_forge_status resume=true",
                 ],
@@ -6611,6 +6624,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 "successor_session_id": successorSessionID,
                 "failure_stage": stage,
                 "creation_attempted": creationAttempted ? "true" : "false",
+                "existing_session_reused": existingSessionReused ? "true" : "false",
+                "successor_request_state": creationAttempted
+                    ? "create_call_started" : (existingSessionReused ? "existing_session_reused" : "not_requested"),
                 "acknowledgement_received": acknowledgementReceived ? "true" : "false",
                 "completion_committed": "false",
                 "disposition": "not_committed_retry_unconfirmed",
@@ -6844,7 +6860,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         defer { if !asyncStartupOwnsCompletion { finishManagedAutonomyStartup() } }
 
         let ingress = try ContinuityIngressDeliveryService(
-            source: app.store, repository: app.projectContexts.repository, config: app.config
+            source: app.store, repository: app.projectContexts.repository, config: app.config,
+            diagnostics: app.diagnostics
         )
         let value = try managedAutonomyFactory(app)
         let sourceConversation = makeNativeSourceConversation(runtime: value)
@@ -6926,7 +6943,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             if sourceFirst { await recoverSource() }
             guard !Task.isCancelled else { return }
             do {
-                _ = try await ingress.drainOnce()
+                _ = try await ingress.drainOnce(attemptID: tickID)
             } catch {
                 if !Task.isCancelled {
                     self?.app.diagnostics.warn("manager_continuity_delivery_failed",
@@ -6937,9 +6954,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                             "error_domain": (error as NSError).domain,
                             "error_numeric_code": "\((error as NSError).code)",
                             "failure_stage": "ingress_drain",
-                            "handoff_id": "unavailable_before_packet_selection",
                             "attempt_id": tickID.uuidString,
-                            "disposition": "unconfirmed_at_failure",
+                            "detail_event": "continuity_ingress_drain_failed",
                         ], category: .manager)
                 }
             }

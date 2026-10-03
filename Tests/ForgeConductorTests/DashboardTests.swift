@@ -7,6 +7,41 @@ import Darwin
 @testable import ForgeConductorCore
 
 final class DashboardTests: XCTestCase {
+    func testConnectionFailureIdentityRemainsDistinctFromListenerAndBindFailure() {
+        let connectionID = UUID()
+        let listenerID = UUID()
+        let error = NSError(domain: "DashboardFixture", code: 61)
+        let beforeRequest = DashboardServer.connectionFailureFields(
+            identity: ["request_available": "false", "request_id": "unavailable_before_parse",
+                       "request_method": "unavailable_before_parse", "request_route": "unavailable_before_parse"],
+            connectionID: connectionID, listenerID: listenerID, error: error
+        )
+        XCTAssertEqual(beforeRequest["connection_id"], connectionID.uuidString)
+        XCTAssertEqual(beforeRequest["listener_instance_id"], listenerID.uuidString)
+        XCTAssertEqual(beforeRequest["request_available"], "false")
+        XCTAssertEqual(beforeRequest["request_id"], "unavailable_before_parse")
+        XCTAssertEqual(beforeRequest["failure_scope"], "accepted_connection")
+        XCTAssertEqual(beforeRequest["error_domain"], "DashboardFixture")
+        XCTAssertEqual(beforeRequest["error_numeric_code"], "61")
+        let requestID = UUID().uuidString
+        let parsed = DashboardServer.connectionFailureFields(
+            identity: ["request_available": "true", "request_id": requestID,
+                       "request_method": "GET", "request_route": "/api/status"],
+            connectionID: connectionID, listenerID: listenerID, error: error
+        )
+        XCTAssertEqual(parsed["request_available"], "true")
+        XCTAssertEqual(parsed["request_id"], requestID)
+        XCTAssertEqual(parsed["request_method"], "GET")
+        XCTAssertEqual(parsed["request_route"], "/api/status")
+        let listener = DashboardServer.listenerFailureFields(listenerID: listenerID, port: 8080, error: error)
+        XCTAssertEqual(listener["failure_scope"], "listener")
+        XCTAssertEqual(listener["connection_id"], "not_applicable_listener_scope")
+        let timeout = DashboardServer.bindTimeoutFields(listenerID: listenerID, port: 8080)
+        XCTAssertEqual(timeout["failure_scope"], "bind_timeout")
+        XCTAssertEqual(timeout["error"], "unavailable_no_listener_error_observed")
+        XCTAssertNotEqual(timeout["failure_scope"], parsed["failure_scope"])
+    }
+
     func testDashboardStartsAndServesStatus() throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-dash-\(UUID().uuidString)", isDirectory: true)

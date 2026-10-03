@@ -8,22 +8,21 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.16.3** |
-| **Build** | **24** |
+| **Version** | **0.16.4** |
+| **Build** | **25** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
 | **Documentation** | [Documentation guide](docs/README.md) |
 
-> **Release status:** current source is `0.16.3 (24)` and includes the MCP
-> reconnect/project-binding correction from product code
-> `a54100b453ba8b1c1489ff09ac64dd6193fc1597`. A fresh universal Developer ID
-> archive was built while HEAD was
-> `b8a2c5dee546dff8d914405c2169a075bd0187e2`. The October 1 check
-> exercised CLI staging and LM Studio deployment, **not** installation of the
-> signed `.pkg`. `/Applications/Forge Conductor.app` was manually copied from
-> the candidate after the old app was stopped. Package installation,
-> notarization, stapling, Gatekeeper acceptance, and shipment remain open.
+> **Release status:** current source is `0.16.4 (25)` with diagnostic capture
+> corrections. It has not been packaged, installed, deployed, or exercised
+> against the installed alpha. The earlier `0.16.3 (24)` Developer ID archive
+> was built from source `a54100b453ba8b1c1489ff09ac64dd6193fc1597` while
+> HEAD was `b8a2c5dee546dff8d914405c2169a075bd0187e2`. Its October 1 CLI
+> staging and LM Studio deploy receipt remains historical evidence; it was
+> not a signed `.pkg` installation. Notarization, Gatekeeper acceptance, and
+> shipment remain open.
 
 The retained Developer ID-signed Desktop candidate is
 `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID/Forge Conductor.app`,
@@ -51,7 +50,7 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, and current repository documentation use `0.16.3 (24)`.
+configurations, and current repository documentation use `0.16.4 (25)`.
 Historical candidate receipts, including the `0.16.2 (23)` Developer ID
 record, retain the identity they actually tested.
 

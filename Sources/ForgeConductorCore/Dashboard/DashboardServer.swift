@@ -203,10 +203,9 @@ public final class DashboardServer: @unchecked Sendable {
                 ], category: .manager)
                 gate.signal()
             case .failed(let err):
-                self?.app.diagnostics.error("dashboard_failed", [
-                    "error": "\(err)",
-                    "port": "\(self?.port ?? 0)",
-                ], category: .manager)
+                self?.app.diagnostics.error("dashboard_failed", Self.listenerFailureFields(
+                    listenerID: listenerEpoch, port: self?.port ?? 0, error: err
+                ), category: .manager)
                 bindResult.record(error: err)
                 gate.signal()
             case .waiting(let err):
@@ -237,7 +236,9 @@ public final class DashboardServer: @unchecked Sendable {
         let wait = gate.wait(timeout: .now() + Self.bindTimeoutSeconds)
         if wait == .timedOut {
             stop()
-            app.diagnostics.error("dashboard_bind_timeout", ["port": "\(port)"], category: .manager)
+            app.diagnostics.error("dashboard_bind_timeout", Self.bindTimeoutFields(
+                listenerID: listenerEpoch, port: port
+            ), category: .manager)
             throw DashboardError.bindTimeout(port)
         }
         if let bindError = bindResult.recordedError() {
@@ -391,23 +392,12 @@ public final class DashboardServer: @unchecked Sendable {
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed(let error):
-                var identity = self?.connectionDiagnosticFields(identifier) ?? [:]
-                identity["connection_id"] = diagnosticID.uuidString
-                identity["listener_instance_id"] = listenerEpoch.uuidString
-                if identity["request_available"] == nil {
-                    identity["request_available"] = "unavailable_after_connection_removal"
-                }
                 self?.app.diagnostics.warn(
                     "dashboard_connection_failed",
-                    identity.merging([
-                        "error": error.localizedDescription,
-                        "error_type": String(reflecting: type(of: error)),
-                        "error_domain": (error as NSError).domain,
-                        "error_numeric_code": "\((error as NSError).code)",
-                        "failure_scope": "accepted_connection",
-                        "failure_stage": "connection_state_failed",
-                        "connection_state": "failed",
-                    ]) { _, newer in newer },
+                    Self.connectionFailureFields(
+                        identity: self?.connectionDiagnosticFields(identifier) ?? [:],
+                        connectionID: diagnosticID, listenerID: listenerEpoch, error: error
+                    ),
                     category: .manager
                 )
                 self?.removeConnection(identifier)
@@ -499,6 +489,49 @@ public final class DashboardServer: @unchecked Sendable {
             "request_method": record.requestMethod ?? "unavailable_before_parse",
             "request_route": record.requestRoute ?? "unavailable_before_parse",
             "request_route_identity": record.requestRouteIdentity ?? "unavailable_before_parse",
+        ]
+    }
+
+    static func connectionFailureFields(identity: [String: String], connectionID: UUID,
+                                        listenerID: UUID, error: Error) -> [String: String] {
+        var fields = identity
+        fields["connection_id"] = connectionID.uuidString
+        fields["listener_instance_id"] = listenerID.uuidString
+        if fields["request_available"] == nil {
+            fields["request_available"] = "unavailable_after_connection_removal"
+        }
+        fields["error"] = error.localizedDescription
+        fields["error_type"] = String(reflecting: type(of: error))
+        fields["error_domain"] = (error as NSError).domain
+        fields["error_numeric_code"] = "\((error as NSError).code)"
+        fields["failure_scope"] = "accepted_connection"
+        fields["failure_stage"] = "connection_state_failed"
+        fields["connection_state"] = "failed"
+        return fields
+    }
+
+    static func listenerFailureFields(listenerID: UUID, port: UInt16, error: Error) -> [String: String] {
+        [
+            "listener_instance_id": listenerID.uuidString,
+            "connection_id": "not_applicable_listener_scope",
+            "failure_scope": "listener",
+            "failure_stage": "listener_state_failed",
+            "port": "\(port)",
+            "error": error.localizedDescription,
+            "error_type": String(reflecting: type(of: error)),
+            "error_domain": (error as NSError).domain,
+            "error_numeric_code": "\((error as NSError).code)",
+        ]
+    }
+
+    static func bindTimeoutFields(listenerID: UUID, port: UInt16) -> [String: String] {
+        [
+            "listener_instance_id": listenerID.uuidString,
+            "connection_id": "not_applicable_listener_scope",
+            "failure_scope": "bind_timeout",
+            "failure_stage": "listener_bind_wait",
+            "port": "\(port)",
+            "error": "unavailable_no_listener_error_observed",
         ]
     }
 

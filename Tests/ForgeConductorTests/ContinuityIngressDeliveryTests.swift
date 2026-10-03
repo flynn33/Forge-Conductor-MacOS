@@ -75,7 +75,67 @@ final class ContinuityIngressDeliveryTests: XCTestCase {
                          checkpoint: @escaping @Sendable (ContinuityIngressDeliveryCheckpoint) async throws -> Void = { _ in }) throws -> ContinuityIngressDeliveryService {
         try ContinuityIngressDeliveryService(source: app.store,
             repository: app.projectContexts.repository, config: app.config,
+            diagnostics: app.diagnostics,
             batchLimit: batchLimit, checkpoint: checkpoint)
+    }
+
+    func testIngressFailureAfterClaimRetainsExactHandoffAndPassStage() async throws {
+        let fixture = try await commitTask()
+        let operationID = try XCTUnwrap(fixture.commit.delivery).operationID
+        let handoffID = fixture.commit.revision.identity.continuityID
+        let passID = UUID()
+        let delivery = try service { point in
+            if case .sourceClaimed = point { throw ContinuityIngressDeliveryInterruption.simulatedExit }
+        }
+        do {
+            _ = try await delivery.drainOnce(attemptID: passID)
+            XCTFail("Expected the selected claim checkpoint to fail")
+        } catch {
+            XCTAssertTrue(error is ContinuityIngressDeliveryInterruption)
+        }
+        let started = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "continuity_ingress_attempt"
+        })
+        let failed = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "continuity_ingress_drain_failed"
+        })
+        XCTAssertEqual(started.fields["attempt_id"], passID.uuidString)
+        XCTAssertEqual(failed.fields["attempt_id"], passID.uuidString)
+        XCTAssertEqual(failed.fields["operation_id"], operationID.uuidString)
+        XCTAssertEqual(failed.fields["handoff_id"], handoffID)
+        XCTAssertEqual(failed.fields["failure_stage"], "source_claimed_checkpoint")
+        XCTAssertEqual(failed.fields["delivery_state"], "claimed")
+        XCTAssertEqual(failed.fields["attempt_count"], "1")
+        XCTAssertEqual(failed.fields["successor_request_state"], "not_requested_by_ingress")
+        await delivery.shutdown()
+    }
+
+    func testIngressRetryRecordDistinguishesScheduledFromStarted() async throws {
+        let fixture = try await commitTask()
+        let operationID = try XCTUnwrap(fixture.commit.delivery).operationID
+        let passID = UUID()
+        let delivery = try service { point in
+            if case .sourceClaimed = point {
+                throw NSError(domain: "IngressFixture", code: 37)
+            }
+        }
+        let report = try await delivery.drainOnce(attemptID: passID)
+        XCTAssertEqual(report.retried, 1)
+        let record = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "continuity_ingress_retry_scheduled"
+        })
+        let stored = try XCTUnwrap(app.store.continuityDelivery(operationID: operationID))
+        XCTAssertEqual(record.fields["attempt_id"], passID.uuidString)
+        XCTAssertEqual(record.fields["operation_id"], operationID.uuidString)
+        XCTAssertEqual(record.fields["handoff_id"], fixture.commit.revision.identity.continuityID)
+        XCTAssertEqual(record.fields["failure_stage"], "source_claimed_checkpoint")
+        XCTAssertEqual(record.fields["disposition"], "retry_scheduled")
+        XCTAssertEqual(record.fields["delivery_state"], "pending")
+        XCTAssertEqual(record.fields["attempt_count"], "\(stored.attempts)")
+        XCTAssertEqual(record.fields["next_attempt_at"], stored.nextAttemptAt)
+        XCTAssertNotNil(record.fields["retry_delay_seconds"])
+        XCTAssertEqual(record.fields["error_domain"], "IngressFixture")
+        await delivery.shutdown()
     }
 
     func testSourceAndManagerIngressBoundariesSurviveSIGKILLWithoutDuplicateAcceptance() async throws {

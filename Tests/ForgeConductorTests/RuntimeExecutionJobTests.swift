@@ -4894,6 +4894,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertEqual(records.count, 2)
         XCTAssertEqual(records.first?.fields["job_id"], records.last?.fields["job_id"])
         XCTAssertEqual(records.first?.fields["idempotency_match"], "false")
+        XCTAssertEqual(records.first?.fields["created_new_job"], "true")
         XCTAssertEqual(records.last?.fields["idempotency_match"], "true")
         XCTAssertEqual(records.last?.fields["created_new_job"], "false")
     }
@@ -4920,6 +4921,9 @@ final class RuntimeExecutionJobTests: XCTestCase {
         })
         XCTAssertEqual(record.fields["invocation_id"], request.requestID.uuidString)
         XCTAssertEqual(toolFailure.fields["invocation_id"], record.fields["invocation_id"])
+        XCTAssertNotNil(toolFailure.fields["command_identity"])
+        XCTAssertNotNil(toolFailure.fields["cwd_identity"])
+        XCTAssertEqual(record.fields["idempotency_match"], "false")
     }
 
     func testBootstrapRouterLegacyShellExecRetainsNativeAccessOutsideProjectRoot() async throws {

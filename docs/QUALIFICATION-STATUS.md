@@ -2,11 +2,17 @@
 
 ## October 3 diagnostic source correction — installation pending
 
-The attached October 2 alpha archive exposed six evidence gaps. Current
+Current repository source identity is `0.16.4 (25)`. The October 2 alpha
+archive exposed six evidence gaps. Current
 source changes preserve sanitized error identity, distinguish returned tool
 failures from exceptions, classify `fs_read` errors by observed cause, retain
 shell job and continuity attempt identity, and disclose Markdown timeline
-omissions. Focused Swift and native Debug checks are tracked in the roadmap.
+omissions. The [A–H capture contract](DIAGNOSTIC-CAPTURE-CONTRACT.md) names the
+source writers and regression tests. On the final `0.16.4 (25)` source tree,
+`swift test` selected 1,955 tests, skipped 13 and failed 0; the canonical
+Debug workspace build succeeded, and the complete app-hosted target passed
+127 tests with no failures. The exact commands and terminal lines are in the
+[roadmap](../ROADMAP.md).
 The `/Applications` app and running helper remain the earlier 0.16.3 alpha;
 this correction has not been packaged, installed, deployed to LM Studio, or
 verified against the original live failure sequence. Discarded historical
@@ -85,7 +91,7 @@ changed, and no Continuity clear, reset, or delete was invoked. The existing ins
 
 ## 0.16.3 MCP reconnect and Dashboard binding correction
 
-Current source identity is **0.16.3, build 24**. Installed `0.16.2 (23)`
+At that historical checkpoint, source identity was **0.16.3, build 24**. Installed `0.16.2 (23)`
 diagnostics reproduced an LM Studio fallback helper restart that changed PID and
 random MCP client UUID, after which project-scoped tools returned
 `project_context_required`. A second live transcript showed that even
@@ -597,8 +603,8 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Product identity: **0.16.3, build 24**, supporting **macOS 26+**. The current
-Developer ID app and archive are recorded in the opening build-24 section;
+Current source identity: **0.16.4, build 25**, supporting **macOS 26+**. The earlier
+0.16.3 Developer ID app and archive are recorded in the opening build-24 section;
 they remain unnotarized, uninstalled, and unshipped. Earlier `0.9.0 (1)`
 receipts remain historical evidence only. This page is a concise status index;
 the detailed, source-bound receipts are in the
@@ -608,7 +614,7 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.3, build 24**. The root [`VERSION`](../VERSION)
+documentation use version **0.16.4, build 25**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

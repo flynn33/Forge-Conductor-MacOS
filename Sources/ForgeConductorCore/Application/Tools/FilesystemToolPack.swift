@@ -396,31 +396,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         } catch let error as ToolCallDeadlineExceeded {
             throw error
         } catch {
-            let nsError = error as NSError
-            let isMissing = nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(ENOENT)
-            let isDenied = nsError.domain == NSPOSIXErrorDomain
-                && (nsError.code == Int(EACCES) || nsError.code == Int(EPERM))
-            let knownReadError = error as? BoundedTextReadError
-            let code: String
-            switch knownReadError {
-            case .notRegularFile: code = "not_regular_file"
-            case .invalidUTF8: code = "invalid_text_encoding"
-            default: code = isMissing ? "not_found" : (isDenied ? "permission_denied" : "read_failed")
-            }
-            var failure = ToolResult.failure(
-                code: code,
-                message: "Unable to read file: \(url.path) (\(error.localizedDescription))",
-                retryable: false
-            )
-            failure.payload["error_type"] = String(reflecting: type(of: error))
-            failure.payload["error_domain"] = nsError.domain
-            failure.payload["error_numeric_code"] = nsError.code
-            if nsError.domain == NSPOSIXErrorDomain {
-                failure.payload["native_error_code"] = nsError.code
-            }
-            failure.payload["failure_stage"] = "bounded_file_read"
-            failure.payload["cause_classified"] = knownReadError != nil || isMissing || isDenied
-            return failure
+            return Self.classifiedReadFailure(error, at: url)
         }
         try cancellation?.checkCancellation()
 
@@ -4389,6 +4365,34 @@ public struct FilesystemToolPack: ToolPackHandling {
         case tooLarge
         case notRegularFile
         case invalidUTF8
+    }
+
+    static func classifiedReadFailure(_ error: Error, at url: URL) -> ToolResult {
+        let nsError = error as NSError
+        let isMissing = nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(ENOENT)
+        let isDenied = nsError.domain == NSPOSIXErrorDomain
+            && (nsError.code == Int(EACCES) || nsError.code == Int(EPERM))
+        let knownReadError = error as? BoundedTextReadError
+        let code: String
+        switch knownReadError {
+        case .notRegularFile: code = "not_regular_file"
+        case .invalidUTF8: code = "invalid_text_encoding"
+        default: code = isMissing ? "not_found" : (isDenied ? "permission_denied" : "read_failed")
+        }
+        var failure = ToolResult.failure(
+            code: code,
+            message: "Unable to read file: \(url.path) (\(error.localizedDescription))",
+            retryable: false
+        )
+        failure.payload["error_type"] = String(reflecting: type(of: error))
+        failure.payload["error_domain"] = nsError.domain
+        failure.payload["error_numeric_code"] = nsError.code
+        if nsError.domain == NSPOSIXErrorDomain {
+            failure.payload["native_error_code"] = nsError.code
+        }
+        failure.payload["failure_stage"] = "bounded_file_read"
+        failure.payload["cause_classified"] = knownReadError != nil || isMissing || isDenied
+        return failure
     }
 
     /// Opens nonblocking so special files cannot strand the transport thread, then

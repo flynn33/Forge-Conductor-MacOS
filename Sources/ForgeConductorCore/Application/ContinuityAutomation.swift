@@ -199,6 +199,10 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         succeeded: Bool,
         cancellation: ToolCallCancellation? = nil
     ) -> ContinuityObservation? {
+        let attemptID = UUID()
+        var stage = "progress_observation"
+        var operation = "unavailable_before_threshold_selection"
+        var persistenceAttempted = false
         do {
             try cancellation?.checkCancellation()
             let observedPath = ToolArgHelpers.string(arguments, "path")
@@ -250,6 +254,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             }
 
             guard update.checkpointDue || update.handoffDue else { return nil }
+            operation = update.handoffDue ? "handoff" : "checkpoint"
+            stage = "inference"
             let inferred = try inferredArguments(
                 clientID: clientID,
                 lastTools: update.current.lastTools,
@@ -260,11 +266,14 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             let reason = finalize
                 ? "auto_handoff progress=\(update.progress)"
                 : "auto_checkpoint progress=\(update.progress)"
+            stage = "packet_persistence"
+            persistenceAttempted = true
             let packet = try continuity.autoPersist(
                 clientID: clientID,
                 reason: reason,
                 finalize: finalize,
                 inferred: inferred,
+                attemptID: attemptID,
                 cancellation: cancellation
             )
             // The packet is durable at this point. Updating the in-memory mirror is
@@ -290,9 +299,14 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                 "client_id": clientID.rawValue,
                 "progress": "\(update.progress)",
                 "reason": reason,
-                "operation": finalize ? "handoff" : "checkpoint",
+                "attempt_id": attemptID.uuidString,
+                "operation": operation,
                 "finalize": finalize ? "true" : "false",
-                "successor_requested": "false",
+                "resume_ready": packet.resumeReady ? "true" : "false",
+                "source": packet.source.rawValue,
+                "save_outcome": "committed",
+                "successor_request_state": finalize
+                    ? "deferred_to_interactive_successor" : "not_applicable_checkpoint",
             ], category: .general)
             return ContinuityObservation(packet: packet, finalize: finalize, reason: reason)
         } catch is CancellationError {
@@ -300,15 +314,20 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         } catch is ToolCallDeadlineExceeded {
             return nil
         } catch {
-            diagnostics.warn("auto_continuity_failed", [
-                "client_id": clientID.rawValue,
-                "error": "\(error)",
-                "error_type": String(reflecting: type(of: error)),
-                "error_domain": (error as NSError).domain,
-                "error_numeric_code": "\((error as NSError).code)",
-                "failure_stage": "packet_persistence",
-                "handoff_id": "unavailable_before_commit",
-            ], category: .general)
+            if !persistenceAttempted {
+                diagnostics.warn("auto_continuity_failed", [
+                    "attempt_id": attemptID.uuidString,
+                    "client_id": clientID.rawValue,
+                    "operation": operation,
+                    "error": "\(error)",
+                    "error_type": String(reflecting: type(of: error)),
+                    "error_domain": (error as NSError).domain,
+                    "error_numeric_code": "\((error as NSError).code)",
+                    "failure_stage": stage,
+                    "handoff_id": "unavailable_before_packet_build",
+                    "successor_request_state": "not_requested_before_persistence",
+                ], category: .general)
+            }
             return nil
         }
     }

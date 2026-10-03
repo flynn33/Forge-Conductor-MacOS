@@ -22,6 +22,7 @@ actor ContinuityIngressDeliveryService {
     private let source: SQLiteStore
     private let repository: ProjectControlPlaneRepository
     private let config: ConfigStore
+    private let diagnostics: (any DiagnosticRecording)?
     private let owner: String
     private let batchLimit: Int
     private let checkpoint: @Sendable (ContinuityIngressDeliveryCheckpoint) async throws -> Void
@@ -29,8 +30,13 @@ actor ContinuityIngressDeliveryService {
     private var draining = false
     private var stopped = false
     private var activeCancellation: ToolCallCancellation?
+    private var activeAttemptID: UUID?
+    private var activeOperationID: UUID?
+    private var activeHandoffID: String?
+    private var activeStage = "pending_selection"
 
     init(source: SQLiteStore, repository: ProjectControlPlaneRepository, config: ConfigStore,
+         diagnostics: (any DiagnosticRecording)? = nil,
          owner: String = "manager-ingress-\(UUID().uuidString.lowercased())", batchLimit: Int = 16,
          checkpoint: @escaping @Sendable (ContinuityIngressDeliveryCheckpoint) async throws -> Void = { _ in }) throws {
         guard !owner.isEmpty, owner.utf8.count <= 128,
@@ -41,6 +47,7 @@ actor ContinuityIngressDeliveryService {
         self.source = source
         self.repository = repository
         self.config = config
+        self.diagnostics = diagnostics
         self.owner = owner
         self.batchLimit = batchLimit
         self.checkpoint = checkpoint
@@ -51,25 +58,55 @@ actor ContinuityIngressDeliveryService {
         activeCancellation?.cancel()
     }
 
-    func drainOnce() async throws -> ContinuityIngressDrainReport {
+    func drainOnce(attemptID: UUID = UUID()) async throws -> ContinuityIngressDrainReport {
         guard !stopped else { throw AutonomyError.shutdown }
         guard !draining else { return ContinuityIngressDrainReport(alreadyDraining: true) }
         draining = true
+        activeAttemptID = attemptID
+        activeOperationID = nil
+        activeHandoffID = nil
+        activeStage = "pending_selection"
         let cancellation = ToolCallCancellation(timeoutSeconds: 8)
         activeCancellation = cancellation
         defer {
             activeCancellation = nil
+            activeAttemptID = nil
+            activeOperationID = nil
+            activeHandoffID = nil
             draining = false
         }
-        return try await withTaskCancellationHandler {
-            try await drainBatch(cancellation: cancellation)
-        } onCancel: {
-            cancellation.cancel()
+        do {
+            return try await withTaskCancellationHandler {
+                try await drainBatch(cancellation: cancellation)
+            } onCancel: {
+                cancellation.cancel()
+            }
+        } catch {
+            let observed = activeOperationID.flatMap { try? source.continuityDelivery(operationID: $0) }
+            diagnostics?.warn("continuity_ingress_drain_failed", [
+                "attempt_id": attemptID.uuidString,
+                "operation_id": activeOperationID?.uuidString ?? "unavailable_before_operation_selection",
+                "handoff_id": activeHandoffID ?? (activeOperationID == nil
+                    ? "unavailable_before_operation_selection" : "unavailable_before_delivery_load"),
+                "failure_stage": activeStage,
+                "successor_request_state": "not_requested_by_ingress",
+                "delivery_state": observed?.state.rawValue ?? "unavailable_at_failure",
+                "attempt_count": observed.map { "\($0.attempts)" } ?? "unavailable_at_failure",
+                "next_attempt_at": observed?.nextAttemptAt ?? "unavailable_at_failure",
+                "claim_expires_at": observed?.leaseExpiresAt ?? "not_applicable_or_unavailable",
+                "disposition": observed?.state.rawValue ?? "unconfirmed_at_failure",
+                "error": error.localizedDescription,
+                "error_type": String(reflecting: type(of: error)),
+                "error_domain": (error as NSError).domain,
+                "error_numeric_code": "\((error as NSError).code)",
+            ], category: .manager)
+            throw error
         }
     }
 
     private func drainBatch(cancellation: ToolCallCancellation) async throws -> ContinuityIngressDrainReport {
         var report = ContinuityIngressDrainReport()
+        activeStage = "pending_selection"
         var identifiers = try source.pendingContinuityHandoffIDs(
             limit: batchLimit, afterOperationID: cursor, cancellation: cancellation
         )
@@ -80,6 +117,9 @@ actor ContinuityIngressDeliveryService {
         for identifier in identifiers {
             try checkCancellation(cancellation)
             cursor = identifier
+            activeOperationID = identifier
+            activeHandoffID = nil
+            activeStage = "delivery_load"
             report.scanned += 1
             let delivery: ContinuityHandoffDelivery
             do {
@@ -87,6 +127,16 @@ actor ContinuityIngressDeliveryService {
                     continue
                 }
                 delivery = stored
+                activeHandoffID = stored.handoff.identity.continuityID
+                diagnostics?.info("continuity_ingress_attempt", [
+                    "attempt_id": activeAttemptID?.uuidString ?? "unavailable_before_drain",
+                    "operation_id": identifier.uuidString,
+                    "handoff_id": stored.handoff.identity.continuityID,
+                    "attempt_count_before_claim": "\(stored.attempts)",
+                    "delivery_state": stored.state.rawValue,
+                    "handoff_delivery_requested": stored.explicitlyRequested ? "true" : "false",
+                    "successor_request_state": "not_requested_by_ingress",
+                ], category: .manager)
             } catch let error as ContinuityIngressError {
                 guard case .integrityFailure = error else { throw error }
                 if try source.quarantineMalformedContinuityDelivery(operationID: identifier, cancellation: cancellation) {
@@ -101,6 +151,7 @@ actor ContinuityIngressDeliveryService {
                 projectID: delivery.handoff.authorization.projectID.description,
                 projectGeneration: Int(delivery.handoff.authorization.projectGeneration.rawValue))
             let selection: BudgetPolicySelection
+            activeStage = "policy_selection"
             do { selection = try config.budgetPolicySelection(scope: scope) }
             catch {
                 try checkCancellation(cancellation)
@@ -115,6 +166,7 @@ actor ContinuityIngressDeliveryService {
             }
             try checkCancellation(cancellation)
             let claim: ContinuityDeliveryClaim
+            activeStage = "source_claim"
             do {
                 guard let owned = try source.claimContinuityHandoff(
                     operationID: identifier, owner: owner, leaseSeconds: 30, cancellation: cancellation
@@ -130,9 +182,12 @@ actor ContinuityIngressDeliveryService {
                 continue
             }
             do {
+                activeStage = "source_claimed_checkpoint"
                 try await checkpoint(.sourceClaimed)
                 try checkCancellation(cancellation)
+                activeStage = "claim_validation"
                 _ = try source.validateContinuityHandoffClaim(claim: claim, cancellation: cancellation)
+                activeStage = "admission_policy_selection"
                 let admissionSelection = try config.budgetPolicySelection(scope: scope)
                 if !admissionSelection.policy.automaticHandoffEnabled {
                     // Policy may change while waiting for the claim or manager.
@@ -143,6 +198,7 @@ actor ContinuityIngressDeliveryService {
                         continue
                     }
                 }
+                activeStage = "manager_acceptance"
                 let receipt = try await repository.acceptContinuityIngress(
                     source: claim.delivery.handoff, operationID: identifier,
                     policySelection: admissionSelection, cancellation: cancellation
@@ -152,8 +208,10 @@ actor ContinuityIngressDeliveryService {
                       receipt.authorization == claim.delivery.handoff.authorization else {
                     throw ContinuityIngressError.integrityFailure("manager acceptance names a different source")
                 }
+                activeStage = "acceptance_committed_checkpoint"
                 try await checkpoint(.acceptanceCommitted)
                 try checkCancellation(cancellation)
+                activeStage = "source_acknowledgement"
                 _ = try source.acknowledgeContinuityHandoff(
                     claim: claim, acceptanceReceiptSHA256: receipt.receiptSHA256,
                     cancellation: cancellation
@@ -164,6 +222,7 @@ actor ContinuityIngressDeliveryService {
                 // committed acceptance; this seam exercises that recovery boundary.
                 throw ContinuityIngressDeliveryInterruption.simulatedExit
             } catch {
+                let failedStage = activeStage
                 if Task.isCancelled || cancellation.isCancelled || cancellation.isDeadlineExceeded || stopped {
                     throw error
                 }
@@ -182,11 +241,31 @@ actor ContinuityIngressDeliveryService {
                     continue
                 }
                 do {
-                    _ = try source.retryContinuityHandoff(
+                    activeStage = "retry_scheduling"
+                    let retryDelay = Double(1 << min(claim.delivery.attempts, 8))
+                    let retried = try source.retryContinuityHandoff(
                         claim: claim, errorCode: Self.errorCode(error),
-                        retryDelaySeconds: Double(1 << min(claim.delivery.attempts, 8)),
+                        retryDelaySeconds: retryDelay,
                         cancellation: cancellation
                     )
+                    diagnostics?.warn("continuity_ingress_retry_scheduled", [
+                        "attempt_id": activeAttemptID?.uuidString ?? "unavailable_before_drain",
+                        "operation_id": identifier.uuidString,
+                        "handoff_id": claim.delivery.handoff.identity.continuityID,
+                        "failure_stage": failedStage,
+                        "recovery_stage": "retry_scheduling",
+                        "successor_request_state": "not_requested_by_ingress",
+                        "delivery_state": retried.state.rawValue,
+                        "attempt_count": "\(retried.attempts)",
+                        "retry_delay_seconds": "\(Int(retryDelay))",
+                        "next_attempt_at": retried.nextAttemptAt,
+                        "claim_expires_at": retried.leaseExpiresAt ?? "not_applicable_claim_released",
+                        "disposition": retried.state == .pending ? "retry_scheduled" : retried.state.rawValue,
+                        "error": error.localizedDescription,
+                        "error_type": String(reflecting: type(of: error)),
+                        "error_domain": (error as NSError).domain,
+                        "error_numeric_code": "\((error as NSError).code)",
+                    ], category: .manager)
                     report.retried += 1
                 } catch let sourceError as ContinuityIngressError {
                     guard try handleSourceRace(sourceError, operationID: identifier,

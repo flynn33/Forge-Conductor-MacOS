@@ -3980,6 +3980,39 @@ final class ContinuityTests: XCTestCase {
         let source = (packet["meta"] as? [String: Any])?["source"] as? String
         XCTAssertEqual(source, HandoffSource.auto.rawValue)
         XCTAssertEqual(latest["resume_ready"] as? Bool, false)
+        let persisted = try XCTUnwrap(app.diagnostics.recent(limit: 200).last {
+            $0.event == "auto_checkpoint_persist"
+        })
+        let observed = try XCTUnwrap(app.diagnostics.recent(limit: 200).last {
+            $0.event == "auto_checkpoint"
+        })
+        XCTAssertEqual(persisted.fields["handoff_id"], observed.fields["handoff_id"])
+        XCTAssertEqual(persisted.fields["attempt_id"], observed.fields["attempt_id"])
+        XCTAssertNotNil(UUID(uuidString: try XCTUnwrap(persisted.fields["attempt_id"])))
+        XCTAssertEqual(persisted.fields["operation"], "checkpoint")
+        XCTAssertEqual(persisted.fields["resume_ready"], "false")
+        XCTAssertEqual(persisted.fields["save_outcome"], "committed")
+        XCTAssertEqual(persisted.fields["successor_request_state"], "not_applicable_checkpoint")
+        XCTAssertEqual(observed.fields["successor_request_state"], "not_applicable_checkpoint")
+    }
+
+    func testAutoCheckpointFailureRetainsPrecommitStageAndUnavailableHandoffID() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let attemptID = UUID()
+        XCTAssertThrowsError(try app.continuity.autoPersist(
+            clientID: ClientID("checkpoint-failure"), reason: "capture test", finalize: false,
+            inferred: ["handoff_id": "missing-checkpoint-packet"], attemptID: attemptID
+        ))
+        let record = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "auto_persist_failed"
+        })
+        XCTAssertEqual(record.fields["attempt_id"], attemptID.uuidString)
+        XCTAssertEqual(record.fields["operation"], "checkpoint")
+        XCTAssertEqual(record.fields["failure_stage"], "packet_build")
+        XCTAssertEqual(record.fields["handoff_id"], "unavailable_before_packet_build")
+        XCTAssertEqual(record.fields["save_outcome"], "not_confirmed")
+        XCTAssertEqual(record.fields["successor_request_state"], "not_requested_by_persistence")
     }
 
     func testContextGetRequiresExplicitProjectBindingBeforeShell() throws {

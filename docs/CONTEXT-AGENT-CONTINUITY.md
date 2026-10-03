@@ -1,4 +1,6 @@
-# Context and agent continuity (v0.16.3)
+# Context and agent continuity (v0.16.4)
+
+This describes the current source identity; the installed alpha remains 0.16.3.
 
 ## Current workflow
 

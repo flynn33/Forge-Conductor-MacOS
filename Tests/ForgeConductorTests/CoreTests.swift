@@ -5,6 +5,17 @@
 import XCTest
 @testable import ForgeConductorCore
 
+private struct ThrowingReadToolPack: ToolPackHandling {
+    var toolNames: [String] { ["fs_read"] }
+
+    func handle(name: String, arguments: [String: Any], context: ToolInvocationContext?,
+                clientID: ClientID, app: ForgeApp,
+                cancellation: ToolCallCancellation?) throws -> ToolResult? {
+        guard name == "fs_read" else { return nil }
+        throw NSError(domain: "ThrownToolFixture", code: 55)
+    }
+}
+
 final class CoreTests: XCTestCase {
     private var tempHome: URL!
 
@@ -642,6 +653,39 @@ final class CoreTests: XCTestCase {
         ], clientID: client)
         XCTAssertEqual(directory.payload["code"] as? String, "not_regular_file")
         XCTAssertEqual(directory.payload["cause_classified"] as? Bool, true)
+        let failedRead = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_call_failed" && $0.fields["tool"] == "fs_read"
+                && $0.fields["code"] == "not_found"
+        })
+        let nowPresent = tempHome.appendingPathComponent("missing.txt")
+        try "now present".write(to: nowPresent, atomically: true, encoding: .utf8)
+        let later = try app.tools.call(name: "fs_read", arguments: ["path": nowPresent.path],
+                                       clientID: client)
+        XCTAssertTrue(later.ok)
+        let laterRead = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_call" && $0.fields["tool"] == "fs_read"
+        })
+        XCTAssertEqual(failedRead.fields["path_identity"], laterRead.fields["path_identity"])
+        XCTAssertNotEqual(failedRead.fields["invocation_id"], laterRead.fields["invocation_id"])
+        let invalidTextURL = tempHome.appendingPathComponent("invalid-utf8.txt")
+        try Data([0xFF, 0xFE]).write(to: invalidTextURL)
+        let invalidText = try app.tools.call(name: "fs_read", arguments: [
+            "path": invalidTextURL.path,
+        ], clientID: client)
+        XCTAssertEqual(invalidText.payload["code"] as? String, "invalid_text_encoding")
+        XCTAssertEqual(invalidText.payload["cause_classified"] as? Bool, true)
+        let permission = FilesystemToolPack.classifiedReadFailure(
+            NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES)), at: invalidTextURL)
+        XCTAssertEqual(permission.payload["code"] as? String, "permission_denied")
+        XCTAssertEqual(permission.payload["native_error_code"] as? Int, Int(EACCES))
+        XCTAssertEqual(permission.payload["cause_classified"] as? Bool, true)
+        let unknown = FilesystemToolPack.classifiedReadFailure(
+            NSError(domain: "UnclassifiedFixture", code: 91), at: invalidTextURL)
+        XCTAssertEqual(unknown.payload["code"] as? String, "read_failed")
+        XCTAssertEqual(unknown.payload["error_domain"] as? String, "UnclassifiedFixture")
+        XCTAssertEqual(unknown.payload["error_numeric_code"] as? Int, 91)
+        XCTAssertEqual(unknown.payload["cause_classified"] as? Bool, false)
+        XCTAssertEqual(unknown.payload["retryable"] as? Bool, false)
     }
 
     func testFailedSearchDiagnosticRetainsReturnedProcessOutcome() throws {
@@ -661,9 +705,52 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(record.fields["exit_code"], "\(try XCTUnwrap(result.payload["exit_code"]))")
         XCTAssertEqual(record.fields["timed_out"], "false")
         XCTAssertEqual(record.fields["executable"], "/usr/bin/grep")
+        XCTAssertNotEqual(record.fields["message"], "error")
+        XCTAssertNotNil(record.fields["count"])
+        XCTAssertNotNil(record.fields["matches_truncated"])
+        XCTAssertNotNil(record.fields["stderr_truncated"])
+        XCTAssertNotNil(ISO8601.date(from: try XCTUnwrap(record.fields["started_at"])))
+        XCTAssertNotNil(ISO8601.date(from: try XCTUnwrap(record.fields["finished_at"])))
         XCTAssertNotNil(record.fields["stderr"])
         XCTAssertNotNil(record.fields["path_identity"])
         XCTAssertNotNil(record.fields["pattern_identity"])
+        let present = tempHome.appendingPathComponent("no-match.txt")
+        try "other content".write(to: present, atomically: true, encoding: .utf8)
+        let noMatch = try app.tools.call(name: "search_text", arguments: [
+            "path": present.path, "pattern": "absent-needle",
+        ], clientID: client)
+        XCTAssertTrue(noMatch.ok)
+        XCTAssertEqual(noMatch.payload["exit_code"] as? Int32, 1)
+        let success = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_call" && $0.fields["tool"] == "search_text"
+        })
+        XCTAssertEqual(success.fields["outcome"], "returned_success")
+        XCTAssertEqual(success.fields["exit_code"], "1")
+    }
+
+    func testThrownToolKeepsExceptionDistinctFromReturnedFailure() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("thrown-read-diagnostic")
+        try bindProjectContext(app: app, clientID: client)
+        let path = tempHome.appendingPathComponent("readable.txt")
+        try "contents".write(to: path, atomically: true, encoding: .utf8)
+        let router = ToolRouter(app: app, packs: [ThrowingReadToolPack()])
+        let cancellation = ToolCallCancellation(timeoutSeconds: 10)
+        let result = try router.call(name: "fs_read", arguments: ["path": path.path],
+                                     clientID: client, cancellation: cancellation)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "tool_exception")
+        let thrown = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_exception" && $0.fields["tool"] == "fs_read"
+        })
+        let returned = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_call_failed" && $0.fields["tool"] == "fs_read"
+        })
+        XCTAssertEqual(thrown.fields["invocation_id"], cancellation.requestID.uuidString)
+        XCTAssertEqual(returned.fields["invocation_id"], cancellation.requestID.uuidString)
+        XCTAssertEqual(returned.fields["outcome"], "threw_exception")
+        XCTAssertEqual(thrown.fields["error_domain"], "ThrownToolFixture")
     }
 
     func testConfiguredWorkspaceRootAllowsFilesystemTool() throws {

@@ -226,12 +226,33 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     public func log(_ record: DiagnosticRecord) {
         var sanitizedFields = DiagnosticRedaction.fields(record.fields)
         let altered = record.fields.keys.filter { sanitizedFields[$0] != record.fields[$0] }.sorted()
+        let unavailable = record.fields.keys.filter {
+            let value = record.fields[$0] ?? ""
+            return value == "unavailable" || value.hasPrefix("unavailable_")
+                || value.hasPrefix("not_applicable")
+        }.sorted()
+        if !unavailable.isEmpty {
+            sanitizedFields["unavailable_fields"] = unavailable.joined(separator: ",")
+        }
         if !altered.isEmpty {
             sanitizedFields["sanitized_fields"] = altered.joined(separator: ",")
             let redacted = altered.filter { sanitizedFields[$0]?.contains("<redacted") == true }
-            let truncated = altered.filter { (record.fields[$0]?.count ?? 0) > 512 }
+            let truncated = altered.filter {
+                (record.fields[$0]?.count ?? 0) > 512
+                    && (sanitizedFields[$0]?.count ?? 0) == 512
+            }
             if !redacted.isEmpty { sanitizedFields["redacted_fields"] = redacted.joined(separator: ",") }
             if !truncated.isEmpty { sanitizedFields["truncated_fields"] = truncated.joined(separator: ",") }
+            sanitizedFields["sanitization_reasons"] = altered.map { key in
+                let retained = sanitizedFields[key] ?? ""
+                let reason: String
+                if retained.contains("<redacted:path>") { reason = "path" }
+                else if retained.contains("<redacted:") { reason = "private_field" }
+                else if retained.contains("<redacted>") { reason = "credential_pattern" }
+                else if truncated.contains(key) { reason = "length_limit" }
+                else { reason = "normalization" }
+                return "\(key)=\(reason)"
+            }.joined(separator: ",")
         }
         let envelope = DiagnosticEnvelope(
             ts: record.ts,
@@ -240,6 +261,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             role: record.role.isEmpty ? role : record.role,
             pid: ProcessInfo.processInfo.processIdentifier,
             category: record.category,
+            component: record.category.rawValue,
             fields: sanitizedFields,
             recordID: UUID().uuidString,
             processInstanceID: Self.processInstanceID,
@@ -623,6 +645,7 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
     public var role: String
     public var pid: Int32
     public var category: DiagnosticCategory
+    public var component: String?
     public var fields: [String: String]
     public var recordID: String?
     public var processInstanceID: String?
@@ -644,6 +667,7 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
             "pid": Int(pid),
             "category": category.rawValue,
         ]
+        if let component { obj["component"] = component }
         if let recordID { obj["record_id"] = recordID }
         if let processInstanceID { obj["process_instance_id"] = processInstanceID }
         if let appVersion { obj["app_version"] = appVersion }
@@ -661,7 +685,7 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case ts, event, severity, role, pid, category, fields
+        case ts, event, severity, role, pid, category, component, fields
         case recordID = "record_id"
         case processInstanceID = "process_instance_id"
         case appVersion = "app_version"
@@ -675,6 +699,7 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
         role: String,
         pid: Int32,
         category: DiagnosticCategory,
+        component: String? = nil,
         fields: [String: String],
         recordID: String? = nil,
         processInstanceID: String? = nil,
@@ -687,6 +712,7 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
         self.role = role
         self.pid = pid
         self.category = category
+        self.component = component
         self.fields = fields
         self.recordID = recordID
         self.processInstanceID = processInstanceID
@@ -710,6 +736,7 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
             pid = (try? c.decode(Int32.self, forKey: .pid)) ?? 0
         }
         category = (try? c.decode(DiagnosticCategory.self, forKey: .category)) ?? .general
+        component = try? c.decode(String.self, forKey: .component)
         fields = (try? c.decode([String: String].self, forKey: .fields)) ?? [:]
         recordID = try? c.decode(String.self, forKey: .recordID)
         processInstanceID = try? c.decode(String.self, forKey: .processInstanceID)
