@@ -69,6 +69,9 @@ Installation, notarization, and shipment of this correction remain separate gate
   Historical versions, artifacts, and test receipts retain their tested identity.
   The existing Xcode project already has the corrected signing and matching
   version/build settings; this documentation update preserves its graph.
+  Installed-app references are dated snapshots: the later publication readback
+  found the prior app absent and retained the unchanged LM Studio registration
+  hash. No installation change was performed by this documentation update.
 
 - Corrected Release archiving to use Developer ID signing and distribution peer
   policy throughout the app, framework, CLI, runtime launcher, and filesystem

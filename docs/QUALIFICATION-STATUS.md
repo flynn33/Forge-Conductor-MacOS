@@ -3,8 +3,8 @@
 ## October 3 installed bootstrap and export repair — 0.16.5 (26)
 
 The corrected Xcode project identifies the candidate as `0.16.5 (26)`. The
-installed `/Applications/Forge Conductor.app` remains `0.16.4 (25)`. Its GUI
-and embedded CLI failed bootstrap with runtime launch-gate status `-67050`
+installed `/Applications/Forge Conductor.app` was `0.16.4 (25)` during the
+earlier October 3 qualification. Its GUI and embedded CLI failed bootstrap with runtime launch-gate status `-67050`
 while strict deep signature verification passed. The installed-framework
 probe required Apple Development certificate extension
 `1.2.840.113635.100.6.1.12` for all four product roles, although the exported
@@ -83,13 +83,25 @@ The final H0 change is test-only and does not change the archived application
 inputs.
 
 The original installation was restored and reopened with its existing
-0.16.4 failure. Its executable SHA-256 and strict signature remain preserved;
-`~/.lmstudio/mcp.json` remains
+0.16.4 failure at that qualification boundary. Its executable SHA-256 and strict
+signature were preserved; `~/.lmstudio/mcp.json` was
 `7663a4f6ae3bee266eb7cefe7edc18056ff1f34c72d72ae8265dbb4e1398b7a3`
 (`native-gui-fixture/export-verification.json`). These checks qualify the
 corrected source project and the isolated native candidate paths described
 above. They do not qualify installation, notarization, distribution, or a full
 LM Studio workflow. The owner retains those shipping steps.
+
+## October 3 publication host readback
+
+The later documentation-publication check found no
+`/Applications/Forge Conductor.app` and no process matching Forge Conductor or
+LM Studio. The LM Studio registration SHA-256 still matches the earlier receipt.
+This documentation update did not install, remove, replace, or launch either
+application. The cause of the host-state change is unknown; the earlier
+qualification snapshot is not a claim that the installed app is still present.
+`/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-03-docs-wiki-sync/publication-host-readback.json`
+records the path, process command, and registration hash. Source identity
+remains `0.16.5 (26)`; owner installation and shipping qualification remain open.
 
 ## Prior 0.16.4 diagnostic source correction — historical test boundary
 
