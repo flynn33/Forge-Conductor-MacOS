@@ -994,6 +994,68 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertTrue(md.contains("unit_test_event") || md.contains("Timeline"))
     }
 
+    func testDiagnosticErrorIdentitySurvivesPersistenceAndExport() throws {
+        XCTAssertEqual(DiagnosticRedaction.redactedValue("<redacted:14b>", forKey: "error"),
+                       "<redacted:14b>")
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-error-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let log = DiagnosticLog(paths: AppPaths(home: home))
+        log.error("read_failed", [
+            "error": "Permission denied at /Users/private/secret.txt",
+            "error_type": "NSPOSIXErrorDomain",
+            "native_error_code": "13",
+        ], category: .tools)
+        let original = try XCTUnwrap(log.recent(limit: 1).first)
+        XCTAssertNotNil(original.recordID)
+        XCTAssertNotNil(original.processInstanceID)
+        XCTAssertEqual(original.fields["error"], "Permission denied at <redacted:path>")
+        XCTAssertEqual(original.fields["redacted_fields"], "error")
+        let loaded = try XCTUnwrap(log.loadPersisted().first)
+        XCTAssertEqual(loaded.recordID, original.recordID)
+        XCTAssertEqual(loaded.fields, original.fields)
+        let exported = try log.export(to: home.appendingPathComponent("export"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: exported.jsonURL)) as? [String: Any])
+        let records = try XCTUnwrap(json["records"] as? [[String: Any]])
+        XCTAssertEqual(records.first?["record_id"] as? String, original.recordID)
+        XCTAssertFalse(try String(contentsOf: exported.jsonURL, encoding: .utf8).contains("/Users/private/secret.txt"))
+        log.warn("long_failure", ["message": String(repeating: "x", count: 600)], category: .tools)
+        let truncated = try XCTUnwrap(log.recent(limit: 1).first)
+        XCTAssertEqual(truncated.fields["message"]?.count, 512)
+        XCTAssertEqual(truncated.fields["truncated_fields"], "message")
+    }
+
+    func testDiagnosticTimelineDisclosesItsLimit() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-timeline-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let log = DiagnosticLog(paths: AppPaths(home: home), ringLimit: 2_101,
+                                maximumLogBytes: 8 * 1024 * 1024, retainedArchives: 1,
+                                persistenceQueueCapacity: 4_096)
+        for index in 0..<2_001 {
+            log.info("row_\(index)", category: .diagnostics)
+        }
+        let exported = try log.export(to: home.appendingPathComponent("export"))
+        let markdown = try String(contentsOf: exported.markdownURL, encoding: .utf8)
+        XCTAssertTrue(markdown.contains("2000 of 2001 selected; 1 omitted"))
+        XCTAssertTrue(markdown.contains("**Timeline is partial:** 1 earlier records omitted"))
+        XCTAssertFalse(markdown.contains("| row_0 |"))
+        XCTAssertTrue(markdown.contains("| row_2000 |"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: exported.jsonURL)) as? [String: Any])
+        XCTAssertEqual(json["json_record_count"] as? Int, 2_001)
+        XCTAssertEqual(json["markdown_omitted_count"] as? Int, 1)
+    }
+
+    func testFailedToolDiagnosticUsesReturnedExecutionFields() {
+        let result = ToolResult(ok: false, payload: ["ok": false, "exit_code": 7,
+            "timed_out": false, "stderr": "grep failed", "count": 0], isError: true)
+        let fields = ToolRouter.resultDiagnosticFields(result, tool: "search_text",
+            clientID: ClientID("diagnostic-client"), durationMs: 36, mutating: false)
+        XCTAssertEqual(fields["outcome"], "returned_failure")
+        XCTAssertEqual(fields["exit_code"], "7")
+        XCTAssertEqual(fields["stderr"], "grep failed")
+        XCTAssertEqual(fields["message"], "unavailable_in_result")
+        XCTAssertNotNil(fields["invocation_id"])
+    }
+
     func testDiagnosticLogRedactsPrivateFieldsBeforePersistenceAndExport() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-redaction-test-\(UUID().uuidString)", isDirectory: true)

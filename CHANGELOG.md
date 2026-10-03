@@ -21,6 +21,12 @@ remain open.
 
 ### Added
 
+- Added stable diagnostic record and process-instance IDs, request correlation,
+  sanitized error type/domain/code and failure-stage details, and explicit JSON
+  and Markdown export counts, history scope, and timeline omission notices.
+  Failed search and shell diagnostics now retain returned execution or durable
+  job outcomes; continuity and Dashboard failures retain available operation
+  and connection identities. The installed alpha has not exercised this source.
 - Produced the `0.16.3 (24)` universal Developer ID app and `.xcarchive` under
   `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID`. The app,
   framework, CLI, runtime launcher, and filesystem daemon pass the strict
@@ -58,6 +64,12 @@ remain open.
 
 ### Fixed
 
+- Corrected `fs_read` so only an observed missing-file POSIX error returns
+  `not_found`; permission, nonregular-file, invalid-text, and unclassified
+  failures retain distinct codes and their original error identity.
+- Corrected the diagnostic export that declared all selected records while
+  silently rendering only the last 2,000 Markdown rows. Earlier rows are now
+  counted and disclosed, and existing redaction markers survive reload.
 - Fixed LM Studio project tools becoming unusable after an MCP helper restart.
   `forge_status` and `get_forge_status` now idempotently attach an unseen MCP
   deployment to an explicit `project_id`, or to the sole active project when

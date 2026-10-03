@@ -372,6 +372,7 @@ public final class MCPServer: @unchecked Sendable {
                 app.diagnostics.info("mcp_tools_call", [
                     "tool": name,
                     "client_id": clientID.rawValue,
+                    "invocation_id": requestCancellation.requestID.uuidString,
                 ], category: .mcp)
                 cancellationLock.lock()
                 let connected = initialized

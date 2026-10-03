@@ -1,5 +1,17 @@
 # Version and qualification status
 
+## October 3 diagnostic source correction — installation pending
+
+The attached October 2 alpha archive exposed six evidence gaps. Current
+source changes preserve sanitized error identity, distinguish returned tool
+failures from exceptions, classify `fs_read` errors by observed cause, retain
+shell job and continuity attempt identity, and disclose Markdown timeline
+omissions. Focused Swift and native Debug checks are tracked in the roadmap.
+The `/Applications` app and running helper remain the earlier 0.16.3 alpha;
+this correction has not been packaged, installed, deployed to LM Studio, or
+verified against the original live failure sequence. Discarded historical
+exceptions cannot be recovered from that archive.
+
 ## 0.16.3 CLI staging and LM Studio deploy receipt — October 1, 2026
 
 A fresh universal Developer ID archive was created at 2026-10-01 11:49:05 UTC

@@ -1181,6 +1181,37 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(afterRestart.bootstrapCount, 1)
     }
 
+    func testInteractiveContinuityFailureKeepsSelectedHandoffAndStage() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let handoffID = UUID().uuidString
+        try app.store.handoffUpsert(HandoffPacket(
+            id: handoffID, resumeReady: true, clientID: "lmstudio-predecessor",
+            goal: "Continue work", status: "ready", projectSlug: "unregistered-project",
+            cwd: home.path, nextActions: ["Resume"]
+        ))
+        let node = ManagerNode(app: app)
+        do {
+            _ = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+            XCTFail("unregistered project unexpectedly resolved")
+        } catch {
+            let failure = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+                $0.event == "manager_interactive_continuity_deferred"
+            })
+            XCTAssertEqual(failure.fields["handoff_id"], handoffID)
+            XCTAssertEqual(failure.fields["failure_stage"], "project_resolution")
+            XCTAssertEqual(failure.fields["creation_attempted"], "false")
+            XCTAssertEqual(failure.fields["completion_committed"], "false")
+            XCTAssertNotNil(failure.fields["error_type"])
+            XCTAssertNotNil(failure.fields["error"])
+            let started = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+                $0.event == "manager_interactive_continuity_attempt"
+            })
+            XCTAssertEqual(started.fields["handoff_id"], handoffID)
+            XCTAssertEqual(started.fields["attempt_id"], failure.fields["attempt_id"])
+        }
+    }
+
     func testOperatorSnapshotRouteIsBoundedRedactedAndPreservesExistingQueryPaths() async throws {
         let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
         let app = try ForgeApp.bootstrap(home: home, clock: clock)

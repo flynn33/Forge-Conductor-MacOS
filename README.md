@@ -198,7 +198,12 @@ connection](docs/LM-STUDIO-CONNECTION.md).
 | **Continuity** | Scrollable project IDs plus first-class checkpoint/handoff rows, exact single/multi-packet Delete, Copy Project ID, Reset, and Clear Cache |
 | **Provider** | Provider selection, connection verification, provisioning, repair, removal, and advanced LM Studio configuration |
 | **Manager** | Process lifecycle, selected project roots, native shell policy, and filesystem service |
-| **Events & Evidence** | Bounded audit events, receipts, diagnostics, and exports |
+| **Events & Evidence** | Bounded audit events and diagnostics with request, job, handoff, and connection identifiers; JSON and explicitly limited Markdown exports |
+
+The current source records sanitized error identity and returned execution details
+for failed tools. Diagnostic exports identify their selected history and disclose
+when the Markdown timeline omits earlier rows. These source changes have not
+been installed into the running 0.16.3 alpha.
 
 ## Build and test
 

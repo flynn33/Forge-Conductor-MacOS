@@ -396,7 +396,31 @@ public struct FilesystemToolPack: ToolPackHandling {
         } catch let error as ToolCallDeadlineExceeded {
             throw error
         } catch {
-            return .failure(code: "not_found", message: "Not a readable file: \(url.path)")
+            let nsError = error as NSError
+            let isMissing = nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(ENOENT)
+            let isDenied = nsError.domain == NSPOSIXErrorDomain
+                && (nsError.code == Int(EACCES) || nsError.code == Int(EPERM))
+            let knownReadError = error as? BoundedTextReadError
+            let code: String
+            switch knownReadError {
+            case .notRegularFile: code = "not_regular_file"
+            case .invalidUTF8: code = "invalid_text_encoding"
+            default: code = isMissing ? "not_found" : (isDenied ? "permission_denied" : "read_failed")
+            }
+            var failure = ToolResult.failure(
+                code: code,
+                message: "Unable to read file: \(url.path) (\(error.localizedDescription))",
+                retryable: false
+            )
+            failure.payload["error_type"] = String(reflecting: type(of: error))
+            failure.payload["error_domain"] = nsError.domain
+            failure.payload["error_numeric_code"] = nsError.code
+            if nsError.domain == NSPOSIXErrorDomain {
+                failure.payload["native_error_code"] = nsError.code
+            }
+            failure.payload["failure_stage"] = "bounded_file_read"
+            failure.payload["cause_classified"] = knownReadError != nil || isMissing || isDenied
+            return failure
         }
         try cancellation?.checkCancellation()
 
@@ -4363,7 +4387,8 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private enum BoundedTextReadError: Error {
         case tooLarge
-        case unreadable
+        case notRegularFile
+        case invalidUTF8
     }
 
     /// Opens nonblocking so special files cannot strand the transport thread, then
@@ -4376,14 +4401,12 @@ public struct FilesystemToolPack: ToolPackHandling {
         try cancellation?.checkCancellation()
         let (parent, leaf) = try pinnedTextParent(of: url, create: false, cancellation: cancellation)
         let descriptor = Darwin.openat(parent.rawValue, leaf, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH)
-        guard descriptor >= 0 else { throw BoundedTextReadError.unreadable }
+        guard descriptor >= 0 else { throw posixError(errno, path: url.path) }
         defer { _ = Darwin.close(descriptor) }
 
         var information = stat()
-        guard Darwin.fstat(descriptor, &information) == 0,
-              information.st_mode & S_IFMT == S_IFREG else {
-            throw BoundedTextReadError.unreadable
-        }
+        guard Darwin.fstat(descriptor, &information) == 0 else { throw posixError(errno, path: url.path) }
+        guard information.st_mode & S_IFMT == S_IFREG else { throw BoundedTextReadError.notRegularFile }
         guard information.st_size >= 0,
               information.st_size <= Self.maximumTextFileBytes else {
             throw BoundedTextReadError.tooLarge
@@ -4404,13 +4427,13 @@ public struct FilesystemToolPack: ToolPackHandling {
             }
             if count == 0 { break }
             if errno == EINTR { continue }
-            throw BoundedTextReadError.unreadable
+            throw posixError(errno, path: url.path)
         }
         guard data.count <= Self.maximumTextFileBytes else {
             throw BoundedTextReadError.tooLarge
         }
         guard let text = String(data: data, encoding: .utf8) else {
-            throw BoundedTextReadError.unreadable
+            throw BoundedTextReadError.invalidUTF8
         }
         try cancellation?.checkCancellation()
         return (data, text)

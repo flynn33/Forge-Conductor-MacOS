@@ -143,9 +143,11 @@ action in the Continuity view:
 5. The successor must acknowledge the exact handoff identifier.
 6. Forge records the predecessor as sealed only after that acknowledgement.
 
-The operation is idempotent across watchdog ticks and Manager restart. A
-failure retains the handoff and reports the exact Accessibility, model, MCP,
-bootstrap, or acknowledgement problem. Forge records durable intent before the
+The operation is idempotent across watchdog ticks and Manager restart. When a
+failure reaches diagnostics, the current source records the selected handoff,
+last processing stage, and the error details available at that stage. An error
+before packet selection is identified as such; an underlying cause that was
+already discarded cannot be reconstructed. Forge records durable intent before the
 GUI action and submitted state after Send, so retry does not open another chat.
 The signed Forge Conductor app requires macOS Accessibility access for this host
 action; no Forge-held LM Studio token or integrations API request is used.
@@ -181,6 +183,16 @@ client, preferring the client with the newest activity when several are live.
 A matching nonterminal run is a fallback; a project is not shown as active just
 because it is registered. Events & Evidence provides bounded diagnostics and
 exports; it does not replace live provider or rollover acceptance.
+
+In the current source, each new diagnostic record has an ID, process-instance
+ID, version, and build identity. A tool request and its result share an
+invocation ID; failed search results retain their exit code, timeout, and
+sanitized stderr, while shell job records retain the durable job ID and
+terminal state without changing the tool response. JSON exports contain the
+selected records. Markdown renders at most the latest 2,000 and states the
+included range and omitted count. The export reads the current master log and
+live ring, not rotated files. These changes are not present in the installed
+alpha until a later owner-controlled installation.
 
 ## 10. Verification boundary
 

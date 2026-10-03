@@ -6,6 +6,7 @@
 
 import Foundation
 import Network
+import CryptoKit
 
 /// Synchronizes the listener's asynchronous bind result with the thread waiting in
 /// `DashboardServer.start()`. Network.framework invokes state callbacks concurrently,
@@ -42,7 +43,12 @@ public final class DashboardServer: @unchecked Sendable {
 
     private struct ActiveConnection {
         let connection: NWConnection
+        let diagnosticID: UUID
         let taskListenerEpoch: UUID
+        var requestID: UUID?
+        var requestMethod: String?
+        var requestRoute: String?
+        var requestRouteIdentity: String?
         var incompleteRequestDeadlineUptimeNanoseconds: UInt64?
     }
 
@@ -372,8 +378,10 @@ public final class DashboardServer: @unchecked Sendable {
             connection.cancel()
             return
         }
+        let diagnosticID = UUID()
         activeConnections[identifier] = ActiveConnection(
             connection: connection,
+            diagnosticID: diagnosticID,
             taskListenerEpoch: listenerEpoch,
             incompleteRequestDeadlineUptimeNanoseconds: deadline
         )
@@ -383,9 +391,23 @@ public final class DashboardServer: @unchecked Sendable {
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed(let error):
+                var identity = self?.connectionDiagnosticFields(identifier) ?? [:]
+                identity["connection_id"] = diagnosticID.uuidString
+                identity["listener_instance_id"] = listenerEpoch.uuidString
+                if identity["request_available"] == nil {
+                    identity["request_available"] = "unavailable_after_connection_removal"
+                }
                 self?.app.diagnostics.warn(
                     "dashboard_connection_failed",
-                    ["error": "\(error)"],
+                    identity.merging([
+                        "error": error.localizedDescription,
+                        "error_type": String(reflecting: type(of: error)),
+                        "error_domain": (error as NSError).domain,
+                        "error_numeric_code": "\((error as NSError).code)",
+                        "failure_scope": "accepted_connection",
+                        "failure_stage": "connection_state_failed",
+                        "connection_state": "failed",
+                    ]) { _, newer in newer },
                     category: .manager
                 )
                 self?.removeConnection(identifier)
@@ -427,6 +449,7 @@ public final class DashboardServer: @unchecked Sendable {
                 }
                 self.http.respond(connection, status: status, body: message, contentType: "text/plain")
             case .request(let request):
+                self.noteParsedRequest(identifier, method: request.method, target: request.target)
                 guard self.markRequestComplete(identifier) else {
                     connection.cancel()
                     return
@@ -444,6 +467,39 @@ public final class DashboardServer: @unchecked Sendable {
                 self.route(request: request, connection: connection)
             }
         }
+    }
+
+    private func noteParsedRequest(_ identifier: ObjectIdentifier, method: String, target: String) {
+        lock.lock()
+        if var record = activeConnections[identifier] {
+            record.requestID = UUID()
+            record.requestMethod = method
+            let path = String(target.split(separator: "?", maxSplits: 1).first ?? "")
+            let knownPrefixes = ["/api/manager", "/api/snapshot", "/api/live", "/api/frame",
+                "/api/system", "/api/forge", "/api/stream", "/api/health", "/static/"]
+            record.requestRoute = ["/", "/index.html", "/control", "/manager", "/ping", "/api/status", MCPTaskHTTPService.path]
+                .contains(path) ? path : (knownPrefixes.first(where: path.hasPrefix).map { "\($0)/*" } ?? "unclassified_route")
+            record.requestRouteIdentity = SHA256.hash(data: Data(path.utf8))
+                .map { String(format: "%02x", $0) }.joined()
+            activeConnections[identifier] = record
+        }
+        lock.unlock()
+    }
+
+    private func connectionDiagnosticFields(_ identifier: ObjectIdentifier) -> [String: String] {
+        lock.lock()
+        let record = activeConnections[identifier]
+        lock.unlock()
+        guard let record else { return ["connection_identity": "unavailable"] }
+        return [
+            "connection_id": record.diagnosticID.uuidString,
+            "listener_instance_id": record.taskListenerEpoch.uuidString,
+            "request_available": record.requestMethod == nil ? "false" : "true",
+            "request_id": record.requestID?.uuidString ?? "unavailable_before_parse",
+            "request_method": record.requestMethod ?? "unavailable_before_parse",
+            "request_route": record.requestRoute ?? "unavailable_before_parse",
+            "request_route_identity": record.requestRouteIdentity ?? "unavailable_before_parse",
+        ]
     }
 
     private func markRequestComplete(_ identifier: ObjectIdentifier) -> Bool {

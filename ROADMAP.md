@@ -55,6 +55,7 @@ this workflow.
 
 | Area | Current state | Required acceptance |
 |---|---|---|
+| Diagnostic capture and six installed-alpha findings | **Source repair in progress; installed-alpha outcome unverified.** The October 2 archive has 11,653 JSON records and a 2,000-row Markdown timeline without an omission notice (E0). Source inspection confirms pre-persistence/reload error redaction, `fs_read`'s unclassified `not_found` mapping, and returned search/shell detail loss (E1). Current source adds stable record and request identities, sanitized error and failure-stage fields, result and job outcomes, connection identity, and explicit export boundaries. Focused diagnostics, filesystem, runtime, Manager, Dashboard, and app-hosted checks are recorded below; the Xcode graph uses existing target memberships. | Verify the patched diagnostic stream and the original user-visible failure sequences on an installed candidate in a later owner-controlled run. The original exceptions for R11618/R11636, R11458's exact cause, R11579's exit, R11640's terminal state, and any Dashboard request association remain unknowable from the old archive. No package, deployment, or live fix is claimed for this source slice. |
 | LM Studio provider | **Exact build-19 Desktop-candidate connection and ordinary-chat acceptance passed without a local credential; build-21 automatic successor acceptance uses the same GUI-hosted MCP channel.** The signed candidate discovered loaded model `qwen/qwen3.8-27b`; Connect and Check and Run Advanced Probe passed before and after exact-path relaunch. Manager readback was ready/contract-valid with `credential_configured=false`, and the UI exposed neither a token field nor a credential action for the loopback endpoint. A fresh foreground LM Studio GUI chat called the candidate's `get_forge_status`, `context_get`, and memory tools and returned the live Forge home, project root, project ID, and handoff ID. | Linked HTTPS provider credentials remain separate; the same-host path retains no operator-facing or Forge-held LM Studio credential. |
 | Project selection | **0.16.3 CLI staging/deploy reconnect observed (E0); package-install acceptance open.** Archive creation time and Git reflog identify build-tree HEAD `b8a2c5dee546dff8d914405c2169a075bd0187e2`, whose product code matches `a54100b453ba8b1c1489ff09ac64dd6193fc1597`. The archive helper's `forge-conductor install` copied artifacts into `~/.forge-conductor`, not `/Applications` or LM Studio. The staged helper's `install-lmstudio-plugin` wrote revision `7a3b0b17-0e39-4cce-b4cd-20df1c6ee9db` to primary, fallback, and CLU `mcp.json` entries. The support, archive, and separately copied `/Applications` helpers match at SHA-256 `49e81bc5522aff13d77c0b710417add067467d38e05fec651062be2f5480a289`. The old v0.16.2 app was stopped; the candidate was manually copied over `/Applications` for cold-start observation, not installed by the `.pkg`. LM Studio fallback PIDs `38508` and `38964` returned the same deployment client and attached Jamf-Technician generation 7. Filesystem, Git, Continuity, and catalog calls returned `ok: true`; the pasted compact catalog receipt was a later `limit: 1` page, while the full catalog response remains in the saved chat. The registration file was unchanged across GUI launches. GUI Deploy was **not** exercised; `AppModel.deployToLMStudio` supplies the running app executable, so CLI deployment does not qualify it. The Xcode graph is unchanged. | The observed CLI staging/deploy and hosted binding are accepted only for those paths. `.pkg` installation failed for lack of root; GUI Deploy, package installation, notarization, Gatekeeper, shipment, and other roadmap gates remain open. |
 | Native tool access | **Build-22 source correction and exact exported-helper probes passed.** Filesystem, search, PDF, Git, shell, and runtime paths are canonicalized but no longer confined to selected project roots or wrapped in Forge's per-command Seatbelt profile. The directly launched signed MCP helper passed `/bin/ps`, a protected Mail-path read without content disclosure, inherited Git, outside-project filesystem/Git operations, and one native runtime job. macOS evaluates access for the responsible signed code objects in the actual launch chain; this does not establish the installed Forge or LM Studio-hosted chain. Runtime jobs retain a default 16-descendant budget, a 1,024-identity hard cap, typed overflow, and bounded cleanup debt. Local outside-project delete/move independently reconstructs protected roots and descriptor-rechecks the source identity at the mutation boundary. Tool grants, shell enablement, project binding/generation, time and output bounds, and durable result fencing remain. | The intended Forge/LM Studio launch chain must prove protected-data access, every runtime profile, descendant cleanup, and destructive-root refusal with the exact candidate. |
@@ -67,6 +68,39 @@ this workflow.
 | Reset / packet deletion / cache clearing | **Focused scope tests and live exact-packet deletion passed.** Exact packet deletion cannot reach project-wide clearing, task-owned ingress, instruction packages, or project files. Continuity Reset uses only project-scoped settled continuity-history clearing and does not advance the project generation; Clear Cache remains bounded to Forge's disposable cache directory. | Owner-machine Reset and Clear Cache mutation acceptance remains open because those controls were intentionally not run against live owner data. |
 | Managed Run removal | **Removed from primary navigation and the current workflow.** Compatibility internals remain only where required to preserve stored data or reusable low-level services. | No current action, guide, status text, or continuity dependency directs the user to start project work through Managed Run. |
 | Distribution artifact | **Product code `a54100b453ba8b1c1489ff09ac64dd6193fc1597` is retained in the `0.16.3 (24)` archive built at HEAD `b8a2c5dee546dff8d914405c2169a075bd0187e2`.** Archive version/build, universal architectures, and strict deep signing passed; a signed `.pkg` was also built. `/Applications/Forge Conductor.app` is a manually copied candidate, not a package-installed app. `installer` returned `Must be run as root to install this package.` | Package installation, notarization, stapling, Gatekeeper acceptance, Apple upload, and shipment remain open. No package-install or public-release pass is claimed. |
+
+## October 3 diagnostic correction evidence
+
+The attached `forge-diagnostics-20261002-130456.json` has 11,653 records.
+R11458, R11579, R11617/R11618, R11636, and R11639/R11640 match the reported
+event types and missing fields. The archive cannot identify their discarded
+exceptions or establish an outage, job reuse, search exit, or specific
+Dashboard request. This is E0 evidence of lost capture and E1 source evidence
+for the exporter, redaction, and `fs_read` mapping. No historical cause was
+reconstructed.
+
+The full `swift test` suite passed 1,948 selected tests with 12 explicit skips
+and no failures before the final diagnostic refinements. On the final local
+source, `swift test --filter MCPProtocolAndDiagnosticsTests` passed 23/23,
+`swift test --filter CoreTests` passed 57/57,
+`swift test --filter DashboardTests` passed 7/7,
+`swift test --filter RuntimeExecutionJobTests` passed 105 selected with one
+explicit skip and no failures, and `swift test --filter ManagerTests` passed
+128 selected with two explicit skips and no failures. The exact failed-shell
+invocation-to-job correlation case passed again after the final diagnostic
+changes. `swift build --product forge-conductor`,
+`swift build --product forge-conductor-app`, and the canonical Debug workspace
+`ForgeConductor` build succeeded again after the final source changes. The
+complete `ForgeConductorAppTests` target executed 127 tests with no failures
+after the final source changes. An earlier focused app-hosted selector
+selected zero tests and is not counted as a pass. The repository hygiene and
+whitespace checks passed. Every edited source and test file already belongs to
+its existing Xcode target; the workspace/project graph is unchanged.
+
+The installed `/Applications` app and its running helper remain the earlier
+0.16.3 alpha. This source correction was not installed, deployed into LM
+Studio, packaged, or exercised against the owner's original live failure
+sequence. Source and app-hosted tests do not close that acceptance gate.
 
 ## Release boundary
 

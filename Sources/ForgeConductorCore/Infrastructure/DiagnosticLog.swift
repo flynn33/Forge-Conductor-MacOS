@@ -89,7 +89,7 @@ final class BoundedAsyncWorkQueue: @unchecked Sendable {
 
 public enum DiagnosticRedaction {
     private static let privateKeys: Set<String> = [
-        "body", "command", "content", "cwd", "error", "goal", "home", "json",
+        "body", "command", "content", "cwd", "goal", "home", "json",
         "markdown", "narrative", "password", "path", "prompt", "query", "secret",
         "summary", "token",
     ]
@@ -101,7 +101,22 @@ public enum DiagnosticRedaction {
     }
 
     public static func redactedValue(_ value: String, forKey key: String) -> String {
+        let markerSize = value.dropFirst("<redacted:".count).dropLast(2)
+        if value.hasPrefix("<redacted:"), value.hasSuffix("b>"),
+           !markerSize.isEmpty, markerSize.allSatisfy(\.isNumber) {
+            return value
+        }
         let normalized = key.lowercased()
+        if normalized == "executable", ["/usr/bin/grep", "/bin/bash"].contains(value) {
+            return value
+        }
+        if normalized == "request_route", value.hasPrefix("/"), value.utf8.count <= 256,
+           value.range(of: #"^/[A-Za-z0-9_./*-]*$"#, options: .regularExpression) != nil {
+            return value
+        }
+        if normalized == "error" || normalized == "error_description" || normalized == "stderr" || normalized == "message" {
+            return sanitizedError(value)
+        }
         let isPrivateKey = privateKeys.contains(normalized)
             || normalized.hasSuffix("_path")
             || normalized.contains("credential")
@@ -116,6 +131,19 @@ public enum DiagnosticRedaction {
             .replacingOccurrences(of: "\r", with: " ")
         return String(flattened.prefix(512))
     }
+
+    /// Preserve an explanation while removing credentials and host paths. The
+    /// marker survives a later persisted-record load without changing meaning.
+    public static func sanitizedError(_ value: String) -> String {
+        let flattened = value.replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+        let credentials = (try? ProjectMemoryRedactor().redact(flattened)) ?? "<redacted>"
+        let pathsRemoved = credentials.replacingOccurrences(
+            of: #"(?<![A-Za-z0-9])(?:file://)?/[^\s,;:)\]]+"#,
+            with: "<redacted:path>", options: .regularExpression
+        )
+        return String(pathsRemoved.prefix(512))
+    }
 }
 
 /// Persistent, structured diagnostic logging for Forge Conductor.
@@ -124,6 +152,7 @@ public enum DiagnosticRedaction {
 /// - In-memory ring for recent UI inspection
 /// - Export to `.json` (structured array) and `.md` (operator-readable)
 public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
+    private static let processInstanceID = UUID().uuidString
     public static let masterLogName = "forge-diagnostics.jsonl"
     public static let ringCapacity = 4_000
     public static let persistenceQueueCapacity = 256
@@ -195,6 +224,15 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
     // MARK: - Write
 
     public func log(_ record: DiagnosticRecord) {
+        var sanitizedFields = DiagnosticRedaction.fields(record.fields)
+        let altered = record.fields.keys.filter { sanitizedFields[$0] != record.fields[$0] }.sorted()
+        if !altered.isEmpty {
+            sanitizedFields["sanitized_fields"] = altered.joined(separator: ",")
+            let redacted = altered.filter { sanitizedFields[$0]?.contains("<redacted") == true }
+            let truncated = altered.filter { (record.fields[$0]?.count ?? 0) > 512 }
+            if !redacted.isEmpty { sanitizedFields["redacted_fields"] = redacted.joined(separator: ",") }
+            if !truncated.isEmpty { sanitizedFields["truncated_fields"] = truncated.joined(separator: ",") }
+        }
         let envelope = DiagnosticEnvelope(
             ts: record.ts,
             event: record.event,
@@ -202,7 +240,11 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             role: record.role.isEmpty ? role : record.role,
             pid: ProcessInfo.processInfo.processIdentifier,
             category: record.category,
-            fields: DiagnosticRedaction.fields(record.fields)
+            fields: sanitizedFields,
+            recordID: UUID().uuidString,
+            processInstanceID: Self.processInstanceID,
+            appVersion: ForgeApp.version,
+            buildIdentity: ForgeApp.buildVersion
         )
 
         // Preserve the ring immediately when uncontended. If a concurrent reader
@@ -302,9 +344,10 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         var merged = try loadPersisted()
         let live = ringState.snapshot(limit: .max)
         // Prefer disk order; append any ring entries not already present by (ts,event,pid)
-        let seen = Set(merged.map(\.identityKey))
+        var seen = Set(merged.map(\.identityKey))
         for e in live where !seen.contains(e.identityKey) {
             merged.append(e)
+            seen.insert(e.identityKey)
         }
         merged.sort { $0.ts < $1.ts }
 
@@ -320,6 +363,16 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             "exported_at": stamp.string(from: Date()),
             "home": DiagnosticRedaction.redactedValue(paths.home.path, forKey: "home"),
             "record_count": merged.count,
+            "json_record_count": merged.count,
+            "json_omitted_count": 0,
+            "markdown_record_count": min(merged.count, 2_000),
+            "markdown_omitted_count": max(0, merged.count - 2_000),
+            "first_record_id": merged.first?.recordID as Any? ?? NSNull(),
+            "last_record_id": merged.last?.recordID as Any? ?? NSNull(),
+            "first_record_at": merged.first?.tsISO as Any? ?? NSNull(),
+            "last_record_at": merged.last?.tsISO as Any? ?? NSNull(),
+            "history_scope": "current_master_log_latest_50000_lines_plus_live_ring",
+            "dropped_persistence_records_this_process": droppedPersistenceCount,
             "records": merged.map { $0.asDictionary() },
         ]
         let jsonData = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
@@ -329,7 +382,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
             product: ForgeApp.productName,
             version: ForgeApp.version,
             home: DiagnosticRedaction.redactedValue(paths.home.path, forKey: "home"),
-            records: merged
+            records: merged,
+            droppedPersistenceRecords: droppedPersistenceCount
         )
         try md.write(to: mdURL, atomically: true, encoding: .utf8)
 
@@ -360,7 +414,8 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         product: String,
         version: String,
         home: String,
-        records: [DiagnosticEnvelope]
+        records: [DiagnosticEnvelope],
+        droppedPersistenceRecords: Int
     ) -> String {
         var lines: [String] = []
         lines.append("# \(product) Diagnostic Export")
@@ -369,6 +424,17 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         lines.append("- **Home:** `\(home)`")
         lines.append("- **Exported:** \(ISO8601.string(from: Date()))")
         lines.append("- **Records:** \(records.count)")
+        lines.append("- **History scope:** Current master log (latest 50,000 lines) plus live ring; rotated files are not read.")
+        lines.append("- **Dropped persistence records in this process:** \(droppedPersistenceRecords)")
+        let rendered = Array(records.suffix(2_000))
+        lines.append("- **JSON records:** \(records.count) of \(records.count) selected; 0 omitted")
+        lines.append("- **Markdown timeline:** \(rendered.count) of \(records.count) selected; \(records.count - rendered.count) omitted")
+        if let first = rendered.first, let last = rendered.last {
+            lines.append("- **Included timeline range:** \(first.recordID ?? "legacy-unavailable") (\(first.tsISO)) to \(last.recordID ?? "legacy-unavailable") (\(last.tsISO))")
+        }
+        if records.count > rendered.count {
+            lines.append("- **Timeline is partial:** \(records.count - rendered.count) earlier records omitted by the 2,000-row limit. The JSON export contains all selected records.")
+        }
         lines.append("")
         lines.append("## Summary by severity")
         lines.append("")
@@ -390,9 +456,9 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
         lines.append("")
         lines.append("## Timeline")
         lines.append("")
-        lines.append("| Time (UTC) | Severity | Category | Event | Fields |")
-        lines.append("|---|---|---|---|---|")
-        for r in records.suffix(2_000) {
+        lines.append("| Record ID | Time (UTC) | Severity | Category | Event | Fields |")
+        lines.append("|---|---|---|---|---|---|")
+        for r in rendered {
             let fields = r.fields
                 .map { "\($0.key)=\($0.value)" }
                 .sorted()
@@ -400,7 +466,7 @@ public final class DiagnosticLog: DiagnosticRecording, @unchecked Sendable {
                 .replacingOccurrences(of: "|", with: "\\|")
             let event = r.event.replacingOccurrences(of: "|", with: "\\|")
             lines.append(
-                "| \(r.tsISO) | \(r.severity.rawValue) | \(r.category.rawValue) | \(event) | \(fields) |"
+                "| \(r.recordID ?? "legacy-unavailable") | \(r.tsISO) | \(r.severity.rawValue) | \(r.category.rawValue) | \(event) | \(fields) |"
             )
         }
         lines.append("")
@@ -558,11 +624,15 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
     public var pid: Int32
     public var category: DiagnosticCategory
     public var fields: [String: String]
+    public var recordID: String?
+    public var processInstanceID: String?
+    public var appVersion: String?
+    public var buildIdentity: String?
 
     public var tsISO: String { ISO8601.string(from: ts) }
 
     public var identityKey: String {
-        "\(tsISO)|\(event)|\(pid)|\(role)"
+        recordID ?? "\(tsISO)|\(event)|\(pid)|\(role)"
     }
 
     public func asDictionary() -> [String: Any] {
@@ -574,6 +644,10 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
             "pid": Int(pid),
             "category": category.rawValue,
         ]
+        if let recordID { obj["record_id"] = recordID }
+        if let processInstanceID { obj["process_instance_id"] = processInstanceID }
+        if let appVersion { obj["app_version"] = appVersion }
+        if let buildIdentity { obj["build_identity"] = buildIdentity }
         if !fields.isEmpty {
             obj["fields"] = fields
         }
@@ -588,6 +662,10 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case ts, event, severity, role, pid, category, fields
+        case recordID = "record_id"
+        case processInstanceID = "process_instance_id"
+        case appVersion = "app_version"
+        case buildIdentity = "build_identity"
     }
 
     public init(
@@ -597,7 +675,11 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
         role: String,
         pid: Int32,
         category: DiagnosticCategory,
-        fields: [String: String]
+        fields: [String: String],
+        recordID: String? = nil,
+        processInstanceID: String? = nil,
+        appVersion: String? = nil,
+        buildIdentity: String? = nil
     ) {
         self.ts = ts
         self.event = event
@@ -606,6 +688,10 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
         self.pid = pid
         self.category = category
         self.fields = fields
+        self.recordID = recordID
+        self.processInstanceID = processInstanceID
+        self.appVersion = appVersion
+        self.buildIdentity = buildIdentity
     }
 
     public init(from decoder: Decoder) throws {
@@ -625,6 +711,10 @@ public struct DiagnosticEnvelope: Sendable, Codable, Equatable {
         }
         category = (try? c.decode(DiagnosticCategory.self, forKey: .category)) ?? .general
         fields = (try? c.decode([String: String].self, forKey: .fields)) ?? [:]
+        recordID = try? c.decode(String.self, forKey: .recordID)
+        processInstanceID = try? c.decode(String.self, forKey: .processInstanceID)
+        appVersion = try? c.decode(String.self, forKey: .appVersion)
+        buildIdentity = try? c.decode(String.self, forKey: .buildIdentity)
     }
 }
 

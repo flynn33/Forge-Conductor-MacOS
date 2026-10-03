@@ -627,6 +627,45 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(search.payload["count"] as? Int, 1)
     }
 
+    func testFsReadDistinguishesMissingFileFromUnreadableTarget() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("read-classification")
+        try bindProjectContext(app: app, clientID: client)
+        let missing = try app.tools.call(name: "fs_read", arguments: [
+            "path": tempHome.appendingPathComponent("missing.txt").path,
+        ], clientID: client)
+        XCTAssertEqual(missing.payload["code"] as? String, "not_found")
+        XCTAssertEqual(missing.payload["native_error_code"] as? Int, Int(ENOENT))
+        let directory = try app.tools.call(name: "fs_read", arguments: [
+            "path": tempHome.path,
+        ], clientID: client)
+        XCTAssertEqual(directory.payload["code"] as? String, "not_regular_file")
+        XCTAssertEqual(directory.payload["cause_classified"] as? Bool, true)
+    }
+
+    func testFailedSearchDiagnosticRetainsReturnedProcessOutcome() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("search-diagnostic")
+        try bindProjectContext(app: app, clientID: client)
+        let result = try app.tools.call(name: "search_text", arguments: [
+            "path": tempHome.appendingPathComponent("missing-search-root").path,
+            "pattern": "needle",
+        ], clientID: client)
+        XCTAssertFalse(result.ok)
+        let record = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_call_failed" && $0.fields["tool"] == "search_text"
+        })
+        XCTAssertEqual(record.fields["outcome"], "returned_failure")
+        XCTAssertEqual(record.fields["exit_code"], "\(try XCTUnwrap(result.payload["exit_code"]))")
+        XCTAssertEqual(record.fields["timed_out"], "false")
+        XCTAssertEqual(record.fields["executable"], "/usr/bin/grep")
+        XCTAssertNotNil(record.fields["stderr"])
+        XCTAssertNotNil(record.fields["path_identity"])
+        XCTAssertNotNil(record.fields["pattern_identity"])
+    }
+
     func testConfiguredWorkspaceRootAllowsFilesystemTool() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }

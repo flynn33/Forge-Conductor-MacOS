@@ -186,7 +186,7 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
             cancellation: cancellation,
             committedResultWins: false
         ) {
-            try await subsystem.legacyShell.execute(
+            let observed = try await subsystem.legacyShell.executeWithEvidence(
                 command: command,
                 workingDirectory: cwd,
                 timeoutSeconds: Int(timeout.rounded(.up)),
@@ -194,6 +194,35 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
                 replayClass: replayClass,
                 idempotencyKey: idempotencyKey
             )
+            let diagnosticFields = [
+                "invocation_id": cancellation?.requestID.uuidString ?? "unavailable",
+                "job_id": observed.job.jobID.uuidString,
+                "state": observed.job.state.rawValue,
+                "terminal": observed.job.state.isTerminal ? "true" : "false",
+                "client_id": context.clientID.rawValue,
+                "project_id": observed.job.projectID.description,
+                "runtime_kind": observed.job.runtimeKind.rawValue,
+                "effective_timeout_sec": "\(observed.job.timeoutSeconds)",
+                "job_created_at": observed.job.createdAt,
+                "job_started_at": observed.job.startedAt ?? "unavailable",
+                "job_completed_at": observed.job.completedAt ?? "unavailable",
+                "error_code": observed.job.errorCode ?? "unavailable",
+                "error": observed.job.errorSummary ?? "unavailable",
+                "idempotency_key_supplied": idempotencyKey == nil ? "false" : "true",
+                "idempotency_match": observed.reused ? "true" : "false",
+                "created_new_job": observed.reused ? "false" : "true",
+                "exit_code": "\(observed.result.payload["exit_code"] ?? "unavailable")",
+                "timed_out": "\(observed.result.payload["timed_out"] ?? "unavailable")",
+                "stderr": observed.result.payload["stderr"] as? String ?? "unavailable",
+                "stdout_truncated": "\(observed.result.payload["stdout_truncated"] ?? "unavailable")",
+                "stderr_truncated": "\(observed.result.payload["stderr_truncated"] ?? "unavailable")",
+            ]
+            if observed.result.ok {
+                app.diagnostics.info("shell_job_terminal", diagnosticFields, category: .tools)
+            } else {
+                app.diagnostics.warn("shell_job_terminal", diagnosticFields, category: .tools)
+            }
+            return observed.result
         }
     }
 
@@ -362,14 +391,34 @@ public struct LegacyShellJobAdapter: Sendable {
             return .failure(code: "missing_command", message: "command required")
         }
         guard timeoutSeconds > 0 else {
-            return .failure(
-                code: "invalid_timeout",
-                message: "timeout_sec must be finite and positive",
-                retryable: false
-            )
+            return .failure(code: "invalid_timeout", message: "timeout_sec must be finite and positive",
+                            retryable: false)
+        }
+        return try await executeWithEvidence(
+            command: command, workingDirectory: workingDirectory,
+            timeoutSeconds: timeoutSeconds, context: context,
+            replayClass: replayClass, idempotencyKey: idempotencyKey,
+            didPersist: didPersist
+        ).result
+    }
+
+    func executeWithEvidence(
+        command: String,
+        workingDirectory: URL,
+        timeoutSeconds: Int,
+        context: ToolInvocationContext,
+        replayClass: RuntimeReplayClass = .nonReplayable,
+        idempotencyKey: String? = nil,
+        didPersist: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) async throws -> (result: ToolResult, job: RuntimeJobRecord, reused: Bool) {
+        guard !command.isEmpty else {
+            throw RuntimeJobError.invalidRequest("command required")
+        }
+        guard timeoutSeconds > 0 else {
+            throw RuntimeJobError.invalidRequest("timeout_sec must be finite and positive")
         }
         let boundedTimeout = min(timeoutSeconds, Self.maximumTimeoutSeconds)
-        let jobID = try await service.submitLegacyBashLoginObservingPersistence(
+        let submission = try await service.submitLegacyBashLoginWithOutcome(
             command: command,
             workingDirectory: workingDirectory,
             timeoutSeconds: boundedTimeout,
@@ -378,6 +427,7 @@ public struct LegacyShellJobAdapter: Sendable {
             idempotencyKey: idempotencyKey,
             didPersist: didPersist
         )
+        let jobID = submission.jobID
         let record: RuntimeJobRecord
         do {
             record = try await withTaskCancellationHandler {
@@ -407,11 +457,11 @@ public struct LegacyShellJobAdapter: Sendable {
             throw CancellationError()
         }
         guard record.state.isTerminal else {
-            return .failure(
+            return (.failure(
                 code: "runtime_terminal_commit_pending",
                 message: "Runtime process ended but its terminal record is pending recovery",
                 retryable: true
-            )
+            ), record, submission.reused)
         }
         let stdout = try await read(
             jobID: jobID,
@@ -427,7 +477,7 @@ public struct LegacyShellJobAdapter: Sendable {
         )
         let timedOut = record.state == .timedOut
         let ok = record.exitCode == 0 && !timedOut && record.state == .completed
-        return ToolResult(
+        let result = ToolResult(
             ok: ok,
             payload: [
                 "ok": ok,
@@ -442,6 +492,7 @@ public struct LegacyShellJobAdapter: Sendable {
             ],
             isError: !ok
         )
+        return (result, record, submission.reused)
     }
 
     private func read(

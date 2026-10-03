@@ -6,6 +6,7 @@
 
 import Foundation
 import CoreFoundation
+import CryptoKit
 
 /// Thin dispatcher: audits tool calls and routes to modular tool packs.
 public final class ToolRouter: ToolExecuting, @unchecked Sendable {
@@ -676,7 +677,12 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             }
             app.diagnostics.error("tool_exception", [
                 "tool": name,
+                "invocation_id": cancellation.requestID.uuidString,
                 "error": "\(error)",
+                "error_type": String(reflecting: type(of: error)),
+                "error_domain": (error as NSError).domain,
+                "error_numeric_code": "\((error as NSError).code)",
+                "failure_stage": "tool_execution",
                 "client_id": clientID.rawValue,
             ], category: .tools)
             return recordAndReturn(
@@ -688,6 +694,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 status: "error",
                 auditError: "\(error)",
                 mutating: false,
+                outcomeOverride: "threw_exception",
                 cancellation: cancellation
             )
         }
@@ -871,6 +878,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         status: String,
         auditError: String?,
         mutating: Bool,
+        outcomeOverride: String? = nil,
         cancellation: ToolCallCancellation? = nil
     ) -> ToolResult {
         let durationMs = Int(Date().timeIntervalSince(start) * 1000)
@@ -903,24 +911,62 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             app.diagnostics.warn("tool_denied", [
                 "tool": tool,
                 "client_id": clientID.rawValue,
+                "invocation_id": cancellation?.requestID.uuidString ?? "unavailable",
+                "outcome": "denied",
+                "ok": "false",
+                "is_error": result.isError ? "true" : "false",
                 "code": (result.payload["code"] as? String) ?? "denied",
             ], category: .tools)
         } else if result.ok {
-            app.diagnostics.info("tool_call", [
-                "tool": tool,
-                "duration_ms": "\(durationMs)",
-                "client_id": clientID.rawValue,
-                "mutating": mutating ? "true" : "false",
-            ], category: .tools)
+            app.diagnostics.info("tool_call", Self.resultDiagnosticFields(result, tool: tool, clientID: clientID, durationMs: durationMs, mutating: mutating, arguments: arguments, invocationID: cancellation?.requestID, outcomeOverride: outcomeOverride), category: .tools)
         } else {
-            app.diagnostics.warn("tool_call_failed", [
-                "tool": tool,
-                "duration_ms": "\(durationMs)",
-                "client_id": clientID.rawValue,
-                "message": (result.payload["message"] as? String) ?? "error",
-            ], category: .tools)
+            app.diagnostics.warn("tool_call_failed", Self.resultDiagnosticFields(result, tool: tool, clientID: clientID, durationMs: durationMs, mutating: mutating, arguments: arguments, invocationID: cancellation?.requestID, outcomeOverride: outcomeOverride ?? (status == "cancelled" ? "cancelled" : (status == "deadline_exceeded" ? "deadline_exceeded" : nil))), category: .tools)
         }
         return result
+    }
+
+    static func resultDiagnosticFields(
+        _ result: ToolResult, tool: String, clientID: ClientID,
+        durationMs: Int, mutating: Bool, arguments: [String: Any] = [:],
+        invocationID: UUID? = nil, outcomeOverride: String? = nil
+    ) -> [String: String] {
+        var fields = [
+            "invocation_id": (invocationID ?? UUID()).uuidString,
+            "tool": tool,
+            "client_id": clientID.rawValue,
+            "duration_ms": "\(durationMs)",
+            "duration_kind": "tool_invocation",
+            "mutating": mutating ? "true" : "false",
+            "outcome": outcomeOverride ?? (result.ok ? "returned_success" : "returned_failure"),
+            "ok": result.ok ? "true" : "false",
+            "is_error": result.isError ? "true" : "false",
+        ]
+        for key in ["code", "message", "retryable", "exit_code", "timed_out", "stderr", "count", "matches_truncated", "executable", "search_options", "stdout_truncated", "stderr_truncated", "job_id", "state", "terminal", "runtime_kind", "effective_timeout_sec", "idempotency_key_supplied", "idempotency_match", "created_new_job", "failure_stage", "error_type", "error_domain", "error_numeric_code", "native_error_code", "cause_classified"] {
+            if let value = result.payload[key], !(value is NSNull) {
+                fields[key] = String(describing: value)
+            }
+        }
+        for key in ["path", "pattern", "command", "cwd"] {
+            if let value = arguments[key] as? String {
+                let digest = SHA256.hash(data: Data("\(clientID.rawValue)|\(value)".utf8))
+                    .map { String(format: "%02x", $0) }.joined()
+                fields["\(key)_identity"] = digest
+            }
+        }
+        for key in ["offset", "length", "start_line", "limit", "timeout_sec"] {
+            if let value = arguments[key] as? NSNumber { fields["requested_\(key)"] = value.stringValue }
+        }
+        if !result.ok {
+            for key in ["code", "message", "retryable"] where fields[key] == nil {
+                fields[key] = "unavailable_in_result"
+            }
+            if tool == "search_text" || tool == "shell_exec" {
+                for key in ["exit_code", "timed_out", "stderr"] where fields[key] == nil {
+                    fields[key] = "unavailable_in_result"
+                }
+            }
+        }
+        return fields
     }
 
     private static let mutatingTools: Set<String> = [

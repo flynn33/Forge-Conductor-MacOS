@@ -6483,11 +6483,6 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 return
             } catch {
                 self?.recordInteractiveContinuityError(error)
-                self?.app.diagnostics.warn(
-                    "manager_interactive_continuity_deferred",
-                    ["error": error.localizedDescription],
-                    category: .manager
-                )
             }
         }
         interactiveContinuityTask = task
@@ -6502,80 +6497,130 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
 
     @discardableResult
     func processInteractiveContinuityOnce(ignoreDelay: Bool = false) async throws -> String? {
-        guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true) else {
-            return nil
-        }
-        guard !interactiveHandoffAlreadyCompleted(packet.id) else { return packet.id }
-
-        guard let updatedAt = ISO8601.date(from: packet.updatedAt) else {
-            throw ProjectMemoryError.integrityFailure(
-                "interactive handoff timestamp is invalid"
-            )
-        }
-        if !ignoreDelay {
-            let remaining = updatedAt.addingTimeInterval(Self.interactiveRolloverDelaySeconds)
-                .timeIntervalSince(app.clock.now())
-            if remaining > 0 {
-                try await Task.sleep(for: .seconds(remaining))
+        let attemptID = UUID().uuidString
+        var stage = "packet_selection"
+        var handoffID = "unavailable_before_packet_selection"
+        var projectID = "unavailable"
+        var successorSessionID = "unavailable"
+        var creationAttempted = false
+        var acknowledgementReceived = false
+        do {
+            guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true) else {
+                return nil
             }
-        }
-        try Task.checkCancellation()
+            handoffID = packet.id
+            stage = "completed_identity_check"
+            guard !interactiveHandoffAlreadyCompleted(packet.id) else { return packet.id }
+            app.diagnostics.info("manager_interactive_continuity_attempt", [
+                "attempt_id": attemptID,
+                "handoff_id": handoffID,
+                "stage": "handoff_selected",
+            ], category: .manager)
 
-        let projects = try await app.projectContexts.repository.operatorProjects(limit: 100)
-        guard let project = Self.interactiveProject(for: packet, projects: projects) else {
-            throw ProjectMemoryError.invalidRequest(
-                "No registered project matches interactive handoff \(packet.id)"
+            stage = "handoff_timestamp_validation"
+            guard let updatedAt = ISO8601.date(from: packet.updatedAt) else {
+                throw ProjectMemoryError.integrityFailure(
+                    "interactive handoff timestamp is invalid"
+                )
+            }
+            if !ignoreDelay {
+                let remaining = updatedAt.addingTimeInterval(Self.interactiveRolloverDelaySeconds)
+                    .timeIntervalSince(app.clock.now())
+                if remaining > 0 {
+                    try await Task.sleep(for: .seconds(remaining))
+                }
+            }
+            try Task.checkCancellation()
+
+            stage = "project_resolution"
+            let projects = try await app.projectContexts.repository.operatorProjects(limit: 100)
+            guard let project = Self.interactiveProject(for: packet, projects: projects) else {
+                throw ProjectMemoryError.invalidRequest(
+                    "No registered project matches interactive handoff \(packet.id)"
+                )
+            }
+            projectID = project.projectID.description
+            stage = "handoff_preparation"
+            let handoff = try Self.interactiveHandoff(packet: packet, project: project)
+            stage = "host_adapter_resolution"
+            let adapter = try hostAdapterRegistry.adapter(
+                identifier: Self.nativeSessionHostAdapterID,
+                storageDirectory: providerStorageDirectory(
+                    adapterID: Self.nativeSessionHostAdapterID
+                )
             )
-        }
-        let handoff = try Self.interactiveHandoff(packet: packet, project: project)
-        let adapter = try hostAdapterRegistry.adapter(
-            identifier: Self.nativeSessionHostAdapterID,
-            storageDirectory: providerStorageDirectory(
-                adapterID: Self.nativeSessionHostAdapterID
+            stage = "host_capability_check"
+            let capabilities = try await adapter.capabilities()
+            guard capabilities.create, capabilities.bootstrap,
+                  capabilities.idempotency || capabilities.queryByIdempotencyKey else {
+                throw ContinuityRunError.hostCapabilityUnavailable
+            }
+            let idempotencyKey = "interactive-continuity:\(packet.id)"
+            let session: HostSession
+            stage = "successor_lookup"
+            if let existing = try await adapter.session(forIdempotencyKey: idempotencyKey) {
+                session = existing
+            } else {
+                stage = "successor_creation"
+                creationAttempted = true
+                session = try await adapter.createSession(SessionCreationRequest(
+                    operationID: packet.id,
+                    projectID: project.projectID.description,
+                    predecessorSessionID: packet.clientID ?? "lmstudio-interactive",
+                    idempotencyKey: idempotencyKey
+                ))
+            }
+            successorSessionID = session.id
+            stage = "successor_bootstrap"
+            try await adapter.bootstrap(session, handoff: handoff)
+            stage = "successor_acknowledgement"
+            let acknowledgement = try await adapter.awaitAcknowledgement(
+                session: session,
+                handoffID: packet.id,
+                timeout: .seconds(10)
             )
-        )
-        let capabilities = try await adapter.capabilities()
-        guard capabilities.create, capabilities.bootstrap,
-              capabilities.idempotency || capabilities.queryByIdempotencyKey else {
-            throw ContinuityRunError.hostCapabilityUnavailable
-        }
-        let idempotencyKey = "interactive-continuity:\(packet.id)"
-        let session: HostSession
-        if let existing = try await adapter.session(forIdempotencyKey: idempotencyKey) {
-            session = existing
-        } else {
-            session = try await adapter.createSession(SessionCreationRequest(
-                operationID: packet.id,
-                projectID: project.projectID.description,
-                predecessorSessionID: packet.clientID ?? "lmstudio-interactive",
-                idempotencyKey: idempotencyKey
-            ))
-        }
-        try await adapter.bootstrap(session, handoff: handoff)
-        let acknowledgement = try await adapter.awaitAcknowledgement(
-            session: session,
-            handoffID: packet.id,
-            timeout: .seconds(10)
-        )
-        guard acknowledgement.handoffID == packet.id,
-              acknowledgement.successorSessionID == session.id else {
-            throw ProjectMemoryError.integrityFailure(
-                "interactive successor acknowledgement identity differs"
+            acknowledgementReceived = true
+            guard acknowledgement.handoffID == packet.id,
+                  acknowledgement.successorSessionID == session.id else {
+                throw ProjectMemoryError.integrityFailure(
+                    "interactive successor acknowledgement identity differs"
+                )
+            }
+            stage = "completion_commit"
+            try markInteractiveHandoffCompleted(packet.id)
+            app.diagnostics.info(
+                "manager_interactive_continuity_completed",
+                [
+                    "attempt_id": attemptID,
+                    "handoff_id": packet.id,
+                    "project_id": project.projectID.description,
+                    "successor_session_id": session.id,
+                    "delay_seconds": "\(Int(Self.interactiveRolloverDelaySeconds))",
+                    "bootstrap": "get_forge_status resume=true",
+                ],
+                category: .manager
             )
+            return packet.id
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            app.diagnostics.warn("manager_interactive_continuity_deferred", [
+                "attempt_id": attemptID,
+                "handoff_id": handoffID,
+                "project_id": projectID,
+                "successor_session_id": successorSessionID,
+                "failure_stage": stage,
+                "creation_attempted": creationAttempted ? "true" : "false",
+                "acknowledgement_received": acknowledgementReceived ? "true" : "false",
+                "completion_committed": "false",
+                "disposition": "not_committed_retry_unconfirmed",
+                "error": error.localizedDescription,
+                "error_type": String(reflecting: type(of: error)),
+                "error_domain": (error as NSError).domain,
+                "error_numeric_code": "\((error as NSError).code)",
+            ], category: .manager)
+            throw error
         }
-        try markInteractiveHandoffCompleted(packet.id)
-        app.diagnostics.info(
-            "manager_interactive_continuity_completed",
-            [
-                "handoff_id": packet.id,
-                "project_id": project.projectID.description,
-                "successor_session_id": session.id,
-                "delay_seconds": "\(Int(Self.interactiveRolloverDelaySeconds))",
-                "bootstrap": "get_forge_status resume=true",
-            ],
-            category: .manager
-        )
-        return packet.id
     }
 
     private func interactiveHandoffAlreadyCompleted(_ handoffID: String) -> Bool {
@@ -6885,7 +6930,17 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             } catch {
                 if !Task.isCancelled {
                     self?.app.diagnostics.warn("manager_continuity_delivery_failed",
-                        ["error_code": "bounded_ingress_drain_failed"], category: .manager)
+                        [
+                            "error_code": "bounded_ingress_drain_failed",
+                            "error": error.localizedDescription,
+                            "error_type": String(reflecting: type(of: error)),
+                            "error_domain": (error as NSError).domain,
+                            "error_numeric_code": "\((error as NSError).code)",
+                            "failure_stage": "ingress_drain",
+                            "handoff_id": "unavailable_before_packet_selection",
+                            "attempt_id": tickID.uuidString,
+                            "disposition": "unconfirmed_at_failure",
+                        ], category: .manager)
                 }
             }
             guard !Task.isCancelled else { return }

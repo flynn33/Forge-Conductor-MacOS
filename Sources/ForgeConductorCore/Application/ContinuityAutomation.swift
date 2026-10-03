@@ -290,6 +290,9 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                 "client_id": clientID.rawValue,
                 "progress": "\(update.progress)",
                 "reason": reason,
+                "operation": finalize ? "handoff" : "checkpoint",
+                "finalize": finalize ? "true" : "false",
+                "successor_requested": "false",
             ], category: .general)
             return ContinuityObservation(packet: packet, finalize: finalize, reason: reason)
         } catch is CancellationError {
@@ -300,6 +303,11 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             diagnostics.warn("auto_continuity_failed", [
                 "client_id": clientID.rawValue,
                 "error": "\(error)",
+                "error_type": String(reflecting: type(of: error)),
+                "error_domain": (error as NSError).domain,
+                "error_numeric_code": "\((error as NSError).code)",
+                "failure_stage": "packet_persistence",
+                "handoff_id": "unavailable_before_commit",
             ], category: .general)
             return nil
         }

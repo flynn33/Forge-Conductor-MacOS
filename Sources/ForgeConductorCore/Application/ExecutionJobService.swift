@@ -963,6 +963,10 @@ public actor ExecutionJobService: ExecutionJobServicing {
     }
 
     public func submit(_ request: RuntimeJobRequest) async throws -> UUID {
+        try await submitWithOutcome(request).jobID
+    }
+
+    func submitWithOutcome(_ request: RuntimeJobRequest) async throws -> (jobID: UUID, reused: Bool) {
         try Task.checkCancellation()
         try await ensureStarted()
         guard !shuttingDown else {
@@ -977,7 +981,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             generation: request.context.projectGeneration,
             idempotencyKey: key
            ) {
-            return existing.jobID
+            return (existing.jobID, true)
         }
         guard pending.count + active.count < limits.maximumQueuedJobs + limits.maximumConcurrentJobs else {
             throw RuntimeJobError.queueFull
@@ -1039,7 +1043,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             guard persisted.jobID == jobID else {
                 spool.discard()
                 releaseArtifactReservation(jobID: jobID)
-                return persisted.jobID
+                return (persisted.jobID, true)
             }
             let jobContext: ToolInvocationContext
             do {
@@ -1072,7 +1076,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             )
             pendingOrder.append(jobID)
             pumpQueue()
-            return jobID
+            return (jobID, false)
         } catch {
             spool.discard()
             if !preserveReservationForRecovery {
@@ -1110,6 +1114,23 @@ public actor ExecutionJobService: ExecutionJobServicing {
         idempotencyKey: String? = nil,
         didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
     ) async throws -> UUID {
+        try await submitLegacyBashLoginWithOutcome(
+            command: command, workingDirectory: workingDirectory,
+            timeoutSeconds: timeoutSeconds, context: context,
+            replayClass: replayClass, idempotencyKey: idempotencyKey,
+            didPersist: didPersist
+        ).jobID
+    }
+
+    func submitLegacyBashLoginWithOutcome(
+        command: String,
+        workingDirectory: URL,
+        timeoutSeconds: Int,
+        context: ToolInvocationContext,
+        replayClass: RuntimeReplayClass,
+        idempotencyKey: String? = nil,
+        didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
+    ) async throws -> (jobID: UUID, reused: Bool) {
         let request: RuntimeJobRequest
         if let didPersist {
             request = RuntimeJobRequest(
@@ -1143,7 +1164,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 idempotencyKey: idempotencyKey
             )
         }
-        return try await submit(request)
+        return try await submitWithOutcome(request)
     }
 
     public func status(jobID: UUID, context: ToolInvocationContext) async throws -> RuntimeJobRecord {

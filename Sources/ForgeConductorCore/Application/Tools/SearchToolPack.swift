@@ -46,12 +46,18 @@ public struct SearchToolPack: ToolPackHandling {
             ok: ok,
             payload: [
             "ok": ok,
+            "executable": "/usr/bin/grep",
+            "search_options": "-RIn;exclude=node_modules,.git",
             "pattern": pattern,
             "matches": Array(lines),
             "count": lines.count,
+            "matches_truncated": result.stdoutTruncated
+                || result.stdout.split(separator: "\n").count > lines.count,
+            "stdout_truncated": result.stdoutTruncated,
             "exit_code": result.exitCode,
             "timed_out": result.timedOut,
             "stderr": result.stderr,
+            "stderr_truncated": result.stderrTruncated,
         ],
             isError: !ok
         )

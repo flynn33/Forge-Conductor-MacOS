@@ -4853,6 +4853,12 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertEqual(result.payload["stderr_truncated"] as? Bool, false)
         XCTAssertEqual(result.payload["command"] as? String, command)
         XCTAssertEqual(result.payload["cwd"] as? String, fixture.projectRoot.path)
+        let diagnostic = try XCTUnwrap(fixture.app.diagnostics.recent(limit: 100).last {
+            $0.event == "shell_job_terminal"
+        })
+        XCTAssertNotNil(diagnostic.fields["job_id"])
+        XCTAssertEqual(diagnostic.fields["state"], RuntimeJobState.completed.rawValue)
+        XCTAssertEqual(diagnostic.fields["terminal"], "true")
         for key in [
             "ok", "exit_code", "stdout", "stderr", "timed_out",
             "stdout_truncated", "stderr_truncated", "command", "cwd",
@@ -4865,6 +4871,55 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertEqual(job.runtimeKind, .bash)
         XCTAssertEqual(job.timeoutSeconds, LegacyShellJobAdapter.maximumTimeoutSeconds)
         XCTAssertEqual(job.state, .completed)
+    }
+
+    func testLegacyShellReportsActualIdempotencyReuse() throws {
+        let fixture = try ProductionFixture.make(clientName: "runtime-shell-reuse")
+        defer { fixture.close() }
+        _ = try fixture.bindProject()
+        let arguments: [String: Any] = [
+            "command": "printf reused",
+            "cwd": fixture.projectRoot.path,
+            "idempotency_key": "reused-shell-test",
+        ]
+        let first = try fixture.app.tools.call(name: "shell_exec", arguments: arguments,
+                                               clientID: fixture.clientID)
+        let second = try fixture.app.tools.call(name: "shell_exec", arguments: arguments,
+                                                clientID: fixture.clientID)
+        XCTAssertTrue(first.ok, "\(first.payload)")
+        XCTAssertTrue(second.ok, "\(second.payload)")
+        let records = fixture.app.diagnostics.recent(limit: 100).filter {
+            $0.event == "shell_job_terminal"
+        }
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records.first?.fields["job_id"], records.last?.fields["job_id"])
+        XCTAssertEqual(records.first?.fields["idempotency_match"], "false")
+        XCTAssertEqual(records.last?.fields["idempotency_match"], "true")
+        XCTAssertEqual(records.last?.fields["created_new_job"], "false")
+    }
+
+    func testFailedLegacyShellDiagnosticRetainsJobTerminalState() throws {
+        let fixture = try ProductionFixture.make(clientName: "runtime-shell-failure-diagnostic")
+        defer { fixture.close() }
+        _ = try fixture.bindProject()
+        let request = ToolCallCancellation(timeoutSeconds: 10)
+        let result = try fixture.app.tools.call(name: "shell_exec", arguments: [
+            "command": "exit 7",
+            "cwd": fixture.projectRoot.path,
+        ], clientID: fixture.clientID, cancellation: request)
+        XCTAssertFalse(result.ok)
+        let record = try XCTUnwrap(fixture.app.diagnostics.recent(limit: 100).last {
+            $0.event == "shell_job_terminal"
+        })
+        XCTAssertEqual(record.fields["exit_code"], "7")
+        XCTAssertEqual(record.fields["state"], RuntimeJobState.failed.rawValue)
+        XCTAssertEqual(record.fields["terminal"], "true")
+        XCTAssertNotNil(record.fields["job_id"])
+        let toolFailure = try XCTUnwrap(fixture.app.diagnostics.recent(limit: 100).last {
+            $0.event == "tool_call_failed" && $0.fields["tool"] == "shell_exec"
+        })
+        XCTAssertEqual(record.fields["invocation_id"], request.requestID.uuidString)
+        XCTAssertEqual(toolFailure.fields["invocation_id"], record.fields["invocation_id"])
     }
 
     func testBootstrapRouterLegacyShellExecRetainsNativeAccessOutsideProjectRoot() async throws {
