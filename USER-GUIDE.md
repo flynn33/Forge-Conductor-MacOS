@@ -1,6 +1,19 @@
 # Forge Conductor user guide
 
-The **0.17.0 (27)** frame refinement is implemented and tested. Smaller,
+The **0.17.0 (27)** Dashboard now uses two equal-width independent columns.
+The left stacks **MCP Servers** above **MCP Tools**; the right stacks
+**Sub-agents** above **Hot Processes**. Outer top/bottom edges align while the
+internal splits follow their content. Hot Processes starts directly beneath
+Sub-agents and fills the remaining right-column height.
+
+Thirteen current public native view methods passed with zero failures/skips;
+all 358 native-cache/Metal images were individually reviewed. The matching
+My Mac Debug build and strict signature verification passed. See [native
+QA](docs/GRAPHITE-NATIVE-QA.md) for exact identities and evidence limits.
+
+## Preceding frame-refinement checkpoint — source 2463aa06…
+
+The **0.17.0 (27)** frame refinement was implemented and tested. Smaller,
 darker Compute frames omit duplicate visible hardware names and activity
 badges while full identities and states remain accessible. The approved chips
 and telemetry effects are preserved. Dashboard omits its inline guidance

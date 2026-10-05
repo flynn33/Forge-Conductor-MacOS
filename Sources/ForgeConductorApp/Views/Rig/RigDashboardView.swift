@@ -128,21 +128,21 @@ struct RigDashboardView: View {
 
                 instrumentationPanels
 
-                Grid(alignment: .topLeading, horizontalSpacing: 14) {
-                    GridRow {
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 12) {
                         mcpServersPanel
+                            .fixedSize(horizontal: false, vertical: true)
                         mcpToolsPanel
                     }
-                }
-                .frame(minHeight: 220)
-
-                Grid(alignment: .topLeading, horizontalSpacing: 14) {
-                    GridRow {
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    VStack(alignment: .leading, spacing: 12) {
                         agentsPanel
+                            .fixedSize(horizontal: false, vertical: true)
                         processesPanel
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
-                .frame(minHeight: 200)
+                .fixedSize(horizontal: false, vertical: true)
 
                 liveFeedPanel
             }
@@ -996,7 +996,7 @@ struct RigDashboardView: View {
 
     private var mcpServersPanel: some View {
         let cards = model.mcpServerCards
-        return panel("MCP SERVERS", meta: "\(cards.count) cards · Metal rings") {
+        return panel("MCP SERVERS", meta: "\(cards.count) cards · Metal rings", fillsGridRow: true) {
             if cards.isEmpty {
                 Text("NO MCP PRESENCE — WAITING FOR HEARTBEAT / PROCESS SCAN")
                     .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
@@ -1070,7 +1070,7 @@ struct RigDashboardView: View {
     private var mcpToolsPanel: some View {
         let tools = model.toolCards
         let packs = model.toolPacks
-        return panel("MCP TOOLS", meta: "\(tools.count) tools · Metal load tiers") {
+        return panel("MCP TOOLS", meta: "\(tools.count) tools · Metal load tiers", fillsGridRow: true) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(Array(packs.prefix(12).enumerated()), id: \.offset) { _, p in

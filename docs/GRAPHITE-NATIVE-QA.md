@@ -1,7 +1,84 @@
 # Graphite native QA
 
+<!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:BEGIN -->
+## Current Dashboard columns — implementation and QA complete
+
+Version/build remains **0.17.0 (27)**. The Dashboard lower panels use two
+independent, equal-width stacks: MCP Servers above MCP Tools at left,
+Sub-agents above Hot Processes at right. Their outer top/bottom bounds align;
+internal splits follow content. Hot Processes starts below Sub-agents and
+fills the remaining right-column height. Approved Compute chips/effects,
+panel content, actions and accessibility identifiers are retained.
+
+The fresh public direct-XCTest native selection passed **13 unique methods in
+13 invocations**, zero failures/skips, with matched observer counts; execution
+time was **239.089 seconds**. All **358 PNGs** were individually opened and
+rehashed: **354 NSView caches and four separate genuine Metal drawable
+readbacks**. The final review union records zero blocking visual findings and
+no missing reviews/hash mismatches. It covers all 13 routes at 1440×900 and
+1100×720 content sizes, nine Manager sections/Settings component, eight setup
+steps, registration/nested Help, full reachable root/secondary/route Guides,
+and populated/bootstrap-empty Dashboard geometry.
+
+| Dashboard state | MCP Servers | MCP Tools | Sub-agents | Hot Processes |
+| --- | ---: | ---: | ---: | ---: |
+| Populated, normal | 936 pt | 424 pt | 510 pt | 850 pt |
+| Populated, minimum | 1324 pt | 636 pt | 624 pt | 1336 pt |
+| Bootstrap-empty, both sizes | 201 pt | 201 pt | 201 pt | 201 pt |
+
+These are painted native AX heights. Both sizes have zero outer top/bottom
+delta and column widths equal within one point; internal row boundaries are
+not required to align. Source gaps are 14 points horizontally and 12 points
+vertically, with painted gaps of 13 and 11 points. The empty case uses its
+explicit bootstrap-failure seam; it does not prove successful empty telemetry.
+
+The current **434-input** source manifest is
+`81a91a81d29ce6a22a51acaeced820b1d6b5163b3d330a2fdf6266cec6774ae8`.
+Comparison against the preceding `2463aa06…` inventory changes only
+`RigDashboardView.swift` and `ForgeConductorUITests.swift`: the other 432
+inputs, canonical project and all 30 resources are byte-identical. The
+project SHA-256 remains
+`a5ecf9dc66845891929ac5de31820a22a355dabb38668dd93ce3849f9f069b1d`.
+Approved Compute geometry/art/shader/renderer/projection inputs are unchanged.
+
+The ordinary canonical My Mac Debug build passed with strict deep signature
+verification, version **0.17.0**, build **27**, Apple Development team
+`9AQ2C2838M`, CDHash `7ddf205eb1ce98e5bc83c891cd880053f2bc5311`.
+Candidate: `build/dashboard-columns-app-final/Build/Products/Debug/Forge Conductor.app`.
+The canonical UI target also passed build-for-testing, including compilation
+of the changed parity test; this is compile-only proof, with no canonical
+testmanager execution claim. Retained unrelated test compiler warnings are
+not called warning-free.
+
+| Current authority | SHA-256 |
+| --- | --- |
+| `build/graphite-results/dashboard-columns-current-native-execution-summary.json` | `0dbaf44dc7e4ebd221a5ddac06b080164c37641a67ddb29d79a46c40a418527f` |
+| `build/graphite-results/dashboard-columns-final-qa-summary.json` | `f82101afeecb0d1bce5246b8043401b43404597c97a062f0e2471462f2e30a75` |
+| `build/graphite-results/dashboard-columns-ordinary-candidate-identity.json` | `7621aad5e7bb2cd0894976734497edc20e2772750f6929b40bc6398facc02ce9` |
+| `build/graphite-results/dashboard-columns-canonical-ui-compile.json` | `fb8c9e8f212ec3a760d044fc5c292472a4fc5a42318529633e668b7ccb66073b` |
+| `build/graphite-results/dashboard-columns-evidence-retention.json` | `eb07bec1a2a05a906bbd228e5016f05844f95c28ade6c168c2d8890c468baa27` |
+
+Execution/build/visual inputs are retained at
+`/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-04-graphite-workbench/dashboard-columns-20261005T101913Z`.
+The initial archive index SHA-256 is
+`a8b2bde12134a1dfdcaa3961a88dbea3e8755ee5851b767f0cf6c0b9f7bf4a87`;
+final documentation and owner publication/readback/synchronization identities
+are appended externally, avoiding self-referential commit records.
+
+These fixtures execute production ContentView/AppModel through public
+AppKit/XCTest with private home/defaults and a read-only HTTP fixture. Bitmap
+caches omit Metal and ordinary compositor/chrome; drawable blits include Metal
+alone. They do not establish new whole-window composition, ordinary Settings
+Scene, installed-product or 2× display proof. Preceding Compute checks, motion,
+ordinary workflows and broader matrix retain their exact inputs and evidence
+limits. They are not added to this 13-method count or relabeled as fresh runs.
+The `2463aa06…`/357-image frame refinement and `28548a73…`/116-test/463-image
+qualification below remain preceding checkpoints. No installation, notarization,
+App Store upload or distribution was performed.
+<!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:END -->
+
 <!-- FORGE-COMPUTE-FRAME-FOLLOWUP:BEGIN -->
-## Current frame refinement — implementation and QA complete
+## Preceding frame refinement — source 2463aa06…
 
 Version/build remains **0.17.0 (27)** for this Unreleased iteration. Compute
 frames are smaller and darker; duplicate visible hardware names and activity
@@ -22,7 +99,7 @@ receipts below remain the preceding checkpoint, not fresh proof of changed
 inputs. Exact owner publication and synchronization refs are recorded externally.
 <!-- FORGE-COMPUTE-FRAME-FOLLOWUP:END -->
 
-## Current frame-refinement native QA
+## Preceding frame-refinement native QA
 
 | Follow-up scope | Actual completed evidence |
 | --- | --- |

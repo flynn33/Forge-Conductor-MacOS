@@ -1,6 +1,16 @@
 # Telemetry architecture (real-time native)
 
-**UI implementation and QA complete.** Current
+Dashboard lower panels use two independent equal-width columns: MCP Servers
+above MCP Tools at left, Sub-agents above Hot Processes at right. Outer
+bounds align; internal splits follow content, and Hot Processes fills the
+remaining right-column height. The current `81a91a81…` source's 13-method
+native matrix passed, and all 358 images were individually reviewed. [Native
+QA](GRAPHITE-NATIVE-QA.md) records exact fresh build/fixture identities and
+preceding checkpoint limits; approved Compute/telemetry inputs are unchanged.
+
+## Preceding telemetry qualification — source 28548a73…
+
+**Preceding UI implementation and QA complete.**
 0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
 successful executions**, with zero failures/skips. The separate native view
 matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
@@ -151,10 +161,12 @@ Stjornarvald's non-interference boundary.
 The existing **COMPUTE CORES** frame now contains the source-integrated CPU/GPU
 chip presentation, with native host labels and provenance. All 68 current
 Compute layers and the normal/minimum Dashboard integration layers were
-reviewed with explicit cache/drawable limits. Intrinsic Grid rows also align
-Storage/Managed Activity, MCP servers/tools, and agents/processes. Managed
-Activity scrolls within a compact 130-point region, and constrained widths
-stack the instrumentation panels instead of clipping them.
+reviewed with explicit cache/drawable limits. Storage/Managed Activity retain
+their aligned instrumentation layout. The lower Dashboard columns stack MCP
+Servers/MCP Tools at left and Sub-agents/Hot Processes at right, with equal
+widths and matching outer bounds rather than equal internal row heights.
+Managed Activity scrolls within a compact 130-point region, and constrained
+widths stack the instrumentation panels instead of clipping them.
 
 Workbench Settings and the Guide menu expose **Guided Setup** for the
 eight-step state-aware wizard covering

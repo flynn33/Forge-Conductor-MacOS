@@ -1766,18 +1766,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(window.waitForExistence(timeout: 8))
         try resizeMainWindowForGraphiteReference(window)
         XCTAssertEqual(app.launchEnvironment["FORGE_SKIP_PS"], "1")
-        let rows: [(name: String, panels: [(identifier: String, heading: String)])] = [
-            ("mcp-presence-tools", [
-                ("rig-mcp-servers-panel", "MCP SERVERS"),
-                ("rig-mcp-tools-panel", "MCP TOOLS"),
-            ]),
-            ("sub-agents-hot-processes", [
-                ("rig-sub-agents-panel", "SUB-AGENTS"),
-                ("rig-hot-processes-panel", "HOT PROCESSES"),
-            ]),
-            ("live-stream", [
-                ("rig-live-stream-panel", "LIVE STREAM ▮ TOOLS · AGENTS · DIAGNOSTICS"),
-            ]),
+        let definitions: [(name: String, identifier: String, heading: String)] = [
+            ("mcp-servers", "rig-mcp-servers-panel", "MCP SERVERS"),
+            ("mcp-tools", "rig-mcp-tools-panel", "MCP TOOLS"),
+            ("sub-agents", "rig-sub-agents-panel", "SUB-AGENTS"),
+            ("hot-processes", "rig-hot-processes-panel", "HOT PROCESSES"),
+            ("live-stream", "rig-live-stream-panel", "LIVE STREAM ▮ TOOLS · AGENTS · DIAGNOSTICS"),
         ]
 
         func captureLowerPanels(size: String) throws {
@@ -1785,41 +1779,88 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             let detail = try XCTUnwrap(selectedDetailContainer(named: "Dashboard"))
             XCTAssertEqual(detail.elementType, .scrollView)
             assertGraphiteGlobalHeader(in: window)
-            for row in rows {
-                var panels: [XCUIElement] = []
-                var headings: [XCUIElement] = []
-                for definition in row.panels {
-                    let matches = detail.groups.matching(identifier: definition.identifier)
-                    XCTAssertEqual(matches.count, 1)
-                    let panel = matches.element
-                    XCTAssertTrue(panel.waitForExistence(timeout: 5))
-                    let headingMatches = panel.staticTexts.matching(NSPredicate(
-                        format: "label == %@ OR value == %@", definition.heading, definition.heading
-                    ))
-                    XCTAssertEqual(headingMatches.count, 1)
-                    let heading = headingMatches.element
-                    XCTAssertTrue(heading.exists)
-                    panels.append(panel)
-                    headings.append(heading)
-                }
-                makeHittable(try XCTUnwrap(headings.first))
-                for _ in 0..<12 {
-                    let bounds = panels.reduce(CGRect.null) { $0.union($1.frame) }
-                    if frameIsContained(bounds, in: detail.frame, tolerance: 2) { break }
-                    let distance = bounds.midY - detail.frame.midY
+            func reveal(_ bounds: () -> CGRect) {
+                for _ in 0..<20 {
+                    if frameIsContained(bounds(), in: detail.frame, tolerance: 2) { break }
+                    let distance = bounds().midY - detail.frame.midY
                     detail.scroll(byDeltaX: 0, deltaY: -min(360, max(-360, distance)))
                 }
-                captureGraphite("\(size)-dashboard-\(row.name)")
-                for (panel, heading) in zip(panels, headings) {
-                    XCTAssertGreaterThan(panel.frame.width, 100)
-                    XCTAssertGreaterThan(panel.frame.height, 30)
-                    XCTAssertTrue(frameIsContained(panel.frame, in: detail.frame, tolerance: 2),
-                                  "The complete \(heading.value ?? heading.label) panel must be visible")
-                    XCTAssertTrue(heading.isHittable)
-                    XCTAssertTrue(frameIsContained(heading.frame, in: panel.frame, tolerance: 2))
+                XCTAssertTrue(frameIsContained(bounds(), in: detail.frame, tolerance: 2),
+                              "The requested panel viewport must be reachable by bounded scrolling")
+            }
+            func assertVisibleDataBounds(in panel: XCUIElement) {
+                XCTAssertGreaterThanOrEqual(panel.frame.minX, detail.frame.minX - 2)
+                XCTAssertLessThanOrEqual(panel.frame.maxX, detail.frame.maxX + 2)
+                for text in panel.staticTexts.allElementsBoundByIndex where text.isHittable {
+                    let identity = !text.identifier.isEmpty ? text.identifier
+                        : !text.label.isEmpty ? text.label : text.value as? String ?? ""
+                    let nestedScroll = identity.isEmpty ? nil : panel.scrollViews
+                        .containing(NSPredicate(
+                            format: "identifier == %@ OR label == %@ OR value == %@", identity, identity, identity
+                        )).allElementsBoundByIndex.last
+                    // The MCP pack strip intentionally scrolls horizontally; only its
+                    // owned viewport clips text. Other panel data keeps its full bounds.
+                    let bounds = nestedScroll.map { text.frame.intersection($0.frame) } ?? text.frame
+                    XCTAssertTrue(frameIsContained(bounds, in: panel.frame, tolerance: 2),
+                                  "Visible panel data must stay inside its own panel")
+                    XCTAssertGreaterThanOrEqual(bounds.minX, detail.frame.minX - 2)
+                    XCTAssertLessThanOrEqual(bounds.maxX, detail.frame.maxX + 2)
                 }
-                if row.name == "mcp-presence-tools" {
-                    let servers = detail.groups["rig-mcp-servers-panel"]
+            }
+            for definition in definitions {
+                let matches = detail.groups.matching(identifier: definition.identifier)
+                XCTAssertEqual(matches.count, 1)
+                let panel = matches.element
+                XCTAssertTrue(panel.waitForExistence(timeout: 5))
+                let headingMatches = panel.staticTexts.matching(NSPredicate(
+                    format: "label == %@ OR value == %@", definition.heading, definition.heading
+                ))
+                XCTAssertEqual(headingMatches.count, 1)
+                let heading = headingMatches.element
+                XCTAssertTrue(heading.exists)
+                XCTAssertGreaterThan(panel.frame.width, 100)
+                XCTAssertGreaterThan(panel.frame.height, 30)
+                makeHittable(heading, in: detail)
+                let fitsViewport = panel.frame.height <= detail.frame.height - 4
+                reveal {
+                    let frame = panel.frame
+                    return CGRect(x: frame.minX, y: frame.minY, width: frame.width,
+                                  height: fitsViewport ? frame.height : detail.frame.height - 16)
+                }
+                XCTAssertTrue(heading.isHittable)
+                XCTAssertTrue(frameIsContained(heading.frame, in: panel.frame, tolerance: 2))
+                XCTAssertTrue(frameIsContained(heading.frame, in: detail.frame, tolerance: 2))
+                if fitsViewport {
+                    XCTAssertTrue(frameIsContained(panel.frame, in: detail.frame, tolerance: 2),
+                                  "A panel that fits must be visible in full")
+                }
+                assertVisibleDataBounds(in: panel)
+                captureGraphite("\(size)-dashboard-\(definition.name)-\(fitsViewport ? "full" : "head")")
+                if !fitsViewport {
+                    reveal {
+                        let frame = panel.frame
+                        let height = detail.frame.height - 16
+                        return CGRect(x: frame.minX, y: frame.maxY - height,
+                                      width: frame.width, height: height)
+                    }
+                    assertVisibleDataBounds(in: panel)
+                    captureGraphite("\(size)-dashboard-\(definition.name)-tail")
+                    // A stretched bottom panel can end in empty space. Its final native
+                    // text must also be reachable, independently of the painted edge.
+                    let lastText = panel.staticTexts.allElementsBoundByIndex
+                        .filter { $0.frame.width > 0 && $0.frame.height > 0
+                            && $0.frame.minX >= panel.frame.minX - 2
+                            && $0.frame.maxX <= panel.frame.maxX + 2 }
+                        .max { $0.frame.maxY < $1.frame.maxY }
+                    let tailContent = try XCTUnwrap(lastText)
+                    makeHittable(tailContent, in: detail)
+                    XCTAssertTrue(frameIsContained(tailContent.frame, in: panel.frame, tolerance: 2))
+                    XCTAssertTrue(frameIsContained(tailContent.frame, in: detail.frame, tolerance: 2))
+                    assertVisibleDataBounds(in: panel)
+                    captureGraphite("\(size)-dashboard-\(definition.name)-last-content")
+                }
+                if definition.name == "mcp-servers" {
+                    let servers = panel
                     let identityFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
                     for expected in ["forge-conductor", "forge-conductor-clu", "forge-conductor-fallback"] {
                         let matches = servers.staticTexts.matching(NSPredicate(
@@ -1828,6 +1869,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                         XCTAssertEqual(matches.count, 1, "Each configured MCP server needs a distinct full identity")
                         let identity = matches.element
                         XCTAssertTrue(identity.exists)
+                        makeHittable(identity, in: detail)
                         XCTAssertTrue(identity.isHittable)
                         XCTAssertTrue(frameIsContained(identity.frame, in: servers.frame, tolerance: 2))
                         XCTAssertTrue(frameIsContained(identity.frame, in: detail.frame, tolerance: 2))
@@ -1839,28 +1881,44 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                         XCTAssertLessThanOrEqual(requiredBounds.height, identity.frame.height + 2,
                                                  "The full \(expected) identity must fit without ellipsis")
                     }
-                } else if row.name == "sub-agents-hot-processes" {
-                    let processes = detail.groups["rig-hot-processes-panel"]
-                    let agents = detail.groups["rig-sub-agents-panel"]
-                    XCTAssertEqual(processes.frame.minY, agents.frame.minY, accuracy: 2,
-                                   "Hot Processes must fill the sibling row from its top edge")
-                    XCTAssertEqual(processes.frame.maxY, agents.frame.maxY, accuracy: 2,
-                                   "Hot Processes must fill the sibling row through its bottom edge")
+                } else if definition.name == "hot-processes" {
+                    let processes = panel
                     XCTAssertGreaterThanOrEqual(processes.frame.height, 198)
                     let empty = processes.staticTexts["NO MATCHING PROCESSES"]
                     if empty.exists {
+                        makeHittable(empty, in: detail)
                         XCTAssertTrue(empty.isHittable)
                         XCTAssertTrue(frameIsContained(empty.frame, in: processes.frame, tolerance: 2))
+                        XCTAssertTrue(frameIsContained(empty.frame, in: detail.frame, tolerance: 2))
                     } else {
                         // ProcessDiscovery's skip flag does not suppress the separate libproc metrics collector.
                         for label in ["PID", "NAME", "CPU", "RSS"] {
                             let column = processes.staticTexts[label]
                             XCTAssertTrue(column.exists)
+                            makeHittable(column, in: detail)
                             XCTAssertTrue(frameIsContained(column.frame, in: processes.frame, tolerance: 2))
+                            XCTAssertTrue(frameIsContained(column.frame, in: detail.frame, tolerance: 2))
                         }
                     }
                 }
             }
+            let servers = detail.groups["rig-mcp-servers-panel"].frame
+            let tools = detail.groups["rig-mcp-tools-panel"].frame
+            let agents = detail.groups["rig-sub-agents-panel"].frame
+            let processes = detail.groups["rig-hot-processes-panel"].frame
+            XCTAssertEqual(servers.minY, agents.minY, accuracy: 2, "Both columns start together")
+            XCTAssertEqual(tools.minY - servers.maxY, 12, accuracy: 2,
+                           "MCP Tools follows MCP Servers without a borrowed row height")
+            XCTAssertEqual(processes.minY - agents.maxY, 12, accuracy: 2,
+                           "Hot Processes follows Sub-agents without waiting for MCP Servers")
+            XCTAssertEqual(tools.maxY, processes.maxY, accuracy: 2, "Both columns end together")
+            XCTAssertEqual(servers.minX, tools.minX, accuracy: 2)
+            XCTAssertEqual(agents.minX, processes.minX, accuracy: 2)
+            XCTAssertEqual(servers.width, tools.width, accuracy: 2)
+            XCTAssertEqual(agents.width, processes.width, accuracy: 2)
+            XCTAssertEqual(servers.width, agents.width, accuracy: 2, "Columns have equal widths")
+            XCTAssertEqual(agents.minX - servers.maxX, 14, accuracy: 2)
+            XCTAssertEqual(processes.minX - tools.maxX, 14, accuracy: 2)
         }
 
         try captureLowerPanels(size: "normal")

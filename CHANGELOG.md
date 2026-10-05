@@ -10,7 +10,21 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-### Current frame refinement — implementation and QA complete
+### Dashboard column rearrangement
+
+Version/build remains **0.17.0 (27)**. The lower Dashboard uses equal-width,
+independent stacks: MCP Servers above MCP Tools at left, Sub-agents above Hot
+Processes at right. Outer edges align while internal splits follow content;
+Hot Processes fills the remaining right-column height. Approved Compute
+artwork/effects and existing panel content/accessibility identifiers remain.
+
+Thirteen public native view methods passed with zero failures/skips; all 358
+PNGs were individually reviewed. The matching My Mac Debug build and strict
+signature passed, and the canonical UI target compiled only. [Native
+QA](docs/GRAPHITE-NATIVE-QA.md) retains exact current identities, separate
+cache/Metal layers and preceding checkpoint limits.
+
+### Preceding frame refinement — source 2463aa06…
 
 Version/build remains **0.17.0 (27)**. Compute frames are smaller and darker,
 with duplicate visible hardware names and activity badges removed while exact

@@ -22,8 +22,26 @@ on that same team and compile the distribution peer policy. The daemon's exact
 signed hashes are sealed into the app and CLI before export; changing signing
 classes after archiving invalidates that trust relationship. See [Xcode](XCODE.md).
 
+<!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:BEGIN -->
+## Current Dashboard columns — implementation and QA complete
+
+**0.17.0 (27)** uses two independent, equal-width column stacks: MCP Servers
+above MCP Tools on the left, Sub-agents above Hot Processes on the right.
+Their outer top/bottom bounds align; internal splits follow content. Hot
+Processes fills the remaining right-column height. Approved Compute chips,
+effects, panel content and accessibility identifiers are retained.
+
+Thirteen public native view methods passed with zero failures/skips, and all
+358 PNGs were individually reviewed. The matching My Mac Debug build and
+strict signature verification passed; the canonical UI target compiled only.
+[Native QA](docs/GRAPHITE-NATIVE-QA.md) records exact source/build identities, separate cache/Metal
+layers and retained evidence. The frame and broader qualification records
+below remain preceding checkpoints; their executions are not relabeled.
+Exact owner publication and synchronization refs are recorded externally.
+<!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:END -->
+
 <!-- FORGE-COMPUTE-FRAME-FOLLOWUP:BEGIN -->
-## Current frame refinement — implementation and QA complete
+## Preceding frame refinement — source 2463aa06…
 
 Version/build remains **0.17.0 (27)** for this Unreleased iteration. Compute
 frames are smaller and darker; duplicate visible hardware names and activity
