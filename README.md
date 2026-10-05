@@ -31,7 +31,8 @@ signed Debug build and four scoped ordinary workflows passed. Historical
 failures and superseded inputs remain separate. Native caches, genuine Metal
 readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
-Exact owner publication/readback/synchronization refs are retained externally.
+Owner source/wiki publication and synchronization are complete. Exact publication
+and readback refs are retained externally.
 
 Current source is **0.17.0 (27)**. The native Graphite workspace has
 Settings-first optional controls, aligned text and detailed CPU/GPU materials

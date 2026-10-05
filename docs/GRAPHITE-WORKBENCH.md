@@ -81,8 +81,8 @@ signing and data isolation remain the preservation boundary.
 ## Acceptance mapping — 30 current-source adaptations
 
 All 30 UI requirements are fulfilled in the named source/native/ordinary scope
-below. Publication is the remaining owner delivery action; exact revisions and
-safe synchronization are recorded outside Git to avoid self-referential edits.
+below. Owner publication and local/remote synchronization are complete; exact
+revisions are recorded outside Git to avoid self-referential edits.
 The separate [Compute table](COMPUTE-CORES.md#full-acceptance-matrix--32-criteria)
 records 23 CC,3 FX and 6 PAL requirements. Historical identities/results remain in
 [Graphite checkpoints](GRAPHITE-WORKBENCH-CHECKPOINTS.md) and

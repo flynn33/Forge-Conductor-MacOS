@@ -169,7 +169,8 @@ PTS and RGB/orientation checks. The 1856×1088 ProRes4444 viewing derivative is
 6.440s; exact original PNGs remain authoritative. No interpolation, whole-window
 movie, measured workload, real-time smoothness or lossless post-codec equality
 is claimed. Ordinary normal composed Dashboard has separate inline observations;
-the current normal/minimum native matrix is still being completed.
+the current normal/minimum native matrix is complete, as recorded in
+[native QA](GRAPHITE-NATIVE-QA.md).
 
 ## Prior c4de77… view-fixture checkpoint — superseded
 

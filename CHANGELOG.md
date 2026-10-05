@@ -32,7 +32,9 @@ Pause/Resume were observed; all owned cases ended and private state was restored
 [native QA](docs/GRAPHITE-NATIVE-QA.md) and linked histories retain all 62 criteria/
 18 capture scopes,68 currentCompute layers/20 frameMOV, exact candidate identity,
 failed checkpoints and unavailableordinary minimum/1×/Skycompositor limits.
-Owner exact publication/readback/synchronization refs are retained externally.
+Corrected stale pending wording in the current phase records to reflect the
+completed native matrix and owner source/wiki publication. Exact publication,
+readback and synchronization refs are retained externally.
 No installation, notarization, App Store Connect upload or distribution was performed.
 
 ### Added
