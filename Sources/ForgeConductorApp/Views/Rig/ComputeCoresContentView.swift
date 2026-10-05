@@ -124,27 +124,8 @@ struct ComputeCoresContentView: View {
                 + (appleIdentity ? 14 : 0) <= plate.width - 6
         return ZStack(alignment: .topLeading) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 10) {
-                    Text(title).font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(GraphitePalette.textPrimary)
-                    Spacer(minLength: 4)
-                    HStack(spacing: 7) {
-                        Circle().fill(status == "High activity" ? GraphitePalette.chartGPU
-                            : status == "Active" ? GraphitePalette.chartCPU : GraphitePalette.textMuted)
-                            .frame(width: 7, height: 7)
-                        Text(status)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(status == "High activity" ? GraphitePalette.chartGPU
-                                : status == "Active" ? GraphitePalette.chartCPU : GraphitePalette.textSecondary)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityAddTraits(.isStaticText)
-                            .accessibilityLabel(status)
-                            .accessibilityIdentifier("compute-\(id)-activity-state")
-                    }
-                    .padding(.horizontal, 10).frame(height: 28)
-                    .background(GraphitePalette.panelRaised.opacity(0.7), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(GraphitePalette.controlBorder, lineWidth: 0.8))
-                }
+                Text(title).font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(GraphitePalette.textPrimary)
                 Text(id == "cpu" ? (channel.logicalCount > 0 ? "\(channel.logicalCount) logical processors"
                       : "Logical count unavailable") : (channel.hardwareCoreCount.map { "\($0) reported GPU cores · aggregate activity" }
                                                         ?? "Aggregate activity · illustrative regions"))
@@ -153,7 +134,7 @@ struct ComputeCoresContentView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
-            .frame(width: panel.width, height: 78, alignment: .topLeading)
+            .frame(width: panel.width, height: 60, alignment: .topLeading)
             VStack(spacing: 2) {
                 HStack(spacing: 3) {
                     if appleIdentity && nameFitsPlate {
@@ -170,19 +151,20 @@ struct ComputeCoresContentView: View {
                 .foregroundStyle(Color(red: 0.77, green: 0.87, blue: 0.97))
                 .frame(width: plate.width - 6, height: plate.height)
                 .position(x: plate.midX - panel.minX, y: plate.midY - panel.minY)
-                .accessibilityHidden(true)
-            Text(channel.name)
-                .font(.system(size: channel.name.count > 32 ? 13 : 17, weight: .semibold))
-                .foregroundStyle(GraphitePalette.textPrimary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(width: panel.width - 32, height: 52)
-                .position(x: panel.width / 2, y: panel.height - 76)
                 .help(channel.name)
                 .accessibilityElement(children: .ignore)
                 .accessibilityAddTraits(.isStaticText)
                 .accessibilityLabel(channel.name)
                 .accessibilityIdentifier("compute-\(id)-hardware-name")
+            Text(status)
+                .font(.system(size: 12))
+                .foregroundStyle(.clear)
+                .frame(width: panel.width - 32, height: 16)
+                .position(x: panel.width / 2, y: panel.height - 37)
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isStaticText)
+                .accessibilityLabel(status)
+                .accessibilityIdentifier("compute-\(id)-activity-state")
             VStack(spacing: 3) {
                 if !channel.engineReadings.isEmpty {
                     Text(channel.engineReadings).font(.system(size: 11).monospacedDigit())

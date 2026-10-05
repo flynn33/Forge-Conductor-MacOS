@@ -179,12 +179,14 @@ final class ComputeChipAppTests: XCTestCase {
     }
 
     func testDecorativeTraceBedAndPulseHaloClearNativeHeaderAndStatusSlots() {
-        for width: CGFloat in [1_060, 760, 580, 280] {
+        for width: CGFloat in [1_560, 1_060, 928, 820, 800, 760, 759, 580, 400, 360, 320, 280] {
             let layout = ComputeChipLayout.make(width: width, cpuRegionCount: 24)
             for route in layout.routes {
                 let panel = route.channel == 0 ? layout.cpuPanel : layout.gpuPanel
-                let header = CGRect(x: panel.minX, y: panel.minY, width: panel.width, height: 78)
-                let status = CGRect(x: panel.minX, y: panel.maxY - 112, width: panel.width, height: 112)
+                let header = CGRect(x: panel.minX, y: panel.minY, width: panel.width,
+                                    height: ComputeChipLayout.panelHeaderHeight)
+                let status = CGRect(x: panel.minX, y: panel.maxY - ComputeChipLayout.panelFooterHeight,
+                                    width: panel.width, height: ComputeChipLayout.panelFooterHeight)
                 let xs = route.points.map { CGFloat($0.x) }
                 let ys = route.points.map { CGFloat($0.y) }
                 let traceBounds = CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!,
@@ -193,7 +195,51 @@ final class ComputeChipAppTests: XCTestCase {
                 XCTAssertFalse(status.intersects(traceBounds), "Width \(width), route \(route.seed)")
                 XCTAssertTrue(panel.contains(traceBounds), "Trace halos remain inside their component panel")
             }
+            for instance in layout.instances where instance.properties.x == 5 || instance.properties.x == 6 {
+                let cosine = abs(cos(CGFloat(instance.properties.w)))
+                let sine = abs(sin(CGFloat(instance.properties.w)))
+                let width = CGFloat(instance.rect.z) * cosine + CGFloat(instance.rect.w) * sine
+                let height = CGFloat(instance.rect.z) * sine + CGFloat(instance.rect.w) * cosine
+                let bounds = CGRect(x: CGFloat(instance.rect.x) - width / 2,
+                                    y: CGFloat(instance.rect.y) - height / 2,
+                                    width: width, height: height)
+                XCTAssertTrue(layout.cpuPanel.contains(bounds) || layout.gpuPanel.contains(bounds),
+                              "Every decorative segment and endpoint stays inside the narrowed frames")
+            }
         }
+    }
+
+    func testCompactPanelsPreserveApprovedArtworkFootprintAndRecordedRouteLengths() {
+        let layout = ComputeChipLayout.make(width: 928, cpuRegionCount: 10)
+        XCTAssertEqual(layout.size.height, 458)
+        XCTAssertEqual(layout.cpuPanel, CGRect(x: 36, y: 0, width: 382, height: 458))
+        XCTAssertEqual(layout.gpuPanel, CGRect(x: 510, y: 0, width: 382, height: 458))
+        XCTAssertEqual(layout.cpuPackage.minX, 138.68, accuracy: 0.0001)
+        XCTAssertEqual(layout.cpuPackage.minY, 168.68, accuracy: 0.0001)
+        XCTAssertEqual(layout.cpuPackage.width, 176.64, accuracy: 0.0001)
+        XCTAssertEqual(layout.gpuPackage.minX, 612.68, accuracy: 0.0001)
+        XCTAssertEqual(layout.gpuPackage.minY, 168.68, accuracy: 0.0001)
+        XCTAssertEqual(layout.gpuPackage.size, layout.cpuPackage.size)
+        let backgrounds = layout.instances.filter { $0.properties.x == 9 }
+        XCTAssertEqual(backgrounds.count, 2)
+        XCTAssertTrue(backgrounds.allSatisfy { $0.color == GraphitePalette.linearRGBA(0x020817) })
+
+        // Lengths recorded by the approved 928-point production Metal motion fixture.
+        // Translation may change final Float rounding, but never the path's shape or scale.
+        let approvedLengths: [(index: Int, length: Float)] = [
+            (3, 78.8698501586914), (10, 58.3492431640625),
+            (21, 50.78894805908203), (30, 71.56834411621094),
+            (38, 71.56831359863281), (43, 62.76820373535156),
+            (51, 78.86984252929688), (62, 71.56832885742188),
+        ]
+        for item in approvedLengths {
+            XCTAssertEqual(layout.routes[item.index].length, item.length, accuracy: 0.0002)
+        }
+        let stacked = ComputeChipLayout.make(width: 280, cpuRegionCount: 10)
+        XCTAssertEqual(stacked.size.height, 608)
+        XCTAssertEqual(stacked.cpuPanel.height, 294)
+        XCTAssertEqual(stacked.gpuPanel.minY, 314)
+        XCTAssertEqual(stacked.gpuPackage.minY - stacked.cpuPackage.minY, 314, accuracy: 0.0001)
     }
 
     func testPauseRetainsShadingAcrossLaterWallTimeAndReduceMotionHasNoPulses() {

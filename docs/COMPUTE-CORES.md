@@ -1,6 +1,99 @@
 # Compute Cores Metal FX and application palette
 
-**UI implementation and QA complete.** Current
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:BEGIN -->
+## Current frame refinement — implementation and QA complete
+
+Version/build remains **0.17.0 (27)** for this Unreleased iteration. Compute
+frames are smaller and darker; duplicate visible hardware names and activity
+badges are removed while exact accessibility identities and states remain.
+The approved chips and telemetry effects are preserved. Dashboard omits its
+inline Guided Mode banner and guide button; other routes retain guidance.
+Workbench Settings labels its existing action **Open Guide**. Sub-agents and
+Hot Processes fill the same grid row, retaining its 200-point minimum.
+
+The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+canonical build graph and all 30 resource files. Thirteen native view methods
+passed and all 357 successful PNGs were reviewed; the one failed fixture
+invocation is retained separately. The matching My Mac Debug build and strict
+signature verification passed (candidate CDHash `3b5399f0…`). Separate Compute
+checks, their overlapping SwiftPM repeat and exact evidence limits are recorded
+in [the Compute phase record](COMPUTE-CORES.md). The `28548a73…` source, 116-test/140-execution and 463-image
+receipts below remain the preceding checkpoint, not fresh proof of changed
+inputs. Exact owner publication and synchronization refs are recorded externally.
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:END -->
+
+`ComputeChipLayout` retains `packageScale = 0.46` and the approved chip, bank,
+nameplate and trace construction. Panel height decreases by 86 points,
+horizontal inset is bounded at 36 points, and the kind-9 panel fill is
+`0x020817`. Completed artwork/routes translate without rescaling. Exact full
+hardware names belong to `compute-cpu-hardware-name` and
+`compute-gpu-hardware-name` on the native nameplates; visually clear native
+state elements retain both `compute-*-activity-state` identifiers. Current
+native assertions and normal/minimum review verify those retained semantics
+and compact-frame clearance. All 30 resource files, the canonical Xcode graph,
+shader, renderer, animation and projection match the preceding inputs.
+
+## Current narrow qualification
+
+| Check | Actual result | Input and evidence boundary |
+| --- | --- | --- |
+| Public direct-XCTest Compute selection | 30 selected/executed, zero failures/skips, terminal 0; 22.824 seconds | 16 pure, 6 lifecycle and 8 presentation cases; predates the final Rig sibling-row addition. Exact Compute production/test inputs remain unchanged; it is not one identical final App snapshot |
+| SwiftPM `ComputeChipAppTests` | 16 executed, zero failures/skips, terminal 0; 0.043 seconds | Repeats the 16 pure Compute cases above; the zero-case qualification-support bundle is excluded, so these are not 46 distinct tests |
+| Current native view matrix | 13 successful methods/invocations, zero failures/skips within that successful selection; 357 successful PNGs individually reviewed | 14 total invocations include one preserved failed new Guide-role fixture assertion; the corrected immutable fixture uses the actual AXHeading. Actual production ContentView/AppModel in isolated public AppKit/XCTest hosting, not canonical testmanager or ordinary runtime execution |
+| Compute visual checkpoint | All 68 PNGs opened; no blocking defect in captured layers | 27 genuine static Metal readbacks, 20 genuine drawable motion frames and 21 NSView caches. Separate layers, current 1× backing scale; no compositor or current 2× raster claim |
+| Sub-agents/Hot Processes layout | Normal/minimum populated and bootstrap-empty panel edges match, zero top/bottom delta | Painted native AX heights 510/624 points populated, 201 points bootstrap-empty; the source minimum remains 200 points. No host-process mutation or successful-bootstrap claim for the explicitly failing-bootstrap seam |
+| Dashboard and Settings guide action | Passed at normal/minimum size | Guided Mode enabled with Dashboard banner absent, Manager inline guide retained, actual settings-show-guide Open Guide action opens exact Manager guide AXHeading and Close dismisses it |
+| Ordinary My Mac Debug candidate | BUILD SUCCEEDED and strict signature verification terminal 0 | Version 0.17.0, build 27; Apple Development team 9AQ2C2838M, CDHash 3b5399f06cb3494d0c63a34efb3b8c210b31abf1. Build/signature only; preceding ordinary workflows are not relabeled |
+| AppTests/canonical UI target and external fixture compilation | Successful compilation, separately recorded | Compile-only proof does not count as UI execution. Retained test/helper warnings are not called warning-free |
+
+Current view authority:
+`build/graphite-results/compute-frame-refinement-final-qa-summary.json`, SHA-256
+`633d46de48a1f760d51dca9d63c577544b2d3639660ad810dab7a30bd2e7828d`.
+The actual successful selection covers all 13 routes at normal 1440×900 and
+minimum 1100×720 content sizes, nine Manager sections and the Settings component,
+eight setup steps at both sizes, registration/nested Help, full reachable root
+and secondary Guide bodies, plus the new guide-placement and row-fill cases.
+The failed initial Guide invocation expected AXStaticText for a title recorded
+as AXHeading; its assertion and thrown wrapper generated two issues. Only the
+fixture's bounded exact-title lookup was corrected, with production bytes
+unchanged. Its two PNGs are excluded from the 357 successful-image union.
+
+Current source inventory: **434 inputs**, SHA-256
+`2463aa065e049627d8c6af3d9188f2258da060fa2d04c4a1e8b0770e4ee777e9`.
+The scoped membership/preservation review is
+`/tmp/forge-frame-refinement-delivery-membership-review.json`, SHA-256
+`986f6ebcedf629e0b838df81383a0842a6968b762345daa35ef9c2e6c093734a`;
+all recorded checks passed, original graph/resource memberships and bytes remain
+unchanged, and changed Swift files retain existing native target membership.
+The project SHA-256 remains
+`a5ecf9dc66845891929ac5de31820a22a355dabb38668dd93ce3849f9f069b1d`.
+The candidate identity receipt is
+`build/graphite-results/compute-frame-refinement-ordinary-candidate-identity.json`,
+SHA-256 `6c6758064db1177cd39088c89448bf43cdc21a3459afc74adaa2c55fd0ce4dc4`.
+
+The earlier 30-case native execution remains an executed checkpoint with its
+recorded module/resource hashes, events and 68 reviewed PNGs. Its original
+AppTests executable was subsequently overwritten and is unavailable; the app
+dylib at that former path now differs from the recorded execution identity.
+That initial full product dependency cannot be replayed from the current path.
+The preserved Compute input comparison supports the bounded reuse above;
+the final native view product and replay inputs are retained separately.
+No missing dependency is treated as a fresh execution or byte-identical bundle.
+
+Additional authorities: `compute-frame-refinement-68-pixel-review.json`
+(SHA-256 `102896fe8f78d3b2434d341497e7f16615629df54dce6d11ae1d85fcfe63a73a`),
+the earlier native `compute-current-receipt.json`/events,
+`/tmp/forge-frame-refinement-swift-test.log`,
+`/tmp/forge-frame-refinement-app-final-build.log` and
+`/tmp/forge-frame-refinement-apphost-final-build.log`.
+Delivery evidence location:
+`/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-04-graphite-workbench/compute-frame-refinement-20261005T093248Z`.
+Exact owner publication/synchronization refs are recorded externally.
+No installation, notarization, App Store Connect upload or distribution is claimed.
+
+## Preceding qualified checkpoint — 0.17.0 (27), source 28548a73…
+
+**Preceding UI implementation and QA complete.**
 0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
 successful executions**, with zero failures/skips. The separate native view
 matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
@@ -11,7 +104,7 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current source: **0.17.0 (27)**. **Revision 2 implementation and required QA: verified.**
+Preceding source: **0.17.0 (27)**, `28548a73…`. **Revision 2 implementation and required QA: verified for those inputs.**
 Detailed CPU/GPU chip presentation is integrated in the retained Dashboard
 frame. The approved application colors use the existing shared palette;
 the Compute increment compares against the already-authorized Graphite UI
@@ -414,6 +507,10 @@ unchanged in that local delta. Current source/contract review and faithful nativ
 Graphite baseline; ordinary/runtime and capture limitations remain explicit.
 
 ## Full acceptance matrix — 32 criteria
+
+The rows below retain the preceding `28548a73…` qualification. The completed
+frame, label and Dashboard guidance follow-up is qualified separately above;
+no earlier result is relabeled as a pass for changed source.
 
 All32criteria are fulfilled in their named current source/native/ordinary scope.
 This table records faithful native equivalents and explicit unavailable proof

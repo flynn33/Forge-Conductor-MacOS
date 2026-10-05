@@ -223,7 +223,7 @@ struct ContentView: View {
 
     private var selectedModule: some View {
             VStack(spacing: 0) {
-                if guidedMode.isEnabled,
+                if model.selectedTab != .rig, guidedMode.isEnabled,
                    let entry = guidedMode.catalog?.entry(for: guidedMode.currentContext) {
                     GuidedInlineHelp(
                         entry: entry,

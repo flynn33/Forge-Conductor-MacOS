@@ -100,7 +100,7 @@ struct WorkbenchSettingsView: View {
                     .foregroundStyle(GraphitePalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
-                    Button("View Guide") {
+                    Button("Open Guide") {
                         preferences.activateMainWindow()
                         guidedMode.present()
                     }

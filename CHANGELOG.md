@@ -10,7 +10,29 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-Current source identity: `0.17.0 (27)`. **Graphite/Compute UI implementation
+### Current frame refinement — implementation and QA complete
+
+Version/build remains **0.17.0 (27)**. Compute frames are smaller and darker,
+with duplicate visible hardware names and activity badges removed while exact
+accessibility identities/states remain. Approved chip artwork, shader,
+renderer, animation and projection are preserved. Dashboard's inline Guided
+Mode banner and guide button are removed; other route guidance is retained.
+Workbench Settings labels its existing action **Open Guide**. Both Sub-agents
+and Hot Processes fill their existing grid row with its 200-point minimum.
+
+The 434-input source manifest `2463aa06…` preserves the canonical Xcode graph
+and all 30 resources. Thirteen native view methods passed; all 357 successful
+PNGs were individually reviewed. One failed new Guide assertion, corrected
+from AXStaticText to the observed AXHeading in the fixture only, remains a
+failed checkpoint outside those successful captures. The matching My Mac
+Debug candidate passed build and strict signature verification. Separate
+30-case Compute and overlapping 16-case SwiftPM results retain their scopes
+in [Compute](docs/COMPUTE-CORES.md) and [native QA](docs/GRAPHITE-NATIVE-QA.md);
+preceding runtime/distribution limits are preserved.
+
+### Preceding qualified UI checkpoint — source 28548a73…
+
+Preceding checkpoint identity: `0.17.0 (27)`, source `28548a73…`. **Graphite/Compute UI implementation
 and required QA are complete.** The native workspace
 uses Settings-first optional controls, aligned text and one exact-reference
 chip resource with bounded telemetry-driven Metal lighting and static fallback.
@@ -19,7 +41,7 @@ Folders…**. Fallback labels use current activity/pause; invalid channels stop
 their own trace immediately and measured idle keeps bounded hysteresis. Empty
 Projects retains its populated list/actions through a native placeholder.
 
-Current qualification passed 116 distinct production tests in 140 successful
+That checkpoint qualification passed 116 distinct production tests in 140 successful
 executions, zero failures/skips; the separate 21-method/22-invocation native
 view matrix passed and all 463 selectedPNG files were individually reviewed. The
 15-check/434-inputaudit, SwiftPMCLI/App, focusedCore 8/H0 (1)/G1 (1) and matching signed
@@ -39,7 +61,7 @@ No installation, notarization, App Store Connect upload or distribution was perf
 
 ### Added
 
-Added behaviors below preserve their earlier checkpoint receipts; the current
+Added behaviors below preserve their earlier checkpoint receipts; the preceding
 complete UI qualification and exact input boundaries are recorded above.
 
 - Added a shared native Graphite Workbench palette and reusable panel, field and

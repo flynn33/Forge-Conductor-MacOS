@@ -1,6 +1,30 @@
 # Graphite Workbench
 
-**UI implementation and QA complete.** Current
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:BEGIN -->
+## Current frame refinement — implementation and QA complete
+
+Version/build remains **0.17.0 (27)** for this Unreleased iteration. Compute
+frames are smaller and darker; duplicate visible hardware names and activity
+badges are removed while exact accessibility identities and states remain.
+The approved chips and telemetry effects are preserved. Dashboard omits its
+inline Guided Mode banner and guide button; other routes retain guidance.
+Workbench Settings labels its existing action **Open Guide**. Sub-agents and
+Hot Processes fill the same grid row, retaining its 200-point minimum.
+
+The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+canonical build graph and all 30 resource files. Thirteen native view methods
+passed and all 357 successful PNGs were reviewed; the one failed fixture
+invocation is retained separately. The matching My Mac Debug build and strict
+signature verification passed (candidate CDHash `3b5399f0…`). Separate Compute
+checks, their overlapping SwiftPM repeat and exact evidence limits are recorded
+in [the Compute phase record](COMPUTE-CORES.md). The `28548a73…` source, 116-test/140-execution and 463-image
+receipts below remain the preceding checkpoint, not fresh proof of changed
+inputs. Exact owner publication and synchronization refs are recorded externally.
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:END -->
+
+## Preceding qualified checkpoint — 0.17.0 (27), source 28548a73…
+
+**Preceding UI implementation and QA complete.**
 0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
 successful executions**, with zero failures/skips. The separate native view
 matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
@@ -11,13 +35,13 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current source identity: **0.17.0 (27)**. The authorized UI phase is verified
+Preceding source identity: **0.17.0 (27)**, `28548a73…`. The authorized UI phase was verified
 for its existing native feature surface. The later Compute Cores increment is
 recorded in [Compute Cores](COMPUTE-CORES.md); its preservation baseline is the
 already-authorized Graphite UI, not an assertion that every layout is unchanged
 from the original main revision.
 
-## Current evidence
+## Preceding checkpoint evidence
 
 The tested product inventory has **434 inputs**, SHA-256
 `28548a73db312130f02e3c86344725f2aa1efca575901fa0ae3dc223b69eb3d1`;
@@ -79,6 +103,11 @@ Native controls, action IDs, settings keys, service availability predicates,
 signing and data isolation remain the preservation boundary.
 
 ## Acceptance mapping — 30 current-source adaptations
+
+These rows retain the completed preceding checkpoint. The narrow follow-up
+above has fresh scoped frame/layout, Guide-route and accessibility evidence in
+[the native QA record](GRAPHITE-NATIVE-QA.md); it does not relabel historical
+results or reopen unrelated requirements.
 
 All 30 UI requirements are fulfilled in the named source/native/ordinary scope
 below. Owner publication and local/remote synchronization are complete; exact

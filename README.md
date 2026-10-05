@@ -22,7 +22,31 @@ on that same team and compile the distribution peer policy. The daemon's exact
 signed hashes are sealed into the app and CLI before export; changing signing
 classes after archiving invalidates that trust relationship. See [Xcode](XCODE.md).
 
-**UI implementation and QA complete.** Current
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:BEGIN -->
+## Current frame refinement — implementation and QA complete
+
+Version/build remains **0.17.0 (27)** for this Unreleased iteration. Compute
+frames are smaller and darker; duplicate visible hardware names and activity
+badges are removed while exact accessibility identities and states remain.
+The approved chips and telemetry effects are preserved. Dashboard omits its
+inline Guided Mode banner and guide button; other routes retain guidance.
+Workbench Settings labels its existing action **Open Guide**. Sub-agents and
+Hot Processes fill the same grid row, retaining its 200-point minimum.
+
+The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+canonical build graph and all 30 resource files. Thirteen native view methods
+passed and all 357 successful PNGs were reviewed; the one failed fixture
+invocation is retained separately. The matching My Mac Debug build and strict
+signature verification passed (candidate CDHash `3b5399f0…`). Separate Compute
+checks, their overlapping SwiftPM repeat and exact evidence limits are recorded
+in [the Compute phase record](docs/COMPUTE-CORES.md). The `28548a73…` source, 116-test/140-execution and 463-image
+receipts below remain the preceding checkpoint, not fresh proof of changed
+inputs. Exact owner publication and synchronization refs are recorded externally.
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:END -->
+
+## Preceding qualified checkpoint — 0.17.0 (27), source 28548a73…
+
+**Preceding UI implementation and QA complete.**
 0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
 successful executions**, with zero failures/skips. The separate native view
 matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**

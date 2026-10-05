@@ -1,6 +1,55 @@
 # Version and qualification status
 
-**UI implementation and QA complete.** Source
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:BEGIN -->
+## Current frame refinement — implementation and QA complete
+
+Version/build remains **0.17.0 (27)** for this Unreleased iteration. Compute
+frames are smaller and darker; duplicate visible hardware names and activity
+badges are removed while exact accessibility identities and states remain.
+The approved chips and telemetry effects are preserved. Dashboard omits its
+inline Guided Mode banner and guide button; other routes retain guidance.
+Workbench Settings labels its existing action **Open Guide**. Sub-agents and
+Hot Processes fill the same grid row, retaining its 200-point minimum.
+
+The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+canonical build graph and all 30 resource files. Thirteen native view methods
+passed and all 357 successful PNGs were reviewed; the one failed fixture
+invocation is retained separately. The matching My Mac Debug build and strict
+signature verification passed (candidate CDHash `3b5399f0…`). Separate Compute
+checks, their overlapping SwiftPM repeat and exact evidence limits are recorded
+in [the Compute phase record](COMPUTE-CORES.md). The `28548a73…` source, 116-test/140-execution and 463-image
+receipts below remain the preceding checkpoint, not fresh proof of changed
+inputs. Exact owner publication and synchronization refs are recorded externally.
+<!-- FORGE-COMPUTE-FRAME-FOLLOWUP:END -->
+
+## Current frame-refinement artifact and evidence
+
+The 434-input scoped source manifest is SHA-256
+`2463aa065e049627d8c6af3d9188f2258da060fa2d04c4a1e8b0770e4ee777e9`;
+current membership/preservation receipt SHA-256 is
+`986f6ebcedf629e0b838df81383a0842a6968b762345daa35ef9c2e6c093734a`.
+The canonical graph, schemes, package inputs, signing/deployment settings and
+all 30 resource files are unchanged. The ordinary My Mac Debug candidate is
+version **0.17.0**, build **27**, Apple Development team **9AQ2C2838M**, CDHash
+`3b5399f06cb3494d0c63a34efb3b8c210b31abf1`; strict signature verification passed.
+Its 33-file identity receipt SHA-256 is
+`6c6758064db1177cd39088c89448bf43cdc21a3459afc74adaa2c55fd0ce4dc4`.
+This establishes build/signature identity, not a new ordinary runtime workflow.
+
+Fresh public native fixtures passed 13 view methods; all 357 successful PNGs
+were opened. One failed fixture invocation remains outside that successful
+selection, giving 14 total invocations. The final QA summary SHA-256 is
+`633d46de48a1f760d51dca9d63c577544b2d3639660ad810dab7a30bd2e7828d`.
+The separate earlier Compute selection executed 30 cases with zero failures/
+skips; its 16-case SwiftPM repeat overlaps. Its recorded product dependency was
+later overwritten, so source-preservation evidence bounds reuse rather than
+claiming a replayable earlier full bundle or one final App snapshot. Exact
+boundaries, failed Guide assertion and tested frame/row/guide behavior are in
+[Compute](COMPUTE-CORES.md) and [native QA](GRAPHITE-NATIVE-QA.md).
+
+## Preceding qualified checkpoint — 0.17.0 (27), source 28548a73…
+
+**Preceding UI implementation and QA complete.** Source
 **0.17.0 (27)**,28548a73… passed 116 distinct production tests in 140 successful
 executions, zero failures/skips. The separate native view matrix passed 21 unique
 methods in 22 invocations; all 463 selectedPNGs were individually opened and
@@ -10,7 +59,7 @@ classes retain their exact boundaries. Owner exact publication/readback/
 synchronization refs are recorded externally; no installation, notarization,
 App Store Connect upload or distribution was performed.
 
-## Current Graphite/Compute source and ordinary candidate — 0.17.0 (27)
+## Preceding Graphite/Compute source and ordinary candidate — 0.17.0 (27)
 
 Current production qualification is **116 distinct tests /140 successful
 executions**, zero failures/skips: Compute 29, regression 68 and proper canonical

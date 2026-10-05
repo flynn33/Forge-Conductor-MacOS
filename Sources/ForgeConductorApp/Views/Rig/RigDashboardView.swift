@@ -1109,7 +1109,7 @@ struct RigDashboardView: View {
 
     private var agentsPanel: some View {
         let agents = model.agentCards
-        return panel("SUB-AGENTS", meta: "\(agents.count) · Metal") {
+        return panel("SUB-AGENTS", meta: "\(agents.count) · Metal", fillsGridRow: true) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
                 ForEach(Array(agents.prefix(12).enumerated()), id: \.offset) { _, a in
                     VStack(alignment: .leading, spacing: 8) {
@@ -1161,7 +1161,7 @@ struct RigDashboardView: View {
     // MARK: Processes
 
     private var processesPanel: some View {
-        panel("HOT PROCESSES", meta: "LM Studio · Forge · llama") {
+        panel("HOT PROCESSES", meta: "LM Studio · Forge · llama", fillsGridRow: true) {
             if model.hotProcesses.isEmpty {
                 Text("NO MATCHING PROCESSES").font(.caption).foregroundStyle(GraphitePalette.textSecondary)
             } else {
@@ -1251,7 +1251,12 @@ struct RigDashboardView: View {
         )
     }
 
-    private func panel<Content: View>(_ title: String, meta: String, @ViewBuilder content: () -> Content) -> some View {
+    private func panel<Content: View>(
+        _ title: String,
+        meta: String,
+        fillsGridRow: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -1267,7 +1272,12 @@ struct RigDashboardView: View {
             content().frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: fillsGridRow ? 200 : nil,
+            maxHeight: fillsGridRow ? .infinity : nil,
+            alignment: .topLeading
+        )
         .background(GraphitePanelSurface())
     }
 

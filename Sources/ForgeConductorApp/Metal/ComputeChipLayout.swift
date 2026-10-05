@@ -124,6 +124,10 @@ enum ComputeChipReferenceGeometry {
 struct ComputeChipLayout {
     static let maximumInstances = 4096
     static let packageScale: CGFloat = 0.46
+    static let panelHeaderHeight: CGFloat = 60
+    static let panelFooterHeight: CGFloat = 44
+    private static let artworkTopTrim: CGFloat = 18
+    private static let panelHeightReduction: CGFloat = 86
     let size: CGSize
     let stacked: Bool
     let cpuPanel: CGRect
@@ -140,7 +144,7 @@ struct ComputeChipLayout {
         let stacked = width < 760
         let panelWidth = stacked ? width : (width - 20) / 2
         let package = min(390, max(220, panelWidth - 70))
-        return (package + 160) * (stacked ? 2 : 1) + (stacked ? 20 : 0)
+        return (package + 160 - panelHeightReduction) * (stacked ? 2 : 1) + (stacked ? 20 : 0)
     }
 
     static func make(width: CGFloat, cpuRegionCount: Int) -> Self {
@@ -149,17 +153,32 @@ struct ComputeChipLayout {
         let panelWidth = stacked ? width : (width - 20) / 2
         let previousPackageSize = min(390, max(220, panelWidth - 70))
         let packageSize = previousPackageSize * packageScale
-        let panelHeight = previousPackageSize + 160
-        let cpuPanel = CGRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
-        let gpuPanel = CGRect(x: stacked ? 0 : panelWidth + 20,
-                              y: stacked ? panelHeight + 20 : 0, width: panelWidth, height: panelHeight)
+        let artworkPanelHeight = previousPackageSize + 160
+        let cpuArtworkPanel = CGRect(x: 0, y: 0, width: panelWidth, height: artworkPanelHeight)
+        let gpuArtworkPanel = CGRect(x: stacked ? 0 : panelWidth + 20,
+                                     y: stacked ? artworkPanelHeight + 20 : 0,
+                                     width: panelWidth, height: artworkPanelHeight)
+        let horizontalInset = min(36, max(0, (panelWidth - 320) / 2))
+        func compactPanel(_ panel: CGRect, channel: Int) -> CGRect {
+            CGRect(x: panel.minX + horizontalInset,
+                   y: panel.minY - (stacked && channel == 1 ? panelHeightReduction : 0),
+                   width: panel.width - horizontalInset * 2,
+                   height: panel.height - panelHeightReduction)
+        }
+        let cpuPanel = compactPanel(cpuArtworkPanel, channel: 0)
+        let gpuPanel = compactPanel(gpuArtworkPanel, channel: 1)
+        func artworkOffset(channel: Int) -> CGFloat {
+            -artworkTopTrim - (stacked && channel == 1 ? panelHeightReduction : 0)
+        }
         func package(in panel: CGRect) -> CGRect {
             CGRect(x: panel.midX - packageSize / 2,
                    y: panel.minY + 83 + (previousPackageSize - packageSize) / 2,
                    width: packageSize, height: packageSize)
         }
-        let cpuPackage = package(in: cpuPanel)
-        let gpuPackage = package(in: gpuPanel)
+        let cpuArtworkPackage = package(in: cpuArtworkPanel)
+        let gpuArtworkPackage = package(in: gpuArtworkPanel)
+        let cpuPackage = cpuArtworkPackage.offsetBy(dx: 0, dy: artworkOffset(channel: 0))
+        let gpuPackage = gpuArtworkPackage.offsetBy(dx: 0, dy: artworkOffset(channel: 1))
         func plate(in package: CGRect, channel: Int) -> CGRect {
             let reference = channel == 0 ? ComputeChipReferenceGeometry.cpuNameplate : ComputeChipReferenceGeometry.gpuNameplate
             let normalized = ComputeChipReferenceGeometry.normalized(reference, cpu: channel == 0)
@@ -189,11 +208,12 @@ struct ComputeChipLayout {
                    y: body.minY + normalized.minY * body.height,
                    width: normalized.width * body.width, height: normalized.height * body.height)
         }
-        for (channel, body) in [cpuPackage, gpuPackage].enumerated() {
+        for (channel, body) in [cpuArtworkPackage, gpuArtworkPackage].enumerated() {
+            let firstInstance = instances.count
             let s = body.width
             let panel = channel == 0 ? cpuPanel : gpuPanel
             append(panel.insetBy(dx: 0.5, dy: 0.5), kind: 9,
-                   color: GraphitePalette.linearRGBA(0x0B1822), seed: channel + 101)
+                   color: GraphitePalette.linearRGBA(0x020817), seed: channel + 101)
             append(body.insetBy(dx: -5, dy: -5).offsetBy(dx: 0, dy: 2), kind: 10,
                    color: SIMD4(0, 0, 0, 0.65), seed: channel)
             append(body, kind: 11, color: SIMD4(repeating: 1), seed: channel)
@@ -239,8 +259,11 @@ struct ComputeChipLayout {
                            seed: 2 + 8 * 32 + (16 + index) * 1024)
                 }
             }
-            let field = CGRect(x: panel.minX + 16, y: panel.minY + 92,
-                               width: panel.width - 32, height: panel.height - 214)
+            // Keep the approved artwork's clipping and route construction unchanged;
+            // compact frames translate the completed artwork without rescaling it.
+            let artworkPanel = channel == 0 ? cpuArtworkPanel : gpuArtworkPanel
+            let field = CGRect(x: artworkPanel.minX + 16, y: artworkPanel.minY + 92,
+                               width: artworkPanel.width - 32, height: artworkPanel.height - 214)
             func clamped(_ point: SIMD2<Float>) -> SIMD2<Float> {
                 SIMD2(min(max(point.x, Float(field.minX)), Float(field.maxX)),
                       min(max(point.y, Float(field.minY)), Float(field.maxY)))
@@ -314,6 +337,14 @@ struct ComputeChipLayout {
                               width: 1.3, height: 1.3),
                        kind: 5, color: GraphitePalette.linearRGBA(0x38B6D7, alpha: animated ? 1 : 0.5), seed: routeIndex)
             }
+            for index in firstInstance..<instances.count where instances[index].properties.x != 9 {
+                instances[index].rect.y += Float(artworkOffset(channel: channel))
+            }
+        }
+        cpuRegions = cpuRegions.map { $0.offsetBy(dx: 0, dy: artworkOffset(channel: 0)) }
+        routes = routes.map { route in
+            ComputeTraceRoute(points: route.points.map { $0 + SIMD2(0, Float(artworkOffset(channel: route.channel))) },
+                              channel: route.channel, seed: route.seed)
         }
         return Self(size: CGSize(width: width, height: height(for: width)), stacked: stacked,
                     cpuPanel: cpuPanel, gpuPanel: gpuPanel, cpuPackage: cpuPackage, gpuPackage: gpuPackage,

@@ -1,8 +1,23 @@
 # Forge Conductor user guide
 
-The Graphite Workbench and Compute Cores UI implementation and required QA are
-complete. The matching ordinary Debug candidate passed build, signature and
-packaging checks and four scoped native workflows. The current native view and
+The **0.17.0 (27)** frame refinement is implemented and tested. Smaller,
+darker Compute frames omit duplicate visible hardware names and activity
+badges while full identities and states remain accessible. The approved chips
+and telemetry effects are preserved. Dashboard omits its inline guidance
+banner; other routes retain guidance. **Open Guide** in Workbench Settings and
+**View Guide** in the Guide menu retain the guide action. Sub-agents and Hot
+Processes fill the same grid row with its existing 200-point minimum.
+
+Fresh native fixtures covered all 13 routes at normal/minimum size, all nine
+Manager sections, all eight setup steps and reachable registration/Guide
+presentations. Thirteen methods passed and all 357 successful PNGs were reviewed;
+the failed initial Guide-role assertion is preserved separately. The current
+ordinary My Mac Debug candidate passed build and strict signature verification.
+These fixture caches and separate Metal readbacks are not compositor screenshots.
+
+The preceding `28548a73…` Graphite/Compute implementation and required QA were
+complete for those recorded inputs. The matching ordinary Debug candidate passed build, signature and
+packaging checks and four scoped native workflows. That checkpoint native view and
 control matrix and final checks passed; actual Settings and normal Dashboard
 observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
@@ -24,7 +39,7 @@ their independent labels.
 The main workspace opens without a global control bar. Open **Forge Conductor
 → Settings…** or **⌘,** to enter **Workbench**. Navigation visibility,
 Auto-refresh telemetry and contextual Guided Mode apply immediately. **Refresh
-Now** updates telemetry; **View Guide** and **Guided Setup** open the shared
+Now** updates telemetry; **Open Guide** and **Guided Setup** open the shared
 guide/setup presentation in the main window.
 
 **Optional view controls** has six separate preferences: Navigation,
@@ -70,14 +85,16 @@ LM Studio chat establishes its normal MCP binding.
 The chips use this Mac's CPU/GPU identity. CPU illumination represents
 logical-processor activity when measured; host-average fallback is labeled
 separately. GPU regions illustrate measuredaggregate activity; trace travel
-is simulated flow. Idle/warming/stale/paused/unavailable labels remain distinct.
+is simulated flow. Idle/warming/stale/paused/unavailable states remain distinct;
+the compact view retains their accessibility labels.
 Reduce Motion keeps a staticactivity presentation. Current materials derive
 from the exact supplied reference, with bounded native crops and Metal lights
 that brighten/changecolor with valid telemetry. Artistic bank colors do not
 assert P/E topology or measuredGPU-core activity.
 
-Current normal/minimum native views, all 9 Manager sections, all 8setup steps,
-reachable Guide bodies/state presentations and signedordinaryworkflows passed
+At the preceding qualified `28548a73…` checkpoint, normal/minimum native views,
+all 9 Manager sections, all 8 setup steps, reachable Guide bodies/state
+presentations and signed ordinary workflows passed
 their recorded checks/reviews. ActualnormalSettings/Dashboard were observed;
 unavailable ordinaryminimum/physical1×/Skycompositor and NSAlertcache-button
 limits remain explicit. Exact owner publication/readback/synchronization refs are retained externally; distribution is separate.

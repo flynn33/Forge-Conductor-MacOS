@@ -337,16 +337,19 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let wasEnabled = guidedModeIsEnabled(toggle)
         if !wasEnabled { toggle.click() }
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["guided-inline-rig"].waitForExistence(timeout: 3)
-        )
+        XCTAssertFalse(app.descendants(matching: .any)["guided-inline-rig"].exists,
+                       "Dashboard keeps its monitoring area clear when Guided Mode is enabled")
+        app.buttons["tab-manager"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["guided-inline-manager"].waitForExistence(timeout: 3),
+                      "Guided Mode still provides inline help on other routes")
+        app.buttons["tab-rig"].click()
 
         app.terminate()
         app.launch()
         toggle = app.descendants(matching: .any)["toolbar-guided-mode"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 8))
         XCTAssertTrue(guidedModeIsEnabled(toggle))
-        XCTAssertTrue(app.descendants(matching: .any)["guided-inline-rig"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.descendants(matching: .any)["guided-inline-rig"].exists)
 
         let help = app.buttons["toolbar-setup-guide"]
         XCTAssertTrue(help.waitForExistence(timeout: 3))
@@ -1838,6 +1841,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                     }
                 } else if row.name == "sub-agents-hot-processes" {
                     let processes = detail.groups["rig-hot-processes-panel"]
+                    let agents = detail.groups["rig-sub-agents-panel"]
+                    XCTAssertEqual(processes.frame.minY, agents.frame.minY, accuracy: 2,
+                                   "Hot Processes must fill the sibling row from its top edge")
+                    XCTAssertEqual(processes.frame.maxY, agents.frame.maxY, accuracy: 2,
+                                   "Hot Processes must fill the sibling row through its bottom edge")
+                    XCTAssertGreaterThanOrEqual(processes.frame.height, 198)
                     let empty = processes.staticTexts["NO MATCHING PROCESSES"]
                     if empty.exists {
                         XCTAssertTrue(empty.isHittable)
