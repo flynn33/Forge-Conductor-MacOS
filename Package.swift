@@ -85,10 +85,18 @@ let package = Package(
                 "Resources/ForgeConductor.entitlements",
                 "Resources/Info.plist",
                 "Resources/com.forge-conductor.filesystem-daemon.plist",
+                "Metal/ComputeChipShaders.metal",
             ],
             resources: [
                 .process("Resources/GuidedHelpCatalog.json"),
-            ]
+                .copy("Resources/ComputeChipReference.png"),
+            ],
+            plugins: ["ComputeChipMetalBuildPlugin"]
+        ),
+        .plugin(
+            name: "ComputeChipMetalBuildPlugin",
+            capability: .buildTool(),
+            path: "Plugins/ComputeChipMetalBuildPlugin"
         ),
         .testTarget(
             name: "ForgeConductorTests",

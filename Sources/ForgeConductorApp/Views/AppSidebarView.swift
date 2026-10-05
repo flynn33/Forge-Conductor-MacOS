@@ -39,12 +39,12 @@ struct AppSidebarView: View, Equatable {
                     .accessibilityIdentifier("app-title")
                 Text(version)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .accessibilityIdentifier("app-version")
                 if let lastError {
                     Text(lastError)
                         .font(.caption2)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(GraphitePalette.failure)
                         .lineLimit(3)
                         .accessibilityIdentifier("app-error")
                 }
@@ -53,7 +53,8 @@ struct AppSidebarView: View, Equatable {
             .padding(16)
         }
         .frame(width: 224)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(GraphitePalette.sidebar)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sidebar")
     }
 
@@ -69,13 +70,17 @@ struct AppSidebarView: View, Equatable {
                     .lineLimit(1)
                 Spacer(minLength: 8)
             }
-            .foregroundStyle(selected ? Color.white : Color.primary)
+            .foregroundStyle(selected ? GraphitePalette.textPrimary : GraphitePalette.textSecondary)
+            .font(.system(size: 13, weight: selected ? .semibold : .regular))
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(selected ? Color.accentColor : Color.clear)
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(LinearGradient(colors: selected ? [GraphitePalette.selectionTop, GraphitePalette.selectionBottom] : [.clear, .clear], startPoint: .top, endPoint: .bottom))
+                    .overlay(alignment: .leading) {
+                        if selected { RoundedRectangle(cornerRadius: 1).fill(GraphitePalette.selectionRail).frame(width: 2).padding(.vertical, 5) }
+                    }
             )
         }
         .buttonStyle(.plain)

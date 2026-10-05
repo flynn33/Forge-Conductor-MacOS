@@ -5,8 +5,10 @@ import AppKit
 import SwiftUI
 
 struct ProjectsOperatorView: View {
+    @EnvironmentObject private var guidedMode: GuidedModeCoordinator
     @StateObject private var viewModel: ProjectsViewModel
     @State private var registrationDraft: ProjectRegistrationDraft?
+    @State private var registrationHelpToken: GuidedModeCoordinator.ContextToken?
     @State private var registrationPickerErrorMessage: String?
     @State private var resetConfirmation: ProjectsViewModel.ResetConfirmation?
     @State private var removeConfirmation: ProjectsViewModel.RemoveConfirmation?
@@ -26,47 +28,93 @@ struct ProjectsOperatorView: View {
     var body: some View {
         HSplitView {
             VStack(spacing: 0) {
-                List(selection: $viewModel.selectedProjectID) {
-                    ForEach(viewModel.projects) { project in
-                        HStack(spacing: 10) {
-                            Image(systemName: "folder")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 16)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(project.displayName).lineLimit(1)
-                                Text("Generation \(project.projectGeneration) · \(project.lifecycleState)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .tag(project.projectID)
-                        .accessibilityIdentifier("project-row-\(project.projectID)")
-                        .contextMenu {
-                            Button("Remove Project…", role: .destructive) {
-                                viewModel.selectedProjectID = project.projectID
-                                requestSelectedProjectRemoval()
-                            }
-                            .disabled(viewModel.isLoading || project.lifecycleState != "active")
+                HStack {
+                    Text("Registered projects")
+                        .font(.system(size: 15, weight: .semibold))
+                    Spacer()
+                    Text("\(viewModel.projects.count)")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                }
+                .padding(16)
+                if viewModel.projects.isEmpty {
+                    VStack(spacing: 10) {
+                        if viewModel.isLoading {
+                            ProgressView("Loading projects…")
+                        } else {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 28))
+                                .foregroundStyle(GraphitePalette.info)
+                            Text(viewModel.errorMessage == nil ? "No registered projects" : "Projects unavailable")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Add project folders or enter an absolute project path below.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(GraphitePalette.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("projects-empty-sidebar")
+                } else {
+                    List(selection: $viewModel.selectedProjectID) {
+                        ForEach(viewModel.projects) { project in
+                            HStack(spacing: 10) {
+                                Image(systemName: "folder.fill")
+                                    .foregroundStyle(GraphitePalette.info)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(project.displayName).lineLimit(1)
+                                    Text("Generation \(project.projectGeneration) · \(project.lifecycleState)")
+                                        .font(.caption)
+                                        .foregroundStyle(GraphitePalette.textSecondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .tag(project.projectID)
+                            .accessibilityIdentifier("project-row-\(project.projectID)")
+                            .contextMenu {
+                                Button("Remove Project…", role: .destructive) {
+                                    viewModel.selectedProjectID = project.projectID
+                                    requestSelectedProjectRemoval()
+                                }
+                                .disabled(viewModel.isLoading || project.lifecycleState != "active")
+                            }
+                        }
+                    }
+                    .listStyle(.sidebar)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.sidebar)
                 Divider()
                 VStack(spacing: 8) {
-                    Button("Add Project Folders…", systemImage: "plus") {
+                    Button {
                         chooseProjectFolder()
+                    } label: {
+                        Label("Add Project Folders…", systemImage: "plus")
+                            .frame(width: 196, height: 20)
                     }
+                    .buttonStyle(GraphiteButtonStyle(kind: .primary))
                     .accessibilityIdentifier("project-register")
-                    Button("Enter Project Path…") {
+                    Button {
                         registrationDraft = ProjectRegistrationDraft(
                             path: "", name: "", allowsPathEntry: true
                         )
+                    } label: {
+                        Text("Enter Project Path…")
+                            .frame(width: 196, height: 20)
                     }
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                     .accessibilityIdentifier("project-register-by-path")
-                    Button("Remove Selected Project…", systemImage: "minus", role: .destructive) {
+                    Button(role: .destructive) {
                         requestSelectedProjectRemoval()
+                    } label: {
+                        Label("Remove Selected Project…", systemImage: "minus")
+                            .frame(width: 196, height: 20)
                     }
+                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                     .disabled(
                         viewModel.isLoading
                             || viewModel.selectedProject?.lifecycleState != "active"
@@ -76,6 +124,7 @@ struct ProjectsOperatorView: View {
                 }
                 .padding(10)
             }
+            .background(GraphitePalette.sidebar)
             .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
 
             ScrollView {
@@ -94,13 +143,15 @@ struct ProjectsOperatorView: View {
                     if let error = registrationPickerErrorMessage {
                         Text(error)
                             .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                             .accessibilityIdentifier("project-picker-error")
                     }
                     if let notice = viewModel.notice {
                         OperatorNoticeBanner(message: notice)
                     }
-                    projectWorkflowActions
+                    if viewModel.selectedProject == nil {
+                        projectWorkflowActions
+                    }
                     if let pendingPath = viewModel.pendingRegistrationPath {
                         GroupBox("Registration reconciliation") {
                             VStack(alignment: .leading, spacing: 10) {
@@ -109,8 +160,10 @@ struct ProjectsOperatorView: View {
                                         ? "Both bounded registration attempts lost their response. The outcome is unknown; replaying the exact request is idempotent."
                                         : "The manager retained this exact registration after a partial transition. When its project is in maintenance, normal work remains fenced. The request is reconstructed after restart."
                                 )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 13))
+                                .lineSpacing(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 LabeledContent("Pending path") {
                                     OperatorIdentifier(pendingPath)
                                 }
@@ -121,8 +174,9 @@ struct ProjectsOperatorView: View {
                                 }
                                 if let message = viewModel.pendingRegistrationMessage {
                                     Text(message)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(.system(size: 13))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .foregroundStyle(GraphitePalette.textSecondary)
                                 }
                                 HStack {
                                     Button("Reconcile Registration") {
@@ -152,7 +206,7 @@ struct ProjectsOperatorView: View {
                         GroupBox("Instruction packages") {
                             Text("Select or add a project to add, reorder, and delete instruction packages.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                         }
                         .accessibilityIdentifier("project-instruction-packages")
@@ -167,8 +221,10 @@ struct ProjectsOperatorView: View {
                 .padding(20)
             }
         }
-        .sheet(item: $registrationDraft) { draft in
+        .background(GraphitePalette.canvas)
+        .sheet(item: $registrationDraft, onDismiss: releaseRegistrationHelpContext) { draft in
             ProjectRegistrationSheet(draft: draft, viewModel: viewModel)
+                .guidedHelpContext(.projectRegistration, ownerToken: $registrationHelpToken)
         }
         .alert(
             "Remove project from Forge Conductor?",
@@ -241,27 +297,41 @@ struct ProjectsOperatorView: View {
 
     private func projectDetail(_ project: OperatorProject) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            GroupBox("Identity") {
-                VStack(alignment: .leading, spacing: 10) {
-                    LabeledContent("Name", value: project.displayName)
-                    LabeledContent("Project UUID") { OperatorIdentifier(project.projectID) }
-                    LabeledContent("Canonical root") {
+            GraphitePanel {
+                HStack(alignment: .top, spacing: 16) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 38))
+                        .foregroundStyle(GraphitePalette.info)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(project.displayName)
+                            .font(.system(size: 20, weight: .semibold))
                         OperatorIdentifier(project.canonicalRoot)
                             .accessibilityIdentifier("project-canonical-root")
+                        HStack(spacing: 16) {
+                            Text("Generation \(project.projectGeneration)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(GraphitePalette.textSecondary)
+                                .accessibilityIdentifier("project-generation")
+                            OperatorStateBadge(state: project.lifecycleState)
+                        }
                     }
-                    LabeledContent("Generation", value: "\(project.projectGeneration)")
-                        .accessibilityIdentifier("project-generation")
-                    LabeledContent("Lifecycle") { OperatorStateBadge(state: project.lifecycleState) }
+                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            projectWorkflowActions
             instructionPackages(project)
+
+            GroupBox("Identity") {
+                LabeledContent("Project UUID") { OperatorIdentifier(project.projectID) }
+            }
 
             GroupBox("Active bindings") {
                 if project.bindings.isEmpty {
                     Text("No active binding records were published.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 } else {
                     ForEach(project.bindings) { binding in
                         HStack {
@@ -284,11 +354,11 @@ struct ProjectsOperatorView: View {
                         LabeledContent("Database size", value: OperatorFormat.bytes(memory.databaseBytes))
                         LabeledContent("Records", value: OperatorFormat.integer(memory.recordCount))
                         LabeledContent("Last integrity check", value: memory.lastIntegrityCheck ?? "Unavailable")
-                        if let detail = memory.detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
+                        if let detail = memory.detail { Text(detail).font(.caption).foregroundStyle(GraphitePalette.textSecondary) }
                     }
                 } else {
                     Text("Memory database health was not published by this manager.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
             }
 
@@ -302,7 +372,7 @@ struct ProjectsOperatorView: View {
                     }
                 } else {
                     Text("No project-scoped continuity projection was published.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
             }
 
@@ -310,7 +380,7 @@ struct ProjectsOperatorView: View {
                 GroupBox("Migration and quarantine warnings") {
                     ForEach(project.migrationWarnings, id: \.self) { warning in
                         Label(warning, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(GraphitePalette.warning)
                             .accessibilityIdentifier("project-migration-warning")
                     }
                 }
@@ -330,15 +400,23 @@ struct ProjectsOperatorView: View {
             }
 
             if let pendingPath = viewModel.pendingRelinkPath {
-                GroupBox {
+                GraphitePanel {
+                    HStack {
+                        Text("Relink reconciliation").font(.system(size: 15, weight: .semibold))
+                        Spacer()
+                        GuidedHelpButton(context: .projectRelink)
+                    }
+                    Divider()
                     VStack(alignment: .leading, spacing: 10) {
                         Text(
                             "The last relink did not return a confirmed receipt. "
                                 + "Replaying the exact project, generation, and path is idempotent "
                                 + "and lets the manager reconcile a commit whose response was lost."
                         )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                         LabeledContent("Pending path") {
                             OperatorIdentifier(pendingPath)
                         }
@@ -346,30 +424,30 @@ struct ProjectsOperatorView: View {
                             Button("Reconcile Relink") {
                                 viewModel.reconcilePendingRelink()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(GraphiteButtonStyle(kind: .primary))
                             .disabled(viewModel.isLoading)
                             .accessibilityIdentifier("project-relink-reconcile")
                             if viewModel.canDiscardPendingRelink {
                                 Button("Dismiss") {
                                     viewModel.discardPendingRelink()
-                                }
+                                    }
                                 .disabled(viewModel.isLoading)
                                 .accessibilityIdentifier("project-relink-reconcile-dismiss")
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                } label: {
-                    HStack {
-                        Text("Relink reconciliation")
-                        Spacer()
-                        GuidedHelpButton(context: .projectRelink)
-                    }
                 }
                 .accessibilityIdentifier("project-relink-reconciliation")
             }
 
-            GroupBox {
+            GraphitePanel {
+                HStack {
+                    Text("Clear project content").font(.system(size: 15, weight: .semibold))
+                    Spacer()
+                    GuidedHelpButton(context: .projectContentClear)
+                }
+                Divider()
                 VStack(alignment: .leading, spacing: 10) {
                     Picker("Scope", selection: $clearMode) {
                         ForEach(OperatorProjectContentClearMode.allCases) { mode in
@@ -379,17 +457,21 @@ struct ProjectsOperatorView: View {
                     .pickerStyle(.menu)
                     .accessibilityIdentifier("project-clear-mode")
                     Text(clearMode.effectDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                     Text("Clearing removes selected content from active application retrieval. SQLite pages, backups, and snapshots are governed by their separate retention policy; this is not secure physical erasure.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                     HStack {
                         Button("Clear \(clearMode.title)…", role: .destructive) {
                             clearConfirmation = viewModel.clearConfirmationForSelectedProject(
                                 mode: clearMode
                             )
                         }
+                        .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                         .disabled(viewModel.isLoading || project.lifecycleState != "active")
                         .accessibilityIdentifier("project-clear-content")
                         if viewModel.pendingClearConfirmation?.projectID.caseInsensitiveCompare(
@@ -404,18 +486,13 @@ struct ProjectsOperatorView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            } label: {
-                HStack {
-                    Text("Clear project content")
-                    Spacer()
-                    GuidedHelpButton(context: .projectContentClear)
-                }
             }
 
             HStack {
                 Button("Remove Project…", role: .destructive) {
                     requestSelectedProjectRemoval()
                 }
+                .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                 .disabled(viewModel.isLoading || project.lifecycleState != "active")
                 .accessibilityIdentifier("project-remove")
                 Button("Relink…") {
@@ -433,7 +510,11 @@ struct ProjectsOperatorView: View {
         GroupBox("Project workflow") {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) { projectWorkflowButtons }
-                VStack(alignment: .leading, spacing: 8) { projectWorkflowButtons }
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 220), alignment: .leading)],
+                    alignment: .leading,
+                    spacing: 8
+                ) { projectWorkflowButtons }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -442,26 +523,42 @@ struct ProjectsOperatorView: View {
 
     @ViewBuilder
     private var projectWorkflowButtons: some View {
-        Button("Add Project Folders…", systemImage: "plus") {
+        Button {
             chooseProjectFolder()
+        } label: {
+            Label("Add Project Folders…", systemImage: "plus")
+                .frame(width: 196, height: 20)
         }
+        .buttonStyle(GraphiteButtonStyle(kind: .primary))
         .accessibilityIdentifier("project-register-primary")
 
-        Button("Add Instructions…", systemImage: "doc.badge.plus") {
+        Button {
             chooseInstructionPackage()
+        } label: {
+            Label("Add Instructions…", systemImage: "doc.badge.plus")
+                .frame(width: 196, height: 20)
         }
+        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
         .disabled(viewModel.isLoading || viewModel.selectedProject?.lifecycleState != "active")
         .accessibilityIdentifier("instruction-package-add-primary")
 
-        Button("Reset Generation…", role: .destructive) {
+        Button(role: .destructive) {
             resetConfirmation = viewModel.resetConfirmationForSelectedProject()
+        } label: {
+            Text("Reset Generation…")
+                .frame(width: 196, height: 20)
         }
+        .buttonStyle(GraphiteButtonStyle(kind: .destructive))
         .disabled(viewModel.isLoading || viewModel.selectedProject == nil)
         .accessibilityIdentifier("project-reset")
 
-        Button("Clear Cache…", role: .destructive) {
+        Button(role: .destructive) {
             showClearCacheConfirmation = true
+        } label: {
+            Text("Clear Cache…")
+                .frame(width: 196, height: 20)
         }
+        .buttonStyle(GraphiteButtonStyle(kind: .destructive))
         .disabled(viewModel.isLoading)
         .help("Removes disposable Forge cache files without deleting project or continuity data.")
         .accessibilityIdentifier("project-clear-cache")
@@ -473,11 +570,19 @@ struct ProjectsOperatorView: View {
 
     @ViewBuilder
     private func instructionPackages(_ project: OperatorProject) -> some View {
-        GroupBox {
+        GraphitePanel {
+            HStack {
+                Text("Instruction packages").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                GuidedHelpButton(context: .instructionQueue)
+            }
+            Divider()
             VStack(alignment: .leading, spacing: 10) {
                 Text("Add files, folders, or ZIPs in their existing format. Forge preserves every source, converts supported instruction content into immutable project-scoped artifacts, and reports anything it cannot interpret. Drag packages to set their priority; the top package has highest priority.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
 
                 if let queue = viewModel.instructionQueue {
                     VStack(alignment: .leading, spacing: 8) {
@@ -485,13 +590,14 @@ struct ProjectsOperatorView: View {
                             Button("Add Instructions…", systemImage: "plus") {
                                 chooseInstructionPackage()
                             }
+                            .buttonStyle(GraphiteButtonStyle(kind: .primary))
                             .disabled(viewModel.isLoading)
                             .accessibilityIdentifier("instruction-package-add")
                             GuidedHelpButton(context: .instructionImport)
                             Spacer()
                             Text("\(queue.packages.count) package\(queue.packages.count == 1 ? "" : "s")")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                         }
                     }
 
@@ -503,12 +609,25 @@ struct ProjectsOperatorView: View {
                         )
                         .frame(maxWidth: .infinity, minHeight: 100)
                     } else {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: 12) {
+                                Text("Priority").frame(width: 48, alignment: .leading)
+                                Text("Instruction package").frame(maxWidth: .infinity, alignment: .leading)
+                                Text("State").frame(width: 104, alignment: .trailing)
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(GraphitePalette.field)
                             ForEach(queue.packages) { package in
                                 instructionPackageRow(package, packages: queue.packages)
-                                    .padding(10)
+                                    .padding(12)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                                    .background(package.state == "running" ? GraphitePalette.panelRaised : GraphitePalette.panelBottom)
+                                    .overlay(alignment: .bottom) {
+                                        Rectangle().fill(GraphitePalette.separator).frame(height: 1)
+                                    }
                                     .draggable(package.id)
                                     .dropDestination(for: String.self) { items, _ in
                                         guard let draggedPackageID = items.first else { return false }
@@ -520,22 +639,21 @@ struct ProjectsOperatorView: View {
                                     }
                             }
                         }
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(GraphitePalette.separator, lineWidth: 1)
+                        }
                     }
                 } else {
                     HStack {
                         ProgressView().controlSize(.small)
                         Text("Loading instruction packages…")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            HStack {
-                Text("Instruction packages")
-                Spacer()
-                GuidedHelpButton(context: .instructionQueue)
-            }
         }
         .accessibilityIdentifier("project-instruction-packages")
     }
@@ -547,6 +665,10 @@ struct ProjectsOperatorView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
+                Text("\(package.position + 1)")
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    .frame(width: 48, alignment: .leading)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(package.displayName)
@@ -555,17 +677,17 @@ struct ProjectsOperatorView: View {
                         if package.state == "running" {
                             Label("Current", systemImage: "play.fill")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(GraphitePalette.primaryFill)
                         }
                     }
                     Text("\(package.packageID) · v\(package.version)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                     if let count = package.documentCount,
                        let bytes = package.instructionByteCount {
                         Text("\(count) source file\(count == 1 ? "" : "s") · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) converted instructions")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
                     if let unresolved = package.unresolvedDocumentCount,
                        unresolved > 0 {
@@ -574,17 +696,18 @@ struct ProjectsOperatorView: View {
                             systemImage: "doc.badge.ellipsis"
                         )
                         .font(.caption)
-                        .foregroundStyle(package.importReady == false ? .orange : .secondary)
+                        .foregroundStyle(package.importReady == false ? GraphitePalette.warning : GraphitePalette.textSecondary)
                     }
                     if let error = package.lastError {
                         Text(error)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(GraphitePalette.failure)
                             .lineLimit(2)
                     }
                 }
                 Spacer()
                 OperatorStateBadge(state: package.state)
+                    .frame(width: 104, alignment: .trailing)
             }
 
             HStack(spacing: 8) {
@@ -593,7 +716,7 @@ struct ProjectsOperatorView: View {
                 } label: {
                     Image(systemName: "arrow.up")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                 .controlSize(.small)
                 .disabled(
                     viewModel.isLoading || packages.first?.id == package.id
@@ -606,7 +729,7 @@ struct ProjectsOperatorView: View {
                 } label: {
                     Image(systemName: "arrow.down")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                 .controlSize(.small)
                 .disabled(
                     viewModel.isLoading || packages.last?.id == package.id
@@ -617,7 +740,7 @@ struct ProjectsOperatorView: View {
                 Button("Delete Package", role: .destructive) {
                     viewModel.removeInstructionPackage(package.id)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                 .controlSize(.small)
                 .disabled(viewModel.isLoading || package.state == "running")
                 .help("Delete this instruction package from the project")
@@ -657,11 +780,11 @@ struct ProjectsOperatorView: View {
             HStack {
                 ProgressView().controlSize(.small)
                 Text("Loading every retained source file…")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
         } else if let error = viewModel.instructionCatalogError(for: package.id) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(error).foregroundStyle(.red)
+                Text(error).foregroundStyle(GraphitePalette.failure)
                 Button("Retry catalog") {
                     viewModel.loadInstructionCatalog(for: package)
                 }
@@ -678,20 +801,22 @@ struct ProjectsOperatorView: View {
                             ? "doc.text.fill"
                             : document.catalogStatus == "Retained attachment"
                                 ? "paperclip" : "questionmark.diamond")
-                            .foregroundStyle(document.catalogStatus == "Unresolved" ? .orange : .secondary)
+                            .foregroundStyle(document.catalogStatus == "Unresolved" ? GraphitePalette.warning : GraphitePalette.textSecondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(document.sourcePath)
-                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
                             Text("\(document.catalogStatus) · \(ByteCountFormatter.string(fromByteCount: Int64(document.originalBytes), countStyle: .file))")
-                                .foregroundStyle(document.catalogStatus == "Unresolved" ? .orange : .secondary)
+                                .foregroundStyle(document.catalogStatus == "Unresolved" ? GraphitePalette.warning : GraphitePalette.textSecondary)
                             if !document.detail.isEmpty {
                                 Text(document.detail)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
-                    .font(.caption)
+                    .font(.system(size: 12))
+                    .multilineTextAlignment(.leading)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("instruction-document-\(document.id)")
                 }
@@ -700,8 +825,14 @@ struct ProjectsOperatorView: View {
         } else {
             Text("Catalog unavailable")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
         }
+    }
+
+    private func releaseRegistrationHelpContext() {
+        guard let token = registrationHelpToken else { return }
+        guidedMode.pop(token)
+        registrationHelpToken = nil
     }
 
     private func chooseInstructionPackage() {
@@ -801,11 +932,18 @@ private struct ProjectRegistrationSheet: View {
                 GuidedHelpButton(context: .projectRegistration)
             }
             Text("Registration records this exact folder, resolves its canonical root, and creates or reconnects the manager-owned project identity. It does not limit native filesystem access.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(GraphitePalette.textSecondary)
             if allowsPathEntry {
-                TextField("Project folder (absolute path)", text: $path)
-                    .accessibilityIdentifier("project-register-path")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Project folder (absolute path)")
+                        .font(.system(size: 13, weight: .medium))
+                    TextField("Project folder (absolute path)", text: $path)
+                        .textFieldStyle(GraphiteFieldStyle())
+                        .accessibilityIdentifier("project-register-path")
+                }
             } else {
                 LabeledContent("Folder") {
                     Text(path)
@@ -816,29 +954,40 @@ private struct ProjectRegistrationSheet: View {
             }
             if viewModel.isLoading {
                 Text("Waiting for the manager to finish refreshing projects.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .accessibilityIdentifier("project-register-waiting-for-manager")
             }
             Text("Forge preserves existing selected folders, adds only this folder, resolves its canonical Git repository identity, and checks it before registration.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            TextField("Display name (optional)", text: $name)
-                .accessibilityIdentifier("project-register-name")
+                .font(.system(size: 13))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(GraphitePalette.textSecondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Display name (optional)")
+                    .font(.system(size: 13, weight: .medium))
+                TextField("Display name (optional)", text: $name)
+                    .textFieldStyle(GraphiteFieldStyle())
+                    .accessibilityIdentifier("project-register-name")
+            }
             HStack {
                 Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+                    .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Register") {
                     viewModel.register(path: path, displayName: name)
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(GraphiteButtonStyle(kind: .primary))
+                .keyboardShortcut(.defaultAction)
                 .disabled(!(path as NSString).isAbsolutePath || viewModel.isLoading)
                 .accessibilityIdentifier("project-register-confirm")
             }
         }
         .padding(22)
         .frame(width: 520)
-        .guidedHelpContext(.projectRegistration)
+        .multilineTextAlignment(.leading)
+        .background(GraphitePalette.canvas)
     }
 }

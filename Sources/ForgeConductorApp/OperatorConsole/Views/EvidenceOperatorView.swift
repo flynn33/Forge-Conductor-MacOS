@@ -24,49 +24,60 @@ struct EvidenceOperatorView: View {
             if let error = viewModel.errorMessage {
                 OperatorErrorBanner(message: error, retry: viewModel.load)
             }
-            HStack {
-                TextField("Filter by event or resource identifier", text: $viewModel.query)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("evidence-search")
-                Button("Export Diagnostics") { appModel.exportDiagnostics() }
-                    .accessibilityIdentifier("evidence-export")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    searchField
+                    exportButton
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    searchField
+                    exportButton
+                }
             }
 
-            List(viewModel.filteredEvents) { event in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(event.kind.replacingOccurrences(of: "_", with: " "))
-                            .font(.headline)
-                        Spacer()
-                        Text(event.timestamp)
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+            GraphitePanel {
+                List(viewModel.filteredEvents) { event in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(event.kind.replacingOccurrences(of: "_", with: " "))
+                                .font(.headline)
+                            Spacer()
+                            Text(event.timestamp)
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(GraphitePalette.textSecondary)
+                        }
+                        Text(event.summary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                        referenceRow(event)
                     }
-                    Text(event.summary)
-                        .lineLimit(3)
-                        .textSelection(.enabled)
-                    referenceRow(event)
+                    .padding(.vertical, 8)
+                    .listRowSeparatorTint(GraphitePalette.separator)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("evidence-event-\(event.eventID)")
                 }
-                .padding(.vertical, 5)
-                .accessibilityIdentifier("evidence-event-\(event.eventID)")
-            }
-            .overlay {
-                if viewModel.filteredEvents.isEmpty, viewModel.errorMessage == nil, !viewModel.isLoading {
-                    ContentUnavailableView(
-                        viewModel.events.isEmpty ? "No Events" : "No Matching Events",
-                        systemImage: "list.bullet.rectangle",
-                        description: Text("The bounded manager page contains no events for this view.")
-                    )
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(GraphitePalette.panelBottom)
+                .overlay {
+                    if viewModel.filteredEvents.isEmpty, viewModel.errorMessage == nil, !viewModel.isLoading {
+                        ContentUnavailableView(
+                            viewModel.events.isEmpty ? "No Events" : "No Matching Events",
+                            systemImage: "list.bullet.rectangle",
+                            description: Text("The bounded manager page contains no events for this view.")
+                        )
+                    }
                 }
             }
 
             HStack {
                 Text("Showing \(viewModel.filteredEvents.count) of \(viewModel.events.count) bounded events")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                 Spacer()
                 if viewModel.nextCursor != nil {
                     Button("Load Older Events", action: viewModel.loadMore)
+                        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                         .controlSize(.small)
                         .disabled(viewModel.isLoadingMore)
                         .accessibilityIdentifier("evidence-load-more")
@@ -75,7 +86,25 @@ struct EvidenceOperatorView: View {
             }
         }
         .padding(20)
+        .background(GraphitePalette.canvas)
         .task { viewModel.load() }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(GraphitePalette.textMuted)
+            TextField("Filter by event or resource identifier", text: $viewModel.query)
+                .textFieldStyle(GraphiteFieldStyle())
+                .accessibilityIdentifier("evidence-search")
+        }
+        .frame(minWidth: 220)
+    }
+
+    private var exportButton: some View {
+        Button("Export Diagnostics") { appModel.exportDiagnostics() }
+            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+            .accessibilityIdentifier("evidence-export")
     }
 
     @ViewBuilder
@@ -90,9 +119,9 @@ struct EvidenceOperatorView: View {
         ].compactMap { $0 }
         if !references.isEmpty {
             Text(references.joined(separator: " · "))
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
     }

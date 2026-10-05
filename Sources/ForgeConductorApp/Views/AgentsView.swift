@@ -1,72 +1,107 @@
 // AgentsView.swift
-// What: Displays the available agent playbooks and their live session health.
-// How: It projects AgentCard values from AppModel into an adaptive native grid
-// and routes maintenance actions back through the presentation model.
-// Why: The view remains a declarative module with no direct storage dependencies.
+// What: Displays available agent playbooks and their live session health.
+// How: Read-only catalog rows consume AgentCard values; maintenance uses AppModel.
 
-import SwiftUI
 import ForgeConductorCore
+import SwiftUI
 
-/// Renders the agent catalog and current agent-session health as adaptive cards.
-///
-/// All mutations are delegated to `AppModel`; this view only selects, formats, and
-/// presents the state needed by the Agents feature module.
 struct AgentsView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Text("Agents")
-                    .font(.title2.weight(.bold))
-                    .accessibilityIdentifier("detail-agents")
-                Spacer(minLength: 12)
-                Text("\(model.agentCards.count) catalog")
-                    .foregroundStyle(.secondary)
-                Button("Prune idle sessions") { model.pruneSessions() }
+        VStack(alignment: .leading, spacing: 16) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    pageHeader
+                    Spacer(minLength: 16)
+                    pruneButton
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    pageHeader
+                    pruneButton
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], spacing: 14) {
-                    ForEach(model.agentCards) { a in
-                        agentCard(a)
+            if model.agentCards.isEmpty {
+                GraphitePanel {
+                    ContentUnavailableView(
+                        "No agents in the catalog", systemImage: "person.3.sequence",
+                        description: Text("Available agent playbooks appear here with their current session health."))
+                }
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(model.agentCards) { agent in
+                            agentRow(agent)
+                        }
                     }
                 }
-                .padding(16)
+            }
+        }
+        .padding(20)
+        .background(GraphitePalette.canvas)
+        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+    }
+
+    private var pageHeader: some View {
+        GraphitePageHeader(title: "Agents", subtitle: "\(model.agentCards.count) catalog playbooks")
+            .accessibilityIdentifier("detail-agents")
+    }
+
+    private var pruneButton: some View {
+        Button("Prune idle sessions") { model.pruneSessions() }
+    }
+
+    private func agentRow(_ agent: AgentCard) -> some View {
+        GraphitePanel {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "person.crop.square")
+                    .font(.title2)
+                    .foregroundStyle(GraphitePalette.info)
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(agent.name)
+                                .font(.headline)
+                                .foregroundStyle(GraphitePalette.textPrimary)
+                                .fixedSize(horizontal: true, vertical: false)
+                            Spacer(minLength: 8)
+                            agentHealth(agent)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(agent.name)
+                                .font(.headline)
+                                .foregroundStyle(GraphitePalette.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            agentHealth(agent)
+                        }
+                    }
+                    Text(agent.description.isEmpty ? agent.agentID : agent.description)
+                        .font(.callout)
+                        .lineSpacing(2)
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 720, alignment: .leading)
+                    if !agent.tools.isEmpty {
+                        Text(agent.tools.joined(separator: " · "))
+                            .font(.system(.caption, design: .monospaced))
+                            .lineSpacing(2)
+                            .foregroundStyle(GraphitePalette.info)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(agent.status)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(GraphitePalette.textMuted)
+                }
             }
         }
     }
 
-    private func agentCard(_ a: AgentCard) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(a.name)
-                    .font(.headline)
-                Spacer(minLength: 8)
-                Text(a.healthLabel)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(a.live ? Color.green : Color.secondary)
-            }
-            Text(a.description.isEmpty ? a.agentID : a.description)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-            if !a.tools.isEmpty {
-                Text(a.tools.prefix(4).joined(separator: " · "))
-                    .font(.caption2)
-                    .foregroundStyle(.cyan)
-                    .lineLimit(1)
-            }
-            Text(a.status)
-                .font(.system(.caption, design: .monospaced))
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(a.live ? Color.green.opacity(0.4) : Color.primary.opacity(0.08), lineWidth: 1)
-        )
+    private func agentHealth(_ agent: AgentCard) -> some View {
+        Label(agent.healthLabel, systemImage: "circle.fill")
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(agent.live ? GraphitePalette.success : GraphitePalette.textSecondary)
     }
 }

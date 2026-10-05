@@ -7,57 +7,69 @@ import ForgeConductorCore
 struct ProviderOperatorView: View {
     @StateObject private var viewModel: ProviderViewModel
     @State private var showingAdvancedSettings = false
+    @State private var inspectedProviderID: ProviderIntegrationID?
 
     init(client: any OperatorManagerClientProtocol) {
         _viewModel = StateObject(wrappedValue: ProviderViewModel(client: client))
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                OperatorHeader(
-                    title: "Provider",
-                    subtitle: "Choose the provider Forge connects to for MCP governance and automatic continuity.",
-                    isLoading: viewModel.isBusy,
-                    titleAccessibilityIdentifier: "detail-provider",
-                    subtitleAccessibilityIdentifier: "provider-operator-view",
-                    onRefresh: viewModel.load
-                )
-                if let error = viewModel.errorMessage {
-                    OperatorErrorBanner(message: error, retry: viewModel.load)
-                }
-                if let notice = viewModel.noticeMessage {
-                    Text(notice)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("provider-probe-notice")
-                }
-                primaryActions
-            }
-            .padding(20)
+        HSplitView {
+            providerSelection
+                .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
 
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    providerSelection
-                    if let operation = viewModel.currentProviderOperation {
-                        providerOperation(operation)
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 12) {
+                    OperatorHeader(
+                        title: "Provider",
+                        subtitle: "Choose the provider Forge connects to for MCP governance and automatic continuity.",
+                        isLoading: viewModel.isBusy,
+                        titleAccessibilityIdentifier: "detail-provider",
+                        subtitleAccessibilityIdentifier: "provider-operator-view",
+                        onRefresh: viewModel.load
+                    )
+                    if let error = viewModel.errorMessage {
+                        OperatorErrorBanner(message: error, retry: viewModel.load)
                     }
-                    if showingAdvancedSettings {
-                        VStack(alignment: .leading, spacing: 16) {
-                            readiness
-                            configurationEditor
-                            if let provider = viewModel.provider {
-                                providerDetail(provider)
-                            }
-                        }
-                        .padding(.top, 8)
+                    if let notice = viewModel.noticeMessage {
+                        Text(notice)
+                            .font(.callout)
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                            .accessibilityIdentifier("provider-probe-notice")
+                    }
+                    if inspectedDescriptor?.id == .lmStudio {
+                        primaryActions
                     }
                 }
                 .padding(20)
+                Divider()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        if let operation = viewModel.currentProviderOperation {
+                            providerOperation(operation)
+                        }
+                        if let descriptor = inspectedDescriptor {
+                            providerInspection(descriptor)
+                            if descriptor.id == .lmStudio {
+                                readiness
+                            }
+                        }
+                        if inspectedDescriptor?.id == .lmStudio, showingAdvancedSettings {
+                            VStack(alignment: .leading, spacing: 16) {
+                                configurationEditor
+                                if let provider = viewModel.provider {
+                                    providerDetail(provider)
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
+                    .padding(20)
+                }
             }
+            .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background(GraphitePalette.canvas)
         .task { viewModel.load() }
         .onDisappear {
             viewModel.clearCredentialEntry()
@@ -84,74 +96,104 @@ struct ProviderOperatorView: View {
             )
         }
         .accessibilityIdentifier("provider-advanced-toggle")
+        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
 
         Button("Connect and Check", action: viewModel.connectAndCheck)
+            .buttonStyle(GraphiteButtonStyle(kind: .primary))
             .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
             .accessibilityIdentifier("provider-test-connection")
 
         Button("Run Advanced Probe", action: viewModel.runContractProbe)
+            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
             .disabled(viewModel.isBusy || viewModel.hasUnsavedChanges)
             .accessibilityIdentifier("provider-run-contract-probe")
     }
 
     private var providerSelection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Execution provider")
-                    .font(.headline)
-                Spacer()
-                if let selected = viewModel.selectedProviderID,
-                   let descriptor = viewModel.providerDescriptors.first(where: { $0.id == selected }) {
-                    Text("Active: \(descriptor.displayName)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("No active provider")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Text("Select another provider to switch execution. Forge keeps one provider active.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("provider-selection-guidance")
-
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 300), spacing: 12)],
-                alignment: .leading,
-                spacing: 12
-            ) {
-                ForEach(viewModel.providerDescriptors, id: \.displayName) { descriptor in
-                    ProviderSelectionCard(
-                        descriptor: descriptor,
-                        integration: viewModel.integration(for: descriptor.id),
-                        operation: viewModel.currentProviderOperation,
-                        selected: viewModel.isProviderSelected(descriptor.id),
-                        actionsDisabled: viewModel.isProviderToggleDisabled(descriptor.id),
-                        primaryActionAvailable: viewModel.isProviderRepairAvailable(descriptor.id),
-                        removalDisabled: viewModel.isProviderRemovalDisabled(descriptor.id),
-                        onToggle: { enabled in
-                            viewModel.setProvider(descriptor.id, enabled: enabled)
-                        },
-                        onPrimaryAction: {
-                            viewModel.performProviderPrimaryAction(descriptor.id)
-                        },
-                        onRemove: {
-                            viewModel.removeProviderIntegration(descriptor.id)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Execution providers")
+                .font(.system(size: 15, weight: .semibold))
+                .padding(16)
+            List(selection: Binding(
+                get: { inspectedDescriptor?.id },
+                set: { inspectedProviderID = $0 }
+            )) {
+                ForEach(viewModel.providerDescriptors, id: \.id) { descriptor in
+                    HStack(spacing: 10) {
+                        Image(systemName: providerIcon(descriptor.id))
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(GraphitePalette.info)
+                            .frame(width: 24, height: 28)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(descriptor.displayName)
+                                .font(.system(size: 13, weight: .medium))
+                            Text(viewModel.isProviderSelected(descriptor.id) ? "Active provider" : "Inspect provider")
+                                .font(.system(size: 11))
+                                .foregroundStyle(GraphitePalette.textSecondary)
                         }
-                    )
+                        Spacer(minLength: 4)
+                        if viewModel.isProviderSelected(descriptor.id) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 7))
+                                .foregroundStyle(GraphitePalette.success)
+                                .accessibilityLabel("Active provider")
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .tag(descriptor.id)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(inspectedDescriptor?.id == descriptor.id ? .isSelected : [])
+                    .accessibilityIdentifier("provider-inspect-\(descriptor.id.rawValue)")
                 }
             }
-
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            Divider()
+            Text("Select a row to inspect. Use Activate in its detail to switch the active provider.")
+                .font(.caption)
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(16)
+                .accessibilityIdentifier("provider-selection-guidance")
             if viewModel.isLoadingProviderRegistry, viewModel.integrations == nil {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Loading provider selection…")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
+                .padding(16)
             }
+        }
+        .background(GraphitePalette.sidebar)
+    }
+
+    private var inspectedDescriptor: ProviderIntegrationDescriptor? {
+        let providerID = inspectedProviderID ?? viewModel.selectedProviderID ?? .lmStudio
+        return viewModel.providerDescriptors.first { $0.id == providerID }
+    }
+
+    private func providerInspection(_ descriptor: ProviderIntegrationDescriptor) -> some View {
+        ProviderSelectionCard(
+            descriptor: descriptor,
+            integration: viewModel.integration(for: descriptor.id),
+            operation: viewModel.currentProviderOperation,
+            selected: viewModel.isProviderSelected(descriptor.id),
+            actionsDisabled: viewModel.isProviderToggleDisabled(descriptor.id),
+            primaryActionAvailable: viewModel.isProviderRepairAvailable(descriptor.id),
+            removalDisabled: viewModel.isProviderRemovalDisabled(descriptor.id),
+            onToggle: { enabled in viewModel.setProvider(descriptor.id, enabled: enabled) },
+            onPrimaryAction: { viewModel.performProviderPrimaryAction(descriptor.id) },
+            onRemove: { viewModel.removeProviderIntegration(descriptor.id) }
+        )
+    }
+
+    private func providerIcon(_ providerID: ProviderIntegrationID) -> String {
+        switch providerID {
+        case .lmStudio: "cpu"
+        case .claudeDesktop: "sparkles"
+        case .codexDesktop: "chevron.left.forwardslash.chevron.right"
+        case .grokBuild: "terminal"
         }
     }
 
@@ -169,12 +211,12 @@ struct ProviderOperatorView: View {
                 if let detail = operation.detail, !detail.isEmpty {
                     Text(detail)
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                         .textSelection(.enabled)
                 }
                 if let code = operation.errorCode, !code.isEmpty {
                     LabeledContent("Error code", value: code)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(GraphitePalette.failure)
                 }
                 if !operation.isTerminal {
                     HStack(spacing: 10) {
@@ -183,7 +225,7 @@ struct ProviderOperatorView: View {
                             .accessibilityIdentifier("provider-operation-progress")
                         Text("Forge is applying and verifying the provider integration.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                         Spacer()
                         Button("Cancel", action: viewModel.cancelCurrentProviderOperation)
                             .disabled(!viewModel.canCancelProviderOperation)
@@ -192,6 +234,7 @@ struct ProviderOperatorView: View {
                 }
             }
         }
+        .labeledContentStyle(ProviderFactsStyle())
     }
 
     private var readiness: some View {
@@ -202,7 +245,16 @@ struct ProviderOperatorView: View {
                         state: providerReadinessState
                     )
                 }
-                LabeledContent("Endpoint", value: "Local LM Studio")
+                LabeledContent("Endpoint") {
+                    OperatorIdentifier(
+                        viewModel.provider?.endpoint ?? viewModel.configuration?.endpoint,
+                        unavailable: "Not configured"
+                    )
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Endpoint: \(viewModel.provider?.endpoint ?? viewModel.configuration?.endpoint ?? "Not configured")")
+                .accessibilityValue(viewModel.provider?.endpoint ?? viewModel.configuration?.endpoint ?? "Not configured")
+                .accessibilityIdentifier("provider-readiness-endpoint")
                 LabeledContent(
                     "Model",
                     value: viewModel.provider?.modelKey
@@ -233,17 +285,35 @@ struct ProviderOperatorView: View {
                 }
             }
         }
+        .labeledContentStyle(ProviderFactsStyle())
     }
 
     private var configurationEditor: some View {
-        GroupBox {
+        GraphitePanel {
+            HStack {
+                Text("Provider settings").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                GuidedHelpButton(context: .providerCredential)
+            }
             VStack(alignment: .leading, spacing: 12) {
-                TextField("Endpoint", text: $viewModel.endpoint)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("provider-endpoint")
-                TextField("Model identifier (optional when exactly one supported model is loaded)", text: $viewModel.modelKey)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("provider-model-key")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Endpoint")
+                        .font(.system(size: 13, weight: .medium))
+                    TextField("Endpoint", text: $viewModel.endpoint)
+                        .textFieldStyle(GraphiteFieldStyle())
+                        .accessibilityIdentifier("provider-endpoint")
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Model identifier")
+                        .font(.system(size: 13, weight: .medium))
+                    TextField("Model identifier (optional when exactly one supported model is loaded)", text: $viewModel.modelKey)
+                        .textFieldStyle(GraphiteFieldStyle())
+                        .accessibilityIdentifier("provider-model-key")
+                    Text("Optional when exactly one supported model is loaded.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !viewModel.availableModels.isEmpty {
                     Picker("Available models", selection: $viewModel.modelKey) {
                         Text("Choose a model").tag("")
@@ -260,7 +330,7 @@ struct ProviderOperatorView: View {
                 if viewModel.configuration?.endpointMode == .local {
                     Text("Local LM Studio uses the private loopback connection without an operator login or token.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                         .accessibilityIdentifier("provider-local-no-auth")
                 } else {
                     Picker("Credential", selection: $viewModel.credentialAction) {
@@ -270,25 +340,32 @@ struct ProviderOperatorView: View {
                     }
                     .accessibilityIdentifier("provider-credential-action")
                     if viewModel.credentialAction == .replace {
-                        SecureField("Linked LM Studio access token", text: $viewModel.token)
-                            .accessibilityIdentifier("provider-token")
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Linked LM Studio access token")
+                                .font(.system(size: 13, weight: .medium))
+                            SecureField("Linked LM Studio access token", text: $viewModel.token)
+                                .textFieldStyle(GraphiteFieldStyle())
+                                .accessibilityIdentifier("provider-token")
+                        }
                     }
                     Text(viewModel.configuration?.credentialConfigured == true
                          ? "A linked-provider Keychain credential is configured."
                          : "No linked-provider Keychain credential is configured.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 HStack {
                     Button("Save", action: viewModel.save)
+                        .buttonStyle(GraphiteButtonStyle(kind: .primary))
                         .disabled(viewModel.configuration == nil)
                         .accessibilityIdentifier("provider-save")
                     Button("Refresh Models", action: viewModel.refreshModels)
+                        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                         .disabled(viewModel.configuration?.saved != true || viewModel.hasUnsavedChanges)
                         .accessibilityIdentifier("provider-refresh-models")
                 }
                 Text("Save updates the LM Studio connection used by Forge MCP and continuity. Saving does not test the connection; model loading remains in LM Studio.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
                 if viewModel.isProbing {
                     ProgressView()
                         .controlSize(.small)
@@ -296,7 +373,7 @@ struct ProviderOperatorView: View {
                 }
                 if viewModel.hasUnsavedChanges {
                     Text("Save changes before refreshing models or testing this endpoint and model.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
                         .accessibilityIdentifier("provider-unsaved-changes")
                 }
             }
@@ -304,12 +381,6 @@ struct ProviderOperatorView: View {
             if viewModel.isSaving || viewModel.isFetchingModels {
                 Button("Cancel request", action: viewModel.cancelConfigurationRequest)
                     .accessibilityIdentifier("provider-cancel-configuration")
-            }
-        } label: {
-            HStack {
-                Text("Provider settings")
-                Spacer()
-                GuidedHelpButton(context: .providerCredential)
             }
         }
     }
@@ -337,7 +408,7 @@ struct ProviderOperatorView: View {
                     LabeledContent("Keychain credential configured", value: OperatorFormat.yesNo(provider.credentialConfigured))
                     Text("Credential values are never displayed or returned by the operator snapshot.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
             }
 
@@ -365,7 +436,7 @@ struct ProviderOperatorView: View {
                     if let error = provider.lastProbeError {
                         Text(error)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(GraphitePalette.failure)
                             .textSelection(.enabled)
                             .accessibilityIdentifier("provider-last-probe-error")
                     }
@@ -374,8 +445,9 @@ struct ProviderOperatorView: View {
 
             Text("Connect and Check uses one manager-owned path for model discovery, LM Studio recovery, Forge MCP registration, and contract verification.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
         }
+        .labeledContentStyle(ProviderFactsStyle())
     }
 
     private func context(_ value: Int?) -> String {
@@ -409,6 +481,21 @@ struct ProviderOperatorView: View {
         case .supplyCredential: "Supply the required provider credential"
         case .retry: "Retry Connect and Check"
         }
+    }
+}
+
+private struct ProviderFactsStyle: LabeledContentStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            configuration.label
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 144, alignment: .leading)
+            configuration.content
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -487,11 +574,12 @@ private struct ProviderSelectionCard: View {
     let onRemove: () -> Void
 
     var body: some View {
-        GroupBox {
+        GraphitePanel {
+            providerHeading
             VStack(alignment: .leading, spacing: 10) {
                 Text(descriptor.detail)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Divider()
@@ -501,6 +589,7 @@ private struct ProviderSelectionCard: View {
                     "Availability",
                     value: descriptor.selectable ? "Selectable" : "Not selectable"
                 )
+                .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("provider-availability-\(descriptor.id.rawValue)")
                 LabeledContent("Setup", value: setupLabel)
                 LabeledContent("Execution", value: executionLabel)
@@ -510,6 +599,7 @@ private struct ProviderSelectionCard: View {
                     LabeledContent("Verified", value: receipt.verifiedAt)
                     ForEach(receiptEvidence) { detail in
                         LabeledContent(detail.label, value: detail.value)
+                            .accessibilityElement(children: .combine)
                             .accessibilityIdentifier(
                                 "provider-receipt-\(descriptor.id.rawValue)-\(detail.key)"
                             )
@@ -522,48 +612,62 @@ private struct ProviderSelectionCard: View {
 
                 if showsActions {
                     Divider()
-                    HStack(spacing: 10) {
-                        if primaryActionAvailable {
-                            Button("Connect and Check", action: onPrimaryAction)
-                                .disabled(actionsDisabled)
-                                .accessibilityIdentifier("provider-repair-\(descriptor.id.rawValue)")
-                        }
-                        if integration?.receipt != nil {
-                            Button("Remove Integration", role: .destructive, action: onRemove)
-                                .disabled(removalDisabled)
-                                .accessibilityIdentifier("provider-remove-\(descriptor.id.rawValue)")
-                        }
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) { integrationActions }
+                        VStack(alignment: .leading, spacing: 8) { integrationActions }
                     }
                 }
             }
+            .labeledContentStyle(ProviderFactsStyle())
             .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: iconName)
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                Text(descriptor.displayName)
-                    .font(.headline)
-                Spacer()
-                Toggle(
-                    "Activate \(descriptor.displayName)",
-                    isOn: Binding(
-                        get: { selected },
-                        set: { enabled in
-                            // These are mutually exclusive selectors. Turning
-                            // one on changes the selection; turning the active
-                            // choice off cannot leave run admission providerless.
-                            onToggle(enabled)
-                        }
-                    )
-                )
-                .labelsHidden()
-                .disabled(actionsDisabled)
-                .accessibilityLabel("Activate \(descriptor.displayName)")
-                .accessibilityIdentifier("provider-toggle-\(descriptor.id.rawValue)")
-            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("provider-card-\(descriptor.id.rawValue)")
+    }
+
+    private var providerHeading: some View {
+        HStack(spacing: 10) {
+            Image(systemName: iconName)
+                .foregroundStyle(GraphitePalette.info)
+            Text(descriptor.displayName)
+                .font(.system(size: 18, weight: .semibold))
+            Spacer()
+            Toggle(
+                "Activate \(descriptor.displayName)",
+                isOn: Binding(
+                    get: { selected },
+                    set: { enabled in
+                        // These are mutually exclusive selectors. Turning
+                        // one on changes the selection; turning the active
+                        // choice off cannot leave run admission providerless.
+                        onToggle(enabled)
+                    }
+                )
+            )
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .disabled(actionsDisabled)
+            .accessibilityLabel("Activate \(descriptor.displayName)")
+            .accessibilityIdentifier("provider-toggle-\(descriptor.id.rawValue)")
+        }
+        .accessibilityElement(children: .contain)
+        .font(.system(size: 15, weight: .semibold))
+    }
+
+    @ViewBuilder
+    private var integrationActions: some View {
+        if primaryActionAvailable {
+            Button("Connect and Check", action: onPrimaryAction)
+                .buttonStyle(GraphiteButtonStyle(kind: .primary))
+                .disabled(actionsDisabled)
+                .accessibilityIdentifier("provider-repair-\(descriptor.id.rawValue)")
+        }
+        if integration?.receipt != nil {
+            Button("Remove Integration", role: .destructive, action: onRemove)
+                .buttonStyle(GraphiteButtonStyle(kind: .destructive))
+                .disabled(removalDisabled)
+                .accessibilityIdentifier("provider-remove-\(descriptor.id.rawValue)")
+        }
     }
 
     private var setupLabel: String {

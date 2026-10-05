@@ -18,15 +18,26 @@ public final class CPUCollector: CPUMetricsCollecting, @unchecked Sendable {
     private let lock = NSLock()
     private var previousCores: [CoreTicks]?
     private var previousHost: CoreTicks?
+    private let perCoreTickProvider: (@Sendable () -> [CoreTicks]?)?
+    private let hostTickProvider: (@Sendable () -> CoreTicks?)?
 
-    private struct CoreTicks {
+    struct CoreTicks: Sendable {
         var user: UInt32
         var system: UInt32
         var idle: UInt32
         var nice: UInt32
     }
 
-    public init() {}
+    public init() {
+        perCoreTickProvider = nil
+        hostTickProvider = nil
+    }
+
+    init(perCoreTickProvider: @escaping @Sendable () -> [CoreTicks]?,
+         hostTickProvider: @escaping @Sendable () -> CoreTicks?) {
+        self.perCoreTickProvider = perCoreTickProvider
+        self.hostTickProvider = hostTickProvider
+    }
 
     public func collect() -> CPUMetrics {
         let logical = ProcessInfo.processInfo.processorCount
@@ -37,7 +48,7 @@ public final class CPUCollector: CPUMetricsCollecting, @unchecked Sendable {
             ?? sysctlString("hw.model")
             ?? "CPU"
 
-        let (per, breakdown) = sampleRealtime()
+        let (per, breakdown, quality) = sampleRealtime()
         let percent: Double
         if !per.isEmpty {
             percent = per.reduce(0, +) / Double(per.count)
@@ -65,14 +76,19 @@ public final class CPUCollector: CPUMetricsCollecting, @unchecked Sendable {
             brand: brand,
             user: breakdown.user,
             system: breakdown.system,
-            idle: breakdown.idle
+            idle: breakdown.idle,
+            sampleQuality: quality,
+            observedAt: Date().timeIntervalSince1970
         )
     }
 
     // MARK: - Real-time sample (no sleep)
 
-    private func sampleRealtime() -> (perCore: [Double], breakdown: (user: Double, system: Double, idle: Double)) {
-        if let cores = readPerCoreTicks() {
+    private func sampleRealtime() -> (perCore: [Double], breakdown: (user: Double, system: Double, idle: Double), quality: CPUSampleQuality) {
+        let coreSample: [CoreTicks]?
+        if let perCoreTickProvider { coreSample = perCoreTickProvider() }
+        else { coreSample = readPerCoreTicks() }
+        if let cores = coreSample, !cores.isEmpty {
             lock.lock()
             let prev = previousCores
             previousCores = cores
@@ -82,28 +98,31 @@ public final class CPUCollector: CPUMetricsCollecting, @unchecked Sendable {
 
             guard let prev, prev.count == cores.count else {
                 // First sample: counters established; next engine tick yields true deltas.
-                return (Array(repeating: 0, count: cores.count), (0, 0, 100))
+                return (Array(repeating: 0, count: cores.count), (0, 0, 100), .warmingUp)
             }
             let per = zip(prev, cores).map { utilization(from: $0, to: $1) }
             let br = breakdown(from: sumTicks(prev), to: sumTicks(cores))
-            return (per, br)
+            return (per, br, .perLogicalProcessor)
         }
 
         // Fallback: host-wide HOST_CPU_LOAD_INFO (still Mach, still delta-only).
-        guard let host = readHostTicks() else {
-            return ([], (0, 0, 100))
+        let hostSample: CoreTicks?
+        if let hostTickProvider { hostSample = hostTickProvider() }
+        else { hostSample = readHostTicks() }
+        guard let host = hostSample else {
+            return ([], (0, 0, 100), .unavailable)
         }
         lock.lock()
         let prev = previousHost
         previousHost = host
         lock.unlock()
         guard let prev else {
-            return ([], (0, 0, 100))
+            return ([], (0, 0, 100), .warmingUp)
         }
         let br = breakdown(from: prev, to: host)
         let pct = br.user + br.system
         let logical = max(ProcessInfo.processInfo.processorCount, 1)
-        return (Array(repeating: pct, count: logical), br)
+        return (Array(repeating: pct, count: logical), br, .hostAggregateFallback)
     }
 
     private func sumTicks(_ cores: [CoreTicks]) -> CoreTicks {

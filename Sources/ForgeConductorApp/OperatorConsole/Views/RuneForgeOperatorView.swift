@@ -40,14 +40,15 @@ struct RuneForgeOperatorView: View {
             if let error = viewModel.errorMessage {
                 OperatorErrorBanner(message: error, retry: viewModel.refresh)
             }
-            NavigationSplitView {
+            HSplitView {
                 navigationList
-                    .navigationSplitViewColumnWidth(min: 230, ideal: 280, max: 360)
-            } detail: {
+                    .frame(minWidth: 230, idealWidth: 280, maxWidth: 360)
                 detail
+                    .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .padding(20)
+        .background(GraphitePalette.canvas)
         .task { viewModel.start() }
         .onDisappear { viewModel.stop() }
     }
@@ -69,11 +70,11 @@ struct RuneForgeOperatorView: View {
     private var headerIdentity: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Rune Forge")
-                .font(.title2.bold())
+                .font(.system(size: 24, weight: .bold))
                 .accessibilityIdentifier("rune-forge-view")
             Text("Development Policy sources, CLU enforcement, and per-project logs")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
                 .accessibilityIdentifier("detail-rune-forge")
         }
     }
@@ -88,10 +89,12 @@ struct RuneForgeOperatorView: View {
                 guard !urls.isEmpty else { return }
                 viewModel.addPolicySources(urls)
             }
+            .buttonStyle(GraphiteButtonStyle(kind: .primary))
             .accessibilityIdentifier("rune-policy-add")
             Button("Refresh", systemImage: "arrow.clockwise") {
                 viewModel.scan()
             }
+            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
             .accessibilityIdentifier("rune-policy-refresh")
             Menu("Export Policy Log", systemImage: "square.and.arrow.up") {
                 Section("All Projects") {
@@ -127,6 +130,7 @@ struct RuneForgeOperatorView: View {
                     }
                 }
             }
+            .buttonStyle(.bordered)
             .accessibilityIdentifier("rune-policy-export")
             .disabled(viewModel.isExporting)
         }
@@ -136,6 +140,7 @@ struct RuneForgeOperatorView: View {
         List(selection: $selection) {
             Label("Overview", systemImage: "shield.lefthalf.filled")
                 .tag(RuneForgeSelection.overview)
+                .accessibilityIdentifier("rune-overview-route")
 
             Label("Policy Feed", systemImage: "text.justify.leading")
                 .tag(RuneForgeSelection.policyFeed)
@@ -145,7 +150,7 @@ struct RuneForgeOperatorView: View {
                 if viewModel.sources.isEmpty {
                     Text("No selected policy sources")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 ForEach(Array(viewModel.sources.enumerated()), id: \.element.id) { index, source in
                     Button {
@@ -155,7 +160,7 @@ struct RuneForgeOperatorView: View {
                             Image(systemName: source.origin == .builtInRavenForge
                                   ? "shield.checkered"
                                   : "doc.badge.gearshape")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .frame(width: 16)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(source.displayName)
@@ -166,7 +171,7 @@ struct RuneForgeOperatorView: View {
                                         : RuneForgeViewModel.sourceStateTitle(source.interpretationState)
                                 )
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                                     .lineLimit(1)
                             }
                         }
@@ -187,7 +192,7 @@ struct RuneForgeOperatorView: View {
                         .accessibilityIdentifier("rune-policy-source-list")
                     Text("Drag to set priority")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
             }
 
@@ -195,7 +200,7 @@ struct RuneForgeOperatorView: View {
                 if viewModel.violations.isEmpty {
                     Text("No current policy violations")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 ForEach(viewModel.violations, id: \.violation.id) { item in
                     Button {
@@ -206,7 +211,7 @@ struct RuneForgeOperatorView: View {
                                 .lineLimit(1)
                             Text(RuneForgeViewModel.violationStateTitle(item.violation.state))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                         }
                     }
                     .buttonStyle(.plain)
@@ -221,6 +226,8 @@ struct RuneForgeOperatorView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(GraphitePalette.sidebar)
     }
 
     @ViewBuilder
@@ -274,11 +281,11 @@ struct RuneForgeOperatorView: View {
 
                 Text("Policy evaluation activity").font(.headline)
                 ForEach(viewModel.evaluationActivity) { activity in
-                    GroupBox {
+                    GraphitePanel {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(activity.summary).textSelection(.enabled)
                             Text("\(activity.evaluatedAt) · \(activity.findingCount) findings · \(activity.detectorFaultCount) detector faults")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -286,7 +293,7 @@ struct RuneForgeOperatorView: View {
                     .accessibilityIdentifier("rune-policy-evaluation-\(activity.id)")
                 }
                 ForEach(viewModel.limitations, id: \.self) { limitation in
-                    Text(limitation).font(.caption).foregroundStyle(.secondary)
+                    Text(limitation).font(.caption).foregroundStyle(GraphitePalette.textSecondary)
                 }
 
                 Text(
@@ -294,7 +301,7 @@ struct RuneForgeOperatorView: View {
                         + "\(RuneForgeViewModel.maximumEvents) cached events"
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             }
             .padding(20)
         }
@@ -302,7 +309,7 @@ struct RuneForgeOperatorView: View {
     }
 
     private func policyEventCard(_ event: PolicyViolationEvent) -> some View {
-        GroupBox {
+        GraphitePanel {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Label(
@@ -313,7 +320,7 @@ struct RuneForgeOperatorView: View {
                     Spacer(minLength: 12)
                     Text(event.occurredAt.formatted(date: .abbreviated, time: .standard))
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
 
                 LazyVGrid(
@@ -335,7 +342,7 @@ struct RuneForgeOperatorView: View {
                     )
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
 
                 policyFeedField("Summary", event.candidate.summary)
                 if let scope = policyScopeDescription(event.candidate.scope) {
@@ -371,7 +378,7 @@ struct RuneForgeOperatorView: View {
                         : "Development-continuation state unavailable."
                 )
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -383,7 +390,7 @@ struct RuneForgeOperatorView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             Text(value)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -410,7 +417,7 @@ struct RuneForgeOperatorView: View {
                     "Development Policy",
                     subtitle: "Observes and reports policy issues without stopping development"
                 )
-                GroupBox("Governing policy") {
+                GraphitePanel(title: "Governing policy") {
                     VStack(alignment: .leading, spacing: 8) {
                         detailRow("Authority", viewModel.governingPolicy?.authority ?? "Raven Forge Development")
                         detailRow("Version", viewModel.governingPolicy?.version ?? "Loading")
@@ -418,7 +425,7 @@ struct RuneForgeOperatorView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                GroupBox("Stjornarvald health") {
+                GraphitePanel(title: "Stjornarvald health") {
                     VStack(alignment: .leading, spacing: 8) {
                         detailRow("State", healthTitle)
                         detailRow("Active policy sources", "\(viewModel.sources.filter(\.active).count)")
@@ -426,18 +433,20 @@ struct RuneForgeOperatorView: View {
                         detailRow("Development status", "Continuing")
                         if viewModel.isDegraded {
                             Text("Cached policy information remains available while the Manager reconnects.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if !viewModel.limitations.isEmpty {
-                    GroupBox("Current limitations") {
+                    GraphitePanel(title: "Current limitations") {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(viewModel.limitations, id: \.self) { limitation in
                                 Label(limitation, systemImage: "info.circle")
-                                    .font(.caption)
+                                    .font(.system(size: 13))
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -461,14 +470,18 @@ struct RuneForgeOperatorView: View {
                     Button("Refresh Source", systemImage: "arrow.clockwise") {
                         viewModel.refreshSource(source)
                     }
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                     .disabled(source.sourceID == nil)
+                    .accessibilityIdentifier("rune-policy-source-refresh")
                     Button("Remove Source", systemImage: "minus.circle", role: .destructive) {
                         viewModel.removeSource(source)
                         selection = .overview
                     }
+                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                     .disabled(source.origin == .builtInRavenForge)
+                    .accessibilityIdentifier("rune-policy-source-remove")
                 }
-                GroupBox("Source identity") {
+                GraphitePanel(title: "Source identity") {
                     VStack(alignment: .leading, spacing: 8) {
                         detailRow("State", RuneForgeViewModel.sourceStateTitle(source.interpretationState))
                         detailRow("Source ID", source.sourceID?.description ?? "Manager confirmation pending")
@@ -479,7 +492,7 @@ struct RuneForgeOperatorView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                GroupBox("Path and interpretation") {
+                GraphitePanel(title: "Path and interpretation") {
                     VStack(alignment: .leading, spacing: 8) {
                         detailRow("Selected path", source.selectedPath)
                         detailRow("Standardized path", source.standardizedPath)
@@ -487,8 +500,9 @@ struct RuneForgeOperatorView: View {
                             detailRow("Interpretation observation", observation)
                         }
                         Text("Every file and folder format is accepted. Unsupported or opaque content remains active with metadata-only or partial interpretation.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -507,7 +521,7 @@ struct RuneForgeOperatorView: View {
                     RuneForgeViewModel.violationStateTitle(violation.state),
                     subtitle: violation.latestSummary
                 )
-                GroupBox("Violation identity and history") {
+                GraphitePanel(title: "Violation identity and history") {
                     VStack(alignment: .leading, spacing: 8) {
                         detailRow("Violation ID", violation.id.description)
                         detailRow("State", RuneForgeViewModel.violationStateTitle(violation.state))
@@ -520,7 +534,7 @@ struct RuneForgeOperatorView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                GroupBox("Evidence and interpretation") {
+                GraphitePanel(title: "Evidence and interpretation") {
                     VStack(alignment: .leading, spacing: 8) {
                         detailRow("Summary", violation.latestSummary)
                         detailRow("Suggested correction", violation.latestSuggestedCorrection)
@@ -544,12 +558,12 @@ struct RuneForgeOperatorView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                GroupBox("Occurrence history") {
+                GraphitePanel(title: "Occurrence history") {
                     VStack(alignment: .leading, spacing: 10) {
                         if history.isEmpty {
                             Text("No occurrence events are present in the bounded manager snapshot.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                         }
                         ForEach(history) { historyEvent in
                             VStack(alignment: .leading, spacing: 2) {
@@ -557,7 +571,7 @@ struct RuneForgeOperatorView: View {
                                     .font(.callout.weight(.semibold))
                                 Text(historyEvent.occurredAt.formatted(date: .abbreviated, time: .standard))
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                                 Text(historyEvent.candidate.summary)
                                     .font(.caption)
                             }
@@ -594,12 +608,8 @@ struct RuneForgeOperatorView: View {
     }
 
     private func detailHeading(_ title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.title.bold())
-            Text(subtitle)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
+        GraphitePageHeader(title: title, subtitle: subtitle)
+            .accessibilityIdentifier("rune-detail-heading")
     }
 
     private func eventSystemImage(_ type: PolicyViolationEventType) -> String {
@@ -617,7 +627,7 @@ struct RuneForgeOperatorView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             Text(value)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)

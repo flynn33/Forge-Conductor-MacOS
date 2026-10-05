@@ -1,48 +1,76 @@
 # Forge Conductor — Xcode
 
-Product identity: marketing version **0.16.5**, build **26**. `VERSION` and
-`BUILD_NUMBER` are the repository authorities. Xcode resolves matching values
-from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`; the Swift runtime uses
-the matching constants in `ForgeFilesystemProtocolConstants`.
+Current source version **0.17.0**, build **27**.
 
-The corrected project is published in owner-authored revision
-`354c695842a4dde00d79f4ee946f35152de9d8df`. The current documentation/wiki
-alignment changes no project, source, resource, or test input. All 12 marketing
-version settings are `0.16.5`; all 16 build-number settings are `26`. The
-[qualification record](docs/QUALIFICATION-STATUS.md) retains the exact Debug,
-archive, export, and native startup/export evidence for those inputs.
+**UI implementation and QA complete.** Exact owner publication, remote readback
+and synchronization identities are recorded externally. Historical failed,
+superseded and unavailable evidence retains its original scope.
 
-Debug builds use automatic Apple Development signing and the exact development
-peer policy. Release archives use manual Developer ID Application signing for
-team `9AQ2C2838M` and compile the exact distribution peer policy. This is a
-signing class, not a shipment claim; the current candidate remains an alpha.
+## Current tested native inputs
 
-The installed `0.16.4 (25)` failure proved that adding
-`FORGE_DEVELOPMENT_SIGNING` to Release is incompatible with a later Developer ID
-export: export changes signatures but leaves compiled peer requirements intact.
-It also changes daemon CodeDirectory hashes after the app and CLI have sealed
-them. Archive directly with Developer ID and export with the same identity.
-Do not re-sign an Apple Development archive into a distribution candidate.
-Existing credentials and signing protections remain required.
+The tested source-input manifest is
+`28548a73db312130f02e3c86344725f2aa1efca575901fa0ae3dc223b69eb3d1`;
+all 434 inputs match the current files. The canonical
+`ForgeConductor.xcworkspace` and existing project passed 15 membership checks.
+All 12 marketing-version settings and 16 build-number settings align with
+`VERSION`, `BUILD_NUMBER` and the protocol constants. All 29 original resource
+memberships remain: 28 original byte sets are unchanged, the requested Guide
+copy preserves its schema, and one `ComputeChipReference.png` is added to Xcode
+and SwiftPM. All 26 signing/deployment configurations retain their settings,
+entitlements and macOS 26.0 policy.
 
-The shipped app, Core framework, and runtime launcher Release configurations
-set `CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO`. Clean Release products therefore
-do not inherit development-only base entitlements. The Core Release
-configuration does not enable testability; Release app-hosted tests must supply
-their documented per-invocation instrumentation override and remain separate
-from candidate products. `ProductPathReliabilityTests` enforces these settings
-for every shipped Release target.
+The ordinary Debug **My Mac** build passed in 4.965 seconds. Its strict deep
+Apple Development signature validated for team `9AQ2C2838M`, with CDHash
+`1a36aa4d3562781a1bd8f5b277848aecfa91b711`. The exact reference PNG and
+19,564-byte `default.metallib`, including both Compute shader functions, are
+packaged in the candidate. Ordinary app outputs remain separate from test-host
+outputs and the working installation.
 
-Full Disk Access is granted by macOS Privacy & Security to the responsible
-signed application or executable; it is not supplied by an entitlement in this
-project. The production app and helpers are intentionally not App Sandbox
-processes, and Forge does not add a per-command Seatbelt profile. macOS TCC
-attributes access according to the responsible signed host and executable in
-the actual launch chain; a parent grant alone is not treated as candidate proof.
-After a TCC change, quit and relaunch LM Studio and Forge, then run a live
-protected-path read through the exact signed candidate without emitting file
-contents. TCC, POSIX permissions, SIP, tool grants, timeouts, output bounds, and
-destructive-root protections remain independent controls.
+The selected production scope passed **116 distinct tests in 140 successful
+executions**, with no failures or skips: Compute 29, app-hosted regressions 68,
+and canonical Provider 33, with 24 Provider repeats counted once; plus fresh
+SwiftPM telemetry provenance 8, H0 version/isolation 1 and G1 version/document
+alignment 1. Both SwiftPM products also built successfully. The initial G1
+marker failure remains historical; the exact marker above and the unchanged
+focused test now pass.
+
+The separate native view matrix passed **21 methods in 22 invocations**. All
+**463 selected PNGs** were opened and reviewed: 281 parent caches, 166 sheet
+caches, 14 NSAlert caches and two production Metal readbacks. The 68 current
+Compute layers and genuine 20-frame motion recording are separate evidence.
+See [Compute Cores](docs/COMPUTE-CORES.md),
+[Graphite Workbench](docs/GRAPHITE-WORKBENCH.md) and
+[native QA](docs/GRAPHITE-NATIVE-QA.md) for exact receipts and artifact hashes.
+
+Four isolated ordinary-candidate workflows passed: healthy/failure paired
+diagnostic exports containing 16/3 records; native folder selection, Cancel,
+root rejection, save and relaunch; and shell OFF/relaunch/ON with real MCP
+denial and exact execution. Actual Settings at 900×560 content covered all nine
+sections, draft/Reload, six opt-ins, Setup-only persistence and restoration.
+Menus, About and the normal 1440×900 Dashboard at 2×, including Pause/Resume,
+were observed. Every owned case ended, seven registration byte sets per case
+were unchanged, and twelve private suite key sets were empty.
+
+Native view caches omit Metal, and parent/sheet caches are separate surfaces.
+The NSAlert caches omit Cancel captions and have compositing artifacts; exact
+native ownership, all 14 Cancel dismissals and no-mutation assertions passed.
+Those caches do not establish ordinary alert-button contrast. Physical 1×,
+ordinary minimum-window and Sky sheet-compositor pixels/Close remain outside
+the exercised scope. Failed or zero-selected runner attempts are excluded from
+pass counts. These fixture and ordinary results establish the required UI QA
+within the recorded limits; they do not qualify installation or distribution.
+
+Only native traffic lights and the app title remain in the title bar. Settings
+opens Workbench; main Manager opens Authorized Folders. Six optional content
+shortcuts appear only when enabled. Immediate Workbench preferences remain
+separate from staged Manager Save/Reload.
+
+Debug retains automatic Apple Development signing and its development peer
+policy. Release retains manual Developer ID Application signing for team
+`9AQ2C2838M` and its distribution peer policy. Signing classes and sealed daemon
+identities must remain consistent; do not re-sign a development archive into a
+distribution candidate. This phase performed no installation, notarization,
+App Store Connect upload or distribution. The owner handles those separately.
 
 ## Open
 
@@ -74,6 +102,31 @@ The Xcode app embeds the manager CLI at
 `Contents/Helpers/forge-conductor`. The SwiftPM staging script also builds,
 stages, signs, and strictly verifies that CLI alongside the runtime launcher and
 filesystem daemon; it does not synthesize the Xcode framework layout.
+
+## Graphite Workbench validation
+
+Run the canonical `ForgeConductor` scheme with the native **My Mac** destination
+(`platform=macOS` in `xcodebuild`). Keep the established Apple Development
+Debug signing and runtime trust policy; this UI phase does not change signing
+or request distribution credentials. The owner performs final building,
+notarization and distribution separately.
+
+Use separate ordinary build and UI-test DerivedData directories. Inspect every
+live destination, Settings section, help/setup presentation and sheet at normal
+and minimum window sizes. Preserve control eligibility, staged drafts and
+Provider inspection/activation separation while recording real native captures.
+A compiled SwiftPM product alone does not establish native UI acceptance.
+
+The earlier Graphite candidates passed their recorded component/lifecycle,
+every-view, conditional, wizard/lower-row and ordinary onboarding/export scopes.
+Their complete counts, hashes and failures remain in
+[Graphite checkpoints](docs/GRAPHITE-WORKBENCH-CHECKPOINTS.md). They qualify those
+inputs. Current revision 2 QA uses the
+[native checklist](docs/GRAPHITE-NATIVE-QA.md); the matching ordinary candidate
+build/signature/package is recorded above. All four current runtime/onboarding/
+export workflows and actual normal Settings/Dashboard observations passed. Installation,
+notarization, App Store Connect upload and distribution are not performed by
+this phase.
 
 ## Build / Test
 
@@ -147,7 +200,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.16.5 (26)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.17.0 (27)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
@@ -551,6 +604,10 @@ test evidence for this working tree is recorded in
 SwiftPM suite, the canonical arm64 Debug workspace build, and focused native UI
 coverage passed. Publication binds that evidence to the resulting revision;
 older receipts do not qualify the 0.14.1 correction.
+
+That dated title-bar ownership description is historical. Current Guided Setup
+opens from Workbench Settings, the Guide menu or its explicitly enabled view
+control; the source remains in the existing app target.
 
 The 0.14.1 source corrections remain in those existing app, Core,
 native-session-host, and test members. No source or resource membership is

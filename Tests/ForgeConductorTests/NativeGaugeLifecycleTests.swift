@@ -14,6 +14,7 @@ import ForgeConductorCore
 final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
     private var fixture: NativeGaugeWindow?
     private var originalVisibleWindows: [NSWindow] = []
+    private let directEvidence = DirectNativeFixtureEvidenceWriter()
 
     nonisolated override func setUp() async throws {
         try await prepareApplicationHost()
@@ -35,6 +36,7 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
             throw NativeGaugeTestFailure("The real gauge Metal queue or pipeline could not initialize.")
         }
 
+        try directEvidence.configure(testName: name)
         retainObservation("host-before-isolation", before: nil)
         // SwiftUI owns the application delegate proxy. Isolate through the
         // public window lifecycle and leave the application's live telemetry
@@ -87,6 +89,127 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
             XCTAssertTrue(view.device === MetalGaugeResources.shared.device)
         }
         retainObservation("visible-static-and-changing-values", before: baseline)
+    }
+
+    func testSettledNonzeroBarRedrawsForActualViewportResizeWithoutValueChange() async throws {
+        try await requireSettledNonzeroResizeFrames(kind: .bar)
+    }
+
+    func testSettledNonzeroRingRedrawsForActualViewportResizeWithoutValueChange() async throws {
+        try await requireSettledNonzeroResizeFrames(kind: .ring)
+    }
+
+    func testSettledNonzeroCoreTilesRedrawForActualViewportResizeWithoutValueChange() async throws {
+        try await requireSettledNonzeroResizeFrames(kind: .cores)
+    }
+
+    private func requireSettledNonzeroResizeFrames(kind: NativeResizeGaugeKind) async throws {
+        let previousContinueAfterFailure = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = previousContinueAfterFailure }
+        let baseline = RuntimeDiagnostics.shared.snapshot()
+        let surfaceDiagnostics = RuntimeDiagnostics()
+        let resizeFixture = NativeGaugeResizeWindow(kind: kind, surfaceDiagnostics: surfaceDiagnostics)
+        defer { resizeFixture.close() }
+
+        NSApp.activate(ignoringOtherApps: true)
+        resizeFixture.window.makeKeyAndOrderFront(nil)
+        resizeFixture.window.orderFrontRegardless()
+        let exposed = await waitUntil(timeout: 5) {
+            NSApp.isActive && resizeFixture.window.isKeyWindow
+                && resizeFixture.window.occlusionState.contains(.visible)
+        }
+        XCTAssertTrue(exposed, "The exact fixed-value fixture must be active and exposed")
+        let mounted = await waitUntil(timeout: 5) { resizeFixture.metalViews.count == 1 }
+        XCTAssertTrue(mounted)
+        let bar = try XCTUnwrap(resizeFixture.metalViews.first)
+        let renderer = try XCTUnwrap(bar.delegate as? NSObject)
+        switch kind {
+        case .bar: XCTAssertTrue(renderer is MetalBarRenderer)
+        case .ring: XCTAssertTrue(renderer is MetalRingRenderer)
+        case .cores: XCTAssertTrue(renderer is MetalCoreBarsRenderer)
+        }
+        XCTAssertTrue(bar.window === resizeFixture.window)
+        XCTAssertTrue(bar.isPaused)
+        XCTAssertTrue(bar.enableSetNeedsDisplay)
+        XCTAssertTrue(bar.device === MetalGaugeResources.shared.device)
+        let firstFrame = await waitUntil(timeout: 5) {
+            self.counter(.gaugeDraws) > self.count(.gaugeDraws, in: baseline)
+        }
+        XCTAssertTrue(firstFrame, "The nonzero production gauge must initially submit a frame without a forced draw")
+        await assertQuietDraws(timeout: 3, quietInterval: 0.25)
+        let warmed = RuntimeDiagnostics.shared.snapshot()
+        XCTAssertEqual(level(.gaugeActiveSurfaces, in: surfaceDiagnostics.snapshot()), 1)
+        XCTAssertEqual(level(.gaugeVisibleSurfaces, in: surfaceDiagnostics.snapshot()), 1)
+
+        try repeatSettledResizeValue(on: bar, kind: kind)
+        await allowNativeEvents(for: 0.3)
+        XCTAssertEqual(counter(.gaugeDraws), count(.gaugeDraws, in: warmed), "Repeating the same nonzero values must remain quiescent")
+
+        for width in [CGFloat(310), 700] {
+            let previousDrawableSize = bar.drawableSize
+            let beforeResize = RuntimeDiagnostics.shared.snapshot()
+            resizeFixture.window.setContentSize(NSSize(width: width, height: 160))
+            resizeFixture.hostingView.layoutSubtreeIfNeeded()
+            let resized = await waitUntil(timeout: 5) {
+                bar.drawableSize != previousDrawableSize
+                    && abs(bar.bounds.width - (width - 48)) < 1
+            }
+            XCTAssertTrue(resized, "A real native viewport and drawable resize must occur before evaluating rendering")
+            let submitted = await waitUntil(timeout: 5) {
+                self.counter(.gaugeDraws) > self.count(.gaugeDraws, in: beforeResize)
+            }
+            let rendererDirty = Mirror(reflecting: renderer).children.prefix(32)
+                .first(where: { $0.label == "dirty" })?.value as? Bool
+            retainObservation("settled-nonzero-\(kind.rawValue)-resize-\(Int(width))", before: beforeResize, transition: [
+                "kind": kind.rawValue,
+                "constant_values_percent": kind == .cores ? [24, 70, 13] : [24],
+                "previous_drawable_size": NSStringFromSize(previousDrawableSize),
+                "current_drawable_size": NSStringFromSize(bar.drawableSize),
+                "bounds": NSStringFromRect(bar.bounds),
+                "window_visible": resizeFixture.window.isVisible,
+                "window_exposed": resizeFixture.window.occlusionState.contains(.visible),
+                "viewport_resized": resized,
+                "new_frame_submitted": submitted,
+                "renderer_dirty": rendererDirty as Any? ?? NSNull(),
+                "surface_accounting": surfaceDiagnostics.snapshot().asDictionary(),
+            ])
+            XCTAssertTrue(submitted, "A resized production gauge must submit its retained nonzero values without a changed value or test-forced draw")
+            await assertQuietDraws(timeout: 3, quietInterval: 0.25)
+            XCTAssertEqual(counter(.gaugeBuffersCreated), count(.gaugeBuffersCreated, in: warmed), "Resizing must reuse the existing geometry buffer")
+            XCTAssertEqual(counter(.gaugeCommandQueuesCreated), count(.gaugeCommandQueuesCreated, in: baseline))
+            XCTAssertEqual(counter(.gaugePipelinesCreated), count(.gaugePipelinesCreated, in: baseline))
+            let afterResize = counter(.gaugeDraws)
+            try repeatSettledResizeValue(on: bar, kind: kind)
+            await allowNativeEvents(for: 0.3)
+            XCTAssertEqual(counter(.gaugeDraws), afterResize)
+        }
+
+        resizeFixture.removeGauge()
+        let detached = await waitUntil(timeout: 5) {
+            bar.delegate == nil
+                && self.level(.gaugeActiveSurfaces, in: surfaceDiagnostics.snapshot()) == 0
+                && self.level(.gaugeVisibleSurfaces, in: surfaceDiagnostics.snapshot()) == 0
+        }
+        XCTAssertTrue(detached, "The resized gauge must dismantle through its production adapter")
+        let afterDetach = RuntimeDiagnostics.shared.snapshot()
+        await allowNativeEvents(for: 0.3)
+        XCTAssertEqual(counter(.gaugeDraws), count(.gaugeDraws, in: afterDetach))
+        XCTAssertEqual(counter(.gaugeBuffersCreated), count(.gaugeBuffersCreated, in: afterDetach))
+    }
+
+    private func repeatSettledResizeValue(on view: MTKView, kind: NativeResizeGaugeKind) throws {
+        let tint = MetalGaugePalette.from(swiftUI: GraphitePalette.chartGPU)
+        switch (kind, view.delegate) {
+        case (.bar, let renderer as MetalBarRenderer):
+            renderer.set(fraction: 0.24, color: tint)
+        case (.ring, let renderer as MetalRingRenderer):
+            renderer.set(fraction: 0.24, color: tint)
+        case (.cores, let renderer as MetalCoreBarsRenderer):
+            renderer.set(cores: [24, 70, 13])
+        default:
+            throw NativeGaugeTestFailure("The resized native view does not retain its expected production renderer.")
+        }
     }
 
     func testHiddenAndOrderedOutProductionGaugesStopDrawingAndResumeWhenVisible() async throws {
@@ -319,14 +442,11 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
     }
 
     private func presentFixtureWindow(_ fixture: NativeGaugeWindow, stage: String) async {
-        // App activation is asynchronous and may be refused. Request it through
-        // AppKit, then prove this exact fixture became key before checking its
-        // exposure. Window ordering alone does not establish either condition.
-        if #available(macOS 14.0, *) {
-            NSApp.activate()
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        // The fixture orders out its last window and can lose activation to the
+        // test runner. Cooperative activate() cannot reclaim it without that
+        // application's participation. Use the public foreground activation
+        // request, then prove this exact window is active, key and exposed.
+        NSApp.activate(ignoringOtherApps: true)
         fixture.window.makeKeyAndOrderFront(nil)
         fixture.window.orderFrontRegardless()
         let activated = await waitUntil(timeout: 5) {
@@ -378,7 +498,8 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         case let renderer as MetalCoreBarsRenderer:
             renderer.set(cores: Array(values.prefix(8)))
         case let renderer as LoadTraceRenderer:
-            renderer.update(samples: values)
+            renderer.update(optionalSamples: values.map(Optional.some), color: MetalGaugePalette.orange,
+                            maximumValue: 200, fraction: Double(fraction))
         case let renderer as MultiSeriesLoadRenderer:
             renderer.update(cpu: values, ram: values.reversed(), gpu: values.map(Optional.some))
         default:
@@ -491,13 +612,12 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
             }
         }
         do {
-            let attachment = XCTAttachment(
-                data: try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys, .prettyPrinted]),
-                uniformTypeIdentifier: "public.json"
-            )
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys, .prettyPrinted])
+            try directEvidence.save(data, name: name, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
             attachment.name = name
             attachment.lifetime = .keepAlways
-            add(attachment)
+            if !directEvidence.isEnabled { add(attachment) }
         } catch { XCTFail("Could not retain native gauge observations") }
     }
 }
@@ -515,7 +635,9 @@ private struct NativeGaugeFixtureView: View {
                     .frame(width: 100, height: 100)
                 MetalCoreBarsView(cores: Array(repeating: 50, count: 8), surfaceDiagnostics: surfaceDiagnostics)
                     .frame(width: 320, height: 100)
-                MetalLoadChart(samples: Array(repeating: 50, count: 32), surfaceDiagnostics: surfaceDiagnostics)
+                MetalLoadChart(optionalSamples: Array(repeating: 50, count: 32),
+                               tint: GraphitePalette.chartDisk, maximumValue: 200, fraction: 0.25,
+                               surfaceDiagnostics: surfaceDiagnostics)
                     .frame(width: 320, height: 100)
                 MultiSeriesLoadChart(
                     cpu: Array(repeating: 50, count: 32),
@@ -612,6 +734,85 @@ private final class NativeGaugeWindow: NSObject {
     func close() {
         NotificationCenter.default.removeObserver(self)
         removeGauges()
+        window.orderOut(nil)
+        window.contentView = nil
+        window.close()
+    }
+}
+
+private enum NativeResizeGaugeKind: String {
+    case bar, ring, cores
+}
+
+@MainActor
+private struct NativeGaugeResizeFixtureView: View {
+    var showsGauge = true
+    let kind: NativeResizeGaugeKind
+    let surfaceDiagnostics: RuntimeDiagnostics
+
+    var body: some View {
+        GeometryReader { geometry in
+            VStack {
+                if showsGauge {
+                    switch kind {
+                    case .bar:
+                        MetalBarGauge(fraction: 0.24, tint: GraphitePalette.chartGPU,
+                                      surfaceDiagnostics: surfaceDiagnostics)
+                            .frame(width: max(geometry.size.width, 1), height: 10)
+                    case .ring:
+                        MetalRingGauge(fraction: 0.24, tint: GraphitePalette.chartGPU,
+                                       surfaceDiagnostics: surfaceDiagnostics)
+                            .frame(width: max(geometry.size.width, 1), height: 80)
+                    case .cores:
+                        MetalCoreBarsView(cores: [24, 70, 13], surfaceDiagnostics: surfaceDiagnostics)
+                            .frame(width: max(geometry.size.width, 1), height: 80)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+@MainActor
+private final class NativeGaugeResizeWindow {
+    let window: NSWindow
+    let hostingView: NSHostingView<NativeGaugeResizeFixtureView>
+    let surfaceDiagnostics: RuntimeDiagnostics
+    let kind: NativeResizeGaugeKind
+
+    init(kind: NativeResizeGaugeKind, surfaceDiagnostics: RuntimeDiagnostics) {
+        self.kind = kind
+        self.surfaceDiagnostics = surfaceDiagnostics
+        hostingView = NSHostingView(rootView: NativeGaugeResizeFixtureView(kind: kind, surfaceDiagnostics: surfaceDiagnostics))
+        window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 480, height: 160),
+                          styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.title = "Fixed nonzero gauge resize validation"
+        window.isReleasedWhenClosed = false
+        window.contentView = hostingView
+    }
+
+    var metalViews: [MTKView] {
+        var result: [MTKView] = []
+        var pending: [(NSView, Int)] = [(hostingView, 0)]
+        var visited = 0
+        while let (view, depth) = pending.popLast(), visited < 512 {
+            visited += 1
+            if let metal = view as? MTKView { result.append(metal) }
+            if depth < 32 { pending.append(contentsOf: view.subviews.map { ($0, depth + 1) }) }
+        }
+        return result
+    }
+
+    func removeGauge() {
+        hostingView.rootView = NativeGaugeResizeFixtureView(showsGauge: false, kind: kind, surfaceDiagnostics: surfaceDiagnostics)
+        hostingView.layoutSubtreeIfNeeded()
+    }
+
+    func close() {
+        removeGauge()
         window.orderOut(nil)
         window.contentView = nil
         window.close()

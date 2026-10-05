@@ -3,6 +3,8 @@
 // Stable accessibility identifiers make the checks independent of display coordinates.
 
 import AppKit
+import Darwin
+import Metal
 import Network
 import XCTest
 
@@ -20,6 +22,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     private var operatorFixture: OperatorManagerUITestFixture?
     private var guidedModeDefaultsSuite: String?
     private var guidedSetupDefaultsSuite: String?
+    private var workbenchDefaultsSuite: String?
 
     nonisolated override func setUpWithError() throws {
         MainActor.assumeIsolated {
@@ -34,6 +37,8 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app.launchEnvironment["FORGE_GUIDED_MODE_DEFAULTS_SUITE"] = guidedModeDefaultsSuite
             guidedSetupDefaultsSuite = "com.forge-conductor.setup-ui.\(testHome.lastPathComponent)"
             app.launchEnvironment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"] = guidedSetupDefaultsSuite
+            workbenchDefaultsSuite = "com.forge-conductor.workbench-ui.\(testHome.lastPathComponent)"
+            app.launchEnvironment["FORGE_WORKBENCH_DEFAULTS_SUITE"] = workbenchDefaultsSuite
             app.launch()
         }
     }
@@ -54,6 +59,11 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
                     .removePersistentDomain(forName: guidedSetupDefaultsSuite)
             }
             guidedSetupDefaultsSuite = nil
+            if let workbenchDefaultsSuite {
+                UserDefaults(suiteName: workbenchDefaultsSuite)?
+                    .removePersistentDomain(forName: workbenchDefaultsSuite)
+            }
+            workbenchDefaultsSuite = nil
             if let testHome {
                 try? FileManager.default.removeItem(at: testHome)
             }
@@ -263,6 +273,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testRefreshToolbarExists() throws {
+        try showWorkbenchControls(["refresh"])
         let refresh = app.buttons["toolbar-refresh"]
         XCTAssertTrue(
             refresh.waitForExistence(timeout: 5),
@@ -274,6 +285,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testGuidedModeRoutesEveryPrimaryViewToItsOwnGuide() throws {
+        try showWorkbenchControls(["guidedMode", "guide"])
         let guidedMode = app.descendants(matching: .any)["toolbar-guided-mode"]
         XCTAssertTrue(guidedMode.waitForExistence(timeout: 8))
 
@@ -319,6 +331,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testGuidedModePersistsAndGuideClosesFromKeyboard() throws {
+        try showWorkbenchControls(["guidedMode", "guide"])
         var toggle = app.descendants(matching: .any)["toolbar-guided-mode"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 8))
         let wasEnabled = guidedModeIsEnabled(toggle)
@@ -358,7 +371,271 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         return (element.value as? String) == "1"
     }
 
+    private func showWorkbenchControls(_ controls: [String]) throws {
+        app.terminate()
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: try XCTUnwrap(workbenchDefaultsSuite)))
+        for control in controls {
+            defaults.set(true, forKey: "forge.workbench.control.\(control).v1")
+        }
+        _ = defaults.synchronize()
+        app.launch()
+    }
+
+    private func openGuideMenuAction(_ title: String) {
+        let menu = app.menuBars.menuBarItems["Guide"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.click()
+        let action = app.menuItems[title]
+        XCTAssertTrue(action.waitForExistence(timeout: 3))
+        XCTAssertTrue(action.isEnabled)
+        action.click()
+    }
+
+    private func openCurrentGuideFromMenu() { openGuideMenuAction("View Guide") }
+    private func openGuidedSetupFromMenu() { openGuideMenuAction("Guided Setup") }
+
+    private func openWorkbenchSettings() -> XCUIElement {
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        selectManagerSection("workbench")
+        XCTAssertTrue(settings.descendants(matching: .any)["workbench-settings"].waitForExistence(timeout: 5))
+        return settings
+    }
+
+    private func setGuidedModeFromSettings(_ enabled: Bool) {
+        let settings = openWorkbenchSettings()
+        let toggle = settings.checkBoxes["settings-guided-mode"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 3))
+        makeHittable(toggle)
+        if guidedModeIsEnabled(toggle) != enabled { toggle.click() }
+        XCTAssertTrue(waitForToggleState(enabled, on: toggle, timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+    }
+
+    func testWorkbenchControlsAreHiddenByDefaultAndSettingsPersistOnlyOptedInActions() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows["forge-main-window"]
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        assertGraphiteGlobalHeader(in: window)
+        captureGraphite("default-workbench-without-controls")
+
+        app.buttons["tab-manager"].click()
+        selectManagerSection("settings")
+        let draftHost = window.textFields["Dashboard host"]
+        XCTAssertTrue(draftHost.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForValue("127.0.0.1", on: draftHost))
+        draftHost.click()
+        draftHost.typeKey("a", modifierFlags: .command)
+        draftHost.typeText("127.0.0.2")
+        let updatesBefore = fixture.settingsUpdateCount
+
+        let settings = openWorkbenchSettings()
+        XCTAssertFalse(settings.buttons["settings-save"].exists,
+                       "Local Workbench preferences must not require a Manager save")
+        let controls = ["navigation", "autoRefresh", "guidedMode", "guide", "refresh", "guidedSetup"]
+        for control in controls {
+            let toggle = settings.checkBoxes["settings-control-\(control)"]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 3))
+            XCTAssertTrue(waitForToggleState(false, on: toggle, timeout: 3))
+        }
+        makeHittable(settings.checkBoxes["settings-control-guidedSetup"])
+        for control in controls {
+            let toggle = settings.checkBoxes["settings-control-\(control)"]
+            XCTAssertTrue(toggle.isHittable)
+            XCTAssertTrue(frameIsContained(toggle.frame, in: settings.frame, tolerance: 2))
+        }
+        captureGraphite("settings-workbench-defaults")
+
+        let refresh = settings.buttons["settings-refresh"]
+        makeHittable(refresh)
+        XCTAssertTrue(refresh.isHittable)
+        XCTAssertTrue(refresh.isEnabled)
+        refresh.click()
+        XCTAssertTrue(settings.descendants(matching: .any)["settings-refresh-status"].waitForExistence(timeout: 5))
+
+        let navigation = settings.checkBoxes["settings-navigation-visible"]
+        makeHittable(navigation)
+        XCTAssertTrue(waitForToggleState(true, on: navigation, timeout: 3))
+        navigation.click()
+        XCTAssertTrue(waitForToggleState(false, on: navigation, timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(window.buttons["tab-manager"].waitForNonExistence(timeout: 3))
+        app.menuBars.menuBarItems["Navigation"].click()
+        captureGraphite("navigation-menu-after-settings-hide")
+        let showNavigation = app.menuItems["Show Navigation"]
+        XCTAssertTrue(showNavigation.waitForExistence(timeout: 3))
+        showNavigation.click()
+        XCTAssertTrue(window.buttons["tab-manager"].waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForValue("127.0.0.2", on: draftHost),
+                      "Entering native Settings must preserve the pre-existing Manager draft")
+
+        setGuidedModeFromSettings(true)
+        XCTAssertTrue(window.descendants(matching: .any)["guided-inline-manager"].waitForExistence(timeout: 3))
+        openCurrentGuideFromMenu()
+        XCTAssertTrue(app.sheets.firstMatch.staticTexts["Manager guide"].waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
+        openGuidedSetupFromMenu()
+        XCTAssertTrue(app.descendants(matching: .any)["setup-guide"].waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
+
+        _ = openWorkbenchSettings()
+        let settingsGuide = settings.buttons["settings-show-guide"]
+        makeHittable(settingsGuide)
+        settingsGuide.click()
+        XCTAssertTrue(app.sheets.firstMatch.staticTexts["Manager guide"].waitForExistence(timeout: 5))
+        captureGraphite("settings-view-guide-route")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
+        _ = openWorkbenchSettings()
+        let settingsSetup = settings.buttons["settings-guided-setup"]
+        makeHittable(settingsSetup)
+        settingsSetup.click()
+        XCTAssertTrue(app.descendants(matching: .any)["setup-guide"].waitForExistence(timeout: 5))
+        captureGraphite("settings-guided-setup-route")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
+
+        _ = openWorkbenchSettings()
+        let autoRefresh = settings.checkBoxes["settings-auto-refresh"]
+        makeHittable(autoRefresh)
+        XCTAssertTrue(waitForToggleState(true, on: autoRefresh, timeout: 3))
+        autoRefresh.click()
+        XCTAssertTrue(waitForToggleState(false, on: autoRefresh, timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+        app.menuBars.menuBarItems["Telemetry"].click()
+        let automatic = app.menuItems["Auto-refresh"]
+        XCTAssertTrue(automatic.waitForExistence(timeout: 3))
+        automatic.click()
+        _ = openWorkbenchSettings()
+        XCTAssertTrue(waitForToggleState(true, on: autoRefresh, timeout: 3),
+                      "Telemetry menu and native Settings must share the same refresh behavior")
+
+        let guideOnly = settings.checkBoxes["settings-control-guide"]
+        makeHittable(guideOnly)
+        guideOnly.click()
+        XCTAssertTrue(waitForToggleState(true, on: guideOnly, timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+        let header = window.descendants(matching: .any)["workbench-global-controls"]
+        XCTAssertTrue(header.waitForExistence(timeout: 3))
+        XCTAssertTrue(header.buttons["toolbar-setup-guide"].isHittable)
+        for identifier in ["toolbar-navigation", "toolbar-auto-refresh", "toolbar-guided-mode", "toolbar-refresh", "dashboard-guided-setup"] {
+            XCTAssertFalse(header.descendants(matching: .any)[identifier].exists,
+                           "Enabling Guide must not reveal unrelated optional controls")
+        }
+        XCTAssertTrue(waitForValue("127.0.0.2", on: draftHost))
+        XCTAssertEqual(fixture.settingsUpdateCount, updatesBefore)
+        captureGraphite("only-guide-control-opted-in")
+
+        _ = openWorkbenchSettings()
+        for control in controls where control != "guide" {
+            let toggle = settings.checkBoxes["settings-control-\(control)"]
+            makeHittable(toggle)
+            toggle.click()
+            XCTAssertTrue(waitForToggleState(true, on: toggle, timeout: 3))
+        }
+        captureGraphite("settings-workbench-opted-in-controls")
+        app.typeKey("w", modifierFlags: .command)
+        assertGraphiteGlobalHeader(in: window, expectsAllControls: true)
+        XCTAssertTrue(waitForValue("127.0.0.2", on: draftHost))
+        window.buttons["settings-reload"].click()
+        XCTAssertTrue(waitForValue("127.0.0.1", on: draftHost),
+                      "Explicit Reload must still replace the staged Manager draft")
+        XCTAssertEqual(fixture.settingsUpdateCount, updatesBefore)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: try XCTUnwrap(workbenchDefaultsSuite)))
+        XCTAssertTrue(waitUntil(timeout: 3) {
+            _ = defaults.synchronize()
+            return controls.allSatisfy { defaults.bool(forKey: "forge.workbench.control.\($0).v1") }
+        })
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        assertGraphiteGlobalHeader(in: window, expectsAllControls: true)
+        captureGraphite("opted-in-controls-persisted-after-relaunch")
+        XCTAssertEqual(fixture.settingsUpdateCount, updatesBefore)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testWorkbenchOptionalControlsCanBeRemovedAndStayHiddenAfterRelaunch() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows["forge-main-window"]
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        let controls = ["navigation", "autoRefresh", "guidedMode", "guide", "refresh", "guidedSetup"]
+        try showWorkbenchControls(controls)
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        assertGraphiteGlobalHeader(in: window, expectsAllControls: true)
+
+        let settings = openWorkbenchSettings()
+        for control in controls where control != "guide" {
+            let toggle = settings.checkBoxes["settings-control-\(control)"]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 3))
+            makeHittable(toggle)
+            XCTAssertTrue(waitForToggleState(true, on: toggle, timeout: 3))
+            toggle.click()
+            XCTAssertTrue(waitForToggleState(false, on: toggle, timeout: 3))
+        }
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+        let header = window.descendants(matching: .any)["workbench-global-controls"]
+        XCTAssertTrue(header.waitForExistence(timeout: 3))
+        XCTAssertTrue(header.buttons["toolbar-setup-guide"].isHittable)
+        for identifier in ["toolbar-navigation", "toolbar-auto-refresh", "toolbar-guided-mode", "toolbar-refresh", "dashboard-guided-setup", "toolbar-guided-setup"] {
+            XCTAssertFalse(header.descendants(matching: .any)[identifier].exists)
+        }
+        captureGraphite("opt-out-retains-only-guide")
+
+        _ = openWorkbenchSettings()
+        let lastControl = settings.checkBoxes["settings-control-guide"]
+        makeHittable(lastControl)
+        XCTAssertTrue(waitForToggleState(true, on: lastControl, timeout: 3))
+        lastControl.click()
+        XCTAssertTrue(waitForToggleState(false, on: lastControl, timeout: 3))
+        makeHittable(settings.checkBoxes["settings-control-guidedSetup"])
+        for control in controls {
+            XCTAssertTrue(waitForToggleState(false, on: settings.checkBoxes["settings-control-\(control)"], timeout: 3))
+        }
+        captureGraphite("settings-workbench-all-controls-opted-out")
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(header.waitForNonExistence(timeout: 3),
+                      "Removing the last optional control must remove the entire control bar")
+        assertGraphiteGlobalHeader(in: window)
+        captureGraphite("opt-out-removes-last-control-bar")
+
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: try XCTUnwrap(workbenchDefaultsSuite)))
+        XCTAssertTrue(waitUntil(timeout: 3) {
+            _ = defaults.synchronize()
+            return controls.allSatisfy { !defaults.bool(forKey: "forge.workbench.control.\($0).v1") }
+        })
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        assertGraphiteGlobalHeader(in: window)
+        captureGraphite("opt-out-persists-clean-workspace-after-relaunch")
+        _ = openWorkbenchSettings()
+        for control in controls {
+            XCTAssertTrue(waitForToggleState(false, on: settings.checkBoxes["settings-control-\(control)"], timeout: 3))
+        }
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
     func testDashboardToolbarGuidedSetupButtonIsLabeledHittableAndOpensWizard() throws {
+        try showWorkbenchControls(["guidedSetup"])
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
@@ -366,12 +643,12 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(dashboard.waitForExistence(timeout: 8))
         dashboard.click()
 
-        let toolbar = app.toolbars.firstMatch
-        XCTAssertTrue(toolbar.waitForExistence(timeout: 5))
-        let guidedSetup = toolbar.descendants(matching: .any)["toolbar-guided-setup"]
+        let header = app.descendants(matching: .any)["workbench-global-controls"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        let guidedSetup = header.buttons["dashboard-guided-setup"]
         XCTAssertTrue(
             guidedSetup.waitForExistence(timeout: 5),
-            "Dashboard must expose a clearly labeled Guided Setup control in the window toolbar"
+            "Dashboard must expose a clearly labeled Guided Setup button in the view header"
         )
         XCTAssertTrue(guidedSetup.label.contains("Guided Setup"))
         XCTAssertTrue(guidedSetup.isHittable)
@@ -404,17 +681,22 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testGuidedSetupReviewConfirmationAdvancesToStartAndPersists() throws {
-        let fixture = try OperatorManagerUITestFixture(initialRunState: "completed")
+        let fixture = try OperatorManagerUITestFixture(
+            initialRunState: "completed",
+            initialProviderHealth: "contract_valid"
+        )
         relaunch(with: fixture)
 
-        let guidedSetup = app.buttons["dashboard-guided-setup"]
-        XCTAssertTrue(guidedSetup.waitForExistence(timeout: 8))
-        guidedSetup.click()
+        openGuidedSetupFromMenu()
 
         let reviewStep = app.buttons["guided-setup-step-5"]
         XCTAssertTrue(reviewStep.waitForExistence(timeout: 5))
         makeHittable(reviewStep)
         reviewStep.click()
+
+        let reviewIdentity = app.staticTexts["guided-setup-review-project-identity"]
+        XCTAssertTrue(reviewIdentity.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(reviewIdentity, contains: "generation 4"))
 
         let confirmByIdentifier = app.buttons["setup-guide-confirm-review"]
         let confirm = confirmByIdentifier.exists
@@ -424,7 +706,19 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         confirm.click()
         let activeTitle = app.staticTexts["guided-setup-step-title"]
         XCTAssertTrue(
-            waitUntil(timeout: 3) { self.element(activeTitle, contains: "Start the automated run") }
+            waitUntil(timeout: 3) { self.element(activeTitle, contains: "Start in LM Studio") }
+        )
+
+        let suiteName = try XCTUnwrap(guidedSetupDefaultsSuite)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        XCTAssertTrue(waitUntil(timeout: 3) {
+            _ = defaults.synchronize()
+            return defaults.integer(forKey: "forge.guidedSetup.step.v2") == 5
+                && defaults.string(forKey: "forge.guidedSetup.reviewedPreparation.v2")?.count == 64
+                && defaults.string(forKey: "forge.guidedSetup.reviewProject.v1")?.isEmpty == false
+        }, "The chosen project and exact reviewed preparation must be durably saved")
+        let reviewedFingerprint = try XCTUnwrap(
+            defaults.string(forKey: "forge.guidedSetup.reviewedPreparation.v2")
         )
 
         let closeByIdentifier = app.buttons["guided-setup-close"]
@@ -432,22 +726,37 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(close.waitForExistence(timeout: 3))
         close.click()
 
-        XCTAssertTrue(guidedSetup.waitForExistence(timeout: 3))
-        guidedSetup.click()
+        openGuidedSetupFromMenu()
         XCTAssertTrue(
-            waitUntil(timeout: 3) { self.element(activeTitle, contains: "Start the automated run") },
+            waitUntil(timeout: 3) { self.element(activeTitle, contains: "Start in LM Studio") },
             "The explicitly confirmed preparation and selected step must resume after reopening"
         )
+        makeHittable(reviewStep)
+        reviewStep.click()
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(confirm, contains: "Continue to LM Studio") && confirm.isEnabled
+        }, "Reopening the same inputs must retain the exact review")
+        XCTAssertEqual(
+            defaults.string(forKey: "forge.guidedSetup.reviewedPreparation.v2"),
+            reviewedFingerprint
+        )
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerProbeAuthorizationCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0,
+                       "Reviewing before a chat must not activate a provider, bind a session or start work")
     }
 
     func testDashboardTitleButtonOpensOrderedGuidedSetupWizard() throws {
+        try showWorkbenchControls(["guidedSetup"])
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
 
         let dashboard = app.buttons["tab-rig"]
         XCTAssertTrue(dashboard.waitForExistence(timeout: 8))
         dashboard.click()
-        XCTAssertTrue(app.staticTexts["DASHBOARD // LM STUDIO"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["detail-rig"].waitForExistence(timeout: 5))
 
         let guidedSetup = app.buttons["dashboard-guided-setup"]
         XCTAssertTrue(
@@ -460,7 +769,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(wizard.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Guided Setup"].exists)
         XCTAssertTrue(
-            app.staticTexts["Set up, start, monitor, and recover an automated project run"].exists
+            app.staticTexts["Set up Forge, work in LM Studio, and monitor policy and continuity"].exists
         )
 
         let expectedSteps = [
@@ -468,9 +777,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Connect the model provider",
             "Register the project",
             "Add and order instructions",
-            "Review automation behavior",
-            "Start the automated run",
-            "Monitor the run",
+            "Review project inputs",
+            "Start in LM Studio",
+            "Monitor governance and continuity",
             "Resolve issues and continue",
         ]
         for (offset, title) in expectedSteps.enumerated() {
@@ -542,6 +851,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let managerTab = app.buttons["tab-manager"]
         XCTAssertTrue(managerTab.waitForExistence(timeout: 8))
         managerTab.click()
+        selectManagerSection("shell")
 
         let shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
         XCTAssertTrue(
@@ -559,6 +869,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
     func testManagerShowsProtectedFilesystemServiceControls() throws {
         app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("filesystem")
 
         let status = app.descendants(matching: .any)[
             "settings-filesystem-service-status"
@@ -620,6 +931,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             app.descendants(matching: .any)["settings-filesystem-recovery-policy"].exists
         )
         XCTAssertTrue(app.buttons["settings-filesystem-recovery-reconcile"].exists)
+        selectManagerSection("folders")
         XCTAssertTrue(app.buttons["settings-allowed-root-add"].exists)
         XCTAssertTrue(
             app.descendants(matching: .any)["settings-allowed-roots-empty"].exists
@@ -628,9 +940,10 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
     func testProtectedFilesystemRefreshMutuallyExcludesEveryConflictingControl() throws {
         app.terminate()
-        app.launchEnvironment["FORGE_FILESYSTEM_SETTINGS_UI_TEST_DELAY_MS"] = "1200"
+        app.launchEnvironment["FORGE_FILESYSTEM_SETTINGS_UI_TEST_DELAY_MS"] = "2000"
         app.launch()
         app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("filesystem")
 
         let operationStatus = app.descendants(matching: .any)[
             "settings-filesystem-operation-status"
@@ -665,6 +978,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             },
             "all protected-filesystem controls must disable during Refresh"
         )
+        captureGraphite("settings-filesystem-refresh-pending")
         XCTAssertTrue(
             app.descendants(matching: .any)["settings-filesystem-service-status"].exists
         )
@@ -686,6 +1000,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             },
             "Refresh must return the shared operation gate to idle"
         )
+        captureGraphite("settings-filesystem-refresh-settled")
     }
 
     private func element(_ element: XCUIElement, contains text: String) -> Bool {
@@ -702,6 +1017,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         relaunch(with: fixture)
 
         app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("shell")
         var shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
         XCTAssertTrue(
             shellToggle.waitForExistence(timeout: 5),
@@ -726,6 +1042,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         app.terminate()
         app.launch()
         app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("shell")
         shellToggle = app.descendants(matching: .any)["settings-shell-enabled"]
         XCTAssertTrue(
             shellToggle.waitForExistence(timeout: 5),
@@ -856,8 +1173,11 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(compute.exists)
         XCTAssertTrue(compute.frame.contains(cpu.frame))
         XCTAssertTrue(compute.frame.contains(gpu.frame))
-        XCTAssertGreaterThan(cpu.frame.intersection(gpu.frame).height, 0)
-        XCTAssertLessThan(cpu.frame.height, 120)
+        XCTAssertFalse(cpu.frame.intersects(gpu.frame), "The revised detailed chip panels must not overlap")
+        XCTAssertGreaterThan(cpu.frame.height, 250, "The Compute frame now contains a detailed native chip rather than compact bars")
+        XCTAssertTrue(compute.staticTexts["compute-cpu-hardware-name"].exists)
+        XCTAssertTrue(compute.staticTexts["compute-gpu-hardware-name"].exists)
+        XCTAssertTrue(compute.staticTexts["compute-activity-provenance"].exists)
 
         let rootScroll = try XCTUnwrap(
             largestScrollView(),
@@ -999,6 +1319,1746 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         try assertEveryPrimaryViewContainedAndAligned(in: window)
     }
 
+    func testGraphiteGuidedHelpAdvancedDisclosureOpensAndCloses() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        app.buttons["tab-projects"].click()
+        openCurrentGuideFromMenu()
+        let help = app.descendants(matching: .any)["guided-help-sheet"]
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        let advanced = help.disclosureTriangles["guided-help-advanced"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 3))
+        XCTAssertTrue(waitForToggleState(false, on: advanced, timeout: 3))
+        makeHittable(advanced)
+        captureGraphite("contextual-help-disclosure-before")
+        expandGraphiteDisclosure(advanced)
+        captureGraphite("contextual-help-disclosure-after")
+        makeHittable(advanced)
+        advanced.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 26, dy: 8)).click()
+        XCTAssertTrue(waitForToggleState(false, on: advanced, timeout: 3))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(help.waitForNonExistence(timeout: 3))
+    }
+
+    func testWorkbenchHeaderKeepsGuidedSetupAtNormalSizeOnRightAndPreservesControls() throws {
+        try showWorkbenchControls(["navigation", "autoRefresh", "guidedMode", "guide", "refresh", "guidedSetup"])
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        for size in ["normal", "minimum"] {
+            if size == "minimum" { resizeMainWindowToMinimum(window) }
+            assertGraphiteGlobalHeader(in: window, expectsAllControls: true)
+            captureGraphite("global-controls-\(size)")
+            let setup = app.buttons["dashboard-guided-setup"]
+            setup.click()
+            XCTAssertTrue(app.descendants(matching: .any)["setup-guide"].waitForExistence(timeout: 5))
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
+        }
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testComputeCoresPausedNativeProjectionRemainsStableAtBothWindowSizes() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows["forge-main-window"]
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        app.buttons["tab-rig"].click()
+        let initialDetail = try XCTUnwrap(selectedDetailContainer(named: "Dashboard"))
+        _ = try requireNativeComputeProjection(in: initialDetail, window: window)
+        let settings = openWorkbenchSettings()
+        let automatic = settings.checkBoxes["settings-auto-refresh"]
+        XCTAssertTrue(waitForToggleState(true, on: automatic, timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+        app.menuBars.menuBarItems["Telemetry"].click()
+        let automaticMenu = app.menuItems["Auto-refresh"]
+        XCTAssertTrue(automaticMenu.waitForExistence(timeout: 3))
+        automaticMenu.click()
+        _ = openWorkbenchSettings()
+        XCTAssertTrue(waitForToggleState(false, on: automatic, timeout: 3),
+                      "The native Telemetry command must pause delivered host telemetry and chip motion")
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+
+        for size in ["normal", "minimum"] {
+            if size == "minimum" { resizeMainWindowToMinimum(window) }
+            app.buttons["tab-rig"].click()
+            let detail = try XCTUnwrap(selectedDetailContainer(named: "Dashboard"))
+            let projection = try requireNativeComputeProjection(in: detail, window: window)
+            let cpuState = projection.compute.staticTexts["compute-cpu-activity-state"]
+            let gpuState = projection.compute.staticTexts["compute-gpu-activity-state"]
+            let renderer = projection.compute.staticTexts["compute-renderer-status"]
+            XCTAssertTrue(waitUntil(timeout: 5) {
+                self.computeSemanticText(cpuState) == "Paused" && self.computeSemanticText(gpuState) == "Paused"
+                    && self.computeSemanticText(renderer) == "Metal · paused"
+            })
+            var priorPixels: Data?
+            var priorSemantics: [String]?
+            for capture in 1...2 {
+                // The second frame crosses the normal3s freshness boundary. An intentional
+                // pause must retain its source/shading and remain distinct from stale data.
+                RunLoop.current.run(until: Date().addingTimeInterval(capture == 1 ? 0.8 : 3.2))
+                let semantics = [cpuState, gpuState, renderer,
+                                 projection.compute.staticTexts["compute-cpu-hardware-name"],
+                                 projection.compute.staticTexts["compute-gpu-hardware-name"],
+                                 projection.compute.staticTexts["compute-activity-provenance"]].map(computeSemanticText)
+                let screenshot = window.screenshot()
+                let name = "compute-paused-native-\(size)-\(capture)"
+                retainComputeScreenshot(screenshot, name: name)
+                let bitmap = try XCTUnwrap(NSBitmapImageRep(data: screenshot.pngRepresentation))
+                let readback = try computeSurfacePixelReadback(bitmap: bitmap, window: window.frame,
+                                                              surface: projection.surface.frame)
+                let receipt = XCTAttachment(string: "window=\(NSStringFromRect(window.frame)); surface=\(NSStringFromRect(projection.surface.frame)); png=\(bitmap.pixelsWide)x\(bitmap.pixelsHigh)\n\(readback.receipt)\nsemantics=\(semantics)")
+                receipt.name = "\(name)-pixel-readback"
+                receipt.lifetime = .keepAlways
+                add(receipt)
+                if let priorPixels { XCTAssertEqual(readback.pixels, priorPixels, "Every settled paused chip pixel must remain unchanged") }
+                if let priorSemantics { XCTAssertEqual(semantics, priorSemantics) }
+                priorPixels = readback.pixels
+                priorSemantics = semantics
+                XCTAssertEqual(semantics[0], "Paused")
+                XCTAssertEqual(semantics[1], "Paused")
+                XCTAssertEqual(semantics[2], "Metal · paused")
+            }
+        }
+        assertComputeHasNoUnrequestedManagerWrites(fixture)
+    }
+
+    func testComputeCoresNativeHostIdentityGeometryAndMetalMotionFrames() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows["forge-main-window"]
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        let settings = openWorkbenchSettings()
+        XCTAssertTrue(waitForToggleState(true, on: settings.checkBoxes["settings-auto-refresh"], timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+        app.buttons["tab-rig"].click()
+        let detail = try XCTUnwrap(selectedDetailContainer(named: "Dashboard"))
+        let projection = try requireNativeComputeProjection(in: detail, window: window)
+        let renderer = projection.compute.staticTexts["compute-renderer-status"]
+        XCTAssertTrue(waitUntil(timeout: 5) { self.computeSemanticText(renderer) == "Metal · simulated trace flow" })
+        captureGraphite("compute-metal-motion-normal-before")
+        let started = ProcessInfo.processInfo.systemUptime
+        var rows: [[String: Any]] = []
+        for index in 1...20 {
+            let before = ProcessInfo.processInfo.systemUptime
+            let screenshot = window.screenshot()
+            let after = ProcessInfo.processInfo.systemUptime
+            let name = String(format: "compute-metal-motion-frame-%03d", index)
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            rows.append(["frame": index, "attachment": name, "capture_start_uptime": before,
+                         "capture_end_uptime": after, "elapsed_start": before - started,
+                         "elapsed_end": after - started, "window": NSStringFromRect(window.frame),
+                         "surface": NSStringFromRect(projection.surface.frame)])
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        let receipt = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+            "kind": "actual unmodified native window screenshots; no interpolated frames",
+            "auto_refresh": true, "elapsed_seconds": elapsed, "frames": rows,
+            "cpu_identity": computeSemanticText(projection.compute.staticTexts["compute-cpu-hardware-name"]),
+            "gpu_identity": computeSemanticText(projection.compute.staticTexts["compute-gpu-hardware-name"])
+        ], options: [.sortedKeys, .prettyPrinted]), uniformTypeIdentifier: "public.json")
+        receipt.name = "compute-metal-motion-frame-times"
+        receipt.lifetime = .keepAlways
+        add(receipt)
+        XCTAssertEqual(rows.count, 20)
+        XCTAssertGreaterThanOrEqual(elapsed, 6)
+        XCTAssertLessThan(elapsed, 30, "Native motion acquisition must remain bounded")
+        XCTAssertEqual(computeSemanticText(renderer), "Metal · simulated trace flow")
+        captureGraphite("compute-metal-motion-normal-after")
+        resizeMainWindowToMinimum(window)
+        _ = try requireNativeComputeProjection(in: detail, window: window)
+        captureGraphite("compute-metal-motion-minimum")
+        assertComputeHasNoUnrequestedManagerWrites(fixture)
+    }
+
+    private func requireNativeComputeProjection(in detail: XCUIElement, window: XCUIElement) throws
+        -> (compute: XCUIElement, surface: XCUIElement) {
+        let compute = detail.descendants(matching: .any)["rig-compute-cores-panel"]
+        XCTAssertTrue(compute.waitForExistence(timeout: 5))
+        makeHittable(compute, in: detail)
+        XCTAssertTrue(frameIsContained(compute.frame, in: detail.frame, tolerance: 2))
+        XCTAssertTrue(frameIsContained(compute.frame, in: window.frame, tolerance: 2))
+        let cpu = compute.descendants(matching: .any)["rig-cpu-cores-panel"]
+        let gpu = compute.descendants(matching: .any)["rig-gpu-cores-panel"]
+        let surface = compute.descendants(matching: .any)["compute-render-surface"]
+        for panel in [cpu, gpu, surface] {
+            XCTAssertTrue(panel.waitForExistence(timeout: 5))
+            XCTAssertTrue(frameIsContained(panel.frame, in: compute.frame, tolerance: 2))
+            XCTAssertTrue(frameIsContained(panel.frame, in: window.frame, tolerance: 2))
+            XCTAssertGreaterThan(panel.frame.width, 0)
+            XCTAssertGreaterThan(panel.frame.height, 0)
+        }
+        XCTAssertFalse(cpu.frame.intersects(gpu.frame), "The independent chip panels must never overlap")
+        let cpuName = compute.staticTexts["compute-cpu-hardware-name"]
+        let gpuName = compute.staticTexts["compute-gpu-hardware-name"]
+        let expectedCPU = observedComputeHostCPUName()
+        XCTAssertTrue(waitUntil(timeout: 5) { self.computeSemanticText(cpuName) == expectedCPU })
+        let observedGPUDevices = MTLCopyAllDevices().map(\.name)
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            let name = self.computeSemanticText(gpuName)
+            return observedGPUDevices.isEmpty ? name == "GPU identity unavailable" : observedGPUDevices.contains(name)
+        })
+        XCTAssertTrue(frameIsContained(cpuName.frame, in: cpu.frame, tolerance: 2))
+        XCTAssertTrue(frameIsContained(gpuName.frame, in: gpu.frame, tolerance: 2))
+        let provenance = compute.staticTexts["compute-activity-provenance"]
+        XCTAssertTrue(provenance.exists)
+        XCTAssertTrue(computeSemanticText(provenance).contains("GPU regions illustrative"))
+        XCTAssertTrue(computeSemanticText(provenance).contains("Trace flow simulated"))
+        // Existing gauges elsewhere retain their own measured values. The revised
+        // component intentionally has chip regions rather than the old mini-bars.
+        for engine in ["device", "render", "tiler"] {
+            XCTAssertFalse(compute.descendants(matching: .any)["rig-gpu-engine-\(engine)"].exists)
+        }
+        return (compute, surface)
+    }
+
+    private func observedComputeHostCPUName() -> String {
+        func observedString(_ key: String) -> String? {
+            var size = 0
+            guard sysctlbyname(key, nil, &size, nil, 0) == 0, size > 1, size <= 4_096 else { return nil }
+            var bytes = [CChar](repeating: 0, count: size)
+            guard sysctlbyname(key, &bytes, &size, nil, 0) == 0 else { return nil }
+            return String(decoding: bytes.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        }
+        let name = (observedString("machdep.cpu.brand_string") ?? observedString("hw.model") ?? "CPU")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "CPU identity unavailable" : name
+    }
+
+    private func computeSemanticText(_ element: XCUIElement) -> String {
+        (element.value as? String) ?? element.label
+    }
+
+    private func retainComputeScreenshot(_ screenshot: XCUIScreenshot, name: String) {
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let semantics = XCTAttachment(string: app.debugDescription)
+        semantics.name = "\(name)-accessibility"
+        semantics.lifetime = .keepAlways
+        add(semantics)
+    }
+
+    private func computeSurfacePixelReadback(bitmap: NSBitmapImageRep, window: CGRect, surface: CGRect) throws
+        -> (pixels: Data, receipt: String) {
+        let scaleX = Double(bitmap.pixelsWide) / Double(window.width)
+        let scaleY = Double(bitmap.pixelsHigh) / Double(window.height)
+        XCTAssertEqual(scaleX, scaleY, accuracy: 0.02)
+        let interior = surface.insetBy(dx: 2, dy: 2)
+        let minX = Int((Double(interior.minX - window.minX) * scaleX).rounded(.up))
+        let maxX = Int((Double(interior.maxX - window.minX) * scaleX).rounded(.down))
+        let minY = Int((Double(interior.minY - window.minY) * scaleY).rounded(.up))
+        let maxY = Int((Double(interior.maxY - window.minY) * scaleY).rounded(.down))
+        XCTAssertGreaterThan(maxX - minX, 100)
+        XCTAssertGreaterThan(maxY - minY, 100)
+        XCTAssertGreaterThanOrEqual(minX, 0)
+        XCTAssertGreaterThanOrEqual(minY, 0)
+        XCTAssertLessThanOrEqual(maxX, bitmap.pixelsWide)
+        XCTAssertLessThanOrEqual(maxY, bitmap.pixelsHigh)
+        var result = Data()
+        result.reserveCapacity((maxX - minX) * (maxY - minY) * 3)
+        for y in minY..<maxY {
+            for x in minX..<maxX {
+                let color = try XCTUnwrap(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                result.append(UInt8((min(max(color.redComponent, 0), 1) * 255).rounded()))
+                result.append(UInt8((min(max(color.greenComponent, 0), 1) * 255).rounded()))
+                result.append(UInt8((min(max(color.blueComponent, 0), 1) * 255).rounded()))
+            }
+        }
+        return (result, "scale=\(scaleX),\(scaleY); actual_surface_scan_rectangle=(\(minX)..<\(maxX),\(minY)..<\(maxY)); RGB_bytes=\(result.count)")
+    }
+
+    private func assertComputeHasNoUnrequestedManagerWrites(_ fixture: OperatorManagerUITestFixture) {
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testGraphiteToolsColumnsAlignWithNativeRowsAtBothWindowSizes() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows["forge-main-window"]
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        for size in ["normal", "minimum"] {
+            if size == "minimum" { resizeMainWindowToMinimum(window) }
+            app.buttons["tab-tools"].click()
+            let detail = try XCTUnwrap(selectedDetailContainer(named: "Tools"))
+            assertGraphiteGlobalHeader(in: window)
+            XCTAssertTrue(detail.textFields["tool-filter"].isHittable)
+            let columns = ["name", "state", "health", "activity"]
+            let headers = columns.map { detail.staticTexts["tools-column-\($0)"] }
+            let values = columns.map { detail.staticTexts["tools-row-\($0)-agent_context"] }
+            for element in headers + values {
+                XCTAssertTrue(element.waitForExistence(timeout: 5))
+                XCTAssertGreaterThan(element.frame.width, 0)
+                XCTAssertGreaterThan(element.frame.height, 0)
+                XCTAssertTrue(frameIsContained(element.frame, in: detail.frame, tolerance: 2))
+                XCTAssertTrue(frameIsContained(element.frame, in: window.frame, tolerance: 2))
+            }
+            XCTAssertTrue(element(values[0], contains: "agent_context"))
+            XCTAssertTrue(element(values[1], contains: "idle"))
+            XCTAssertTrue(element(values[2], contains: "READY"))
+            let scrollQuery = detail.scrollViews.containing(.staticText, identifier: "tools-row-name-agent_context")
+            XCTAssertEqual(scrollQuery.count, 1)
+            XCTAssertTrue(frameIsContained(scrollQuery.element.frame, in: detail.frame, tolerance: 2))
+            for value in values {
+                XCTAssertTrue(frameIsContained(value.frame, in: scrollQuery.element.frame, tolerance: 2))
+            }
+            let aligned = waitUntil(timeout: 5) {
+                abs(headers[0].frame.minX - values[0].frame.minX) <= 2
+                    && abs(headers[1].frame.minX - values[1].frame.minX) <= 2
+                    && abs(headers[2].frame.minX - values[2].frame.minX) <= 2
+                    && abs(headers[3].frame.maxX - values[3].frame.maxX) <= 2
+            }
+            captureGraphite("tools-column-alignment-\(size)")
+            XCTAssertTrue(aligned, "Native column headings must align with the displayed row at \(size) width")
+            for index in 0..<3 {
+                XCTAssertEqual(headers[index].frame.minX, values[index].frame.minX, accuracy: 2)
+            }
+            XCTAssertEqual(headers[3].frame.maxX, values[3].frame.maxX, accuracy: 2)
+        }
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testGraphiteNativeSettingsCapturesEverySectionAtMinimumSize() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let mainWindow = app.windows["forge-main-window"]
+        XCTAssertTrue(mainWindow.waitForExistence(timeout: 8))
+        assertGraphiteGlobalHeader(in: mainWindow)
+        let settings = openWorkbenchSettings()
+        let handle = settings.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -1, dy: 0))
+        handle.click(forDuration: 0.2, thenDragTo: handle.withOffset(CGVector(dx: -800, dy: 0)))
+        captureGraphite("settings-minimum-after-drag")
+        XCTAssertTrue(waitUntil(timeout: 3) {
+            abs(settings.frame.width - 760) <= 3 && abs(settings.frame.height - 592) <= 3
+        }, "Native Settings must reach its 760 × 560 content minimum plus the measured 32-point title bar")
+        XCTAssertEqual(settings.frame.width, 760, accuracy: 3)
+        XCTAssertEqual(settings.frame.height, 592, accuracy: 3)
+
+        let sections = [
+            ("workbench", "Workbench"), ("folders", "Authorized Folders"),
+            ("service", "Service"), ("runtime", "Runtime"), ("settings", "Settings"),
+            ("shell", "Project Shell"), ("filesystem", "Protected Filesystem"),
+            ("maintenance", "Maintenance"), ("doctor", "Doctor"),
+        ]
+        for (identifier, title) in sections {
+            selectManagerSection(identifier)
+            let heading = settings.groups["detail-manager"].staticTexts.matching(
+                NSPredicate(format: "label == %@ OR value == %@", title, title)
+            )
+            XCTAssertTrue(heading.element.waitForExistence(timeout: 3))
+            XCTAssertEqual(heading.count, 1)
+            XCTAssertTrue(frameIsContained(heading.element.frame, in: settings.frame, tolerance: 2))
+            let body = try XCTUnwrap(settings.scrollViews.allElementsBoundByIndex
+                .filter { $0.exists && $0.frame.width > 300 }
+                .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
+            body.scroll(byDeltaX: 0, deltaY: 1_200)
+            captureGraphite("settings-minimum-\(identifier)")
+
+            let lowerAnchor: XCUIElement?
+            switch identifier {
+            case "workbench":
+                let navigation = settings.checkBoxes["settings-navigation-visible"]
+                XCTAssertTrue(navigation.isHittable)
+                lowerAnchor = settings.checkBoxes["settings-control-guidedSetup"]
+            case "folders":
+                let addFolder = settings.buttons["settings-allowed-root-add"]
+                XCTAssertTrue(waitForEnabled(addFolder, timeout: 5))
+                XCTAssertTrue(addFolder.isHittable)
+                lowerAnchor = nil
+            case "service":
+                for action in ["Start", "Stop", "Restart"] {
+                    XCTAssertTrue(settings.buttons[action].isHittable)
+                }
+                lowerAnchor = nil
+            case "settings":
+                XCTAssertTrue(waitForValue("127.0.0.1", on: settings.textFields["Dashboard host"]))
+                lowerAnchor = settings.textFields["Session idle TTL (sec)"]
+            case "shell":
+                XCTAssertTrue(settings.descendants(matching: .any)["settings-shell-enabled"].isHittable)
+                lowerAnchor = settings.descendants(matching: .any)["shell-policy-migration-status"]
+            case "filesystem":
+                XCTAssertTrue(settings.descendants(matching: .any)["settings-filesystem-service-status"].exists)
+                lowerAnchor = settings.buttons["settings-filesystem-service-refresh"]
+            case "maintenance":
+                for action in ["Refresh telemetry now", "Prune stale presence", "Prune idle sessions", "Run doctor"] {
+                    XCTAssertTrue(settings.buttons[action].isHittable)
+                }
+                lowerAnchor = nil
+            case "doctor":
+                XCTAssertTrue(settings.staticTexts["Health checks"].exists)
+                XCTAssertTrue(settings.buttons["Run doctor"].isHittable)
+                lowerAnchor = nil
+            default:
+                XCTAssertTrue(settings.staticTexts["App version"].exists)
+                lowerAnchor = nil
+            }
+            if let lowerAnchor {
+                XCTAssertTrue(lowerAnchor.waitForExistence(timeout: 5))
+                makeHittable(lowerAnchor, in: settings)
+                XCTAssertTrue(frameIsContained(lowerAnchor.frame, in: settings.frame, tolerance: 2))
+                captureGraphite("settings-minimum-\(identifier)-lower")
+            }
+            if ["folders", "settings", "shell"].contains(identifier) {
+                for action in ["settings-reload", "settings-save"] {
+                    XCTAssertTrue(settings.buttons[action].isHittable)
+                    XCTAssertTrue(frameIsContained(settings.buttons[action].frame, in: settings.frame, tolerance: 2))
+                }
+            }
+        }
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
+    }
+
+    func testGraphiteWorkbenchCapturesEveryCurrentView() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        try captureGraphitePrimaryViews(in: window, size: "normal")
+        resizeMainWindowToMinimum(window)
+        try captureGraphitePrimaryViews(in: window, size: "minimum")
+        try resizeMainWindowForGraphiteReference(window)
+        app.buttons["tab-manager"].click()
+        for section in ["folders", "service", "runtime", "settings", "shell", "filesystem", "maintenance", "doctor", "workbench"] {
+            selectManagerSection(section)
+            captureGraphite("manager-\(section)")
+        }
+    }
+
+    func testGraphiteDashboardLowerPanelsRemainVisibleAtBothWindowSizes() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        XCTAssertEqual(app.launchEnvironment["FORGE_SKIP_PS"], "1")
+        let rows: [(name: String, panels: [(identifier: String, heading: String)])] = [
+            ("mcp-presence-tools", [
+                ("rig-mcp-servers-panel", "MCP SERVERS"),
+                ("rig-mcp-tools-panel", "MCP TOOLS"),
+            ]),
+            ("sub-agents-hot-processes", [
+                ("rig-sub-agents-panel", "SUB-AGENTS"),
+                ("rig-hot-processes-panel", "HOT PROCESSES"),
+            ]),
+            ("live-stream", [
+                ("rig-live-stream-panel", "LIVE STREAM ▮ TOOLS · AGENTS · DIAGNOSTICS"),
+            ]),
+        ]
+
+        func captureLowerPanels(size: String) throws {
+            app.buttons["tab-rig"].click()
+            let detail = try XCTUnwrap(selectedDetailContainer(named: "Dashboard"))
+            XCTAssertEqual(detail.elementType, .scrollView)
+            assertGraphiteGlobalHeader(in: window)
+            for row in rows {
+                var panels: [XCUIElement] = []
+                var headings: [XCUIElement] = []
+                for definition in row.panels {
+                    let matches = detail.groups.matching(identifier: definition.identifier)
+                    XCTAssertEqual(matches.count, 1)
+                    let panel = matches.element
+                    XCTAssertTrue(panel.waitForExistence(timeout: 5))
+                    let headingMatches = panel.staticTexts.matching(NSPredicate(
+                        format: "label == %@ OR value == %@", definition.heading, definition.heading
+                    ))
+                    XCTAssertEqual(headingMatches.count, 1)
+                    let heading = headingMatches.element
+                    XCTAssertTrue(heading.exists)
+                    panels.append(panel)
+                    headings.append(heading)
+                }
+                makeHittable(try XCTUnwrap(headings.first))
+                for _ in 0..<12 {
+                    let bounds = panels.reduce(CGRect.null) { $0.union($1.frame) }
+                    if frameIsContained(bounds, in: detail.frame, tolerance: 2) { break }
+                    let distance = bounds.midY - detail.frame.midY
+                    detail.scroll(byDeltaX: 0, deltaY: -min(360, max(-360, distance)))
+                }
+                captureGraphite("\(size)-dashboard-\(row.name)")
+                for (panel, heading) in zip(panels, headings) {
+                    XCTAssertGreaterThan(panel.frame.width, 100)
+                    XCTAssertGreaterThan(panel.frame.height, 30)
+                    XCTAssertTrue(frameIsContained(panel.frame, in: detail.frame, tolerance: 2),
+                                  "The complete \(heading.value ?? heading.label) panel must be visible")
+                    XCTAssertTrue(heading.isHittable)
+                    XCTAssertTrue(frameIsContained(heading.frame, in: panel.frame, tolerance: 2))
+                }
+                if row.name == "mcp-presence-tools" {
+                    let servers = detail.groups["rig-mcp-servers-panel"]
+                    let identityFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
+                    for expected in ["forge-conductor", "forge-conductor-clu", "forge-conductor-fallback"] {
+                        let matches = servers.staticTexts.matching(NSPredicate(
+                            format: "label == %@ OR value == %@", expected, expected
+                        ))
+                        XCTAssertEqual(matches.count, 1, "Each configured MCP server needs a distinct full identity")
+                        let identity = matches.element
+                        XCTAssertTrue(identity.exists)
+                        XCTAssertTrue(identity.isHittable)
+                        XCTAssertTrue(frameIsContained(identity.frame, in: servers.frame, tolerance: 2))
+                        XCTAssertTrue(frameIsContained(identity.frame, in: detail.frame, tolerance: 2))
+                        let requiredBounds = (expected as NSString).boundingRect(
+                            with: CGSize(width: identity.frame.width, height: .greatestFiniteMagnitude),
+                            options: [.usesLineFragmentOrigin, .usesFontLeading],
+                            attributes: [.font: identityFont]
+                        )
+                        XCTAssertLessThanOrEqual(requiredBounds.height, identity.frame.height + 2,
+                                                 "The full \(expected) identity must fit without ellipsis")
+                    }
+                } else if row.name == "sub-agents-hot-processes" {
+                    let processes = detail.groups["rig-hot-processes-panel"]
+                    let empty = processes.staticTexts["NO MATCHING PROCESSES"]
+                    if empty.exists {
+                        XCTAssertTrue(empty.isHittable)
+                        XCTAssertTrue(frameIsContained(empty.frame, in: processes.frame, tolerance: 2))
+                    } else {
+                        // ProcessDiscovery's skip flag does not suppress the separate libproc metrics collector.
+                        for label in ["PID", "NAME", "CPU", "RSS"] {
+                            let column = processes.staticTexts[label]
+                            XCTAssertTrue(column.exists)
+                            XCTAssertTrue(frameIsContained(column.frame, in: processes.frame, tolerance: 2))
+                        }
+                    }
+                }
+            }
+        }
+
+        try captureLowerPanels(size: "normal")
+        resizeMainWindowToMinimum(window)
+        try captureLowerPanels(size: "minimum")
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testGraphiteWorkbenchCapturesSupportingPresentations() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+
+        app.buttons["tab-provider"].click()
+        for provider in ["lmstudio", "claude-desktop", "codex-desktop", "grok-build"] {
+            inspectProvider(provider)
+            captureGraphite("provider-\(provider)")
+        }
+        inspectProvider("lmstudio")
+        let providerAdvanced = app.buttons["provider-advanced-toggle"]
+        makeHittable(providerAdvanced)
+        providerAdvanced.click()
+        XCTAssertTrue(app.textFields["provider-endpoint"].waitForExistence(timeout: 5))
+        captureGraphite("provider-advanced")
+
+        app.buttons["tab-runtimes"].click()
+        let runtimeAdvanced = app.buttons["runtime-advanced-toggle"]
+        XCTAssertTrue(runtimeAdvanced.waitForExistence(timeout: 5))
+        makeHittable(runtimeAdvanced)
+        runtimeAdvanced.click()
+        let shell = app.descendants(matching: .any)["runtime-shell-enabled"]
+        XCTAssertTrue(shell.waitForExistence(timeout: 5))
+        makeHittable(shell)
+        captureGraphite("runtimes-advanced")
+        for (identifier, name) in [
+            ("runtime-capabilities-panel", "runtimes-capabilities"),
+            ("runtime-execution-limits", "runtimes-execution-limits")
+        ] {
+            let panel = app.descendants(matching: .any)[identifier]
+            XCTAssertTrue(panel.waitForExistence(timeout: 3))
+            makeHittable(panel)
+            XCTAssertTrue(frameIsContained(panel.frame, in: app.windows.firstMatch.frame, tolerance: 2))
+            if identifier == "runtime-capabilities-panel" {
+                for runtime in ["direct", "zsh", "bash", "python", "powershell"] {
+                    let row = panel.descendants(matching: .any)["runtime-capability-\(runtime)"]
+                    XCTAssertTrue(row.exists)
+                    XCTAssertTrue(frameIsContained(row.frame, in: panel.frame, tolerance: 2))
+                }
+            }
+            captureGraphite(name)
+        }
+
+        app.buttons["tab-rune-forge"].click()
+        let feed = app.descendants(matching: .any)["rune-policy-feed-route"]
+        XCTAssertTrue(feed.waitForExistence(timeout: 5))
+        feed.click()
+        XCTAssertTrue(app.descendants(matching: .any)["rune-policy-event-\(fixture.policyEventID)"].waitForExistence(timeout: 5))
+        captureGraphite("rune-policy-feed")
+
+        app.buttons["tab-projects"].click()
+        let registration = app.buttons["project-register-by-path"]
+        XCTAssertTrue(registration.waitForExistence(timeout: 5))
+        registration.click()
+        let path = app.textFields["project-register-path"]
+        XCTAssertTrue(path.waitForExistence(timeout: 5))
+        path.click()
+        path.typeText("relative-path")
+        let name = app.textFields["project-register-name"]
+        name.click()
+        name.typeText("Readable project name")
+        let registrationSheet = app.sheets.firstMatch
+        for label in ["Project folder (absolute path)", "Display name (optional)"] {
+            let persistentLabel = registrationSheet.staticTexts[label]
+            XCTAssertTrue(persistentLabel.exists, "Registration field labels must survive text entry")
+            XCTAssertTrue(frameIsContained(persistentLabel.frame, in: registrationSheet.frame, tolerance: 2))
+        }
+        XCTAssertFalse(app.buttons["project-register-confirm"].isEnabled)
+        captureGraphite("project-registration-validation")
+        let registrationGuide = app.buttons["guided-help-projectRegistration"]
+        XCTAssertTrue(registrationGuide.exists)
+        registrationGuide.click()
+        let nestedGuide = app.descendants(matching: .any)["guided-help-sheet"]
+        XCTAssertTrue(nestedGuide.waitForExistence(timeout: 5))
+        app.buttons["guided-help-close"].click()
+        XCTAssertTrue(nestedGuide.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(path.exists, "Closing registration Help must preserve the registration dialog")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(path.waitForNonExistence(timeout: 3))
+
+        openCurrentGuideFromMenu()
+        let help = app.descendants(matching: .any)["guided-help-sheet"]
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        captureGraphite("contextual-help")
+        let advancedHelp = app.disclosureTriangles["guided-help-advanced"]
+        XCTAssertTrue(advancedHelp.waitForExistence(timeout: 3))
+        expandGraphiteDisclosure(advancedHelp)
+        captureGraphite("contextual-help-advanced")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(help.waitForNonExistence(timeout: 3))
+
+        app.buttons["tab-rig"].click()
+        openGuidedSetupFromMenu()
+        let wizard = app.descendants(matching: .any)["setup-guide"]
+        XCTAssertTrue(wizard.waitForExistence(timeout: 5))
+        for step in 1...8 {
+            let stepButton = app.buttons["guided-setup-step-\(step)"]
+            XCTAssertTrue(stepButton.waitForExistence(timeout: 3))
+            makeHittable(stepButton)
+            stepButton.click()
+            if [3, 5].contains(step) { try makeGraphiteSetupReviewScopeVisible() }
+            captureGraphite("guided-setup-step-\(step)")
+            let lowerDestination = [2: "provider", 3: "projects", 5: "projects", 6: "provider", 8: "evidence"][step]
+            if let lowerDestination {
+                let action = app.buttons["setup-guide-open-\(lowerDestination)"]
+                XCTAssertTrue(action.waitForExistence(timeout: 3))
+                makeHittable(action)
+                XCTAssertTrue(frameIsContained(action.frame, in: app.sheets.firstMatch.frame, tolerance: 2))
+                captureGraphite("guided-setup-step-\(step)-lower")
+            }
+        }
+        app.buttons["guided-setup-close"].click()
+        XCTAssertTrue(wizard.waitForNonExistence(timeout: 3))
+
+        app.typeKey(",", modifierFlags: .command)
+        for section in ["folders", "service", "runtime", "settings", "shell", "filesystem", "maintenance", "doctor"] {
+            selectManagerSection(section)
+            captureGraphite("settings-\(section)")
+        }
+        app.typeKey("w", modifierFlags: .command)
+    }
+
+    func testGuidedSetupStepTransitionsResetScrollAndPreserveProgress() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            initialRunState: "completed",
+            initialProviderHealth: "contract_valid"
+        )
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        openGuidedSetupFromMenu()
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+        let steps: [(title: String, purpose: String, destination: String)] = [
+            (
+                "Confirm Forge is ready",
+                "The manager owns projects, provider configuration, automation, continuity, and durable recovery.",
+                "manager"
+            ),
+            (
+                "Connect the model provider",
+                "Forge needs one reachable, tool-capable model for ordinary LM Studio chats to use its tools.",
+                "provider"
+            ),
+            (
+                "Register the project",
+                "A registered project gives LM Studio a stable identity and an exact default working folder.",
+                "projects"
+            ),
+            (
+                "Add and order instructions",
+                "Instruction packages define the work, allowed capabilities, completion requirements, and execution order.",
+                "projects"
+            ),
+            (
+                "Review project inputs",
+                "Before starting in LM Studio, confirm the provider, project folders, instruction order, and Development Policy priority.",
+                "projects"
+            ),
+            (
+                "Start in LM Studio",
+                "Project work begins in the LM Studio chat interface, where you interact with the model normally.",
+                "provider"
+            ),
+            (
+                "Monitor governance and continuity",
+                "Continue working in LM Studio while Forge enforces Development Policy and protects session continuity.",
+                "continuity"
+            ),
+            (
+                "Resolve issues and continue",
+                "Forge preserves durable state and routes each issue to the view that owns the corrective action.",
+                "evidence"
+            ),
+        ]
+
+        func assertTop(of step: Int, capture: String) throws {
+            let expected = steps[step - 1]
+            let title = sheet.staticTexts["guided-setup-step-title"]
+            XCTAssertTrue(waitUntil(timeout: 5) { self.element(title, contains: expected.title) })
+            let scrollViews = sheet.scrollViews.containing(
+                .staticText, identifier: "guided-setup-step-title"
+            )
+            XCTAssertEqual(scrollViews.count, 1)
+            let content = scrollViews.element
+            XCTAssertTrue(content.exists)
+            let indicator = content.staticTexts["STEP \(step) OF 8"]
+            XCTAssertTrue(indicator.exists)
+            let purpose = content.staticTexts.matching(NSPredicate(
+                format: "label == %@ OR value == %@", expected.purpose, expected.purpose
+            )).element
+            XCTAssertTrue(purpose.exists)
+            for heading in [indicator, title, purpose] {
+                XCTAssertTrue(heading.isHittable, "New step \(step) must expose its complete introduction")
+                XCTAssertTrue(frameIsContained(heading.frame, in: content.frame, tolerance: 2))
+            }
+            XCTAssertLessThan(title.frame.minY, content.frame.minY + 80,
+                              "Changing steps must return the detail viewport to its introduction")
+            let footer = sheet.staticTexts[
+                "Step \(step) of 8 · Progress is saved when you leave the wizard"
+            ]
+            XCTAssertTrue(footer.exists)
+            XCTAssertTrue(frameIsContained(footer.frame, in: sheet.frame, tolerance: 2))
+            XCTAssertGreaterThanOrEqual(footer.frame.minY, content.frame.maxY - 2)
+            XCTAssertTrue(sheet.buttons["guided-setup-close"].isHittable)
+            captureGraphite(capture)
+        }
+
+        for step in 1...8 {
+            try assertTop(of: step, capture: "guided-setup-transition-step-\(step)-top")
+            let destination = sheet.buttons["setup-guide-open-\(steps[step - 1].destination)"]
+            XCTAssertTrue(destination.waitForExistence(timeout: 3))
+            makeHittable(destination)
+            XCTAssertTrue(destination.isHittable)
+            if (2...5).contains(step) {
+                let content = sheet.scrollViews.containing(
+                    .staticText, identifier: "guided-setup-step-title"
+                ).element
+                XCTAssertFalse(frameIsContained(
+                    sheet.staticTexts["guided-setup-step-title"].frame,
+                    in: content.frame, tolerance: 2
+                ), "The regression must start from an actually scrolled detail viewport")
+            }
+            if step < 8 {
+                let next = sheet.buttons[step == 5 ? "setup-guide-confirm-review" : "setup-guide-next"]
+                XCTAssertTrue(waitForEnabled(next, timeout: 5))
+                XCTAssertTrue(next.isHittable)
+                next.click()
+            }
+        }
+
+        sheet.buttons["Back"].click()
+        try assertTop(of: 7, capture: "guided-setup-transition-back-top")
+        let lower = sheet.buttons["setup-guide-open-continuity"]
+        makeHittable(lower)
+        sheet.buttons["guided-setup-step-8"].click()
+        try assertTop(of: 8, capture: "guided-setup-transition-sidebar-top")
+        sheet.buttons["guided-setup-close"].click()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 3))
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: try XCTUnwrap(guidedSetupDefaultsSuite)))
+        XCTAssertEqual(defaults.integer(forKey: "forge.guidedSetup.step.v2"), 7)
+        openGuidedSetupFromMenu()
+        XCTAssertTrue(sheet.waitForExistence(timeout: 3))
+        try assertTop(of: 8, capture: "guided-setup-transition-reopened-top")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 3))
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertTrue(fixture.providerIntegrationMutationRecords.isEmpty)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testGraphiteGuidedSetupProjectReviewScopeCapturesFullIdentity() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            initialRunState: "completed",
+            initialProviderHealth: "contract_valid"
+        )
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        openGuidedSetupFromMenu()
+        for step in [3, 5] {
+            let selection = app.buttons["guided-setup-step-\(step)"]
+            XCTAssertTrue(selection.waitForExistence(timeout: 3))
+            selection.click()
+            try makeGraphiteSetupReviewScopeVisible()
+            let identity = app.staticTexts["guided-setup-review-project-identity"]
+            XCTAssertTrue(element(identity, contains: fixture.projectID))
+            XCTAssertTrue(element(identity, contains: "generation 4"))
+            captureGraphite("guided-setup-project-review-step-\(step)")
+        }
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertTrue(fixture.providerIntegrationMutationRecords.isEmpty)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+    }
+
+    func testProviderInspectionDoesNotDispatchActivationDeploymentDeletionOrModels() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        app.buttons["tab-provider"].click()
+        inspectProvider("lmstudio")
+        let endpoint = app.otherElements["provider-readiness-endpoint"]
+        XCTAssertTrue(endpoint.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            self.element(endpoint, contains: "http://127.0.0.1:1234")
+        })
+        let baseline = (
+            selection: fixture.providerSelectionRequestCount,
+            models: fixture.providerModelRequestCount,
+            deletion: fixture.providerIntegrationDeletionRequestCount,
+            preparation: fixture.providerPreparationCount,
+            mutations: fixture.providerIntegrationMutationRecords.count,
+            probes: fixture.providerProbeRecords.count,
+            saves: fixture.providerConfigurationSaveCount
+        )
+        for provider in ["claude-desktop", "codex-desktop", "grok-build", "lmstudio"] {
+            inspectProvider(provider)
+            let toggle = app.descendants(matching: .any)["provider-toggle-\(provider)"]
+            XCTAssertTrue(waitForToggleState(provider == "lmstudio", on: toggle))
+        }
+        XCTAssertEqual(fixture.providerSelectionRequestCount, baseline.selection)
+        XCTAssertEqual(fixture.providerModelRequestCount, baseline.models)
+        XCTAssertEqual(fixture.providerIntegrationDeletionRequestCount, baseline.deletion)
+        XCTAssertEqual(fixture.providerPreparationCount, baseline.preparation)
+        XCTAssertEqual(fixture.providerIntegrationMutationRecords.count, baseline.mutations)
+        XCTAssertEqual(fixture.providerProbeRecords.count, baseline.probes)
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, baseline.saves)
+    }
+
+    func testProviderReadinessShowsConfigurationFallbackAndReportedEndpointWithoutDispatch() throws {
+        let configurationEndpoint = "https://provider-fixture.example.invalid"
+        let reportedEndpoint = "https://reported-provider.example.invalid"
+        for reported in [nil, reportedEndpoint] as [String?] {
+            let fixture = try OperatorManagerUITestFixture(
+                providerEndpoint: configurationEndpoint,
+                providerLinkedNodeID: UUID(uuidString: "78787878-7878-4787-8787-787878787878")!,
+                reportedProviderEndpoint: reported
+            )
+            relaunch(with: fixture)
+            app.buttons["tab-provider"].click()
+            inspectProvider("lmstudio")
+            let endpoint = app.otherElements["provider-readiness-endpoint"]
+            XCTAssertTrue(endpoint.waitForExistence(timeout: 5))
+            XCTAssertTrue(waitUntil(timeout: 5) {
+                self.element(endpoint, contains: reported ?? configurationEndpoint)
+            })
+            makeHittable(endpoint)
+            captureGraphite(reported == nil
+                ? "provider-readiness-linked-configuration-fallback"
+                : "provider-readiness-reported-endpoint")
+            XCTAssertEqual(fixture.providerPreparationCount, 0)
+            XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+            XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+            XCTAssertEqual(fixture.providerModelRequestCount, 0)
+            XCTAssertTrue(fixture.providerProbeRecords.isEmpty)
+            XCTAssertTrue(fixture.providerIntegrationMutationRecords.isEmpty)
+            XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+        }
+    }
+
+    func testGraphiteWorkbenchCapturesConditionalDetailsAndCancelledDestructiveActions() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            includeContinuityOperation: true,
+            activeInstructionQueue: true,
+            includeSecondInstructionPackage: true,
+            includePolicyDetails: true,
+            providerEndpoint: "https://provider-fixture.example.invalid",
+            providerLinkedNodeID: UUID(uuidString: "78787878-7878-4787-8787-787878787878")!
+        )
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+
+        app.buttons["tab-projects"].click()
+        let currentPackage = app.staticTexts["Current"]
+        XCTAssertTrue(currentPackage.waitForExistence(timeout: 5))
+        makeHittable(currentPackage)
+        XCTAssertFalse(app.buttons["instruction-package-remove-\(fixture.instructionPackageID)"].isEnabled)
+        captureGraphite("projects-current-instruction-package")
+        captureGraphiteProjectCatalog(fixture: fixture, name: "projects-current-instruction-catalog")
+
+        app.buttons["tab-rune-forge"].click()
+        let baselineSource = app.buttons["rune-policy-source-row-66666666-6666-4666-8666-666666666666"]
+        XCTAssertTrue(baselineSource.waitForExistence(timeout: 5))
+        baselineSource.click()
+        let removeSource = app.buttons["rune-policy-source-remove"]
+        XCTAssertTrue(removeSource.waitForExistence(timeout: 5))
+        XCTAssertFalse(removeSource.isEnabled, "The governing baseline must remain protected")
+        captureGraphite("rune-governing-source")
+        app.buttons["rune-policy-source-row-67676767-6767-4767-8767-676767676767"].click()
+        XCTAssertTrue(app.staticTexts["Opaque instruction source"].waitForExistence(timeout: 5))
+        captureGraphite("rune-partially-interpreted-source")
+        let violation = app.buttons["rune-violation-row-77777777-7777-4777-8777-777777777777"]
+        XCTAssertTrue(violation.waitForExistence(timeout: 5))
+        violation.click()
+        XCTAssertTrue(app.staticTexts["Violation identity and history"].waitForExistence(timeout: 5))
+        captureGraphite("rune-violation-identity")
+        let history = app.staticTexts["Occurrence history"]
+        makeHittable(history)
+        captureGraphite("rune-violation-evidence-and-history")
+
+        app.buttons["tab-runtimes"].click()
+        let job = app.descendants(matching: .any)["runtime-job-row-\(fixture.runtimeJobID)"]
+        XCTAssertTrue(job.waitForExistence(timeout: 5))
+        job.click()
+        let technical = app.disclosureTriangles["runtime-job-technical-details"]
+        XCTAssertTrue(technical.waitForExistence(timeout: 5))
+        makeHittable(technical)
+        captureGraphite("runtime-job-technical-disclosure-before")
+        expandGraphiteDisclosure(technical)
+        XCTAssertTrue(app.staticTexts[fixture.runtimeJobID].waitForExistence(timeout: 3))
+        captureGraphite("runtime-job-technical-details")
+
+        app.buttons["tab-evidence"].click()
+        let event = app.descendants(matching: .any)["evidence-event-\(fixture.continuityEventID)"]
+        XCTAssertTrue(event.waitForExistence(timeout: 5))
+        let search = app.textFields["evidence-search"]
+        search.click()
+        search.typeText("no-matching-graphite-event")
+        XCTAssertTrue(app.staticTexts["No Matching Events"].waitForExistence(timeout: 3))
+        captureGraphite("evidence-no-match")
+        search.typeKey("a", modifierFlags: .command)
+        search.typeKey(.delete, modifierFlags: [])
+        XCTAssertTrue(event.waitForExistence(timeout: 3))
+
+        app.buttons["tab-provider"].click()
+        inspectProvider("lmstudio")
+        let advanced = app.buttons["provider-advanced-toggle"]
+        makeHittable(advanced)
+        advanced.click()
+        let credentials = app.descendants(matching: .any)["provider-credential-action"]
+        XCTAssertTrue(credentials.waitForExistence(timeout: 5))
+        makeHittable(credentials)
+        credentials.click()
+        let replace = app.menuItems["Replace credential"]
+        XCTAssertTrue(replace.waitForExistence(timeout: 3))
+        replace.click()
+        let token = app.secureTextFields["provider-token"]
+        XCTAssertTrue(token.waitForExistence(timeout: 3))
+        makeHittable(token)
+        token.click()
+        token.typeText("fixture-token-for-visual-qa")
+        XCTAssertFalse(app.debugDescription.contains("fixture-token-for-visual-qa"))
+        captureGraphite("provider-unsaved-credential-replacement")
+        XCTAssertFalse(app.buttons["provider-test-connection"].isEnabled)
+        let providerMutationsBefore = fixture.providerIntegrationMutationRecords.count
+        let providerSelectionBefore = fixture.providerSelectionRequestCount
+        let cardConnect = app.buttons["provider-repair-lmstudio"]
+        makeHittable(cardConnect)
+        XCTAssertTrue(waitForEnabled(cardConnect, timeout: 3))
+        cardConnect.click()
+        let unsavedNotice = app.staticTexts["provider-probe-notice"]
+        XCTAssertTrue(unsavedNotice.waitForExistence(timeout: 3))
+        XCTAssertTrue(element(
+            unsavedNotice,
+            contains: "Save or discard the LM Studio Advanced changes before reconnecting."
+        ))
+        makeHittable(unsavedNotice)
+        captureGraphite("provider-unsaved-credential-connection-guard")
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, providerSelectionBefore)
+        XCTAssertEqual(fixture.providerIntegrationMutationRecords.count, providerMutationsBefore)
+
+        app.buttons["tab-continuity"].click()
+        let packet = app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityCheckpointID)"]
+        XCTAssertTrue(packet.waitForExistence(timeout: 5))
+        packet.click()
+        let packetsBefore = fixture.continuityPacketIDs
+        let mutationsBefore = fixture.mutationAuthorizationCount
+        let delete = app.buttons["continuity-delete-packets"]
+        XCTAssertTrue(waitForEnabled(delete, timeout: 5))
+        delete.click()
+        let confirmation = app.sheets.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts["Delete selected continuity packets?"].exists)
+        captureGraphite("continuity-delete-confirmation")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 3))
+        XCTAssertEqual(fixture.continuityPacketIDs, packetsBefore)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, mutationsBefore)
+        app.buttons["continuity-reset"].click()
+        let reset = app.sheets.firstMatch
+        XCTAssertTrue(reset.waitForExistence(timeout: 3))
+        XCTAssertTrue(reset.staticTexts["Reset continuity history?"].exists)
+        captureGraphite("continuity-reset-confirmation")
+        reset.buttons["Cancel"].click()
+        XCTAssertTrue(reset.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(fixture.continuityHistoryClearScopes.isEmpty)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, mutationsBefore)
+
+        app.buttons["tab-projects"].click()
+        setGuidedModeFromSettings(true)
+        XCTAssertTrue(app.descendants(matching: .any)["guided-inline-projects"].waitForExistence(timeout: 3))
+        captureGraphite("projects-inline-guidance")
+        let instructionHelp = app.buttons["guided-help-instructionQueue"]
+        XCTAssertTrue(instructionHelp.waitForExistence(timeout: 5))
+        makeHittable(instructionHelp)
+        instructionHelp.click()
+        XCTAssertTrue(app.descendants(matching: .any)["guided-help-sheet"].waitForExistence(timeout: 3))
+        captureGraphite("nested-instruction-help")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.descendants(matching: .any)["guided-help-sheet"].waitForNonExistence(timeout: 3))
+
+        app.buttons["tab-rune-forge"].click()
+        let cachedPartialSource = app.buttons["rune-policy-source-row-67676767-6767-4767-8767-676767676767"]
+        XCTAssertTrue(cachedPartialSource.waitForExistence(timeout: 5))
+        let overview = app.staticTexts["rune-overview-route"]
+        XCTAssertTrue(overview.waitForExistence(timeout: 5))
+        makeHittable(overview)
+        overview.click()
+        fixture.stop()
+        let cachedWarning = app.staticTexts[
+            "Cached policy information remains available while the Manager reconnects."
+        ]
+        XCTAssertTrue(cachedWarning.waitForExistence(timeout: 12))
+        makeHittable(cachedWarning)
+        captureGraphite("rune-cached-manager-unavailable-overview")
+        XCTAssertTrue(cachedPartialSource.exists)
+        cachedPartialSource.click()
+        XCTAssertTrue(app.staticTexts["Opaque instruction source"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Retry"].exists)
+        captureGraphite("rune-cached-partially-interpreted-source")
+        XCTAssertEqual(fixture.mutationAuthorizationCount, mutationsBefore)
+    }
+
+    func testGraphiteInstructionCatalogTransportErrorCanRetryWithoutMutatingQueue() throws {
+        let fixture = try OperatorManagerUITestFixture(failFirstInstructionCatalog: true)
+        relaunch(with: fixture)
+        app.buttons["tab-projects"].click()
+        let toggle = app.buttons["instruction-package-catalog-toggle-\(fixture.instructionPackageID)"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        makeHittable(toggle)
+        let packageIDs = fixture.instructionPackageIDs
+        let generation = fixture.projectGeneration
+        let mutationBaseline = fixture.mutationAuthorizationCount
+        toggle.click()
+        let retry = app.buttons["Retry catalog"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5))
+        makeHittable(retry)
+        XCTAssertEqual(fixture.instructionCatalogRequestCount, 1)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@ OR value CONTAINS %@",
+            "fixture catalog transport failure", "fixture catalog transport failure"
+        )).element.waitForExistence(timeout: 3))
+        captureGraphite("projects-catalog-transport-error")
+        retry.click()
+        let catalog = app.staticTexts["instruction-document-catalog-\(fixture.instructionPackageID)"]
+        XCTAssertTrue(catalog.waitForExistence(timeout: 5))
+        makeHittable(catalog)
+        XCTAssertTrue(retry.waitForNonExistence(timeout: 3))
+        XCTAssertEqual(fixture.instructionCatalogRequestCount, 2)
+        XCTAssertTrue(app.descendants(matching: .any)["instruction-document-fixture-instruction-document"].exists)
+        XCTAssertEqual(fixture.instructionPackageIDs, packageIDs)
+        XCTAssertEqual(fixture.projectGeneration, generation)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, mutationBaseline)
+        XCTAssertEqual(fixture.instructionQueueRemoveRequestCount, 0)
+        XCTAssertEqual(fixture.instructionQueueReorderRequestCount, 0)
+        captureGraphite("projects-catalog-retry-recovered")
+    }
+
+    func testGraphiteEvidencePaginationRetainsPageAcrossTransportErrorAndRetry() throws {
+        let fixture = try OperatorManagerUITestFixture(
+            includePagedEvidence: true, failFirstEvidencePage: true
+        )
+        relaunch(with: fixture)
+        app.buttons["tab-evidence"].click()
+        let count = app.staticTexts["Showing 100 of 100 bounded events"]
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        let loadOlder = app.buttons["evidence-load-more"]
+        XCTAssertTrue(loadOlder.waitForExistence(timeout: 3))
+        XCTAssertTrue(loadOlder.isEnabled)
+        captureGraphite("evidence-first-page-with-pagination")
+        let mutationBaseline = fixture.mutationAuthorizationCount
+        loadOlder.click()
+        let error = app.descendants(matching: .any)["operator-unavailable"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(error, contains: "fixture evidence page transport failure"))
+        XCTAssertTrue(count.exists, "A failed older-page request must retain its first page")
+        XCTAssertTrue(waitForEnabled(loadOlder, timeout: 3))
+        XCTAssertEqual(fixture.evidencePageRequestCount, 1)
+        captureGraphite("evidence-older-page-transport-error")
+        loadOlder.click()
+        XCTAssertTrue(app.staticTexts["Showing 101 of 101 bounded events"].waitForExistence(timeout: 5))
+        XCTAssertTrue(error.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(loadOlder.waitForNonExistence(timeout: 3))
+        XCTAssertEqual(fixture.evidencePageRequestCount, 2)
+        XCTAssertEqual(fixture.lastEvidenceCursor, "101")
+        XCTAssertEqual(fixture.mutationAuthorizationCount, mutationBaseline)
+        captureGraphite("evidence-pagination-retry-recovered")
+        let search = app.textFields["evidence-search"]
+        search.click()
+        search.typeText("Fixture evidence event 100")
+        let recoveredEvent = app.descendants(matching: .any)["evidence-event-fixture-evidence-100"]
+        XCTAssertTrue(recoveredEvent.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Showing 1 of 101 bounded events"].waitForExistence(timeout: 3))
+        captureGraphite("evidence-older-page-filtered-event")
+    }
+
+    func testGraphiteWorkbenchCapturesEmptyAndUnavailableStates() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        app.buttons["tab-continuity"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-packets-empty"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["continuity-delete-packets"].isEnabled)
+        captureGraphite("continuity-empty-packets")
+        app.buttons["tab-evidence"].click()
+        XCTAssertTrue(app.staticTexts["No Events"].waitForExistence(timeout: 5))
+        captureGraphite("evidence-empty-page")
+
+        app.terminate()
+        operatorFixture?.stop()
+        operatorFixture = nil
+        app.launchEnvironment.removeValue(forKey: "FORGE_OPERATOR_UI_TEST_PORT")
+        app.launch()
+        for route in ["projects", "continuity", "runtimes", "provider", "evidence"] {
+            let tab = app.buttons["tab-\(route)"]
+            XCTAssertTrue(tab.waitForExistence(timeout: 8))
+            tab.click()
+            XCTAssertTrue(app.descendants(matching: .any)["operator-unavailable"].waitForExistence(timeout: 5))
+            captureGraphite("manager-unavailable-\(route)")
+        }
+    }
+
+    func testGraphiteFilesystemPendingLifecycleFenceIsReadOnly() throws {
+        app.terminate()
+        try FileManager.default.createDirectory(
+            at: testHome,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        let fence = testHome.appendingPathComponent(".protected-filesystem-unregister-v1.json")
+        let lock = fence.appendingPathExtension("lock")
+        let descriptor = lock.path.withCString {
+            Darwin.open($0, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK, mode_t(0o600))
+        }
+        guard descriptor >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        // The peer lease must outlive every app process. Recovery cannot acquire
+        // it, so this record remains unresolved without a ServiceManagement call.
+        defer {
+            app?.terminate()
+            _ = flock(descriptor, LOCK_UN)
+            _ = Darwin.close(descriptor)
+        }
+        guard Darwin.fchmod(descriptor, mode_t(0o600)) == 0,
+              flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        var information = stat()
+        guard Darwin.fstat(descriptor, &information) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        let record: [String: Any] = [
+            "schemaVersion": 2,
+            "operationID": UUID().uuidString.lowercased(),
+            "attemptID": UUID().uuidString.lowercased(),
+            "intent": "update",
+            "phase": "registration_pending",
+            "attemptNumber": 1,
+            "leaseDevice": NSNumber(value: UInt64(information.st_dev)),
+            "leaseInode": NSNumber(value: UInt64(information.st_ino)),
+            "createdAtMilliseconds": 1,
+            "updatedAtMilliseconds": 1,
+        ]
+        let recordBytes = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+        try recordBytes.write(to: fence)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fence.path)
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+
+        for size in ["normal", "minimum"] {
+            if size == "minimum" { resizeMainWindowToMinimum(window) }
+            let manager = app.buttons["tab-manager"]
+            XCTAssertTrue(manager.waitForExistence(timeout: 5))
+            manager.click()
+            selectManagerSection("filesystem")
+            let lifecycle = app.descendants(matching: .any)["settings-filesystem-lifecycle-fence-status"]
+            let pending = "Service stopped; replacement registration is pending"
+            XCTAssertTrue(waitUntil(timeout: 8) { self.element(lifecycle, contains: pending) })
+            let operation = app.descendants(matching: .any)["settings-filesystem-operation-status"]
+            XCTAssertTrue(waitUntil(timeout: 8) { self.element(operation, contains: pending) })
+            let warning = app.descendants(matching: .any)["settings-filesystem-lifecycle-fence-warning"]
+            XCTAssertTrue(warning.exists)
+            let unresolved = app.descendants(matching: .any)["settings-filesystem-service-message"]
+            XCTAssertTrue(element(unresolved, contains: "remains unresolved"))
+            for identifier in [
+                "settings-filesystem-service-enable",
+                "settings-filesystem-service-reinstall",
+                "settings-filesystem-service-disable",
+                "settings-filesystem-service-approval",
+                "settings-filesystem-recovery-reconcile",
+            ] {
+                let control = app.buttons[identifier]
+                XCTAssertTrue(control.exists)
+                XCTAssertFalse(control.isEnabled, "The unresolved peer lease must fence \(identifier)")
+            }
+            XCTAssertTrue(app.buttons["settings-filesystem-service-refresh"].isEnabled)
+            let recovery = app.buttons["settings-filesystem-lifecycle-recovery"]
+            XCTAssertTrue(recovery.exists)
+            XCTAssertTrue(recovery.isEnabled)
+            XCTAssertEqual(recovery.label, "Register pending replacement")
+            makeHittable(recovery)
+            captureGraphite("manager-filesystem-pending-fence-\(size)")
+            selectManagerSection("folders")
+            let attention = app.buttons["manager-filesystem-attention"]
+            XCTAssertTrue(attention.waitForExistence(timeout: 5))
+            XCTAssertTrue(attention.isEnabled)
+            makeHittable(attention)
+            captureGraphite("manager-pending-fence-attention-\(size)")
+            XCTAssertEqual(try Data(contentsOf: fence), recordBytes)
+        }
+
+        app.buttons["tab-tools"].click()
+        app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("filesystem")
+        let settings = managerWindow
+        XCTAssertTrue(settings.descendants(matching: .any)["settings-filesystem-lifecycle-fence-warning"].exists)
+        let settingsRecovery = settings.buttons["settings-filesystem-lifecycle-recovery"]
+        XCTAssertTrue(settingsRecovery.exists)
+        XCTAssertTrue(settingsRecovery.isEnabled)
+        makeHittable(settingsRecovery)
+        captureGraphite("settings-filesystem-pending-fence")
+        XCTAssertEqual(try Data(contentsOf: fence), recordBytes, "Read-only native observation must preserve unresolved authority")
+        XCTAssertEqual(try Data(contentsOf: lock), Data())
+        var finalInformation = stat()
+        XCTAssertEqual(Darwin.fstat(descriptor, &finalInformation), 0)
+        XCTAssertEqual(finalInformation.st_dev, information.st_dev)
+        XCTAssertEqual(finalInformation.st_ino, information.st_ino)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+        XCTAssertTrue(fixture.providerIntegrationMutationRecords.isEmpty)
+        XCTAssertTrue(fixture.providerProbeRecords.isEmpty)
+    }
+
+    func testGraphiteFilesystemRecoveryDebtAndNativeDoctorReport() throws {
+        app.terminate()
+        let quarantine = testHome.appendingPathComponent("filesystem-quarantine", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: quarantine,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: quarantine.path)
+        let lock = quarantine.appendingPathComponent(".ledger.lock")
+        try Data().write(to: lock)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: lock.path)
+        // Read-only health counts fixed occupied slots. Unknown receipt authority
+        // remains debt without introducing a real victim path or a service request.
+        let receipt = Data("{\"fixture\":\"retained-unresolved-debt\"}".utf8)
+        let slots = (0..<32).map { quarantine.appendingPathComponent(String(format: "slot-%02d.json", $0)) }
+        for slot in slots {
+            try receipt.write(to: slot)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: slot.path)
+        }
+        let fixtureEntries = try FileManager.default.contentsOfDirectory(atPath: quarantine.path).sorted()
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+
+        var registrationState: String?
+        var lifecycleControls: [Bool]?
+        for size in ["normal", "minimum"] {
+            if size == "minimum" { resizeMainWindowToMinimum(window) }
+            let manager = app.buttons["tab-manager"]
+            XCTAssertTrue(manager.waitForExistence(timeout: 5))
+            manager.click()
+            selectManagerSection("filesystem")
+            let operation = app.descendants(matching: .any)["settings-filesystem-operation-status"]
+            XCTAssertTrue(operation.waitForExistence(timeout: 5))
+            XCTAssertTrue(waitUntil(timeout: 8) { self.element(operation, contains: "Idle") })
+            let status = app.descendants(matching: .any)["settings-filesystem-service-status"]
+            XCTAssertTrue(status.exists)
+            let controls = [
+                app.buttons["settings-filesystem-service-enable"],
+                app.buttons["settings-filesystem-service-reinstall"],
+                app.buttons["settings-filesystem-service-disable"],
+                app.buttons["settings-filesystem-service-approval"],
+                app.buttons["settings-filesystem-recovery-reconcile"],
+            ]
+            XCTAssertTrue(controls.allSatisfy(\.exists))
+            let currentRegistration = try XCTUnwrap(
+                ["Not enabled", "Enabled", "Approval required", "Not packaged or invalid"]
+                    .first { element(status, contains: $0) }
+            )
+            if registrationState == nil {
+                registrationState = currentRegistration
+                lifecycleControls = controls.map(\.isEnabled)
+            }
+            let refresh = app.buttons["settings-filesystem-service-refresh"]
+            XCTAssertTrue(waitForEnabled(refresh, timeout: 5))
+            makeHittable(refresh)
+            refresh.click()
+            let debt = app.descendants(matching: .any)["settings-filesystem-recovery-debt"]
+            let exhausted = app.descendants(matching: .any)["settings-filesystem-recovery-exhausted"]
+            XCTAssertTrue(waitUntil(timeout: 8) {
+                self.element(operation, contains: "Idle")
+                    && self.element(debt, contains: "Local 32/32")
+                    && exhausted.exists
+                    && refresh.isEnabled
+            }, "The native read-only refresh must expose the full isolated quarantine ledger")
+            XCTAssertTrue(element(status, contains: try XCTUnwrap(registrationState)))
+            XCTAssertEqual(controls.map(\.isEnabled), lifecycleControls)
+            makeHittable(exhausted)
+            captureGraphite("manager-filesystem-recovery-debt-\(size)")
+
+            selectManagerSection("doctor")
+            let runDoctor = app.buttons["Run doctor"]
+            XCTAssertTrue(waitForEnabled(runDoctor, timeout: 5))
+            makeHittable(runDoctor)
+            runDoctor.click()
+            captureGraphite("manager-doctor-report-observed-\(size)")
+            let report = app.descendants(matching: .any).matching(
+                NSPredicate(format: "value BEGINSWITH %@ OR label BEGINSWITH %@", "state=", "state=")
+            ).firstMatch
+            XCTAssertTrue(report.waitForExistence(timeout: 8), "Doctor must render its actual local native report")
+            XCTAssertTrue(element(report, contains: "state=attention"))
+            XCTAssertTrue(element(report, contains: "FAIL  swift_binary_install:"))
+            XCTAssertTrue(element(report, contains: testHome.path))
+            XCTAssertTrue(app.staticTexts["Doctor ISSUES"].exists)
+            captureGraphite("manager-doctor-issues-\(size)")
+            selectManagerSection("filesystem")
+            XCTAssertTrue(waitUntil(timeout: 8) { self.element(operation, contains: "Idle") })
+            XCTAssertTrue(
+                element(status, contains: try XCTUnwrap(registrationState)),
+                "Read-only Doctor must preserve service registration"
+            )
+            XCTAssertEqual(controls.map(\.isEnabled), lifecycleControls)
+        }
+
+        XCTAssertFalse(FileManager.default.isExecutableFile(
+            atPath: testHome.appendingPathComponent("bin/forge-conductor").path
+        ), "The fixture must not install a helper while reading Doctor")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: quarantine.path).sorted(), fixtureEntries)
+        XCTAssertEqual(try Data(contentsOf: lock), Data())
+        for slot in slots {
+            XCTAssertEqual(try Data(contentsOf: slot), receipt, "Read-only Refresh and Doctor must preserve retained debt")
+        }
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+        XCTAssertTrue(fixture.providerIntegrationMutationRecords.isEmpty)
+        XCTAssertTrue(fixture.providerProbeRecords.isEmpty)
+    }
+
+    func testGraphiteWorkbenchUnderNativeAccessibilityPreferences() throws {
+        guard ProcessInfo.processInfo.environment["FORGE_GRAPHITE_NATIVE_ACCESSIBILITY_QA"] == "1" else {
+            throw XCTSkip("Requires an explicit native accessibility QA run with the desktop preferences configured")
+        }
+        let workspace = NSWorkspace.shared
+        XCTAssertTrue(workspace.accessibilityDisplayShouldReduceMotion)
+        XCTAssertTrue(workspace.accessibilityDisplayShouldReduceTransparency)
+        XCTAssertTrue(workspace.accessibilityDisplayShouldIncreaseContrast)
+        let desktopStyle = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?[
+            "AppleInterfaceStyle"
+        ] as? String ?? "Light"
+        XCTAssertNotEqual(desktopStyle.lowercased(), "dark")
+        XCTAssertNotEqual(
+            ProcessInfo.processInfo.environment["FORGE_GRAPHITE_ACCESSIBILITY_VARIANT"], "1"
+        )
+        app.launchEnvironment["FORGE_GRAPHITE_ACCESSIBILITY_VARIANT"] = "0"
+        XCTAssertNotEqual(app.launchEnvironment["FORGE_GRAPHITE_ACCESSIBILITY_VARIANT"], "1")
+        let preferences = XCTAttachment(string: """
+        native_reduce_motion=\(workspace.accessibilityDisplayShouldReduceMotion)
+        native_reduce_transparency=\(workspace.accessibilityDisplayShouldReduceTransparency)
+        native_increase_contrast=\(workspace.accessibilityDisplayShouldIncreaseContrast)
+        desktop_style=\(desktopStyle)
+        app_graphite_accessibility_variant=\(app.launchEnvironment["FORGE_GRAPHITE_ACCESSIBILITY_VARIANT"] ?? "unset")
+        """)
+        preferences.name = "graphite-actual-native-accessibility-preferences"
+        preferences.lifetime = .keepAlways
+        add(preferences)
+
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        try resizeMainWindowForGraphiteReference(window)
+        app.buttons["tab-mcp"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["detail-mcp"].waitForExistence(timeout: 5))
+        captureGraphite("native-accessibility-mcp-normal")
+        resizeMainWindowToMinimum(window)
+        captureGraphite("native-accessibility-mcp-minimum")
+
+        app.buttons["tab-manager"].click()
+        selectManagerSection("settings")
+        let host = app.textFields["Dashboard host"]
+        XCTAssertTrue(host.waitForExistence(timeout: 5))
+        makeHittable(host)
+        host.click()
+        captureGraphite("native-accessibility-main-field-focus")
+        app.typeKey(.tab, modifierFlags: [])
+        captureGraphite("native-accessibility-main-keyboard-next-control")
+        app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("settings")
+        let settingsHost = managerWindow.textFields["Dashboard host"]
+        XCTAssertTrue(settingsHost.waitForExistence(timeout: 5))
+        settingsHost.click()
+        captureGraphite("native-accessibility-settings-field-focus")
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(app.windows["com_apple_SwiftUI_Settings_window"].waitForNonExistence(timeout: 3))
+
+        app.buttons["tab-projects"].click()
+        openCurrentGuideFromMenu()
+        let help = app.sheets.firstMatch
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        captureGraphite("native-accessibility-contextual-help")
+        let advancedHelp = help.disclosureTriangles["guided-help-advanced"]
+        XCTAssertTrue(advancedHelp.waitForExistence(timeout: 3))
+        expandGraphiteDisclosure(advancedHelp)
+        captureGraphite("native-accessibility-contextual-help-advanced")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(help.waitForNonExistence(timeout: 3))
+
+        app.buttons["tab-provider"].click()
+        inspectProvider("lmstudio")
+        let advanced = app.buttons["provider-advanced-toggle"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        advanced.click()
+        let endpoint = app.textFields["provider-endpoint"]
+        XCTAssertTrue(endpoint.waitForExistence(timeout: 3))
+        makeHittable(endpoint)
+        captureGraphite("native-accessibility-provider-advanced")
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertTrue(fixture.providerIntegrationMutationRecords.isEmpty)
+        XCTAssertTrue(fixture.providerProbeRecords.isEmpty)
+    }
+
+    func testGraphiteWorkbenchCapturesAccessibilityVariantsAndKeyboardFocus() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        app.launchEnvironment["FORGE_GRAPHITE_ACCESSIBILITY_VARIANT"] = "1"
+        relaunch(with: fixture)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        resizeMainWindowToMinimum(window)
+        app.buttons["tab-manager"].click()
+        selectManagerSection("settings")
+        let host = app.textFields["Dashboard host"]
+        XCTAssertTrue(host.waitForExistence(timeout: 5))
+        makeHittable(host)
+        host.click()
+        captureGraphite("accessibility-main-field-focus")
+        app.typeKey(.tab, modifierFlags: [])
+        captureGraphite("accessibility-main-keyboard-next-control")
+        app.typeKey(",", modifierFlags: .command)
+        selectManagerSection("settings")
+        let settingsHost = managerWindow.textFields["Dashboard host"]
+        XCTAssertTrue(settingsHost.waitForExistence(timeout: 5))
+        settingsHost.click()
+        captureGraphite("accessibility-settings-field-focus")
+        app.typeKey("w", modifierFlags: .command)
+    }
+
+    func testManagerSectionSelectionPreservesStagedSettingsWithoutDispatchingSave() throws {
+        let fixture = try OperatorManagerUITestFixture()
+        relaunch(with: fixture)
+        app.buttons["tab-manager"].click()
+        selectManagerSection("settings")
+        let host = app.textFields["Dashboard host"]
+        XCTAssertTrue(host.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForEnabled(app.buttons["settings-save"], timeout: 5))
+        host.click()
+        host.typeKey("a", modifierFlags: .command)
+        host.typeText("graphite-draft.invalid")
+        for section in ["service", "runtime", "shell", "filesystem", "maintenance", "doctor", "folders", "settings"] {
+            selectManagerSection(section)
+        }
+        XCTAssertTrue(waitForValue("graphite-draft.invalid", on: app.textFields["Dashboard host"]))
+        XCTAssertEqual(fixture.settingsUpdateCount, 0, "Changing presentation sections must not save a draft")
+        let reload = app.buttons["settings-reload"]
+        XCTAssertTrue(reload.isEnabled)
+        reload.click()
+        XCTAssertTrue(waitForValue("127.0.0.1", on: app.textFields["Dashboard host"]))
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+    }
+
+    private func captureGraphitePrimaryViews(in window: XCUIElement, size: String) throws {
+        let routes: [(route: String, marker: String, title: String)] = [
+            ("rig", "detail-rig", "Dashboard"), ("mcp", "detail-mcp", "LM Studio MCP"),
+            ("agents", "detail-agents", "Agents"), ("tools", "detail-tools", "Tools"),
+            ("feed", "detail-feed", "Live Feed"), ("projects", "detail-projects", "Projects"),
+            ("rune-forge", "detail-rune-forge", "Rune Forge"),
+            ("continuity", "detail-continuity", "Continuity"), ("runtimes", "detail-runtimes", "Runtimes"),
+            ("provider", "detail-provider", "Provider"), ("evidence", "detail-evidence", "Events & Evidence"),
+            ("diagnostics", "detail-diagnostics", "Diagnostics"), ("manager", "detail-manager", "Manager"),
+        ]
+        for item in routes {
+            let route = app.buttons["tab-\(item.route)"]
+            XCTAssertTrue(route.waitForExistence(timeout: 5))
+            route.click()
+            let detail = try XCTUnwrap(selectedDetailContainer(named: item.title))
+            let marker = graphitePageHeading(in: detail, identifier: item.marker, title: item.title)
+            let contentTop = assertGraphiteGlobalHeader(in: window)
+            XCTAssertTrue(frameIsContained(detail.frame, in: window.frame, tolerance: 2))
+            XCTAssertTrue(frameIsContained(marker.frame, in: detail.frame, tolerance: 2))
+            XCTAssertGreaterThanOrEqual(marker.frame.minY, contentTop - 2)
+            if item.route == "rune-forge" || item.route == "runtimes" {
+                let identifier = item.route == "rune-forge" ? "rune-detail-heading" : "runtime-task-requirements"
+                let firstDetail = app.descendants(matching: .any)[identifier]
+                XCTAssertTrue(firstDetail.waitForExistence(timeout: 5))
+                let label = item.route == "rune-forge" ? "Development Policy" : "Runtimes for the selected task"
+                let firstHeading = firstDetail.staticTexts[label]
+                XCTAssertTrue(firstHeading.waitForExistence(timeout: 3))
+                XCTAssertTrue(firstHeading.isHittable, "The first split detail heading must remain exposed")
+                XCTAssertGreaterThanOrEqual(firstDetail.frame.minY, contentTop - 2)
+                XCTAssertTrue(frameIsContained(firstDetail.frame, in: detail.frame, tolerance: 2))
+            }
+            captureGraphite("\(size)-\(item.route)")
+            if item.route == "rig" {
+                for (label, identifier, name) in [
+                    ("COMPUTE CORES", "rig-compute-cores-panel", "compute-cores"),
+                    ("STORAGE", "rig-storage-panel", "storage-iops")
+                ] {
+                    let heading = app.staticTexts[label]
+                    XCTAssertTrue(heading.waitForExistence(timeout: 3))
+                    makeHittable(heading)
+                    let panel = app.descendants(matching: .any)[identifier]
+                    XCTAssertTrue(panel.exists)
+                    makeHittable(panel)
+                    XCTAssertTrue(heading.isHittable)
+                    XCTAssertTrue(frameIsContained(panel.frame, in: detail.frame, tolerance: 2),
+                                  "The complete instrumentation panel must be visible in its capture")
+                    if name == "storage-iops" {
+                        XCTAssertEqual(panel.staticTexts.matching(NSPredicate(
+                            format: "label CONTAINS %@ OR value CONTAINS %@", "IOPS", "IOPS"
+                        )).count, 3)
+                    }
+                    captureGraphite("\(size)-dashboard-\(name)")
+                }
+            } else if item.route == "projects", let fixture = operatorFixture {
+                captureGraphiteProjectCatalog(fixture: fixture, name: "\(size)-projects-instruction-catalog")
+            }
+        }
+    }
+
+    private func captureGraphiteProjectCatalog(fixture: OperatorManagerUITestFixture, name: String) {
+        let toggle = app.buttons["instruction-package-catalog-toggle-\(fixture.instructionPackageID)"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        makeHittable(toggle)
+        toggle.click()
+        let catalog = app.staticTexts["instruction-document-catalog-\(fixture.instructionPackageID)"]
+        XCTAssertTrue(catalog.waitForExistence(timeout: 5))
+        makeHittable(catalog)
+        XCTAssertTrue(app.descendants(matching: .any)["instruction-document-fixture-instruction-document"].exists)
+        XCTAssertGreaterThan(fixture.instructionCatalogRequestCount, 0)
+        captureGraphite(name)
+        makeHittable(toggle)
+        toggle.click()
+        XCTAssertTrue(catalog.waitForNonExistence(timeout: 3))
+    }
+
+    private func expandGraphiteDisclosure(_ element: XCUIElement) {
+        makeHittable(element)
+        element.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 26, dy: 8)).click()
+        XCTAssertTrue(waitForToggleState(true, on: element, timeout: 3),
+                      "The native disclosure must be expanded before capturing its details")
+        makeHittable(element)
+    }
+
+    private func captureGraphite(_ name: String) {
+        let sheet = app.sheets.firstMatch
+        let settingsWindow = app.windows["com_apple_SwiftUI_Settings_window"]
+        let isSettings = name.hasPrefix("settings-") || name.hasPrefix("accessibility-settings-")
+            || name.hasPrefix("native-accessibility-settings-")
+        let surface = sheet.exists ? sheet
+            : isSettings && settingsWindow.exists ? settingsWindow : app.windows.firstMatch
+        let screenshot = XCTAttachment(screenshot: surface.screenshot())
+        screenshot.name = "graphite-\(name)"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let semantics = XCTAttachment(string: app.debugDescription)
+        semantics.name = "graphite-\(name)-accessibility"
+        semantics.lifetime = .keepAlways
+        add(semantics)
+        let windows = app.windows.allElementsBoundByIndex.map { window in
+            "\(window.label): \(NSStringFromRect(window.frame))"
+        }.joined(separator: "\n")
+        let geometry = XCTAttachment(string: windows)
+        geometry.name = "graphite-\(name)-actual-window-geometry"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+    }
+
+    private func resizeMainWindowForGraphiteReference(_ window: XCUIElement) throws {
+        app.launchEnvironment["FORGE_GRAPHITE_WINDOW_SIZE"] = "normal"
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        let dashboard = app.buttons["tab-rig"]
+        XCTAssertTrue(dashboard.waitForExistence(timeout: 5))
+        dashboard.click()
+        let content = app.descendants(matching: .any)["root-split"]
+        XCTAssertTrue(content.waitForExistence(timeout: 5))
+        XCTAssertEqual(window.frame.width, 1_440, accuracy: 3)
+        XCTAssertEqual(content.frame.height, 900, accuracy: 3)
+    }
+
+    @discardableResult
+    private func assertGraphiteGlobalHeader(in window: XCUIElement, expectsAllControls: Bool = false) -> CGFloat {
+        let content = app.descendants(matching: .any)["root-split"]
+        let header = app.descendants(matching: .any)["workbench-global-controls"]
+        XCTAssertTrue(content.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.toolbars.count, 0, "Native title-bar action controls must remain absent")
+        if !expectsAllControls {
+            XCTAssertFalse(header.exists, "The default workspace must have no persistent control bar")
+            for identifier in [
+                "toolbar-navigation", "toolbar-auto-refresh", "toolbar-guided-mode",
+                "toolbar-setup-guide", "toolbar-refresh", "toolbar-guided-setup", "dashboard-guided-setup"
+            ] {
+                XCTAssertFalse(app.descendants(matching: .any)[identifier].exists,
+                               "Optional control must remain absent until enabled in Settings: \(identifier)")
+            }
+            return content.frame.minY
+        }
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        XCTAssertTrue(frameIsContained(header.frame, in: content.frame, tolerance: 2))
+        XCTAssertEqual(app.toolbars.count, 0, "Action controls must reside in the view header below the native title bar")
+        for identifier in [
+            "toolbar-navigation", "toolbar-auto-refresh", "toolbar-guided-mode",
+            "toolbar-setup-guide", "toolbar-refresh", "dashboard-guided-setup"
+        ] {
+            let control = header.descendants(matching: .any)[identifier]
+            XCTAssertTrue(control.exists, "Missing preserved global control \(identifier)")
+            XCTAssertTrue(control.isHittable, "Global control must remain reachable: \(identifier)")
+            XCTAssertTrue(frameIsContained(control.frame, in: header.frame, tolerance: 2),
+                          "Global control must remain below native title-bar chrome: \(identifier)")
+        }
+        let setup = header.buttons["dashboard-guided-setup"]
+        XCTAssertTrue(header.descendants(matching: .any)["toolbar-guided-setup"].exists)
+        XCTAssertTrue(setup.label.contains("Guided Setup"))
+        XCTAssertEqual(setup.frame.height, 32, accuracy: 2)
+        XCTAssertGreaterThan(setup.frame.minX, header.frame.midX)
+        XCTAssertEqual(setup.frame.maxX, header.frame.maxX - 20, accuracy: 2)
+        return header.frame.maxY
+    }
+
+    private func graphitePageHeading(
+        in detail: XCUIElement,
+        identifier: String,
+        title: String
+    ) -> XCUIElement {
+        let headingTitle: String
+        switch title {
+        case "LM Studio MCP": headingTitle = "LM Studio · MCP"
+        case "Manager": headingTitle = "Authorized Folders"
+        default: headingTitle = title
+        }
+        let pageHeaderIdentifiers = [
+            "detail-mcp", "detail-agents", "detail-tools", "detail-feed",
+            "detail-diagnostics", "detail-manager"
+        ]
+        let headings: XCUIElementQuery
+        if pageHeaderIdentifiers.contains(identifier) {
+            let pageHeader = detail.groups[identifier]
+            XCTAssertTrue(pageHeader.waitForExistence(timeout: 5))
+            headings = pageHeader.staticTexts.matching(
+                NSPredicate(format: "label == %@ OR value == %@", headingTitle, headingTitle)
+            )
+        } else {
+            let headingIdentifier = identifier == "detail-rune-forge" ? "rune-forge-view" : identifier
+            headings = detail.staticTexts.matching(NSPredicate(
+                format: "identifier == %@ AND (label == %@ OR value == %@)",
+                headingIdentifier, headingTitle, headingTitle
+            ))
+        }
+        let heading = headings.element
+        XCTAssertTrue(heading.waitForExistence(timeout: 5), "Missing exact native heading \(headingTitle)")
+        XCTAssertEqual(headings.count, 1, "The selected module must own one exact native heading")
+        return heading
+    }
+
+    private func inspectProvider(_ identifier: String) {
+        let row = app.descendants(matching: .any)["provider-inspect-\(identifier)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        makeHittable(row)
+        row.click()
+        XCTAssertTrue(app.descendants(matching: .any)["provider-card-\(identifier)"].waitForExistence(timeout: 5))
+    }
+
+    private func selectManagerSection(_ identifier: String) {
+        let owner = managerWindow
+        let section = owner.buttons["manager-section-\(identifier)"]
+        XCTAssertTrue(section.waitForExistence(timeout: 5))
+        makeHittable(section, in: owner)
+        section.click()
+    }
+
+    private var managerWindow: XCUIElement {
+        let settings = app.windows["com_apple_SwiftUI_Settings_window"]
+        return settings.exists ? settings : app.windows["forge-main-window"]
+    }
+
     func testContinuityHeaderAndContentAvoidTitleBarAndUnusedSplitAtMinimumWidth() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
@@ -1062,8 +3122,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(window.waitForExistence(timeout: 8))
         resizeMainWindowToMinimum(window)
 
-        let toolbar = app.toolbars.firstMatch
-        XCTAssertTrue(toolbar.waitForExistence(timeout: 5))
+        let contentTop = assertGraphiteGlobalHeader(in: window)
         let projects = app.buttons["tab-projects"]
         XCTAssertTrue(projects.waitForExistence(timeout: 5))
         projects.click()
@@ -1075,13 +3134,13 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertGreaterThanOrEqual(
             detail.frame.minY,
-            toolbar.frame.maxY - 2,
-            "Project content must begin below the window toolbar"
+            contentTop - 2,
+            "Project content must begin inside the native content region"
         )
         XCTAssertGreaterThanOrEqual(
             title.frame.minY,
-            toolbar.frame.maxY - 2,
-            "The first readable project heading must not run under titlebar controls"
+            contentTop - 2,
+            "The first readable project heading must remain inside the native content region"
         )
     }
 
@@ -1107,13 +3166,15 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             let button = app.buttons[tab.id]
             XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing \(tab.id)")
             button.click()
-            let marker = app.descendants(matching: .any)[tab.detail]
-            XCTAssertTrue(marker.waitForExistence(timeout: 5), "Missing \(tab.detail)")
             let detail = try XCTUnwrap(
                 selectedDetailContainer(named: tab.title),
                 "Missing selected-detail container for \(tab.title)"
             )
+            let marker = graphitePageHeading(in: detail, identifier: tab.detail, title: tab.title)
             let frame = detail.frame
+            let contentTop = assertGraphiteGlobalHeader(in: window)
+            XCTAssertGreaterThanOrEqual(frame.minY, contentTop - 2)
+            XCTAssertGreaterThanOrEqual(marker.frame.minY, contentTop - 2)
             XCTAssertGreaterThan(frame.width, 600, "\(tab.detail) is unexpectedly narrow")
             XCTAssertGreaterThan(frame.height, 500, "\(tab.detail) is unexpectedly short")
             XCTAssertTrue(
@@ -1262,6 +3323,88 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityHandoffID)"].exists)
     }
 
+    func testContinuityNativeMultiplePacketSelectionDeletesExactPacketsAndClearsOnReload() throws {
+        let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
+        let originalGeneration = fixture.projectGeneration
+        let expectedPacketIDs = Set([fixture.continuityCheckpointID, fixture.continuityHandoffID])
+        relaunch(with: fixture)
+        let continuity = app.buttons["tab-continuity"]
+        XCTAssertTrue(continuity.waitForExistence(timeout: 8))
+        continuity.click()
+        let checkpoint = app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityCheckpointID)"]
+        let handoff = app.descendants(matching: .any)["continuity-packet-row-\(fixture.continuityHandoffID)"]
+        let delete = app.buttons["continuity-delete-packets"]
+        XCTAssertTrue(checkpoint.waitForExistence(timeout: 5))
+        XCTAssertTrue(handoff.waitForExistence(timeout: 5))
+        XCTAssertFalse(delete.isEnabled)
+        checkpoint.click()
+        XCUIElement.perform(withKeyModifiers: .command) { handoff.click() }
+        XCTAssertTrue(waitForEnabled(delete, timeout: 5))
+        captureGraphite("continuity-native-two-packets-selected")
+        delete.click()
+        let confirmation = app.sheets.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts["Delete selected continuity packets?"].exists)
+        let message = "Delete 2 selected packets? Only those handoff/checkpoint records and their derived projections will be removed."
+        XCTAssertTrue(confirmation.staticTexts[message].exists)
+        captureGraphite("continuity-native-two-packets-confirmation")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 3))
+        XCTAssertEqual(Set(fixture.continuityPacketIDs), expectedPacketIDs)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 0)
+        XCTAssertNil(fixture.lastContinuityPacketDeletionBody)
+
+        let readsBeforeReload = fixture.continuityPacketListRequestCount
+        app.buttons["tab-tools"].click()
+        continuity.click()
+        XCTAssertTrue(waitUntil(timeout: 5) { fixture.continuityPacketListRequestCount > readsBeforeReload })
+        XCTAssertTrue(checkpoint.waitForExistence(timeout: 5))
+        XCTAssertTrue(handoff.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitUntil(timeout: 5) { delete.exists && !delete.isEnabled },
+                      "Reloading packets must clear the native multi-selection as well as the model selection")
+        captureGraphite("continuity-native-selection-cleared-after-reload")
+
+        checkpoint.click()
+        XCUIElement.perform(withKeyModifiers: .command) { handoff.click() }
+        XCTAssertTrue(waitForEnabled(delete, timeout: 5))
+        delete.click()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts[message].exists)
+        confirmation.buttons["Delete"].click()
+        XCTAssertTrue(waitUntil(timeout: 5) { !checkpoint.exists && !handoff.exists })
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-packets-empty"].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitUntil(timeout: 5) { !delete.isEnabled })
+        XCTAssertTrue(fixture.continuityPacketIDs.isEmpty)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
+        let deletion = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: XCTUnwrap(fixture.lastContinuityPacketDeletionBody)
+        ) as? [String: Any])
+        XCTAssertEqual(Set(deletion.keys), ["project_id", "packet_ids"])
+        XCTAssertEqual(deletion["project_id"] as? String, fixture.projectID)
+        let deletedPacketIDs = try XCTUnwrap(deletion["packet_ids"] as? [String])
+        XCTAssertEqual(deletedPacketIDs.count, 2)
+        XCTAssertEqual(Set(deletedPacketIDs), expectedPacketIDs)
+
+        let readsAfterDeletion = fixture.continuityPacketListRequestCount
+        app.buttons["tab-tools"].click()
+        continuity.click()
+        XCTAssertTrue(waitUntil(timeout: 5) { fixture.continuityPacketListRequestCount > readsAfterDeletion })
+        XCTAssertTrue(app.descendants(matching: .any)["continuity-packets-empty"].waitForExistence(timeout: 5))
+        XCTAssertFalse(checkpoint.exists)
+        XCTAssertFalse(handoff.exists)
+        XCTAssertFalse(delete.isEnabled)
+        XCTAssertTrue(app.buttons["continuity-copy-project-id"].isEnabled)
+        captureGraphite("continuity-native-deleted-packets-remain-empty-after-reload")
+        XCTAssertEqual(fixture.projectGeneration, originalGeneration)
+        XCTAssertTrue(fixture.continuityHistoryClearScopes.isEmpty)
+        XCTAssertEqual(fixture.settingsUpdateCount, 0)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.controlRequestCount, 0)
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerConfigurationSaveCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1)
+    }
+
     func testContinuityResetClearsOnlyContinuityHistory() throws {
         let fixture = try OperatorManagerUITestFixture(includeContinuityOperation: true)
         let originalGeneration = fixture.projectGeneration
@@ -1374,29 +3517,27 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
         let providerIDs = ["lmstudio", "claude-desktop", "codex-desktop", "grok-build"]
         for providerID in providerIDs {
+            inspectProvider(providerID)
             XCTAssertTrue(
                 app.descendants(matching: .any)["provider-card-\(providerID)"]
                     .waitForExistence(timeout: 5),
-                "Provider card \(providerID) should be visible"
+                "Inspected provider \(providerID) must retain its full detail controls"
             )
-        }
-
-        for providerID in providerIDs {
             let toggle = app.descendants(matching: .any)["provider-toggle-\(providerID)"]
             XCTAssertTrue(
                 waitForToggleState(providerID == "lmstudio", on: toggle),
-                "Only LM Studio should be selected in the provider registry fixture"
+                "Inspection must preserve the active LM Studio registry selection"
             )
+            if providerID != "grok-build" {
+                let connectAndCheck = app.buttons["provider-repair-\(providerID)"]
+                XCTAssertTrue(
+                    waitForEnabled(connectAndCheck, timeout: 5),
+                    "Selectable provider \(providerID) must retain Connect and Check"
+                )
+                XCTAssertEqual(connectAndCheck.label, "Connect and Check")
+            }
         }
 
-        for providerID in ["lmstudio", "claude-desktop", "codex-desktop"] {
-            let connectAndCheck = app.buttons["provider-repair-\(providerID)"]
-            XCTAssertTrue(
-                waitForEnabled(connectAndCheck, timeout: 5),
-                "Selectable provider \(providerID) should expose Connect and Check"
-            )
-            XCTAssertEqual(connectAndCheck.label, "Connect and Check")
-        }
         XCTAssertFalse(
             app.buttons["provider-repair-grok-build"].exists,
             "Grok Build must remain visibly nonselectable"
@@ -1409,8 +3550,10 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
 
         let selectionGuidance = app.staticTexts["provider-selection-guidance"]
         XCTAssertTrue(selectionGuidance.exists)
-        XCTAssertTrue(element(selectionGuidance, contains: "Select another provider"))
+        XCTAssertTrue(element(selectionGuidance, contains: "Select a row to inspect"))
+        XCTAssertTrue(element(selectionGuidance, contains: "Use Activate"))
 
+        inspectProvider("lmstudio")
         let connectAndCheck = app.buttons["provider-repair-lmstudio"]
         XCTAssertTrue(waitForEnabled(connectAndCheck, timeout: 5))
         XCTAssertEqual(connectAndCheck.label, "Connect and Check")
@@ -1426,7 +3569,11 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             "Expected two preparations and one repair; observed \(fixture.providerPreparationCount) preparation(s) and \(fixture.providerIntegrationMutationRecords.count) repair(s)"
         )
         XCTAssertEqual(fixture.providerPreparationAuthorizationCount, 2)
-        XCTAssertEqual(fixture.providerPreparationResumeWaitingRuns, [false, true])
+        XCTAssertEqual(
+            fixture.providerPreparationResumeWaitingRuns,
+            [false, false],
+            "Connect and Check must keep retained runs quiescent through preparation and integration verification"
+        )
         let repair = try XCTUnwrap(fixture.providerIntegrationMutationRecords.first)
         XCTAssertEqual(repair.kind, "repair")
         XCTAssertEqual(repair.providerID, "lmstudio")
@@ -1519,6 +3666,50 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(element(notice, contains: "integration passed verification"))
     }
 
+    func testGraphiteProviderBusyPreparationPollsAndCancelsExactOperation() throws {
+        let fixture = try OperatorManagerUITestFixture(includePendingProviderOperation: true)
+        relaunch(with: fixture)
+        let provider = app.buttons["tab-provider"]
+        XCTAssertTrue(provider.waitForExistence(timeout: 8))
+        provider.click()
+
+        let progress = app.descendants(matching: .any)["provider-operation-progress"]
+        let cancel = app.buttons["provider-operation-cancel"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForEnabled(cancel, timeout: 5))
+        XCTAssertTrue(waitUntil(timeout: 5) { fixture.providerOperationPollRequestCount > 0 },
+                      "The busy panel must observe the exact durable operation through its real polling path")
+        makeHittable(cancel)
+        captureGraphite("provider-busy-verifying-configuration")
+        let toggle = app.switches["provider-toggle-lmstudio"]
+        let repair = app.buttons["provider-repair-lmstudio"]
+        XCTAssertTrue(toggle.exists)
+        XCTAssertFalse(toggle.isEnabled)
+        XCTAssertTrue(repair.exists)
+        XCTAssertFalse(repair.isEnabled)
+        cancel.click()
+
+        XCTAssertTrue(waitUntil(timeout: 5) { fixture.providerOperationCancellationIDs.count == 1 })
+        XCTAssertEqual(fixture.providerOperationCancellationIDs, [fixture.pendingProviderOperationID])
+        XCTAssertEqual(fixture.providerOperationCancellationAuthorizationCount, 1)
+        let body = try XCTUnwrap(fixture.providerOperationCancellationBodies.first)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertTrue(payload.isEmpty, "Cancellation must keep the protected empty-object command contract")
+        XCTAssertTrue(progress.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(waitForEnabled(toggle, timeout: 5))
+        XCTAssertTrue(waitForEnabled(repair, timeout: 5))
+        let notice = app.staticTexts["provider-probe-notice"]
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            notice.exists && self.element(notice, contains: "Provider setup was cancelled")
+        })
+        captureGraphite("provider-busy-cancellation-reconciled")
+        XCTAssertEqual(fixture.providerSelectionRequestCount, 0)
+        XCTAssertEqual(fixture.providerPreparationCount, 0)
+        XCTAssertEqual(fixture.startRequestCount, 0)
+        XCTAssertEqual(fixture.mutationAuthorizationCount, 1,
+                       "Polling and inspection are read-only; only the requested cancellation may mutate")
+    }
+
     func testRuntimeCancelUsesProtectedTypedRequestAndReconcilesSuccessAndRejection() throws {
         let fixture = try OperatorManagerUITestFixture()
         relaunch(with: fixture)
@@ -1535,19 +3726,57 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(cancel.isEnabled, "A queued runtime job must be cancellable")
 
         fixture.setRuntimeJobState("running")
+        let snapshotBaseline = fixture.operatorSnapshotRequestCount
         refreshOperator()
-        XCTAssertTrue(waitUntil(timeout: 5) {
+        let runningPublished = waitUntil(timeout: 5) {
             self.element(state, contains: "running") && cancel.isEnabled
-        })
+        }
+        if !runningPublished {
+            captureGraphite("runtime-cancel-running-refresh-failure")
+            let evidence = XCTAttachment(string: """
+                Snapshot requests before Refresh: \(snapshotBaseline)
+                Snapshot requests after Refresh: \(fixture.operatorSnapshotRequestCount)
+                Latest snapshot runtime state: \(fixture.lastOperatorSnapshotRuntimeState ?? "unavailable")
+                Selected job state label: \(state.label)
+                Selected job state value: \(String(describing: state.value))
+                Cancel Job enabled: \(cancel.isEnabled)
+                """
+            )
+            evidence.name = "runtime-refresh-request-and-publication-evidence"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+        }
+        XCTAssertGreaterThan(fixture.operatorSnapshotRequestCount, snapshotBaseline)
+        XCTAssertEqual(fixture.lastOperatorSnapshotRuntimeState, "running")
+        XCTAssertTrue(runningPublished)
 
         for noncancellableState in [
             "cancelling", "completed", "failed", "timed_out", "cancelled", "quarantined_stale",
         ] {
             fixture.setRuntimeJobState(noncancellableState)
+            let snapshotBaseline = fixture.operatorSnapshotRequestCount
             refreshOperator()
-            XCTAssertTrue(waitUntil(timeout: 5) {
-                self.element(state, contains: noncancellableState)
-            })
+            let displayState = noncancellableState.replacingOccurrences(of: "_", with: " ")
+            let statePublished = waitUntil(timeout: 5) {
+                self.element(state, contains: displayState)
+            }
+            captureGraphite("runtime-job-state-\(noncancellableState)")
+            let evidence = XCTAttachment(string: [
+                "Raw requested runtime state: \(noncancellableState)",
+                "Expected native state text: \(displayState)",
+                "Snapshot requests before Refresh: \(snapshotBaseline)",
+                "Snapshot requests after Refresh: \(fixture.operatorSnapshotRequestCount)",
+                "Latest snapshot runtime state: \(fixture.lastOperatorSnapshotRuntimeState ?? "unavailable")",
+                "Selected job state label: \(state.label)",
+                "Selected job state value: \(String(describing: state.value))",
+                "Cancel Job enabled: \(cancel.isEnabled)",
+            ].joined(separator: "\n"))
+            evidence.name = "runtime-\(noncancellableState)-request-and-publication-evidence"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            XCTAssertGreaterThan(fixture.operatorSnapshotRequestCount, snapshotBaseline)
+            XCTAssertEqual(fixture.lastOperatorSnapshotRuntimeState, noncancellableState)
+            XCTAssertTrue(statePublished)
             XCTAssertFalse(
                 cancel.isEnabled,
                 "Cancel Job must be disabled for \(noncancellableState) jobs"
@@ -1701,6 +3930,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
             selectedRoot.standardizedFileURL.path
         )
         makeHittable(reconcile)
+        captureGraphite("projects-relink-response-loss-pending-reconciliation")
         reconcile.click()
 
         XCTAssertTrue(waitUntil(timeout: 8) {
@@ -1712,6 +3942,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(notice.waitForExistence(timeout: 5))
         XCTAssertTrue(element(notice, contains: "Reconciled"))
         XCTAssertFalse(reconcile.exists)
+        captureGraphite("projects-relink-response-loss-reconciled")
     }
 
     func testProjectsRelinkRejectionOffersExactManualReconciliation() throws {
@@ -1740,6 +3971,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(fixture.relinkRequestCount, 1)
         XCTAssertEqual(fixture.projectGeneration, 4)
         makeHittable(reconcile)
+        captureGraphite("projects-relink-rejection-pending-reconciliation")
         reconcile.click()
 
         XCTAssertTrue(waitUntil(timeout: 8) {
@@ -1752,6 +3984,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(notice.waitForExistence(timeout: 5))
         XCTAssertTrue(element(notice, contains: "generation 5"))
         XCTAssertFalse(reconcile.exists)
+        captureGraphite("projects-relink-rejection-reconciled")
     }
 
     func testToolPermissionCatalogSupportsMixedKeyboardAndSavedProjectDefaults() throws {
@@ -2044,8 +4277,9 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     }
 
     func testCollapsedNavigationCanBeRestored() throws {
+        try showWorkbenchControls(["navigation"])
         let toggle = app.buttons["toolbar-navigation"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 8), "Navigation toolbar toggle should always remain available")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8), "Navigation header control should always remain available")
 
         toggle.click() // collapse
         XCTAssertTrue(toggle.exists, "Navigation toggle must remain available while navigation is hidden")
@@ -2055,7 +4289,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         let rigByLabel = app.staticTexts["Dashboard"]
         XCTAssertTrue(
             rigByID.waitForExistence(timeout: 3) || rigByLabel.waitForExistence(timeout: 3),
-            "Navigation should reappear after using the toolbar toggle"
+            "Navigation should reappear after using the header control"
         )
     }
 
@@ -2080,6 +4314,7 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
     private func resizeMainWindowToMinimum(_ window: XCUIElement) {
         let initialFrame = window.frame
         if initialFrame.width <= 1_120, initialFrame.height <= 840 {
+            assertGraphiteMinimumContent(in: window)
             return
         }
         let handle = window.coordinate(
@@ -2098,6 +4333,14 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         )
         XCTAssertLessThanOrEqual(window.frame.width, 1_120)
         XCTAssertLessThanOrEqual(window.frame.height, 840)
+        assertGraphiteMinimumContent(in: window)
+    }
+
+    private func assertGraphiteMinimumContent(in window: XCUIElement) {
+        let content = app.descendants(matching: .any)["root-split"]
+        XCTAssertTrue(content.waitForExistence(timeout: 5))
+        XCTAssertEqual(window.frame.width, 1_100, accuracy: 3)
+        XCTAssertEqual(content.frame.height, 720, accuracy: 3)
     }
 
     private func resizeMainWindowForWideGrid(_ window: XCUIElement) {
@@ -2234,16 +4477,46 @@ final class ForgeConductorUITests: XCTestCase, @unchecked Sendable {
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    private func makeHittable(_ element: XCUIElement) {
-        let containingScrollViews = app.scrollViews
-            .containing(.any, identifier: element.identifier)
-            .allElementsBoundByIndex
-        let scrollView = containingScrollViews.last ?? app.scrollViews.firstMatch
-        for _ in 0..<6 where !element.isHittable {
-            scrollView.swipeUp()
+    private func makeGraphiteSetupReviewScopeVisible() throws {
+        let sheet = app.sheets.firstMatch
+        let picker = sheet.popUpButtons["guided-setup-project-selection"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        let panel = try XCTUnwrap(sheet.groups
+            .containing(.popUpButton, identifier: "guided-setup-project-selection")
+            .allElementsBoundByIndex.last)
+        let scrollView = try XCTUnwrap(sheet.scrollViews
+            .containing(.popUpButton, identifier: "guided-setup-project-selection")
+            .allElementsBoundByIndex.last)
+        for _ in 0..<12 where !frameIsContained(panel.frame, in: scrollView.frame, tolerance: 2) {
+            let distance = panel.frame.midY - scrollView.frame.midY
+            scrollView.scroll(byDeltaX: 0, deltaY: -min(360, max(-360, distance)))
         }
-        for _ in 0..<6 where !element.isHittable {
-            scrollView.swipeDown()
+        XCTAssertTrue(frameIsContained(panel.frame, in: scrollView.frame, tolerance: 2))
+        XCTAssertTrue(frameIsContained(panel.frame, in: sheet.frame, tolerance: 2))
+        XCTAssertTrue(panel.staticTexts["Project to review"].exists)
+        let identity = panel.staticTexts["guided-setup-review-project-identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 5))
+        XCTAssertTrue(frameIsContained(identity.frame, in: scrollView.frame, tolerance: 2))
+        XCTAssertTrue(picker.isHittable)
+        XCTAssertEqual(picker.value as? String, "Fixture Project")
+    }
+
+    private func makeHittable(_ element: XCUIElement, in owner: XCUIElement? = nil) {
+        let selectorIdentity = !element.identifier.isEmpty ? element.identifier
+            : !element.label.isEmpty ? element.label : element.value as? String ?? ""
+        let containingScrollViews = (owner ?? app).scrollViews
+            .containing(NSPredicate(
+                format: "identifier == %@ OR label == %@ OR value == %@",
+                selectorIdentity, selectorIdentity, selectorIdentity
+            ))
+            .allElementsBoundByIndex
+        let explicitScrollOwner = owner?.elementType == .scrollView ? owner : nil
+        if !selectorIdentity.isEmpty, let scrollView = containingScrollViews.last ?? explicitScrollOwner {
+            for _ in 0..<12 where !element.isHittable
+                || !frameIsContained(element.frame, in: scrollView.frame, tolerance: 2) {
+                let distance = element.frame.midY - scrollView.frame.midY
+                scrollView.scroll(byDeltaX: 0, deltaY: -min(360, max(-360, distance)))
+            }
         }
         XCTAssertTrue(element.isHittable)
     }
@@ -2296,6 +4569,13 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private let rejectFirstRelinkResponse: Bool
     private let includeContinuityOperation: Bool
     private let continuityOperationState: String
+    private let includePolicyDetails: Bool
+    private let includePagedEvidence: Bool
+    private var remainingInstructionCatalogFailures: Int
+    private var remainingEvidencePageFailures: Int
+    private var mutableEvidencePageRequestCount = 0
+    private var mutableLastEvidenceCursor: String?
+    private let managerVersion: String
     private var mutableRunState: String
     private var mutableDeletedRun = false
     private var mutableDeletionRequestCount = 0
@@ -2309,6 +4589,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableContinuityOperationCleared = false
     private var mutableContinuityHistoryClearScopes: [String] = []
     private var mutableContinuityPacketIDs: [String] = []
+    private var mutableContinuityPacketListRequestCount = 0
+    private var mutableLastContinuityPacketDeletionBody: Data?
     private var mutableAcceptedStart = false
     private var mutableAcceptedStartRunID: String?
     private var mutableShellEnabled = true
@@ -2324,6 +4606,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableProviderConfigurationRevision = "0"
     private var mutableProviderConfiguredModel = ""
     private var mutableProviderConfiguredEndpoint = "http://127.0.0.1:1234"
+    private let providerLinkedNodeID: UUID?
+    private let reportedProviderEndpoint: String?
     private var mutableProviderHealth = "healthy"
     private var mutableProviderLastProbeMode: String?
     private var mutableProviderLastProbeError: String?
@@ -2335,7 +4619,19 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableConfiguredProviderIntegrationIDs: Set<String> = []
     private var mutableProviderIntegrationMutationRecords: [ProviderIntegrationMutationRecord] = []
     private var mutableProviderIntegrationMutationAuthorizationCount = 0
+    private var mutableProviderSelectionRequestCount = 0
+    private var mutableProviderModelRequestCount = 0
+    private var mutableProviderIntegrationDeletionRequestCount = 0
+    private let includePendingProviderOperation: Bool
+    let pendingProviderOperationID = "67676767-6767-4676-8676-676767676767"
+    private var mutablePendingProviderOperationCancelled = false
+    private var mutableProviderOperationPollRequestCount = 0
+    private var mutableProviderOperationCancellationIDs: [String] = []
+    private var mutableProviderOperationCancellationBodies: [Data] = []
+    private var mutableProviderOperationCancellationAuthorizationCount = 0
     private var mutableRuntimeJobState = "queued"
+    private var mutableOperatorSnapshotRequestCount = 0
+    private var mutableLastOperatorSnapshotRuntimeState: String?
     private var mutableRuntimeCancellationJobIDs: [String] = []
     private var mutableRuntimeCancellationBodies: [Data] = []
     private var mutableRuntimeCancellationAuthorizationCount = 0
@@ -2356,6 +4652,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     private var mutableInstructionQueueReorderRequestCount = 0
     private var mutableInstructionQueueRemoveRequestCount = 0
     private var mutableInstructionQueueStatusRequestCount = 0
+    private var mutableInstructionCatalogRequestCount = 0
     private let supportedProviderIntegrationIDs: Set<String> = [
         "lmstudio",
         "claude-desktop",
@@ -2379,6 +4676,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         locked { mutableContinuityHistoryClearScopes }
     }
     var continuityPacketIDs: [String] { locked { mutableContinuityPacketIDs } }
+    var continuityPacketListRequestCount: Int { locked { mutableContinuityPacketListRequestCount } }
+    var lastContinuityPacketDeletionBody: Data? { locked { mutableLastContinuityPacketDeletionBody } }
     var acceptedStartRunID: String { locked { mutableAcceptedStartRunID ?? "" } }
     var shellEnabled: Bool { locked { mutableShellEnabled } }
     var allowedRoots: [String] { locked { mutableAllowedRoots } }
@@ -2407,6 +4706,17 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     }
     var providerIntegrationMutationAuthorizationCount: Int {
         locked { mutableProviderIntegrationMutationAuthorizationCount }
+    }
+    var providerSelectionRequestCount: Int { locked { mutableProviderSelectionRequestCount } }
+    var providerModelRequestCount: Int { locked { mutableProviderModelRequestCount } }
+    var providerIntegrationDeletionRequestCount: Int {
+        locked { mutableProviderIntegrationDeletionRequestCount }
+    }
+    var providerOperationPollRequestCount: Int { locked { mutableProviderOperationPollRequestCount } }
+    var providerOperationCancellationIDs: [String] { locked { mutableProviderOperationCancellationIDs } }
+    var providerOperationCancellationBodies: [Data] { locked { mutableProviderOperationCancellationBodies } }
+    var providerOperationCancellationAuthorizationCount: Int {
+        locked { mutableProviderOperationCancellationAuthorizationCount }
     }
     var runtimeCancellationJobIDs: [String] { locked { mutableRuntimeCancellationJobIDs } }
     var runtimeCancellationBodies: [Data] { locked { mutableRuntimeCancellationBodies } }
@@ -2439,6 +4749,17 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
     var instructionQueueStatusRequestCount: Int {
         locked { mutableInstructionQueueStatusRequestCount }
     }
+    var instructionCatalogRequestCount: Int { locked { mutableInstructionCatalogRequestCount } }
+    var evidencePageRequestCount: Int { locked { mutableEvidencePageRequestCount } }
+    var lastEvidenceCursor: String? { locked { mutableLastEvidenceCursor } }
+
+    private var providerEndpointMode: [String: Any] {
+        guard let providerLinkedNodeID else { return ["mode": "local"] }
+        return [
+            "mode": "linked",
+            "node_id": providerLinkedNodeID.uuidString.lowercased(),
+        ]
+    }
 
     init(
         failStartResponse: Bool = false,
@@ -2450,9 +4771,21 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         includeContinuityOperation: Bool = false,
         continuityOperationState: String = "awaiting_durable_acknowledgement",
         activeInstructionQueue: Bool = false,
-        includeSecondInstructionPackage: Bool = false
+        includeSecondInstructionPackage: Bool = false,
+        failFirstInstructionCatalog: Bool = false,
+        includePagedEvidence: Bool = false,
+        failFirstEvidencePage: Bool = false,
+        includePolicyDetails: Bool = false,
+        providerEndpoint: String = "http://127.0.0.1:1234",
+        initialProviderHealth: String = "healthy",
+        includePendingProviderOperation: Bool = false,
+        providerLinkedNodeID: UUID? = nil,
+        reportedProviderEndpoint: String? = nil
     ) throws {
         self.failStartResponse = failStartResponse
+        self.includePendingProviderOperation = includePendingProviderOperation
+        self.providerLinkedNodeID = providerLinkedNodeID
+        self.reportedProviderEndpoint = reportedProviderEndpoint
         self.failContractProbe = failContractProbe
         self.dropRelinkResponseCount = max(
             dropRelinkResponseCount,
@@ -2461,6 +4794,20 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         self.rejectFirstRelinkResponse = rejectFirstRelinkResponse
         self.includeContinuityOperation = includeContinuityOperation
         self.continuityOperationState = continuityOperationState
+        self.includePolicyDetails = includePolicyDetails
+        self.includePagedEvidence = includePagedEvidence
+        self.remainingInstructionCatalogFailures = failFirstInstructionCatalog ? 1 : 0
+        self.remainingEvidencePageFailures = failFirstEvidencePage ? 1 : 0
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        managerVersion = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("VERSION"),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        mutableProviderConfiguredEndpoint = providerEndpoint
+        mutableProviderHealth = initialProviderHealth
         mutableContinuityPacketIDs = includeContinuityOperation
             ? [
                 "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -2540,6 +4887,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             mutableRuntimeJobState = state
         }
     }
+
+    var operatorSnapshotRequestCount: Int { locked { mutableOperatorSnapshotRequestCount } }
+    var lastOperatorSnapshotRuntimeState: String? { locked { mutableLastOperatorSnapshotRuntimeState } }
 
     func rejectNextRuntimeCancellation() {
         locked {
@@ -2632,6 +4982,17 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         ),
         connection: NWConnection
     ) {
+        locked {
+            if request.path == "/api/manager/providers/selection" {
+                mutableProviderSelectionRequestCount += 1
+            }
+            if request.path == "/api/manager/provider/models" {
+                mutableProviderModelRequestCount += 1
+            }
+            if request.method == "DELETE", request.path.hasSuffix("/integration") {
+                mutableProviderIntegrationDeletionRequestCount += 1
+            }
+        }
         switch request.path {
         case "/api/manager/status":
             respond(status: 200, object: managerStatus(), to: connection)
@@ -2654,7 +5015,42 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             }
             respond(status: 200, object: managerSettings(), to: connection)
         case "/api/manager/operator/snapshot":
-            respond(status: 200, object: snapshot(), to: connection)
+            var response = snapshot()
+            if includePagedEvidence {
+                let cursor = request.queryItems.first(where: { $0.name == "cursor" })?.value
+                let expected = cursor.map { ["limit": "100", "cursor": $0] } ?? ["limit": "100"]
+                guard request.method == "GET",
+                      exactQuery(request.queryItems, equals: expected),
+                      cursor == nil || cursor == "101" else {
+                    respond(status: 400, object: ["message": "invalid bounded evidence page request"], to: connection)
+                    return
+                }
+                if let cursor {
+                    let failPage = locked { () -> Bool in
+                        mutableEvidencePageRequestCount += 1
+                        mutableLastEvidenceCursor = cursor
+                        guard remainingEvidencePageFailures > 0 else { return false }
+                        remainingEvidencePageFailures -= 1
+                        return true
+                    }
+                    if failPage {
+                        respond(status: 503, object: ["message": "fixture evidence page transport failure"], to: connection)
+                        return
+                    }
+                    response["events"] = [pagedEvidenceEvent(sequence: 100)]
+                    response["next_cursor"] = NSNull()
+                } else {
+                    response["events"] = stride(from: 200, through: 101, by: -1)
+                        .map { pagedEvidenceEvent(sequence: Int64($0)) }
+                    response["next_cursor"] = "101"
+                }
+            }
+            let jobs = response["runtime_jobs"] as? [[String: Any]]
+            locked {
+                mutableOperatorSnapshotRequestCount += 1
+                mutableLastOperatorSnapshotRuntimeState = jobs?.first?["state"] as? String
+            }
+            respond(status: 200, object: response, to: connection)
         case "/api/manager/continuity/packets":
             guard request.method == "GET",
                   request.headers["authorization"]?.hasPrefix("Bearer ") == true,
@@ -2663,7 +5059,8 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 return
             }
             let packets: [[String: Any]] = locked {
-                mutableContinuityPacketIDs.enumerated().map { index, id in
+                mutableContinuityPacketListRequestCount += 1
+                return mutableContinuityPacketIDs.enumerated().map { index, id in
                     [
                         "packet_id": id,
                         "project_id": projectID,
@@ -2688,6 +5085,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 return
             }
             let deleted = locked { () -> [String] in
+                mutableLastContinuityPacketDeletionBody = request.body
                 let visible = Set(mutableContinuityPacketIDs)
                 let exact = ids.filter(visible.contains)
                 mutableContinuityPacketIDs.removeAll { ids.contains($0) }
@@ -2788,7 +5186,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             respond(
                 status: 200,
                 object: [
-                    "violations": [],
+                    "violations": includePolicyDetails ? [policyViolation()] : [],
                     "controlsExecution": false,
                 ],
                 to: connection
@@ -2812,6 +5210,47 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         case "/api/manager/projects/instruction-packages":
             locked { mutableInstructionQueueStatusRequestCount += 1 }
             respond(status: 200, object: instructionQueue(), to: connection)
+        case "/api/manager/projects/instruction-packages/catalog":
+            guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let object = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  object["project_id"] as? String == projectID,
+                  (object["project_generation"] as? NSNumber)?.uint64Value == locked({ mutableProjectGeneration }),
+                  let contentSHA = object["content_sha256"] as? String,
+                  [String(repeating: "c", count: 64), String(repeating: "d", count: 64)].contains(contentSHA),
+                  (object["cursor"] as? NSNumber)?.intValue == 0,
+                  (object["limit"] as? NSNumber)?.intValue == 128 else {
+                respond(status: 400, object: ["message": "invalid instruction catalog scope"], to: connection)
+                return
+            }
+            let failCatalog = locked { () -> Bool in
+                mutableInstructionCatalogRequestCount += 1
+                guard remainingInstructionCatalogFailures > 0 else { return false }
+                remainingInstructionCatalogFailures -= 1
+                return true
+            }
+            if failCatalog {
+                respond(status: 503, object: ["message": "fixture catalog transport failure"], to: connection)
+                return
+            }
+            respond(status: 200, object: [
+                "project_id": projectID,
+                "project_generation": locked { mutableProjectGeneration },
+                "content_sha256": contentSHA,
+                "total_documents": 1,
+                "cursor": 0,
+                "next_cursor": NSNull(),
+                "documents": [[
+                    "id": "fixture-instruction-document",
+                    "source_path": "instructions/Fixture Instructions.md",
+                    "status": "converted_instruction",
+                    "detail": "Preserved source converted to immutable project-scoped instructions.",
+                    "converter": "text",
+                    "original_bytes": "128",
+                    "original_sha256": contentSHA,
+                    "canonical_sha256": contentSHA,
+                    "canonical_bytes": "128",
+                ]],
+            ], to: connection)
         case "/api/manager/projects/instruction-packages/stop":
             guard request.headers["authorization"]?.hasPrefix("Bearer ") == true,
                   let object = try? JSONSerialization.jsonObject(with: request.body)
@@ -2998,6 +5437,29 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 return
             }
             respond(status: 200, object: providerIntegrations(), to: connection)
+        case "/api/manager/provider-operations/\(pendingProviderOperationID)":
+            guard includePendingProviderOperation, request.method == "GET", request.body.isEmpty else {
+                respond(status: 404, object: ["message": "provider operation is unavailable"], to: connection)
+                return
+            }
+            locked { mutableProviderOperationPollRequestCount += 1 }
+            respond(status: 200, object: pendingProviderOperation(), to: connection)
+        case "/api/manager/provider-operations/\(pendingProviderOperationID)/cancel":
+            guard includePendingProviderOperation, request.method == "POST",
+                  request.headers["authorization"]?.hasPrefix("Bearer ") == true,
+                  let payload = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any],
+                  payload.isEmpty else {
+                respond(status: 401, object: ["message": "missing provider cancellation authority or exact payload"], to: connection)
+                return
+            }
+            locked {
+                mutablePendingProviderOperationCancelled = true
+                mutableProviderOperationCancellationIDs.append(pendingProviderOperationID)
+                mutableProviderOperationCancellationBodies.append(request.body)
+                mutableProviderOperationCancellationAuthorizationCount += 1
+                mutableMutationAuthorizationCount += 1
+            }
+            respond(status: 200, object: pendingProviderOperation(), to: connection)
         case let path where path.hasPrefix("/api/manager/providers/")
             && path.hasSuffix("/repair"):
             let providerID = String(
@@ -3067,6 +5529,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 return [
                     "revision": mutableProviderConfigurationRevision,
                     "endpoint": mutableProviderConfiguredEndpoint,
+                    "endpoint_mode": providerEndpointMode,
                     "modelKey": "fixture-model",
                     "credentialConfigured": false,
                     "saved": true,
@@ -3109,6 +5572,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             let configuration: [String: Any] = locked {
                 ["revision": mutableProviderConfigurationRevision,
                  "endpoint": mutableProviderConfiguredEndpoint,
+                 "endpoint_mode": providerEndpointMode,
                  "modelKey": mutableProviderConfiguredModel,
                  "credentialConfigured": false,
                  "saved": mutableProviderConfigurationRevision != "0",
@@ -3621,6 +6085,19 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
         ]
     }
 
+    private func pagedEvidenceEvent(sequence: Int64) -> [String: Any] {
+        [
+            "sequence": sequence,
+            "event_id": "fixture-evidence-\(sequence)",
+            "timestamp": "2026-10-04T12:00:00Z",
+            "kind": "fixture_evidence",
+            "summary": "Fixture evidence event \(sequence)",
+            "severity": "info",
+            "project_id": projectID,
+            "project_generation": 4,
+        ]
+    }
+
     private func managedActivityEvents() -> [[String: Any]] {
         [[
             "event_id": "fixture-assistant-event",
@@ -3667,7 +6144,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "revision": "fixture-policy-revision",
                 "sourceID": ["rawValue": sourceID],
             ],
-            "sources": [],
+            "sources": includePolicyDetails ? policySources() : [],
             "violationEvents": [[
                 "schemaVersion": "1.0.0",
                 "sequence": 1,
@@ -3722,6 +6199,53 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "detectorFaultCount": 0,
             ]],
             "limitations": ["Fixture history is intentionally bounded."],
+        ]
+    }
+
+    private func policySources() -> [[String: Any]] {
+        [
+            [
+                "id": ["rawValue": "66666666-6666-4666-8666-666666666666"],
+                "origin": "built_in_raven_forge",
+                "displayName": "Raven Forge Development baseline",
+                "selectedPath": "docs/DEVELOPMENT-POLICY.md",
+                "standardizedPath": "/tmp/forge-operator-fixture/docs/DEVELOPMENT-POLICY.md",
+                "rootKind": "regular_file",
+                "active": true,
+                "interpretationState": "indexed",
+                "addedAt": 809_956_800.0,
+                "latestObservation": "Fixture governing baseline remains protected from removal.",
+            ],
+            [
+                "id": ["rawValue": "67676767-6767-4767-8767-676767676767"],
+                "origin": "user_selected",
+                "displayName": "Opaque instruction source",
+                "selectedPath": "/tmp/forge-operator-fixture/policy/governance.opaque-format",
+                "standardizedPath": "/tmp/forge-operator-fixture/policy/governance.opaque-format",
+                "rootKind": "regular_file",
+                "active": true,
+                "interpretationState": "partially_indexed",
+                "addedAt": 809_956_801.0,
+                "latestObservation": "Fixture source is active with metadata-only interpretation.",
+            ],
+        ]
+    }
+
+    private func policyViolation() -> [String: Any] {
+        [
+            "violation": [
+                "id": ["rawValue": "77777777-7777-4777-8777-777777777777"],
+                "fingerprint": String(repeating: "f", count: 64),
+                "ruleID": ["rawValue": "RF-FIXTURE-001"],
+                "policyRevision": "fixture-policy-revision",
+                "state": "open",
+                "firstObservedAt": 809_956_800.0,
+                "lastObservedAt": 809_956_805.0,
+                "occurrenceCount": 1,
+                "latestSummary": "Fixture policy violation: documentation evidence is missing.",
+                "latestSuggestedCorrection": "Update the current documentation before closing the phase.",
+            ],
+            "latestEventSequence": 1,
         ]
     }
 
@@ -3809,13 +6333,39 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             }
             return provider
         }
-        return [
+        var registry: [String: Any] = [
             "selection_revision": state.0,
             "selected_provider_id": "lmstudio",
             "providers": providers,
             "current_operation": NSNull(),
             "recent_operations": [],
         ]
+        if includePendingProviderOperation {
+            let operation = pendingProviderOperation()
+            if locked({ mutablePendingProviderOperationCancelled }) {
+                registry["recent_operations"] = [operation]
+            } else {
+                registry["current_operation"] = operation
+            }
+        }
+        return registry
+    }
+
+    private func pendingProviderOperation() -> [String: Any] {
+        let state = locked { (providerIntegrationRevision, mutablePendingProviderOperationCancelled) }
+        var operation: [String: Any] = [
+            "operation_id": pendingProviderOperationID, "kind": "repair", "provider_id": "lmstudio",
+            "phase": state.1 ? "cancelled" : "verifying_configuration",
+            "expected_revision": state.0,
+            "idempotency_key_sha256": String(repeating: "a", count: 64),
+            "intent_sha256": String(repeating: "b", count: 64),
+            "detail": state.1 ? "Provider setup was cancelled."
+                : "Verifying the registered LM Studio integration before activation.",
+            "accepted_at": "2026-10-04T12:00:00Z",
+            "updated_at": state.1 ? "2026-10-04T12:00:01Z" : "2026-10-04T12:00:00Z",
+        ]
+        if state.1 { operation["completed_at"] = "2026-10-04T12:00:01Z" }
+        return operation
     }
 
     private func providerIntegrationOperation(
@@ -3858,6 +6408,9 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
             "model_key": "fixture-model",
             "tool_use_capable": true,
         ]
+        if let reportedProviderEndpoint {
+            value["endpoint"] = reportedProviderEndpoint
+        }
         if let mode = state.1 {
             value["last_probe_mode"] = mode
             value["probe_result_storage"] = "memory_only"
@@ -4028,7 +6581,7 @@ private final class OperatorManagerUITestFixture: @unchecked Sendable {
                 "refresh_interval_sec": 8,
             ] as [String: Any],
             "home": "/tmp/forge-operator-fixture",
-            "version": "0.14.1",
+            "version": managerVersion,
         ]
     }
 

@@ -1,5 +1,20 @@
 # Versioning policy
 
+**UI implementation and QA complete.** Current
+0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
+successful executions**, with zero failures/skips. The separate native view
+matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
+were individually opened and reviewed. The 15-check/434-input audit, matching
+signed Debug build and four scoped ordinary workflows passed. Historical
+failures and superseded inputs remain separate. Native caches, genuine Metal
+readbacks and ordinary observations retain their explicit limits; no
+installation, notarization, App Store upload or distribution was performed.
+Exact owner publication/readback/synchronization refs are retained externally.
+
+Current identity is **0.17.0 (27)**. The Graphite/Compute UI implementation and
+native QA/check-refresh passed; exact owner publication/readback/synchronization refs are retained externally; version alignment and a signed build
+are not shipment qualification. Historical receipts keep their tested identity.
+
 Forge Conductor uses a three-part product version:
 
 ```text
@@ -35,13 +50,25 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.16.5`, build `26`. `VERSION`, `BUILD_NUMBER`,
-compiled protocol constants, all 12 Xcode marketing-version settings, all 16
-Xcode build-number settings, active guides, and wiki pages use this identity.
-The documentation/wiki alignment does not create a new product version or
-change the existing project graph. Installed apps and historical evidence keep
-their actual identities; the current candidate qualification is recorded in
-[qualification status](QUALIFICATION-STATUS.md).
+The current product version is `0.17.0`, build `27`. The backward-compatible
+Graphite presentation advances the feature-release component and resets the
+patch component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
+marketing-version settings and all 16 build-number settings align.
+
+The latest exact-reference source audit passed 15/15 checks over 434 inputs.
+The matching current 434-input ordinary Debug build passed strict signing/
+compiled-library/exact reference packaging and four scoped manual ordinary
+workflows. Current native QA and finalchecks passed; owner exact owner publication/readback/synchronization refs are retained externally; the prior433-input artifact retains its
+checkpoint identity. [Compute Cores](COMPUTE-CORES.md#current-material-source-audit)
+records exact corrected audit/candidate/checkpoint hashes. The fifth material
+pilot and current 116-distinct production coverage passed; current native view/
+control QA, current-source check refresh passed; exact owner publication refs are retained externally in [Graphite Workbench](GRAPHITE-WORKBENCH.md).
+Exact source/wiki publication refs are recorded externally without
+self-referential commits. Prior passes retain their tested inputs.
+
+Installed apps and historical evidence retain their actual identities.
+The October 3 `0.16.5 (26)` archive/export evidence is not relabeled as a
+`0.17.0 (27)` qualification; see [qualification status](QUALIFICATION-STATUS.md).
 
 ## Release checklist
 
@@ -56,3 +83,9 @@ their actual identities; the current candidate qualification is recorded in
 
 Historical evidence keeps the version it actually tested. Do not rewrite an old
 receipt merely because the current product version advanced.
+
+The initial current G1 document-version case failed one assertion for the
+missing exact XCODE marker. The marker is restored, the test remains unchanged
+and its focused rerun passed one actual case, zero failures/skips, terminal 0
+(0.010s; command 1.980s). The failed log is preserved in Compute checkpoint
+history; no test or product identity changed.

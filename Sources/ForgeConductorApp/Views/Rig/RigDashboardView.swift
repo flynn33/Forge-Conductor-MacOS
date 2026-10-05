@@ -97,30 +97,30 @@ struct RigProviderIndicatorState: Equatable {
 /// Display updates continuously from the realtime metrics engine (not a 2s snapshot).
 struct RigDashboardView: View {
     @EnvironmentObject private var model: AppModel
-    private let onOpenGuidedSetup: () -> Void
-
-    init(onOpenGuidedSetup: @escaping () -> Void = {}) {
-        self.onOpenGuidedSetup = onOpenGuidedSetup
-    }
 
     var body: some View {
-        // Telemetry publication is the only display clock; static values stay quiescent.
+        // Telemetry drives measurements; Compute owns its bounded visible-only FX clock.
         rigContent
     }
 
     private var rigContent: some View {
+        GeometryReader { geometry in
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 headerPills
-                sysStrip
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 14) {
-                        loadTracePanel
-                            .frame(minWidth: 360, maxWidth: .infinity)
-                        operationalIndicatorsPanel
-                            .frame(width: 440)
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            currentProjectPanel
+                            sysStrip
+                            loadTracePanel
+                        }
+                        .frame(minWidth: 580, maxWidth: .infinity)
+                        operationalIndicatorsPanel.frame(width: min(560, max(300, (geometry.size.width - 40) * 0.34)))
                     }
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        currentProjectPanel
+                        sysStrip
                         loadTracePanel
                         operationalIndicatorsPanel
                     }
@@ -146,40 +146,100 @@ struct RigDashboardView: View {
 
                 liveFeedPanel
             }
-            .padding(18)
+            .padding(20)
         }
-        .background(Color(red: 0.008, green: 0.016, blue: 0.04))
+        .background(GraphitePalette.canvas)
         .onAppear { model.startRigOperationalMonitoring() }
         .onDisappear { model.stopRigOperationalMonitoring() }
+        }
+    }
+
+    private var currentProjectPanel: some View {
+        let runtime = model.rigOperationalSnapshot
+        let progress = projectProgressCard
+        return GraphitePanel(title: "Current Project") {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(GraphitePalette.info)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(runtime.projectName ?? "No selected project")
+                        .font(.system(size: 17, weight: .semibold))
+                        .textSelection(.enabled)
+                    Text(progress.detail)
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let package = runtime.currentPackageName {
+                        Text(package).font(.system(size: 12))
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                            .textSelection(.enabled)
+                    }
+                }
+                Spacer(minLength: 12)
+                Text(progress.state)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(progress.tone.color)
+                    .padding(6)
+                    .background(progress.tone.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+            }
+            if runtime.projectTotalSteps + runtime.projectTotalPackages > 0 {
+                MetalBarGauge(fraction: progress.fraction, tint: GraphitePalette.primaryFill)
+                    .frame(height: 8)
+                    .clipShape(Capsule())
+                    .accessibilityLabel(progress.detail)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-current-project")
     }
 
     private var loadTracePanel: some View {
-        MultiSeriesLoadChart(
-            cpu: model.historyCPU,
-            ram: model.historyRAM,
-            gpu: model.historyGPU
-        )
-        .frame(height: 208)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.35), lineWidth: 1))
-        .overlay(alignment: .topLeading) {
-            Text("LOAD TRACE  ·  Metal  ·  REAL-TIME  ·  \(model.telemetryModeLabel)")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.cyan.opacity(0.8))
-                .padding(10)
+        GraphitePanel(title: "System Load History") {
+            HStack(spacing: 16) {
+                chartLegend("CPU", color: GraphitePalette.chartCPU)
+                chartLegend("RAM", color: GraphitePalette.chartRAM)
+                chartLegend("GPU", color: GraphitePalette.chartGPU)
+                Spacer(minLength: 0)
+                Text(model.telemetryModeLabel)
+                    .font(.system(size: 11))
+                    .foregroundStyle(GraphitePalette.textMuted)
+            }
+            HStack(spacing: 8) {
+                VStack(alignment: .trailing) {
+                    Text("100%")
+                    Spacer()
+                    Text("50%")
+                    Spacer()
+                    Text("0%")
+                }
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundStyle(GraphitePalette.textMuted)
+                .frame(width: 34)
+                MultiSeriesLoadChart(cpu: model.historyCPU, ram: model.historyRAM, gpu: model.historyGPU)
+                    .frame(height: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+
+    private func chartLegend(_ label: String, color: Color) -> some View {
+        Label {
+            Text(label).font(.system(size: 11))
+        } icon: {
+            Circle().fill(color).frame(width: 6, height: 6)
         }
     }
 
     private var operationalIndicatorsPanel: some View {
         panel("ORCHESTRATION STATUS", meta: "5 s bounded refresh") {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(operationalIndicatorCards.enumerated()), id: \.offset) { _, card in
                     orchestrationCard(card, compact: true)
                 }
             }
-            orchestrationCard(projectProgressCard, compact: true)
         }
-        .frame(height: 208)
+        .frame(minHeight: 208)
         .accessibilityIdentifier("rig-operational-indicators")
     }
 
@@ -375,11 +435,12 @@ struct RigDashboardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 managedActivityEvidenceStatus(runtime)
                 currentInstructionStatus(runtime)
-                Divider().overlay(Color.cyan.opacity(0.16))
+                Divider().overlay(GraphitePalette.separator.opacity(0.16))
                 if runtime.activityFeed.isEmpty {
                     Text("Waiting for instruction, continuity, orchestration, or policy activity.")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
                 } else {
                     ScrollView(.vertical) {
@@ -400,7 +461,7 @@ struct RigDashboardView: View {
     private func managedActivityEvidenceStatus(_ runtime: RigOperationalSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("SOURCE STATUS")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 145), spacing: 6)],
                 alignment: .leading,
@@ -420,13 +481,13 @@ struct RigDashboardView: View {
                 )
             }
         }
-        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+        .font(.system(size: 11, weight: .semibold, design: .monospaced))
         .accessibilityElement(children: .combine)
     }
 
     private func managedActivitySourceBadge(_ label: String, available: Bool) -> some View {
         Text("\(label) \(available ? "LIVE" : "UNAVAILABLE")")
-            .foregroundStyle(available ? Color.mint : Color.orange)
+            .foregroundStyle(available ? Color.mint : GraphitePalette.warning)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
@@ -442,17 +503,17 @@ struct RigDashboardView: View {
         if let package = runtime.currentPackageName {
             VStack(alignment: .leading, spacing: 4) {
                 Text("PROJECT · \(runtime.projectName ?? "NO SELECTION")")
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("CURRENT PACKAGE")
                         .foregroundStyle(.cyan)
                     Text(package)
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let position = runtime.currentPackagePosition,
                        runtime.projectTotalPackages > 0 {
                         Text("\(position)/\(runtime.projectTotalPackages)")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
                     Spacer(minLength: 8)
                     if let state = runtime.activeRunState {
@@ -464,27 +525,27 @@ struct RigDashboardView: View {
                     if let step = runtime.currentStep, let total = runtime.currentStepTotal {
                         let delivered = runtime.currentPackageCompletedSteps ?? max(step - 1, 0)
                         Text("CURRENT STEP \(step) OF \(total) · \(delivered) DELIVERED")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(GraphitePalette.warning)
                     } else {
                         Text("STEP —")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
                     if let phase = runtime.currentPhase {
-                        Text("· \(phase)").foregroundStyle(.secondary)
+                        Text("· \(phase)").foregroundStyle(GraphitePalette.textSecondary)
                     }
                     if let workItem = runtime.currentWorkItem {
                         Text("· \(workItem)")
                             .foregroundStyle(.primary)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if let nextAction = runtime.currentNextAction {
                     Text("NEXT · \(nextAction)")
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .font(.system(size: 12, weight: .medium).monospacedDigit())
             .accessibilityElement(children: .combine)
         } else {
             VStack(alignment: .leading, spacing: 4) {
@@ -519,40 +580,42 @@ struct RigDashboardView: View {
                         "NEXT PACKAGE · \(nextPackage) · POSITION \(position)"
                             + " · \(steps) STEPS"
                     )
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(GraphitePalette.warning)
                 }
             }
-            .font(.system(size: 10, weight: .semibold, design: .monospaced))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 12, weight: .medium).monospacedDigit())
+            .foregroundStyle(GraphitePalette.textSecondary)
         }
     }
 
     private func managedActivityRow(_ entry: RigActivityEntry) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(activityTime(entry.occurredAt))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .frame(width: 74, alignment: .leading)
                 Text(entry.category.rawValue)
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(activityColor(entry.severity))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().stroke(activityColor(entry.severity).opacity(0.55)))
                 Text(activitySeverityTitle(entry.severity))
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(activityColor(entry.severity))
                 Text(entry.title)
                     .fontWeight(.semibold)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
             }
             Text(entry.message)
                 .foregroundStyle(.primary.opacity(0.88))
                 .textSelection(.enabled)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.system(size: 10, design: .monospaced))
+        .font(.system(size: 12))
         .padding(9)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
@@ -577,10 +640,10 @@ struct RigDashboardView: View {
 
     private func activityColor(_ severity: RigActivitySeverity) -> Color {
         switch severity {
-        case .informational: .cyan
-        case .success: .mint
-        case .warning: .orange
-        case .failure: .red
+        case .informational: GraphitePalette.info
+        case .success: GraphitePalette.success
+        case .warning: GraphitePalette.warning
+        case .failure: GraphitePalette.failure
         }
     }
 
@@ -599,13 +662,11 @@ struct RigDashboardView: View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .center, spacing: 12) {
                 dashboardTitle
-                guidedSetupButton
                 statusPills
             }
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 12) {
                     dashboardTitle
-                    guidedSetupButton
                 }
                 statusPills
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -617,51 +678,37 @@ struct RigDashboardView: View {
         let provider = model.rigOperationalSnapshot.selectedProvider
         let providerName = if provider.executionMode == .unavailable,
                               !provider.integrationEvidenceAvailable {
-            "LM STUDIO"
+            "LM Studio"
         } else if provider.id == nil {
-            "PROVIDER"
+            "Provider"
         } else {
-            provider.displayName.uppercased()
+            provider.displayName
         }
         let subtitle = if provider.executionMode == .desktopHost {
-            "HOST-MANAGED PROVIDER · GPU · DISK · MCP · LIVE FEED · METAL"
+            "Host-managed provider · GPU · Disk · MCP · Live Feed · Metal"
         } else if provider.executionMode == .unavailable,
                   provider.integrationEvidenceAvailable {
-            "PROVIDER SELECTION · GPU · DISK · MCP · LIVE FEED · METAL"
+            "Provider selection · GPU · Disk · MCP · Live Feed · Metal"
         } else {
-            "LOCAL MODELS · GPU · DISK · LM STUDIO MCP · LIVE FEED · METAL"
+            "Local models · GPU · Disk · LM Studio MCP · Live Feed · Metal"
         }
         return VStack(alignment: .leading, spacing: 4) {
-            Text("DASHBOARD // \(providerName)")
-                .font(.system(.title3, design: .rounded).weight(.bold))
-                .foregroundStyle(Color.cyan)
+            Text("Dashboard")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(GraphitePalette.textPrimary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
                 .accessibilityIdentifier("detail-rig")
-            Text(subtitle)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            Text("\(providerName) · \(subtitle)")
+                .font(.system(size: 13))
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .layoutPriority(1)
     }
 
-    private var guidedSetupButton: some View {
-        Button(action: onOpenGuidedSetup) {
-            Label("Guided Setup", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(.cyan.opacity(0.82))
-        .controlSize(.small)
-        .fixedSize()
-        .help("Walk through project setup, launch, monitoring, and recovery")
-        .accessibilityIdentifier("dashboard-guided-setup")
-    }
-
     private var statusPills: some View {
-        // Fixed-width chip strip: 4×80 + 3×6 spacing = 338pt — never grows with MTKView.
+        // Bounded status strip stays stable while telemetry updates.
         HStack(spacing: 6) {
             MetalStatusPill(
                 text: "LINK",
@@ -688,178 +735,94 @@ struct RigDashboardView: View {
         .layoutPriority(0)
     }
 
-    // MARK: Sys strip — Metal bars only
+    // MARK: Sys strip — bounded Metal traces and meters
 
     private var sysStrip: some View {
         let s = model.sysStrip
         let gpuValue = s.gpuPercent.map { String(format: "%.1f%%", $0) } ?? "—"
         let gpuFraction = s.gpuPercent.map { $0 / 100 } ?? 0
         let gpuMetadata = s.gpuPercent == nil ? "telemetry unavailable" : "Metal IOKit"
-        let gpuTint: Color = s.gpuPercent == nil ? .gray : .green
-        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 12)], spacing: 12) {
-            sysCard("CPU", value: String(format: "%.1f%%", s.cpuPercent), meta: s.cpuBrand, frac: s.cpuPercent / 100, tint: .cyan)
-            sysCard("FREQ", value: s.freqMHz.map { "\($0)" } ?? "—", meta: "MHz · load \(String(format: "%.2f", s.loadM1))", frac: min((Double(s.freqMHz ?? 0) / 4000), 1), tint: .mint)
-            sysCard("RAM", value: String(format: "%.1f%%", s.ramPercent), meta: "pressure", frac: s.ramPercent / 100, tint: .orange)
+        let gpuTint: Color = s.gpuPercent == nil ? GraphitePalette.textMuted : GraphitePalette.chartGPU
+        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 136), spacing: 12)], spacing: 12) {
+            sysCard("CPU", value: String(format: "%.1f%%", s.cpuPercent), meta: s.cpuBrand, frac: s.cpuPercent / 100, tint: GraphitePalette.chartCPU, history: model.historyCPU.map(Optional.some))
+            sysCard("FREQ", value: s.freqMHz.map { "\($0)" } ?? "—", meta: "MHz · load \(String(format: "%.2f", s.loadM1))", frac: min((Double(s.freqMHz ?? 0) / 4000), 1), tint: GraphitePalette.primaryFill)
+            sysCard("RAM", value: String(format: "%.1f%%", s.ramPercent), meta: "pressure", frac: s.ramPercent / 100, tint: GraphitePalette.chartRAM, history: model.historyRAM.map(Optional.some))
             sysCard(
                 "GPU",
                 value: gpuValue,
                 meta: gpuMetadata,
                 frac: gpuFraction,
-                tint: gpuTint
+                tint: gpuTint,
+                history: model.historyGPU
             )
             sysCard(
                 "DISK I/O",
                 value: String(format: "%.1f", s.diskTotalMBs),
                 meta: String(format: "R %.1f · W %.1f MB/s", s.diskReadMBs, s.diskWriteMBs),
                 frac: min(s.diskTotalMBs / 200, 1),
-                tint: .purple
+                tint: GraphitePalette.chartDisk,
+                history: model.history.map { Float($0.diskIO) },
+                maximumValue: 200
             )
         }
     }
 
-    private func sysCard(_ title: String, value: String, meta: String, frac: Double, tint: Color) -> some View {
+    private func sysCard(_ title: String, value: String, meta: String, frac: Double, tint: Color,
+                         history: [Float?]? = nil, maximumValue: Float = 100) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Circle().fill(tint).frame(width: 5, height: 5).accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
             Text(value)
-                .font(.system(.title2, design: .monospaced).weight(.bold))
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            MetalBarGauge(fraction: frac, tint: tint)
-                .frame(height: 14)
-                .clipShape(Capsule())
+                .font(.system(size: 26, weight: .semibold).monospacedDigit())
+                .foregroundStyle(GraphitePalette.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .help(value)
+            if let history {
+                MetalLoadChart(optionalSamples: history, tint: tint, maximumValue: maximumValue, fraction: frac)
+                    .frame(height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .accessibilityLabel("\(title) recent samples and current level")
+                    .accessibilityValue(value)
+            } else {
+                MetalBarGauge(fraction: frac, tint: tint)
+                    .frame(height: 10)
+                    .clipShape(Capsule())
+                    .frame(height: 40, alignment: .bottom)
+                    .accessibilityLabel("\(title) current level")
+                    .accessibilityValue(value)
+            }
             Text(meta)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .font(.system(size: 11))
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(tint.opacity(0.25), lineWidth: 1))
+        .background(GraphitePanelSurface())
+
     }
 
     // MARK: CPU cores — Metal
 
     private var computeCoresPanel: some View {
-        let cores = model.perCPU
-        let gpu = model.system?.gpu.first
-        let gpuCoreCount = max(gpu?.cores ?? 0, 0)
+        let projection = ComputeChipSnapshot.project(
+            cpu: model.system?.cpu,
+            gpu: model.system?.gpu ?? [],
+            devices: ComputeChipResources.shared.devices,
+            now: Date().timeIntervalSince1970
+        )
+        let gpuCount = projection.gpu.hardwareCoreCount.map { "GPU \($0) cores" } ?? "GPU count unavailable"
         return panel(
             "COMPUTE CORES",
-            meta: "CPU \(cores.count) logical · GPU \(gpuCoreCount) cores"
+            meta: "CPU \(projection.cpu.logicalCount) logical · \(gpuCount)"
         ) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 14) {
-                    cpuCoreContent(cores)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                    Divider().overlay(Color.cyan.opacity(0.16))
-                    gpuCoreContent(gpu, coreCount: gpuCoreCount)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-                VStack(alignment: .leading, spacing: 12) {
-                    cpuCoreContent(cores)
-                    Divider().overlay(Color.cyan.opacity(0.16))
-                    gpuCoreContent(gpu, coreCount: gpuCoreCount)
-                }
-            }
+            ComputeCoresContentView(snapshot: projection, autoRefresh: model.autoRefresh)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("rig-compute-cores-panel")
-    }
-
-    private func cpuCoreContent(_ cores: [Double]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("CPU CORES · \(cores.count) LOGICAL")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.secondary)
-            if cores.isEmpty {
-                Text("NO PER-CORE DATA")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                // The core renderer is an activity strip, not a hero chart. Keep
-                // its animation compact so topology and GPU telemetry remain in
-                // one glanceable compute frame.
-                MetalCoreBarsView(cores: cores)
-                    .frame(height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("rig-cpu-cores-panel")
-    }
-
-    private func gpuCoreContent(_ gpu: GPUMetrics?, coreCount: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("GPU CORES · \(coreCount > 0 ? "\(coreCount)" : "COUNT UNAVAILABLE")")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.secondary)
-            if let gpu {
-                if coreCount > 0 {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 24), spacing: 5)],
-                        alignment: .leading,
-                        spacing: 5
-                    ) {
-                        ForEach(0..<coreCount, id: \.self) { index in
-                            Text("\(index + 1)")
-                                .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(Color.purple.opacity(0.9))
-                                .frame(maxWidth: .infinity, minHeight: 18)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .fill(Color.purple.opacity(0.08))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .stroke(Color.purple.opacity(0.35), lineWidth: 1)
-                                )
-                        }
-                    }
-                    .accessibilityLabel("\(coreCount) GPU cores")
-                }
-
-                HStack(spacing: 10) {
-                    gpuEngineStat("DEVICE", gpu.utilGPU)
-                    gpuEngineStat("RENDER", gpu.utilRenderer)
-                    gpuEngineStat("TILER", gpu.utilTiler)
-                }
-                .padding(.top, coreCount > 0 ? 6 : 0)
-
-                Text("Core tiles show topology; macOS exposes aggregate engine load, not per-core utilization.")
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("NO GPU DATA")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("rig-gpu-cores-panel")
-    }
-
-    private func gpuEngineStat(_ label: String, _ percent: Double?) -> some View {
-        let measured = percent != nil
-        let value = percent ?? 0
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.system(size: 8, design: .monospaced))
-                .foregroundStyle(.secondary)
-            Text(measured ? String(format: "%.0f%%", value) : "—")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(measured ? Color.purple : Color.secondary)
-            MetalBarGauge(
-                fraction: measured ? min(max(value / 100, 0), 1) : 0,
-                tint: measured ? .purple : .secondary
-            )
-            .frame(height: 6)
-            .clipShape(Capsule())
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: Storage — Metal meters
@@ -869,25 +832,28 @@ struct RigDashboardView: View {
         let io = model.diskIO
         return panel("STORAGE", meta: String(format: "%.1f MB/s total", io.totalMBs)) {
             HStack(spacing: 14) {
-                ioStat("READ", io.readMBs, io.readIOPS, frac: min(io.readMBs / 100, 1), tint: .cyan)
-                ioStat("WRITE", io.writeMBs, io.writeIOPS, frac: min(io.writeMBs / 100, 1), tint: .orange)
-                ioStat("TOTAL", io.totalMBs, io.totalIOPS, frac: min(io.totalMBs / 200, 1), tint: .purple)
+                ioStat("READ", io.readMBs, io.readIOPS, frac: min(io.readMBs / 100, 1), tint: GraphitePalette.chartCPU)
+                ioStat("WRITE", io.writeMBs, io.writeIOPS, frac: min(io.writeMBs / 100, 1), tint: GraphitePalette.chartRAM)
+                ioStat("TOTAL", io.totalMBs, io.totalIOPS, frac: min(io.totalMBs / 200, 1), tint: GraphitePalette.chartDisk)
             }
             .padding(.bottom, 10)
             if disks.isEmpty {
-                Text("NO VOLUME DATA").font(.caption).foregroundStyle(.secondary)
+                Text("NO VOLUME DATA").font(.caption).foregroundStyle(GraphitePalette.textSecondary)
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(disks.prefix(4).enumerated()), id: \.offset) { _, d in
                         VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 8) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(d.mount).font(.system(size: 11, design: .monospaced))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .help(d.mount)
                                 Spacer(minLength: 8)
                                 Text(String(format: "%.0f/%.0f GB · %.0f%%", d.usedGB, d.totalGB, d.percent))
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundStyle(.secondary)
+                                    .font(.system(size: 11).monospacedDigit())
+                                    .fixedSize()
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                             }
-                            MetalBarGauge(fraction: d.percent / 100, tint: .cyan)
+                            MetalBarGauge(fraction: d.percent / 100, tint: GraphitePalette.chartCPU)
                                 .frame(height: 10)
                                 .clipShape(Capsule())
                         }
@@ -901,10 +867,10 @@ struct RigDashboardView: View {
 
     private func ioStat(_ title: String, _ mbs: Double, _ iops: Double, frac: Double, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
-            Text(String(format: "%.1f MB/s", mbs)).font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(tint)
+            Text(title).font(.system(size: 11, design: .monospaced)).foregroundStyle(GraphitePalette.textSecondary)
+            Text(String(format: "%.1f MB/s", mbs)).font(.system(size: 12, weight: .semibold).monospacedDigit()).foregroundStyle(tint)
             MetalBarGauge(fraction: frac, tint: tint).frame(height: 8).clipShape(Capsule())
-            Text(String(format: "%.0f IOPS", iops)).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+            Text(String(format: "%.0f IOPS", iops)).font(.system(size: 11).monospacedDigit()).foregroundStyle(GraphitePalette.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -970,7 +936,9 @@ struct RigDashboardView: View {
         }()
 
         return panel("ORCHESTRATION", meta: "\(o?.healthLabel ?? "—") · \(mode)") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: cards.count == 1
+                      ? [GridItem(.flexible())]
+                      : [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
                 ForEach(Array(cards.enumerated()), id: \.offset) { _, c in
                     orchestrationCard(c)
                 }
@@ -985,28 +953,26 @@ struct RigDashboardView: View {
         compact: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: compact ? 4 : 6) {
-            HStack(spacing: 6) {
-                Text(card.title)
-                    .font(.system(size: compact ? 8 : 10, weight: .bold, design: .monospaced))
-                Spacer(minLength: 4)
-                Circle()
-                    .fill(card.tone.color)
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
-                Text(card.state)
-                    .font(.system(size: compact ? 8 : 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(card.tone.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    Text(card.title).fixedSize()
+                    Spacer(minLength: 4)
+                    orchestrationStateLabel(card).fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(card.title).fixedSize(horizontal: false, vertical: true)
+                    orchestrationStateLabel(card)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            .font(.system(size: 11, weight: .semibold))
             MetalBarGauge(fraction: card.fraction, tint: card.tone.color)
                 .frame(height: compact ? 6 : 8)
                 .clipShape(Capsule())
             Text(card.detail)
-                .font(.system(size: compact ? 8 : 9, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(compact ? 1 : 2)
-                .minimumScaleFactor(0.75)
+                .font(.system(size: 12))
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(compact ? 7 : 10)
         .background(
@@ -1018,6 +984,14 @@ struct RigDashboardView: View {
         .accessibilityValue(card.tone.rawValue)
     }
 
+    private func orchestrationStateLabel(_ card: OrchestrationCardState) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(card.tone.color).frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(card.state).foregroundStyle(card.tone.color)
+        }
+    }
+
     // MARK: MCP servers — Metal rings
 
     private var mcpServersPanel: some View {
@@ -1025,20 +999,28 @@ struct RigDashboardView: View {
         return panel("MCP SERVERS", meta: "\(cards.count) cards · Metal rings") {
             if cards.isEmpty {
                 Text("NO MCP PRESENCE — WAITING FOR HEARTBEAT / PROCESS SCAN")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
                     ForEach(Array(cards.prefix(12).enumerated()), id: \.offset) { _, s in
+                        let identity = Text(s.label)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        let health = Text(s.healthLabel)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(healthColor(s.health))
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 8) {
-                                Text(s.label)
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                    .lineLimit(1)
-                                Spacer(minLength: 8)
-                                Text(s.healthLabel)
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundStyle(healthColor(s.health))
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 8) {
+                                    identity.fixedSize()
+                                    Spacer(minLength: 8)
+                                    health.fixedSize()
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    identity.fixedSize(horizontal: false, vertical: true)
+                                    health.fixedSize()
+                                }
                             }
+                            .help(s.label)
                             HStack(alignment: .top, spacing: 12) {
                                 MetalRingGaugeLabeled(
                                     fraction: s.activity / 100,
@@ -1048,23 +1030,23 @@ struct RigDashboardView: View {
                                 .frame(width: 56, height: 56)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("\(s.role) · \(s.status)\(s.live ? " · LINK" : "")")
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(.system(size: 11, design: .monospaced))
                                     Text(String(format: "%.1f evt/min · %d/5m · err %.2f", s.eventsPerMin, s.eventCount5m, s.errorRate))
-                                        .font(.system(size: 8, design: .monospaced))
-                                        .foregroundStyle(.secondary)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(GraphitePalette.textSecondary)
                                     Text("pid \(s.pid.map(String.init) ?? "—") · \(s.source)")
-                                        .font(.system(size: 8, design: .monospaced))
-                                        .foregroundStyle(.secondary)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(GraphitePalette.textSecondary)
                                     if !s.topTools.isEmpty {
                                         Text(s.topTools.joined(separator: " · "))
-                                            .font(.system(size: 8, design: .monospaced))
+                                            .font(.system(size: 11, design: .monospaced))
                                             .foregroundStyle(.cyan.opacity(0.8))
                                             .lineLimit(1)
                                     }
                                     if !s.healthReason.isEmpty {
                                         Text(s.healthReason)
-                                            .font(.system(size: 8, design: .monospaced))
-                                            .foregroundStyle(.secondary)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundStyle(GraphitePalette.textSecondary)
                                             .lineLimit(1)
                                     }
                                 }
@@ -1079,6 +1061,8 @@ struct RigDashboardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-mcp-servers-panel")
     }
 
     // MARK: MCP tools — Metal load tiles
@@ -1094,14 +1078,14 @@ struct RigDashboardView: View {
                         let total = max(Double(p.toolCount), 1)
                         VStack(spacing: 4) {
                             Text(p.pack)
-                                .font(.system(size: 9, design: .monospaced))
-                            MetalBarGauge(fraction: active / total, tint: .cyan)
+                                .font(.system(size: 11, design: .monospaced))
+                            MetalBarGauge(fraction: active / total, tint: GraphitePalette.chartCPU)
                                 .frame(width: 64, height: 6)
                                 .clipShape(Capsule())
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .background(Capsule().stroke(Color.cyan.opacity(0.35)))
+                        .background(Capsule().stroke(GraphitePalette.separator.opacity(0.35)))
                     }
                 }
             }
@@ -1117,6 +1101,8 @@ struct RigDashboardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-mcp-tools-panel")
     }
 
     // MARK: Agents — Metal rings
@@ -1133,7 +1119,7 @@ struct RigDashboardView: View {
                                 .lineLimit(1)
                             Spacer(minLength: 8)
                             Text(a.healthLabel)
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(healthColor(a.health))
                         }
                         HStack(alignment: .top, spacing: 10) {
@@ -1145,16 +1131,17 @@ struct RigDashboardView: View {
                             .frame(width: 48, height: 48)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(a.status)
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundStyle(.secondary)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                                 if let last = a.lastSessionStatus {
                                     Text("last \(last)")
-                                        .font(.system(size: 8, design: .monospaced))
-                                        .foregroundStyle(.secondary)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(GraphitePalette.textSecondary)
                                 }
                                 if let sum = a.summary, !sum.isEmpty {
-                                    Text(sum).font(.system(size: 8, design: .monospaced))
-                                        .foregroundStyle(.secondary).lineLimit(2)
+                                    Text(sum).font(.system(size: 12))
+                                        .foregroundStyle(GraphitePalette.textSecondary).lineLimit(2)
+                                        .help(sum)
                                 }
                             }
                         }
@@ -1167,6 +1154,8 @@ struct RigDashboardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-sub-agents-panel")
     }
 
     // MARK: Processes
@@ -1174,31 +1163,34 @@ struct RigDashboardView: View {
     private var processesPanel: some View {
         panel("HOT PROCESSES", meta: "LM Studio · Forge · llama") {
             if model.hotProcesses.isEmpty {
-                Text("NO MATCHING PROCESSES").font(.caption).foregroundStyle(.secondary)
+                Text("NO MATCHING PROCESSES").font(.caption).foregroundStyle(GraphitePalette.textSecondary)
             } else {
                 VStack(spacing: 6) {
-                    HStack(spacing: 10) {
-                        Text("PID").frame(width: 52, alignment: .leading)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text("PID").frame(width: 52, alignment: .trailing)
                         Text("NAME").frame(maxWidth: .infinity, alignment: .leading)
                         Text("CPU").frame(width: 100, alignment: .leading)
                         Text("RSS").frame(width: 48, alignment: .trailing)
                     }
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     ForEach(Array(model.hotProcesses.prefix(12).enumerated()), id: \.offset) { _, p in
-                        HStack(spacing: 10) {
-                            Text("\(p.pid)").frame(width: 52, alignment: .leading)
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("\(p.pid)").frame(width: 52, alignment: .trailing)
                             Text(p.name).frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
+                                .help(p.name)
                             MetalBarGauge(fraction: min(p.cpuPercent / 100, 1), tint: p.cpuPercent > 50 ? .orange : .cyan)
                                 .frame(width: 100, height: 8)
                                 .clipShape(Capsule())
                             Text(String(format: "%.2fG", p.rssGB)).frame(width: 48, alignment: .trailing)
                         }
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: 12).monospacedDigit())
                     }
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-hot-processes-panel")
     }
 
     // MARK: Live feed
@@ -1211,7 +1203,7 @@ struct RigDashboardView: View {
                 ForEach(Array(model.liveFeedEvents.prefix(24).enumerated()), id: \.offset) { _, e in
                     HStack(spacing: 8) {
                         Text(String(e.timestamp.suffix(8)))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                             .frame(width: 56, alignment: .leading)
                         Text(e.status)
                             .foregroundStyle(auditStatusColor(e.status))
@@ -1221,24 +1213,26 @@ struct RigDashboardView: View {
                             .truncationMode(.middle)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if let ms = e.durationMs {
-                            MetalBarGauge(fraction: min(Double(ms) / 2000, 1), tint: .mint)
+                            MetalBarGauge(fraction: min(Double(ms) / 2000, 1), tint: GraphitePalette.primaryFill)
                                 .frame(width: 40, height: 5)
                                 .clipShape(Capsule())
                                 .allowsHitTesting(false)
                             Text("\(ms)ms")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .frame(width: 44, alignment: .trailing)
                         } else {
                             Color.clear.frame(width: 40 + 8 + 44, height: 5)
                         }
                     }
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: 220, alignment: .topLeading)
             .clipped()
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("rig-live-stream-panel")
     }
 
     // MARK: Helpers
@@ -1258,29 +1252,23 @@ struct RigDashboardView: View {
     }
 
     private func panel<Content: View>(_ title: String, meta: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text("▸ \(title)")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.cyan)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Spacer(minLength: 12)
-                Text(meta)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .layoutPriority(1)
+        VStack(alignment: .leading, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(title).font(.system(size: 15, weight: .semibold))
+                    Spacer(minLength: 12)
+                    Text(meta).font(.system(size: 11)).foregroundStyle(GraphitePalette.textMuted)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.system(size: 15, weight: .semibold))
+                    Text(meta).font(.system(size: 11)).foregroundStyle(GraphitePalette.textMuted)
+                }
             }
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
+            content().frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .clipped()
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.035)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.15), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(GraphitePanelSurface())
     }
 
     private func healthColor(_ h: String) -> Color {

@@ -30,9 +30,10 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
     private weak var view: MTKView?
     private var dirty = false
     private var series: [Series] = []
-    private var currentCPU: [Float] = []
-    private var currentRAM: [Float] = []
+    private var currentCPU: [Float?] = []
+    private var currentRAM: [Float?] = []
     private var currentGPU: [Float?] = []
+    private var drawableSize = CGSize.zero
 
     public override convenience init() { self.init(surfaceDiagnostics: nil) }
 
@@ -46,107 +47,59 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
         guard let device = resources.device,
               let pipeline = resources.configure(
                   view,
-                  clearColor: MTLClearColor(red: 0.01, green: 0.015, blue: 0.04, alpha: 1)
+                  clearColor: GraphitePalette.metalClear
               )
         else { return }
         self.device = device
         self.queue = resources.commandQueue
         self.pipeline = pipeline
         self.view = view
+        drawableSize = view.drawableSize
         view.delegate = self
         surfaceLifetime.attach()
+        requestDraw()
     }
 
     public func update(cpu: [Float], ram: [Float], gpu: [Float?]) {
-        guard currentCPU != cpu || currentRAM != ram || currentGPU != gpu else {
+        let nextCPU = GraphiteTraceGeometry.normalizedSamples(cpu.map(Optional.some))
+        let nextRAM = GraphiteTraceGeometry.normalizedSamples(ram.map(Optional.some))
+        let nextGPU = GraphiteTraceGeometry.normalizedSamples(gpu)
+        guard currentCPU != nextCPU || currentRAM != nextRAM || currentGPU != nextGPU else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
             return
         }
-        currentCPU = cpu
-        currentRAM = ram
-        currentGPU = gpu
+        currentCPU = nextCPU
+        currentRAM = nextRAM
+        currentGPU = nextGPU
         series = [
-            Series(values: cpu.map(Optional.some), color: SIMD4(0.09, 0.94, 1.0, 1.0)),
-            Series(values: ram.map(Optional.some), color: SIMD4(1.0, 0.42, 0.12, 0.95)),
-            Series(values: gpu, color: SIMD4(0.18, 1.0, 0.55, 0.95)),
+            Series(values: nextCPU, color: GraphitePalette.metalCPU),
+            Series(values: nextRAM, color: GraphitePalette.metalRAM),
+            Series(values: nextGPU, color: GraphitePalette.metalGPU),
         ]
         requestDraw()
     }
 
     private func rebuild() {
-        guard let device else { return }
-        let seriesCopy = series
-
-        var verts: [GaugeVertex] = []
-        // Grid lines (horizontal at 25/50/75).
-        let gridColor = SIMD4<Float>(0.1, 0.35, 0.45, 0.35)
-        var gridCount = 0
-        for g in [Float(0.25), Float(0.5), Float(0.75)] {
-            let y = Float(-0.85) + Float(1.7) * g
-            verts.append(GaugeVertex(pos: SIMD2(Float(-1), y), color: gridColor))
-            verts.append(GaugeVertex(pos: SIMD2(Float(1), y), color: gridColor))
-            gridCount += 2
+        guard let device, let view else { return }
+        let viewport = view.bounds.size
+        let parts = series.enumerated().map { index, series in
+            GraphiteTraceGeometry.parts(samples: series.values, color: series.color,
+                                        viewport: viewport, fillAlpha: index == 0 ? 0.20 : 0.08)
         }
-        let fillStart = verts.count
-        var fillCount = 0
-        if let cpu = seriesCopy.first {
-            let n = max(cpu.values.count, 2)
-            let fill = SIMD4<Float>(0.09, 0.94, 1.0, 0.22)
-            for i in 0..<n {
-                let x = -1 + 2 * Float(i) / Float(n - 1)
-                let sample = i < cpu.values.count ? cpu.values[i] : nil
-                let v = min(max((sample ?? 0) / 100, 0), 1)
-                let y = -0.85 + 1.7 * v
-                verts.append(GaugeVertex(pos: SIMD2(x, -0.85), color: SIMD4<Float>(0.05, 0.2, 0.3, 0)))
-                verts.append(GaugeVertex(pos: SIMD2(x, y), color: fill))
-                fillCount += 2
-            }
-        }
-        var lineRanges: [(Int, Int)] = []
-        for s in seriesCopy {
-            let n = max(s.values.count, 2)
-            var segmentStart: Int?
-            var segmentCount = 0
-
-            func finishSegment() {
-                if let segmentStart, segmentCount >= 2 {
-                    lineRanges.append((segmentStart, segmentCount))
-                }
-            }
-
-            for i in 0..<n {
-                let sample = i < s.values.count ? s.values[i] : nil
-                guard let sample, sample.isFinite else {
-                    finishSegment()
-                    segmentStart = nil
-                    segmentCount = 0
-                    continue
-                }
-                if segmentStart == nil {
-                    segmentStart = verts.count
-                }
-                let x = -1 + 2 * Float(i) / Float(n - 1)
-                let v = min(max(sample / 100, 0), 1)
-                let y = -0.85 + 1.7 * v
-                verts.append(GaugeVertex(pos: SIMD2(x, y), color: s.color))
-                segmentCount += 1
-            }
-            finishSegment()
-        }
-
-        vertices.upload(verts, device: device)
-        self.drawGrid = gridCount
-        self.drawFillStart = fillStart
-        self.drawFillCount = fillCount
-        self.drawLines = lineRanges
+        var values = GraphiteTraceGeometry.material(viewport: viewport)
+        values.append(contentsOf: GraphiteTraceGeometry.grid(viewport: viewport))
+        // Fill every series before its luminous stroke so later fills cannot mute earlier lines.
+        for part in parts { values.append(contentsOf: part.fill) }
+        for part in parts { values.append(contentsOf: part.halo) }
+        for part in parts { values.append(contentsOf: part.core) }
+        vertices.upload(values, device: device)
     }
 
-    private var drawGrid = 0
-    private var drawFillStart = 0
-    private var drawFillCount = 0
-    private var drawLines: [(Int, Int)] = []
-
-    public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        guard drawableSize != size else { return }
+        drawableSize = size
+        requestDraw()
+    }
 
     public func draw(in view: MTKView) {
         guard dirty else {
@@ -171,19 +124,8 @@ public final class MultiSeriesLoadRenderer: NSObject, MTKViewDelegate {
         encoder.setRenderPipelineState(pipeline)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
 
-        let grid = drawGrid
-        let fillStart = drawFillStart
-        let fillCount = drawFillCount
-        let lines = drawLines
-
-        if grid >= 2 {
-            encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: grid)
-        }
-        if fillCount >= 2 {
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: fillStart, vertexCount: fillCount)
-        }
-        for (start, count) in lines where count >= 2 {
-            encoder.drawPrimitives(type: .lineStrip, vertexStart: start, vertexCount: count)
+        if vertices.count >= 3 {
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count)
         }
 
         encoder.endEncoding()

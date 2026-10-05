@@ -10,12 +10,90 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
-Current source identity: `0.16.5 (26)`. The installed `0.16.4 (25)` startup and
-export failures were reproduced on October 3; candidate evidence and remaining
-qualification boundaries are recorded in [qualification status](docs/QUALIFICATION-STATUS.md).
-Installation, notarization, and shipment of this correction remain separate gates.
+Current source identity: `0.17.0 (27)`. **Graphite/Compute UI implementation
+and required QA are complete.** The native workspace
+uses Settings-first optional controls, aligned text and one exact-reference
+chip resource with bounded telemetry-driven Metal lighting and static fallback.
+Seven Projects actions share 220×32 source bodies; setup step 3 names **Add Project
+Folders…**. Fallback labels use current activity/pause; invalid channels stop
+their own trace immediately and measured idle keeps bounded hysteresis. Empty
+Projects retains its populated list/actions through a native placeholder.
+
+Current qualification passed 116 distinct production tests in 140 successful
+executions, zero failures/skips; the separate 21-method/22-invocation native
+view matrix passed and all 463 selectedPNG files were individually reviewed. The
+15-check/434-inputaudit, SwiftPMCLI/App, focusedCore 8/H0 (1)/G1 (1) and matching signed
+Debug build passed. Four scoped ordinary workflows passed, including healthy/
+failure native exports, folder persistence and shellpolicy denial/execution.
+Actual Settings/draft/Reload/opt-ins/persistence/restoration and normal Dashboard/
+Pause/Resume were observed; all owned cases ended and private state was restored.
+
+[Graphite](docs/GRAPHITE-WORKBENCH.md), [Compute](docs/COMPUTE-CORES.md),
+[native QA](docs/GRAPHITE-NATIVE-QA.md) and linked histories retain all 62 criteria/
+18 capture scopes,68 currentCompute layers/20 frameMOV, exact candidate identity,
+failed checkpoints and unavailableordinary minimum/1×/Skycompositor limits.
+Owner exact publication/readback/synchronization refs are retained externally.
+No installation, notarization, App Store Connect upload or distribution was performed.
 
 ### Added
+
+Added behaviors below preserve their earlier checkpoint receipts; the current
+complete UI qualification and exact input boundaries are recorded above.
+
+- Added a shared native Graphite Workbench palette and reusable panel, field and
+  button treatment across the app, Settings, help and Metal telemetry. The
+  presentation retains the live destinations and current source controls.
+- Added Manager section navigation for Workbench, folders, service, runtime,
+  staged settings, shell, protected filesystem, maintenance and doctor. Native
+  Settings opens at Workbench; the main Manager entry retains Authorized
+  Folders as its initial section. Interface preferences apply immediately;
+  configuration Save/Reload remains explicit. Opening preferences preserves
+  pre-existing staged Manager edits. Settings has a larger scrollable workspace.
+- Added compact CPU/RAM/GPU/disk traces using bounded real history, missing
+  sample gaps, restrained luminous strokes, shaded fills and static material.
+  The native render lifecycle retains shared resources and hidden-view
+  quiescence; focused geometry and production lifecycle cases passed.
+- Removed the persistent main-window control bar. Workbench Settings provides
+  navigation, telemetry and guidance options, with six independent opt-in
+  shortcuts above the current view. Existing Navigation and Telemetry menu
+  actions and shortcuts remain; the Guide menu opens contextual help or Guided
+  Setup and controls the shared Guided Mode preference. Existing optional
+  action identifiers remain. Native settings/menu, individual visibility,
+  relaunch persistence and opt-out cases passed.
+- Improved Manager form grouping and aligned value columns; bounded short
+  numeric fields, ungrouped port/timeout display, wrapping paths and catalog
+  identities, clearer essential prose and row baselines. Models, actions and
+  eligibility remain unchanged. Fresh normal/minimum and section captures
+  passed; the Tools lazy-row/header repair passed strict four-column geometry
+  at both sizes, and fresh secondary/Manager/Tools/focus pixels were reviewed.
+  Current normal/minimum native review and matching signed-candidate workflows passed; historical retries remain recorded.
+- Added local Provider inspection separate from activation. Selecting a
+  provider row inspects its information; the existing explicit activation
+  toggle remains the transaction boundary.
+- Corrected Guided Setup retaining a previous step's lower scroll position.
+  Detail viewport identity now follows the selected step while review ownership
+  remains outside it; the native scroll/progress regression passed across all
+  eight steps, including saved progress and request non-mutation.
+- Added read-only registered-project selection in Guided Setup's project,
+  instruction and review steps. Preparation can be reviewed before an LM Studio
+  chat exists, without binding or activating that project; changed project,
+  queue or provider revision invalidates the prior review. The seven read-only model cases, native confirmation/persistence and final
+  all-step scroll/progress captures passed.
+- Restyled Tools, Live Feed, Agents, Diagnostics and MCP status with clearer
+  rows, semantic outcomes, readable metadata and responsive action groups.
+  Current filtering, pruning, export and deployment commands are preserved.
+- Kept Continuity packet selection local to its native List, synchronizing
+  guarded changes with the existing model after a traced selection-time
+  publishing warning. Paired native multi-packet and single-packet selection/
+  deletion tests passed; the current normal/minimum matrix also passed its
+  selected-packet and cancellation parity checks.
+- Corrected bundled Dashboard/Manager guide copy to the actual Settings/menu,
+  runtime, telemetry, protected-filesystem and Doctor controls. Guide schema
+  and resource membership remain unchanged.
+- Corrected stale cancelled Continuity packet responses overwriting a newer
+  project packet result, with a reproduced failure and passing paired
+  regression. Aligned the empty Live Feed header with the other page headers;
+  normal and minimum-size native recaptures show the corrected alignment.
 
 - Added stable diagnostic record and process-instance IDs, request correlation,
   sanitized error type/domain/code and failure-stage details, and explicit JSON

@@ -1,5 +1,14 @@
 # Dashboard parity — evidence & architecture
 
+The native Graphite UI implementation and required QA are complete for
+0.17.0 (27). Persistent main-window shortcuts are removed; their actions remain
+in Settings and menus, with six independently enabled optional view controls.
+Current production checks, normal/minimum native view fixtures and signed
+ordinary workflows passed in their named scopes. Earlier failed and passing
+checkpoints retain their original inputs and results in
+[Graphite Workbench](GRAPHITE-WORKBENCH.md). Exact owner publication/readback/
+synchronization refs are retained externally.
+
 The visible native view is **Dashboard**. Historical evidence and stable
 technical identifiers may still use “FORGE RIG” or `rig`; those compatibility
 names are not a second dashboard.
@@ -26,11 +35,30 @@ names are not a second dashboard.
 | `MetalBarGauge` | Sys strip, storage, I/O, orch, processes, agent bars, feed duration |
 | `MetalRingGauge` / labeled | MCP activity rings, agent ON/SB |
 | `MetalCoreBarsView` | Per-core bar field |
-| `MultiSeriesLoadRenderer` | CPU/RAM/GPU load trace |
+| `MetalLoadChart` / `LoadTraceRenderer` | Compact CPU/RAM/GPU/disk history with fraction meter on one surface |
+| `MultiSeriesLoadRenderer` | Combined CPU/RAM/GPU load trace |
 | `MetalToolLoadTile` | MCP tool load tiles |
 
 ## UI
-`RigDashboardView` single board: Dashboard title bar with **Guided Setup** · sys
+
+The Graphite Workbench phase applies shared native tokens to panels and Metal
+traces while preserving published metrics and the combined Compute Cores frame.
+The added review scope calls for reference-matching sparklines and static
+luminous material. Seven changed-geometry cases, four native production
+lifecycle cases and the earlier persistent-header check passed.
+Sixteen Rig and two telemetry contract cases preserve measurement parity.
+Earlier checkpoint top/lower visual review and all four ordinary-candidate
+onboarding/export cases passed in [Graphite Workbench](GRAPHITE-WORKBENCH.md). Prior receipts below
+remain bound to their historical source.
+
+The latest source opens without a global control bar. **Settings → Workbench**
+and the Navigation, Telemetry and Guide menus retain the global actions. Six
+separate preferences can opt into individual controls above the selected view;
+all six are off by default. **Guided Setup** is available from Workbench Settings,
+the Guide menu or its explicitly enabled optional control. The current native
+preferences and every-view normal/minimum QA passed in their named fixture
+scopes, with separate ordinary Settings observations.
+`RigDashboardView` single board: sys
 strip · multi-series load · orchestration
 status · combined **COMPUTE CORES** frame · Storage/Managed Activity aligned row ·
 orchestration · MCP servers/tools aligned row · agents/hot-processes aligned
@@ -64,12 +92,19 @@ restart and primary/fallback/CLU failover, so the tracker does not lose the
 active project merely because LM Studio relaunched the helper.
 
 ## Manager console
-`ManagerSettingsView`: **Start / Stop / Restart**, settings form (host/port/refresh/watchdog/TTL/shell/auto-restart), prune, doctor. It uses an in-process `ManagerNode` only when the GUI owns the service; with the normal LaunchAgent topology it uses the typed native `ManagerDashboardClient` and does not compete for the dashboard port.
+`ManagerSettingsView` has local sections for Authorized Folders, Service,
+Runtime, Settings, Project Shell, Protected Filesystem, Maintenance and Doctor.
+**Start / Stop / Restart**, staged host/port/refresh/watchdog/TTL/shell/auto-restart
+settings, pruning and doctor retain their existing model operations. Switching
+sections does not save or reload drafts. It uses an in-process `ManagerNode`
+only when the GUI owns the service; with the normal LaunchAgent topology it
+uses the typed native `ManagerDashboardClient` and does not compete for the
+dashboard port.
 
 ## Tests
 The [qualification status](QUALIFICATION-STATUS.md) records the exact local and
-CI counts, source bindings, and current source version **0.16.5**, build
-**26** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
+CI counts, source bindings, and current source version **0.17.0**, build
+**27** identity. Historical `0.9.0 (1)` and `0.12.0 (4)` receipts remain
 explicitly historical.
 The retained local app-hosted tests and four production onboarding scenarios passed;
 the installed-app qualifier remains partial because its own System Events

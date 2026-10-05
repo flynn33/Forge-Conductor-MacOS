@@ -79,8 +79,8 @@ The accepted and limited rows are recorded individually in
 
 README, User Guide, Unreleased changelog, roadmap, architecture, documentation
 index, Guided Mode, qualification status, product record, acceptance, and this
-handoff describe the current behavior. `VERSION` is now `0.16.5` and
-`BUILD_NUMBER` is `26`, matching the current authority. RF-SJ-10 created no
+handoff describe the current behavior. `VERSION` is now `0.17.0` and
+`BUILD_NUMBER` is `27`, matching the current authority. RF-SJ-10 created no
 release archive or shipment artifact. The later October 3 bootstrap repair
 completed a universal Developer ID archive/export and isolated native candidate
 checks; [qualification status](QUALIFICATION-STATUS.md) records that evidence.

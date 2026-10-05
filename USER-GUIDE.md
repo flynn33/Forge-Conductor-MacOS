@@ -1,10 +1,88 @@
 # Forge Conductor user guide
 
-Version **0.16.5**, build **26** (current source; candidate qualification is separate from installation).
+The Graphite Workbench and Compute Cores UI implementation and required QA are
+complete. The matching ordinary Debug candidate passed build, signature and
+packaging checks and four scoped native workflows. The current native view and
+control matrix and final checks passed; actual Settings and normal Dashboard
+observations retain their recorded scope. Exact owner publication, remote
+readback and synchronization references are retained externally. See the
+[phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
+
+Version **0.17.0**, build **27** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
 governance, memory, and automatic continuity.
+
+## Graphite Workbench navigation
+
+The main sidebar retains the current Forge destinations. Graphite panels,
+fields, catalog rows and status accents provide a consistent native reading
+surface; operational error, denial, warning and unavailable evidence retain
+their independent labels.
+
+The main workspace opens without a global control bar. Open **Forge Conductor
+→ Settings…** or **⌘,** to enter **Workbench**. Navigation visibility,
+Auto-refresh telemetry and contextual Guided Mode apply immediately. **Refresh
+Now** updates telemetry; **View Guide** and **Guided Setup** open the shared
+guide/setup presentation in the main window.
+
+**Optional view controls** has six separate preferences: Navigation,
+Auto-refresh, Guided Mode, Guide, Refresh and Guided Setup. Enable only the
+shortcuts you want above the selected view; all six are off by default. The
+**Navigation** menu and **Control-Command-S** show or hide navigation. The
+**Telemetry** menu retains Auto-refresh and **Command-R** for Refresh Now.
+The **Guide** menu provides View Guide, Guided Setup and Guided Mode.
+The six optional-control preferences and Guided Mode persist across relaunches.
+Navigation visibility and Auto-refresh retain their existing session behavior.
+
+**Manager** has nine sections: Workbench, Authorized Folders, Service, Runtime,
+Settings, Project Shell, Protected Filesystem, Maintenance and Doctor. The
+main Manager entry initially selects Authorized Folders; native Settings
+initially selects Workbench. Interface preferences have no Save/Reload footer.
+Opening either entry or switching sections preserves staged configuration.
+Folder selection, host/port/refresh/watchdog/session settings and shell settings
+remain staged until **Save settings**; **Reload from disk** explicitly replaces
+the draft. Each section scrolls when content exceeds the available height.
+
+**Provider** has a provider list and detail workspace. Clicking a row only
+inspects that provider. Its explicit activation toggle changes the active
+provider; **Connect and Check** remains the LM Studio connection action.
+Save or discard LM Studio Advanced edits before reconnecting. The toolbar
+disables its connection and probe actions while edits are staged; an available
+provider-card connection action reports the same save-first notice.
+The [Graphite Workbench record](docs/GRAPHITE-WORKBENCH.md) separates
+implemented behavior, manual native observations and tested checkpoints.
+Current native palette/size QA passed in its named scopes. Installation and
+distribution remain separate owner actions.
+
+**Guided Setup** opens from Workbench Settings, the Guide menu, or its explicitly
+enabled optional view control. Step3 opens Projects and names **Add Project
+Folders…**, matching the visible registration control. Its project, instruction and review
+steps let you choose a registered **Project to review** before starting an
+LM Studio chat. Review reads that project's generation, queue and provider
+revision without activating it or creating a model session. Use **Confirm
+Review and Continue** once the displayed inputs are ready; the subsequent
+LM Studio chat establishes its normal MCP binding.
+
+## Compute Cores update — verified UI scope
+
+The chips use this Mac's CPU/GPU identity. CPU illumination represents
+logical-processor activity when measured; host-average fallback is labeled
+separately. GPU regions illustrate measuredaggregate activity; trace travel
+is simulated flow. Idle/warming/stale/paused/unavailable labels remain distinct.
+Reduce Motion keeps a staticactivity presentation. Current materials derive
+from the exact supplied reference, with bounded native crops and Metal lights
+that brighten/changecolor with valid telemetry. Artistic bank colors do not
+assert P/E topology or measuredGPU-core activity.
+
+Current normal/minimum native views, all 9 Manager sections, all 8setup steps,
+reachable Guide bodies/state presentations and signedordinaryworkflows passed
+their recorded checks/reviews. ActualnormalSettings/Dashboard were observed;
+unavailable ordinaryminimum/physical1×/Skycompositor and NSAlertcache-button
+limits remain explicit. Exact owner publication/readback/synchronization refs are retained externally; distribution is separate.
+See [Compute Cores](docs/COMPUTE-CORES.md) and [native QA](docs/GRAPHITE-NATIVE-QA.md)
+for exact evidence and historical failed attempts.
 
 ## 1. Start Forge Conductor
 

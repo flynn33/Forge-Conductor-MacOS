@@ -10,6 +10,7 @@ struct ContinuityOperatorView: View {
     @State private var confirmsPacketDeletion = false
     @State private var confirmsReset = false
     @State private var showClearCacheConfirmation = false
+    @State private var selectedPacketIDs = Set<String>()
 
     init(client: any OperatorManagerClientProtocol) {
         _viewModel = StateObject(wrappedValue: ContinuityViewModel(client: client))
@@ -19,11 +20,12 @@ struct ContinuityOperatorView: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Continuity")
-                    .font(.title2.bold())
+                    .font(.system(size: 24, weight: .bold))
                     .accessibilityIdentifier("detail-continuity")
                 Text("Automatic continuity packets by project")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .accessibilityIdentifier("continuity-operator-view")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -39,14 +41,19 @@ struct ContinuityOperatorView: View {
                 }
                 if let error = viewModel.commandErrorMessage {
                     Label {
-                        Text(error).font(.caption).textSelection(.enabled)
+                        Text(error).font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
                     } icon: {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(GraphitePalette.warning)
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .background(GraphitePalette.panelRaised, in: RoundedRectangle(cornerRadius: 9))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 9)
+                            .stroke(GraphitePalette.warning.opacity(0.5), lineWidth: 1)
+                    }
                     .accessibilityIdentifier("continuity-delete-error")
                 }
                 if let notice = viewModel.notice { OperatorNoticeBanner(message: notice) }
@@ -58,6 +65,18 @@ struct ContinuityOperatorView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(GraphitePalette.canvas)
+        .onAppear {
+            selectedPacketIDs = viewModel.selectedPacketIDs
+        }
+        .onChange(of: selectedPacketIDs) { _, selection in
+            guard viewModel.selectedPacketIDs != selection else { return }
+            viewModel.selectedPacketIDs = selection
+        }
+        .onChange(of: viewModel.selectedPacketIDs) { _, selection in
+            guard selectedPacketIDs != selection else { return }
+            selectedPacketIDs = selection
+        }
         .task {
             viewModel.load()
         }
@@ -91,13 +110,13 @@ struct ContinuityOperatorView: View {
 
     private var packetBrowser: some View {
         HSplitView {
-            GroupBox("Project IDs") {
+            GraphitePanel(title: "Project IDs") {
                 projectList
             }
-            .frame(minWidth: 260, idealWidth: 320, maxWidth: 420)
+            .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
             .accessibilityIdentifier("continuity-project-frame")
 
-            GroupBox("Continuity packets") {
+            GraphitePanel(title: "Continuity packets") {
                 packetList
             }
             .frame(minWidth: 420, maxWidth: .infinity)
@@ -121,18 +140,21 @@ struct ContinuityOperatorView: View {
                     .accessibilityIdentifier("continuity-project-row-\(projectID)")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(GraphitePalette.panelBottom)
         .accessibilityIdentifier("continuity-project-list")
     }
 
     private var packetList: some View {
-        List(selection: $viewModel.selectedPacketIDs) {
+        List(selection: $selectedPacketIDs) {
             if viewModel.packets.isEmpty, !viewModel.isLoadingPackets {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("No continuity packets")
                         .font(.headline)
                     Text("Handoffs and checkpoints appear automatically when Forge saves continuity.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 .padding(.vertical, 12)
                 .accessibilityIdentifier("continuity-packets-empty")
@@ -147,14 +169,17 @@ struct ContinuityOperatorView: View {
                         Text(packet.timestamp)
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                 }
+                .padding(.vertical, 4)
                 .tag(packet.packetID)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(packet.type) \(packet.packetID) \(packet.timestamp)")
                 .accessibilityIdentifier("continuity-packet-row-\(packet.packetID)")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(GraphitePalette.panelBottom)
         .overlay {
             if viewModel.isLoadingPackets { ProgressView().controlSize(.small) }
         }
@@ -177,17 +202,21 @@ struct ContinuityOperatorView: View {
             NSPasteboard.general.setString(projectID, forType: .string)
         }
         .disabled(viewModel.selectedProjectID == nil)
+        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
         .accessibilityIdentifier("continuity-copy-project-id")
 
         Button("Delete", role: .destructive) { confirmsPacketDeletion = true }
+            .buttonStyle(GraphiteButtonStyle(kind: .destructive))
             .disabled(!viewModel.canDeleteSelectedPackets)
             .accessibilityIdentifier("continuity-delete-packets")
 
         Button("Reset", role: .destructive) { confirmsReset = true }
+        .buttonStyle(GraphiteButtonStyle(kind: .destructive))
         .disabled(!viewModel.canResetSelectedProject)
         .accessibilityIdentifier("continuity-reset")
 
         Button("Clear Cache", role: .destructive) { showClearCacheConfirmation = true }
+            .buttonStyle(GraphiteButtonStyle(kind: .destructive))
             .disabled(viewModel.isClearingCache)
             .help("Removes disposable continuity cache without deleting packets or project files.")
             .accessibilityIdentifier("continuity-clear-cache")

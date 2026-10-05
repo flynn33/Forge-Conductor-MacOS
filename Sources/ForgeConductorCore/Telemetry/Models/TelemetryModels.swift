@@ -187,6 +187,11 @@ public struct PowerMetrics: Sendable, Equatable {
     }
 }
 
+/// Local sample provenance; transport dictionaries retain their existing schema.
+public enum CPUSampleQuality: String, Sendable, Equatable {
+    case perLogicalProcessor, hostAggregateFallback, warmingUp, unavailable, unknown
+}
+
 public struct CPUMetrics: Sendable {
     public var percent: Double
     public var perCPU: [Double]
@@ -199,6 +204,8 @@ public struct CPUMetrics: Sendable {
     public var user: Double
     public var system: Double
     public var idle: Double
+    public var sampleQuality: CPUSampleQuality
+    public var observedAt: TimeInterval?
 
     public init(
         percent: Double,
@@ -211,7 +218,9 @@ public struct CPUMetrics: Sendable {
         brand: String,
         user: Double,
         system: Double,
-        idle: Double
+        idle: Double,
+        sampleQuality: CPUSampleQuality = .unknown,
+        observedAt: TimeInterval? = nil
     ) {
         self.percent = percent
         self.perCPU = perCPU
@@ -224,6 +233,8 @@ public struct CPUMetrics: Sendable {
         self.user = user
         self.system = system
         self.idle = idle
+        self.sampleQuality = sampleQuality
+        self.observedAt = observedAt
     }
 
     public func asDictionary() -> [String: Any] {
@@ -380,6 +391,9 @@ public struct GPUMetrics: Sendable {
     public var memTotalMiB: Int
     public var cores: Int?
     public var metal: Bool
+    /// Registry identity of the sources associated with this sample, if consistent.
+    public var registryID: UInt64?
+    public var observedAt: TimeInterval?
 
     public init(
         vendor: String,
@@ -390,7 +404,9 @@ public struct GPUMetrics: Sendable {
         memUsedMiB: Int?,
         memTotalMiB: Int,
         cores: Int?,
-        metal: Bool
+        metal: Bool,
+        registryID: UInt64? = nil,
+        observedAt: TimeInterval? = nil
     ) {
         self.vendor = vendor
         self.name = name
@@ -401,6 +417,8 @@ public struct GPUMetrics: Sendable {
         self.memTotalMiB = memTotalMiB
         self.cores = cores
         self.metal = metal
+        self.registryID = registryID
+        self.observedAt = observedAt
     }
 
     public func asDictionary() -> [String: Any] {

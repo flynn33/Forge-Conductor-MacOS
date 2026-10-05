@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 #if SWIFT_PACKAGE
 import ForgeNativeSessionHostPlugin
 @testable import ForgeConductorApp
@@ -65,7 +66,12 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
     private let providerRegistryDelayNanoseconds: UInt64
     private let legacySnapshotDelayNanoseconds: UInt64
     private let configurationSaved: Bool
+    private let suspendFirstContinuityRequest: Bool
+    private let continuityPacketError: URLError.Code?
     private var mutableContinuityPackets: [OperatorContinuityPacket]
+    private var firstContinuityRequestContinuation: CheckedContinuation<Void, Never>?
+    private(set) var continuityPacketRequestCount = 0
+    private(set) var firstContinuityRequestWasCancelled = false
     private(set) var continuityDeleteRequests: [OperatorContinuityPacketDeleteRequest] = []
     private var acceptedSelectionOperation: ProviderIntegrationOperationSnapshot?
     private(set) var repairRequests: [ProviderIntegrationMutationRequest] = []
@@ -84,6 +90,8 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         legacySnapshotDelayNanoseconds: UInt64 = 0,
         configurationSaved: Bool = false,
         continuityPackets: [OperatorContinuityPacket] = [],
+        suspendFirstContinuityRequest: Bool = false,
+        continuityPacketError: URLError.Code? = nil,
         operatorSnapshotJSON: String = "{}"
     ) throws {
         self.preparationState = preparationState
@@ -92,6 +100,8 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
         self.providerRegistryDelayNanoseconds = providerRegistryDelayNanoseconds
         self.legacySnapshotDelayNanoseconds = legacySnapshotDelayNanoseconds
         self.configurationSaved = configurationSaved
+        self.suspendFirstContinuityRequest = suspendFirstContinuityRequest
+        self.continuityPacketError = continuityPacketError
         mutableContinuityPackets = continuityPackets
         operatorSnapshot = try JSONDecoder().decode(
             OperatorSnapshot.self,
@@ -309,11 +319,23 @@ private actor LegacyLMProviderSelectionClient: OperatorManagerClientProtocol {
 
     func continuityPackets(projectID: String) async throws -> OperatorContinuityPacketList {
         guard let identifier = UUID(uuidString: projectID) else { throw notInScope }
+        continuityPacketRequestCount += 1
+        if suspendFirstContinuityRequest, continuityPacketRequestCount == 1 {
+            await withCheckedContinuation { firstContinuityRequestContinuation = $0 }
+            firstContinuityRequestWasCancelled = Task.isCancelled
+            throw URLError(.cancelled)
+        }
+        if let continuityPacketError { throw URLError(continuityPacketError) }
         let projectID = ProjectID(identifier)
         return OperatorContinuityPacketList(
             projectID: projectID,
             packets: mutableContinuityPackets.filter { $0.projectID == projectID }
         )
+    }
+
+    func releaseFirstContinuityRequest() {
+        firstContinuityRequestContinuation?.resume()
+        firstContinuityRequestContinuation = nil
     }
 
     func deleteContinuityPackets(
@@ -340,6 +362,74 @@ final class ProviderConfigurationAppTests: XCTestCase {
 
     override func tearDownWithError() throws {
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
+    }
+
+    @MainActor
+    func testCancelledContinuityPacketRequestCannotPublishOverReplacementResult() async throws {
+        let projectID = ProjectID(try XCTUnwrap(UUID(uuidString: "34f5856b-b3c0-4135-8fcb-b8680483494f")))
+        let packet = OperatorContinuityPacket(
+            packetID: "replacement-packet",
+            projectID: projectID,
+            type: "handoff",
+            source: .model,
+            timestamp: "2026-10-04T12:00:00Z",
+            resumeReady: true
+        )
+        let client = try LegacyLMProviderSelectionClient(
+            continuityPackets: [packet],
+            suspendFirstContinuityRequest: true
+        )
+        let viewModel = ContinuityViewModel(client: client)
+        viewModel.selectedProjectID = projectID.description
+        viewModel.loadPackets()
+        let firstRequestDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while await client.continuityPacketRequestCount == 0,
+              ContinuousClock.now < firstRequestDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let firstRequestCount = await client.continuityPacketRequestCount
+        XCTAssertEqual(firstRequestCount, 1)
+
+        viewModel.loadPackets()
+        let replacementDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while viewModel.isLoadingPackets, ContinuousClock.now < replacementDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(viewModel.isLoadingPackets)
+        XCTAssertEqual(viewModel.packets.map(\.packetID), [packet.packetID])
+
+        let noStaleError = expectation(description: "Cancelled predecessor does not publish an error")
+        noStaleError.isInverted = true
+        let observation = viewModel.$commandErrorMessage.sink { message in
+            if message != nil { noStaleError.fulfill() }
+        }
+        await client.releaseFirstContinuityRequest()
+        await fulfillment(of: [noStaleError], timeout: 0.25)
+        withExtendedLifetime(observation) {}
+
+        let cancelled = await client.firstContinuityRequestWasCancelled
+        let requestCount = await client.continuityPacketRequestCount
+        XCTAssertTrue(cancelled)
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertNil(viewModel.commandErrorMessage)
+        XCTAssertFalse(viewModel.isLoadingPackets)
+        XCTAssertEqual(viewModel.packets.map(\.packetID), [packet.packetID])
+    }
+
+    @MainActor
+    func testContinuityPacketTransportFailureRemainsVisible() async throws {
+        let client = try LegacyLMProviderSelectionClient(continuityPacketError: .cannotConnectToHost)
+        let viewModel = ContinuityViewModel(client: client)
+        viewModel.selectedProjectID = "34f5856b-b3c0-4135-8fcb-b8680483494f"
+        viewModel.loadPackets()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while viewModel.isLoadingPackets, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertFalse(viewModel.isLoadingPackets)
+        XCTAssertEqual(viewModel.commandErrorMessage, URLError(.cannotConnectToHost).localizedDescription)
+        XCTAssertTrue(viewModel.packets.isEmpty)
     }
 
     @MainActor

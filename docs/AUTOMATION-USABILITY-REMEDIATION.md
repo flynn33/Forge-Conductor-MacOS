@@ -6,6 +6,10 @@ workflow that needs only a project location and instruction packages while
 Forge owns application preparation, bounded instruction handling, completion,
 continuity, and contextual help.
 
+The dated closeouts below retain their original UI entry points and evidence.
+Current operating guidance uses Workbench Settings, the Guide menu and
+explicitly enabled optional controls; see [Graphite Workbench](GRAPHITE-WORKBENCH.md).
+
 The plan package was integrity-checked before implementation. Its three files
 matched `SHA256SUMS`; the full plan hash is
 `858bc672895e564662ce1355c5ab4c591055648e2696dcffaac46f6373549255`.

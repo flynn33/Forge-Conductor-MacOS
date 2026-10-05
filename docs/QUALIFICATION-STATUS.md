@@ -1,5 +1,59 @@
 # Version and qualification status
 
+**UI implementation and QA complete.** Source
+**0.17.0 (27)**,28548a73… passed 116 distinct production tests in 140 successful
+executions, zero failures/skips. The separate native view matrix passed 21 unique
+methods in 22 invocations; all 463 selectedPNGs were individually opened and
+reviewed. The 15-check/434-inputaudit, matching signed Debug build and four
+scoped ordinary workflows passed. Historical failures and unavailable proof
+classes retain their exact boundaries. Owner exact publication/readback/
+synchronization refs are recorded externally; no installation, notarization,
+App Store Connect upload or distribution was performed.
+
+## Current Graphite/Compute source and ordinary candidate — 0.17.0 (27)
+
+Current production qualification is **116 distinct tests /140 successful
+executions**, zero failures/skips: Compute 29, regression 68 and proper canonical
+Provider 33 (24 Provider repeats counted once), plus fresh Core 8/H0(1)/G1(1).
+CLI/App SwiftPM compilation and the canonical ordinaryDebug build passed
+separately. The view matrix is **21 unique methods /22 successful invocations**
+with **463 selected PNGs actually opened**:281 parent caches,166 sheet caches,
+14 NSAlert caches and 2 separate production Metal readbacks. All 68 currentCompute
+layers and the genuine 20-frame MOV are separate reviewed evidence.
+
+The signed current candidate 1a36aa4d…/source 28548a73… passed four manual ordinary
+workflows: healthy 16/failure 3 paired exports with privacy/scope; native folder
+Select/Cancel/root rejection/save/relaunch; shellOFF/relaunch/ON with real MCP
+denial/exact execution. Actual ordinary Settings 900×560 content, all 9 sections,
+draft/Reload, six opt-ins/Setup-only persistence/restoration, menus/About and
+normal 1440×900@2×Dashboard/Pause/Resume were observed. Ownedcases ended; seven
+registration byte sets per case were unchanged and twelve private suite key sets
+were empty. This is scoped runtime proof, not installed/remote/shipping proof.
+
+NSViewcaches omitMetal and parent/sheet caches are separate surfaces. All 14
+NSAlertcaches omit Cancel captions and have background/destructive-label
+artifacts; actual 14 Cancel dismissals/no-mutation assertions passed, while
+ordinary alert-button contrast is unqualified by those caches. Physical 1×,
+ordinary minimum and Sky sheet-compositor pixels/Close remain explicitlimits,
+not extra acceptance gates. Historical failed/zero-selected runner attempts
+remain excluded. Required UI implementation/QA is complete; exact owner publication/readback/safe synchronization refs are retained externally.
+
+The current [Graphite 30 mappings](GRAPHITE-WORKBENCH.md),
+[Compute 32 criteria/18 capture scopes](COMPUTE-CORES.md) and
+[native QA](GRAPHITE-NATIVE-QA.md) are the active UI authorities. The current
+source hash is `28548a73db312130f02e3c86344725f2aa1efca575901fa0ae3dc223b69eb3d1`.
+Exact source/graph/signed candidate identities, production 116/140 receipt and
+native 463-image union are retained in those records. Historical rejected art,
+failed third/fourth pilots, mixed/native host failures, version-marker failure,
+12 current matrix failed attempts and two superseded successful framing
+checkpoints remain history; none is counted as current success.
+
+All UI implementation/required QA/documentation mappings are complete in their
+named scopes. Exact owner publication/readback/safe synchronization refs are retained externally,
+with no self-referential commit edit. Historical
+live providers, installation, privileged service and shipment below retain
+their separate qualifications.
+
 ## October 3 installed bootstrap and export repair — 0.16.5 (26)
 
 The corrected Xcode project identifies the candidate as `0.16.5 (26)`. The
@@ -100,8 +154,9 @@ This documentation update did not install, remove, replace, or launch either
 application. The cause of the host-state change is unknown; the earlier
 qualification snapshot is not a claim that the installed app is still present.
 `/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-03-docs-wiki-sync/publication-host-readback.json`
-records the path, process command, and registration hash. Source identity
-remains `0.16.5 (26)`; owner installation and shipping qualification remain open.
+records the path, process command and registration hash. At that publication
+checkpoint, source identity remained `0.16.5 (26)`; owner installation and
+shipping qualification remained open.
 
 ## Prior 0.16.4 diagnostic source correction — historical test boundary
 
@@ -706,7 +761,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.16.5, build 26**, supporting **macOS 26+**. The earlier
+Current source identity: **0.17.0, build 27**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the opening build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -719,7 +774,7 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.16.5, build 26**. The root [`VERSION`](../VERSION)
+documentation use version **0.17.0, build 27**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are
@@ -733,8 +788,9 @@ and icon. A standalone SwiftPM CLI is not a substitute for that signed bundle.
 ## Historical source and functional evidence
 
 These records retain their named source revisions and checkpoint boundaries.
-They do not qualify the current `0.16.5 (26)` candidate. Its October 3 evidence
-and unperformed shipping paths are recorded in the opening section.
+They do not qualify the current `0.17.0 (27)` UI source. Its completed, scoped
+UI acceptance is recorded in the opening Graphite section; the October 3 `0.16.5 (26)`
+candidate retains its separate evidence and unperformed shipping paths.
 
 The September 20 adversarial pre-release audit corrected scoped dashboard
 mutation authorization, a misclassified state-changing Stjornarvald route, an
@@ -839,12 +895,12 @@ remote `main` were then synchronized at documentation closeout revision
 documentation only and leaves that historical native graph unchanged. These
 revisions remain distribution evidence for the source they name. They did not
 establish the then-current `0.14.4 (10)` source result and do not qualify the
-current `0.16.5 (26)` candidate.
+current `0.17.0 (27)` source.
 
 | Surface | Recorded checkpoint result | Boundary |
 |---|---|---|
 | 0.14.1 operability correction | Published source `8ca3f24d9a81adce56e1a5232a6181edd08cf00b`, tree `9bc840d7fdfe47bd552c4b8e095091502fecc3b6`, passed **1,844 tests with 13 explicit skips and zero failures**. Both SwiftPM products and a clean canonical arm64 Apple Development-signed Debug workspace build passed with no warning or error lines. Native UI coverage passed the eight-step Guided Setup, Autonomy recovery, complete Continuity detail/title-bar geometry, Provider Connect and Check plus contract-failure presentation, compact Dashboard Storage/Managed Activity geometry, and every primary view at minimum and normal window sizes. The checkpoint version/build constants and all Xcode configurations were aligned to `0.14.1 (7)`. | One Provider configuration case is an explicit Keychain-environment skip, and the UI runner retains a nonfailing main-thread runtime diagnostic. No fresh live loaded-model LM Studio or live Claude/Codex host result is claimed; installed-build and distribution-artifact evidence remain separate. |
-| Historical Swift/Core provider baseline | The `0.14.0 (6)` provider baseline `65af43e31aa2b818ccd2f915aa7f89c34b7c821d`, tree `945cdb9d6adaf17c85845fe846910ece527288fd`, passed both SwiftPM product builds and a direct full-suite terminal run with **1,849 XCTest cases**, **13 explicit environment/live skips, and zero failures**. The warning-repair source `117aa95f982bccb4c1ef0d0acc8b92666127be70`, tree `00344bd6a1ce72f278e1a832a1d6e9f3a27f2d9f`, separately passed both SwiftPM product builds, a fresh canonical Apple Development-signed Debug workspace build, and the focused **3/3** MCP attachment plus **20/20** Provider configuration cases without either reported Swift diagnostic. | The 1,849-case regression remains bound to its exact baseline revision and is not claimed for the current `0.16.5 (26)` candidate. Declared skips remain distinct from passes. Live desktop-host, installed-build, distribution-artifact, and shipment qualification remain separate. |
+| Historical Swift/Core provider baseline | The `0.14.0 (6)` provider baseline `65af43e31aa2b818ccd2f915aa7f89c34b7c821d`, tree `945cdb9d6adaf17c85845fe846910ece527288fd`, passed both SwiftPM product builds and a direct full-suite terminal run with **1,849 XCTest cases**, **13 explicit environment/live skips, and zero failures**. The warning-repair source `117aa95f982bccb4c1ef0d0acc8b92666127be70`, tree `00344bd6a1ce72f278e1a832a1d6e9f3a27f2d9f`, separately passed both SwiftPM product builds, a fresh canonical Apple Development-signed Debug workspace build, and the focused **3/3** MCP attachment plus **20/20** Provider configuration cases without either reported Swift diagnostic. | The 1,849-case regression remains bound to its exact baseline revision and is not claimed for the current `0.17.0 (27)` source. Declared skips remain distinct from passes. Live desktop-host, installed-build, distribution-artifact, and shipment qualification remain separate. |
 | Projects and Manager | The published-tree Xcode **My Mac** product registered picker-selected and absolute-path projects, authorized and saved canonical roots, rejected filesystem root, and retained state across relaunch. | That project-registration flow did not qualify the installed protected filesystem service as a distinct process. |
 | Provider integrations | The 0.14.0 source implements mutually exclusive LM Studio, Claude Code Desktop, and Codex Desktop selection; transactional Forge-owned desktop package installation, rollback, repair, and removal; a bounded durable operation ledger; revision-bound run admission; authenticated loopback hooks; and selected-provider readiness on Dashboard and Guided Setup. Desktop sessions receive a provider-specific MCP launch command and a five-minute, single-use capability bound to provider, session, run, project generation, selection revision, deployment, and frozen authorization scope. Project tools stay unavailable until `desktop_run_attach` atomically consumes that capability. Deterministic focused coverage passed **100/100**; canonical Xcode passed **83/83 Core**, **40/40 app-hosted**, and **6/6 native UI** cases; the full SwiftPM regression passed **1,849 cases with 13 explicit skips and zero failures**. Grok Build remains visible but non-selectable for owned-artifact cleanup and forward compatibility. | Deterministic tests and an installation receipt do not prove that a selectable desktop host is open, has reloaded the package, has accepted hook trust, or has completed a live session. Claude and Codex require separate live acceptance; neither qualifies the other. Grok's documented startup/prompt hook outputs do not deliver Forge's initial assignment context, so no ready, run, or live-support claim is made for Grok in 0.14.0. The Thread Performance Checker limitation belongs to that historical source; `0.15.0 (14)` repaired the product paths and passed 111/111 app-hosted cases with no structured runtime warnings. |
 | LM Studio Provider | The published-tree native UI saved the loopback endpoint and loaded `qwen/qwen3.8-27b` model, refreshed inventory, passed the connection probe, replaced the manager, retained configuration, and passed again. Checkpoint deterministic recovery coverage verifies bounded discovery across system, per-user, Homebrew, and `PATH` CLI locations; wrapped status JSON and string ports; server start; delayed readiness; reported-port fallback; cancellation; and fail-closed malformed, timed-out, or truncated results. | A downloaded or listed model is not treated as loaded; the exact loaded variant remains required. The host had no loaded model during that checkpoint qualification, so the record claims no fresh live contract-probe pass. |

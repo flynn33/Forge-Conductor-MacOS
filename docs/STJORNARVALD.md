@@ -513,7 +513,7 @@ Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
 destinations, all guide routes, immediate opaque-source acceptance during
 Manager outage, the native source picker, and four-format native export.
 
-The current source authority is version `0.16.5`, build `26`. RF-SJ-10 created
+The current source authority is version `0.17.0`, build `27`. RF-SJ-10 created
 no release archive or shipment artifact. The later October 3 bootstrap repair
 completed a universal Developer ID archive/export and isolated native candidate
 checks, recorded in [qualification status](QUALIFICATION-STATUS.md). Installation,

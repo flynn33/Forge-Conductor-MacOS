@@ -22,8 +22,8 @@
         "Keep Forge Activity bounded to 100 app-local rows and cap displayed rows at 8 KiB"
       ],
       "controls": [
-        "Refresh",
-        "Auto-refresh",
+        "Refresh Now (Command-R, Telemetry menu, or Settings > Workbench)",
+        "Auto-refresh (Settings > Workbench or Telemetry menu)",
         "Instrument panels",
         "History traces",
         "Activity panels",
@@ -37,10 +37,11 @@
         "Forge Activity is latest bounded state, not a persisted full conversation transcript"
       ],
       "normal_workflow": [
-        "Use Guided Setup in the Dashboard title bar when preparing a project for LM Studio",
+        "Open Guided Setup from the Guide menu or Settings > Workbench when preparing a project for LM Studio",
         "Use the Dashboard to observe health and load",
         "Use Forge Activity to follow instruction, continuity, orchestration, and policy events",
-        "Open the relevant feature tab to change behavior"
+        "Open the relevant feature tab to change behavior",
+        "Enable individual view shortcuts in Settings > Workbench > Optional view controls only when wanted"
       ],
       "troubleshooting": [
         "No data: check Manager and provider status",
@@ -56,7 +57,10 @@
       ],
       "control_anchors": [
         "toolbar-refresh",
-        "toolbar-auto-refresh"
+        "toolbar-auto-refresh",
+        "settings-refresh",
+        "settings-auto-refresh",
+        "settings-guided-setup"
       ]
     },
     {
@@ -957,9 +961,11 @@
         "Start/stop/restart",
         "Selected project roots",
         "Shell policy",
-        "Budgets",
-        "Watchdog",
-        "Advanced settings"
+        "Native runtime status",
+        "Dashboard and telemetry settings",
+        "Protected filesystem status and maintenance",
+        "Doctor checks",
+        "Workbench interface preferences"
       ],
       "status_meanings": [
         "running",
@@ -971,7 +977,7 @@
       ],
       "normal_workflow": [
         "Ordinary users leave Manager running",
-        "Use settings only for application-wide preferences"
+        "Change local interface preferences immediately in Settings > Workbench; Manager configuration edits remain staged until Save settings"
       ],
       "troubleshooting": [
         "Port held by other Forge manager",

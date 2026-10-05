@@ -1,18 +1,22 @@
 # Documentation guide
 
-Start with the shortest document that answers the question. Historical evidence
-is retained for auditability, but it is not current operating guidance. Current
-operating documents describe repository identity **0.16.5, build 26** unless a
-source-bound historical receipt says otherwise. The
-[GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) follows the
-same identity and evidence boundaries.
-
-## Use and setup
+Current source is **0.17.0 (27)**. The Graphite/Compute UI implementation and
+required QA are complete. Exact owner publication/readback/synchronization refs
+are retained externally. All 116 distinct production tests passed in 140
+executions. The separate native matrix passed 21 methods in 22 invocations; all
+463 selected PNG files were individually reviewed. Matching ordinary
+workflows, exact source/artifact identities, unavailable capture limits and
+failed histories remain in [Graphite](GRAPHITE-WORKBENCH.md),
+[Compute](COMPUTE-CORES.md) and [native QA](GRAPHITE-NATIVE-QA.md). Broader historical
+qualification is not promoted by this UI phase.
 
 | Document | Purpose |
 | --- | --- |
 | [User guide](../USER-GUIDE.md) | Install, configure, and operate Forge Conductor |
 | [Xcode guide](../XCODE.md) | Build, test, archive, sign, and inspect the native app |
+| [Graphite Workbench](GRAPHITE-WORKBENCH.md) | Current native presentation, feature preservation and phase evidence |
+| [Compute Cores](COMPUTE-CORES.md) | Revision 2 chip/Metal FX, palette, current candidate and 32 individually scoped criteria |
+| [Native QA](GRAPHITE-NATIVE-QA.md) | Completed manual/native matrix, checked observations and capture limits |
 | [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow current setup guidance or open contextual offline help |
 | [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
@@ -49,6 +53,11 @@ same identity and evidence boundaries.
 | [Functional-build record](FUNCTIONAL-DEVELOPMENT-BUILD.md) | Detailed candidate and artifact receipts |
 
 ## Historical records
+
+[Graphite checkpoints](GRAPHITE-WORKBENCH-CHECKPOINTS.md) and
+[Compute checkpoints](COMPUTE-CORES-CHECKPOINTS.md) retain the complete earlier
+phase receipts, failures and candidate identities. Their original inputs remain
+the qualification boundary.
 
 Files whose names begin with `AUDIT-`, `BUILD-BASELINE`, `COHERENT-RESUME`,
 `EDIT-BUILD-TOOL-PATH`, `G1-`, or `RELEASE-` are retained as

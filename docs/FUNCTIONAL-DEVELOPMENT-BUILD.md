@@ -1,18 +1,53 @@
 # Functional development build acceptance
 
-This document retains the earlier Apple Development-signed candidate scope and
-its exact evidence. On September 15, 2026, the owner changed the active target
-to a fully functional, feature-complete, shippable build, authorized direct
-GitHub `main` updates under the owner's account, and reserved shipment for the
-owner. The Developer ID, notarization, Gatekeeper, physical-hardware, and
-privileged root-service gates deferred below are now open for that active
-target. See [ROADMAP.md](../ROADMAP.md) and [the delivery workflow](DELIVERY-WORKFLOW.md).
+**UI implementation and QA complete.** Source
+**0.17.0 (27)**,28548a73… passed 116 distinct production tests in 140 successful
+executions, zero failures/skips. The separate native view matrix passed 21 unique
+methods in 22 invocations; all 463 selectedPNGs were individually opened and
+reviewed. The 15-check/434-inputaudit, matching signed Debug build and four
+scoped ordinary workflows passed. Historical failures and unavailable proof
+classes retain their exact boundaries. Owner exact publication/readback/
+synchronization refs are recorded externally; no installation, notarization,
+App Store Connect upload or distribution was performed.
 
-The earlier owner-authorized target was `functional_development_build`: a usable,
-fully functional native macOS application built in optimized Release
-configuration and signed with the available legitimate Apple Development
-identity. This scope changes delivery qualification, not required product
-features.
+This current UIrecord does not replace the broader owner-completion mission
+or the historically accepted development slice below. The current Graphite/
+Compute implementation/required QA is complete; installation, distribution and
+remaining live-provider/privileged-service obligations keep their own bounds.
+The owner will ship separately.
+
+## October 4–5 Graphite and Compute source phase — 0.17.0 (27)
+
+Current production qualification is **116 distinct tests /140 successful
+executions**, zero failures/skips: Compute 29, regression 68 and proper canonical
+Provider 33 (24 Provider repeats counted once), plus fresh Core 8/H0(1)/G1(1).
+CLI/App SwiftPM compilation and the canonical ordinaryDebug build passed
+separately. The view matrix is **21 unique methods /22 successful invocations**
+with **463 selected PNGs actually opened**:281 parent caches,166 sheet caches,
+14 NSAlert caches and 2 separate production Metal readbacks. All 68 currentCompute
+layers and the genuine 20-frame MOV are separate reviewed evidence.
+
+The signed current candidate 1a36aa4d…/source 28548a73… passed four manual ordinary
+workflows: healthy 16/failure 3 paired exports with privacy/scope; native folder
+Select/Cancel/root rejection/save/relaunch; shellOFF/relaunch/ON with real MCP
+denial/exact execution. Actual ordinary Settings 900×560 content, all 9 sections,
+draft/Reload, six opt-ins/Setup-only persistence/restoration, menus/About and
+normal 1440×900@2×Dashboard/Pause/Resume were observed. Ownedcases ended; seven
+registration byte sets per case were unchanged and twelve private suite key sets
+were empty. This is scoped runtime proof, not installed/remote/shipping proof.
+
+NSViewcaches omitMetal and parent/sheet caches are separate surfaces. All 14
+NSAlertcaches omit Cancel captions and have background/destructive-label
+artifacts; actual 14 Cancel dismissals/no-mutation assertions passed, while
+ordinary alert-button contrast is unqualified by those caches. Physical 1×,
+ordinary minimum and Sky sheet-compositor pixels/Close remain explicitlimits,
+not extra acceptance gates. Historical failed/zero-selected runner attempts
+remain excluded. Required UI implementation/QA is complete; exact owner publication/readback/safe synchronization refs are retained externally.
+
+The [Graphite](GRAPHITE-WORKBENCH.md), [Compute](COMPUTE-CORES.md),
+[native QA](GRAPHITE-NATIVE-QA.md) and [checkpoint history](COMPUTE-CORES-CHECKPOINTS.md)
+records are authoritative for 62 criteria/18 capture scopes and exact receipts.
+Owner source/wiki publication and synchronized refs are recorded externally.
 
 ## October 3, 2026 corrected project — 0.16.5 (26)
 

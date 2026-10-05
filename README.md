@@ -8,8 +8,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.16.5** |
-| **Build** | **26** |
+| **Version** | **0.17.0** |
+| **Build** | **27** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -22,12 +22,41 @@ on that same team and compile the distribution peer policy. The daemon's exact
 signed hashes are sealed into the app and CLI before export; changing signing
 classes after archiving invalidates that trust relationship. See [Xcode](XCODE.md).
 
-> **Release status:** current source is `0.16.5 (26)`, repairing the observed
-> installed `0.16.4 (25)` bootstrap signing rejection and unavailable diagnostic
-> export. The installed bundle passed strict signature validation but compiled
-> an Apple Development peer requirement and retained pre-export daemon hashes.
-> Candidate validation is recorded in the [qualification record](docs/QUALIFICATION-STATUS.md).
-> The owner's installation and shipment remain separate from candidate testing.
+**UI implementation and QA complete.** Current
+0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
+successful executions**, with zero failures/skips. The separate native view
+matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
+were individually opened and reviewed. The 15-check/434-input audit, matching
+signed Debug build and four scoped ordinary workflows passed. Historical
+failures and superseded inputs remain separate. Native caches, genuine Metal
+readbacks and ordinary observations retain their explicit limits; no
+installation, notarization, App Store upload or distribution was performed.
+Exact owner publication/readback/synchronization refs are retained externally.
+
+Current source is **0.17.0 (27)**. The native Graphite workspace has
+Settings-first optional controls, aligned text and detailed CPU/GPU materials
+from the supplied reference. Bounded Metal lighting follows valid telemetry;
+missing, stale and paused states retain distinct meaning. Current selected
+fixture checks, matching Debug package and four scoped ordinary workflows passed.
+The current native view/control matrix and final checks passed. Exact owner publication/readback/synchronization refs are retained externally.
+
+[Graphite Workbench](docs/GRAPHITE-WORKBENCH.md) and
+[Compute Cores](docs/COMPUTE-CORES.md) record all 62 criteria/18 capture gates,
+exact tested inputs, prior pixel/movie reviews and retained failed checkpoints.
+The final QA mapping combines current native fixture normal/minimum views with
+the signed ordinary workflows and actual native Settings/Dashboard observations. No installation, notarization, App Store Connect upload
+or distribution was performed.
+
+Current independent review opened all 463 selected view PNGs and 68 Compute layers;
+the 20-frame drawable movie is separately verified. Four matching manual ordinary workflows completed:
+healthy/failure paired exports (16/3 records), native folder save/cancel/root
+rejection/relaunch and shell OFF/relaunch/ON with real MCP denial/execution.
+Actual Settings was reviewed at 900×560 content (900×592 outer); all nine
+sections, draft/Reload, six opt-ins and Setup-only persistence were observed.
+Normal composed Dashboard, menus, Pause/Resume, restored preferences, native
+Quit, unchanged seven registrations per case and twelve empty private suite
+key sets have scoped proof. The completed current native matrix and exact limits
+are recorded in [Compute Cores](docs/COMPUTE-CORES.md).
 
 The historical October 1 Developer ID-signed Desktop candidate was
 `~/Desktop/Forge Conductor 0.16.3 (24)-a54100b-DeveloperID/Forge Conductor.app`,
@@ -55,14 +84,64 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The root version authorities, compiled protocol constants, all Xcode build
-configurations, and current repository documentation use `0.16.5 (26)`.
-The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki) uses
-the same current source identity and qualification boundaries. Installed-app
+configurations, and current repository documentation use `0.17.0 (27)`.
+The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)
+publication/readback/synchronization refs are retained externally. Installed-app
 references are dated qualification snapshots; the later publication readback
 found the prior `/Applications` app absent, as recorded in
 [qualification status](docs/QUALIFICATION-STATUS.md). Historical
 candidate receipts, including the `0.16.2 (23)` Developer ID record, retain the
 identity they actually tested.
+
+## Graphite Workbench
+
+The native interface uses a shared graphite palette across the main window,
+Settings, panels, fields, catalog rows and Metal telemetry. Provider inspection
+is separate from activation: select a row to inspect it, then use its explicit
+activation toggle. The main workspace opens without a global control bar.
+Open **Forge Conductor → Settings…** (**⌘,**) for **Workbench** preferences:
+navigation, telemetry updates and contextual guidance apply immediately.
+Six independent options can show Navigation, Auto-refresh, Guided Mode, Guide,
+Refresh or Guided Setup above the selected view. These shortcuts are off by
+default; Navigation, Telemetry and Guide menus retain the actions.
+Optional-control visibility and Guided Mode persist across relaunches;
+navigation visibility and Auto-refresh retain their existing session behavior.
+
+Manager has nine local sections: Workbench, Authorized Folders, Service, Runtime,
+Settings, Project Shell, Protected Filesystem, Maintenance and Doctor. Native
+Settings opens at Workbench; the main Manager entry opens at Authorized Folders.
+Workbench uses the shared guide and interface state without a Save/Reload
+footer. Configuration edits in the folder, settings and shell sections remain
+staged until **Save settings**; **Reload from disk** explicitly replaces them.
+Opening preferences or changing sections preserves those drafts. Settings uses
+a larger, scrollable workspace. Earlier native preference/menu and draft-preservation
+cases passed for their checkpoint inputs; Tools column geometry also passed at both sizes. Final
+current-input validation is recorded in the phase evidence.
+
+The dashboard retains all measurements and its combined **Compute Cores**
+panel. Existing Projects, Continuity, Rune Forge, Runtimes, Agents, Tools,
+Live Feed, Events & Evidence, Diagnostics, Guided Setup and help remain
+available. Current-source behavior takes precedence over decorative controls
+in the reference design. The [scope and evidence record](docs/GRAPHITE-WORKBENCH.md)
+tracks final visual review separately from implementation.
+
+## Compute Cores revision 2 — verified UI scope
+
+The CPU/GPU materials use the supplied reference and retain its detailed frames,
+grain and contacts. Bounded Metal lighting brightens and changes color with
+valid telemetry. Measured logical CPU activity, host fallback, aggregate GPU
+response, independent freshness, pause and native rendering failure remain
+distinct states.
+
+The signed ordinary Debug candidate matches source manifest 28548a73…; all four
+scoped workflows and actual Settings/normal Dashboard observations passed.
+The 116 distinct production tests, 21 native view methods and 463 reviewed
+images qualify the recorded UI scope. Exact owner publication, remote readback
+and synchronization references are retained externally. This phase performed
+no installation, notarization or distribution.
+[Graphite](docs/GRAPHITE-WORKBENCH.md), [Compute](docs/COMPUTE-CORES.md) and
+[native QA](docs/GRAPHITE-NATIVE-QA.md) retain exact artifacts, capture limits,
+unavailable proof classes and failed checkpoints.
 
 ## What Forge Conductor does
 
@@ -206,13 +285,14 @@ connection](docs/LM-STUDIO-CONNECTION.md).
 | **Rune Forge** | Development Policy selection and ordering, CLU violation delivery, per-project history, and log export |
 | **Continuity** | Scrollable project IDs plus first-class checkpoint/handoff rows, exact single/multi-packet Delete, Copy Project ID, Reset, and Clear Cache |
 | **Provider** | Provider selection, connection verification, provisioning, repair, removal, and advanced LM Studio configuration |
-| **Manager** | Process lifecycle, selected project roots, native shell policy, and filesystem service |
+| **Manager** | Local section navigation for process lifecycle, selected project roots, staged settings, native shell policy, protected filesystem, maintenance and doctor |
 | **Events & Evidence** | Bounded audit events and diagnostics with request, job, handoff, and connection identifiers; JSON and explicitly limited Markdown exports |
 
 The current source records sanitized error identity and returned execution details
 for failed tools. Diagnostic exports identify their selected history and disclose
-when the Markdown timeline omits earlier rows. The owner-installed 0.16.4 startup failure is recorded separately; 0.16.5 adds
-startup capture and export even when the graph cannot be constructed.
+when the Markdown timeline omits earlier rows. The owner-installed 0.16.4
+startup failure is recorded separately; the October 3 `0.16.5 (26)` correction
+added startup capture and export even when the graph cannot be constructed.
 
 ## Build and test
 

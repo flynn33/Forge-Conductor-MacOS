@@ -27,7 +27,7 @@ struct TelemetryDashboardView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.cyan.opacity(0.35), lineWidth: 1)
+                            .stroke(GraphitePalette.panelBorder, lineWidth: 1)
                     )
                 orchestrationSection
                 HStack(alignment: .top, spacing: 14) {
@@ -44,10 +44,10 @@ struct TelemetryDashboardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("TELEMETRY")
                     .font(.system(.title2, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color.cyan)
+                    .foregroundStyle(GraphitePalette.textPrimary)
                 Text(model.hostName)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
             Spacer(minLength: 16)
             statusPill(
@@ -88,14 +88,14 @@ struct TelemetryDashboardView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(displayValue)
                     .font(.system(.title, design: .monospaced).weight(.bold))
                     .foregroundStyle(displayTint)
                 Text(value == nil ? "" : unit)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -137,12 +137,12 @@ struct TelemetryDashboardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(GraphitePanelSurface())
     }
 
     private func orchCard(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption2).foregroundStyle(.secondary)
+            Text(title).font(.caption2).foregroundStyle(GraphitePalette.textSecondary)
             Text(value).font(.system(.body, design: .monospaced).weight(.semibold))
         }
         .padding(12)
@@ -155,7 +155,7 @@ struct TelemetryDashboardView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text("HOT PROCESSES").font(.headline)
             if procs.isEmpty {
-                Text("No matching processes").foregroundStyle(.secondary).font(.caption)
+                Text("No matching processes").foregroundStyle(GraphitePalette.textSecondary).font(.caption)
             } else {
                 ForEach(Array(procs.prefix(8).enumerated()), id: \.offset) { _, p in
                     HStack(spacing: 10) {
@@ -169,14 +169,14 @@ struct TelemetryDashboardView: View {
                             .font(.system(.caption, design: .monospaced))
                         Text(String(format: "%.2f GB", p.rssGB))
                             .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(GraphitePanelSurface())
     }
 
     private var storagePanel: some View {
@@ -186,7 +186,7 @@ struct TelemetryDashboardView: View {
             Text("STORAGE").font(.headline)
             Text(String(format: "IO %.1f MB/s (R %.1f / W %.1f)", io.totalMBs, io.readMBs, io.writeMBs))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
             ForEach(Array(disks.prefix(4).enumerated()), id: \.offset) { _, d in
                 HStack(spacing: 10) {
                     Text(d.mount)
@@ -199,7 +199,7 @@ struct TelemetryDashboardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(GraphitePanelSurface())
     }
 
     private func statusPill(text: String, tone: TelemetryStatusTone) -> some View {

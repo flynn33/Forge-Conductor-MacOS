@@ -4,8 +4,8 @@
 // model methods that own transactional configuration, reload, and verification.
 // Why: Connection side effects stay behind Core protocols instead of leaking into UI.
 
-import SwiftUI
 import ForgeConductorCore
+import SwiftUI
 
 /// Presents MCP server health and the transactional LM Studio deployment workflow.
 ///
@@ -15,93 +15,96 @@ struct MCPServersView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Text("LM Studio · MCP")
-                    .font(.title2.weight(.bold))
-                    .accessibilityIdentifier("detail-mcp")
-                Spacer(minLength: 12)
-                Text("\(model.mcpServerCards.filter(\.live).count) live · \(model.mcpServerCards.count) total")
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    Button("Deploy to LM Studio") {
-                        model.deployToLMStudio()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.isInstallingPlugin)
-                    .help("Transactionally configure primary + failover, reload LM Studio, and verify both hosted connections")
-                    .accessibilityIdentifier("mcp-deploy-lmstudio")
-
-                    Button("Refresh") {
-                        model.refreshLMStudioPluginStatus()
-                        model.refresh(force: true)
-                    }
-                    Button("Prune presence") { model.prunePresence() }
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            GraphitePageHeader(
+                title: "LM Studio · MCP",
+                subtitle: "\(model.mcpServerCards.filter(\.live).count) live · \(model.mcpServerCards.count) total"
+            )
+            .accessibilityIdentifier("detail-mcp")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { deploymentActions }
+                VStack(alignment: .leading, spacing: 10) { deploymentActions }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-
-            productFlowBanner
-                .padding(.horizontal, 16)
-
-            pluginStatusBanner
-                .padding(.horizontal, 16)
-
-            if model.mcpServerCards.isEmpty {
-                ContentUnavailableView(
-                    "No LM Studio MCP activity yet",
-                    systemImage: "server.rack",
-                    description: Text(
-                        "Click Deploy to LM Studio. Forge writes and validates all required configuration, reloads LM Studio, and verifies both hosted connections automatically."
-                    )
-                )
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
-                        ForEach(model.mcpServerCards) { s in
-                            serverCard(s)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    pluginStatusBanner
+                    if model.mcpServerCards.isEmpty {
+                        GraphitePanel {
+                            ContentUnavailableView(
+                                "No LM Studio MCP activity yet",
+                                systemImage: "server.rack",
+                                description: Text(
+                                    "Click Deploy to LM Studio. Forge writes and validates all required configuration, reloads LM Studio, and verifies both hosted connections automatically."
+                                )
+                            )
+                        }
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 14)], spacing: 14) {
+                            ForEach(model.mcpServerCards) { server in serverCard(server) }
                         }
                     }
-                    .padding(16)
+                    productFlowBanner
                 }
             }
         }
-        .onAppear {
+        .padding(20)
+        .background(GraphitePalette.canvas)
+        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+        .onAppear { model.refreshLMStudioPluginStatus() }
+    }
+
+    @ViewBuilder
+    private var deploymentActions: some View {
+        Button("Deploy to LM Studio") { model.deployToLMStudio() }
+            .buttonStyle(GraphiteButtonStyle(kind: .primary))
+            .disabled(model.isInstallingPlugin)
+            .help("Transactionally configure primary + failover, reload LM Studio, and verify both hosted connections")
+            .accessibilityIdentifier("mcp-deploy-lmstudio")
+        Button("Refresh") {
             model.refreshLMStudioPluginStatus()
+            model.refresh(force: true)
         }
+        Button("Prune presence") { model.prunePresence() }
     }
 
     private var productFlowBanner: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Product flow")
-                .font(.caption.weight(.semibold))
-            Text("Install LM Studio → Install Forge Conductor → Deploy to LM Studio (this button) → Use tools / agents.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Deploy owns the complete operation: it writes main + failover configuration, triggers hot reload (or relaunches LM Studio), verifies LM Studio synchronized the exact revision, and independently checks both tool servers.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        GraphitePanel(title: "Deployment workflow") {
+            Text(
+                "Install LM Studio → Install Forge Conductor → Deploy to LM Studio (this button) → Use tools / agents."
+            )
+            .font(.callout)
+            .lineSpacing(2)
+            .foregroundStyle(GraphitePalette.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 760, alignment: .leading)
+            Text(
+                "Deploy owns the complete operation: it writes main + failover configuration, triggers hot reload (or relaunches LM Studio), verifies LM Studio synchronized the exact revision, and independently checks both tool servers."
+            )
+            .font(.callout)
+            .lineSpacing(2)
+            .foregroundStyle(GraphitePalette.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 760, alignment: .leading)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.accentColor.opacity(0.08))
-        )
     }
 
     @ViewBuilder
     private var pluginStatusBanner: some View {
         let st = model.lmStudioPluginStatus
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Image(systemName: st?.isFullyInstalled == true ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(st?.isFullyInstalled == true ? Color.green : Color.orange)
-                Text(st?.isFullyInstalled == true ? "LM Studio connection deployed" : "Not fully deployed to LM Studio")
-                    .font(.headline)
+        GraphitePanel {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(
+                    systemName: st?.isFullyInstalled == true ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(st?.isFullyInstalled == true ? GraphitePalette.success : GraphitePalette.warning)
+                Text(
+                    st == nil
+                        ? "Checking LM Studio deployment"
+                        : (st?.isFullyInstalled == true
+                            ? "LM Studio connection deployed" : "Not fully deployed to LM Studio")
+                )
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if model.isInstallingPlugin {
                     ProgressView()
@@ -109,108 +112,116 @@ struct MCPServersView: View {
                 }
             }
             Text(st?.detail ?? "Checking deploy status…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.callout)
+                .lineSpacing(2)
+                .foregroundStyle(GraphitePalette.textSecondary)
                 .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 760, alignment: .leading)
             if let msg = model.lmStudioPluginMessage, !msg.isEmpty {
                 Text(msg)
-                    .font(.caption)
-                    .foregroundStyle(.primary)
+                    .font(.callout)
+                    .lineSpacing(2)
+                    .foregroundStyle(GraphitePalette.textPrimary)
                     .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 760, alignment: .leading)
             }
-            HStack(spacing: 16) {
-                labeledBit("main (primary)", st?.primaryPluginInstalled == true)
-                labeledBit("failover", st?.fallbackPluginInstalled == true)
-                labeledBit("mcp.json", st?.mcpJSONRegistered == true)
-                labeledBit("serve binary", st?.binaryExecutable == true)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 135), spacing: 10)], alignment: .leading, spacing: 8) {
+                labeledBit("main (primary)", st?.primaryPluginInstalled)
+                labeledBit("failover", st?.fallbackPluginInstalled)
+                labeledBit("mcp.json", st?.mcpJSONRegistered)
+                labeledBit("serve binary", st?.binaryExecutable)
             }
-            .font(.caption2)
+            .font(.caption)
             if let path = st?.binaryPath {
                 Text("Serve binary: \(path)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineSpacing(2)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .textSelection(.enabled)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text("No manual file editing or LM Studio restart is required. A deployment may relaunch LM Studio when hot reload cannot replace a stale plugin process; plugin selection remains a per-chat LM Studio choice.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Text(
+                "No manual file editing or LM Studio restart is required. A deployment may relaunch LM Studio when hot reload cannot replace a stale plugin process; plugin selection remains a per-chat LM Studio choice."
+            )
+            .font(.callout)
+            .lineSpacing(2)
+            .foregroundStyle(GraphitePalette.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 760, alignment: .leading)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(
-                    (st?.isFullyInstalled == true ? Color.green : Color.orange).opacity(0.35),
-                    lineWidth: 1
-                )
-        )
     }
 
-    private func labeledBit(_ title: String, _ ok: Bool) -> some View {
+    private func labeledBit(_ title: String, _ ok: Bool?) -> some View {
         HStack(spacing: 4) {
             Circle()
-                .fill(ok ? Color.green : Color.red.opacity(0.7))
+                .fill(
+                    ok == true
+                        ? GraphitePalette.success : (ok == false ? GraphitePalette.warning : GraphitePalette.textMuted)
+                )
                 .frame(width: 7, height: 7)
             Text(title)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
+            Text(ok.map { $0 ? "yes" : "no" } ?? "pending")
+                .foregroundStyle(GraphitePalette.textSecondary)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func serverCard(_ s: MCPServerCard) -> some View {
         let tone = TelemetryHealth.tone(for: s.health)
         let color = tone.color
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(serverDisplayName(s))
-                    .font(.headline)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(s.healthLabel)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(color)
+        return GraphitePanel {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(serverDisplayName(s))
+                        .font(.headline)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 8)
+                    Text(s.healthLabel)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(color)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(serverDisplayName(s))
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(s.healthLabel)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(color)
+                }
             }
             Text("\(s.hostKind) · \(s.status)")
                 .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
+                .foregroundStyle(GraphitePalette.textSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("pid \(s.pid.map(String.init) ?? "—")")
                     .font(.system(.caption, design: .monospaced))
                 Spacer(minLength: 8)
                 Text(s.source)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
             if !s.healthReason.isEmpty {
                 Text(s.healthReason)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .font(.callout)
+                    .lineSpacing(2)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 5) {
                 Circle()
                     .fill(color)
                     .frame(width: 8, height: 8)
                 Text(s.live ? "live process" : (s.health == "config" ? "configured · starts on demand" : "not running"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(color.opacity(0.35), lineWidth: 1)
-        )
         .accessibilityElement(children: .combine)
         .accessibilityValue(tone.rawValue)
     }

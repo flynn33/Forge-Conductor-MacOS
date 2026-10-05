@@ -1,5 +1,20 @@
 # Telemetry architecture (real-time native)
 
+**UI implementation and QA complete.** Current
+0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
+successful executions**, with zero failures/skips. The separate native view
+matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
+were individually opened and reviewed. The 15-check/434-input audit, matching
+signed Debug build and four scoped ordinary workflows passed. Historical
+failures and superseded inputs remain separate. Native caches, genuine Metal
+readbacks and ordinary observations retain their explicit limits; no
+installation, notarization, App Store upload or distribution was performed.
+Exact owner publication/readback/synchronization refs are retained externally.
+
+Current Graphite/Compute implementation/native QA/checks are complete; exact owner publication/readback/synchronization refs are retained externally. The operating contracts below
+remain in force; exact current and historical evidence is separated in
+[Graphite Workbench](GRAPHITE-WORKBENCH.md) and [Compute Cores](COMPUTE-CORES.md).
+
 ## Product model
 
 Telemetry is a **continuous native stream**, not a multi-second snapshot poll.
@@ -11,6 +26,37 @@ Telemetry is a **continuous native stream**, not a multi-second snapshot poll.
 | Native GUI | Receives bounded latest-value delivery; Metal gauges draw on demand, stop while hidden/detached, and resume with the latest values |
 | Web UI (`telemetry/static`) | Primary: `EventSource /api/stream?hz=20`; fallback: `/api/live` only if stream stalls |
 | HTTP current frame | `GET /api/live` (alias `/api/snapshot`) returns the **current** live frame for tools/compat |
+
+The added Graphite review scope calls for CPU/RAM/GPU/disk sparklines, shaded
+fills and static luminous material matching the selected reference. Existing
+values/units, missing-sample gaps, retained-history bounds, shared rendering
+resources and demand drawing are retained. Seven changed-geometry cases and
+four production native lifecycle cases passed. Earlier checkpoint Dashboard/
+lower-row native pixel review and 100-cycle navigation passed in
+[Graphite Workbench](GRAPHITE-WORKBENCH.md).
+Earlier telemetry receipts do not qualify these newer presentation inputs.
+
+## Compute Cores revision 2 — verified current scope
+
+Current Compute uses one exact reference PNG, two cached native CPU/GPU crops,
+two immutable Metal textures and one sampler. Runtime logical CPU samples or
+explicit host-average fallback drive bounded local regions; aggregate GPU
+activity drives illustrative regions without measured-core claims. Source
+registry/time/quality and stale/zero/missing semantics remain independent.
+Trace travel is simulated, bounded and quiescent when hidden/paused.
+
+Current Compute 29, regression 68, proper canonical Provider 33 and fresh
+Core 8/H0/G1 checks passed: 116 distinct production tests in 140 successful
+executions. The separate 21-method/22-invocation native view matrix passed with
+463 reviewed PNGs. All 68 Compute layers, the verified 20-frame MOV, strict
+signed candidate/library packaging and four scoped ordinary workflows passed.
+Actual normal Dashboard/Pause/Resume and Settings/preferences/restoration
+complement native fixtures. Detailed resource/lifecycle measurements and
+capture limits are in [Compute Cores](COMPUTE-CORES.md) and
+[native QA](GRAPHITE-NATIVE-QA.md); no universal renderer-exclusive CPU cost,
+installed-product, whole-window MOV or unavailable 1× claim is made. Exact owner
+publication/readback/synchronization refs are retained externally; the operating
+telemetry invariants below remain in force.
 
 ## Endpoints
 
@@ -102,20 +148,32 @@ That global newest feed and Dashboard's exact project/generation feed are bounde
 responses through a strict 4 MiB ceiling and cancel on overflow. Both preserve
 Stjornarvald's non-interference boundary.
 
-At normal widths, the **COMPUTE CORES** frame combines CPU logical-core bars
-with GPU core topology and engine telemetry. Intrinsic Grid rows also align
+The existing **COMPUTE CORES** frame now contains the source-integrated CPU/GPU
+chip presentation, with native host labels and provenance. All 68 current
+Compute layers and the normal/minimum Dashboard integration layers were
+reviewed with explicit cache/drawable limits. Intrinsic Grid rows also align
 Storage/Managed Activity, MCP servers/tools, and agents/processes. Managed
 Activity scrolls within a compact 130-point region, and constrained widths
 stack the instrumentation panels instead of clipping them.
 
-The title bar exposes **Guided Setup**, an eight-step state-aware wizard for
+Workbench Settings and the Guide menu expose **Guided Setup** for the
+eight-step state-aware wizard covering
 Manager readiness, provider connection, project registration, instruction
 ordering, automation review, run start, monitoring, and recovery. It reads the
 same bounded operational snapshot to recommend the next required step; it does
-not introduce another telemetry or render loop. The wizard opens only from its
-explicit Dashboard/title-bar controls and never covers the app at launch.
+not introduce another telemetry or render loop. The wizard opens on explicit
+request and never covers the app at launch. Its optional view control appears
+only after enablement in Workbench Settings. Navigation visibility and telemetry
+updates are also available in Settings; existing Navigation and Telemetry menus
+retain their shortcuts. The current native matrix and scoped ordinary Settings
+workflow verified opt-in controls, draft preservation, persistence and
+restoration; their exact evidence boundaries remain in the phase record.
 
 ## Qualification boundary
+
+The earlier qualifications below retain their original source/runtime scopes.
+They do not replace the current production counts and four manual ordinary
+workflows recorded above.
 
 Telemetry contract and stream tests qualify only this subsystem. The retained
 Apple Development installed-app qualifier passed bounded shell app/manager
@@ -137,6 +195,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.16.5`
+`0.17.0`
 
-Build: `26`
+Build: `27`

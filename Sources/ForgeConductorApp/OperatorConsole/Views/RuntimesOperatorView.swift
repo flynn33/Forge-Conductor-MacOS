@@ -13,87 +13,96 @@ struct RuntimesOperatorView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $viewModel.selectedJobID) {
-                Section("Active and recent jobs") {
-                    ForEach(viewModel.jobs) { job in
-                        HStack(spacing: 10) {
-                            Image(systemName: "terminal")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 16)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(job.commandSummary).lineLimit(1)
-                                Text("\(job.runtimeKind) · \(job.state)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: 12) {
+            OperatorHeader(
+                title: "Runtimes",
+                subtitle: "Programs needed by the selected task and the results of its durable jobs",
+                isLoading: viewModel.isLoading,
+                titleAccessibilityIdentifier: "detail-runtimes",
+                subtitleAccessibilityIdentifier: "runtimes-operator-view",
+                onRefresh: viewModel.load
+            )
+            if let error = viewModel.errorMessage {
+                OperatorErrorBanner(message: error, retry: viewModel.load)
+            }
+            if let notice = viewModel.notice {
+                OperatorNoticeBanner(message: notice)
+            }
+            HSplitView {
+                List(selection: $viewModel.selectedJobID) {
+                    Section("Active and recent jobs") {
+                        ForEach(viewModel.jobs) { job in
+                            HStack(spacing: 10) {
+                                Image(systemName: "terminal")
+                                    .foregroundStyle(GraphitePalette.textSecondary)
+                                    .frame(width: 16)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(job.commandSummary).lineLimit(1)
+                                    Text("\(job.runtimeKind) · \(job.state)")
+                                        .font(.caption)
+                                        .foregroundStyle(GraphitePalette.textSecondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            .tag(job.jobID)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("runtime-job-row-\(job.jobID)")
+                        }
+                    }
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+                .background(GraphitePalette.sidebar)
+                .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        taskRequirements
+                        if let job = viewModel.selectedJob {
+                            jobDetail(job)
+                        } else if !viewModel.jobs.isEmpty {
+                            Text("Select a job to inspect its durable output and exit state.")
+                                .foregroundStyle(GraphitePalette.textSecondary)
+                        } else {
+                            GraphitePanel(title: "Jobs") {
+                                Text("No active or recent runtime jobs were published.")
+                                    .foregroundStyle(GraphitePalette.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
-                        .tag(job.jobID)
-                        .accessibilityIdentifier("runtime-job-row-\(job.jobID)")
-                    }
-                }
-            }
-            .listStyle(.sidebar)
-        } detail: {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    OperatorHeader(
-                        title: "Runtimes",
-                        subtitle: "Programs needed by the selected task and the results of its durable jobs",
-                        isLoading: viewModel.isLoading,
-                        titleAccessibilityIdentifier: "detail-runtimes",
-                        subtitleAccessibilityIdentifier: "runtimes-operator-view",
-                        onRefresh: viewModel.load
-                    )
-                    if let error = viewModel.errorMessage {
-                        OperatorErrorBanner(message: error, retry: viewModel.load)
-                    }
-                    if let notice = viewModel.notice {
-                        OperatorNoticeBanner(message: notice)
-                    }
-                    taskRequirements
-                    Button {
-                        showingAdvancedSettings.toggle()
-                    } label: {
-                        Label(
-                            "Advanced runtime settings",
-                            systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("runtime-advanced-toggle")
-                    if showingAdvancedSettings {
-                        VStack(alignment: .leading, spacing: 16) {
-                            shellPolicy
-                            capabilityList
-                            runtimePolicy
+                        Button {
+                            showingAdvancedSettings.toggle()
+                        } label: {
+                            Label(
+                                "Advanced runtime settings",
+                                systemImage: showingAdvancedSettings ? "chevron.down" : "chevron.right"
+                            )
                         }
-                        .padding(.top, 8)
-                    }
-                    if let job = viewModel.selectedJob {
-                        jobDetail(job)
-                    } else if !viewModel.jobs.isEmpty {
-                        Text("Select a job to inspect its durable output and exit state.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        GroupBox("Jobs") {
-                            Text("No active or recent runtime jobs were published.")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+                        .accessibilityIdentifier("runtime-advanced-toggle")
+                        if showingAdvancedSettings {
+                            VStack(alignment: .leading, spacing: 16) {
+                                shellPolicy
+                                capabilityList
+                                runtimePolicy
+                            }
+                            .padding(.top, 8)
                         }
                     }
+                    .padding(16)
                 }
-                .padding(20)
+                .background(GraphitePalette.canvas)
+                .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationSplitViewStyle(.balanced)
+        .padding(20)
+        .background(GraphitePalette.canvas)
         .task { viewModel.load() }
         .guidedHelpState(viewModel.guidedHelpState, for: .runtimes)
     }
 
     private var shellPolicy: some View {
-        GroupBox("Application-wide shell policy") {
+        GraphitePanel(title: "Application-wide shell policy") {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(
                     "Shell enabled",
@@ -116,25 +125,27 @@ struct RuntimesOperatorView: View {
     }
 
     private var taskRequirements: some View {
-        GroupBox("Runtimes for the selected task") {
+        GraphitePanel(title: "Runtimes for the selected task") {
             VStack(alignment: .leading, spacing: 10) {
                 if let taskID = viewModel.runtimePolicy?.selectedTaskID {
                     LabeledContent("Task") { OperatorIdentifier(taskID) }
                 } else {
                     Text("No task runtime is selected. Missing optional runtimes do not block LM Studio chat work.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 ForEach(viewModel.runtimePolicy?.requirements ?? [], id: \.runtime) { item in
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(runtimeName(item.runtime))
                             Text(item.reason)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 13))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                             if let action = item.recoveryAction {
                                 Text(action)
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
+                                    .font(.system(size: 13))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .foregroundStyle(GraphitePalette.warning)
                             }
                         }
                         Spacer()
@@ -146,10 +157,11 @@ struct RuntimesOperatorView: View {
                 }
             }
         }
+        .accessibilityIdentifier("runtime-task-requirements")
     }
 
     private var capabilityList: some View {
-        GroupBox("Runtime capabilities") {
+        GraphitePanel(title: "Runtime capabilities") {
             VStack(alignment: .leading, spacing: 9) {
                 runtimeCapability("Direct process", id: "direct", capability: viewModel.runtimePolicy?.direct)
                 runtimeCapability("zsh", id: "zsh", capability: viewModel.runtimePolicy?.zsh)
@@ -158,10 +170,11 @@ struct RuntimesOperatorView: View {
                 runtimeCapability("PowerShell", id: "powershell", capability: viewModel.runtimePolicy?.powershell)
             }
         }
+        .accessibilityIdentifier("runtime-capabilities-panel")
     }
 
     private var runtimePolicy: some View {
-        GroupBox("Execution limits") {
+        GraphitePanel(title: "Execution limits") {
             VStack(alignment: .leading, spacing: 8) {
                 LabeledContent("Job concurrency", value: viewModel.runtimePolicy.map { "\($0.maximumConcurrentJobs)" } ?? "Unavailable")
                 LabeledContent("Default timeout", value: viewModel.runtimePolicy.map { "\($0.defaultTimeoutSeconds)s" } ?? "Unavailable")
@@ -170,12 +183,21 @@ struct RuntimesOperatorView: View {
                 LabeledContent("Network policy", value: viewModel.runtimePolicy?.networkPolicy ?? "Unavailable")
             }
         }
+        .accessibilityIdentifier("runtime-execution-limits")
     }
 
     private func jobDetail(_ job: OperatorRuntimeJob) -> some View {
-        GroupBox {
+        GraphitePanel {
+            HStack {
+                Text("Selected job").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                GuidedHelpButton(context: .runtimeJob)
+            }
+            Divider()
             VStack(alignment: .leading, spacing: 9) {
                 LabeledContent("State") { OperatorStateBadge(state: job.state) }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("State")
                     .accessibilityIdentifier("runtime-job-state")
                 LabeledContent("Purpose", value: job.commandSummary)
                 LabeledContent("Result", value: jobResult(job))
@@ -193,12 +215,14 @@ struct RuntimesOperatorView: View {
                     }
                     .padding(.top, 6)
                 }
+                .accessibilityIdentifier("runtime-job-technical-details")
                 if let error = job.errorSummary {
-                    Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                    Text(error).font(.caption).foregroundStyle(GraphitePalette.failure).textSelection(.enabled)
                 }
                 Button("Cancel Job", role: .destructive) {
                     viewModel.cancelSelectedJob()
                 }
+                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                     .disabled(!viewModel.canCancelSelectedJob)
                     .help(
                         viewModel.canCancelSelectedJob
@@ -206,12 +230,6 @@ struct RuntimesOperatorView: View {
                             : "Only queued or running jobs can be cancelled."
                     )
                     .accessibilityIdentifier("runtime-job-cancel")
-            }
-        } label: {
-            HStack {
-                Text("Selected job")
-                Spacer()
-                GuidedHelpButton(context: .runtimeJob)
             }
         }
     }
@@ -226,16 +244,17 @@ struct RuntimesOperatorView: View {
                 Text(label)
                 Text(capability?.path ?? "Executable path unavailable")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                     .lineLimit(1)
                     .textSelection(.enabled)
                 Text(capability?.version ?? "Version unavailable")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
             Spacer()
             OperatorStateBadge(state: capability?.status.rawValue ?? "unknown")
         }
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("runtime-capability-\(id)")
     }
 

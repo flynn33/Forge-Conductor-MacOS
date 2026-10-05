@@ -8,7 +8,12 @@ struct ToolPermissionEditor: View {
     @ObservedObject var viewModel: AutonomyViewModel
 
     var body: some View {
-        GroupBox {
+        GraphitePanel {
+            HStack {
+                Text("Task capabilities").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                GuidedHelpButton(context: .instructionQueue)
+            }
             if let permissions = viewModel.toolPermissions {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack(spacing: 12) {
@@ -34,11 +39,11 @@ struct ToolPermissionEditor: View {
                         .accessibilityIdentifier("run-tools-restore-recommended")
                     }
                     TextField("Search capabilities", text: $viewModel.toolSearch)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(GraphiteFieldStyle())
                         .accessibilityIdentifier("run-tools-search")
                     Text("\(permissions.effectiveCount) granted · \(permissions.availableCount) available · saved for this project")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                         .accessibilityIdentifier("run-tools-selection-count")
 
                     ScrollView {
@@ -82,19 +87,19 @@ struct ToolPermissionEditor: View {
                                                 if tool.highImpact {
                                                     Text("Higher impact")
                                                         .font(.caption2)
-                                                        .foregroundStyle(.orange)
+                                                        .foregroundStyle(GraphitePalette.warning)
                                                 }
                                             }
                                             Text(tool.description)
                                                 .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                                .foregroundStyle(GraphitePalette.textSecondary)
                                             Text(tool.id)
                                                 .font(.caption2.monospaced())
-                                                .foregroundStyle(.tertiary)
+                                                .foregroundStyle(GraphitePalette.textMuted)
                                             if let reason = tool.unavailableReason {
                                                 Text(reason)
                                                     .font(.caption2)
-                                                    .foregroundStyle(.orange)
+                                                    .foregroundStyle(GraphitePalette.warning)
                                             }
                                         }
                                         .padding(.leading, 20)
@@ -110,17 +115,12 @@ struct ToolPermissionEditor: View {
                     ProgressView().controlSize(.small)
                     Text("Loading the registered capability catalog for this project…")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 .accessibilityIdentifier("run-tools-loading")
             }
-        } label: {
-            HStack {
-                Text("Task capabilities")
-                Spacer()
-                GuidedHelpButton(context: .instructionQueue)
-            }
         }
+        .graphiteWorkbench()
     }
 }
 

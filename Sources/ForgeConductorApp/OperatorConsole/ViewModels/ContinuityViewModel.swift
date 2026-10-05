@@ -91,6 +91,7 @@ final class ContinuityViewModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
+                guard !Task.isCancelled else { return }
                 commandErrorMessage = error.localizedDescription
             }
             isLoadingPackets = false

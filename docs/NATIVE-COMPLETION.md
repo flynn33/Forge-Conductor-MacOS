@@ -1,10 +1,19 @@
 # Completion evidence and instruction-package requirements
 
-Current source identity: **0.16.5, build 26**.
+Current source identity: **0.17.0, build 27**.
+
+This document records the retained Manager completion-plan contract and inherited
+GUI guidance. The current main window and Projects view have no live **Run
+Details → Start Task** caller. The selections below describe that unrouted
+compatibility surface and its protocol semantics, not a current GUI entry
+point. The ordinary user workflow starts in the LM Studio chat interface; see
+the [user guide](../USER-GUIDE.md). The six checks and compatible Manager APIs
+remain distinct from this presentation boundary.
 
 Completion is owned by two explicit sources:
 
-1. Forge's built-in evidence checkboxes, selected in **Projects → Run Details → Start Task**.
+1. Forge's built-in evidence checkboxes, historically selected in
+   **Projects → Run Details → Start Task**.
 2. Additional requirements declared by the exact instruction package bound to
    the run.
 
@@ -14,7 +23,7 @@ recognized built-in checks.
 
 ## Built-in completion checks
 
-The native Project Runs sheet exposes six selectable checks:
+The inherited Project Runs selection surface defines six built-in checks:
 
 - **Buildable project**
 - **No build errors**
@@ -79,6 +88,6 @@ Connect and Check** and resume the retained task when the provider is ready.
 - Completion history and evidence references remain project/run scoped.
 
 The root `VERSION`, `BUILD_NUMBER`, Xcode build settings, protocol constants,
-and version assertions use `0.16.5 (26)`. Source and deterministic test evidence
+and version assertions use `0.17.0 (27)`. Source and deterministic test evidence
 do not by themselves qualify an installed app, Developer ID artifact,
 notarization, Gatekeeper acceptance, or shipment.

@@ -1,17 +1,32 @@
 // MetalLoadChart.swift
-// What: Adapts the single-series load renderer to SwiftUI.
-// How: NSViewRepresentable creates an MTKView, assigns its coordinator, and
-// forwards new sample arrays without rebuilding the native view.
-// Why: The adapter isolates AppKit/Metal lifecycle details from dashboard composition.
+// One native Metal surface presents a trace and its optional current fraction.
 
 import SwiftUI
 import MetalKit
 import ForgeConductorCore
 
-/// SwiftUI wrapper around an MTKView that draws the load history with Metal.
 struct MetalLoadChart: NSViewRepresentable {
-    var samples: [Float]
-    var surfaceDiagnostics: RuntimeDiagnostics? = nil
+    var optionalSamples: [Float?]
+    var tint: Color
+    var maximumValue: Float
+    var fraction: Double?
+    var surfaceDiagnostics: RuntimeDiagnostics?
+
+    init(samples: [Float], surfaceDiagnostics: RuntimeDiagnostics? = nil) {
+        self.init(optionalSamples: samples.map(Optional.some), surfaceDiagnostics: surfaceDiagnostics)
+    }
+
+    init(
+        optionalSamples: [Float?], tint: Color = GraphitePalette.chartCPU,
+        maximumValue: Float = 100, fraction: Double? = nil,
+        surfaceDiagnostics: RuntimeDiagnostics? = nil
+    ) {
+        self.optionalSamples = optionalSamples
+        self.tint = tint
+        self.maximumValue = maximumValue
+        self.fraction = fraction
+        self.surfaceDiagnostics = surfaceDiagnostics
+    }
 
     func makeCoordinator() -> LoadTraceRenderer {
         LoadTraceRenderer(surfaceDiagnostics: surfaceDiagnostics)
@@ -20,12 +35,17 @@ struct MetalLoadChart: NSViewRepresentable {
     func makeNSView(context: Context) -> MTKView {
         let view = GaugeMetalView()
         context.coordinator.attach(to: view)
-        context.coordinator.update(samples: samples)
+        update(context.coordinator)
         return view
     }
 
     func updateNSView(_ nsView: MTKView, context: Context) {
-        context.coordinator.update(samples: samples)
+        update(context.coordinator)
+    }
+
+    private func update(_ renderer: LoadTraceRenderer) {
+        renderer.update(optionalSamples: optionalSamples, color: MetalGaugePalette.from(swiftUI: tint),
+                        maximumValue: maximumValue, fraction: fraction)
     }
 
     static func dismantleNSView(_ nsView: MTKView, coordinator: LoadTraceRenderer) {

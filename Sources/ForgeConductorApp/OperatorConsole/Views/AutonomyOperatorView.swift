@@ -24,24 +24,32 @@ struct AutonomyOperatorView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $viewModel.selectedRunID) {
+                Text("Project runs")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(GraphitePalette.textPrimary)
+                    .padding(.vertical, 8)
                 ForEach(viewModel.runs) { run in
                     HStack(spacing: 10) {
                         Image(systemName: "bolt.horizontal.circle")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.info)
                             .frame(width: 16)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(run.mission).lineLimit(1)
                             Text(OperatorRunStatePresentation.displayName(run.state))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .lineLimit(1)
                         }
                     }
+                    .padding(.vertical, 4)
                     .tag(run.runID)
                     .accessibilityIdentifier("autonomy-run-row-\(run.runID)")
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(GraphitePalette.sidebar)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
         } detail: {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -70,12 +78,12 @@ struct AutonomyOperatorView: View {
                     if viewModel.projects.isEmpty {
                         Text("Register a repository in Projects before starting a managed run. The manager itself starts with the app; its lifecycle controls are in Manager.")
                             .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                             .accessibilityIdentifier("autonomy-project-prerequisite")
                     } else if let prerequisite = viewModel.providerPrerequisiteMessage {
                         Text(prerequisite)
                             .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                             .accessibilityIdentifier("autonomy-provider-prerequisite")
                     }
 
@@ -92,6 +100,7 @@ struct AutonomyOperatorView: View {
                 }
                 .padding(20)
             }
+            .background(GraphitePalette.canvas)
         }
         .navigationSplitViewStyle(.balanced)
         .alert(
@@ -148,11 +157,16 @@ struct AutonomyOperatorView: View {
                     )
                     Text("Forge checkpoints and rolls this task into a successor session when supported; no handoff identifiers are required.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
             }
 
-            GroupBox {
+            GraphitePanel {
+                HStack {
+                    Text("Completion evidence").font(.system(size: 15, weight: .semibold))
+                    Spacer()
+                    GuidedHelpButton(context: .instructionQueue)
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     if let plan = run.completionPlan, !plan.obligations.isEmpty {
                         ForEach(plan.obligations) { obligation in
@@ -163,16 +177,16 @@ struct AutonomyOperatorView: View {
                                         ? "checkmark.circle.fill" : "circle"
                                 )
                                 .foregroundStyle(
-                                    completionPassed(obligation, run: run) ? .green : .secondary
+                                    completionPassed(obligation, run: run) ? GraphitePalette.success : GraphitePalette.textSecondary
                                 )
                                 Text(obligation.reason)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                             }
                         }
                     } else if run.completionGates.isEmpty {
                         Text("No completion requirements were published.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     } else {
                         ForEach(run.completionGates, id: \.self) { requirement in
                             Label(
@@ -181,20 +195,14 @@ struct AutonomyOperatorView: View {
                                     ? "checkmark.circle.fill" : "circle"
                             )
                             .foregroundStyle(
-                                run.passedGates.contains(requirement) ? .green : .secondary
+                                run.passedGates.contains(requirement) ? GraphitePalette.success : GraphitePalette.textSecondary
                             )
                         }
                     }
                     Text("This is a read-only record of the task's completion requirements. Forge evaluates the selected built-in checks automatically; any additional requirement comes from the instruction package.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                         .accessibilityIdentifier("run-completion-requirements-read-only")
-                }
-            } label: {
-                HStack {
-                    Text("Completion evidence")
-                    Spacer()
-                    GuidedHelpButton(context: .instructionQueue)
                 }
             }
 
@@ -221,42 +229,42 @@ struct AutonomyOperatorView: View {
                         if isProviderFailure(run) {
                             Text("Choose Connect and Check in Provider. Forge keeps the durable run state and resumes the exact retained operation automatically when the provider is ready.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-provider-connect-and-check-guidance")
                             Button("Open Provider", action: onOpenProvider)
                                 .accessibilityIdentifier("run-failure-open-provider")
                         } else if run.lastErrorCode == AutonomyError.completionValidationFailed.code {
                             Text("Review the unmet requirement in Completion evidence. Built-in checks are evaluated by Forge, and instruction-package requirements remain owned by that package.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                             Text("Forge preserves and re-evaluates the saved completion request automatically. If project output must change, correct it and choose Retry when that control is available.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-failure-automatic-recheck")
                         } else if run.state == "blocked_configuration" {
                             Text("Forge retained this older task and automatic recovery is already in progress. No configuration step is required; Refresh Run reads the latest durable state.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-blocked-automatic-recovery")
                         } else if automaticallyWaiting(run) {
                             Text("Forge retained this task and will continue automatically when the named dependency or retry time is ready. Use Refresh Run to read the latest durable state.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-waiting-fallback-guidance")
                         } else if run.state == "failed_recoverable" {
                             Text("The task state is preserved. Correct the condition shown above, then choose Retry to continue from that saved state.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-recoverable-fallback-guidance")
                         } else if run.state == "failed_terminal" {
                             Text("This task cannot continue. Review Technical details and the Dashboard activity feed, correct the underlying project or instruction-package issue, then start a new task.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-terminal-fallback-guidance")
                         } else {
                             Text("Review the exact state and Technical details, correct the named condition, then choose Retry when that control is available. The saved task remains intact.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(GraphitePalette.textSecondary)
                                 .accessibilityIdentifier("run-generic-fallback-guidance")
                         }
                     }
@@ -269,20 +277,25 @@ struct AutonomyOperatorView: View {
                 spacing: 8
             ) {
                 Button("Pause") { viewModel.control(.pause) }
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                     .accessibilityIdentifier("run-pause")
                     .disabled(!viewModel.canControl(.pause, run: run))
                 Button("Resume") { viewModel.control(.resume) }
+                    .buttonStyle(GraphiteButtonStyle(kind: .primary))
                     .accessibilityIdentifier("run-resume")
                     .disabled(!viewModel.canControl(.resume, run: run))
                 Button("Cancel", role: .destructive) { showingCancelConfirmation = true }
+                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                     .accessibilityIdentifier("run-cancel")
                     .disabled(!viewModel.canControl(.cancel, run: run))
                 Button("Retry") { viewModel.control(.retry) }
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                     .accessibilityIdentifier("run-retry")
                     .disabled(!viewModel.canControl(.retry, run: run))
                 Button("Delete Task…", role: .destructive) {
                     showingDeleteConfirmation = true
                 }
+                .buttonStyle(GraphiteButtonStyle(kind: .destructive))
                 .accessibilityIdentifier("run-delete")
                 .disabled(!viewModel.canDelete(run))
                 if let action = viewModel.controlInFlight {
@@ -296,11 +309,12 @@ struct AutonomyOperatorView: View {
                         .accessibilityLabel("Deleting settled task")
                 }
                 Button("Refresh Run", action: viewModel.refreshSelectedRun)
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                     .disabled(viewModel.controlInFlight != nil)
             }
             Text("Commands are persisted by the manager. The GUI never mutates run state locally.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(GraphitePalette.textSecondary)
                 .accessibilityIdentifier("run-controls-authority")
 
             DisclosureGroup("Technical details") {

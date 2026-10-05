@@ -12,10 +12,10 @@ import ForgeConductorCore
 extension TelemetryStatusTone {
     var color: Color {
         switch self {
-        case .healthy: .green
-        case .caution: .yellow
-        case .failure: .red
-        case .informational: .cyan
+        case .healthy: GraphitePalette.success
+        case .caution: GraphitePalette.warning
+        case .failure: GraphitePalette.failure
+        case .informational: GraphitePalette.info
         case .unavailable: .secondary
         }
     }
@@ -24,12 +24,19 @@ extension TelemetryStatusTone {
 // MARK: - Shared shader + types
 
 enum MetalGaugePalette {
-    static let cyan = SIMD4<Float>(0.09, 0.94, 1.0, 1)
-    static let orange = SIMD4<Float>(1.0, 0.42, 0.12, 1)
-    static let green = SIMD4<Float>(0.18, 1.0, 0.55, 1)
-    static let purple = SIMD4<Float>(0.75, 0.45, 1.0, 1)
-    static let red = SIMD4<Float>(1.0, 0.25, 0.35, 1)
-    static let track = SIMD4<Float>(0.05, 0.12, 0.18, 1)
+    static let cyan = GraphitePalette.metalCPU
+    static let orange = GraphitePalette.metalWarning
+    static let green = GraphitePalette.metalSuccess
+    static let purple = GraphitePalette.metalGPU
+    static let red = GraphitePalette.metalFailure
+    static let track = GraphitePalette.metalTrack
+    static let trackTop = GraphitePalette.metalTrackTop
+    static let trackBottom = GraphitePalette.metalTrackBottom
+
+    static func shade(_ color: SIMD4<Float>, brightness: Float) -> SIMD4<Float> {
+        SIMD4(min(color.x * brightness, 1), min(color.y * brightness, 1),
+              min(color.z * brightness, 1), color.w)
+    }
 
     static func from(swiftUI color: Color) -> SIMD4<Float> {
         let n = NSColor(color)
@@ -40,7 +47,7 @@ enum MetalGaugePalette {
     static func health(_ h: String) -> SIMD4<Float> {
         switch TelemetryHealth.tone(for: h) {
         case .healthy: return green
-        case .caution: return SIMD4(1, 0.8, 0.2, 1)
+        case .caution: return GraphitePalette.metalWarning
         case .failure: return red
         case .informational: return cyan
         case .unavailable: return SIMD4(0.48, 0.54, 0.62, 1)
@@ -59,6 +66,7 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
     private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
+    private var drawableSize = CGSize.zero
     private var fraction: Float = 0
     private var color = MetalGaugePalette.cyan
 
@@ -74,13 +82,14 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
         guard let device = resources.device,
               let pipeline = resources.configure(
                   view,
-                  clearColor: MTLClearColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
+                  clearColor: GraphitePalette.metalClear
               )
         else { return }
         self.device = device
         self.queue = resources.commandQueue
         self.pipeline = pipeline
         self.view = view
+        drawableSize = view.drawableSize
         view.delegate = self
         surfaceLifetime.attach()
         requestDraw()
@@ -101,14 +110,14 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
         guard let device else { return }
         let x = -1 + 2 * fraction
         let values: [GaugeVertex] = [
-            .init(pos: SIMD2(-1, -0.55), color: MetalGaugePalette.track),
-            .init(pos: SIMD2(1, -0.55), color: MetalGaugePalette.track),
-            .init(pos: SIMD2(-1, 0.55), color: MetalGaugePalette.track),
-            .init(pos: SIMD2(1, 0.55), color: MetalGaugePalette.track),
-            .init(pos: SIMD2(-1, -0.55), color: color),
-            .init(pos: SIMD2(x, -0.55), color: color),
-            .init(pos: SIMD2(-1, 0.55), color: color),
-            .init(pos: SIMD2(x, 0.55), color: color),
+            .init(pos: SIMD2(-1, -0.55), color: MetalGaugePalette.trackBottom),
+            .init(pos: SIMD2(1, -0.55), color: MetalGaugePalette.trackBottom),
+            .init(pos: SIMD2(-1, 0.55), color: MetalGaugePalette.trackTop),
+            .init(pos: SIMD2(1, 0.55), color: MetalGaugePalette.trackTop),
+            .init(pos: SIMD2(-1, -0.55), color: MetalGaugePalette.shade(color, brightness: 0.7)),
+            .init(pos: SIMD2(x, -0.55), color: MetalGaugePalette.shade(color, brightness: 0.7)),
+            .init(pos: SIMD2(-1, 0.55), color: MetalGaugePalette.shade(color, brightness: 1.1)),
+            .init(pos: SIMD2(x, 0.55), color: MetalGaugePalette.shade(color, brightness: 1.1)),
         ]
         vertices.upload(values, device: device)
     }
@@ -130,7 +139,11 @@ final class MetalBarRenderer: NSObject, MTKViewDelegate {
         view.setNeedsDisplay(view.bounds)
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        guard drawableSize != size else { return }
+        drawableSize = size
+        requestDraw()
+    }
     func draw(in view: MTKView) {
         guard dirty else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
@@ -206,6 +219,7 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
     private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
+    private var drawableSize = CGSize.zero
     private var count = 0
     private var fraction: Float = 0
     private var color = MetalGaugePalette.cyan
@@ -222,13 +236,14 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
         guard let device = resources.device,
               let pipeline = resources.configure(
                   view,
-                  clearColor: MTLClearColor(red: 0.015, green: 0.03, blue: 0.06, alpha: 1)
+                  clearColor: GraphitePalette.metalClear
               )
         else { return }
         self.device = device
         self.queue = resources.commandQueue
         self.pipeline = pipeline
         self.view = view
+        drawableSize = view.drawableSize
         view.delegate = self
         surfaceLifetime.attach()
         requestDraw()
@@ -293,15 +308,19 @@ final class MetalRingRenderer: NSObject, MTKViewDelegate {
             let i1 = SIMD2(cos(a1) * inner, sin(a1) * inner)
             // two triangles
             verts.append(.init(pos: o0, color: color))
-            verts.append(.init(pos: i0, color: color))
+            verts.append(.init(pos: i0, color: MetalGaugePalette.shade(color, brightness: 0.7)))
             verts.append(.init(pos: o1, color: color))
             verts.append(.init(pos: o1, color: color))
-            verts.append(.init(pos: i0, color: color))
-            verts.append(.init(pos: i1, color: color))
+            verts.append(.init(pos: i0, color: MetalGaugePalette.shade(color, brightness: 0.7)))
+            verts.append(.init(pos: i1, color: MetalGaugePalette.shade(color, brightness: 0.7)))
         }
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        guard drawableSize != size else { return }
+        drawableSize = size
+        requestDraw()
+    }
     func draw(in view: MTKView) {
         guard dirty else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
@@ -389,6 +408,7 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
     private let surfaceLifetime: GaugeSurfaceLifetime
     private weak var view: MTKView?
     private var dirty = false
+    private var drawableSize = CGSize.zero
     private var count = 0
     private var cores: [Float] = []
 
@@ -404,13 +424,14 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
         guard let device = resources.device,
               let pipeline = resources.configure(
                   view,
-                  clearColor: MTLClearColor(red: 0.01, green: 0.02, blue: 0.05, alpha: 1)
+                  clearColor: GraphitePalette.metalClear
               )
         else { return }
         self.device = device
         self.queue = resources.commandQueue
         self.pipeline = pipeline
         self.view = view
+        drawableSize = view.drawableSize
         view.delegate = self
         surfaceLifetime.attach()
         requestDraw()
@@ -457,17 +478,23 @@ final class MetalCoreBarsRenderer: NSObject, MTKViewDelegate {
     }
 
     private func quad(_ x0: Float, _ y0: Float, _ x1: Float, _ y1: Float, _ c: SIMD4<Float>) -> [GaugeVertex] {
-        [
-            .init(pos: SIMD2(x0, y0), color: c),
-            .init(pos: SIMD2(x1, y0), color: c),
-            .init(pos: SIMD2(x0, y1), color: c),
-            .init(pos: SIMD2(x1, y0), color: c),
-            .init(pos: SIMD2(x1, y1), color: c),
-            .init(pos: SIMD2(x0, y1), color: c),
+        let lower = MetalGaugePalette.shade(c, brightness: 0.65)
+        let upper = MetalGaugePalette.shade(c, brightness: 1.08)
+        return [
+            .init(pos: SIMD2(x0, y0), color: lower),
+            .init(pos: SIMD2(x1, y0), color: lower),
+            .init(pos: SIMD2(x0, y1), color: upper),
+            .init(pos: SIMD2(x1, y0), color: lower),
+            .init(pos: SIMD2(x1, y1), color: upper),
+            .init(pos: SIMD2(x0, y1), color: upper),
         ]
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        guard drawableSize != size else { return }
+        drawableSize = size
+        requestDraw()
+    }
     func draw(in view: MTKView) {
         guard dirty else {
             RuntimeDiagnostics.shared.increment(.gaugeDrawsSkippedStatic)
@@ -536,7 +563,7 @@ struct MetalToolLoadTile: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(shortLabel)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(Color.cyan)
             MetalBarGauge(fraction: min(max(activity / 100, Double(loadTier) / 3.0), 1), tint: healthColor)
                 .frame(height: 6)
@@ -567,17 +594,17 @@ struct MetalStatusPill: View {
     var fraction: Double = 1
 
     /// Compact chip: fits four across a typical detail header without colliding with the title.
-    private let width: CGFloat = 80
+    private let width: CGFloat = 104
     private let barHeight: CGFloat = 3
     private var tint: Color { tone.color }
 
     var body: some View {
         VStack(spacing: 3) {
             Text(text)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .lineLimit(2)
+                .help(text)
                 .frame(maxWidth: .infinity)
             MetalBarGauge(fraction: max(fraction, 0.05), tint: tint)
                 .frame(width: width - 16, height: barHeight)
@@ -586,7 +613,7 @@ struct MetalStatusPill: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .frame(width: width, height: 32)
+        .frame(width: width, height: 44)
         .background(
             RoundedRectangle(cornerRadius: 5)
                 .stroke(tint.opacity(0.6), lineWidth: 1)

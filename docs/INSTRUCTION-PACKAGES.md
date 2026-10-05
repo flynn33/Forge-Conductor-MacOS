@@ -21,7 +21,7 @@ project UUID and generation; Forge does not require a Managed Run to use it.
 5. In **Provider**, select and verify exactly one provider. LM Studio requires a
    current saved model/readiness receipt; desktop providers require a verified
    integration and retain their host-selected model.
-   Grok Build remains visible but cannot be selected or admit a run in 0.14.1
+   Grok Build remains visible but cannot be selected or admit a run
    because its documented hook outputs cannot deliver the initial assignment
    context to the model.
 6. Open a normal LM Studio chat and call `get_forge_status`. Select the intended
@@ -29,7 +29,11 @@ project UUID and generation; Forge does not require a Managed Run to use it.
    `instruction_catalog` and `instruction_read` to consume packages in the
    displayed priority order.
 
-The question-mark toolbar button opens the same setup sequence inside the app.
+Use **View Guide** in **Settings → Workbench** or the **Guide** menu for the
+current view's offline instructions; **Guided Setup** opens the ordered setup
+wizard. Individual view shortcuts appear only when enabled in Workbench
+Settings. Fresh preferences and every-view acceptance are recorded separately
+in [Graphite Workbench](GRAPHITE-WORKBENCH.md).
 
 ## Accepted package formats
 

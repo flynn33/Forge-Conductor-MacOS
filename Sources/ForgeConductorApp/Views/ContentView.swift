@@ -1,5 +1,5 @@
 // ContentView.swift
-// What: Composes the persistent sidebar, active feature module, and global toolbar.
+// What: Composes the persistent sidebar, active feature module, and optional view controls.
 // How: A single AppTab switch selects one detail view while shared controls mutate
 // AppModel; visible heading anchors make each rendered module automation-accessible.
 // Why: Central composition keeps navigation ownership separate from feature views.
@@ -12,6 +12,7 @@ enum GuidedSetupStorage {
     static let currentCompletionKey = "forge.guidedSetup.completed.v2"
     static let selectedStepKey = "forge.guidedSetup.step.v2"
     static let reviewedPreparationKey = "forge.guidedSetup.reviewedPreparation.v2"
+    static let reviewProjectKey = "forge.guidedSetup.reviewProject.v1"
 
     static func defaults() -> UserDefaults {
         guard let suiteName = ProcessInfo.processInfo.environment[
@@ -103,7 +104,7 @@ struct GuidedSetupProgress: Equatable {
     }
 }
 
-/// Provides the app's top-level split layout, toolbar, and feature-module routing.
+/// Provides the app's top-level split layout, optional controls, and feature-module routing.
 ///
 /// `ContentView` is intentionally a composition boundary: feature views own their
 /// presentation while `AppModel.AppTab` supplies the single navigation state.
@@ -121,8 +122,9 @@ struct ContentView: View {
         GuidedSetupStorage.reviewedPreparationKey,
         store: GuidedSetupStorage.defaults()
     ) private var reviewedPreparationFingerprint = ""
-    @StateObject private var guidedMode = GuidedModeCoordinator()
-    @State private var showingGuidedSetup = false
+    @EnvironmentObject private var guidedMode: GuidedModeCoordinator
+    @EnvironmentObject private var workbench: WorkbenchPreferences
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var rootPresentedGuide: Binding<GuidedHelpContext?> {
         Binding<GuidedHelpContext?>(
@@ -160,55 +162,43 @@ struct ContentView: View {
             // complex SwiftUI child is unreliable on macOS because the child
             // may flatten into its descendants and disappear from the AX tree.
             VStack(spacing: 0) {
-                if guidedMode.isEnabled,
-                   let entry = guidedMode.catalog?.entry(for: guidedMode.currentContext) {
-                    GuidedInlineHelp(
-                        entry: entry,
-                        state: guidedMode.state(for: entry.context),
-                        openGuide: { guidedMode.present() }
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                }
-                ZStack {
-                    selectedDetail
-                }
+                if !workbench.enabledControls.isEmpty { globalControls }
+                selectedModule
             }
-            .id(model.selectedTab)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("\(model.selectedTab.displayName) content")
-            .accessibilityIdentifier("detail-\(model.selectedTab.accessibilityID)")
+            .background(GraphitePalette.canvas)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.16), value: model.isNavigationVisible)
+        .animation((reduceMotion || GraphiteAccessibilityFixture.enabled) ? nil : .easeInOut(duration: 0.16), value: model.isNavigationVisible)
+        .graphiteWorkbench()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("root-split")
         .onAppear {
             guidedMode.select(model.selectedTab.guidedHelpContext)
             if GuidedSetupStorage.shouldPresentAutomatically(
                 in: GuidedSetupStorage.defaults()
             ) {
-                showingGuidedSetup = true
+                workbench.isGuidedSetupPresented = true
             }
         }
         .onChange(of: model.selectedTab) { _, tab in
             guidedMode.select(tab.guidedHelpContext)
         }
         .environmentObject(guidedMode)
-        .sheet(isPresented: $showingGuidedSetup) {
+        .sheet(isPresented: $workbench.isGuidedSetupPresented) {
             GuidedSetupWizardView(
                 selectedStep: $guidedSetupStep,
                 reviewedPreparationFingerprint: $reviewedPreparationFingerprint,
                 managerReady: model.serviceActive,
                 snapshot: model.rigOperationalSnapshot,
+                client: model.operatorManagerClient,
                 onOpen: { tab in
                     model.selectTab(tab)
-                    showingGuidedSetup = false
+                    workbench.isGuidedSetupPresented = false
                 },
                 onComplete: {
                     guidedSetupCompleted = true
-                    showingGuidedSetup = false
+                    workbench.isGuidedSetupPresented = false
                 }
             )
         }
@@ -229,104 +219,117 @@ struct ContentView: View {
                 .frame(width: 520, height: 320)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
+    }
+
+    private var selectedModule: some View {
+            VStack(spacing: 0) {
+                if guidedMode.isEnabled,
+                   let entry = guidedMode.catalog?.entry(for: guidedMode.currentContext) {
+                    GuidedInlineHelp(
+                        entry: entry,
+                        state: guidedMode.state(for: entry.context),
+                        openGuide: { guidedMode.present() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                }
+                ZStack {
+                    selectedDetail
+                }
+            }
+            .id(model.selectedTab)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(GraphitePalette.canvas)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("\(model.selectedTab.displayName) content")
+            .accessibilityIdentifier("detail-\(model.selectedTab.accessibilityID)")
+    }
+
+    private var globalControls: some View {
+        HStack(spacing: 8) {
+            if model.isLoading {
+                ProgressView().controlSize(.small)
+                    .accessibilityIdentifier("toolbar-loading")
+            } else if let updated = model.updated {
+                Text(updated, style: .time)
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundStyle(GraphitePalette.textMuted)
+                    .accessibilityIdentifier("toolbar-updated")
+            }
+            Spacer(minLength: 8)
+            if workbench.shows(.navigation) {
                 Button {
-                    withAnimation { model.toggleNavigation() }
+                    withAnimation((reduceMotion || GraphiteAccessibilityFixture.enabled) ? nil : .easeInOut(duration: 0.16)) { model.toggleNavigation() }
                 } label: {
-                    Image(systemName: "sidebar.leading")
+                    Label("Navigation", systemImage: "sidebar.leading")
                 }
                 .help("Show or hide navigation")
                 .accessibilityIdentifier("toolbar-navigation")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Group {
-                    if model.selectedTab == .rig {
-                        Button {
-                            showingGuidedSetup = true
-                        } label: {
-                            Label(
-                                "Guided Setup",
-                                systemImage: "point.topleft.down.to.point.bottomright.curvepath"
-                            )
-                            .labelStyle(.titleAndIcon)
-                        }
-                        .controlSize(.regular)
-                        .help("Set up, start, monitor, and recover an automated project run")
-                        .accessibilityIdentifier("toolbar-guided-setup")
-                    }
-                }
-            }
-            // Separate items (no HStack) so macOS applies native toolbar control scale.
-            ToolbarItem(placement: .primaryAction) {
-                Group {
-                    if model.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                            .accessibilityIdentifier("toolbar-loading")
-                    }
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Group {
-                    if let updated = model.updated {
-                        Text(updated, style: .time)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                            .accessibilityIdentifier("toolbar-updated")
-                    }
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
+            if workbench.shows(.autoRefresh) {
                 Toggle(isOn: $model.autoRefresh) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Label("Auto-refresh", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .toggleStyle(.button)
-                .controlSize(.small)
                 .help("Auto-refresh")
                 .accessibilityIdentifier("toolbar-auto-refresh")
             }
-            ToolbarItem(placement: .primaryAction) {
+            if workbench.shows(.guidedMode) {
                 Toggle(isOn: $guidedMode.isEnabled) {
-                    Image(systemName: "sparkles.rectangle.stack")
+                    Label("Guided Mode", systemImage: "sparkles.rectangle.stack")
                 }
                 .toggleStyle(.button)
-                .controlSize(.small)
                 .help("Show or hide contextual Guided Mode")
                 .accessibilityLabel("Guided Mode")
                 .accessibilityIdentifier("toolbar-guided-mode")
             }
-            ToolbarItem(placement: .primaryAction) {
+            if workbench.shows(.guide) {
                 Button {
                     guidedMode.present()
                 } label: {
-                    Image(systemName: "questionmark.circle")
+                    Label("Guide", systemImage: "questionmark.circle")
                 }
-                .controlSize(.small)
                 .help("Open the guide for the current view")
                 .accessibilityIdentifier("toolbar-setup-guide")
             }
-            ToolbarItem(placement: .primaryAction) {
+            if workbench.shows(.refresh) {
                 Button {
                     model.refresh(force: true)
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .controlSize(.small)
                 .help("Refresh now")
                 .accessibilityIdentifier("toolbar-refresh")
             }
+            if workbench.shows(.guidedSetup) {
+                HStack(spacing: 0) {
+                    Button {
+                        workbench.isGuidedSetupPresented = true
+                    } label: {
+                        Label("Guided Setup", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    }
+                    .help("Review project setup, monitor progress, and recover work")
+                    .accessibilityIdentifier("dashboard-guided-setup")
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("toolbar-guided-setup")
+            }
         }
+        .controlSize(.regular)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(GraphitePalette.panelBottom)
+        .overlay(alignment: .bottom) { Rectangle().fill(GraphitePalette.separator).frame(height: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("workbench-global-controls")
     }
 
     @ViewBuilder
     private var selectedDetail: some View {
         switch model.selectedTab {
         case .rig:
-            RigDashboardView(onOpenGuidedSetup: {
-                showingGuidedSetup = true
-            })
+            RigDashboardView()
         case .mcp:
             MCPServersView()
         case .agents:
@@ -476,7 +479,7 @@ private struct GuidedSetupWizardView: View {
             purpose: "A registered project gives LM Studio a stable identity and an exact default working folder.",
             readyWhen: "Projects shows the repository as Active with its current generation.",
             actions: [
-                "Open Projects and choose Register Project.",
+                "Open Projects and choose “Add Project Folders…”.",
                 "Select the repository itself. Registration records that exact project identity and default working folder; it does not confine native filesystem access.",
                 "Wait for the durable registration result before importing instructions.",
             ],
@@ -512,7 +515,7 @@ private struct GuidedSetupWizardView: View {
             actions: [
                 "Review the visible package order and each package's per-file catalog in Projects.",
                 "Review the Development Policy source order in Rune Forge. The top source has highest priority.",
-                "Continuity remains automatic; its view manages project-ID copy/deletion, reset, selected-package deletion, and disposable-cache clearing.",
+                "Continuity remains automatic; its view manages project-ID copy, history reset, selected-packet deletion, and disposable-cache clearing.",
             ],
             recovery: [
                 "Use Provider → Connect and Check when LM Studio readiness requires attention.",
@@ -585,10 +588,34 @@ private struct GuidedSetupWizardView: View {
     @Binding var selectedStep: Int
     @Binding var reviewedPreparationFingerprint: String
     let managerReady: Bool
-    let snapshot: RigOperationalSnapshot
+    private let baseSnapshot: RigOperationalSnapshot
     let onOpen: (AppModel.AppTab) -> Void
     let onComplete: () -> Void
+    @StateObject private var reviewModel: GuidedSetupReviewViewModel
+    @State private var reviewReloadToken = UUID()
+    @AppStorage(GuidedSetupStorage.reviewProjectKey, store: GuidedSetupStorage.defaults())
+    private var savedReviewProjectID = ""
     @Environment(\.dismiss) private var dismiss
+
+    init(
+        selectedStep: Binding<Int>,
+        reviewedPreparationFingerprint: Binding<String>,
+        managerReady: Bool,
+        snapshot: RigOperationalSnapshot,
+        client: any OperatorManagerClientProtocol,
+        onOpen: @escaping (AppModel.AppTab) -> Void,
+        onComplete: @escaping () -> Void
+    ) {
+        _selectedStep = selectedStep
+        _reviewedPreparationFingerprint = reviewedPreparationFingerprint
+        self.managerReady = managerReady
+        baseSnapshot = snapshot
+        self.onOpen = onOpen
+        self.onComplete = onComplete
+        _reviewModel = StateObject(wrappedValue: GuidedSetupReviewViewModel(client: client))
+    }
+
+    private var snapshot: RigOperationalSnapshot { reviewModel.snapshot(base: baseSnapshot) }
 
     var body: some View {
         let index = min(max(selectedStep, 0), steps.count - 1)
@@ -597,9 +624,9 @@ private struct GuidedSetupWizardView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Guided Setup")
-                        .font(.title2.bold())
+                        .font(.system(size: 22, weight: .semibold))
                     Text("Set up Forge, work in LM Studio, and monitor policy and continuity")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 Spacer()
                 Button("Next required step") {
@@ -629,6 +656,9 @@ private struct GuidedSetupWizardView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         stepHeader(step, index: index)
+                        if [.project, .instructions, .configure].contains(step.kind) {
+                            projectReviewScope
+                        }
                         statusCard(for: step)
                         guideSection("Ready when", symbol: "checkmark.seal", items: [step.readyWhen])
                         guideSection("What to do", symbol: "list.number", items: step.actions, numbered: true)
@@ -638,7 +668,7 @@ private struct GuidedSetupWizardView: View {
                                 Button(destination.label) {
                                     onOpen(destination.tab)
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(GraphiteButtonStyle(kind: .primary))
                                 .accessibilityIdentifier(
                                     "setup-guide-open-\(destination.tab.accessibilityID)"
                                 )
@@ -649,45 +679,106 @@ private struct GuidedSetupWizardView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .frame(minWidth: 500, maxWidth: .infinity)
+                .id(index)
             }
 
             Divider()
             HStack {
                 Text("Step \(index + 1) of \(steps.count) · Progress is saved when you leave the wizard")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button("Back") { selectedStep = max(0, index - 1) }
                     .disabled(index == 0)
                 if step.kind == .configure {
                     Button(
                         configurationReviewIsCurrent
-                            ? "Continue to Start"
+                            ? "Continue to LM Studio"
                             : "Confirm Review and Continue"
                     ) {
                         confirmConfigurationReview()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(progress.preparationFingerprint == nil)
+                    .buttonStyle(GraphiteButtonStyle(kind: .primary))
+                    .disabled(progress.preparationState == .unavailable)
                     .accessibilityIdentifier("setup-guide-confirm-review")
                 } else if index == steps.count - 1 {
                     Button("Finish Guided Setup", action: onComplete)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(GraphiteButtonStyle(kind: .primary))
                         .accessibilityIdentifier("setup-guide-finish")
                 } else {
                     Button("Next") { selectedStep = min(steps.count - 1, index + 1) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(GraphiteButtonStyle(kind: .primary))
                         .accessibilityIdentifier("setup-guide-next")
                 }
             }
             .padding(16)
         }
         .frame(minWidth: 780, idealWidth: 900, minHeight: 600, idealHeight: 680)
-        .accessibilityIdentifier("setup-guide")
+        .graphiteWorkbench()
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("setup-guide")
         .accessibilityLabel("Guided Setup wizard")
         .onAppear {
             selectedStep = min(max(selectedStep, 0), steps.count - 1)
+        }
+        .task(id: reviewReloadToken) {
+            let previousSelection = reviewModel.selectedProjectID
+            await reviewModel.loadProjects(
+                preferredProjectID: savedReviewProjectID.isEmpty ? nil : savedReviewProjectID
+            )
+            guard !Task.isCancelled else { return }
+            if previousSelection == reviewModel.selectedProjectID {
+                await reviewModel.loadSelection()
+            }
+        }
+        .task(id: reviewModel.selectedProjectID) {
+            await reviewModel.loadSelection()
+        }
+        .onChange(of: reviewModel.selectedProjectID) { _, projectID in
+            if let projectID { savedReviewProjectID = projectID }
+        }
+    }
+
+    private var projectReviewScope: some View {
+        GraphitePanel(title: "Project to review") {
+            HStack(alignment: .center, spacing: 10) {
+                Picker("Registered project", selection: $reviewModel.selectedProjectID) {
+                    Text("Choose a project").tag(Optional<String>.none)
+                    ForEach(reviewModel.projects) { project in
+                        Text(project.displayName).tag(Optional(project.projectID))
+                    }
+                }
+                .pickerStyle(.menu)
+                .buttonStyle(.bordered)
+                .disabled(reviewModel.isLoadingProjects)
+                .accessibilityIdentifier("guided-setup-project-selection")
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    reviewReloadToken = UUID()
+                }
+                .disabled(reviewModel.isLoading)
+                .accessibilityIdentifier("guided-setup-review-refresh")
+                if reviewModel.isLoading { ProgressView().controlSize(.small) }
+            }
+            if let project = reviewModel.selectedProject {
+                Text(project.canonicalRoot)
+                    .font(.system(size: 12)).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(project.projectID) · generation \(project.projectGeneration)")
+                    .font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("guided-setup-review-project-identity")
+            }
+            if let error = reviewModel.errorMessage {
+                Text(error).foregroundStyle(GraphitePalette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("guided-setup-review-error")
+            } else if reviewModel.projects.isEmpty, !reviewModel.isLoading {
+                Text("Register a project in Projects, then refresh this review.")
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
+            Text("Reviewing inputs does not activate a project or start a model session.")
+                .font(.system(size: 13)).foregroundStyle(GraphitePalette.textSecondary)
         }
     }
 
@@ -713,7 +804,8 @@ private struct GuidedSetupWizardView: View {
     }
 
     private func confirmConfigurationReview() {
-        guard let fingerprint = progress.preparationFingerprint else { return }
+        guard progress.preparationState != .unavailable,
+              let fingerprint = progress.preparationFingerprint else { return }
         reviewedPreparationFingerprint = fingerprint
         selectedStep = GuidedSetupProgress.Step.start.rawValue
     }
@@ -726,11 +818,11 @@ private struct GuidedSetupWizardView: View {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(selectedStep == index ? Color.accentColor : Color.secondary.opacity(0.15))
+                        .fill(selectedStep == index ? GraphitePalette.selectionTop : GraphitePalette.panelRaised)
                         .frame(width: 28, height: 28)
                     Text("\(index + 1)")
                         .font(.caption.bold())
-                        .foregroundStyle(selectedStep == index ? .white : .primary)
+                        .foregroundStyle(GraphitePalette.textPrimary)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(step.title)
@@ -748,7 +840,7 @@ private struct GuidedSetupWizardView: View {
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(selectedStep == index ? Color.accentColor.opacity(0.12) : .clear)
+                    .fill(LinearGradient(colors: selectedStep == index ? [GraphitePalette.selectionTop, GraphitePalette.selectionBottom] : [.clear, .clear], startPoint: .top, endPoint: .bottom))
             )
         }
         .buttonStyle(.plain)
@@ -759,17 +851,20 @@ private struct GuidedSetupWizardView: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: step.symbol)
                 .font(.system(size: 32))
-                .foregroundStyle(.tint)
+                .foregroundStyle(GraphitePalette.info)
                 .frame(width: 44)
             VStack(alignment: .leading, spacing: 5) {
                 Text("STEP \(index + 1) OF \(steps.count)")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                 Text(step.title)
-                    .font(.title2.bold())
+                    .font(.system(size: 20, weight: .semibold))
                     .accessibilityIdentifier("guided-setup-step-title")
                 Text(step.purpose)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14))
+                    .lineSpacing(3)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -784,7 +879,7 @@ private struct GuidedSetupWizardView: View {
                     Text(status.label).font(.headline)
                     Text(status.detail)
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -800,21 +895,22 @@ private struct GuidedSetupWizardView: View {
         numbered: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: symbol).font(.headline)
+            Label(title, systemImage: symbol).font(.system(size: 15, weight: .semibold))
             ForEach(Array(items.enumerated()), id: \.offset) { offset, item in
                 HStack(alignment: .top, spacing: 9) {
                     if numbered {
                         Text("\(offset + 1)")
                             .font(.caption.bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(GraphitePalette.textPrimary)
                             .frame(width: 22, height: 22)
-                            .background(Circle().fill(Color.accentColor))
+                            .background(Circle().fill(GraphitePalette.selectionTop))
                     } else {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 5))
                             .padding(.top, 7)
                     }
-                    Text(item).fixedSize(horizontal: false, vertical: true)
+                    Text(item).font(.system(size: 14)).lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -829,8 +925,8 @@ private struct GuidedSetupWizardView: View {
         switch step.kind {
         case .manager:
             return managerReady
-                ? ("Ready", "Manager is running.", "checkmark.circle.fill", .green)
-                : ("Action required", "Manager is not running.", "exclamationmark.triangle.fill", .orange)
+                ? ("Ready", "Manager is running.", "checkmark.circle.fill", GraphitePalette.success)
+                : ("Action required", "Manager is not running.", "exclamationmark.triangle.fill", GraphitePalette.warning)
         case .provider:
             let providerStatus = GuidedSetupProviderStatus.compose(snapshot.selectedProvider)
             if providerStatus.isReady {
@@ -838,27 +934,27 @@ private struct GuidedSetupWizardView: View {
                     providerStatus.label,
                     providerStatus.detail,
                     "checkmark.circle.fill",
-                    .green
+                    GraphitePalette.success
                 )
             }
             return (
                 providerStatus.label,
                 providerStatus.detail,
                 "arrow.right.circle.fill",
-                .accentColor
+                GraphitePalette.info
             )
         case .project:
             if let project = snapshot.projectName {
-                return ("Ready", "\(project) is the current registered project.", "checkmark.circle.fill", .green)
+                return ("Ready", "\(project) is the current registered project.", "checkmark.circle.fill", GraphitePalette.success)
             }
-            return ("Next", "Register the repository you want Forge to operate on.", "arrow.right.circle.fill", .accentColor)
+            return ("Next", "Register the repository you want Forge to operate on.", "arrow.right.circle.fill", GraphitePalette.info)
         case .instructions:
             if snapshot.projectTotalPackages > 0 {
-                return ("Ready", "\(snapshot.projectTotalPackages) instruction package(s) are available.", "checkmark.circle.fill", .green)
+                return ("Ready", "\(snapshot.projectTotalPackages) instruction package(s) are available.", "checkmark.circle.fill", GraphitePalette.success)
             }
             return snapshot.projectName == nil
-                ? ("Waiting", "Register a project first.", "clock", .secondary)
-                : ("Next", "Add at least one instruction package.", "arrow.right.circle.fill", .accentColor)
+                ? ("Waiting", "Register a project first.", "clock", GraphitePalette.unavailable)
+                : ("Next", "Add at least one instruction package.", "arrow.right.circle.fill", GraphitePalette.info)
         case .configure:
             let ready = managerReady && providerReady
                 && snapshot.projectName != nil && snapshot.projectTotalPackages > 0
@@ -867,34 +963,34 @@ private struct GuidedSetupWizardView: View {
                     "Review complete",
                     "This exact project, provider, and instruction package setup is ready to start.",
                     "checkmark.circle.fill",
-                    .green
+                    GraphitePalette.success
                 )
             }
             return ready
-                ? ("Ready to review", "The setup prerequisites are present.", "checkmark.circle.fill", .green)
-                : ("Waiting", "Complete the earlier setup steps first.", "clock", .secondary)
+                ? ("Ready to review", "The setup prerequisites are present.", "checkmark.circle.fill", GraphitePalette.success)
+                : ("Waiting", "Complete the earlier setup steps first.", "clock", GraphitePalette.unavailable)
         case .start:
             if snapshot.projectTotalPackages > 0 && providerReady {
                 return (
                     "Ready in LM Studio",
                     "Open a normal LM Studio chat and call get_forge_status.",
                     "play.circle",
-                    .green
+                    GraphitePalette.success
                 )
             }
-            return ("Waiting", "Provider, project, and instructions must be ready.", "clock", .secondary)
+            return ("Waiting", "Provider, project, and instructions must be ready.", "clock", GraphitePalette.unavailable)
         case .monitor:
             return (
                 needsAttention ? "Action required" : "Automatic",
                 "CLU governance and continuity operate while you work in LM Studio.",
                 needsAttention ? "exclamationmark.triangle.fill" : "waveform.path.ecg",
-                needsAttention ? .orange : .green
+                needsAttention ? GraphitePalette.warning : GraphitePalette.success
             )
         case .recover:
             if needsAttention {
-                return ("Action required", "A provider, package, policy, or continuity item needs attention.", "exclamationmark.triangle.fill", .orange)
+                return ("Action required", "A provider, package, policy, or continuity item needs attention.", "exclamationmark.triangle.fill", GraphitePalette.warning)
             }
-            return ("No current issue", "Forge has not reported an active blocking condition.", "checkmark.circle.fill", .green)
+            return ("No current issue", "Forge has not reported an active blocking condition.", "checkmark.circle.fill", GraphitePalette.success)
         }
     }
 }
@@ -918,7 +1014,7 @@ struct OperatorStartupContent<Content: View>: View {
                     ProgressView("Starting Forge Conductor…")
                 } else {
                     Text(errorMessage ?? "Startup has not completed.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                     Button("Retry startup", action: retry)
                         .accessibilityIdentifier("operator-retry-startup")
                 }

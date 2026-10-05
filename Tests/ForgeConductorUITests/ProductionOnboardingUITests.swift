@@ -26,6 +26,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
     private var managerPort: UInt16 = 0
     private var session: URLSession!
     private var guidedSetupDefaultsSuite: String!
+    private var workbenchDefaultsSuite: String!
     private var lmStudioRegistrationSnapshot: LMStudioForgeRegistrationSnapshot!
 
     nonisolated override func setUpWithError() throws {
@@ -84,6 +85,8 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                 forKey: "forge.guidedSetup.completed.v2"
             )
             app.launchEnvironment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"] = guidedSetupDefaultsSuite
+            workbenchDefaultsSuite = "com.forge-conductor.production-workbench.\(fixture.lastPathComponent)"
+            app.launchEnvironment["FORGE_WORKBENCH_DEFAULTS_SUITE"] = workbenchDefaultsSuite
             reservation.close()
         }
     }
@@ -109,6 +112,11 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
                     .removePersistentDomain(forName: guidedSetupDefaultsSuite)
             }
             guidedSetupDefaultsSuite = nil
+            if let workbenchDefaultsSuite {
+                UserDefaults(suiteName: workbenchDefaultsSuite)?
+                    .removePersistentDomain(forName: workbenchDefaultsSuite)
+            }
+            workbenchDefaultsSuite = nil
             if let fixture {
                 Self.makeFixtureRemovable(fixture)
                 try FileManager.default.removeItem(at: fixture)
@@ -145,8 +153,15 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(app.launchArguments.contains("--uitesting"))
         app.launch()
         XCTAssertTrue(waitUntil(timeout: 20) {
-            self.contains(self.element("app-error"), "Bootstrap failed:")
+            self.contains(self.app.staticTexts["app-error"], "Bootstrap failed:")
         }, "The ordinary product must expose the actual home-layout failure")
+        for identifier in ["app-error", "app-title", "app-version"] {
+            XCTAssertEqual(app.staticTexts.matching(identifier: identifier).count, 1,
+                           "The sidebar must preserve each footer's native identity")
+        }
+        XCTAssertTrue(contains(app.staticTexts["app-title"], "Forge Conductor"))
+        let version = app.staticTexts["app-version"]
+        XCTAssertFalse(((version.value as? String) ?? version.label).isEmpty)
         if let candidatePath = ProcessInfo.processInfo.environment["FORGE_DESKTOP_CANDIDATE_PATH"],
            !candidatePath.isEmpty {
             let expectedPath = URL(fileURLWithPath: candidatePath).standardizedFileURL.path
@@ -906,6 +921,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         // so its independent form is the only shell-policy control in the UI.
         try click(app.buttons["tab-rig"])
         app.typeKey(",", modifierFlags: .command)
+        try click(app.buttons["manager-section-shell"])
         let shellToggle = element("settings-shell-enabled")
         try makeHittable(shellToggle)
         XCTAssertTrue(waitForToggleState(true, on: shellToggle))
@@ -925,6 +941,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         let afterRelaunch: OnboardingManagerSettings = try await read("/api/manager/settings")
         XCTAssertEqual(afterRelaunch, disabled)
         app.typeKey(",", modifierFlags: .command)
+        try click(app.buttons["manager-section-shell"])
         let restoredToggle = element("settings-shell-enabled")
         try makeHittable(restoredToggle)
         XCTAssertTrue(waitForToggleState(false, on: restoredToggle))
@@ -1019,7 +1036,7 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attachScreenshot("diagnostics-native-export-folder-picker")
         try chooseFolderInNativePanel(directory.path, prompt: "Export Here")
         let completion = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Exported ")
+            NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "Exported ", "Exported ")
         ).firstMatch
         XCTAssertTrue(completion.waitForExistence(timeout: 20), "The native export must report completion")
         XCTAssertTrue(waitUntil { self.app.buttons["diagnostics-export"].isEnabled })
@@ -2016,10 +2033,7 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
     }
 
     private func refreshCurrentView() throws {
-        let refresh = app.buttons["toolbar-refresh"]
-        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
-        XCTAssertTrue(refresh.isHittable)
-        refresh.click()
+        app.typeKey("r", modifierFlags: .command)
     }
 
     private func continuityPacketIDs() async throws -> [String] {
@@ -2085,10 +2099,7 @@ final class DesktopCandidateLiveProjectsUITests: XCTestCase, @unchecked Sendable
     }
 
     private func refreshProjects() throws {
-        let refresh = app.buttons["toolbar-refresh"]
-        XCTAssertTrue(refresh.waitForExistence(timeout: 10))
-        XCTAssertTrue(refresh.isHittable)
-        refresh.click()
+        app.typeKey("r", modifierFlags: .command)
     }
 
     private func resizeMainWindowToMinimum(_ window: XCUIElement) {

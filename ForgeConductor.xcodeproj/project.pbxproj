@@ -7,6 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A60800000000000000000001 /* Resources/ComputeChipReference.png in Resources */ = {isa = PBXBuildFile; fileRef = A60800000000000000000002 /* Resources/ComputeChipReference.png */; };
+		A60700000000000000000001 /* ComputeChipPresentationAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60700000000000000000002 /* ComputeChipPresentationAppTests.swift */; };
+		A6060000000000000000000D /* ComputeChipAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6060000000000000000000E /* ComputeChipAppTests.swift */; };
+		A6060000000000000000000B /* Views/Rig/ComputeCoresContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6060000000000000000000C /* Views/Rig/ComputeCoresContentView.swift */; };
+		A60600000000000000000009 /* Metal/ComputeChipShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = A6060000000000000000000A /* Metal/ComputeChipShaders.metal */; };
+		A60600000000000000000007 /* Metal/ComputeChipRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60600000000000000000008 /* Metal/ComputeChipRenderer.swift */; };
+		A60600000000000000000005 /* Metal/ComputeChipAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60600000000000000000006 /* Metal/ComputeChipAnimation.swift */; };
+		A60600000000000000000003 /* Metal/ComputeChipLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60600000000000000000004 /* Metal/ComputeChipLayout.swift */; };
+		A60600000000000000000001 /* Metal/ComputeChipProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60600000000000000000002 /* Metal/ComputeChipProjection.swift */; };
+		A60500000000000000000001 /* ComputeTelemetryProvenanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60500000000000000000002 /* ComputeTelemetryProvenanceTests.swift */; };
+		A60400000000000000000007 /* GuidedSetupReviewAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60400000000000000000008 /* GuidedSetupReviewAppTests.swift */; };
+		A60400000000000000000005 /* OperatorConsole/ViewModels/GuidedSetupReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60400000000000000000006 /* OperatorConsole/ViewModels/GuidedSetupReviewViewModel.swift */; };
+		A60400000000000000000003 /* GraphiteWorkbenchAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60400000000000000000004 /* GraphiteWorkbenchAppTests.swift */; };
+		A60400000000000000000001 /* Views/GraphiteWorkbench.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60400000000000000000002 /* Views/GraphiteWorkbench.swift */; };
 		D14000000000000000000001 /* Application/DesktopProviderHookBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000001 /* Application/DesktopProviderHookBridge.swift */; };
 		D14000000000000000000002 /* Application/ProviderIntegrationAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000002 /* Application/ProviderIntegrationAdapters.swift */; };
 		D14000000000000000000003 /* Application/ProviderIntegrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14F00000000000000000003 /* Application/ProviderIntegrationCoordinator.swift */; };
@@ -626,6 +640,20 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A60800000000000000000002 /* Resources/ComputeChipReference.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Resources/ComputeChipReference.png; sourceTree = "<group>"; };
+		A60700000000000000000002 /* ComputeChipPresentationAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeChipPresentationAppTests.swift; sourceTree = "<group>"; };
+		A6060000000000000000000E /* ComputeChipAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeChipAppTests.swift; sourceTree = "<group>"; };
+		A6060000000000000000000C /* Views/Rig/ComputeCoresContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Rig/ComputeCoresContentView.swift; sourceTree = "<group>"; };
+		A6060000000000000000000A /* Metal/ComputeChipShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Metal/ComputeChipShaders.metal; sourceTree = "<group>"; };
+		A60600000000000000000008 /* Metal/ComputeChipRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/ComputeChipRenderer.swift; sourceTree = "<group>"; };
+		A60600000000000000000006 /* Metal/ComputeChipAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/ComputeChipAnimation.swift; sourceTree = "<group>"; };
+		A60600000000000000000004 /* Metal/ComputeChipLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/ComputeChipLayout.swift; sourceTree = "<group>"; };
+		A60600000000000000000002 /* Metal/ComputeChipProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metal/ComputeChipProjection.swift; sourceTree = "<group>"; };
+		A60500000000000000000002 /* ComputeTelemetryProvenanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeTelemetryProvenanceTests.swift; sourceTree = "<group>"; };
+		A60400000000000000000008 /* GuidedSetupReviewAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedSetupReviewAppTests.swift; sourceTree = "<group>"; };
+		A60400000000000000000006 /* OperatorConsole/ViewModels/GuidedSetupReviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperatorConsole/ViewModels/GuidedSetupReviewViewModel.swift; sourceTree = "<group>"; };
+		A60400000000000000000004 /* GraphiteWorkbenchAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphiteWorkbenchAppTests.swift; sourceTree = "<group>"; };
+		A60400000000000000000002 /* Views/GraphiteWorkbench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/GraphiteWorkbench.swift; sourceTree = "<group>"; };
 		D14F00000000000000000001 /* Application/DesktopProviderHookBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/DesktopProviderHookBridge.swift; sourceTree = "<group>"; };
 		D14F00000000000000000002 /* Application/ProviderIntegrationAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProviderIntegrationAdapters.swift; sourceTree = "<group>"; };
 		D14F00000000000000000003 /* Application/ProviderIntegrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/ProviderIntegrationCoordinator.swift; sourceTree = "<group>"; };
@@ -1148,6 +1176,9 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				A60700000000000000000002 /* ComputeChipPresentationAppTests.swift */,
+				A6060000000000000000000E /* ComputeChipAppTests.swift */,
+				A60500000000000000000002 /* ComputeTelemetryProvenanceTests.swift */,
 				D14F00000000000000000007 /* DesktopProviderHookBridgeTests.swift */,
 				D14F00000000000000000008 /* DesktopProviderPluginInstallerTests.swift */,
 				D14F00000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift */,
@@ -1162,6 +1193,8 @@
 				F10800000000000000000002 /* StjornarvaldPolicyLogExporterTests.swift */,
 				F10900000000000000000002 /* StjornarvaldIntegrationQualificationTests.swift */,
 				R3F000000000000000000009 /* GuidedModeAppTests.swift */,
+				A60400000000000000000008 /* GuidedSetupReviewAppTests.swift */,
+				A60400000000000000000004 /* GraphiteWorkbenchAppTests.swift */,
 				BE153ABEB86940BF8945EE52 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift */,
 				B09F00000000000000000054 /* ProviderConfigurationAppTests.swift */,
 				B09F00000000000000000056 /* NativeGaugeLifecycleTests.swift */,
@@ -1336,6 +1369,12 @@
 		DB59238523D446A9AC5B2534 /* ForgeConductorApp */ = {
 			isa = PBXGroup;
 			children = (
+				A6060000000000000000000C /* Views/Rig/ComputeCoresContentView.swift */,
+				A6060000000000000000000A /* Metal/ComputeChipShaders.metal */,
+				A60600000000000000000008 /* Metal/ComputeChipRenderer.swift */,
+				A60600000000000000000006 /* Metal/ComputeChipAnimation.swift */,
+				A60600000000000000000004 /* Metal/ComputeChipLayout.swift */,
+				A60600000000000000000002 /* Metal/ComputeChipProjection.swift */,
 				R3F000000000000000000001 /* GuidedMode/GuidedHelpContext.swift */,
 				R3F000000000000000000002 /* GuidedMode/GuidedControlAnchor.swift */,
 				R3F000000000000000000003 /* GuidedMode/GuidedHelpCatalog.swift */,
@@ -1349,6 +1388,7 @@
 				A26F00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift */,
 				A26F00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift */,
 				A26F00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift */,
+				A60400000000000000000006 /* OperatorConsole/ViewModels/GuidedSetupReviewViewModel.swift */,
 				A26F00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift */,
 				A26F00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift */,
 				A26F00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift */,
@@ -1371,6 +1411,7 @@
 				F14FF988E33B43889826D634 /* Metal/MetalLoadChart.swift */,
 				E50FAB20018D4FC390E66323 /* Views/AgentsView.swift */,
 				A0FC0000000000000000000D /* Views/AppSidebarView.swift */,
+				A60400000000000000000002 /* Views/GraphiteWorkbench.swift */,
 				2A0AEBA3D35E479A9A2365DF /* Views/ContentView.swift */,
 				856642883A3044CF8E0E5249 /* Views/LiveFeedView.swift */,
 				4752420A6CFA440C9B159378 /* Views/MCPServersView.swift */,
@@ -1388,6 +1429,7 @@
 				D43949241CEC4465B715CE8A /* Resources/Assets.xcassets */,
 				0E4AA80EB2DB42C2A4F5D96F /* Resources/Forge-Conductor.icns */,
 				R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */,
+				A60800000000000000000002 /* Resources/ComputeChipReference.png */,
 			);
 			path = ForgeConductorApp;
 			sourceTree = "<group>";
@@ -1955,6 +1997,7 @@
 				B074848A95504C7C892A2AA3 /* Resources/Assets.xcassets in Resources */,
 				EA0B411478214153ACFF0171 /* Resources/Forge-Conductor.icns in Resources */,
 				R3B000000000000000000008 /* Resources/GuidedHelpCatalog.json in Resources */,
+				A60800000000000000000001 /* Resources/ComputeChipReference.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2021,6 +2064,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A60500000000000000000001 /* ComputeTelemetryProvenanceTests.swift in Sources */,
 				D14000000000000000000007 /* DesktopProviderHookBridgeTests.swift in Sources */,
 				D14000000000000000000008 /* DesktopProviderPluginInstallerTests.swift in Sources */,
 				D14000000000000000000009 /* ManagerProviderIntegrationRoutesTests.swift in Sources */,
@@ -2145,10 +2189,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A60700000000000000000001 /* ComputeChipPresentationAppTests.swift in Sources */,
+				A6060000000000000000000D /* ComputeChipAppTests.swift in Sources */,
 				A10700000000000000000004 /* RuneForgeAppTests.swift in Sources */,
 				A10800000000000000000003 /* StjornarvaldPolicyLogExporterTests.swift in Sources */,
 				A10900000000000000000003 /* StjornarvaldIntegrationQualificationTests.swift in Sources */,
 				R3B000000000000000000009 /* GuidedModeAppTests.swift in Sources */,
+				A60400000000000000000007 /* GuidedSetupReviewAppTests.swift in Sources */,
+				A60400000000000000000003 /* GraphiteWorkbenchAppTests.swift in Sources */,
 				14782D2FE9544A59A1AED446 /* Tests/ForgeConductorTests/OperatorProjectContractTests.swift in Sources */,
 				B09B00000000000000000054 /* ProviderConfigurationAppTests.swift in Sources */,
 				B09B00000000000000000056 /* NativeGaugeLifecycleTests.swift in Sources */,
@@ -2161,6 +2209,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A6060000000000000000000B /* Views/Rig/ComputeCoresContentView.swift in Sources */,
+				A60600000000000000000009 /* Metal/ComputeChipShaders.metal in Sources */,
+				A60600000000000000000007 /* Metal/ComputeChipRenderer.swift in Sources */,
+				A60600000000000000000005 /* Metal/ComputeChipAnimation.swift in Sources */,
+				A60600000000000000000003 /* Metal/ComputeChipLayout.swift in Sources */,
+				A60600000000000000000001 /* Metal/ComputeChipProjection.swift in Sources */,
 				A10700000000000000000001 /* OperatorConsole/Services/RuneForgePolicyPicker.swift in Sources */,
 				A10700000000000000000002 /* OperatorConsole/ViewModels/RuneForgeViewModel.swift in Sources */,
 				A10700000000000000000003 /* OperatorConsole/Views/RuneForgeOperatorView.swift in Sources */,
@@ -2174,6 +2228,7 @@
 				A26B00000000000000000036 /* OperatorConsole/Models/OperatorConsoleModels.swift in Sources */,
 				A26B00000000000000000037 /* OperatorConsole/Services/OperatorManagerClient.swift in Sources */,
 				A26B00000000000000000038 /* OperatorConsole/ViewModels/AutonomyViewModel.swift in Sources */,
+				A60400000000000000000005 /* OperatorConsole/ViewModels/GuidedSetupReviewViewModel.swift in Sources */,
 				A26B00000000000000000039 /* OperatorConsole/ViewModels/ContinuityViewModel.swift in Sources */,
 				A26B00000000000000000040 /* OperatorConsole/ViewModels/EvidenceViewModel.swift in Sources */,
 				A26B00000000000000000041 /* OperatorConsole/ViewModels/ProjectsViewModel.swift in Sources */,
@@ -2200,6 +2255,7 @@
 				8780C2DA841D48FB83431C6E /* Metal/MetalLoadChart.swift in Sources */,
 				9F3A29352180427487EB1C7F /* Views/AgentsView.swift in Sources */,
 				A0FC0000000000000000000E /* Views/AppSidebarView.swift in Sources */,
+				A60400000000000000000001 /* Views/GraphiteWorkbench.swift in Sources */,
 				9DF3781457444A598959A011 /* Views/ContentView.swift in Sources */,
 				E8E583A90ACB4539867D4B8F /* Views/LiveFeedView.swift in Sources */,
 				508215B072784CB3936F6A9A /* Views/MCPServersView.swift in Sources */,
@@ -2663,7 +2719,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2679,7 +2735,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SKIP_INSTALL = YES;
@@ -2748,13 +2804,13 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -2775,7 +2831,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2794,7 +2850,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2814,7 +2870,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2832,7 +2888,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2848,7 +2904,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -2859,7 +2915,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2959,7 +3015,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2975,7 +3031,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -2989,7 +3045,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -3002,7 +3058,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -3052,7 +3108,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3076,7 +3132,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3100,7 +3156,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3124,7 +3180,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3180,7 +3236,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3189,7 +3245,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3205,7 +3261,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3214,7 +3270,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3229,7 +3285,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3237,7 +3293,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3253,7 +3309,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3261,7 +3317,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3276,13 +3332,13 @@
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.5;
+				MARKETING_VERSION = 0.17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

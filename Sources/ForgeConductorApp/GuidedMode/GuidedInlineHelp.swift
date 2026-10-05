@@ -8,26 +8,35 @@ struct GuidedInlineHelp: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "questionmark.circle.fill")
-                .foregroundStyle(.tint)
+                .foregroundStyle(GraphitePalette.info)
                 .font(.title3)
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.purpose)
-                    .font(.callout.weight(.medium))
+                    .font(.system(size: 13, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(state.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                 if let action = state.recommendedAction {
                     Text(action)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GraphitePalette.textSecondary)
                 }
             }
+            .multilineTextAlignment(.leading)
             Spacer(minLength: 12)
             Button("Open Guide", action: openGuide)
+                .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                 .accessibilityIdentifier("guided-inline-open")
         }
         .padding(12)
-        .background(.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .background(GraphitePalette.panelRaised, in: RoundedRectangle(cornerRadius: 9))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(GraphitePalette.info.opacity(0.4), lineWidth: 1)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("guided-inline-\(entry.context.rawValue)")
     }
@@ -46,8 +55,10 @@ struct GuidedHelpButton: View {
             coordinator.present(context)
         } label: {
             Image(systemName: "questionmark.circle")
+                .frame(minWidth: 24, minHeight: 24)
         }
         .buttonStyle(.borderless)
+        .foregroundStyle(GraphitePalette.info)
         .help("Open contextual guide")
         .accessibilityLabel("Open contextual guide")
         .accessibilityIdentifier("guided-help-\((context ?? coordinator.currentContext).rawValue)")
@@ -57,6 +68,7 @@ struct GuidedHelpButton: View {
 private struct GuidedHelpContextModifier: ViewModifier {
     @EnvironmentObject private var coordinator: GuidedModeCoordinator
     let context: GuidedHelpContext
+    let ownerToken: Binding<GuidedModeCoordinator.ContextToken?>
     @State private var token: GuidedModeCoordinator.ContextToken?
 
     private var presentedContext: Binding<GuidedHelpContext?> {
@@ -66,7 +78,9 @@ private struct GuidedHelpContextModifier: ViewModifier {
                 return coordinator.presentedContext
             },
             set: { value in
-                if value == nil { coordinator.dismiss() }
+                if value == nil, let token, ownerToken.wrappedValue == token {
+                    coordinator.dismiss()
+                }
             }
         )
     }
@@ -76,10 +90,12 @@ private struct GuidedHelpContextModifier: ViewModifier {
             .onAppear {
                 guard token == nil else { return }
                 token = coordinator.push(context)
+                ownerToken.wrappedValue = token
             }
             .onDisappear {
                 guard let token else { return }
                 coordinator.pop(token)
+                if ownerToken.wrappedValue == token { ownerToken.wrappedValue = nil }
                 self.token = nil
             }
             .sheet(item: presentedContext) { presentedContext in
@@ -97,6 +113,8 @@ private struct GuidedHelpContextModifier: ViewModifier {
                     )
                     .padding(24)
                     .frame(width: 520, height: 320)
+                    .background(GraphitePalette.canvas)
+                    .foregroundStyle(GraphitePalette.textPrimary)
                 }
             }
     }
@@ -117,8 +135,11 @@ private struct GuidedHelpStateModifier: ViewModifier {
 }
 
 extension View {
-    func guidedHelpContext(_ context: GuidedHelpContext) -> some View {
-        modifier(GuidedHelpContextModifier(context: context))
+    func guidedHelpContext(
+        _ context: GuidedHelpContext,
+        ownerToken: Binding<GuidedModeCoordinator.ContextToken?>
+    ) -> some View {
+        modifier(GuidedHelpContextModifier(context: context, ownerToken: ownerToken))
     }
 
     func guidedHelpState(_ state: GuidedHelpState, for context: GuidedHelpContext) -> some View {

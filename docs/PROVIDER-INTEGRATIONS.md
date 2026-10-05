@@ -1,6 +1,6 @@
 # Provider integrations
 
-Current source identity: version **0.16.5**, build **26**. Qualification remains
+Current source identity: version **0.17.0**, build **27**. Qualification remains
 evidence-bound per host and candidate.
 
 ## Current provider workflow
@@ -10,7 +10,21 @@ providers are LM Studio, Claude Code Desktop, and Codex Desktop. Grok Build is
 visible only for Forge-owned artifact cleanup and forward compatibility; it is
 not selectable.
 
-For LM Studio, selecting the provider, choosing **Connect and Check**, using the
+In Graphite Workbench, choosing a row in the Provider list only inspects that
+provider's details. Local inspection is separate from active-provider state and
+dispatches no activation or integration request. Use the explicit activation
+toggle to select a provider. See [Graphite Workbench](GRAPHITE-WORKBENCH.md) for
+this phase's completed native parity and visual QA, with exact evidence
+classes and limits.
+
+Unsaved LM Studio Advanced changes disable the connection and probe actions
+in the Provider header. The provider card keeps its existing eligibility rules: its action may
+remain available, but the LM Studio connection guard reports **Save or discard
+the LM Studio Advanced changes before reconnecting** before starting preparation.
+Turning off the selected provider keeps it active and asks the operator to
+choose another provider to switch execution.
+
+For LM Studio, activating the provider, choosing **Connect and Check**, using the
 Advanced connection check, and invoking the probe all use the same Manager
 preparation contract. None of those actions starts or resumes a Managed Run.
 

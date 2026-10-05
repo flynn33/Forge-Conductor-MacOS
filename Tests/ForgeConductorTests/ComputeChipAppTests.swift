@@ -1,0 +1,654 @@
+import AppKit
+import MetalKit
+import SwiftUI
+import XCTest
+import ForgeConductorCore
+import Darwin
+#if SWIFT_PACKAGE
+@testable import ForgeConductorApp
+#else
+@testable import Forge_Conductor
+#endif
+
+@MainActor
+final class ComputeChipAppTests: XCTestCase {
+    func testProjectionClampsFiniteValuesAndNeverTurnsMissingIntoIdle() {
+        let projection = project(cpu: cpu(values: [-10, 50, 110, .nan], quality: .perLogicalProcessor))
+        XCTAssertEqual(projection.cpu.activity[0], 0)
+        XCTAssertEqual(projection.cpu.activity[1], 0.5)
+        XCTAssertEqual(projection.cpu.activity[2], 1)
+        XCTAssertNil(projection.cpu.activity[3])
+        XCTAssertNil(ComputeChipSnapshot.fraction(.infinity))
+        XCTAssertNil(ComputeChipSnapshot.fraction(nil))
+        XCTAssertEqual(projection.cpu.name, "Apple M5 Max")
+        let missing = project(cpu: nil)
+        XCTAssertTrue(missing.cpu.activity.isEmpty)
+        XCTAssertEqual(missing.cpu.label(at: 100, paused: false), "Activity unavailable")
+    }
+
+    func testBlankHardwareNamesStayVisibleWithoutDiscardingRegistryMatchedActivity() {
+        for blank in ["", " \n\t "] {
+            var processor = cpu(values: [20, 0], quality: .perLogicalProcessor)
+            processor.brand = blank
+            let snapshot = ComputeChipSnapshot.project(
+                cpu: processor, gpu: [gpu()],
+                devices: [.init(name: blank, registryID: 42)], now: 100)
+            XCTAssertEqual(snapshot.cpu.name, "CPU identity unavailable")
+            XCTAssertEqual(snapshot.gpu.name, "GPU identity unavailable")
+            XCTAssertEqual(snapshot.cpu.activity, [0.2, 0])
+            XCTAssertEqual(snapshot.gpu.quality, .measured)
+            XCTAssertEqual(snapshot.gpu.observedAt, 100)
+            XCTAssertTrue(snapshot.gpu.activity.allSatisfy { $0 == 0.6 })
+            XCTAssertEqual(snapshot.gpu.engineReadings, "Device 60% · Renderer 20% · Tiler 12%")
+        }
+        let unidentified = ComputeChipSnapshot.project(cpu: nil, gpu: [gpu()], devices: [], now: 100)
+        XCTAssertEqual(unidentified.cpu.name, "CPU identity unavailable")
+        XCTAssertEqual(unidentified.gpu.name, "GPU identity unavailable")
+        XCTAssertEqual(unidentified.gpu.quality, .unavailable)
+        XCTAssertTrue(unidentified.gpu.activity.allSatisfy { $0 == nil })
+    }
+
+    func testRawCPUModelIdentifierAndNonemptyGPUVariantArePreserved() {
+        var processor = cpu(values: [20, 0], quality: .perLogicalProcessor)
+        processor.brand = "  Mac16,13  "
+        let variant = "AMD Radeon RX 7900 XTX — External Engineering Variant"
+        let snapshot = ComputeChipSnapshot.project(
+            cpu: processor, gpu: [gpu()],
+            devices: [.init(name: " \n" + variant + "\t ", registryID: 42)], now: 100)
+        XCTAssertEqual(snapshot.cpu.name, "Mac16,13")
+        XCTAssertEqual(snapshot.gpu.name, variant)
+        XCTAssertEqual(snapshot.gpu.quality, .measured)
+        XCTAssertTrue(snapshot.gpu.activity.allSatisfy { $0 == 0.6 })
+    }
+
+    func testEqualMeasuredCPUValuesRemainMeasuredAndFallbackIsExplicit() {
+        let measured = project(cpu: cpu(values: [18, 18, 18, 18], quality: .perLogicalProcessor))
+        XCTAssertEqual(measured.cpu.quality, .measured)
+        XCTAssertEqual(measured.cpu.activity.compactMap { $0 }, [0.18, 0.18, 0.18, 0.18])
+        XCTAssertTrue(measured.provenance.contains("logical-processor activity"))
+        let fallback = project(cpu: cpu(values: [18, 18, 18, 18], quality: .hostAggregateFallback))
+        XCTAssertEqual(fallback.cpu.quality, .aggregateFallback)
+        XCTAssertTrue(fallback.provenance.contains("host aggregate fallback; regions illustrative"))
+        let warming = project(cpu: cpu(values: [0, 0, 0, 0], quality: .warmingUp))
+        XCTAssertTrue(warming.cpu.activity.allSatisfy { $0 == nil })
+        XCTAssertEqual(warming.cpu.label(at: 100, paused: false), "Warming up")
+        let unknown = project(cpu: cpu(values: [0, 0, 0, 0], quality: .unknown))
+        XCTAssertEqual(unknown.cpu.label(at: 100, paused: false), "Provenance unavailable")
+    }
+
+    func testGPUAssociationRequiresExactRegistryIdentityAndKeepsIndependentTime() {
+        let devices = [ComputeGPUIdentity(name: "Unmatched local device", registryID: 9),
+                       ComputeGPUIdentity(name: "Apple M5 Max", registryID: 42)]
+        let sample = gpu(registryID: 42, observedAt: 96, percent: 65)
+        let snapshot = ComputeChipSnapshot.project(cpu: cpu(values: [20, 0], quality: .perLogicalProcessor),
+                                                   gpu: [sample], devices: devices, now: 100)
+        XCTAssertEqual(snapshot.gpu.name, "Apple M5 Max")
+        XCTAssertEqual(snapshot.gpu.observedAt, 96)
+        XCTAssertEqual(snapshot.gpu.label(at: 100, paused: false), "Stale activity")
+        XCTAssertEqual(snapshot.cpu.label(at: 100, paused: false), "Active")
+        XCTAssertTrue(snapshot.gpu.validActivity(at: 100).allSatisfy { $0 == nil })
+        let unmatched = ComputeChipSnapshot.project(cpu: nil, gpu: [gpu(registryID: 77)], devices: devices, now: 100)
+        XCTAssertEqual(unmatched.gpu.name, "Unmatched local device")
+        XCTAssertEqual(unmatched.gpu.quality, .unavailable)
+        XCTAssertTrue(unmatched.gpu.activity.allSatisfy { $0 == nil })
+        XCTAssertTrue(unmatched.gpu.engineReadings.isEmpty)
+    }
+
+    func testOversizedLogicalTopologyGroupsTruthfullyAndIncludesEveryProcessor() {
+        let projected = project(cpu: cpu(values: Array(repeating: 40, count: 300), quality: .perLogicalProcessor))
+        XCTAssertEqual(projected.cpu.logicalCount, 300)
+        XCTAssertEqual(projected.cpu.activity.count, 256)
+        XCTAssertTrue(projected.cpu.activity.allSatisfy { abs(($0 ?? -1) - 0.4) < 0.00001 })
+        XCTAssertTrue(projected.provenance.contains("grouped logical-processor activity"))
+        var incomplete = cpu(values: Array(repeating: 40, count: 299), quality: .perLogicalProcessor)
+        incomplete.countLogical = 300
+        XCTAssertNil(project(cpu: incomplete).cpu.activity.last!)
+    }
+
+    func testChipLayoutIsBoundedStableAndStacksOnlyInsideNarrowFrame() {
+        for count in [0, 1, 24, 256, 4_096] {
+            let normal = ComputeChipLayout.make(width: 1_060, cpuRegionCount: count)
+            let repeated = ComputeChipLayout.make(width: 1_060, cpuRegionCount: count)
+            let narrow = ComputeChipLayout.make(width: 580, cpuRegionCount: count)
+            XCTAssertFalse(normal.stacked)
+            XCTAssertTrue(narrow.stacked)
+            XCTAssertEqual(normal.cpuPackage.width, normal.cpuPackage.height)
+            XCTAssertEqual(narrow.gpuPackage.width, narrow.gpuPackage.height)
+            XCTAssertEqual(normal.instances, repeated.instances)
+            XCTAssertLessThanOrEqual(normal.instances.count, ComputeChipLayout.maximumInstances)
+            XCTAssertLessThanOrEqual(normal.routes.count, ComputeChipAnimation.maximumRoutes)
+            XCTAssertEqual(normal.cpuRegions.count, min(max(count, 1), 256))
+            XCTAssertTrue(normal.cpuRegions.allSatisfy { normal.cpuPackage.contains($0) })
+            XCTAssertTrue(normal.cpuRegions.allSatisfy { $0.width > 0 && $0.height > 0 })
+            XCTAssertEqual(normal.size.height, ComputeChipLayout.height(for: 1_060))
+            XCTAssertGreaterThan(narrow.gpuPanel.minY, narrow.cpuPanel.maxY)
+        }
+    }
+
+    func testChipsUseCompactReferenceFootprintAndFourSidedBoundedFanout() {
+        for width: CGFloat in [1_060, 760, 580, 280] {
+            let layout = ComputeChipLayout.make(width: width, cpuRegionCount: 256)
+            let panelWidth = width < 760 ? width : (width - 20) / 2
+            let priorPackageWidth = min(390, max(220, panelWidth - 70))
+            for package in [layout.cpuPackage, layout.gpuPackage] {
+                XCTAssertEqual(package.width, priorPackageWidth * 0.46, accuracy: 0.0001)
+                XCTAssertEqual(package.height, priorPackageWidth * 0.46, accuracy: 0.0001)
+            }
+            XCTAssertEqual(layout.routes.count, 64)
+            XCTAssertTrue(layout.cpuRegions.allSatisfy { $0.width > 0 && $0.height > 0 })
+            let gpuRegions = layout.instances.filter { $0.properties.x == 4 && $0.properties.y >= 256 }
+            XCTAssertEqual(gpuRegions.map { Int($0.properties.y) }, Array(256...271))
+            XCTAssertTrue(gpuRegions.allSatisfy { $0.rect.z > 0 && $0.rect.w > 0 })
+            for channel in 0..<2 {
+                let package = channel == 0 ? layout.cpuPackage : layout.gpuPackage
+                let crop = channel == 0 ? ComputeChipReferenceGeometry.cpuCrop : ComputeChipReferenceGeometry.gpuCrop
+                let groups = channel == 0 ? ComputeChipReferenceGeometry.cpuContactGroups : ComputeChipReferenceGeometry.gpuContactGroups
+                let contacts = layout.routes.filter { $0.channel == channel }.compactMap { $0.points.first }.map { point in
+                    CGPoint(x: crop.minX + (CGFloat(point.x) - package.minX) / package.width * crop.width,
+                            y: crop.minY + (CGFloat(point.y) - package.minY) / package.height * crop.height)
+                }
+                XCTAssertEqual(contacts.count, 32)
+                XCTAssertTrue(contacts.allSatisfy { point in groups.contains { $0.insetBy(dx: -0.01, dy: -0.01).contains(point) } },
+                              "Every animated trace starts at a photographed gold contact")
+                let upperY: CGFloat = channel == 0 ? 346 : 335
+                let lowerY: CGFloat = channel == 0 ? 772 : 787
+                let leftX: CGFloat = channel == 0 ? 192 : 830
+                let rightX: CGFloat = channel == 0 ? 594 : 1284
+                XCTAssertEqual(contacts.filter { abs($0.y - upperY) < 0.01 }.count, 8)
+                XCTAssertEqual(contacts.filter { abs($0.y - lowerY) < 0.01 }.count, 8)
+                XCTAssertEqual(contacts.filter { abs($0.x - leftX) < 0.01 }.count, 8)
+                XCTAssertEqual(contacts.filter { abs($0.x - rightX) < 0.01 }.count, 8)
+            }
+        }
+    }
+
+    func testSingleLogicalProcessorOnlyChangesItsOwnEnvelope() {
+        let snapshot = project(cpu: cpu(values: [0, 0, 88, 0], quality: .perLogicalProcessor))
+        var animation = ComputeChipAnimation()
+        _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100, motionAllowed: true, paused: false)
+        XCTAssertTrue(animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100, motionAllowed: true, paused: false))
+        XCTAssertGreaterThan(animation.values[2], 0)
+        XCTAssertEqual(animation.values[0], 0)
+        XCTAssertEqual(animation.values[1], 0)
+        XCTAssertEqual(animation.values[3], 0)
+        XCTAssertEqual(animation.values[2], 0.88 * (1 - exp(-0.1 / 0.18)), accuracy: 0.00001)
+        var hugeDelta = ComputeChipAnimation()
+        _ = hugeDelta.advance(snapshot: snapshot, monotonic: 0, wallTime: 100, motionAllowed: true, paused: false)
+        _ = hugeDelta.advance(snapshot: snapshot, monotonic: 10_000, wallTime: 100, motionAllowed: true, paused: false)
+        XCTAssertEqual(hugeDelta.values[2], animation.values[2], accuracy: 0.00001)
+    }
+
+    func testDecorativeTraceBedAndPulseHaloClearNativeHeaderAndStatusSlots() {
+        for width: CGFloat in [1_060, 760, 580, 280] {
+            let layout = ComputeChipLayout.make(width: width, cpuRegionCount: 24)
+            for route in layout.routes {
+                let panel = route.channel == 0 ? layout.cpuPanel : layout.gpuPanel
+                let header = CGRect(x: panel.minX, y: panel.minY, width: panel.width, height: 78)
+                let status = CGRect(x: panel.minX, y: panel.maxY - 112, width: panel.width, height: 112)
+                let xs = route.points.map { CGFloat($0.x) }
+                let ys = route.points.map { CGFloat($0.y) }
+                let traceBounds = CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!,
+                                         height: ys.max()! - ys.min()!).insetBy(dx: -8, dy: -8)
+                XCTAssertFalse(header.intersects(traceBounds), "Width \(width), route \(route.seed)")
+                XCTAssertFalse(status.intersects(traceBounds), "Width \(width), route \(route.seed)")
+                XCTAssertTrue(panel.contains(traceBounds), "Trace halos remain inside their component panel")
+            }
+        }
+    }
+
+    func testPauseRetainsShadingAcrossLaterWallTimeAndReduceMotionHasNoPulses() {
+        let snapshot = project(cpu: cpu(values: [25, 70], quality: .perLogicalProcessor),
+                               samples: [gpu(percent: 60)])
+        var animation = ComputeChipAnimation()
+        XCTAssertFalse(animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100,
+                                         motionAllowed: true, paused: true))
+        let frozen = animation.values
+        XCTAssertFalse(animation.advance(snapshot: snapshot, monotonic: 20, wallTime: 120,
+                                         motionAllowed: true, paused: true))
+        XCTAssertEqual(animation.values, frozen)
+        XCTAssertEqual(animation.values[0], 0.25)
+        XCTAssertEqual(animation.values[256], 0.6)
+        XCTAssertEqual(snapshot.cpu.label(at: 120, paused: true), "Paused")
+        XCTAssertFalse(animation.advance(snapshot: snapshot, monotonic: 21, wallTime: 100,
+                                         motionAllowed: false, paused: false))
+        let routes = ComputeChipLayout.make(width: 1_060, cpuRegionCount: 2).routes
+        XCTAssertTrue(animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                               motionAllowed: false, paused: false).isEmpty)
+    }
+
+    func testTraceFollowsPolylineCornersAndPulseSlotsAreBoundedDeterministic() {
+        let route = ComputeTraceRoute(points: [SIMD2(0, 0), SIMD2(20, 0), SIMD2(20, 20)], channel: 0, seed: 1)
+        XCTAssertEqual(route.length, 40)
+        XCTAssertEqual(route.point(at: 10).position, SIMD2(10, 0))
+        XCTAssertEqual(route.point(at: 30).position, SIMD2(20, 10))
+        XCTAssertEqual(route.point(at: 30).angle, .pi / 2, accuracy: 0.00001)
+        let snapshot = project(cpu: cpu(values: [80], quality: .perLogicalProcessor))
+        var animation = ComputeChipAnimation()
+        _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100, motionAllowed: true, paused: false)
+        _ = animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100, motionAllowed: true, paused: false)
+        let routes = Array(repeating: route, count: 400)
+        let pulses = animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100, motionAllowed: true, paused: false)
+        XCTAssertEqual(pulses.count, 192)
+        XCTAssertEqual(pulses, animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100, motionAllowed: true, paused: false))
+        XCTAssertTrue(animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 105, motionAllowed: true, paused: false).isEmpty)
+    }
+
+    func testStaleGPUStopsWhileFreshCPUStillMovesAndInvalidChannelsRemainDark() {
+        let snapshot = project(cpu: cpu(values: [80], quality: .perLogicalProcessor),
+                               samples: [gpu(observedAt: 96, percent: 80)])
+        var animation = ComputeChipAnimation()
+        _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100, motionAllowed: true, paused: false)
+        XCTAssertTrue(animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100, motionAllowed: true, paused: false))
+        XCTAssertGreaterThan(animation.phase[0], 0)
+        XCTAssertEqual(animation.phase[1], 0)
+        XCTAssertEqual(animation.values[256], 0.8, accuracy: 0.00001)
+    }
+
+    func testFreshInvalidChannelImmediatelyStopsOnlyItsPreviouslyActiveTrace() {
+        let routes = [
+            ComputeTraceRoute(points: [SIMD2(0, 0), SIMD2(100, 0)], channel: 0, seed: 0),
+            ComputeTraceRoute(points: [SIMD2(0, 10), SIMD2(100, 10)], channel: 1, seed: 1),
+        ]
+        let qualities: [ComputeActivityQuality] = [.unavailable, .warmingUp, .unknown, .measured, .aggregateFallback]
+        for channel in 0..<2 {
+            for quality in qualities {
+                var snapshot = project(cpu: cpu(values: [80], quality: .perLogicalProcessor),
+                                       samples: [gpu(percent: 60)])
+                var animation = ComputeChipAnimation()
+                _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100, motionAllowed: true, paused: false)
+                _ = animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100, motionAllowed: true, paused: false)
+                XCTAssertEqual(animation.active, [true, true])
+                let priorPhase = animation.phase[channel]
+                var invalid = channel == 0 ? snapshot.cpu : snapshot.gpu
+                invalid.quality = quality
+                invalid.observedAt = 100.1
+                invalid.activity = Array(repeating: nil, count: invalid.activity.count)
+                if channel == 0 { snapshot.cpu = invalid } else { snapshot.gpu = invalid }
+
+                XCTAssertTrue(animation.advance(snapshot: snapshot, monotonic: 0.2, wallTime: 100.1,
+                                                 motionAllowed: true, paused: false))
+                XCTAssertFalse(animation.active[channel], "\(quality), channel \(channel)")
+                XCTAssertTrue(animation.active[1 - channel])
+                XCTAssertEqual(animation.phase[channel], priorPhase)
+                XCTAssertEqual(animation.values[channel == 0 ? 0 : 256], -1)
+                let pulses = animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100.1,
+                                                      motionAllowed: true, paused: false)
+                XCTAssertEqual(pulses.count, 3)
+                XCTAssertTrue(pulses.allSatisfy { Int($0.properties.z) == 1 - channel })
+
+                invalid.quality = .measured
+                invalid.activity = Array(repeating: 0.015, count: invalid.activity.count)
+                if channel == 0 { snapshot.cpu = invalid } else { snapshot.gpu = invalid }
+                _ = animation.advance(snapshot: snapshot, monotonic: 0.3, wallTime: 100.1,
+                                      motionAllowed: true, paused: false)
+                XCTAssertFalse(animation.active[channel], "An invalid sample must also clear the previous hold")
+            }
+        }
+    }
+
+    func testMeasuredIdleRetainsBoundedTraceHysteresisAfterActivity() {
+        var snapshot = project(cpu: cpu(values: [80], quality: .perLogicalProcessor), samples: [gpu(percent: 0)])
+        var animation = ComputeChipAnimation()
+        _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100, motionAllowed: true, paused: false)
+        _ = animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100, motionAllowed: true, paused: false)
+        snapshot.cpu.activity = [0]
+        _ = animation.advance(snapshot: snapshot, monotonic: 0.2, wallTime: 100, motionAllowed: true, paused: false)
+        XCTAssertTrue(animation.active[0], "Measured idle keeps its short visual hold")
+        for time in [0.3, 0.4, 0.5] {
+            _ = animation.advance(snapshot: snapshot, monotonic: time, wallTime: 100, motionAllowed: true, paused: false)
+        }
+        XCTAssertFalse(animation.active[0], "Measured idle releases the hold after 350ms")
+    }
+
+    private func project(cpu: CPUMetrics?, samples: [GPUMetrics] = []) -> ComputeChipSnapshot {
+        ComputeChipSnapshot.project(cpu: cpu, gpu: samples,
+                                    devices: [.init(name: "Apple M5 Max", registryID: 42)], now: 100)
+    }
+    private func cpu(values: [Double], quality: CPUSampleQuality) -> CPUMetrics {
+        CPUMetrics(percent: 18, perCPU: values, countLogical: values.count, countPhysical: values.count,
+                   freqMHz: nil, freqPerCoreMHz: nil, loadAvg: (0, 0, 0), brand: "Apple M5 Max",
+                   user: 0, system: 0, idle: 0, sampleQuality: quality, observedAt: 100)
+    }
+    private func gpu(registryID: UInt64? = 42, observedAt: Double = 100, percent: Double = 60) -> GPUMetrics {
+        GPUMetrics(vendor: "Apple", name: "Observed registry name", utilGPU: percent, utilRenderer: 20, utilTiler: 12,
+                   memUsedMiB: nil, memTotalMiB: 0, cores: nil, metal: true, registryID: registryID, observedAt: observedAt)
+    }
+}
+
+#if !SWIFT_PACKAGE
+@MainActor
+final class ComputeChipNativeLifecycleTests: XCTestCase, @unchecked Sendable {
+    private let directEvidence = DirectNativeFixtureEvidenceWriter()
+    private var hiddenWindows: [NSWindow] = []
+    private var fixture: ComputeNativeFixture?
+
+    nonisolated override func setUp() async throws { try await isolateHost() }
+    private func isolateHost() throws {
+        continueAfterFailure = true
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw XCTSkip("Native Compute evidence requires an application host and display")
+        }
+        guard ComputeChipResources.shared.pipeline() != nil else {
+            XCTFail(ComputeChipResources.shared.failureReason ?? "Compiled Metal chip pipeline unavailable")
+            throw NSError(domain: "ComputeNative", code: 1)
+        }
+        try directEvidence.configure(testName: name)
+        if NSApp.isHidden { NSApp.unhideWithoutActivation() }
+        hiddenWindows = NSApp.windows.filter(\.isVisible)
+        hiddenWindows.forEach { $0.orderOut(nil) }
+    }
+    nonisolated override func tearDown() async throws { await restoreHost() }
+    private func restoreHost() async {
+        fixture?.close(); fixture = nil
+        hiddenWindows.forEach { $0.orderFront(nil) }; hiddenWindows.removeAll()
+    }
+
+    func testCompiledChipCommandsCompleteAndReuseBuffersAcrossSamplesAndResize() async throws {
+        let fixture = mount(paused: true)
+        await require { fixture.diagnostics.snapshot().completedCommands > 0 }
+        let baseline = fixture.diagnostics.snapshot()
+        XCTAssertEqual(baseline.failedCommands, 0)
+        XCTAssertEqual(baseline.activeSurfaces, 1)
+        XCTAssertEqual(baseline.ownedBuffers, 7)
+        XCTAssertEqual(baseline.activeClocks, 0)
+        XCTAssertEqual(baseline.vertexFunction, "compute_chip_vertex")
+        XCTAssertEqual(baseline.fragmentFunction, "compute_chip_fragment")
+        XCTAssertFalse(baseline.libraryOrigin.isEmpty)
+        fixture.update(percent: 70, paused: true)
+        await require { fixture.diagnostics.snapshot().completedCommands > baseline.completedCommands }
+        XCTAssertEqual(fixture.diagnostics.snapshot().geometryRebuilds, baseline.geometryRebuilds)
+        let prior = fixture.diagnostics.snapshot().completedCommands
+        fixture.resize(width: 580)
+        await require { fixture.diagnostics.snapshot().completedCommands > prior }
+        XCTAssertTrue(fixture.renderer.layout?.stacked == true)
+        XCTAssertEqual(fixture.diagnostics.snapshot().ownedBuffers, 7)
+        XCTAssertLessThanOrEqual(fixture.diagnostics.snapshot().maximumInFlightSlots, 3)
+        retain("compiled-demand-resize", fixture.diagnostics.snapshot())
+        fixture.close()
+        await require { fixture.diagnostics.snapshot().ownedBuffers == 0 && fixture.diagnostics.snapshot().inFlightSlots == 0 }
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeSurfaces, 0)
+    }
+
+    func testClockStopsWhenScrolledOffscreenAndOrderedOutThenResumesOnce() async throws {
+        let fixture = mount(paused: true)
+        await require { fixture.diagnostics.snapshot().completedCommands > 0 }
+        try await measurePhase("paused-baseline", fixture: fixture)
+        fixture.update(percent: 35, paused: false)
+        await require { fixture.diagnostics.snapshot().animationFrames >= 3 }
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeClocks, 1)
+        XCTAssertLessThanOrEqual(fixture.surface.preferredFramesPerSecond, 30)
+        try await measurePhase("visible-active", fixture: fixture)
+        fixture.scrollAway()
+        await require { fixture.diagnostics.snapshot().activeClocks == 0 && fixture.diagnostics.snapshot().inFlightSlots == 0 }
+        let hidden = fixture.diagnostics.snapshot().submissions
+        try await measurePhase("scrolled-hidden", fixture: fixture)
+        XCTAssertEqual(fixture.diagnostics.snapshot().submissions, hidden)
+        fixture.update(percent: 70, paused: false)
+        fixture.scrollBack()
+        await require { fixture.diagnostics.snapshot().submissions > hidden && fixture.diagnostics.snapshot().activeClocks == 1 }
+        fixture.window.orderOut(nil)
+        await require { fixture.diagnostics.snapshot().activeClocks == 0 && fixture.diagnostics.snapshot().inFlightSlots == 0 }
+        let orderedOut = fixture.diagnostics.snapshot().submissions
+        await events(0.35)
+        XCTAssertEqual(fixture.diagnostics.snapshot().submissions, orderedOut)
+        retain("viewport-and-window-quiescence", fixture.diagnostics.snapshot())
+    }
+
+    func testDrawableReadbackRetainsOneInFlightCommandAndOnlyLatestPendingRequest() async throws {
+        let fixture = mount(paused: true)
+        await require { fixture.diagnostics.snapshot().completedCommands > 0
+            && fixture.diagnostics.snapshot().inFlightSlots == 0 }
+        var delivered: [Int] = []
+        fixture.renderer.requestReadback { _ in delivered.append(1) }
+        fixture.surface.draw()
+        fixture.renderer.requestReadback { _ in delivered.append(2) }
+        fixture.surface.draw()
+        fixture.renderer.requestReadback { _ in delivered.append(3) }
+        fixture.surface.draw()
+        await require { delivered == [1, 3] && fixture.diagnostics.snapshot().inFlightReadbacks == 0
+            && fixture.surface.framebufferOnly }
+        let observation = fixture.diagnostics.snapshot()
+        XCTAssertEqual(delivered, [1, 3], "The intermediate pending callback must be replaced, not queued")
+        XCTAssertEqual(observation.maximumInFlightReadbacks, 1)
+        XCTAssertEqual(observation.inFlightReadbacks, 0)
+        XCTAssertEqual(observation.failedCommands, 0)
+        XCTAssertEqual(observation.ownedBuffers, 7)
+        retain("one-in-flight-readback-and-latest-pending", observation)
+        fixture.close()
+        await require { fixture.diagnostics.snapshot().ownedBuffers == 0
+            && fixture.diagnostics.snapshot().inFlightSlots == 0
+            && fixture.diagnostics.snapshot().inFlightReadbacks == 0 }
+    }
+
+    func testPausedAndReducedMotionDrawStaticFramesWithoutRecurringClock() async throws {
+        let fixture = mount(paused: true)
+        await require { fixture.diagnostics.snapshot().completedCommands > 0 }
+        await events(0.15)
+        let paused = fixture.diagnostics.snapshot().submissions
+        await events(0.35)
+        XCTAssertEqual(fixture.diagnostics.snapshot().submissions, paused)
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeClocks, 0)
+        fixture.update(percent: 80, paused: false, reduceMotion: true)
+        await require { fixture.diagnostics.snapshot().submissions > paused }
+        await events(0.15)
+        let reduced = fixture.diagnostics.snapshot().submissions
+        await events(0.35)
+        XCTAssertEqual(fixture.diagnostics.snapshot().submissions, reduced)
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeClocks, 0)
+        XCTAssertTrue(fixture.surface.isPaused)
+        retain("paused-and-reduced-motion", fixture.diagnostics.snapshot())
+    }
+
+    func testMinimizedOccludedAndRepeatedlyReopenedNativeChipsReleaseAndResumeOneClock() async throws {
+        let initial = mount(paused: false)
+        await require { initial.diagnostics.snapshot().animationFrames >= 3 }
+        initial.window.miniaturize(nil)
+        await require { initial.window.isMiniaturized && initial.diagnostics.snapshot().activeClocks == 0
+            && initial.diagnostics.snapshot().inFlightSlots == 0 }
+        let minimized = initial.diagnostics.snapshot().submissions
+        await events(0.3)
+        XCTAssertEqual(initial.diagnostics.snapshot().submissions, minimized)
+        initial.update(percent: 45, paused: false)
+        initial.window.deminiaturize(nil)
+        initial.window.makeKeyAndOrderFront(nil)
+        await require { !initial.window.isMiniaturized && initial.diagnostics.snapshot().submissions > minimized
+            && initial.diagnostics.snapshot().activeClocks == 1 }
+
+        let cover = NSWindow(contentRect: initial.window.frame.insetBy(dx: -24, dy: -24),
+                             styleMask: [.borderless], backing: .buffered, defer: false)
+        cover.isReleasedWhenClosed = false
+        cover.isOpaque = true; cover.backgroundColor = .black
+        defer { cover.orderOut(nil); cover.close() }
+        cover.orderFrontRegardless()
+        await require { !initial.window.occlusionState.contains(.visible)
+            && initial.diagnostics.snapshot().activeClocks == 0 && initial.diagnostics.snapshot().inFlightSlots == 0 }
+        XCTAssertTrue(initial.window.isVisible, "This assertion distinguishes native occlusion from orderOut")
+        let occluded = initial.diagnostics.snapshot().submissions
+        await events(0.3)
+        XCTAssertEqual(initial.diagnostics.snapshot().submissions, occluded)
+        initial.update(percent: 45, paused: false)
+        cover.orderOut(nil)
+        initial.window.makeKeyAndOrderFront(nil)
+        await require { initial.window.occlusionState.contains(.visible)
+            && initial.diagnostics.snapshot().submissions > occluded && initial.diagnostics.snapshot().activeClocks == 1 }
+        retain("minimized-fully-occluded-and-resumed", initial.diagnostics.snapshot())
+        initial.close()
+        await require { initial.diagnostics.snapshot().ownedBuffers == 0 && initial.diagnostics.snapshot().inFlightSlots == 0 }
+
+        for cycle in 1...12 {
+            let reopened = mount(paused: false)
+            await require { reopened.diagnostics.snapshot().completedCommands > 0
+                && reopened.diagnostics.snapshot().activeClocks == 1 }
+            let mounted = reopened.diagnostics.snapshot()
+            XCTAssertEqual(mounted.activeSurfaces, 1, "Cycle \(cycle)")
+            XCTAssertEqual(mounted.ownedBuffers, 7, "Cycle \(cycle)")
+            reopened.close()
+            await require { reopened.diagnostics.snapshot().ownedBuffers == 0 && reopened.diagnostics.snapshot().inFlightSlots == 0 }
+            let released = reopened.diagnostics.snapshot()
+            XCTAssertEqual(released.activeSurfaces, 0, "Cycle \(cycle)")
+            XCTAssertEqual(released.activeClocks, 0, "Cycle \(cycle)")
+            XCTAssertEqual(released.failedCommands, 0, "Cycle \(cycle)")
+            retain("reopen-cycle-\(cycle)-released", released)
+        }
+    }
+
+    func testPowerStateNotificationFromBackgroundDeliversOnMainActorAndDetaches() async throws {
+        let fixture = mount(paused: true)
+        await require { fixture.diagnostics.snapshot().completedCommands > 0
+            && fixture.diagnostics.snapshot().inFlightSlots == 0 }
+        await events(0.15)
+        XCTAssertTrue(fixture.surface.hasPowerStateObservation)
+        let before = fixture.diagnostics.snapshot()
+        let deliveredBefore = fixture.surface.powerStateNotificationCount
+        let postedOnMain = await Task.detached {
+            let postedOnMain = Thread.isMainThread
+            NotificationCenter.default.post(name: .NSProcessInfoPowerStateDidChange,
+                                             object: ProcessInfo.processInfo)
+            return postedOnMain
+        }.value
+        XCTAssertFalse(postedOnMain, "The test must exercise Foundation's documented background delivery origin")
+        await require { fixture.surface.powerStateNotificationCount == deliveredBefore + 1
+            && fixture.diagnostics.snapshot().completedCommands > before.completedCommands }
+        XCTAssertEqual(fixture.surface.preferredFramesPerSecond,
+                       ProcessInfo.processInfo.isLowPowerModeEnabled ? 15 : 30)
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeClocks, 0)
+        XCTAssertEqual(fixture.diagnostics.snapshot().failedCommands, 0)
+        fixture.close()
+        await require { fixture.diagnostics.snapshot().ownedBuffers == 0
+            && fixture.diagnostics.snapshot().inFlightSlots == 0 }
+        XCTAssertFalse(fixture.surface.hasPowerStateObservation)
+        let detached = fixture.diagnostics.snapshot()
+        let deliveredAtDetach = fixture.surface.powerStateNotificationCount
+        await Task.detached {
+            NotificationCenter.default.post(name: .NSProcessInfoPowerStateDidChange,
+                                             object: ProcessInfo.processInfo)
+        }.value
+        await events(0.15)
+        XCTAssertEqual(fixture.surface.powerStateNotificationCount, deliveredAtDetach)
+        XCTAssertEqual(fixture.diagnostics.snapshot().submissions, detached.submissions)
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeSurfaces, 0)
+        XCTAssertEqual(fixture.diagnostics.snapshot().activeClocks, 0)
+        XCTAssertEqual(fixture.diagnostics.snapshot().ownedBuffers, 0)
+        retain("background-power-state-delivery-and-detach", fixture.diagnostics.snapshot())
+    }
+
+    private func mount(paused: Bool) -> ComputeNativeFixture {
+        let fixture = ComputeNativeFixture(paused: paused)
+        self.fixture = fixture
+        fixture.window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        fixture.window.displayIfNeeded()
+        return fixture
+    }
+    private func wait(timeout: Double = 4, predicate: @escaping () -> Bool) async -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            if predicate() { return true }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return predicate()
+    }
+    private func require(file: StaticString = #filePath, line: UInt = #line,
+                         predicate: @escaping () -> Bool) async {
+        let succeeded = await wait(predicate: predicate)
+        XCTAssertTrue(succeeded, "Expected bounded native Compute transition", file: file, line: line)
+    }
+    private func events(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
+    private func retain(_ name: String, _ snapshot: ComputeChipRendererObservation) {
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        do { try directEvidence.save(data, name: "compute-\(name)", extension: "json") }
+        catch { XCTFail("Could not preserve the exact native Compute observation: \(error)") }
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "compute-\(name)"; attachment.lifetime = .keepAlways
+        if !directEvidence.isEnabled { add(attachment) }
+    }
+    private struct ProcessMeasurement {
+        let uptime: Double
+        let userSeconds: Double
+        let systemSeconds: Double
+    }
+    private func processMeasurement() throws -> ProcessMeasurement {
+        var usage = rusage()
+        guard getrusage(Int32(RUSAGE_SELF), &usage) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        func seconds(_ value: timeval) -> Double { Double(value.tv_sec) + Double(value.tv_usec) / 1_000_000 }
+        return ProcessMeasurement(uptime: ProcessInfo.processInfo.systemUptime,
+                                  userSeconds: seconds(usage.ru_utime), systemSeconds: seconds(usage.ru_stime))
+    }
+    private func measurePhase(_ name: String, fixture: ComputeNativeFixture) async throws {
+        await events(0.2)
+        let before = try processMeasurement()
+        let resourcesBefore = fixture.diagnostics.snapshot()
+        await events(1.5)
+        let after = try processMeasurement()
+        let elapsed = after.uptime - before.uptime
+        let user = after.userSeconds - before.userSeconds
+        let system = after.systemSeconds - before.systemSeconds
+        let resourcesAfter = fixture.diagnostics.snapshot()
+        let json: [String: Any] = [
+            "phase": name, "wall_seconds": elapsed, "process_user_cpu_seconds": user,
+            "process_system_cpu_seconds": system, "process_cpu_percent_one_core": (user + system) / elapsed * 100,
+            "submissions": resourcesAfter.submissions - resourcesBefore.submissions,
+            "completed_commands": resourcesAfter.completedCommands - resourcesBefore.completedCommands,
+            "last_gpu_duration_seconds": resourcesAfter.lastGPUDuration.map { $0 as Any } ?? NSNull(),
+            "owned_buffers": resourcesAfter.ownedBuffers, "in_flight_slots": resourcesAfter.inFlightSlots,
+            "active_clocks": resourcesAfter.activeClocks,
+            "scope": "Same app-hosted fixture; process CPU includes other application-host work."
+        ]
+        XCTAssertGreaterThan(elapsed, 0)
+        XCTAssertGreaterThanOrEqual(user + system, 0)
+        let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+        try directEvidence.save(data, name: "compute-process-phase-\(name)", extension: "json")
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "compute-process-phase-\(name)"; attachment.lifetime = .keepAlways
+        if !directEvidence.isEnabled { add(attachment) }
+    }
+}
+
+@MainActor
+private final class ComputeNativeFixture {
+    let window: NSWindow
+    let scroll: NSScrollView
+    let document: NSView
+    let surface: ComputeChipMetalView
+    let renderer: ComputeChipRenderer
+    let diagnostics = ComputeChipDiagnostics()
+    init(paused: Bool) {
+        window = NSWindow(contentRect: NSRect(x: 180, y: 140, width: 900, height: 600),
+                          styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        scroll.hasVerticalScroller = true; scroll.autoresizingMask = [.width, .height]
+        document = ComputeFlippedDocument(frame: NSRect(x: 0, y: 0, width: 900, height: 1_900))
+        surface = ComputeChipMetalView(frame: NSRect(x: 0, y: 0, width: 900, height: ComputeChipLayout.height(for: 900)))
+        renderer = ComputeChipRenderer(diagnostics: diagnostics)
+        document.addSubview(surface); scroll.documentView = document; window.contentView = scroll
+        renderer.attach(surface); update(percent: 35, paused: paused)
+    }
+    func update(percent: Float, paused: Bool, reduceMotion: Bool = false) {
+        let now = Date().timeIntervalSince1970
+        let snapshot = ComputeChipSnapshot(cpu: .init(name: "Native fixture CPU", quality: .measured, observedAt: now,
+                                                       activity: [percent / 100, 0, 0.2, 0], logicalCount: 4),
+                                           gpu: .init(name: "Native fixture GPU", quality: .measured, observedAt: now,
+                                                       activity: Array(repeating: percent / 100, count: 16), logicalCount: 0))
+        renderer.update(snapshot: snapshot, autoRefresh: !paused, reduceMotion: reduceMotion, increasedContrast: false)
+    }
+    func resize(width: CGFloat) {
+        window.setContentSize(CGSize(width: width, height: 600))
+        document.setFrameSize(CGSize(width: width, height: 1_900))
+        surface.setFrameSize(CGSize(width: width, height: ComputeChipLayout.height(for: width)))
+        scrollBack(); window.displayIfNeeded()
+    }
+    func scrollAway() {
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: 1_200)); scroll.reflectScrolledClipView(scroll.contentView)
+    }
+    func scrollBack() {
+        scroll.contentView.scroll(to: .zero); scroll.reflectScrolledClipView(scroll.contentView)
+    }
+    func close() {
+        renderer.detach(from: surface); window.orderOut(nil); window.close()
+    }
+}
+@MainActor private final class ComputeFlippedDocument: NSView { override var isFlipped: Bool { true } }
+#endif

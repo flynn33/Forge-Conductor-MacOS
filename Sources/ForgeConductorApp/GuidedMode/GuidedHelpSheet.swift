@@ -20,20 +20,24 @@ struct GuidedHelpSheet: View {
         Group {
             if let entry = catalog.entry(for: context) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 20) {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text("Guided Mode")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                                 Text(entry.title)
-                                    .font(.title2.bold())
+                                    .font(.system(size: 24, weight: .bold))
                                     .accessibilityAddTraits(.isHeader)
                                 Text(entry.purpose)
-                                    .foregroundStyle(.secondary)
+                                    .font(.system(size: 13))
+                                    .lineSpacing(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
                             }
                             Spacer()
                             Button("Close") { coordinator.dismiss() }
+                                .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                                 .keyboardShortcut(.cancelAction)
                                 .accessibilityIdentifier("guided-help-close")
                         }
@@ -49,21 +53,27 @@ struct GuidedHelpSheet: View {
                         guideSection("Normal workflow", symbol: "list.number", items: entry.normalWorkflow)
                         guideSection("Troubleshooting", symbol: "wrench.and.screwdriver", items: entry.troubleshooting)
 
-                        DisclosureGroup("Advanced details", isExpanded: $showingAdvanced) {
-                            guideItems(entry.advancedDetails)
-                                .padding(.top, 8)
+                        GraphitePanel {
+                            DisclosureGroup("Advanced details", isExpanded: $showingAdvanced) {
+                                guideItems(entry.advancedDetails)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, 8)
+                            }
+                            .accessibilityIdentifier("guided-help-advanced")
                         }
 
                         if !entry.relatedContexts.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Related guides").font(.headline)
-                                HStack {
+                                Text("Related guides").font(.system(size: 15, weight: .semibold))
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180))], alignment: .leading, spacing: 8) {
                                     ForEach(entry.relatedContexts) { related in
                                         if let relatedEntry = catalog.entry(for: related) {
                                             Button(relatedEntry.title) {
                                                 context = related
                                                 showingAdvanced = false
                                             }
+                                            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+                                            .accessibilityIdentifier("guided-help-related-\(related.rawValue)")
                                         }
                                     }
                                 }
@@ -80,22 +90,35 @@ struct GuidedHelpSheet: View {
                 )
                 .overlay(alignment: .topTrailing) {
                     Button("Close") { coordinator.dismiss() }
+                        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
                         .padding()
                 }
             }
         }
         .frame(minWidth: 640, idealWidth: 720, minHeight: 560, idealHeight: 680)
+        .background(GraphitePalette.canvas)
+        .foregroundStyle(GraphitePalette.textPrimary)
+        .tint(GraphitePalette.info)
+        .multilineTextAlignment(.leading)
+        .preferredColorScheme(.dark)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("guided-help-sheet")
     }
 
     private func stateCard(for context: GuidedHelpContext) -> some View {
         let state = coordinator.state(for: context)
-        return GroupBox("Current guidance") {
+        return GraphitePanel(title: "Current guidance") {
             VStack(alignment: .leading, spacing: 6) {
-                Text(state.status).font(.headline)
-                Text(state.detail).foregroundStyle(.secondary)
+                Text(state.status).font(.system(size: 13, weight: .semibold))
+                Text(state.detail)
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
                 if let action = state.recommendedAction {
-                    Text(action).font(.callout.weight(.medium))
+                    Text(action)
+                        .font(.system(size: 13, weight: .medium))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -103,20 +126,23 @@ struct GuidedHelpSheet: View {
     }
 
     private func guideSection(_ title: String, symbol: String, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: symbol).font(.headline)
+        GraphitePanel {
+            Label(title, systemImage: symbol).font(.system(size: 15, weight: .semibold))
             guideItems(items)
         }
     }
 
     private func guideItems(_ items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 5))
                         .padding(.top, 7)
-                    Text(item).fixedSize(horizontal: false, vertical: true)
+                    Text(item)
+                        .font(.system(size: 13))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

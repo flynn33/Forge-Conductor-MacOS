@@ -32,6 +32,9 @@ enum GuidedControlAnchor {
         "run-tools-select-none",
         "runtime-job-cancel",
         "runtime-shell-enabled",
+        "settings-refresh",
+        "settings-auto-refresh",
+        "settings-guided-setup",
         "toolbar-auto-refresh",
         "toolbar-refresh",
     ]

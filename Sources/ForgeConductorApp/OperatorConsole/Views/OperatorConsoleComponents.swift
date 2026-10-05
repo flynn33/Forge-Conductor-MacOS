@@ -32,20 +32,22 @@ struct OperatorHeader: View {
             VStack(alignment: .leading, spacing: 3) {
                 if let titleAccessibilityIdentifier {
                     Text(title)
-                        .font(.title2.bold())
+                        .font(.system(size: 24, weight: .semibold))
                         .accessibilityIdentifier(titleAccessibilityIdentifier)
                 } else {
-                    Text(title).font(.title2.bold())
+                    Text(title).font(.system(size: 24, weight: .semibold))
                 }
                 if let subtitleAccessibilityIdentifier {
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier(subtitleAccessibilityIdentifier)
                 } else {
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer()
@@ -66,12 +68,13 @@ struct OperatorErrorBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(GraphitePalette.warning)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Manager state unavailable").font(.headline)
                 Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
                 if let retry {
                     Button("Retry", action: retry)
@@ -81,7 +84,7 @@ struct OperatorErrorBanner: View {
             Spacer()
         }
         .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .background(GraphitePanelSurface())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("operator-unavailable")
         .accessibilityLabel("Manager state unavailable. \(message)")
@@ -93,11 +96,12 @@ struct OperatorNoticeBanner: View {
 
     var body: some View {
         Label(message, systemImage: "checkmark.circle.fill")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(.system(size: 13))
+            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(GraphitePalette.textSecondary)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(GraphitePanelSurface())
             .accessibilityIdentifier("operator-notice")
     }
 }
@@ -119,18 +123,18 @@ struct OperatorStateBadge: View {
             .foregroundStyle(foreground)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(background, in: Capsule())
+            .background(background, in: RoundedRectangle(cornerRadius: 4))
             .accessibilityLabel("State")
             .accessibilityValue(displayState)
     }
 
     private var foreground: Color {
         switch state {
-        case "completed", "active", "running", "healthy", "ready", "sealed": .green
-        case "failed_terminal", "cancelled", "failed", "quarantined_stale": .red
-        case "blocked_configuration": .blue
-        case "waiting_provider", "waiting_resource", "awaiting_bootstrap", "retry_wait", "paused": .orange
-        default: .secondary
+        case "completed", "active", "running", "healthy", "ready", "sealed": GraphitePalette.success
+        case "failed_terminal", "cancelled", "failed", "quarantined_stale": GraphitePalette.failure
+        case "blocked_configuration": GraphitePalette.info
+        case "waiting_provider", "waiting_resource", "awaiting_bootstrap", "retry_wait", "paused": GraphitePalette.warning
+        default: GraphitePalette.textSecondary
         }
     }
 
@@ -152,9 +156,9 @@ struct OperatorIdentifier: View {
 
     var body: some View {
         Text(value ?? unavailable)
-            .font(.system(.caption, design: .monospaced))
-            .foregroundStyle(value == nil ? .secondary : .primary)
-            .lineLimit(2)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(value == nil ? GraphitePalette.textSecondary : GraphitePalette.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
     }
 }

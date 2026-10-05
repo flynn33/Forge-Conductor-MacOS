@@ -1,18 +1,45 @@
 # Guided Setup and Guided Mode
 
+The native Graphite UI implementation and required QA are complete for
+0.17.0 (27). Persistent main-window shortcuts are removed; their actions remain
+in Settings and menus, with six independently enabled optional view controls.
+Current production checks, normal/minimum native view fixtures and signed
+ordinary workflows passed in their named scopes. Earlier failed and passing
+checkpoints retain their original inputs and results in
+[Graphite Workbench](GRAPHITE-WORKBENCH.md). Exact owner publication/readback/
+synchronization refs are retained externally.
+
 Guided Mode provides optional, offline explanations for the part of Forge
 Conductor currently in use. It does not connect to the model, change project or
 provider configuration, start work, or perform recovery actions.
 
+## Graphite presentation
+
+The current native guide banner, help sheets and Guided Setup use the shared
+graphite panel and control treatment. Their routes and readiness actions remain
+owned by the existing model. Provider row inspection is separate from its
+explicit activation controls; selecting a visual row does not complete setup.
+The [Graphite Workbench record](GRAPHITE-WORKBENCH.md) retains the earlier
+native visual, guide persistence/Escape and wizard scroll/progress checkpoints.
+The current normal/minimum native matrix passed shared guidance, all eight
+Wizard steps, registration and full Advanced content; its selected image layers
+were individually reviewed. The signed ordinary candidate has separate
+Settings/Dashboard and runtime observations. Cache/compositor limitations and
+earlier failed checkpoints remain explicit in the phase record.
+
 ## Using Guided Mode
 
-Use the **Guided Mode** toolbar control to show or hide the concise guidance
-banner above the selected view. This preference persists across app relaunches.
+Use **Show contextual Guided Mode** in **Settings → Workbench** or **Guided
+Mode** in the **Guide** menu to show or hide the concise guidance banner above
+the selected view. This shared preference applies immediately and persists
+across app relaunches. Its optional view toggle appears only when enabled under
+**Settings → Workbench → Optional view controls**.
 The banner explains the purpose of the view, its current state when one is
 available, and the next ordinary action when one is needed.
 
-Use the question-mark toolbar button for the complete guide to the selected
-tab. Guides describe:
+Use **View Guide** in Workbench Settings or the **Guide** menu for the complete
+guide to the selected tab. The optional **Guide** shortcut can also be enabled
+in Settings. Guides describe:
 
 - what the view is for;
 - what Forge handles automatically;
@@ -28,7 +55,8 @@ question-mark actions explain only the current view or control.
 
 ## Guided Setup wizard
 
-Open **Dashboard** and choose **Guided Setup** in its title bar. The wizard does
+Choose **Guided Setup** in Workbench Settings or the **Guide** menu; an optional
+view shortcut can be enabled in Settings. The wizard does
 not cover the app at launch; it opens only on explicit request and remembers the
 selected step across relaunches. Its eight steps are the supported operating
 order:
@@ -45,7 +73,9 @@ order:
 4. **Add and order instructions** — import one or more packages and drag them
    into the priority order the model should follow.
 5. **Review project inputs** — confirm provider readiness, instruction order,
-   and Development Policy priority in Rune Forge.
+   and Development Policy priority in Rune Forge. Choose the registered
+   project in the wizard's **Project to review** panel, then use **Confirm Review
+   and Continue** when the current inputs are ready.
 6. **Start in LM Studio** — open a normal LM Studio chat, call
    `get_forge_status`, then give the model the task.
 7. **Monitor governance and continuity** — use Dashboard for the automatic
@@ -66,26 +96,37 @@ The review step distinguishes selectable built-in evidence checks from
 instruction-package requirements. Package requirements are read-only in Forge
 configuration and remain part of the bound instruction artifact.
 
+Project review reads the registered project identity, generation, instruction
+queue and provider revision before a model chat is started. It does not require
+an active MCP project binding, make that project Dashboard's active project,
+activate a provider or dispatch work. The wizard remembers the reviewed project
+choice independently. A changed project generation, instruction queue or
+provider configuration requires a new review. Seven app-hosted review
+regressions, native review confirmation/persistence and final wizard scroll/
+progress captures passed. Exact verification is recorded separately in
+[Graphite Workbench](GRAPHITE-WORKBENCH.md).
+
 Only one provider can be selected. Desktop-host activation may transactionally
 install or update Forge-owned plugin, hook, skill, and MCP files, but the wizard
 does not approve host permissions. Claude and Codex can require a user trust
-    review; any remaining host action stays visible in Provider. LM Studio work
+review; any remaining host action stays visible in Provider. LM Studio work
 begins and remains in the ordinary LM Studio interface. After a durable
 handoff, Forge uses the app's public macOS Accessibility controls to create the
 visible successor and the installed GUI MCP tool to acknowledge it; it does not
 use the REST integrations array.
 
-Grok Build remains visible in Provider but is non-selectable in current source 0.16.5. Its
+Grok Build remains visible in Provider but is non-selectable in current source 0.17.0. Its
 documented startup and prompt hook outputs cannot deliver Forge's initial
 assignment context to the model, so Guided Setup never treats Grok package
 presence as readiness and cannot advance a Grok run.
 
 ## Context inside sheets and focused controls
 
-Important sheets and controls expose their own question-mark buttons. Start
-Task and Register Project use nested guide presentation owned by the active
-sheet, so opening and closing help retains entered text and selections. More
-specific guides are available for:
+Important sheets and controls expose their own question-mark buttons. Current
+project-management sheets use nested guide presentation owned by the active
+sheet, so opening and closing help retains entered text and selections. The
+retained Start Task guide context does not introduce a live Start Task route.
+More specific guides are available for:
 
 - adding and ordering instruction packages;
 - relinking, resetting, and clearing project content;
@@ -137,9 +178,11 @@ validated against the app-owned identifier list and fails tests if a primary
 tab or typed guide context is omitted. Guided Mode does not intercept ordinary
 screen interaction when its inline banner is visible.
 
-Native UI acceptance covers all 13 current primary-tab routes, Start Task's more-specific
-guide, preservation of the entered task draft while help opens and closes,
-persisted Guided Mode preference, keyboard dismissal, and the reusable native
-tool-permission checkboxes. These behaviors are also backed by app-hosted
-catalog and route tests, so an unavailable UI-automation host is recorded as a
-test-environment limitation rather than silently treated as a pass.
+Earlier native UI acceptance covers all 13 primary-tab routes, live project
+sheet guide presentation and draft preservation, persisted Guided Mode
+preference, keyboard dismissal and the retained component checks. Start Task
+and the reusable tool-permission component retain compatibility guide contexts;
+this phase adds no production route to either. App-hosted catalog and route
+tests cover their typed mappings. The final native capture and interaction
+results remain separate evidence in the Graphite record; an unperformed or
+failed check is never counted as a pass.
