@@ -109,6 +109,28 @@ final class GraphiteWorkbenchAppTests: XCTestCase {
         XCTAssertNotEqual(GraphitePalette.metalCPU, GraphitePalette.metalGPU)
     }
 
+    func testComputeBackgroundIsDarkerWhileDefaultPanelsAndReadableContrastArePreserved() throws {
+        let standard = GraphitePanelSurface()
+        XCTAssertEqual(standard.topColor, GraphitePalette.panelTop)
+        XCTAssertEqual(standard.bottomColor, GraphitePalette.panelBottom)
+        XCTAssertEqual(GraphitePalette.computePanelTop, GraphitePalette.color(0x030916))
+        XCTAssertEqual(GraphitePalette.computePanelBottom, GraphitePalette.color(0x02060D))
+        for (background, ordinary) in [
+            (GraphitePalette.computePanelTop, GraphitePalette.panelTop),
+            (GraphitePalette.computePanelBottom, GraphitePalette.panelBottom),
+        ] {
+            let dark = try luminance(background)
+            XCTAssertLessThan(dark, try luminance(ordinary) * 0.25,
+                              "Compute chips and effects receive a distinctly darker surrounding surface")
+            for foreground in [GraphitePalette.textPrimary, GraphitePalette.textSecondary,
+                               GraphitePalette.textMuted] {
+                XCTAssertGreaterThanOrEqual((try luminance(foreground) + 0.05) / (dark + 0.05), 4.5)
+            }
+            XCTAssertGreaterThanOrEqual((try luminance(GraphitePalette.controlBorder) + 0.05)
+                                       / (dark + 0.05), 3)
+        }
+    }
+
     func testChipSRGBBoundaryConvertsOnceAndPreservesAlpha() {
         XCTAssertEqual(GraphitePalette.linearRGBA(0x000000), SIMD4(0, 0, 0, 1))
         XCTAssertEqual(GraphitePalette.linearRGBA(0xFFFFFF, alpha: 0.25), SIMD4(1, 1, 1, 0.25))

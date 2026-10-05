@@ -1,7 +1,34 @@
 # Version and qualification status
 
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
+## Compute PCB refinement — verified native scope
+
+**0.17.0 (27)** tightens each Compute board frame to the trace endpoints,
+with eight points of pulse clearance. Headings and engine readings sit outside
+the board frames. The entire PCB and surrounding Compute panel are much darker
+midnight blue, with subdued silver/gold components, trace highlights and
+shadowed metal detail. Approved chip sizes/artwork, banks and core effects
+remain. Traveling signals have stronger colored bloom and bright centers;
+existing route shapes, signal counts, cadence and pause/hidden/stale bounds remain.
+
+The canonical My Mac AppTests selection passed **45 tests**, with zero
+failures/skips; **31 SwiftPM tests** repeat cases from that selection. All
+**68 PNGs** were individually reviewed and rehashed: **47 genuine Metal
+readbacks and 21 separate NSView caches**, with zero blocking findings,
+missing reviews or hash mismatches. The matching ordinary Debug build and
+strict signature verification passed.
+
+These captures are separate native cache/Metal layers, including a 20-frame
+motion sequence. They do not qualify desktop composition, XCUITest,
+installation or distribution. Earlier receipts retain their exact inputs.
+
+Detailed source/candidate identities, retained failures and evidence limits
+are in [Compute Cores](COMPUTE-CORES.md) and [native QA](GRAPHITE-NATIVE-QA.md).
+Exact owner publication/synchronization refs belong to external delivery receipts.
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:END -->
+
 <!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:BEGIN -->
-## Current Dashboard columns — implementation and QA complete
+## Preceding Dashboard columns — source 81a91a81…
 
 **0.17.0 (27)** uses two independent, equal-width column stacks: MCP Servers
 above MCP Tools on the left, Sub-agents above Hot Processes on the right.
@@ -29,7 +56,7 @@ inline Guided Mode banner and guide button; other routes retain guidance.
 Workbench Settings labels its existing action **Open Guide**. Sub-agents and
 Hot Processes fill the same grid row, retaining its 200-point minimum.
 
-The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+The preceding scoped source manifest `2463aa06…` covers 434 inputs with unchanged
 canonical build graph and all 30 resource files. Thirteen native view methods
 passed and all 357 successful PNGs were reviewed; the one failed fixture
 invocation is retained separately. The matching My Mac Debug build and strict

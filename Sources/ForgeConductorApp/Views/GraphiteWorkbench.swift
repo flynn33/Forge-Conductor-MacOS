@@ -138,6 +138,8 @@ enum GraphitePalette {
     static let sidebar = color(0x15212B)
     static let panelTop = color(0x1D2D39)
     static let panelBottom = color(0x17232C)
+    static let computePanelTop = color(0x030916)
+    static let computePanelBottom = color(0x02060D)
     static let panelRaised = color(0x1D2D39)
     static let field = color(0x13202A)
     static let fieldFocused = color(0x243747)
@@ -220,12 +222,14 @@ extension EnvironmentValues {
 }
 
 struct GraphitePanelSurface: View {
+    var topColor: Color = GraphitePalette.panelTop
+    var bottomColor: Color = GraphitePalette.panelBottom
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.graphiteAccessibilityCapabilities) private var capabilities
 
     var body: some View {
         RoundedRectangle(cornerRadius: 9)
-            .fill(LinearGradient(colors: [GraphitePalette.panelTop, GraphitePalette.panelBottom],
+            .fill(LinearGradient(colors: [topColor, bottomColor],
                                  startPoint: .top, endPoint: .bottom))
             .overlay {
                 RoundedRectangle(cornerRadius: 9)
@@ -244,10 +248,12 @@ struct GraphitePanelSurface: View {
 
 struct GraphitePanel<Content: View>: View {
     let title: String?
+    let surface: GraphitePanelSurface
     @ViewBuilder var content: Content
 
-    init(title: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String? = nil, surface: GraphitePanelSurface = GraphitePanelSurface(), @ViewBuilder content: () -> Content) {
         self.title = title
+        self.surface = surface
         self.content = content()
     }
 
@@ -258,7 +264,7 @@ struct GraphitePanel<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(GraphitePanelSurface())
+        .background(surface)
         .accessibilityElement(children: .contain)
     }
 }

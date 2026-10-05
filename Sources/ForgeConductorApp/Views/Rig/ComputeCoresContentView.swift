@@ -95,7 +95,7 @@ struct ComputeCoresContentView: View {
                     .accessibilityIdentifier("compute-renderer-status")
             }
         }
-        .background((reduceTransparency || capabilities.reduceTransparency) ? GraphitePalette.panelBottom : Color.clear)
+        .background((reduceTransparency || capabilities.reduceTransparency) ? GraphitePalette.computePanelBottom : Color.clear)
     }
 
     private func updateTopology() {
@@ -250,6 +250,11 @@ private struct ComputeChipStaticFallback: View {
                 local.translateBy(x: rect.midX, y: rect.midY)
                 local.rotate(by: .radians(Double(instance.properties.w)))
                 local.translateBy(x: -rect.midX, y: -rect.midY)
+                if kind == 9, let image = resources.circuitBoardImage {
+                    local.clip(to: Path(roundedRect: rect, cornerRadius: min(10, min(rect.width, rect.height) * 0.08)))
+                    local.draw(Image(decorative: image, scale: 1), in: rect)
+                    continue
+                }
                 if kind == 10 {
                     guard let image = instance.properties.z == 0
                         ? resources.cpuMaterialImage : resources.gpuMaterialImage else { continue }

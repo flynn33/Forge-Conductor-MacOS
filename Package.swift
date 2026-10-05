@@ -90,6 +90,7 @@ let package = Package(
             resources: [
                 .process("Resources/GuidedHelpCatalog.json"),
                 .copy("Resources/ComputeChipReference.png"),
+                .copy("Resources/ComputeCircuitBoard.png"),
             ],
             plugins: ["ComputeChipMetalBuildPlugin"]
         ),

@@ -1,6 +1,35 @@
 # Forge Conductor user guide
 
-The **0.17.0 (27)** Dashboard now uses two equal-width independent columns.
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
+## Compute PCB refinement — verified native scope
+
+**0.17.0 (27)** tightens each Compute board frame to the trace endpoints,
+with eight points of pulse clearance. Headings and engine readings sit outside
+the board frames. The entire PCB and surrounding Compute panel are much darker
+midnight blue, with subdued silver/gold components, trace highlights and
+shadowed metal detail. Approved chip sizes/artwork, banks and core effects
+remain. Traveling signals have stronger colored bloom and bright centers;
+existing route shapes, signal counts, cadence and pause/hidden/stale bounds remain.
+
+The canonical My Mac AppTests selection passed **45 tests**, with zero
+failures/skips; **31 SwiftPM tests** repeat cases from that selection. All
+**68 PNGs** were individually reviewed and rehashed: **47 genuine Metal
+readbacks and 21 separate NSView caches**, with zero blocking findings,
+missing reviews or hash mismatches. The matching ordinary Debug build and
+strict signature verification passed.
+
+These captures are separate native cache/Metal layers, including a 20-frame
+motion sequence. They do not qualify desktop composition, XCUITest,
+installation or distribution. Earlier receipts retain their exact inputs.
+
+Detailed source/candidate identities, retained failures and evidence limits
+are in [Compute Cores](docs/COMPUTE-CORES.md) and [native QA](docs/GRAPHITE-NATIVE-QA.md).
+Exact owner publication/synchronization refs belong to external delivery receipts.
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:END -->
+
+## Preceding Dashboard columns — source 81a91a81…
+
+The **0.17.0 (27)** Dashboard uses two equal-width independent columns.
 The left stacks **MCP Servers** above **MCP Tools**; the right stacks
 **Sub-agents** above **Hot Processes**. Outer top/bottom edges align while the
 internal splits follow their content. Hot Processes starts directly beneath

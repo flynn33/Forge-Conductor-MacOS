@@ -1,7 +1,79 @@
 # Compute Cores Metal FX and application palette
 
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
+## Compute PCB refinement — verified native scope
+
+**0.17.0 (27)** tightens each Compute board frame to the trace endpoints,
+with eight points of pulse clearance. Headings and engine readings sit outside
+the board frames. The entire PCB and surrounding Compute panel are much darker
+midnight blue, with subdued silver/gold components, trace highlights and
+shadowed metal detail. Approved chip sizes/artwork, banks and core effects
+remain. Traveling signals have stronger colored bloom and bright centers;
+existing route shapes, signal counts, cadence and pause/hidden/stale bounds remain.
+
+One shared PCB raster/immutable texture serves both chips alongside the two
+existing chip textures and one sampler. Metal and static fallback use the same
+board. The complete substrate is toned once with a 0.68 black overlay in its
+bounded cached sRGB image. A 1,024-sample receipt records mean sRGB luminance
+`0.118133893759695` before processing and `0.03784214119721017` after it.
+Compute alone overrides the existing surface with `computePanelTop`
+(`0x030916`) and `computePanelBottom` (`0x02060D`); other panels retain their
+defaults. Reduce Transparency also uses the dark Compute fill.
+
+The final inventory has **435 inputs / 31 resources**: 422 original inputs
+are unchanged, 12 changed and one PCB is added. All original 30 resource files
+are unchanged; Info/entitlements are build configuration inputs rather than
+resource-count entries. The existing project adds only two PCB objects and two
+app-group/Resources-phase list entries. Original objects, settings, schemes
+and workspace are preserved; SwiftPM copies the same new PCB resource.
+
+| Final source/material authority | Identity |
+| --- | --- |
+| Source manifest, `build/pcb-evidence/contrast-source-input-manifest.json` | SHA-256 `8aeafde6bd315a1d3ad35ff82b6fc5b33d82cd96481d0d595cbebe77695fa689` |
+| Canonical Xcode project | SHA-256 `3497491dcb8fa73b537378f10242a355f1f9932f27704289a457bb79f3fd03bb` |
+| `ComputeCircuitBoard.png`, 1254×1254 | SHA-256 `68c8fef9216de6cb41e599d65c09e7c261b7bc21f9c451769ffb4969555046d0` |
+| Ordinary Debug candidate | `build/pcb-app/Build/Products/Debug/Forge Conductor.app` |
+| Candidate CDHash | `da4039dc3bfda88dbf0d0bedfe8ddda96b7682f9` |
+| Candidate `Forge Conductor.debug.dylib` | SHA-256 `40c24d96e9b7b7dc3af6891c1a01404e275aad14fcfb1a5f6f52eaa5b759fde3` |
+| Candidate `default.metallib` | SHA-256 `4382d482b8a6c8609614e955d83ae1b2fe2134bf7ee73e42e51e1c4fffb90042` |
+
+| Final verification | Actual result and boundary |
+| --- | --- |
+| Canonical My Mac AppTests | 45 executed/passed, zero failures/skips, terminal 0; 31.971 seconds of case execution: 19 Compute, 6 lifecycle, 8 presentation and 12 Graphite |
+| Focused SwiftPM selection | 31 passed, zero failures; the 19 Compute/12 Graphite cases overlap the native selection and are not 31 additional distinct tests |
+| Visual review union | All 68 PNGs individually opened and rehashed: 47 genuine Metal readbacks/21 separate NSView caches, zero blocking findings, missing reviews or hash mismatches; includes 20 motion frames |
+| Matching ordinary Debug candidate | `BUILD SUCCEEDED`; strict signature verification terminal 0, Apple Development team `9AQ2C2838M`, version 0.17.0/build 27 |
+
+Native result: `build/pcb-evidence/canonical-contrast.xcresult`.
+Logs: `/tmp/forge-pcb-contrast-native-test.log`,
+`/tmp/forge-pcb-contrast-swift-test.log` and
+`/tmp/forge-pcb-contrast-app-build.log`. The visual union is
+`build/pcb-evidence/contrast-visual-review-union.json`, SHA-256
+`e65994e1ce83c49841ea1c25745f113e5290c16727cbbe4c4144e49fe8c04602`.
+The source manifest excludes documents and future commit identity; these doc
+updates do not relabel tested production inputs.
+
+The initial 31-case native run failed two assertions in
+`testControlledNativeAccessibilityCapabilitiesPreserveInputsActionsAndMetalOutput`:
+the actual fixture field did not receive focus. The cause remains unknown.
+The unchanged isolated retry passed 1/1; the preceding 33-case run passed,
+and the final changed-source 45-case run passed. The failure and retry remain
+retained, with no weakened assertion and no addition to the final test count.
+
+These captures are separate native cache/Metal layers, including a 20-frame
+motion sequence. They do not qualify desktop composition, XCUITest,
+installation or distribution. Earlier receipts retain their exact inputs.
+
+Evidence is retained at `/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-05-compute-pcb-refinement`.
+The initial retained copy has 4,438 entries / 660,338,122 bytes, with hashes,
+modes and symlinks verified. It includes the final/failed/retry/preceding xcresults, separate
+ordinary/test products, 311 attachments including the 68 PNGs, logs and receipts.
+[Native QA](GRAPHITE-NATIVE-QA.md) records the execution/review details.
+Exact owner publication/synchronization refs belong to external delivery receipts.
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:END -->
+
 <!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:BEGIN -->
-## Current Dashboard columns — implementation and QA complete
+## Preceding Dashboard columns — source 81a91a81…
 
 **0.17.0 (27)** uses two independent, equal-width column stacks: MCP Servers
 above MCP Tools on the left, Sub-agents above Hot Processes on the right.
@@ -29,7 +101,7 @@ inline Guided Mode banner and guide button; other routes retain guidance.
 Workbench Settings labels its existing action **Open Guide**. Sub-agents and
 Hot Processes fill the same grid row, retaining its 200-point minimum.
 
-The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+The preceding scoped source manifest `2463aa06…` covers 434 inputs with unchanged
 canonical build graph and all 30 resource files. Thirteen native view methods
 passed and all 357 successful PNGs were reviewed; the one failed fixture
 invocation is retained separately. The matching My Mac Debug build and strict
@@ -40,7 +112,8 @@ receipts below remain the preceding checkpoint, not fresh proof of changed
 inputs. Exact owner publication and synchronization refs are recorded externally.
 <!-- FORGE-COMPUTE-FRAME-FOLLOWUP:END -->
 
-`ComputeChipLayout` retains `packageScale = 0.46` and the approved chip, bank,
+At the preceding `2463aa06…` checkpoint, `ComputeChipLayout` retained
+`packageScale = 0.46` and the approved chip, bank,
 nameplate and trace construction. Panel height decreases by 86 points,
 horizontal inset is bounded at 36 points, and the kind-9 panel fill is
 `0x020817`. Completed artwork/routes translate without rescaling. Exact full
@@ -76,7 +149,7 @@ as AXHeading; its assertion and thrown wrapper generated two issues. Only the
 fixture's bounded exact-title lookup was corrected, with production bytes
 unchanged. Its two PNGs are excluded from the 357 successful-image union.
 
-Current source inventory: **434 inputs**, SHA-256
+Preceding `2463aa06…` source inventory: **434 inputs**, SHA-256
 `2463aa065e049627d8c6af3d9188f2258da060fa2d04c4a1e8b0770e4ee777e9`.
 The scoped membership/preservation review is
 `/tmp/forge-frame-refinement-delivery-membership-review.json`, SHA-256
@@ -136,7 +209,8 @@ source/native/ordinary bounds. Exact owner publication/readback/synchronization
 refs are retained externally.
 
 **Exact-reference correction — current covered layers and native matrix verified:** the owner rejected the
-approximate chip artwork. Current source bundles only `ComputeChipReference.png`,
+approximate chip artwork. At the preceding `28548a73…` checkpoint, source
+bundled only `ComputeChipReference.png`,
 byte-identical to `/Users/flynn/Downloads/Compute Cores Dashboard.png`:
 1448×1086, 1,682,363 bytes, SHA-256
 `7184bbb39a6b014b32283869557edb6166acecd1bc8f201401ceda02169975f1`. The earlier two 1254×1254
@@ -147,8 +221,8 @@ checkpoints outside the checkout under `/tmp/forge-compute-material-checkpoints/
 the exact reference. Bounded processing replaces photographed activity, sample
 model text and annotation leaders; the photographic package/frame/grain detail
 is reference-derived. These processed rasters are not claimed byte-identical to
-the original crops or a lossless recovery of unlit artwork. Two cached CGImages
-also serve genuine static fallback; normal Metal uses two immutable textures,
+the original crops or a lossless recovery of unlit artwork. At that checkpoint,
+two cached CGImages served genuine static fallback and Metal used two immutable textures,
 nine mip levels each and one sampler. No per-frame image decode/upload is added.
 The latest explicit resize allowance retains `.46` preceding dimensions
 (179.4-point maximum); even at 2× the package does not exceed either crop's
@@ -162,9 +236,10 @@ in its selected 12/50/82% frames. The current selected native matrix passed; Exa
 Dashboard/Pause/Resume, Settings and four scoped runtime workflows were
 observed; ordinary minimum/1×/Sky compositor limits remain explicit.
 
-## Current material source audit
+<a id="current-material-source-audit"></a>
+## Preceding material source audit — source 28548a73…
 
-The latest completed audit passed **15/15** checks over **434 inputs**, source
+The preceding `28548a73…` audit passed **15/15** checks over **434 inputs**, source
 manifest SHA-256
 `28548a73db312130f02e3c86344725f2aa1efca575901fa0ae3dc223b69eb3d1`.
 Independent readback matched all 434 listed file hashes at reconciliation.
@@ -175,7 +250,7 @@ audit SHA-256 is
 Exact copies are under `build/graphite-results/final-lifecycle-repairs`.
 This records the tested current UI scope; exact owner publication/readback/synchronization refs are retained externally.
 
-There are **30 resource inputs**: all original 29 memberships remain, 28 original
+That preceding audit has **30 resource inputs**: all original 29 memberships remain, 28 original
 byte sets are unchanged, the requested Guide catalog copy retains its schema,
 and exactly one app/native/SwiftPM PNG is added. All 26 signing/deployment
 configurations retain their settings. The preceding 435-input/two-material
@@ -208,7 +283,8 @@ retains exact image hashes, color domains and remaining-verification limits.
 This selected review does not establish full component composition or arbitrary
 host/hardware acceptance.
 
-## Fresh corrected-source selected checks
+<a id="fresh-corrected-source-selected-checks"></a>
+## Preceding corrected-source selected checks — source 28548a73…
 
 Current combined receipt:
 `build/graphite-results/final-285-current-swift/combined-current-qualification.json`,
@@ -237,7 +313,7 @@ failed/skipped/zero-selected/time-out checkpoints remain in the
 [history](COMPUTE-CORES-CHECKPOINTS.md), including third/fourth reference-pilot
 failures, CLI-development-identity fixture mistakes and the initial G1 marker.
 
-## Current Compute layer review and motion
+## Preceding Compute layer review and motion — source 28548a73…
 
 Independent review separately opened all **68 current Compute PNG layers**:
 27 production Metal still drawables, 16 native text/layout caches without
@@ -269,7 +345,7 @@ resizing is also distinct from retained original dimensions/hashes. The earlier
 precise checkpoint boundaries in
 [history](COMPUTE-CORES-CHECKPOINTS.md#equal-project-actions-checkpoint-before-lifecycle-transitions).
 
-Current source manifest 28548a73… also has a verified **20-frame genuine drawable MOV**:
+Preceding source manifest 28548a73… also has a verified **20-frame genuine drawable MOV**:
 `/tmp/forge-direct-xctest-host/final-lifecycle-repairs-compute-production-motion.mov`,
 23,893,625 bytes, SHA-256
 `5d1ceb4f75bf6a12b8791d7bc35b5eb64a085cd6a466940a81ae20220e3e4085`.
@@ -292,7 +368,7 @@ conditional-size assertion repair and subsequent successful framing checkpoints
 remain factual history; they are excluded from the final current image union.
 See [checkpoint history](COMPUTE-CORES-CHECKPOINTS.md).
 
-## Current registration and contextual Guide fixture — verified
+## Preceding registration and contextual Guide fixture — verified
 
 Current registration/nested Guide and all reachable root/secondary/route Guide
 Advanced tails are included in the selected final matrix below. The catalog
@@ -301,7 +377,7 @@ retains23contexts;20have current visible openers. `projectReset`,
 no invented visible route or action qualifies them. RunDetails remains a
 styled, retained component without a current caller.
 
-## Current native view and Guide review — verified
+## Preceding native view and Guide review — source 28548a73…
 
 `build/graphite-results/native-workbench-final-matrix-28548a73-qualification.json`,
 SHA-256 `c90e3448f07409c27ec6520cfd0e7983a40ec7f41b11b7e605bfefb4a21cdf30`,
@@ -343,7 +419,7 @@ Dashboard/runtime proof below complements native normal/minimum fixtures;
 unavailable ordinary minimum/physical1×/Sky sheet compositor remain explicit
 limits without inventing new acceptance gates.
 
-## Current ordinary candidate — four manual workflows completed
+## Preceding ordinary candidate — four manual workflows completed
 
 The canonical Debug **My Mac** build ended with exit 0/`BUILD SUCCEEDED` in
 **4.965 seconds** for the 434-input 28548a73… checkpoint. Root verified strict
@@ -455,8 +531,10 @@ across ten artwork banks (bounded at 256), maps sixteen illustrative GPU regions
 across eight central/eight flank reference banks. Source-pixel masks/contacts
 anchor bounded geometry and auxiliary lighting; at most 128 static routes per
 package and 32 animated routes each remain. Artwork colors do not assert P/E
-classification or measured GPU-core topology. Two cached CGImages, two shared
-immutable mipmapped textures and one sampler retain explicit resource ownership.
+classification or measured GPU-core topology. At the preceding `28548a73…`
+checkpoint, two cached CGImages, two shared immutable mipmapped textures and
+one sampler had explicit resource ownership; the latest PCB adds one shared
+raster/texture as recorded above.
 Current selected Compute fixtures and their material/fallback/lifecycle layer
 review passed. Hidden, detached, paused and reduced-motion observations retain
 zero recurring clocks/submissions in the named native cases. Earlier exact
@@ -467,10 +545,10 @@ Dashboard/Settings and the four runtime workflows have separate observations.
 The current native minimum/control matrix passed with the cache/compositor
 limits recorded above.
 
-Read-only resource comparison retains all 29 original resource inputs; 28
-original byte sets remain unchanged and only requested Guide catalog copy
+The preceding `28548a73…` read-only resource comparison retained all 29 original
+resource inputs; 28 original byte sets remained unchanged and only requested Guide catalog copy
 changed. Exactly one reference PNG is additive in native resources and SwiftPM
-copies. The latest complete audit above covers 434 inputs. The matching current
+copies. That preceding audit covers 434 inputs. The matching current
 ordinary build/package and four scoped runtime workflows are recorded above;
 final current native view/control QA passed; exact owner refs are retained externally.
 
@@ -530,7 +608,7 @@ The rows below retain the preceding `28548a73…` qualification. The completed
 frame, label and Dashboard guidance follow-up is qualified separately above;
 no earlier result is relabeled as a pass for changed source.
 
-All32criteria are fulfilled in their named current source/native/ordinary scope.
+All 32 criteria were fulfilled in the preceding checkpoint's named source/native/ordinary scope.
 This table records faithful native equivalents and explicit unavailable proof
 classes. Exact owner publication/readback/synchronization refs are retained externally; it does not erase completed QA or
 authorize claiming installation/distribution.
@@ -572,6 +650,9 @@ authorize claiming installation/distribution.
 
 ## Native capture matrix
 
+The rows below retain the preceding `28548a73…` inputs and capture scope.
+Latest PCB verification is recorded above in its separate native scope.
+
 All18package ID/name pairs are fulfilled in the named available-native scopes
 below. Exact files/state/size/scale, semantic assertions and motion evidence
 are retained in current receipts. Separate caches/readbacks are not compositor
@@ -600,6 +681,9 @@ Older matrices remain historical.
 | CAP-18 | palette-native-appearance | Verified nativeappearance scope — current normal/minimum fixtures plus actual ordinarySettings 9 sections/draft/Reload/opt-ins/persistence/restoration/Quit,About/menus andnormal Dashboard/Pause/Resume. |
 
 ## Owner delivery — tested inputs and external refs
+
+This section retains the preceding `28548a73…` delivery scope. The latest PCB
+verification is recorded above; external receipts own exact delivery refs.
 
 The UI implementation, all 62combined acceptance mappings and18 capture scopes,
 current production/native checks,463view-image review,68 Compute layers,

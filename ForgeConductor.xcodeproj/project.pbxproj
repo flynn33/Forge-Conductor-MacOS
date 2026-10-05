@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A60900000000000000000001 /* Resources/ComputeCircuitBoard.png in Resources */ = {isa = PBXBuildFile; fileRef = A60900000000000000000002 /* Resources/ComputeCircuitBoard.png */; };
 		A60800000000000000000001 /* Resources/ComputeChipReference.png in Resources */ = {isa = PBXBuildFile; fileRef = A60800000000000000000002 /* Resources/ComputeChipReference.png */; };
 		A60700000000000000000001 /* ComputeChipPresentationAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60700000000000000000002 /* ComputeChipPresentationAppTests.swift */; };
 		A6060000000000000000000D /* ComputeChipAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6060000000000000000000E /* ComputeChipAppTests.swift */; };
@@ -640,6 +641,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A60900000000000000000002 /* Resources/ComputeCircuitBoard.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Resources/ComputeCircuitBoard.png; sourceTree = "<group>"; };
 		A60800000000000000000002 /* Resources/ComputeChipReference.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Resources/ComputeChipReference.png; sourceTree = "<group>"; };
 		A60700000000000000000002 /* ComputeChipPresentationAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeChipPresentationAppTests.swift; sourceTree = "<group>"; };
 		A6060000000000000000000E /* ComputeChipAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeChipAppTests.swift; sourceTree = "<group>"; };
@@ -1430,6 +1432,7 @@
 				0E4AA80EB2DB42C2A4F5D96F /* Resources/Forge-Conductor.icns */,
 				R3F000000000000000000008 /* Resources/GuidedHelpCatalog.json */,
 				A60800000000000000000002 /* Resources/ComputeChipReference.png */,
+				A60900000000000000000002 /* Resources/ComputeCircuitBoard.png */,
 			);
 			path = ForgeConductorApp;
 			sourceTree = "<group>";
@@ -1998,6 +2001,7 @@
 				EA0B411478214153ACFF0171 /* Resources/Forge-Conductor.icns in Resources */,
 				R3B000000000000000000008 /* Resources/GuidedHelpCatalog.json in Resources */,
 				A60800000000000000000001 /* Resources/ComputeChipReference.png in Resources */,
+				A60900000000000000000001 /* Resources/ComputeCircuitBoard.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

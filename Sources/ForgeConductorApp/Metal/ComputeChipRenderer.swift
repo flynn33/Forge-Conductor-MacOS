@@ -50,12 +50,15 @@ final class ComputeChipResources {
     let libraryOrigin: String
     let cpuMaterialImage: CGImage?
     let gpuMaterialImage: CGImage?
+    let circuitBoardImage: CGImage?
     let cpuMaterialTexture: MTLTexture?
     let gpuMaterialTexture: MTLTexture?
+    let circuitBoardTexture: MTLTexture?
     let materialSampler: MTLSamplerState?
-    var materialTextureCount: Int { [cpuMaterialTexture, gpuMaterialTexture].compactMap { $0 }.count }
+    var materialTextureCount: Int { [cpuMaterialTexture, gpuMaterialTexture, circuitBoardTexture].compactMap { $0 }.count }
     private let library: MTLLibrary?
     private static let materialImages = referenceMaterials()
+    private static let boardImage = circuitBoardMaterial()
     private var cachedPipeline: MTLRenderPipelineState?
     private(set) var failureReason: String?
 
@@ -83,8 +86,10 @@ final class ComputeChipResources {
         self.device = device; self.commandQueue = commandQueue; self.library = library
         self.libraryOrigin = libraryOrigin; self.devices = devices
         cpuMaterialImage = Self.materialImages.cpu; gpuMaterialImage = Self.materialImages.gpu
+        circuitBoardImage = Self.boardImage
         var cpu: MTLTexture?
         var gpu: MTLTexture?
+        var board: MTLTexture?
         var sampler: MTLSamplerState?
         if let device {
             if let cpuMaterialImage {
@@ -93,17 +98,42 @@ final class ComputeChipResources {
             if let gpuMaterialImage {
                 gpu = Self.materialTexture(named: "GPU reference crop", image: gpuMaterialImage, device: device)
             }
+            if let circuitBoardImage {
+                board = Self.materialTexture(named: "shared circuit board", image: circuitBoardImage, device: device)
+            }
             let descriptor = MTLSamplerDescriptor()
             descriptor.label = "Compute shared package material sampler"
             descriptor.minFilter = .linear; descriptor.magFilter = .linear; descriptor.mipFilter = .linear
             descriptor.sAddressMode = .clampToEdge; descriptor.tAddressMode = .clampToEdge
             sampler = device.makeSamplerState(descriptor: descriptor)
         }
-        cpuMaterialTexture = cpu; gpuMaterialTexture = gpu; materialSampler = sampler
+        cpuMaterialTexture = cpu; gpuMaterialTexture = gpu; circuitBoardTexture = board; materialSampler = sampler
         if device == nil { failureReason = "Metal device unavailable" }
         else if commandQueue == nil { failureReason = "Metal queue unavailable" }
         else if library == nil { failureReason = "Compiled chip shader library unavailable" }
-        else if cpu == nil || gpu == nil || sampler == nil { failureReason = "Chip package material assets unavailable" }
+        else if cpu == nil || gpu == nil || board == nil || sampler == nil { failureReason = "Chip package material assets unavailable" }
+    }
+
+    /// One immutable PCB raster is shared by both chip boards and the static failure view.
+    private static func circuitBoardMaterial() -> CGImage? {
+        guard let url = assetBundle.url(forResource: "ComputeCircuitBoard", withExtension: "png"),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              (1...2_048).contains(width), width == height else { return nil }
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0,
+                  [kCGImageSourceShouldCacheImmediately: true] as CFDictionary),
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height,
+                  bitsPerComponent: 8, bytesPerRow: width * 4, space: space,
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+        else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // Tone the entire substrate, including metal highlights, once for both render paths.
+        context.setFillColor(CGColor(gray: 0, alpha: 0.68))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
     }
 
     /// One bounded reference decode produces two independently owned native rasters, also
@@ -231,7 +261,7 @@ final class ComputeChipResources {
         }
     }
 
-    /// Two immutable bundled materials own all mip levels; no frame performs image decoding or upload.
+    /// Three immutable bundled materials own all mip levels; no frame performs image decoding or upload.
     private static func materialTexture(named name: String, image: CGImage, device: MTLDevice) -> MTLTexture? {
         guard image.width > 0, image.height > 0, image.width <= 2_048, image.height <= 2_048,
               let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
@@ -273,7 +303,7 @@ final class ComputeChipResources {
 
     func pipeline() -> MTLRenderPipelineState? {
         if let cachedPipeline { return cachedPipeline }
-        guard let device, let library, cpuMaterialTexture != nil, gpuMaterialTexture != nil,
+        guard let device, let library, cpuMaterialTexture != nil, gpuMaterialTexture != nil, circuitBoardTexture != nil,
               materialSampler != nil,
               let vertex = library.makeFunction(name: "compute_chip_vertex"),
               let fragment = library.makeFunction(name: "compute_chip_fragment") else {
@@ -574,6 +604,7 @@ final class ComputeChipRenderer: NSObject, MTKViewDelegate {
         encoder.setFragmentBuffer(slot.activity, offset: 0, index: 0)
         encoder.setFragmentTexture(resources.cpuMaterialTexture, index: 0)
         encoder.setFragmentTexture(resources.gpuMaterialTexture, index: 1)
+        encoder.setFragmentTexture(resources.circuitBoardTexture, index: 2)
         encoder.setFragmentSamplerState(resources.materialSampler, index: 0)
         encoder.setVertexBuffer(geometryBuffer, offset: 0, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: layout.instances.count)

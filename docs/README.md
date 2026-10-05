@@ -1,7 +1,21 @@
 # Documentation guide
 
-Current source is **0.17.0 (27)**. The Graphite/Compute UI implementation and
-required QA are complete. Exact owner publication/readback/synchronization refs
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
+## Compute PCB refinement — verified native scope
+
+Current source remains **0.17.0 (27)**. Compute has trace-bound board frames,
+eight-point pulse clearance, external headings/readings, a much darker PCB and
+surrounding panel, and brighter traveling trace signals. The canonical My Mac
+selection passed **45 tests**; **31 SwiftPM repeats** passed. All **68 PNGs**
+were individually reviewed/rehashed, and the matching Debug build/signature
+passed. See [Compute](COMPUTE-CORES.md) and [native QA](GRAPHITE-NATIVE-QA.md)
+for exact source/candidate identities, retained failures and separate-layer
+capture limits. Installation and distribution remain separate. The broader
+qualification below belongs to the preceding `28548a73…` checkpoint.
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:END -->
+
+At the preceding `28548a73…` checkpoint, the **0.17.0 (27)** Graphite/Compute
+UI implementation and required QA were complete. Exact owner publication/readback/synchronization refs
 are retained externally. All 116 distinct production tests passed in 140
 executions. The separate native matrix passed 21 methods in 22 invocations; all
 463 selected PNG files were individually reviewed. Matching ordinary

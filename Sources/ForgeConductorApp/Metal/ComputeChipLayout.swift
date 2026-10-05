@@ -132,6 +132,8 @@ struct ComputeChipLayout {
     let stacked: Bool
     let cpuPanel: CGRect
     let gpuPanel: CGRect
+    let cpuBoard: CGRect
+    let gpuBoard: CGRect
     let cpuPackage: CGRect
     let gpuPackage: CGRect
     let cpuNameplate: CGRect
@@ -189,6 +191,7 @@ struct ComputeChipLayout {
         var instances: [ComputeChipInstance] = []
         var routes: [ComputeTraceRoute] = []
         var cpuRegions: [CGRect] = []
+        var boards: [CGRect] = []
         func append(_ rect: CGRect, kind: Float, color: SIMD4<Float>, region: Int = -1, seed: Int = 0,
                     angle: Float = 0) {
             instances.append(.init(rect: SIMD4(Float(rect.midX), Float(rect.midY), Float(rect.width), Float(rect.height)),
@@ -211,9 +214,6 @@ struct ComputeChipLayout {
         for (channel, body) in [cpuArtworkPackage, gpuArtworkPackage].enumerated() {
             let firstInstance = instances.count
             let s = body.width
-            let panel = channel == 0 ? cpuPanel : gpuPanel
-            append(panel.insetBy(dx: 0.5, dy: 0.5), kind: 9,
-                   color: GraphitePalette.linearRGBA(0x020817), seed: channel + 101)
             append(body.insetBy(dx: -5, dy: -5).offsetBy(dx: 0, dy: 2), kind: 10,
                    color: SIMD4(0, 0, 0, 0.65), seed: channel)
             append(body, kind: 11, color: SIMD4(repeating: 1), seed: channel)
@@ -337,9 +337,26 @@ struct ComputeChipLayout {
                               width: 1.3, height: 1.3),
                        kind: 5, color: GraphitePalette.linearRGBA(0x38B6D7, alpha: animated ? 1 : 0.5), seed: routeIndex)
             }
-            for index in firstInstance..<instances.count where instances[index].properties.x != 9 {
+            for index in firstInstance..<instances.count {
                 instances[index].rect.y += Float(artworkOffset(channel: channel))
             }
+            // The board follows every decorative trace, including nonanimated routes.
+            // Keep eight points for the existing pulse halo; labels belong to the outer panel.
+            var bounds = CGRect.null
+            for instance in instances[firstInstance...] {
+                let cosine = abs(cos(CGFloat(instance.properties.w)))
+                let sine = abs(sin(CGFloat(instance.properties.w)))
+                let width = CGFloat(instance.rect.z) * cosine + CGFloat(instance.rect.w) * sine
+                let height = CGFloat(instance.rect.z) * sine + CGFloat(instance.rect.w) * cosine
+                bounds = bounds.union(CGRect(x: CGFloat(instance.rect.x) - width / 2,
+                                             y: CGFloat(instance.rect.y) - height / 2,
+                                             width: width, height: height))
+            }
+            let board = bounds.insetBy(dx: -8, dy: -8)
+            boards.append(board)
+            instances.insert(.init(rect: SIMD4(Float(board.midX), Float(board.midY), Float(board.width), Float(board.height)),
+                                   color: GraphitePalette.linearRGBA(0x020817), properties: SIMD4(9, -1, Float(channel), 0)),
+                             at: firstInstance)
         }
         cpuRegions = cpuRegions.map { $0.offsetBy(dx: 0, dy: artworkOffset(channel: 0)) }
         routes = routes.map { route in
@@ -347,7 +364,7 @@ struct ComputeChipLayout {
                               channel: route.channel, seed: route.seed)
         }
         return Self(size: CGSize(width: width, height: height(for: width)), stacked: stacked,
-                    cpuPanel: cpuPanel, gpuPanel: gpuPanel, cpuPackage: cpuPackage, gpuPackage: gpuPackage,
+                    cpuPanel: cpuPanel, gpuPanel: gpuPanel, cpuBoard: boards[0], gpuBoard: boards[1], cpuPackage: cpuPackage, gpuPackage: gpuPackage,
                     cpuNameplate: plate(in: cpuPackage, channel: 0), gpuNameplate: plate(in: gpuPackage, channel: 1), cpuRegions: cpuRegions,
                     instances: instances, routes: routes)
     }

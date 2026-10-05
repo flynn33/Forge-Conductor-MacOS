@@ -403,7 +403,7 @@
       try requireCompletedMetal(in: fixture)
     }
 
-    func testProductionMaterialAssetsReuseTwoTexturesWhileGPUHueAndBrightnessFollowActivity()
+    func testProductionMaterialAssetsReuseThreeTexturesWhileGPUHueAndBrightnessFollowActivity()
       async throws
     {
       let initializationStart = ProcessInfo.processInfo.systemUptime
@@ -414,13 +414,17 @@
         name: "compute-native-reference-resource-initialization-timing")
       let cpuTexture = try XCTUnwrap(resources.cpuMaterialTexture)
       let gpuTexture = try XCTUnwrap(resources.gpuMaterialTexture)
+      let circuitBoardTexture = try XCTUnwrap(resources.circuitBoardTexture)
       let sampler = try XCTUnwrap(resources.materialSampler)
       let cpuImage = try XCTUnwrap(resources.cpuMaterialImage)
       let gpuImage = try XCTUnwrap(resources.gpuMaterialImage)
+      let circuitBoardImage = try XCTUnwrap(resources.circuitBoardImage)
+      let circuitBoardImageIdentity = ObjectIdentifier(circuitBoardImage)
       let identities = [
-        ObjectIdentifier(cpuTexture), ObjectIdentifier(gpuTexture), ObjectIdentifier(sampler),
+        ObjectIdentifier(cpuTexture), ObjectIdentifier(gpuTexture),
+        ObjectIdentifier(circuitBoardTexture), ObjectIdentifier(sampler),
       ]
-      XCTAssertEqual(resources.materialTextureCount, 2)
+      XCTAssertEqual(resources.materialTextureCount, 3)
       try requireReferenceMaterialPreservation(cpu: cpuImage, gpu: gpuImage)
       for (texture, dimension) in [(cpuTexture, 440), (gpuTexture, 464)] {
         XCTAssertEqual(texture.pixelFormat, .rgba8Unorm_srgb)
@@ -428,6 +432,15 @@
         XCTAssertEqual(texture.height, dimension)
         XCTAssertEqual(texture.mipmapLevelCount, 9)
       }
+      XCTAssertGreaterThan(circuitBoardImage.width, 0)
+      XCTAssertEqual(circuitBoardImage.width, circuitBoardImage.height)
+      XCTAssertLessThanOrEqual(circuitBoardImage.width, 2_048)
+      XCTAssertEqual(circuitBoardTexture.pixelFormat, .rgba8Unorm_srgb)
+      XCTAssertEqual(circuitBoardTexture.width, circuitBoardImage.width)
+      XCTAssertEqual(circuitBoardTexture.height, circuitBoardImage.height)
+      XCTAssertEqual(circuitBoardTexture.mipmapLevelCount,
+                     1 + Int(floor(log2(Double(circuitBoardImage.width)))))
+      try requireCircuitBoardBackgroundDarkening(circuitBoardImage)
       let fixture = try await mount(
         snapshot: snapshot(cpu: Array(repeating: 85, count: 10), gpu: 12))
       let layout = try XCTUnwrap(fixture.metalViews.only?.renderer?.layout)
@@ -447,6 +460,21 @@
           id: "compute-gpu-activity-state", in: fixture)
         let pixels = try await readback(
           from: fixture, name: "compute-native-material-gpu-\(Int(value))")
+        if value == 12 {
+          try requireCircuitBoardMaterialPixels(
+            layout: layout, resources: resources, classification: "genuine production Metal drawable"
+          ) { point in
+            let x = Int((point.x * CGFloat(pixels.width) / pixels.pointSize.width).rounded(.down))
+            let y = Int((point.y * CGFloat(pixels.height) / pixels.pointSize.height).rounded(.down))
+            guard x >= 0, y >= 0, x < pixels.width, y < pixels.height else {
+              throw ComputePresentationFailure("A circuit-board sample must be inside its drawable")
+            }
+            let offset = y * pixels.bytesPerRow + x * 4
+            return NSColor(srgbRed: CGFloat(pixels.bytes[offset + 2]) / 255,
+                           green: CGFloat(pixels.bytes[offset + 1]) / 255,
+                           blue: CGFloat(pixels.bytes[offset]) / 255, alpha: 1)
+          }
+        }
         let cpu = try layout.cpuRegions.map { try interiorPixels(in: $0, from: pixels).rgb }
         if let unchangedCPU { XCTAssertEqual(cpu, unchangedCPU) } else { unchangedCPU = cpu }
         var rgb = Data()
@@ -496,8 +524,11 @@
           [
             ObjectIdentifier(try XCTUnwrap(resources.cpuMaterialTexture)),
             ObjectIdentifier(try XCTUnwrap(resources.gpuMaterialTexture)),
+            ObjectIdentifier(try XCTUnwrap(resources.circuitBoardTexture)),
             ObjectIdentifier(try XCTUnwrap(resources.materialSampler)),
           ], identities)
+        XCTAssertEqual(ObjectIdentifier(try XCTUnwrap(resources.circuitBoardImage)),
+                       circuitBoardImageIdentity)
         try requireCompletedMetal(in: fixture)
       }
       retainText(
@@ -552,13 +583,16 @@
       fixture.model.snapshot = snapshot(cpu: Array(repeating: 85, count: 10), gpu: 82)
       _ = try await readback(from: fixture, name: "compute-native-material-resized")
       XCTAssertGreaterThan(fixture.diagnostics.snapshot().geometryRebuilds, geometryBefore)
-      XCTAssertEqual(resources.materialTextureCount, 2)
+      XCTAssertEqual(resources.materialTextureCount, 3)
       XCTAssertEqual(
         [
           ObjectIdentifier(try XCTUnwrap(resources.cpuMaterialTexture)),
           ObjectIdentifier(try XCTUnwrap(resources.gpuMaterialTexture)),
+          ObjectIdentifier(try XCTUnwrap(resources.circuitBoardTexture)),
           ObjectIdentifier(try XCTUnwrap(resources.materialSampler)),
         ], identities)
+      XCTAssertEqual(ObjectIdentifier(try XCTUnwrap(resources.circuitBoardImage)),
+                     circuitBoardImageIdentity)
       fixture.close()
       let detached = await waitUntil {
         let observation = fixture.diagnostics.snapshot()
@@ -577,11 +611,14 @@
         [
           ObjectIdentifier(try XCTUnwrap(resources.cpuMaterialTexture)),
           ObjectIdentifier(try XCTUnwrap(resources.gpuMaterialTexture)),
+          ObjectIdentifier(try XCTUnwrap(resources.circuitBoardTexture)),
           ObjectIdentifier(try XCTUnwrap(resources.materialSampler)),
         ], identities)
+      XCTAssertEqual(ObjectIdentifier(try XCTUnwrap(resources.circuitBoardImage)),
+                     circuitBoardImageIdentity)
       try requireCompletedMetal(in: reopened)
       retainText(
-        "cpu_texture=\(identities[0]); gpu_texture=\(identities[1]); sampler=\(identities[2]); immutable_material_count=2; immutable_sampler_count=1; uploaded_mip_levels=9; material_gpu_allocation_bytes=\(cpuTexture.allocatedSize + gpuTexture.allocatedSize); decoded_material_raster_bytes=\(cpuImage.bytesPerRow * cpuImage.height + gpuImage.bytesPerRow * gpuImage.height); resource_identities_unchanged_after_values_resize_and_reopen=true",
+        "cpu_texture=\(identities[0]); gpu_texture=\(identities[1]); circuit_board_texture=\(identities[2]); sampler=\(identities[3]); immutable_material_count=3; immutable_sampler_count=1; uploaded_chip_mip_levels=9; uploaded_board_mip_levels=\(circuitBoardTexture.mipmapLevelCount); material_gpu_allocation_bytes=\(cpuTexture.allocatedSize + gpuTexture.allocatedSize + circuitBoardTexture.allocatedSize); decoded_material_raster_bytes=\(cpuImage.bytesPerRow * cpuImage.height + gpuImage.bytesPerRow * gpuImage.height + circuitBoardImage.bytesPerRow * circuitBoardImage.height); resource_identities_unchanged_after_values_resize_and_reopen=true",
         name: "compute-native-material-shared-resource-ownership")
     }
 
@@ -687,6 +724,11 @@
       let resources = ComputeChipResources(
         device: nil, commandQueue: nil, library: nil,
         libraryOrigin: "", devices: [])
+      let circuitBoardImage = try XCTUnwrap(resources.circuitBoardImage)
+      XCTAssertGreaterThan(circuitBoardImage.width, 0)
+      XCTAssertEqual(circuitBoardImage.width, circuitBoardImage.height)
+      XCTAssertNil(resources.circuitBoardTexture)
+      XCTAssertEqual(resources.materialTextureCount, 0)
       let fixture = try await mount(
         snapshot: snapshot(cpu: [22, 0, 0, 0, 0, 0], gpu: nil),
         resources: resources, requireMetal: false)
@@ -720,6 +762,18 @@
       try requireNativeFallbackMaterialStructure(
         layout: layout, resources: resources, componentFrame: componentFrame,
         bitmap: missing, fixture: fixture)
+      let scaleX = CGFloat(missing.pixelsWide) / fixture.hostingView.bounds.width
+      let scaleY = CGFloat(missing.pixelsHigh) / fixture.hostingView.bounds.height
+      try requireCircuitBoardMaterialPixels(
+        layout: layout, resources: resources, classification: "actual native fallback Canvas cache"
+      ) { point in
+        let x = Int(((componentFrame.minX + point.x) * scaleX).rounded(.down))
+        let y = Int(((componentFrame.minY + point.y) * scaleY).rounded(.down))
+        guard x >= 0, y >= 0, x < missing.pixelsWide, y < missing.pixelsHigh else {
+          throw ComputePresentationFailure("A circuit-board sample must be inside its native cache")
+        }
+        return try XCTUnwrap(missing.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+      }
       // Canonical mapped region order is part of the current material-layout contract.
       var mappedGPURegionIDs: Set<Int> = []
       let regions = layout.instances.filter { instance in
@@ -833,6 +887,41 @@
       let g = sums[1] / count
       let b = sums[2] / count
       return (r, g, b, 0.2126 * r + 0.7152 * g + 0.0722 * b)
+    }
+
+    private func requireCircuitBoardBackgroundDarkening(_ processed: CGImage) throws {
+      let url = try XCTUnwrap(ComputeChipResources.assetBundle.url(
+        forResource: "ComputeCircuitBoard", withExtension: "png"))
+      let source = try XCTUnwrap(CGImageSourceCreateWithURL(url as CFURL, nil))
+      let original = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+      XCTAssertEqual(processed.width, original.width)
+      XCTAssertEqual(processed.height, original.height)
+      let originalBitmap = NSBitmapImageRep(cgImage: original)
+      let processedBitmap = NSBitmapImageRep(cgImage: processed)
+      var originalLuminance = 0.0
+      var processedLuminance = 0.0
+      func luminance(_ color: NSColor) -> Double {
+        0.2126 * Double(color.redComponent) + 0.7152 * Double(color.greenComponent)
+          + 0.0722 * Double(color.blueComponent)
+      }
+      for row in 0..<32 {
+        for column in 0..<32 {
+          let x = min(original.width - 1, Int((Double(column) + 0.5) / 32 * Double(original.width)))
+          let y = min(original.height - 1, Int((Double(row) + 0.5) / 32 * Double(original.height)))
+          originalLuminance += luminance(try XCTUnwrap(
+            originalBitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))) / 1_024
+          processedLuminance += luminance(try XCTUnwrap(
+            processedBitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))) / 1_024
+        }
+      }
+      XCTAssertGreaterThan(originalLuminance, 0)
+      XCTAssertLessThan(processedLuminance, originalLuminance * 0.40,
+                        "The shared PCB raster must be distinctly darker than the bundled source")
+      XCTAssertGreaterThan(processedLuminance, originalLuminance * 0.20,
+                           "Darkening must preserve circuit-board detail")
+      XCTAssertEqual(processedLuminance, originalLuminance * 0.32, accuracy: 1.0 / 255 + 0.001)
+      retainText("bounded_samples=1024; source_mean_srgb_luminance=\(originalLuminance); shared_processed_mean_srgb_luminance=\(processedLuminance); black_overlay_alpha=0.68; same_processed_image_used_by_metal_and_static_fallback=true",
+                 name: "compute-native-circuit-board-background-contrast")
     }
 
     private func requireReferenceMaterialPreservation(cpu: CGImage, gpu: CGImage) throws {
@@ -972,6 +1061,67 @@
       retainText(
         receipts.joined(separator: "\n"),
         name: "compute-native-exact-reference-material-preservation")
+    }
+
+    private func requireCircuitBoardMaterialPixels(
+      layout: ComputeChipLayout, resources: ComputeChipResources, classification: String,
+      colorAt: (CGPoint) throws -> NSColor
+    ) throws {
+      let image = try XCTUnwrap(resources.circuitBoardImage)
+      let reference = NSBitmapImageRep(cgImage: image)
+      let excluded = layout.instances.filter { [Float(5), 6, 10, 11].contains($0.properties.x) }
+        .map { instance -> CGRect in
+          let cosine = abs(cos(CGFloat(instance.properties.w)))
+          let sine = abs(sin(CGFloat(instance.properties.w)))
+          let width = CGFloat(instance.rect.z) * cosine + CGFloat(instance.rect.w) * sine
+          let height = CGFloat(instance.rect.z) * sine + CGFloat(instance.rect.w) * cosine
+          return CGRect(x: CGFloat(instance.rect.x) - width / 2,
+                        y: CGFloat(instance.rect.y) - height / 2,
+                        width: width, height: height).insetBy(dx: -3, dy: -3)
+        }
+      func luminance(_ color: NSColor) -> Double {
+        0.2126 * Double(color.redComponent) + 0.7152 * Double(color.greenComponent)
+          + 0.0722 * Double(color.blueComponent)
+      }
+      var receipts: [String] = []
+      for (channel, board) in [("CPU", layout.cpuBoard), ("GPU", layout.gpuBoard)] {
+        var errors: [Double] = []
+        var visible = 0
+        for row in 0..<32 {
+          for column in 0..<32 {
+            let u = (CGFloat(column) + 0.5) / 32
+            let v = (CGFloat(row) + 0.5) / 32
+            let point = CGPoint(x: board.minX + u * board.width, y: board.minY + v * board.height)
+            guard board.insetBy(dx: 12, dy: 12).contains(point),
+              !excluded.contains(where: { $0.contains(point) }) else { continue }
+            // Average the source footprint instead of selecting one bright source pixel
+            // that can disappear when the immutable mipmapped material is minified.
+            var expected = 0.0
+            for y in -2...2 {
+              for x in -2...2 {
+                let sourceX = min(image.width - 1, max(0, Int(
+                  (u + CGFloat(x) * 0.25 / board.width) * CGFloat(image.width))))
+                let sourceY = min(image.height - 1, max(0, Int(
+                  (v + CGFloat(y) * 0.25 / board.height) * CGFloat(image.height))))
+                expected += luminance(try XCTUnwrap(
+                  reference.colorAt(x: sourceX, y: sourceY)?.usingColorSpace(.sRGB))) / 25
+              }
+            }
+            guard expected > 0.08 else { continue }
+            let actual = luminance(try colorAt(point))
+            errors.append(abs(actual - expected))
+            if actual > 0.04 { visible += 1 }
+          }
+        }
+        let visibleFraction = Double(visible) / Double(max(errors.count, 1))
+        let meanError = errors.reduce(0, +) / Double(max(errors.count, 1))
+        XCTAssertGreaterThanOrEqual(errors.count, 8, "Each board must expose sampled source detail outside its chip and live traces")
+        XCTAssertGreaterThanOrEqual(visibleFraction, 0.60, "Bundled circuit-board detail must appear in actual native pixels")
+        XCTAssertLessThan(meanError, 0.12, "Rendered board samples must follow the shared source material")
+        receipts.append("channel=\(channel); board=\(NSStringFromRect(board)); source_selected_samples=\(errors.count); visible_fraction=\(visibleFraction); mean_srgb_luminance_error=\(meanError)")
+      }
+      retainText("classification=\(classification); bounded source-correlated samples exclude chip, shadow, decorative trace segments, endpoints and border\n" + receipts.joined(separator: "\n"),
+                 name: "compute-native-circuit-board-material-pixels")
     }
 
     private func requireNativeFallbackMaterialStructure(
@@ -1467,9 +1617,9 @@
       XCTAssertGreaterThan(gpuDuration, 0)
       XCTAssertLessThanOrEqual(observation.maximumInFlightSlots, 3)
       XCTAssertLessThanOrEqual(observation.ownedBuffers, 7)
-      XCTAssertEqual(observation.sharedMaterialTextures, 2)
+      XCTAssertEqual(observation.sharedMaterialTextures, 3)
       XCTAssertEqual(observation.sharedMaterialSamplers, 1)
-      XCTAssertEqual(observation.materialTextureLoads, 2)
+      XCTAssertEqual(observation.materialTextureLoads, 3)
       let view = try XCTUnwrap(fixture.metalViews.only)
       XCTAssertNil(
         view.hitTest(NSPoint(x: view.frame.midX, y: view.frame.midY)),
@@ -1942,7 +2092,8 @@
     var body: some View {
       VStack(alignment: .leading) {
         if model.showsComponent {
-          GraphitePanel(title: "COMPUTE CORES") {
+          GraphitePanel(title: "COMPUTE CORES",
+                        surface: GraphitePanelSurface(topColor: GraphitePalette.computePanelTop, bottomColor: GraphitePalette.computePanelBottom)) {
             ComputeCoresContentView(
               snapshot: model.snapshot, autoRefresh: model.autoRefresh, suppressMotion: !model.motionEnabled,
               resources: model.resources, diagnostics: diagnostics

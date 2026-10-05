@@ -1,7 +1,94 @@
 # Graphite native QA
 
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
+## Compute PCB refinement — verified native scope
+
+**0.17.0 (27)** tightens each Compute board frame to the trace endpoints,
+with eight points of pulse clearance. Headings and engine readings sit outside
+the board frames. The entire PCB and surrounding Compute panel are much darker
+midnight blue, with subdued silver/gold components, trace highlights and
+shadowed metal detail. Approved chip sizes/artwork, banks and core effects
+remain. Traveling signals have stronger colored bloom and bright centers;
+existing route shapes, signal counts, cadence and pause/hidden/stale bounds remain.
+
+The final canonical **My Mac** AppTests run passed **45 tests**, zero
+failures/skips, terminal 0, in **31.971 seconds of case execution**: Compute 19,
+lifecycle 6, presentation 8 and Graphite 12. Focused SwiftPM passed 31 cases
+(19 Compute/12 Graphite); all overlap that native selection. The zero-case
+qualification-support bundle is not counted as an executed production test.
+The ordinary Debug build and strict signature verification passed separately.
+
+The canonical selection ran through the existing workspace/target:
+
+```sh
+xcodebuild -workspace ForgeConductor.xcworkspace \
+  -scheme ForgeConductorAppTests -configuration Debug -destination 'platform=macOS' \
+  -derivedDataPath build/pcb-tests -resultBundlePath build/pcb-evidence/canonical-contrast.xcresult \
+  -parallel-testing-enabled NO \
+  '-only-testing:ForgeConductorAppTests/ComputeChipAppTests' \
+  '-only-testing:ForgeConductorAppTests/ComputeChipNativeLifecycleTests' \
+  '-only-testing:ForgeConductorAppTests/ComputeChipPresentationAppTests' \
+  '-only-testing:ForgeConductorAppTests/GraphiteWorkbenchAppTests' test
+```
+
+Result summary: `build/pcb-evidence/contrast-test-summary.json`, SHA-256
+`d60a72802af74894d725b587dc689e07d9943dfc467e5aaf341f1fadec1dff05`.
+Logs: `/tmp/forge-pcb-contrast-native-test.log`,
+`/tmp/forge-pcb-contrast-swift-test.log` and
+`/tmp/forge-pcb-contrast-app-build.log`.
+
+Four reviews individually opened/rehashed all **68 unique PNGs**:
+**47 genuine Metal drawable readbacks and 21 separate NSView caches**, with
+zero blocking findings, missing reviews or hash mismatches. The selected
+material/activity, native fixture, accessibility/fallback and motion layers
+include a **20-frame motion sequence**.
+
+| Reviewer receipt in `build/pcb-evidence` | PNGs opened | SHA-256 |
+| --- | ---: | --- |
+| `contrast-accessibility-fallback-review.json` | 13 | `644b9ab65f259df6698cc7683d0f42bfd4bd447a186c79f67c1efd06b2a28b40` |
+| `contrast-fixture-review.json` | 22 | `e606b9ec72852e423bb05f830abba1874e513c843d19638c47b4336aa1bf3b8f` |
+| `contrast-material-review.json` | 11 | `0df5c268c06598547d054be251ea614ea181a01303bdd7419fd4712449acaf88` |
+| `contrast-motion-review.json` | 22 | `f2f537fe087bc0dfb5cb3df31189d10898872ba9c00cd9c415d345aaa63f3c80` |
+
+These four receipts cover 68 distinct images. Union authority:
+`build/pcb-evidence/contrast-visual-review-union.json`, SHA-256
+`e65994e1ce83c49841ea1c25745f113e5290c16727cbbe4c4144e49fe8c04602`.
+The native fixture sidecars preserve distinct idle, warming, missing,
+provenance-unavailable and stale states and exact hardware identities. Stale
+GPU retains historical 82% readings/illumination while AX reports **Stale
+activity**; a still image does not prove stale trace-stop behavior.
+
+Final source inventory: **435 inputs / 31 resources**, manifest SHA-256
+`8aeafde6bd315a1d3ad35ff82b6fc5b33d82cd96481d0d595cbebe77695fa689`.
+All original 30 resource byte sets are unchanged; the graph adds only two PCB
+objects and two list entries. Original objects/settings/schemes remain.
+The signed ordinary candidate is `build/pcb-app/Build/Products/Debug/Forge Conductor.app`,
+CDHash `da4039dc3bfda88dbf0d0bedfe8ddda96b7682f9`, Apple Development team
+`9AQ2C2838M`, version **0.17.0 (27)**. [Compute](COMPUTE-CORES.md) records
+full project/asset/dylib/metallib identities and the cached substrate-darkening measurement.
+
+The initial 31-case run had two failed assertions in
+`testControlledNativeAccessibilityCapabilitiesPreserveInputsActionsAndMetalOutput`;
+the fixture field did not receive focus. Cause is unknown. Its unchanged
+isolated retry passed 1/1; the preceding 33-case run and final 45-case run
+passed. Failure/retry results remain separate, and no assertion was weakened.
+
+Native caches omit Metal; genuine drawable readbacks omit native labels/chrome.
+These are separate layers, with motion evidence separate from motion-reduced
+fixture stills. This run is canonical app-hosted XCTest, not XCUITest or a
+composed desktop capture. No current candidate installation or distribution
+is claimed. Earlier broader route/workflow/display receipts retain their inputs.
+
+Evidence is retained at `/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-05-compute-pcb-refinement`.
+The initial retained copy has 4,438 entries / 660,338,122 bytes, with
+hash/mode/symlink verification.
+Final 45-case, initial failed 31-case, isolated retry and preceding 33-case
+xcresults, ordinary/test products, 311 attachments and logs remain available.
+Exact owner publication/synchronization refs belong to external delivery receipts.
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:END -->
+
 <!-- FORGE-DASHBOARD-COLUMNS-FOLLOWUP:BEGIN -->
-## Current Dashboard columns — implementation and QA complete
+## Preceding Dashboard columns — source 81a91a81…
 
 Version/build remains **0.17.0 (27)**. The Dashboard lower panels use two
 independent, equal-width stacks: MCP Servers above MCP Tools at left,
@@ -88,7 +175,7 @@ inline Guided Mode banner and guide button; other routes retain guidance.
 Workbench Settings labels its existing action **Open Guide**. Sub-agents and
 Hot Processes fill the same grid row, retaining its 200-point minimum.
 
-The current scoped source manifest `2463aa06…` covers 434 inputs with unchanged
+The preceding scoped source manifest `2463aa06…` covers 434 inputs with unchanged
 canonical build graph and all 30 resource files. Thirteen native view methods
 passed and all 357 successful PNGs were reviewed; the one failed fixture
 invocation is retained separately. The matching My Mac Debug build and strict

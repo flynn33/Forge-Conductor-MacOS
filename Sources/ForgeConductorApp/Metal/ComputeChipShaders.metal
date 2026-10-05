@@ -50,6 +50,7 @@ fragment float4 compute_chip_fragment(ChipVertex in [[stage_in]],
                                      constant ChipUniforms &uniforms [[buffer(1)]],
                                      texture2d<float> cpuMaterial [[texture(0)]],
                                      texture2d<float> gpuMaterial [[texture(1)]],
+                                     texture2d<float> circuitBoard [[texture(2)]],
                                      sampler materialSampler [[sampler(0)]]) {
     int kind = int(in.properties.x);
     float2 p = in.uv * in.size;
@@ -83,11 +84,8 @@ fragment float4 compute_chip_fragment(ChipVertex in [[stage_in]],
         float2 q = abs((in.uv-0.5)*in.size)-in.size*0.5+radius;
         float boundary = length(max(q,float2(0)))+min(max(q.x,q.y),0.0)-radius;
         alpha *= 1-smoothstep(-0.35,0.35,boundary);
-        float2 radial = (in.uv-float2(0.5,0.53))/float2(0.68,0.88);
-        float field = exp(-2.8*dot(radial,radial));
-        float fieldGrain = chip_hash(floor(in.uv*float2(437,563))+seed);
-        color *= 0.78+field*0.25+(fieldGrain-0.5)*0.035;
-        color += field*float3(0.0015,0.0035,0.0055);
+        // Static circuitry stays below the preserved package, live tile fields and pulses.
+        color = circuitBoard.sample(materialSampler,in.uv).rgb;
         float border = 1-smoothstep(0.25,0.80,abs(boundary+0.70));
         color += border*float3(0.006,0.012,0.016);
     } else if (kind == 0 || kind == 1 || kind == 3 || kind == 8) {
@@ -212,9 +210,16 @@ fragment float4 compute_chip_fragment(ChipVertex in [[stage_in]],
         alpha *= 0.75;
     } else if (kind == 7) {
         float2 local = (in.uv-0.5)*2;
-        float radius = length(local);
-        alpha *= exp(-5.5*radius*radius);
-        color = mix(in.color.rgb,float3(0.76,0.96,1),exp(-32*radius*radius));
+        float raw = clamp(in.properties.y,0.0,1.0);
+        float energy = pow(raw,0.65);
+        float coreEnergy = pow(energy,1.6);
+        float bloom = exp(-2.8*dot(local,local));
+        float streak = exp(-3.0*local.x*local.x-20.0*local.y*local.y);
+        float whiteCore = exp(-7.5*local.x*local.x-38.0*local.y*local.y);
+        color = in.color.rgb*(0.30+1.25*energy)*(0.55+0.45*streak)
+              + whiteCore*coreEnergy*float3(1.8,2.052,2.16);
+        alpha *= max(bloom*0.70,streak);
+        if (raw == 0) { alpha = 0; }
     }
     if (uniforms.options.x > 0.5 && (kind == 4 || kind == 12)) { color *= 1.35; }
     return float4(color,alpha);

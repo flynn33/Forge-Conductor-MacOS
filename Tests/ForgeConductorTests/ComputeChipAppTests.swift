@@ -183,6 +183,7 @@ final class ComputeChipAppTests: XCTestCase {
             let layout = ComputeChipLayout.make(width: width, cpuRegionCount: 24)
             for route in layout.routes {
                 let panel = route.channel == 0 ? layout.cpuPanel : layout.gpuPanel
+                let board = route.channel == 0 ? layout.cpuBoard : layout.gpuBoard
                 let header = CGRect(x: panel.minX, y: panel.minY, width: panel.width,
                                     height: ComputeChipLayout.panelHeaderHeight)
                 let status = CGRect(x: panel.minX, y: panel.maxY - ComputeChipLayout.panelFooterHeight,
@@ -194,6 +195,8 @@ final class ComputeChipAppTests: XCTestCase {
                 XCTAssertFalse(header.intersects(traceBounds), "Width \(width), route \(route.seed)")
                 XCTAssertFalse(status.intersects(traceBounds), "Width \(width), route \(route.seed)")
                 XCTAssertTrue(panel.contains(traceBounds), "Trace halos remain inside their component panel")
+                XCTAssertTrue(board.insetBy(dx: -0.01, dy: -0.01).contains(traceBounds),
+                              "Every pulse halo remains on its circuit board")
             }
             for instance in layout.instances where instance.properties.x == 5 || instance.properties.x == 6 {
                 let cosine = abs(cos(CGFloat(instance.properties.w)))
@@ -205,6 +208,60 @@ final class ComputeChipAppTests: XCTestCase {
                                     width: width, height: height)
                 XCTAssertTrue(layout.cpuPanel.contains(bounds) || layout.gpuPanel.contains(bounds),
                               "Every decorative segment and endpoint stays inside the narrowed frames")
+            }
+        }
+    }
+
+    func testCircuitBoardsFitActualTraceEndsAndKeepNativeLabelsOutsideTheirFrames() {
+        for width: CGFloat in [1_560, 1_060, 928, 820, 800, 760, 759, 580, 400, 360, 320, 280] {
+            let layout = ComputeChipLayout.make(width: width, cpuRegionCount: 24)
+            let backgrounds = layout.instances.indices.filter { layout.instances[$0].properties.x == 9 }
+            XCTAssertEqual(backgrounds.count, 2)
+            guard backgrounds.count == 2 else { continue }
+            for (channel, panel, board, package) in [
+                (0, layout.cpuPanel, layout.cpuBoard, layout.cpuPackage),
+                (1, layout.gpuPanel, layout.gpuBoard, layout.gpuPackage),
+            ] {
+                let header = CGRect(x: panel.minX, y: panel.minY, width: panel.width,
+                                    height: ComputeChipLayout.panelHeaderHeight)
+                let footer = CGRect(x: panel.minX, y: panel.maxY - ComputeChipLayout.panelFooterHeight,
+                                    width: panel.width, height: ComputeChipLayout.panelFooterHeight)
+                XCTAssertTrue(panel.contains(board), "Width \(width), channel \(channel)")
+                XCTAssertFalse(header.intersects(board), "Native headings stay outside the board")
+                XCTAssertFalse(footer.intersects(board), "Native status and engine readings stay outside the board")
+                XCTAssertLessThan(board.width, panel.width)
+                XCTAssertLessThan(board.height, panel.height)
+                XCTAssertTrue(board.contains(package))
+
+                let start = backgrounds[channel]
+                let end = channel == 0 ? backgrounds[1] : layout.instances.endIndex
+                let artwork = layout.instances[(start + 1)..<end].filter {
+                    [Float(5), 6, 10, 11].contains($0.properties.x)
+                }
+                XCTAssertTrue(artwork.contains { $0.properties.x == 10 })
+                XCTAssertTrue(artwork.contains { $0.properties.x == 11 })
+                XCTAssertTrue(artwork.contains { $0.properties.x == 5 })
+                XCTAssertTrue(artwork.contains { $0.properties.x == 6 })
+                let bounds = artwork.map { instance -> CGRect in
+                    let cosine = abs(cos(CGFloat(instance.properties.w)))
+                    let sine = abs(sin(CGFloat(instance.properties.w)))
+                    let extentX = CGFloat(instance.rect.z) * cosine + CGFloat(instance.rect.w) * sine
+                    let extentY = CGFloat(instance.rect.z) * sine + CGFloat(instance.rect.w) * cosine
+                    return CGRect(x: CGFloat(instance.rect.x) - extentX / 2,
+                                  y: CGFloat(instance.rect.y) - extentY / 2,
+                                  width: extentX, height: extentY)
+                }
+                let visibleArtwork = bounds.reduce(CGRect.null) { $0.union($1) }
+                XCTAssertTrue(bounds.allSatisfy { board.contains($0) })
+                XCTAssertEqual(visibleArtwork.minX - board.minX, 8, accuracy: 0.01)
+                XCTAssertEqual(visibleArtwork.minY - board.minY, 8, accuracy: 0.01)
+                XCTAssertEqual(board.maxX - visibleArtwork.maxX, 8, accuracy: 0.01)
+                XCTAssertEqual(board.maxY - visibleArtwork.maxY, 8, accuracy: 0.01)
+                let background = layout.instances[start]
+                XCTAssertEqual(CGFloat(background.rect.x), board.midX, accuracy: 0.01)
+                XCTAssertEqual(CGFloat(background.rect.y), board.midY, accuracy: 0.01)
+                XCTAssertEqual(CGFloat(background.rect.z), board.width, accuracy: 1.01)
+                XCTAssertEqual(CGFloat(background.rect.w), board.height, accuracy: 1.01)
             }
         }
     }
@@ -288,6 +345,103 @@ final class ComputeChipAppTests: XCTestCase {
         XCTAssertGreaterThan(animation.phase[0], 0)
         XCTAssertEqual(animation.phase[1], 0)
         XCTAssertEqual(animation.values[256], 0.8, accuracy: 0.00001)
+    }
+
+    func testTracePulseIlluminationUsesSmoothedActivityAndPreservesChannelTintFamilies() {
+        let routes = [
+            ComputeTraceRoute(points: [SIMD2(0, 0), SIMD2(100, 0)], channel: 0, seed: 2),
+            ComputeTraceRoute(points: [SIMD2(0, 10), SIMD2(100, 10)], channel: 0, seed: 6),
+            ComputeTraceRoute(points: [SIMD2(0, 20), SIMD2(100, 20)], channel: 1, seed: 130),
+            ComputeTraceRoute(points: [SIMD2(0, 30), SIMD2(100, 30)], channel: 1, seed: 134),
+        ]
+        var snapshot = project(cpu: cpu(values: [80, 20], quality: .perLogicalProcessor),
+                               samples: [gpu(percent: 60)])
+        var animation = ComputeChipAnimation()
+        _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100,
+                              motionAllowed: true, paused: false)
+        _ = animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100,
+                              motionAllowed: true, paused: false)
+        let pulses = animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                             motionAllowed: true, paused: false)
+        XCTAssertEqual(pulses.count, 12)
+        let tints: [UInt32] = [0x33ACFF, 0x37DCC0, 0x33ACFF, 0xA275FF]
+        for (index, route) in routes.enumerated() {
+            let maximum = animation.values[route.channel == 0 ? 0 : 256]
+            XCTAssertGreaterThan(maximum, 0)
+            XCTAssertLessThan(maximum, route.channel == 0 ? 0.8 : 0.6)
+            let tint = GraphitePalette.linearRGBA(tints[index])
+            for tail in 0..<3 {
+                let pulse = pulses[index * 3 + tail]
+                XCTAssertEqual(pulse.properties.y, maximum)
+                XCTAssertEqual(pulse.properties.z, Float(route.seed))
+                XCTAssertEqual(pulse.color.x, tint.x)
+                XCTAssertEqual(pulse.color.y, tint.y)
+                XCTAssertEqual(pulse.color.z, tint.z)
+                XCTAssertEqual(pulse.color.w,
+                               (1 - Float(tail) * 0.27) * (0.35 + pow(maximum, 0.65) * 0.65),
+                               accuracy: 0.00001)
+            }
+        }
+        snapshot.cpu.activity = [0.05, 0.01]
+        snapshot.gpu.activity = Array(repeating: 0.95, count: 16)
+        XCTAssertEqual(animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                               motionAllowed: true, paused: false), pulses,
+                       "Raw target changes cannot bypass the renderer's activity envelope")
+        _ = animation.advance(snapshot: snapshot, monotonic: 0.2, wallTime: 100,
+                              motionAllowed: true, paused: false)
+        let next = animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                           motionAllowed: true, paused: false)
+        XCTAssertEqual(next.count, 12)
+        XCTAssertGreaterThan(next[0].properties.y, 0.05)
+        XCTAssertLessThan(next[0].properties.y, pulses[0].properties.y)
+        XCTAssertLessThan(next[0].color.w, pulses[0].color.w)
+        XCTAssertGreaterThan(next[6].properties.y, pulses[6].properties.y)
+        XCTAssertLessThan(next[6].properties.y, 0.95)
+        XCTAssertGreaterThan(next[6].color.w, pulses[6].color.w)
+        XCTAssertTrue(animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                              motionAllowed: true, paused: true).isEmpty)
+        XCTAssertTrue(animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                              motionAllowed: false, paused: false).isEmpty)
+        snapshot.gpu.observedAt = 90
+        _ = animation.advance(snapshot: snapshot, monotonic: 0.3, wallTime: 100,
+                              motionAllowed: true, paused: false)
+        let freshOnly = animation.pulseInstances(routes: routes, snapshot: snapshot, wallTime: 100,
+                                                motionAllowed: true, paused: false)
+        XCTAssertEqual(freshOnly.count, 6)
+        XCTAssertTrue(freshOnly.allSatisfy { $0.properties.z == 2 || $0.properties.z == 6 })
+    }
+
+    func testLuminousTraceStreaksRemainInsideTheExistingEightPointBoardHalo() {
+        let snapshot = project(cpu: cpu(values: [80], quality: .perLogicalProcessor),
+                               samples: [gpu(percent: 80)])
+        for width: CGFloat in [1_560, 1_060, 928, 820, 800, 760, 759, 580, 400, 360, 320, 280] {
+            let layout = ComputeChipLayout.make(width: width, cpuRegionCount: 1)
+            var animation = ComputeChipAnimation()
+            _ = animation.advance(snapshot: snapshot, monotonic: 0, wallTime: 100,
+                                  motionAllowed: true, paused: false)
+            _ = animation.advance(snapshot: snapshot, monotonic: 0.1, wallTime: 100,
+                                  motionAllowed: true, paused: false)
+            let pulses = animation.pulseInstances(routes: layout.routes, snapshot: snapshot, wallTime: 100,
+                                                 motionAllowed: true, paused: false)
+            XCTAssertEqual(layout.routes.count, 64)
+            XCTAssertEqual(pulses.count, 192)
+            for pulse in pulses {
+                XCTAssertEqual(pulse.rect.z, 15)
+                XCTAssertEqual(pulse.rect.w, 5.5)
+                let cosine = abs(cos(CGFloat(pulse.properties.w)))
+                let sine = abs(sin(CGFloat(pulse.properties.w)))
+                let extentX = CGFloat(pulse.rect.z) * cosine + CGFloat(pulse.rect.w) * sine
+                let extentY = CGFloat(pulse.rect.z) * sine + CGFloat(pulse.rect.w) * cosine
+                XCTAssertLessThanOrEqual(extentX / 2, 8)
+                XCTAssertLessThanOrEqual(extentY / 2, 8)
+                let bounds = CGRect(x: CGFloat(pulse.rect.x) - extentX / 2,
+                                    y: CGFloat(pulse.rect.y) - extentY / 2,
+                                    width: extentX, height: extentY)
+                let board = pulse.properties.z < 128 ? layout.cpuBoard : layout.gpuBoard
+                XCTAssertTrue(board.insetBy(dx: -0.01, dy: -0.01).contains(bounds),
+                              "Width \(width), route \(pulse.properties.z)")
+            }
+        }
     }
 
     func testFreshInvalidChannelImmediatelyStopsOnlyItsPreviouslyActiveTrace() {

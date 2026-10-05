@@ -817,7 +817,8 @@ struct RigDashboardView: View {
         let gpuCount = projection.gpu.hardwareCoreCount.map { "GPU \($0) cores" } ?? "GPU count unavailable"
         return panel(
             "COMPUTE CORES",
-            meta: "CPU \(projection.cpu.logicalCount) logical · \(gpuCount)"
+            meta: "CPU \(projection.cpu.logicalCount) logical · \(gpuCount)",
+            surface: GraphitePanelSurface(topColor: GraphitePalette.computePanelTop, bottomColor: GraphitePalette.computePanelBottom)
         ) {
             ComputeCoresContentView(snapshot: projection, autoRefresh: model.autoRefresh)
         }
@@ -1255,6 +1256,7 @@ struct RigDashboardView: View {
         _ title: String,
         meta: String,
         fillsGridRow: Bool = false,
+        surface: GraphitePanelSurface = GraphitePanelSurface(),
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1278,7 +1280,7 @@ struct RigDashboardView: View {
             maxHeight: fillsGridRow ? .infinity : nil,
             alignment: .topLeading
         )
-        .background(GraphitePanelSurface())
+        .background(surface)
     }
 
     private func healthColor(_ h: String) -> Color {

@@ -114,22 +114,25 @@ struct ComputeChipAnimation {
         pulseStorage.removeAll(keepingCapacity: true)
         guard motionAllowed && !paused else { return pulseStorage }
         pulseStorage.reserveCapacity(min(routes.count, Self.maximumRoutes) * 3)
-        let cpuMaximum = snapshot.cpu.activity.reduce(Float(0)) { max($0, $1 ?? 0) }
-        let gpuMaximum = snapshot.gpu.activity.reduce(Float(0)) { max($0, $1 ?? 0) }
+        let cpuMaximum = values[..<256].reduce(Float(0), max)
+        let gpuMaximum = values[256..<272].reduce(Float(0), max)
         for route in routes.prefix(Self.maximumRoutes) {
             let channel = route.channel
             let source = channel == 0 ? snapshot.cpu : snapshot.gpu
             guard source.isFresh(at: wallTime), active[channel], route.length > 1 else { continue }
             let distance = (phase[channel] + Float(route.seed * 17)).truncatingRemainder(dividingBy: route.length)
-            let maximum = channel == 0 ? cpuMaximum : gpuMaximum
+            let maximum = min(max(channel == 0 ? cpuMaximum : gpuMaximum, 0), 1)
+            let energy = pow(maximum, 0.65)
+            let alternateTint = (route.seed / 4) % 2 != 0
+            let tint: UInt32 = alternateTint ? (channel == 0 ? 0x37DCC0 : 0xA275FF) : 0x33ACFF
             for tail in 0..<3 {
                 let sample = max(0, distance - Float(tail) * 10)
                 let position = route.point(at: sample)
-                let color = GraphitePalette.linearRGBA(0x25DBF4,
-                    alpha: (1 - Float(tail) * 0.27) * (0.35 + maximum * 0.65))
+                let color = GraphitePalette.linearRGBA(tint,
+                    alpha: (1 - Float(tail) * 0.27) * (0.35 + energy * 0.65))
                 pulseStorage.append(.init(rect: SIMD4(position.position.x, position.position.y,
-                                               tail == 0 ? 9 : 15, tail == 0 ? 9 : 6),
-                                    color: color, properties: SIMD4(7, -1, Float(route.seed), position.angle)))
+                                               15, 5.5),
+                                    color: color, properties: SIMD4(7, maximum, Float(route.seed), position.angle)))
             }
         }
         return pulseStorage
