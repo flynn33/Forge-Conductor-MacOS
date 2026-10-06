@@ -2,12 +2,12 @@
 
 Current source identity: **0.18.0, build 28**.
 
-**Owner publication/installation checkpoint — 0.18.0 (28).** The owner requests
-publication of the current source/docs and wiki synchronization, then will handle
-installation. Further product repair waits for the owner's installation report.
-The actual managed policy mission remains **unverified**: its latest attempt
-stopped before model activation on an invalid harness mission. No installed or
-all-feature acceptance is claimed. [Checkpoint and limits](LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
+**Published owner checkpoint — 0.18.0 (28).** The source and wiki were
+published under the owner identity and both local checkouts were synchronized.
+The owner will build, notarize and install this version; further product repair
+waits for the installation report. The actual managed policy mission remains
+**unverified** after a harness preparation failure before model activation.
+Installed and all-feature acceptance remain open. [Published references and limits](LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
 
 Managed policy feedback and source replay now pass **93 affected source cases**
 (two disjoint selections: 65 + 28, zero failures/skips) on `5af17b77…`, including

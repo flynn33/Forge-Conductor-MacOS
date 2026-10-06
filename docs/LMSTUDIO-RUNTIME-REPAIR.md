@@ -9,16 +9,26 @@ build separately.
 
 ## Owner publication and installation checkpoint
 
-The owner requests publication of the current **0.18.0 (28)** source/document
-checkpoint and wiki synchronization, then will handle installation. Further
-product repair waits for the owner's installation report. Publication and
-synchronization are not claimed complete here; exact owner revisions/readback
-and local-main synchronization belong to their verified external receipts.
-Existing signing, identity, executable modes and installation boundaries remain.
+The **0.18.0 (28)** source/document checkpoint is published at
+[`65d1443204b9059b13dad32a13c7625d97c94435`](https://github.com/flynn33/Forge-Conductor-MacOS/commit/65d1443204b9059b13dad32a13c7625d97c94435).
+The wiki is published at `2a23d68e3fd4f449d769d088389eac7c745d0178`.
+Both commits use **Jim Daley / flynn33** as owner identity without attribution
+trailers. After fetch, local `main` and wiki `master` each matched their remote
+branch with clean trees and **0/0 divergence**. All **439 source/build inputs**
+and all **25 updated wiki pages** matched their local and remote content hashes.
+The source attribution workflow passed; the hosted native integrity job passed,
+while the broader hosted matrix was pending at this checkpoint.
+
+The owner will **build, notarize and install** the updated version. Further
+product repair waits for the installation report. Existing native signing,
+executable modes, credentials and installation boundaries remain preserved.
+The final documentation-only update records these preceding verified revisions
+without creating a self-referential commit identifier. Exact publication and
+readback receipts are retained outside the repository.
 
 Current source `5af17b77…` retains **93 passing affected source cases**, the two
 separate **passing native XCTest regressions**, and subsequent five-role Debug
-identity/settings evidence above. Earlier negative receipts, the fresh Debug
+identity/settings evidence recorded below. Earlier negative receipts, the fresh Debug
 cleanup NONPASS and incremental-only confirmation scope are preserved. Version
 and build authorities remain **0.18.0/28**; the canonical graph remains
 `534e6476…`. Historical version/evidence references keep their original inputs.
@@ -40,7 +50,7 @@ SHA `69e4f2e3cf73f0339cebec5e05992a9aabd34a7c2867faa0ce5ae233b485e9f5`.
 
 Actual model notice consumption/correction, ordinary GUI rollover, crash,
 installed, full-policy and all-feature gates remain open. One automatic detector
-and14 guidance-only rules remain; this handoff adds no detector or feature scope.
+and 14 guidance-only rules remain; this handoff adds no detector or feature scope.
 
 ## Managed policy feedback and source replay — source checkpoint
 
@@ -430,16 +440,17 @@ At the preceding publication checkpoint, source/document changes remained local
 at `f0dd195636117c210356621ee844b24a9af46fe2`, without a commit or push. The SSH-agent
 and keyless GraphQL limitations recorded then retain that scope.
 
-For the current owner-directed handoff, root verified owner account `flynn33`
-and the existing authorized Admin Role bypass. The planned route is an
-owner-authored local Git commit and direct push; the source commit will be
-**unsigned**, with no verified-signature claim. No new signing key, repository
-rule change, native-app signing change or executable-mode weakening is part of
-that route; mode **100755** on
-`Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md` remains preserved.
-Publication, source/wiki readback and safe local-main synchronization are not
-claimed complete before execution. Exact resulting revisions and verification
-receipts will be retained externally after the push.
+The subsequent owner-directed handoff published source commit
+`65d1443204b9059b13dad32a13c7625d97c94435` and wiki commit
+`2a23d68e3fd4f449d769d088389eac7c745d0178` under the verified `flynn33` account.
+The source push used the existing, explicitly authorized **Admin Role bypass**
+for pull-request, expected status-check and verified-signature requirements.
+The owner-authored source commit is **unsigned**; no verified-signature claim
+is made. No signing key, repository rule or native-app signing setting was
+changed for publication. Mode **100755** on
+`Sources/ForgeConductorCore/Resources/Agents/precommit-audit.md` is preserved
+in the remote tree. Source/wiki readback and safe synchronization passed as
+recorded in the owner checkpoint above and retained external receipts.
 
 The first current **8,192-token actual-model attempt remains NONPASS**. It
 reached the saved-three-call trigger, same-handoff acknowledgement and predecessor
