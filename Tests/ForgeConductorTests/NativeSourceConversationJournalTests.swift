@@ -419,12 +419,18 @@ final class NativeSourceConversationJournalTests: XCTestCase {
                 let bytes = try Data(contentsOf: f.database)
                 if variant == "exact" {
                     let jobs = try RuntimeJobRepository(databaseURL: f.database)
-                    XCTAssertEqual(try JournalSQL.value(f.database, "SELECT version FROM runtime_job_schema_version"), "5")
+                    XCTAssertEqual(try JournalSQL.value(f.database, "SELECT version FROM runtime_job_schema_version"), "6")
+                    XCTAssertEqual(try JournalSQL.value(f.database, """
+                        SELECT COUNT(*) FROM pragma_table_info('runtime_job_output_streams')
+                        WHERE ((name='producer_end_reason' AND type='TEXT')
+                            OR (name='producer_read_errno' AND type='INTEGER'))
+                            AND "notnull"=0 AND dflt_value IS NULL
+                        """), "2", "Runtime provenance is additive and has no manufactured EOF default")
                     XCTAssertEqual(try JournalSQL.value(f.database, "SELECT COUNT(*) FROM native_source_conversations"), "1")
                     await jobs.close()
                     let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self,
                         from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: f.database)))
-                    XCTAssertEqual(manifest.sourceVersion, 0); XCTAssertEqual(manifest.targetVersion, 5)
+                    XCTAssertEqual(manifest.sourceVersion, 0); XCTAssertEqual(manifest.targetVersion, 6)
                     XCTAssertEqual(manifest.state, .completed)
                     let backup = f.database.deletingLastPathComponent().appendingPathComponent(manifest.backupFilename)
                     XCTAssertEqual(JSONSupport.sha256Hex(try Data(contentsOf: backup)), manifest.backupSHA256)

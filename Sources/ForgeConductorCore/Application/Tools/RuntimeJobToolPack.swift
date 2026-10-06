@@ -65,9 +65,9 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             "python.run": "Start a durable isolated Python job when the configured interpreter is available.",
             "powershell.run": "Start a durable noninteractive PowerShell job when pwsh is available.",
             "job.status": "Read durable status for one project-generation-bound runtime job.",
-            "job.read_output": "Read one bounded stdout or stderr slice from a durable runtime job.",
+            "job.read_output": "Read a bounded stdout/stderr byte page. Continue at next_offset; pages may be shorter than limit to fit the result budget. data is legacy text; optional data_base64 preserves exact bytes when the page is not valid UTF-8. eof ends retained byte pages only. Complete native output also requires producer_end_reason=eof, producer_read_errno=null, and artifact_truncated=false for both streams. Missing/null producer reason is legacy unknown; read_error or forced_close is incomplete.",
             "job.cancel": "Cancel a runtime job and terminate its process group with bounded escalation.",
-            "job.list": "List a bounded page of runtime jobs in the current project generation.",
+            "job.list": "List complete runtime job rows within the current project generation and inline result budget. Pass both fields from next_cursor to read the next page, including jobs with the same creation timestamp.",
         ][name]
     }
 
@@ -123,6 +123,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                 ] as [String: Any],
                 "limit": ["type": "integer", "minimum": 1, "maximum": RuntimeJobRepository.maximumListLimit],
                 "before_created_at": string,
+                "before_job_id": ["type": "string", "minLength": 36, "maxLength": 36],
             ], required: [])
         default:
             return nil
@@ -177,18 +178,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                     context: context
                 )
                 try Task.checkCancellation()
-                return .success([
-                    "job_id": jobID.uuidString.lowercased(),
-                    "stream": stream.rawValue,
-                    "offset": slice.offset,
-                    "data": String(decoding: slice.data, as: UTF8.self),
-                    "next_offset": slice.nextOffset,
-                    "retained_bytes": slice.totalRetainedBytes,
-                    "observed_bytes": slice.totalObservedBytes,
-                    "eof": slice.eof,
-                    "artifact_truncated": slice.artifactTruncated,
-                    "sha256": slice.sha256,
-                ])
+                return try Self.outputResult(slice, context: context)
             case "job.cancel":
                 let jobID = try Self.jobID(arguments)
                 let record = try await service.cancelAndReturnRecord(
@@ -206,18 +196,24 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             case "job.list":
                 let states = try Self.states(arguments)
                 let limit = ToolArgHelpers.int(arguments, "limit") ?? 20
+                let beforeJobID: UUID?
+                if let value = arguments["before_job_id"] {
+                    guard let raw = value as? String, let id = UUID(uuidString: raw) else {
+                        throw RuntimeJobError.invalidRequest("before_job_id must be a UUID")
+                    }
+                    beforeJobID = id
+                } else {
+                    beforeJobID = nil
+                }
                 let records = try await service.list(
                     context: context,
                     states: states,
                     limit: limit,
-                    beforeCreatedAt: ToolArgHelpers.string(arguments, "before_created_at")
+                    beforeCreatedAt: ToolArgHelpers.string(arguments, "before_created_at"),
+                    beforeJobID: beforeJobID
                 )
                 try Task.checkCancellation()
-                return .success([
-                    "jobs": records.map(Self.recordPayload),
-                    "count": records.count,
-                    "has_more": records.count == min(max(1, limit), RuntimeJobRepository.maximumListLimit),
-                ])
+                return try Self.listResult(records, requestedLimit: limit, context: context)
             default:
                 return nil
             }
@@ -234,6 +230,115 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
         } catch {
             return .failure(code: "runtime_job_error", message: error.localizedDescription, retryable: false)
         }
+    }
+
+    private static func outputResult(
+        _ slice: RuntimeOutputSlice,
+        context: ToolInvocationContext
+    ) throws -> ToolResult {
+        let budget = min(ToolInvocationBroker.maximumDurableResultBytes,
+                         context.authorizationScope.maximumInlineOutputBytes)
+        // One verified read supplies every candidate. Every returned candidate
+        // is checked against the complete durable result, including its wrapper.
+        func candidate(_ count: Int) throws -> ToolResult? {
+            try Task.checkCancellation()
+            let bytes = Data(slice.data.prefix(count))
+            let advanced = slice.offset.addingReportingOverflow(UInt64(count))
+            let next = min(slice.totalRetainedBytes, advanced.overflow ? UInt64.max : advanced.partialValue)
+            var payload: [String: Any] = [
+                "job_id": slice.jobID.uuidString.lowercased(),
+                "stream": slice.stream.rawValue,
+                "offset": slice.offset,
+                "data": String(decoding: bytes, as: UTF8.self),
+                "next_offset": next,
+                "retained_bytes": slice.totalRetainedBytes,
+                "observed_bytes": slice.totalObservedBytes,
+                "eof": next >= slice.totalRetainedBytes,
+                "artifact_truncated": slice.artifactTruncated,
+                "sha256": slice.sha256,
+                "producer_end_reason": slice.producerEndReason?.rawValue as Any? ?? NSNull(),
+                "producer_read_errno": slice.producerReadErrno as Any? ?? NSNull(),
+            ]
+            if String(data: bytes, encoding: .utf8) == nil {
+                payload["data_base64"] = bytes.base64EncodedString()
+            }
+            let result = ToolResult.success(payload)
+            let encoded = try JSONSupport.canonicalJSON([
+                "ok": result.ok, "is_error": result.isError, "payload": result.payload,
+            ])
+            return encoded.utf8.count <= budget ? result : nil
+        }
+        var count = slice.data.count
+        var rejectedCount: Int?
+        for _ in 0..<18 {
+            guard count > 0 || slice.data.isEmpty else {
+                throw RuntimeJobError.invalidRequest("output byte page cannot fit the caller's inline result budget")
+            }
+            if var fitting = try candidate(count) {
+                var lower = count
+                var upper = (rejectedCount ?? count) - 1
+                // Refine the verified fitting prefix so repeated small-budget
+                // reads do not waste half their capacity. UTF-8 boundaries can
+                // remove the base64 field; no unchecked size estimate is returned.
+                for _ in 0..<16 where lower < upper {
+                    let middle = lower + (upper - lower + 1) / 2
+                    if let larger = try candidate(middle) {
+                        fitting = larger
+                        lower = middle
+                    } else {
+                        upper = middle - 1
+                    }
+                }
+                return fitting
+            }
+            rejectedCount = count
+            count /= 2
+        }
+        throw RuntimeJobError.invalidRequest("output page metadata exceeds the caller's inline result budget")
+    }
+
+    private static func listResult(
+        _ records: [RuntimeJobRecord], requestedLimit: Int, context: ToolInvocationContext
+    ) throws -> ToolResult {
+        let budget = min(ToolInvocationBroker.maximumDurableResultBytes,
+                         context.authorizationScope.maximumInlineOutputBytes)
+        let mayHaveMore = records.count == min(max(1, requestedLimit), RuntimeJobRepository.maximumListLimit)
+        func candidate(_ count: Int) throws -> ToolResult? {
+            try Task.checkCancellation()
+            let selected = records.prefix(count)
+            let hasMore = count < records.count || mayHaveMore
+            var payload: [String: Any] = [
+                "jobs": selected.map(Self.recordPayload), "count": count, "has_more": hasMore,
+            ]
+            if hasMore, let last = selected.last {
+                payload["next_cursor"] = [
+                    "before_created_at": last.createdAt,
+                    "before_job_id": last.jobID.uuidString.lowercased(),
+                ]
+            }
+            let result = ToolResult.success(payload)
+            let encoded = try JSONSupport.canonicalJSON([
+                "ok": result.ok, "is_error": result.isError, "payload": result.payload,
+            ])
+            return encoded.utf8.count <= budget ? result : nil
+        }
+        if records.isEmpty, let empty = try candidate(0) { return empty }
+        var lower = 0
+        var upper = records.count
+        var fitting: ToolResult?
+        for _ in 0..<7 where lower < upper {
+            let middle = lower + (upper - lower + 1) / 2
+            if let result = try candidate(middle) {
+                fitting = result
+                lower = middle
+            } else {
+                upper = middle - 1
+            }
+        }
+        guard let fitting else {
+            throw RuntimeJobError.invalidRequest("a complete job row cannot fit the caller's inline result budget")
+        }
+        return fitting
     }
 
     private static func request(

@@ -8,7 +8,7 @@ tools:
   - git_log
   - fs_read
   - search_text
-  - search_files
+  - fs_glob
   - shell_exec
 when_to_use:
   - Before every git commit
@@ -44,6 +44,9 @@ quality_bar:
 Gate commits on a structured audit. **You must call `agent_run_complete`** with
 all output_schema fields. Hosts that skip complete leave open sessions that
 auto-close and raise false WARN badges.
+
+Find filenames with `fs_glob(pattern="*.swift", path="<project>")`. The pattern
+matches each filename; use `search_text` for file contents.
 
 ## Required completion
 

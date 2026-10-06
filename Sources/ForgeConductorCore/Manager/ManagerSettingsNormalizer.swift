@@ -17,6 +17,7 @@ public enum ManagerSettingsNormalizer {
             return ["budget_update": try BudgetPolicyUpdate.decode(dictionary: object).asDictionary()]
         }
         try validateLegacyBudgetKeys(patch)
+        try validateContinuityRollover(patch)
         let fields: [(String, String, ClosedRange<Int>)] = [
             ("dashboard", "port", 1...65_535),
             ("dashboard", "refresh_interval_sec", 2...300),
@@ -47,6 +48,19 @@ public enum ManagerSettingsNormalizer {
     public static func validateLegacyBudgetKeys(_ patch: [String: Any]) throws {
         var inspectedValues = 0
         try rejectUnknownBudgetKeys(patch, path: [], inspectedValues: &inspectedValues)
+    }
+
+    public static func validateContinuityRollover(_ patch: [String: Any]) throws {
+        guard let raw = patch["sessions"] else { return }
+        guard let sessions = raw as? [String: Any] else {
+            throw ManagerSettingsValidationError(field: "sessions", reason: "expected_object")
+        }
+        guard let rawLimit = sessions["continuity_rollover_tool_calls"] else { return }
+        guard let limit = JSONSupport.exactInteger(rawLimit),
+              AppConfig.SessionsConfig.continuityRolloverToolCallRange.contains(limit) else {
+            throw ManagerSettingsValidationError(field: "sessions.continuity_rollover_tool_calls",
+                reason: "expected_finite_integer_in_range", permittedRange: "1...10000")
+        }
     }
 
     private static func rejectUnknownBudgetKeys(_ value: Any, path: [String], inspectedValues: inout Int) throws {
@@ -104,6 +118,10 @@ public enum ManagerSettingsNormalizer {
             var s: [String: Any] = [:]
             if let ttl = intValue(sessions["idle_ttl_sec"]), ttl >= 60 {
                 s["idle_ttl_sec"] = ttl
+            }
+            if let limit = JSONSupport.exactInteger(sessions["continuity_rollover_tool_calls"]),
+               AppConfig.SessionsConfig.continuityRolloverToolCallRange.contains(limit) {
+                s["continuity_rollover_tool_calls"] = limit
             }
             if !s.isEmpty { normalized["sessions"] = s }
         }

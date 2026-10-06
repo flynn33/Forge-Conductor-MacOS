@@ -317,6 +317,8 @@ public struct ProviderCapabilities: Codable, Sendable, Equatable {
     public let usageReporting: Bool
     public let idempotencyLookup: Bool
     public let capabilityFingerprintSHA256: String
+    /// The immutable transport's requested limit, when known. This is not a model service ceiling.
+    public let requestedMaximumOutputTokens: Int?
 
     public init(
         providerID: String,
@@ -332,7 +334,8 @@ public struct ProviderCapabilities: Codable, Sendable, Equatable {
         structuredOutput: Bool,
         usageReporting: Bool,
         idempotencyLookup: Bool,
-        capabilityFingerprintSHA256: String
+        capabilityFingerprintSHA256: String,
+        requestedMaximumOutputTokens: Int? = nil
     ) throws {
         try ManagedModelProviderContract.validateIdentifier(providerID, field: "provider ID")
         try ManagedModelProviderContract.validateString(
@@ -353,6 +356,9 @@ public struct ProviderCapabilities: Codable, Sendable, Equatable {
               maximumContextLength.map({
                   $0 >= contextLength && $0 <= ManagedModelProviderContract.maximumContextTokens
               }) ?? true,
+              requestedMaximumOutputTokens.map({
+                  (1...ManagedModelProviderContract.maximumContextTokens).contains($0)
+              }) ?? true,
               capabilityFingerprintSHA256.count == 64,
               capabilityFingerprintSHA256.allSatisfy({ $0.isHexDigit }) else {
             throw ManagedModelProviderContractError.invalidValue("provider capabilities are invalid")
@@ -371,6 +377,7 @@ public struct ProviderCapabilities: Codable, Sendable, Equatable {
         self.usageReporting = usageReporting
         self.idempotencyLookup = idempotencyLookup
         self.capabilityFingerprintSHA256 = capabilityFingerprintSHA256.lowercased()
+        self.requestedMaximumOutputTokens = requestedMaximumOutputTokens
     }
 }
 

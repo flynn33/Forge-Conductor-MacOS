@@ -5,6 +5,124 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class StjornarvaldPolicySourceCatalogTests: XCTestCase {
+    func testExplicitCloseIsIdempotentRejectsFurtherWorkAndPreservesDurableSources() async throws {
+        let fixture = try SourceFixture()
+        let catalog = try fixture.makeCatalog()
+        defer { _ = catalog.close() }
+        let file = try fixture.file("closed-policy.md", data: Data("Use Swift and AppKit.\n".utf8))
+        let other = try fixture.file("removed-policy.md", data: Data("Preserve native APIs.\n".utf8))
+        let firstRequest = stableUUID(prefix: 0x70, index: 1)
+        let first = try await catalog.add(selectedURL: file, requestID: firstRequest)
+        let removed = try await catalog.add(
+            selectedURL: other, requestID: stableUUID(prefix: 0x70, index: 2)
+        )
+        try await catalog.remove(sourceID: removed.id, requestID: stableUUID(prefix: 0x70, index: 3))
+        XCTAssertEqual(try catalog.reorder(sourceIDs: [first.id]).map(\.id), [first.id])
+        try catalog.scheduleOrThrow(sourceID: first.id)
+        var progress = try catalog.progress(sourceID: first.id)
+        for _ in 0..<20 where progress.pendingWorkCount > 0 {
+            progress = try catalog.runNextBatch(
+                sourceID: first.id, maximumWorkItems: 8, maximumBytes: 64 * 1_024
+            )
+        }
+        XCTAssertEqual(progress.pendingWorkCount, 0)
+        let revisionID = try XCTUnwrap(progress.revisionID)
+        let artifacts = try catalog.artifacts(revisionID: revisionID)
+        let artifact = try XCTUnwrap(artifacts.first { $0.relativePath == "." })
+        let segments = try catalog.segments(artifactID: artifact.id)
+        XCTAssertFalse(segments.isEmpty)
+        let sources = try catalog.sources()
+        let revisions = try catalog.revisions(sourceID: first.id)
+
+        XCTAssertTrue(catalog.close())
+        XCTAssertTrue(catalog.close())
+        let closed: StjornarvaldPolicySourceError = .unavailable("closed")
+        XCTAssertThrowsError(try catalog.sources()) { XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed) }
+        XCTAssertThrowsError(try catalog.revisions(sourceID: first.id)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        XCTAssertThrowsError(try catalog.artifacts(revisionID: revisionID)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        XCTAssertThrowsError(try catalog.segments(artifactID: artifact.id)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        XCTAssertThrowsError(try catalog.progress(sourceID: first.id)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        XCTAssertThrowsError(try catalog.reorder(sourceIDs: [first.id])) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        XCTAssertThrowsError(try catalog.scheduleOrThrow(sourceID: first.id)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        XCTAssertThrowsError(try catalog.runNextBatch(sourceID: first.id)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, closed)
+        }
+        do {
+            _ = try await catalog.add(selectedURL: file, requestID: stableUUID(prefix: 0x70, index: 4))
+            XCTFail("A closed catalog accepted a new source mutation")
+        } catch { XCTAssertEqual(error as? StjornarvaldPolicySourceError, closed) }
+        do {
+            try await catalog.refresh(sourceID: first.id, requestID: stableUUID(prefix: 0x70, index: 5))
+            XCTFail("A closed catalog accepted a refresh")
+        } catch { XCTAssertEqual(error as? StjornarvaldPolicySourceError, closed) }
+        do {
+            try await catalog.remove(sourceID: first.id, requestID: stableUUID(prefix: 0x70, index: 6))
+            XCTFail("A closed catalog accepted a removal")
+        } catch { XCTAssertEqual(error as? StjornarvaldPolicySourceError, closed) }
+        await catalog.schedule(sourceID: first.id)
+
+        let reopened = try fixture.makeCatalog()
+        defer { _ = reopened.close() }
+        XCTAssertEqual(try reopened.sources(), sources)
+        XCTAssertEqual(try reopened.sources(includeRemoved: false).map(\.id), [first.id])
+        XCTAssertEqual(try reopened.revisions(sourceID: first.id), revisions)
+        XCTAssertEqual(try reopened.artifacts(revisionID: revisionID), artifacts)
+        XCTAssertEqual(try reopened.segments(artifactID: artifact.id), segments)
+        XCTAssertEqual(try reopened.progress(sourceID: first.id), progress)
+        let replay = try await reopened.add(selectedURL: file, requestID: firstRequest)
+        XCTAssertEqual(replay.id, first.id)
+        XCTAssertEqual(try reopened.sources(), sources)
+        XCTAssertThrowsError(try reopened.reorder(sourceIDs: [first.id, removed.id]))
+        XCTAssertTrue(reopened.close())
+        XCTAssertTrue(reopened.close())
+    }
+
+    func testForgeAppShutdownClosesRetainedPolicyCatalogDescriptors() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("policy-catalog-shutdown-\(UUID().uuidString)", isDirectory: true)
+        var app: ForgeApp?
+        var reader: (any DevelopmentPolicySourceReading)?
+        defer {
+            _ = app?.shutdown()
+            reader = nil
+            app = nil
+            try? FileManager.default.removeItem(at: root)
+        }
+        app = try ForgeApp.bootstrap(
+            home: root.appendingPathComponent("app-home", isDirectory: true), startTelemetry: false
+        )
+        reader = try XCTUnwrap(app?.developmentPolicySources)
+        let databaseURL = try XCTUnwrap(app?.paths.stjornarvaldPolicyLogSQLite)
+        XCTAssertEqual(try reader!.sources(includeRemoved: false, limit: 100), [])
+        let targets = try policyDatabaseTargets(databaseURL: databaseURL)
+        let before = try policyDatabaseDescriptors(targets: targets, ownedNamespace: root.lastPathComponent)
+        XCTAssertFalse(before.descriptors.isEmpty,
+            "The retained catalog must own observable policy database descriptors: \(before.diagnostic)")
+
+        XCTAssertTrue(app!.shutdown().completed)
+        let after = try policyDatabaseDescriptors(targets: targets, ownedNamespace: root.lastPathComponent)
+        XCTAssertTrue(after.descriptors.isEmpty,
+            "Policy database descriptors remained after shutdown: \(after.descriptors.sorted()); "
+                + "before=\(before.diagnostic); after=\(after.diagnostic)")
+        XCTAssertThrowsError(try reader!.sources(includeRemoved: false, limit: 100)) {
+            XCTAssertEqual($0 as? StjornarvaldPolicySourceError, .unavailable("closed"))
+        }
+        XCTAssertTrue(app!.shutdown().completed)
+        withExtendedLifetime((app, reader)) {}
+    }
+
     func testSourceCatalogAndViolationLogShareVersionedDatabaseInEitherOpenOrder() throws {
         let sourceFirst = try SourceFixture()
         _ = try sourceFirst.makeCatalog()
@@ -341,6 +459,94 @@ final class StjornarvaldPolicySourceCatalogTests: XCTestCase {
         XCTAssertTrue(message.map { String(cString: $0).contains("append-only") } ?? false)
         sqlite3_free(message)
     }
+}
+
+private struct PolicyDatabaseIdentity: Hashable {
+    let device: Int64
+    let inode: UInt64
+
+    init(_ information: stat) {
+        device = Int64(information.st_dev)
+        inode = UInt64(information.st_ino)
+    }
+}
+
+private struct PolicyDatabaseDescriptorObservation {
+    let descriptors: Set<Int32>
+    let diagnostic: String
+}
+
+private func policyDatabaseTargets(databaseURL: URL) throws -> [PolicyDatabaseIdentity: String] {
+    let databasePath = databaseURL.resolvingSymlinksInPath().path
+    var targets: [PolicyDatabaseIdentity: String] = [:]
+    for suffix in ["", "-wal", "-shm"] {
+        let path = databasePath + suffix
+        var information = stat()
+        guard Darwin.lstat(path, &information) == 0 else {
+            let failure = errno
+            if !suffix.isEmpty, failure == ENOENT { continue }
+            throw POSIXError(POSIXErrorCode(rawValue: failure) ?? .EIO)
+        }
+        let identity = PolicyDatabaseIdentity(information)
+        guard information.st_mode & S_IFMT == S_IFREG, targets[identity] == nil else {
+            throw POSIXError(.EIO)
+        }
+        targets[identity] = path
+    }
+    return targets
+}
+
+private func policyDatabaseDescriptors(
+    targets: [PolicyDatabaseIdentity: String], ownedNamespace: String
+) throws -> PolicyDatabaseDescriptorObservation {
+    var entries = [proc_fdinfo](repeating: proc_fdinfo(), count: 4_096)
+    let capacity = entries.count * MemoryLayout<proc_fdinfo>.stride
+    let bytes = entries.withUnsafeMutableBytes {
+        proc_pidinfo(getpid(), PROC_PIDLISTFDS, 0, $0.baseAddress, Int32($0.count))
+    }
+    guard bytes > 0, Int(bytes) < capacity,
+          Int(bytes) % MemoryLayout<proc_fdinfo>.stride == 0 else {
+        throw POSIXError(.EIO)
+    }
+    let targetNames = Set(targets.values.map { URL(fileURLWithPath: $0).lastPathComponent })
+    var matched = Set<Int32>()
+    var candidates: [String] = []
+    for entry in entries.prefix(Int(bytes) / MemoryLayout<proc_fdinfo>.stride)
+        where entry.proc_fdtype == UInt32(PROX_FDTYPE_VNODE) {
+        var information = stat()
+        guard Darwin.fstat(entry.proc_fd, &information) == 0 else {
+            let failure = errno
+            if failure == EBADF { continue }
+            throw POSIXError(POSIXErrorCode(rawValue: failure) ?? .EIO)
+        }
+        let identity = PolicyDatabaseIdentity(information)
+        let isTarget = targets[identity] != nil
+        if isTarget { matched.insert(entry.proc_fd) }
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let result = path.withUnsafeMutableBufferPointer {
+            Darwin.fcntl(entry.proc_fd, F_GETPATH, $0.baseAddress!)
+        }
+        let observedPath: String
+        if result == 0 {
+            guard path.last == 0 else { throw POSIXError(.ENAMETOOLONG) }
+            observedPath = path.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        } else {
+            let failure = errno
+            guard isTarget else { continue }
+            observedPath = "<F_GETPATH errno=\(failure)>"
+        }
+        let observedURL = URL(fileURLWithPath: observedPath)
+        let ownedCandidate = targetNames.contains(observedURL.lastPathComponent)
+            && observedURL.pathComponents.contains(ownedNamespace)
+        if isTarget || ownedCandidate {
+            guard candidates.count < 16 else { throw POSIXError(.E2BIG) }
+            candidates.append("fd=\(entry.proc_fd),dev=\(identity.device),ino=\(identity.inode),"
+                + "matchesTarget=\(isTarget),path=\(observedPath)")
+        }
+    }
+    let expected = targets.map { "\($0.value):dev=\($0.key.device),ino=\($0.key.inode)" }.sorted()
+    return PolicyDatabaseDescriptorObservation(descriptors: matched,
+        diagnostic: "expected=\(expected); ownedCandidates=\(candidates.sorted())")
 }
 
 private final class SourceFixture {

@@ -279,10 +279,44 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         runID: RunID,
         mission: String,
         expectedContextLength: Int,
-        budgetPolicy: ContextBudgetPolicy?
+        budgetPolicy: ContextBudgetPolicy?,
+        preservingRunningGUI: LiveGUIPreservationBaseline? = nil,
+        phaseDiagnosticURL: URL? = nil,
+        providerMaximumOutputTokens: Int = 512
     ) async throws -> InterruptedPhase {
+        var diagnosticStage = "provider_inventory"
+        var phaseReturned = false
+        var thresholdDiagnostic: [String: Any]?
+        var initialBudgetDiagnostic: [String: Any]?
+        defer {
+            if let phaseDiagnosticURL {
+                do {
+                    let value: [String: Any] = [
+                        "scope": "owned interrupted live fixture operation boundary",
+                        "last_stage": diagnosticStage,
+                        "phase_returned": phaseReturned,
+                        "test_task_cancelled": Task.isCancelled,
+                        "run_id": runID.description,
+                        "threshold_observation": thresholdDiagnostic ?? NSNull(),
+                        "initial_budget_observation": initialBudgetDiagnostic ?? NSNull(),
+                        "private_payloads_exported": false,
+                    ]
+                    let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
+                    guard data.count <= 8 * 1_024 else {
+                        throw LiveGUIPreservationError.invalidFixtureConfiguration
+                    }
+                    try OwnerOnlyAtomicFile.write(data, to: phaseDiagnosticURL)
+                } catch {
+                    XCTFail("Owned phase diagnostic could not be retained: \(error)")
+                }
+            }
+        }
         let guiPIDs = forgeGUIProcessIDs()
-        XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must be closed")
+        if let preservingRunningGUI {
+            try assertLiveGUIPreserved(preservingRunningGUI)
+        } else {
+            XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must be closed")
+        }
         let loadedProvider = try loadedProviderInstance(
             baseURL: baseURL,
             modelKey: modelKey
@@ -297,9 +331,11 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             at: home,
             withIntermediateDirectories: true
         )
+        diagnosticStage = "owned_app_bootstrap"
         let app = try ForgeApp.bootstrap(home: home)
         try configureDashboard(port: port, app: app)
-        try writeProviderConfiguration(baseURL: baseURL, modelKey: modelKey, paths: app.paths)
+        try writeProviderConfiguration(baseURL: baseURL, modelKey: modelKey, paths: app.paths,
+            maximumOutputTokens: providerMaximumOutputTokens)
         let projectRoot = home.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
         // The production manager requires an explicit root grant even for this
@@ -349,6 +385,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             _ = app.shutdown()
         }
 
+        diagnosticStage = "project_registration"
         let registered = try node.registerProject(
             path: projectRoot.path,
             displayName: "Live Automatic Threshold Continuity"
@@ -359,7 +396,9 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         let generation = ProjectGeneration(try unsignedInteger(
             registered["project_generation"]
         ))
+        diagnosticStage = "managed_runtime_recovery"
         let startupReport = try XCTUnwrap(try node.recoverManagedAutonomy())
+        diagnosticStage = "run_preparation"
         let preparation = node.inspectAutonomousRunPreparation(
             runID: runID,
             projectID: projectID,
@@ -369,7 +408,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             adapterID: ForgeNativeSessionHostPlugin.identifier,
             modelKey: modelKey,
             allowedTools: ["fs_read"],
-            completionGates: ["live_real_provider_threshold_continuity"],
+            completionGates: [ProjectInstructionQueueStore.builtInCompletionGate],
             networkAllowed: false,
             maximumInlineOutputBytes: 64 * 1_024
         )
@@ -378,12 +417,16 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             .ready,
             "Live manager preparation failed: \(preparation.detail)"
         )
+        diagnosticStage = "manager_service_start"
         _ = try node.startService()
+        diagnosticStage = "manager_service_start_delay"
         try await Task.sleep(for: .milliseconds(100))
+        diagnosticStage = "manager_control_credential"
         let bearerToken = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
         let endpoint = try XCTUnwrap(URL(
             string: "http://127.0.0.1:\(port)/api/manager/runs/start"
         ))
+        diagnosticStage = "manager_run_start_route"
         let started = try postJSON(
             endpoint,
             object: [
@@ -395,7 +438,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 "adapter_id": ForgeNativeSessionHostPlugin.identifier,
                 "model_key": modelKey,
                 "allowed_tools": ["fs_read"],
-                "completion_gates": ["live_real_provider_threshold_continuity"],
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
                 "network_allowed": false,
                 "maximum_inline_output_bytes": 64 * 1_024,
             ],
@@ -407,13 +450,29 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                 code: started.object["code"] as? String ?? "unreported")
         }
         XCTAssertEqual(started.object["run_id"] as? String, runID.description)
+        diagnosticStage = "runtime_holder"
         let runtime = try XCTUnwrap(holder.load())
         let thresholdRun = try await driveUntilExactRollover(
             runtime: runtime,
             repository: app.projectContexts.repository,
             runID: runID,
-            timeout: .seconds(1_500)
+            timeout: .seconds(1_500),
+            recordStage: { diagnosticStage = $0 },
+            recordThresholdObservation: { observation in
+                thresholdDiagnostic = observation.map { value in
+                    ["source": value.source.rawValue,
+                     "trigger_point": value.triggerPoint.rawValue,
+                     "action": value.action.rawValue,
+                     "capacity": value.capacity, "used": value.used,
+                     "remaining": value.remaining, "fixed_reserve": value.fixedReserve,
+                     "projected_next_turn": value.projectedNextTurn,
+                     "checkpoint_threshold": value.thresholds.checkpoint,
+                     "rollover_threshold": value.thresholds.rollover,
+                     "emergency_threshold": value.thresholds.emergency] as [String: Any]
+                }
+            }
         )
+        diagnosticStage = "threshold_observation_validation"
         let predecessorSessionID = try XCTUnwrap(thresholdRun.activeSessionID)
         let predecessorResponseID = try XCTUnwrap(
             thresholdRun.specification.work.metadata["provider_response_id"]
@@ -428,6 +487,28 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             identity: pending.identity
         )
         let budgetState = try XCTUnwrap(budgetStateValue)
+        if phaseDiagnosticURL != nil {
+            let observations = try await app.projectContexts.repository.contextBudgetObservations(
+                identity: observation.identity, limit: 32
+            )
+            let observationCount = try await app.projectContexts.repository.contextBudgetObservationCount(
+                identity: observation.identity
+            )
+            XCTAssertEqual(observationCount, observations.count,
+                "The bounded page must include the initial preflight observation")
+            let initial = try XCTUnwrap(observations.last(where: {
+                $0.triggerPoint == .beforeProviderTurn && $0.source == .serializedEstimate
+            }))
+            initialBudgetDiagnostic = [
+                "source": initial.source.rawValue, "trigger_point": initial.triggerPoint.rawValue,
+                "action": initial.action.rawValue, "used": initial.used,
+                "fixed_reserve": initial.fixedReserve, "capacity": initial.capacity,
+                "remaining": initial.remaining, "rollover_threshold": initial.thresholds.rollover,
+            ]
+            XCTAssertEqual(initial.action, .normal,
+                "The owned fixture must admit a real provider turn before rollover")
+            XCTAssertGreaterThan(initial.remaining, initial.thresholds.checkpoint)
+        }
         XCTAssertEqual(pending.requestedAction, .rollover)
         XCTAssertNil(pending.fulfilledAction)
         XCTAssertEqual(pending.observationID, observation.observationID)
@@ -484,19 +565,23 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             predecessorTurns.append(turn)
         }
         XCTAssertEqual(predecessorTurns.count, predecessorProviderTurnIntentCount)
+        diagnosticStage = "bootstrap_crash_activation"
         try await runtime.tick()
         // Observe the provider deadline plus cleanup margin before cancelling the manager.
+        diagnosticStage = "bootstrap_crash_quiescence"
         let interruptedRun = try await waitForQuiescentRun(
             runtime: runtime,
             repository: app.projectContexts.repository,
             runID: runID,
-            timeout: .seconds(Self.providerTotalTimeoutSeconds + 30)
+            timeout: .seconds(Self.providerTotalTimeoutSeconds + 30),
+            returnUnexpectedQuiescentFailure: phaseDiagnosticURL != nil
         ) { run in
             run.state == .waitingProvider
                 && run.specification.work.pendingIntent?.kind == .continuity
         }
         XCTAssertEqual(interruptedRun.activeSessionID, predecessorSessionID)
 
+        diagnosticStage = "bootstrap_receipt_validation"
         let operationID = pending.continuityOperationID
         let memoryRepository = try app.projectMemory.repositoryForProject(projectID.description)
         let operationValue = try memoryRepository.continuityOperationV2(
@@ -573,9 +658,12 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         )
         let fenceEvent = try exactEvent("continuity_predecessor_fencing", events: crashEvents)
 
+        diagnosticStage = "interrupted_phase_shutdown"
         node.shutdownManagedAutonomy()
         _ = try node.stopService()
         XCTAssertTrue(app.shutdown().completed)
+        diagnosticStage = "interrupted_phase_return"
+        phaseReturned = true
         return InterruptedPhase(
             projectID: projectID,
             projectGeneration: generation,
@@ -609,10 +697,15 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         port: Int,
         registry: HostAdapterRegistry,
         budgetPolicy: ContextBudgetPolicy?,
-        interrupted: InterruptedPhase
+        interrupted: InterruptedPhase,
+        preservingRunningGUI: LiveGUIPreservationBaseline? = nil
     ) async throws -> RecoveredPhase {
         let guiPIDs = forgeGUIProcessIDs()
-        XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must remain closed during recovery")
+        if let preservingRunningGUI {
+            try assertLiveGUIPreserved(preservingRunningGUI)
+        } else {
+            XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must remain closed during recovery")
+        }
         let app = try ForgeApp.bootstrap(home: home)
         try configureDashboard(port: port, app: app)
         let holder = LiveManagedRuntimeHolder()
@@ -816,10 +909,15 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         registry: HostAdapterRegistry,
         budgetPolicy: ContextBudgetPolicy?,
         interrupted: InterruptedPhase,
-        recovered: RecoveredPhase
+        recovered: RecoveredPhase,
+        preservingRunningGUI: LiveGUIPreservationBaseline? = nil
     ) async throws -> ReplayedPhase {
         let guiPIDs = forgeGUIProcessIDs()
-        XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must remain closed during replay")
+        if let preservingRunningGUI {
+            try assertLiveGUIPreserved(preservingRunningGUI)
+        } else {
+            XCTAssertTrue(guiPIDs.isEmpty, "Forge Conductor GUI must remain closed during replay")
+        }
         let app = try ForgeApp.bootstrap(home: home)
         try configureDashboard(port: port, app: app)
         let holder = LiveManagedRuntimeHolder()
@@ -919,16 +1017,20 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         runtime: ManagedAutonomyRuntime,
         repository: ProjectControlPlaneRepository,
         runID: RunID,
-        timeout: Duration
+        timeout: Duration,
+        recordStage: ((String) -> Void)? = nil,
+        recordThresholdObservation: ((ContextBudgetObservation?) -> Void)? = nil
     ) async throws -> AutonomousRunRecord {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: timeout)
         var activations = 0
         while clock.now < deadline {
+            recordStage?("threshold_run_read")
             guard let run = try await repository.autonomousRun(runID) else {
                 try await Task.sleep(for: .milliseconds(50))
                 continue
             }
+            recordStage?("threshold_event_read")
             let events = try await repository.autonomyEvents(runID: runID, limit: 1_000)
             if let predecessorTool = events.first(where: {
                 $0.eventType == "tool_invocation_intent_persisted"
@@ -937,13 +1039,16 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                     sequence: predecessorTool.sequence
                 )
             }
+            recordStage?("threshold_runtime_snapshot")
             let snapshot = await runtime.snapshot()
             if !snapshot.supervisor.activeRunIDs.contains(runID) {
                 switch run.state {
                 case .rollingOver:
+                    recordStage?("threshold_pending_action_read")
                     let pending = try await repository.pendingContextBudgetActionRequest(
                         runID: runID
                     )
+                    recordStage?("threshold_observation_read")
                     let observation: ContextBudgetObservation? = if let pending {
                         try await repository.contextBudgetObservation(
                             observationID: pending.observationID
@@ -951,6 +1056,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                     } else {
                         nil
                     }
+                    recordThresholdObservation?(observation)
+                    recordStage?("threshold_observation_contract")
                     guard pending?.requestedAction == .rollover,
                           observation?.source == .providerExact,
                           observation?.triggerPoint == .afterProviderTurn,
@@ -968,6 +1075,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                     guard activations <= 16 else {
                         throw LiveQualificationError.activationLimitExceeded
                     }
+                    recordStage?("threshold_runtime_tick")
                     try await runtime.tick()
                 case .waitingProvider, .waitingResource, .retryWait, .failedRecoverable,
                      .blockedConfiguration, .validatingCompletion, .completed, .cancelRequested,
@@ -978,6 +1086,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
                     break
                 }
             }
+            recordStage?("threshold_poll_delay")
             try await Task.sleep(for: .milliseconds(100))
         }
         let final = try await repository.autonomousRun(runID)
@@ -1056,12 +1165,21 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
         repository: ProjectControlPlaneRepository,
         runID: RunID,
         timeout: Duration,
+        returnUnexpectedQuiescentFailure: Bool = false,
         predicate: (AutonomousRunRecord) -> Bool
     ) async throws -> AutonomousRunRecord {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: timeout)
         while clock.now < deadline {
-            if let run = try await repository.autonomousRun(runID), predicate(run) {
+            if let run = try await repository.autonomousRun(runID) {
+                let unexpectedFailure = returnUnexpectedQuiescentFailure && (
+                    run.state == .failedRecoverable || run.state == .failedTerminal
+                        || run.state == .blockedConfiguration || run.state == .cancelled
+                )
+                guard predicate(run) || unexpectedFailure else {
+                    try await Task.sleep(for: .milliseconds(50))
+                    continue
+                }
                 let snapshot = await runtime.snapshot()
                 if !snapshot.supervisor.activeRunIDs.contains(runID) { return run }
             }
@@ -1184,7 +1302,8 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
     private func writeProviderConfiguration(
         baseURL: URL,
         modelKey: String,
-        paths: AppPaths
+        paths: AppPaths,
+        maximumOutputTokens: Int = 512
     ) throws {
         let directory = paths.managedProvidersDir.appendingPathComponent(
             ForgeNativeSessionHostPlugin.identifier,
@@ -1202,7 +1321,7 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             firstByteTimeoutSeconds: 120,
             idleTimeoutSeconds: Self.providerTotalTimeoutSeconds,
             totalTimeoutSeconds: Self.providerTotalTimeoutSeconds,
-            maximumOutputTokens: 512
+            maximumOutputTokens: maximumOutputTokens
         )
         let data = try JSONEncoder().encode(configuration)
         let url = directory.appendingPathComponent(
@@ -1527,6 +1646,262 @@ final class LiveLMStudioManagedAutonomyTests: XCTestCase {
             "stale_generation_run_ids": report.staleGenerationRuns.map(\.description),
         ]
     }
+    func testRealProviderAutomaticThresholdCrashRecoveryPreservesRunningInstalledGUIAndMCPRegistration() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["FORGE_LIVE_LMSTUDIO_COEXISTING_GUI"] == "yes" else {
+            throw XCTSkip("Set FORGE_LIVE_LMSTUDIO_COEXISTING_GUI=yes for the separate owned live fixture")
+        }
+        let modelKey = try XCTUnwrap(environment["FORGE_LIVE_LMSTUDIO_MODEL"])
+        let rawCapacity = try XCTUnwrap(environment["FORGE_LIVE_LMSTUDIO_EXPECTED_CONTEXT_LENGTH"])
+        let expectedContextLength = try XCTUnwrap(Int(rawCapacity))
+        XCTAssertEqual(expectedContextLength, 262_144, "This fixture is pinned to the retained real inventory")
+        guard !modelKey.isEmpty, expectedContextLength == 262_144 else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let installedPath = try XCTUnwrap(environment["FORGE_LIVE_INSTALLED_GUI_BUNDLE"])
+        let installedBundle = URL(fileURLWithPath: installedPath, isDirectory: true)
+            .standardizedFileURL.resolvingSymlinksInPath()
+        guard installedPath.hasPrefix("/"), !installedPath.contains("\0") else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let baseURL = try XCTUnwrap(URL(string: environment["FORGE_LIVE_LMSTUDIO_BASE_URL"]
+                                      ?? "http://127.0.0.1:1234"))
+        let evidencePath = try XCTUnwrap(environment["FORGE_LIVE_MANAGER_EVIDENCE"])
+        guard evidencePath.hasPrefix("/"), !evidencePath.contains("\0") else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let evidenceURL = URL(fileURLWithPath: evidencePath).standardizedFileURL
+        let preservationURL = evidenceURL.deletingLastPathComponent().appendingPathComponent(
+            evidenceURL.deletingPathExtension().lastPathComponent + "-gui-preservation.json"
+        )
+        let phaseDiagnosticURL = evidenceURL.deletingPathExtension()
+            .appendingPathExtension("interrupted-phase.json")
+        let resolvedEvidence = evidenceURL.deletingLastPathComponent()
+            .resolvingSymlinksInPath().appendingPathComponent(evidenceURL.lastPathComponent)
+        let protectedRoots = [LMStudioEnvironment.homeDir.resolvingSymlinksInPath(),
+                              installedBundle.deletingLastPathComponent()]
+        guard !FileManager.default.fileExists(atPath: evidenceURL.path),
+              !FileManager.default.fileExists(atPath: preservationURL.path),
+              !FileManager.default.fileExists(atPath: phaseDiagnosticURL.path),
+              !protectedRoots.contains(where: {
+                  resolvedEvidence.path == $0.path || resolvedEvidence.path.hasPrefix($0.path + "/")
+              }) else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let baseline = try captureLiveGUIPreservationBaseline(installedBundle: installedBundle)
+        XCTAssertFalse(baseline.guiProcesses.isEmpty)
+        let home = URL(fileURLWithPath: "/private/tmp", isDirectory: true).appendingPathComponent(
+            "forge-live-manager-threshold-coexisting-\(UUID().uuidString)", isDirectory: true
+        )
+        guard !evidenceURL.path.hasPrefix(home.path + "/"),
+              !installedBundle.path.hasPrefix(home.path + "/") else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        var phaseNames: [String] = ["baseline"]
+        var completed = false
+        try writeLiveGUIPreservationEvidence(to: preservationURL, baseline: baseline,
+            phases: phaseNames, completed: false)
+        defer {
+            do {
+                try writeLiveGUIPreservationEvidence(to: preservationURL, baseline: baseline,
+                    phases: phaseNames, completed: completed)
+                try assertLiveGUIPreserved(baseline)
+            } catch {
+                XCTFail("Installed GUI/MCP baseline was not preserved: \(error)")
+            }
+            if FileManager.default.fileExists(atPath: home.path) {
+                try? FileManager.default.removeItem(at: home)
+            }
+        }
+        let registry = HostAdapterRegistry()
+        ForgeNativeSessionHostPlugin.register(in: registry)
+        let runID = RunID()
+        let mission = Self.thresholdMission()
+        XCTAssertLessThanOrEqual(mission.utf8.count, 16_384)
+        // These admitted totals exceed the measured 26450-token initial input
+        // plus reserve. The original 8192/10240 totals rolled over before a turn.
+        // Do not write this test-only policy into installed configuration.
+        // Actual usage/afterProviderTurn, reserves, exact receipts and all
+        // failure assertions remain those of the existing real-provider phases.
+        let admittedCheckpointTokens = 27_648
+        let admittedRolloverTokens = 28_672
+        let fixturePolicy = try ContextBudgetPolicy(
+            checkpointFraction: 1 - Double(admittedCheckpointTokens) / Double(expectedContextLength),
+            rolloverFraction: 1 - Double(admittedRolloverTokens) / Double(expectedContextLength),
+            emergencyFraction: 0.05
+        ).validated()
+        let ports = [Int.random(in: 31_000...36_000), Int.random(in: 37_000...42_000),
+                     Int.random(in: 43_000...48_000)]
+        let interrupted = try await executeInterruptedPhase(
+            home: home, port: ports[0], baseURL: baseURL, modelKey: modelKey,
+            registry: registry, runID: runID, mission: mission,
+            expectedContextLength: expectedContextLength, budgetPolicy: fixturePolicy,
+            preservingRunningGUI: baseline,
+            phaseDiagnosticURL: phaseDiagnosticURL,
+            providerMaximumOutputTokens: 4_096
+        )
+        try assertLiveGUIPreserved(baseline)
+        phaseNames.append("interrupted_after_real_bootstrap")
+        try writeLiveGUIPreservationEvidence(to: preservationURL, baseline: baseline,
+            phases: phaseNames, completed: false)
+        let recovered = try await executeRecoveryPhase(
+            home: home, port: ports[1], registry: registry, budgetPolicy: nil,
+            interrupted: interrupted, preservingRunningGUI: baseline
+        )
+        try assertLiveGUIPreserved(baseline)
+        phaseNames.append("recovered_sealed_and_successor_tool_completed")
+        try writeLiveGUIPreservationEvidence(to: preservationURL, baseline: baseline,
+            phases: phaseNames, completed: false)
+        let replayed = try await executeStableReplayPhase(
+            home: home, port: ports[2], registry: registry, budgetPolicy: nil,
+            interrupted: interrupted, recovered: recovered, preservingRunningGUI: baseline
+        )
+        try assertLiveGUIPreserved(baseline)
+        phaseNames.append("stable_replay")
+        try writeEvidence(to: evidenceURL, modelKey: modelKey, mission: mission,
+            interrupted: interrupted, recovered: recovered, replayed: replayed,
+            budgetPolicy: fixturePolicy)
+        // The original writer and original no-GUI receipt remain unchanged.
+        // This separate receipt describes observed nonempty preserved GUI PIDs.
+        let data = try OwnerOnlyAtomicFile.read(from: evidenceURL, maximumBytes: 256 * 1_024)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["qualification_scope"] = "real_lmstudio_managed_threshold_crash_recovery_preserving_running_gui"
+        object["gui_preservation_observations"] = object.removeValue(forKey: "gui_absence_observations")
+        object["gui_preservation_evidence_file"] = preservationURL.lastPathComponent
+        object["fixture_threshold_policy"] = [
+            "scope": "owned_interrupted_predecessor_only_not_production_or_installed_settings",
+            "verified_capacity": expectedContextLength,
+            "admitted_checkpoint_tokens": admittedCheckpointTokens,
+            "admitted_rollover_tokens": admittedRolloverTokens,
+            "provider_maximum_output_tokens": 4_096,
+            "recovery_and_replay_use_production_policy": true,
+        ] as [String: Any]
+        try OwnerOnlyAtomicFile.write(
+            JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .prettyPrinted]),
+            to: evidenceURL
+        )
+        completed = true
+        print("FORGE_LIVE_MANAGER_EVIDENCE=\(evidenceURL.path)")
+        print("FORGE_LIVE_GUI_PRESERVATION_EVIDENCE=\(preservationURL.path)")
+    }
+
+    private struct LiveGUIProcessIdentity: Codable, Equatable, Sendable {
+        let pid: Int
+        let bundleIdentifier: String
+        let bundlePath: String
+        let executablePath: String
+        let launchTime: Double?
+    }
+
+    private struct LiveMCPRegistrationIdentity: Codable, Equatable, Sendable {
+        let path: String
+        let byteCount: Int
+        let sha256: String
+        let device: UInt64
+        let inode: UInt64
+        let owner: UInt64
+        let group: UInt64
+        let permissions: UInt64
+        let modificationTime: Double
+    }
+
+    private struct LiveGUIPreservationBaseline: Codable, Equatable, Sendable {
+        let installedBundlePath: String
+        let guiProcesses: [LiveGUIProcessIdentity]
+        let registration: LiveMCPRegistrationIdentity
+    }
+
+    private enum LiveGUIPreservationError: Error {
+        case invalidFixtureConfiguration
+        case changedBaseline
+    }
+
+    private func captureLiveGUIPreservationBaseline(
+        installedBundle: URL
+    ) throws -> LiveGUIPreservationBaseline {
+#if canImport(AppKit)
+        // Never point this test at a hermetic override and call it live evidence.
+        XCTAssertNil(LMStudioEnvironment.homeDirOverride)
+        guard LMStudioEnvironment.homeDirOverride == nil else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let applications = NSRunningApplication.runningApplications(
+            withBundleIdentifier: ManagerInstaller.bundleIdentifier
+        ).filter { !$0.isTerminated }
+        guard !applications.isEmpty, applications.count <= 8 else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let identities = try applications.map { application in
+            LiveGUIProcessIdentity(
+                pid: Int(application.processIdentifier),
+                bundleIdentifier: try XCTUnwrap(application.bundleIdentifier),
+                bundlePath: try XCTUnwrap(application.bundleURL)
+                    .standardizedFileURL.resolvingSymlinksInPath().path,
+                executablePath: try XCTUnwrap(application.executableURL)
+                    .standardizedFileURL.resolvingSymlinksInPath().path,
+                launchTime: application.launchDate?.timeIntervalSince1970
+            )
+        }.sorted { $0.pid < $1.pid }
+        guard identities.contains(where: { $0.bundlePath == installedBundle.path }) else {
+            XCTFail("The explicitly identified installed GUI must already be running")
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        let url = LMStudioEnvironment.mcpConfigURL.standardizedFileURL
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let bytes = try OwnerOnlyAtomicFile.read(from: url, maximumBytes: 1_024 * 1_024)
+        guard !bytes.isEmpty else { throw LiveGUIPreservationError.invalidFixtureConfiguration }
+        func number(_ key: FileAttributeKey) throws -> UInt64 {
+            try XCTUnwrap(attributes[key] as? NSNumber).uint64Value
+        }
+        let registration = LiveMCPRegistrationIdentity(
+            path: url.path, byteCount: bytes.count, sha256: JSONSupport.sha256Hex(bytes),
+            device: try number(.systemNumber), inode: try number(.systemFileNumber),
+            owner: try number(.ownerAccountID), group: try number(.groupOwnerAccountID),
+            permissions: try number(.posixPermissions),
+            modificationTime: try XCTUnwrap(attributes[.modificationDate] as? Date).timeIntervalSince1970
+        )
+        return LiveGUIPreservationBaseline(installedBundlePath: installedBundle.path,
+            guiProcesses: identities, registration: registration)
+#else
+        throw XCTSkip("Running GUI preservation requires the native macOS AppKit surface")
+#endif
+    }
+
+    private func assertLiveGUIPreserved(_ baseline: LiveGUIPreservationBaseline) throws {
+        let current = try captureLiveGUIPreservationBaseline(
+            installedBundle: URL(fileURLWithPath: baseline.installedBundlePath, isDirectory: true)
+        )
+        XCTAssertEqual(current, baseline, "Original GUI process identities and entire MCP registration must be unchanged")
+        guard current == baseline else { throw LiveGUIPreservationError.changedBaseline }
+    }
+
+    private func writeLiveGUIPreservationEvidence(
+        to url: URL, baseline: LiveGUIPreservationBaseline, phases: [String], completed: Bool
+    ) throws {
+        let current = try? captureLiveGUIPreservationBaseline(
+            installedBundle: URL(fileURLWithPath: baseline.installedBundlePath, isDirectory: true)
+        )
+        let currentObject: Any = try current.map {
+            try JSONSupport.object(from: JSONEncoder().encode($0))
+        } ?? NSNull()
+        let object: [String: Any] = [
+            "schema_version": 1,
+            "scope": "owned live managed fixture; exact running GUI process and MCP-file baseline",
+            "all_three_phase_calls_returned": completed,
+            "baseline_preserved": current == baseline,
+            "completed_phase_names": phases,
+            "baseline": try JSONSupport.object(from: JSONEncoder().encode(baseline)),
+            "current": currentObject,
+            "current_snapshot_available": current != nil,
+            "registration_contents_exported": false,
+        ]
+        let bytes = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .prettyPrinted])
+        guard phases.count <= 4, bytes.count <= 16 * 1_024 else {
+            throw LiveGUIPreservationError.invalidFixtureConfiguration
+        }
+        try OwnerOnlyAtomicFile.write(bytes, to: url)
+    }
+
 }
 
 private final class LiveManagedRuntimeHolder: @unchecked Sendable {

@@ -143,6 +143,7 @@ public struct ManagerSettings: Sendable, Equatable {
     public var watchdogIntervalSec: Int
     public var openBrowserOnStart: Bool
     public var sessionIdleTTLSec: Int
+    public var continuityRolloverToolCalls: Int
     public var shellEnabled: Bool
     public var shellUserDisabled: Bool
     public var shellPolicyVersion: Int
@@ -164,6 +165,7 @@ public struct ManagerSettings: Sendable, Equatable {
         watchdogIntervalSec: Int,
         openBrowserOnStart: Bool,
         sessionIdleTTLSec: Int,
+        continuityRolloverToolCalls: Int = AppConfig.SessionsConfig.defaultContinuityRolloverToolCalls,
         shellEnabled: Bool,
         shellUserDisabled: Bool,
         shellPolicyVersion: Int,
@@ -184,6 +186,7 @@ public struct ManagerSettings: Sendable, Equatable {
         self.watchdogIntervalSec = watchdogIntervalSec
         self.openBrowserOnStart = openBrowserOnStart
         self.sessionIdleTTLSec = sessionIdleTTLSec
+        self.continuityRolloverToolCalls = continuityRolloverToolCalls
         self.shellEnabled = shellEnabled
         self.shellUserDisabled = shellUserDisabled
         self.shellPolicyVersion = shellPolicyVersion
@@ -205,6 +208,7 @@ public struct ManagerSettings: Sendable, Equatable {
             throw ManagerModelError.invalidSettings
         }
         let sessions = dictionary["sessions"] as? [String: Any] ?? [:]
+        try ManagerSettingsNormalizer.validateContinuityRollover(dictionary)
         let shell = dictionary["shell"] as? [String: Any] ?? [:]
         let migration = shell["migration"] as? [String: Any] ?? [:]
         let runtimes = shell["runtimes"] as? [String: Any] ?? [:]
@@ -216,6 +220,8 @@ public struct ManagerSettings: Sendable, Equatable {
             watchdogIntervalSec: ManagerJSONValue.int(manager["watchdog_interval_sec"]) ?? 3,
             openBrowserOnStart: ManagerJSONValue.bool(manager["open_browser_on_start"]) ?? false,
             sessionIdleTTLSec: ManagerJSONValue.int(sessions["idle_ttl_sec"]) ?? 14_400,
+            continuityRolloverToolCalls: ManagerJSONValue.int(sessions["continuity_rollover_tool_calls"])
+                ?? AppConfig.SessionsConfig.defaultContinuityRolloverToolCalls,
             shellEnabled: ManagerJSONValue.bool(shell["enabled"]) ?? false,
             shellUserDisabled: ManagerJSONValue.bool(shell["user_disabled"]) ?? false,
             shellPolicyVersion: ManagerJSONValue.int(shell["policy_version"])
@@ -254,6 +260,7 @@ public struct ManagerSettings: Sendable, Equatable {
             ] as [String: Any],
             "sessions": [
                 "idle_ttl_sec": sessionIdleTTLSec,
+                "continuity_rollover_tool_calls": continuityRolloverToolCalls,
             ] as [String: Any],
             "shell": [
                 "enabled": shellEnabled,
@@ -348,6 +355,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
     public var watchdogIntervalSec: Int?
     public var openBrowserOnStart: Bool?
     public var sessionIdleTTLSec: Int?
+    public var continuityRolloverToolCalls: Int?
     public var shellEnabled: Bool?
     public var shellTimeoutSec: Int?
     public var logLevel: String?
@@ -362,6 +370,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         watchdogIntervalSec: Int? = nil,
         openBrowserOnStart: Bool? = nil,
         sessionIdleTTLSec: Int? = nil,
+        continuityRolloverToolCalls: Int? = nil,
         shellEnabled: Bool? = nil,
         shellTimeoutSec: Int? = nil,
         logLevel: String? = nil,
@@ -375,6 +384,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         self.watchdogIntervalSec = watchdogIntervalSec
         self.openBrowserOnStart = openBrowserOnStart
         self.sessionIdleTTLSec = sessionIdleTTLSec
+        self.continuityRolloverToolCalls = continuityRolloverToolCalls
         self.shellEnabled = shellEnabled
         self.shellTimeoutSec = shellTimeoutSec
         self.logLevel = logLevel
@@ -394,6 +404,7 @@ public struct ManagerSettingsPatch: Sendable, Equatable {
         if let openBrowserOnStart { mgr["open_browser_on_start"] = openBrowserOnStart }
         var sessions: [String: Any] = [:]
         if let sessionIdleTTLSec { sessions["idle_ttl_sec"] = sessionIdleTTLSec }
+        if let continuityRolloverToolCalls { sessions["continuity_rollover_tool_calls"] = continuityRolloverToolCalls }
         var shell: [String: Any] = [:]
         if let shellEnabled { shell["enabled"] = shellEnabled }
         if let shellTimeoutSec { shell["default_timeout_sec"] = shellTimeoutSec }

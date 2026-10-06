@@ -312,7 +312,8 @@ struct NativeSourceBudgetObservation: Codable, Sendable {
             maximumContextLength: c.maximumContextLength, statefulResponses: c.statefulResponses,
             streaming: c.streaming, customTools: c.customTools, mcp: c.mcp, structuredOutput: c.structuredOutput,
             usageReporting: c.usageReporting, idempotencyLookup: c.idempotencyLookup,
-            capabilityFingerprintSHA256: c.capabilityFingerprintSHA256)
+            capabilityFingerprintSHA256: c.capabilityFingerprintSHA256,
+            requestedMaximumOutputTokens: c.requestedMaximumOutputTokens)
         try NativeSourcePressureValidation.hash(c.capabilityFingerprintSHA256)
         guard let resolved = value.configuration.resolvedPolicy else { throw NativeSourcePressureModelError.invalidMetadata }
         try NativeSourcePressureValidation.require(resolved.inheritedSourceBudget == nil

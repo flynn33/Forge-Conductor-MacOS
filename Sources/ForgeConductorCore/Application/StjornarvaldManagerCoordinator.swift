@@ -438,7 +438,9 @@ public final class StjornarvaldManagerCoordinator: @unchecked Sendable {
             limitations: [
                 "Presented notices prove transport, not model comprehension or correction.",
                 "Source bodies and unbounded history are excluded from this snapshot.",
-                "Automatic detection currently covers native-stack evidence. Cataloging imported policy text does not mean every rule has an executable detector.",
+                "Automatic detection covers 1 of 15 indexed Raven rules: RFD-NATIVE-001 uses declared Xcode production source/resource/copy membership. Binary runtime contents are not inspected. The other 14 rules are policy guidance without executable detectors; zero violations does not establish full policy compliance.",
+                "Native-stack membership excludes test targets and build-script phases. Unsupported, changing, or oversized graphs produce incomplete activity rather than a compliance claim.",
+                "Selected policy text is indexed for reading; importing text does not create an executable detector for each requirement.",
             ],
             evaluationActivity: try observationRepository?.recentEvaluationActivity(
                 limit: limit, projectID: projectID, projectGeneration: projectGeneration

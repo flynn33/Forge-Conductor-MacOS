@@ -1054,7 +1054,13 @@ final class NativeSourcePressureJournalTests: XCTestCase {
                 XCTAssertEqual(JSONSupport.sha256Hex(try Data(contentsOf: backup)), manifest.backupSHA256)
                 let jobs = try RuntimeJobRepository(databaseURL: f.database)
                 await jobs.close()
-                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT version FROM runtime_job_schema_version"), "5")
+                XCTAssertEqual(try PressureSQL.value(f.database, "SELECT version FROM runtime_job_schema_version"), "6")
+                XCTAssertEqual(try PressureSQL.value(f.database, """
+                    SELECT COUNT(*) FROM pragma_table_info('runtime_job_output_streams')
+                    WHERE ((name='producer_end_reason' AND type='TEXT')
+                        OR (name='producer_read_errno' AND type='INTEGER'))
+                        AND "notnull"=0 AND dflt_value IS NULL
+                    """), "2", "Runtime output provenance must not alter the independent ingress lineage")
             } catch { await reopened.close(); throw error }
         }
     }

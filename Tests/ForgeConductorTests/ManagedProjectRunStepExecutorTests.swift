@@ -996,3 +996,142 @@ private final class ManagedStepToolExecutor: ToolExecuting, @unchecked Sendable 
         return .success(["tool": name, "value": "fixture-output"])
     }
 }
+
+extension ManagedProjectRunStepExecutorTests {
+    func testFailedToolAtRolloverDoesNotClaimSuccessfulEffect() async throws {
+        let snapshot = try await failedProgressBoundaryFixture(succeeds: false, ordered: false)
+        XCTAssertFalse(snapshot.nextAction.contains("successfully completed"))
+        XCTAssertTrue(snapshot.nextAction.contains("not_found"))
+    }
+
+    func testFailedExactOrderedToolAtRolloverRemainsFirstOpenAction() async throws {
+        let snapshot = try await failedProgressBoundaryFixture(succeeds: false, ordered: true)
+        XCTAssertNil(snapshot.work.metadata["managed_ordered_tool_cursor"])
+        XCTAssertEqual(ManagedProjectRunStepExecutor.pendingOrderedToolInstruction(snapshot.work),
+            "1. Call fixture.read to read the fixture.")
+    }
+
+    func testSuccessfulToolAtRolloverPreservesCompletedEffect() async throws {
+        let snapshot = try await failedProgressBoundaryFixture(succeeds: true, ordered: false)
+        XCTAssertTrue(snapshot.nextAction.contains("successfully completed"))
+        XCTAssertTrue(snapshot.nextAction.contains("Do not repeat that tool call"))
+    }
+
+    func testSuccessfulExactOrderedToolAtRolloverAdvancesOneAction() async throws {
+        let snapshot = try await failedProgressBoundaryFixture(succeeds: true, ordered: true)
+        XCTAssertEqual(snapshot.work.metadata["managed_ordered_tool_cursor"], "1")
+        XCTAssertEqual(ManagedProjectRunStepExecutor.pendingOrderedToolInstruction(snapshot.work),
+            "2. Call fixture.read to verify the fixture again.")
+    }
+
+    func testFailedBrokerResultPersistsTypedInvocationOutcome() async throws {
+        let snapshot = try await failedProgressBoundaryFixture(succeeds: false, ordered: false)
+        XCTAssertEqual(snapshot.work.metadata["managed_last_tool_outcome"], "failed")
+    }
+
+    func testSuccessfulBrokerResultPersistsTypedInvocationOutcome() async throws {
+        let snapshot = try await failedProgressBoundaryFixture(succeeds: true, ordered: false)
+        XCTAssertEqual(snapshot.work.metadata["managed_last_tool_outcome"], "succeeded")
+    }
+
+    private func failedProgressBoundaryFixture(succeeds: Bool, ordered: Bool) async throws -> FailedProgressSnapshot {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("managed-failed-progress-\(UUID().uuidString)")
+        let repository = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control.sqlite3"))
+        do {
+            let projectID = ProjectID()
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            _ = try await repository.registerProjectUnchecked(projectID: projectID,
+                displayName: "Failed tool progress", canonicalRoot: projectRoot)
+            let instructionContext = """
+            1. Call fixture.read to read the fixture.
+            2. Call fixture.read to verify the fixture again.
+            """
+            let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+                projectID: projectID, projectGeneration: .initial,
+                mission: "Retain the actual tool outcome at a real managed rollover boundary",
+                providerID: "fixture-provider", adapterID: "fixture-adapter", modelKey: "fixture-model",
+                specification: AutonomousRunSpecification(allowedTools: ["fixture.read"], completionGates: ["tests"],
+                    work: AutonomousRunWork(metadata: ordered ? ["managed_instruction_context": instructionContext] : [:])),
+                authorizationScope: ToolAuthorizationScope(canonicalRoots: [projectRoot], allowedTools: ["fixture.read"],
+                    networkAllowed: false, maximumInlineOutputBytes: 64 * 1_024)))
+            let provider = ManagedStepFixtureProvider()
+            let executor = FailedProgressToolExecutor(succeeds: succeeds)
+            let broker = ToolInvocationBroker(repository: repository, executor: executor,
+                classifier: try StaticToolReplayClassifier(productionToolNames: executor.toolNames,
+                    classifications: ["fixture.read": .readOnly]))
+            let budget = FailedProgressAfterToolBudget()
+            let stepper = try ManagedProjectRunStepExecutor(repository: repository,
+                providerResolver: { _ in provider }, toolDefinitionResolver: { _ in [] }, broker: broker, budget: budget)
+            let coordinator = try ProjectRunCoordinator(runID: run.runID, repository: repository,
+                managerID: "failed-progress-manager", stepExecutor: stepper,
+                completionValidator: EvidenceBoundCompletionValidator(), maximumSteps: 8)
+            let activation = try await coordinator.runActivation()
+            XCTAssertEqual(activation.finalState, .rollingOver)
+            let storedValue = try await repository.autonomousRun(run.runID)
+            let stored = try XCTUnwrap(storedValue)
+            let sessionID = try XCTUnwrap(stored.activeSessionID)
+            let invocationValue = try await repository.toolInvocation(sessionID: sessionID, providerCallID: "call-read")
+            let invocation = try XCTUnwrap(invocationValue)
+            XCTAssertEqual(invocation.state, .completed) // Broker terminal receipt, independent of result success.
+            let resultJSON = try XCTUnwrap(invocation.resultSummary)
+            let result = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(resultJSON.utf8)) as? [String: Any])
+            XCTAssertEqual(result["ok"] as? Bool, succeeds)
+            XCTAssertEqual(result["is_error"] as? Bool, !succeeds)
+            XCTAssertEqual(invocation.resultSHA256, JSONSupport.sha256Hex(resultJSON))
+            let payload = try XCTUnwrap(result["payload"] as? [String: Any])
+            if !succeeds { XCTAssertEqual(payload["code"] as? String, "not_found") }
+            XCTAssertEqual(executor.callCount, 1)
+            let providerSnapshot = await provider.snapshot()
+            XCTAssertEqual(providerSnapshot.rootCalls, 1)
+            XCTAssertEqual(providerSnapshot.continuationCalls, 0) // Budget yields after the exact tool result.
+            XCTAssertEqual(stored.specification.work.metadata["managed_last_tool_call_id"], "call-read")
+            XCTAssertEqual(stored.specification.work.metadata["managed_last_tool_output"], try JSONSupport.canonicalJSON(payload))
+            let observedToolResults = await budget.toolResultCount()
+            XCTAssertEqual(observedToolResults, 1)
+            let next = try XCTUnwrap(stored.specification.work.nextAction)
+            let snapshot = FailedProgressSnapshot(work: stored.specification.work, nextAction: next)
+            await repository.close()
+            try FileManager.default.removeItem(at: root)
+            return snapshot
+        } catch {
+            await repository.close()
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
+    }
+}
+
+private struct FailedProgressSnapshot {
+    let work: AutonomousRunWork
+    let nextAction: String
+}
+
+private final class FailedProgressToolExecutor: ToolExecuting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+    private let succeeds: Bool
+    init(succeeds: Bool) { self.succeeds = succeeds }
+    var toolNames: [String] { ["fixture.read"] }
+    var callCount: Int { lock.lock(); defer { lock.unlock() }; return calls }
+    func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult { result() }
+    func call(name: String, arguments: [String: Any], context: ToolInvocationContext) throws -> ToolResult { result() }
+    private func result() -> ToolResult {
+        lock.lock(); calls += 1; lock.unlock()
+        return succeeds ? .success(["value": "fixture-output"])
+            : .failure(code: "not_found", message: "The fixture read did not produce an effect")
+    }
+}
+
+private actor FailedProgressAfterToolBudget: ManagedRunBudgetEvaluating {
+    private var count = 0
+    func evaluateBeforeProviderTurn(run: AutonomousRunRecord, sessionID: String, capabilities: ProviderCapabilities,
+        serializedInputBytes: Int) async throws -> ContextBudgetAction { .normal }
+    func observeProviderTurn(_ turn: ProviderTurn, run: AutonomousRunRecord, sessionID: String,
+        capabilities: ProviderCapabilities) async throws -> ContextBudgetAction { .normal }
+    func observeToolResult(serializedBytes: Int, providerResponseID: String, run: AutonomousRunRecord,
+        sessionID: String, capabilities: ProviderCapabilities) async throws -> ContextBudgetAction { count += 1; return .rollover }
+    func observeProviderOverflow(run: AutonomousRunRecord, sessionID: String,
+        capabilities: ProviderCapabilities) async throws -> ContextBudgetAction { .emergency }
+    func toolResultCount() -> Int { count }
+}

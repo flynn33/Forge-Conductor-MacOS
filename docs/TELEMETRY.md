@@ -1,9 +1,21 @@
 # Telemetry architecture (real-time native)
 
+Current `0.18.0` repair starts MCP serve processes with on-demand metrics,
+while the GUI retains its bounded continuous stream. Fresh one-shot collection
+runs on the telemetry worker and does not start a timer or enqueue GUI delivery.
+Current tests and candidate measurements are recorded in
+[the repair record](LMSTUDIO-RUNTIME-REPAIR.md); preceding UI/telemetry receipts
+retain their source identities.
+The current native Compute v3 ordering diagnostic failed its unchanged
+active/key/exposed startup predicate before any cover variant. Its one actual
+test, two assertions, native exit 65, complete streams and corrected foreground
+SecurityAgent identity remain in the repair record. Neither cover quiescence
+nor a production renderer defect follows from this startup failure.
+
 Dashboard lower panels use two independent equal-width columns: MCP Servers
 above MCP Tools at left, Sub-agents above Hot Processes at right. Outer
 bounds align; internal splits follow content, and Hot Processes fills the
-remaining right-column height. The current `81a91a81…` source's 13-method
+remaining right-column height. The preceding `81a91a81…` source's 13-method
 native matrix passed, and all 358 images were individually reviewed. [Native
 QA](GRAPHITE-NATIVE-QA.md) records exact fresh build/fixture identities and
 preceding checkpoint limits; approved Compute/telemetry inputs are unchanged.
@@ -21,7 +33,7 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current Graphite/Compute implementation/native QA/checks are complete; exact owner publication/readback/synchronization refs are retained externally. The operating contracts below
+Preceding 0.17.0 (27) Graphite/Compute implementation/native QA/checks are complete; exact owner publication/readback/synchronization refs are retained externally. The operating contracts below
 remain in force; exact current and historical evidence is separated in
 [Graphite Workbench](GRAPHITE-WORKBENCH.md) and [Compute Cores](COMPUTE-CORES.md).
 
@@ -207,6 +219,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.17.0`
+`0.18.0`
 
-Build: `27`
+Build: `28`

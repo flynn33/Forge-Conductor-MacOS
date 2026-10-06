@@ -92,9 +92,24 @@ public struct AppConfig: Sendable, Equatable, Codable {
     }
 
     public struct SessionsConfig: Sendable, Equatable, Codable {
+        public static let defaultContinuityRolloverToolCalls = 200
+        public static let continuityRolloverToolCallRange = 1...10_000
         public var idleTTLSec: Int
-        public init(idleTTLSec: Int = 14_400) { self.idleTTLSec = idleTTLSec }
-        enum CodingKeys: String, CodingKey { case idleTTLSec = "idle_ttl_sec" }
+        public var continuityRolloverToolCalls: Int
+        public init(idleTTLSec: Int = 14_400, continuityRolloverToolCalls: Int = AppConfig.SessionsConfig.defaultContinuityRolloverToolCalls) {
+            self.idleTTLSec = idleTTLSec
+            self.continuityRolloverToolCalls = continuityRolloverToolCalls
+        }
+        enum CodingKeys: String, CodingKey {
+            case idleTTLSec = "idle_ttl_sec"
+            case continuityRolloverToolCalls = "continuity_rollover_tool_calls"
+        }
+        public init(from decoder: any Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            idleTTLSec = try values.decode(Int.self, forKey: .idleTTLSec)
+            continuityRolloverToolCalls = try values.decodeIfPresent(Int.self, forKey: .continuityRolloverToolCalls)
+                ?? Self.defaultContinuityRolloverToolCalls
+        }
     }
 
     public struct CoordinatorConfig: Sendable, Equatable, Codable {
@@ -186,7 +201,8 @@ public struct AppConfig: Sendable, Equatable, Codable {
                 "open_browser_on_start": manager.openBrowserOnStart,
             ] as [String: Any],
             "mcp": ["role": mcp.role] as [String: Any],
-            "sessions": ["idle_ttl_sec": sessions.idleTTLSec] as [String: Any],
+            "sessions": ["idle_ttl_sec": sessions.idleTTLSec,
+                         "continuity_rollover_tool_calls": sessions.continuityRolloverToolCalls] as [String: Any],
             "coordinator": [
                 "enabled": coordinator.enabled,
                 "lease_ttl_sec": coordinator.leaseTTLSec,
@@ -236,6 +252,7 @@ public struct AppConfig: Sendable, Equatable, Codable {
         }
         if let sessions = dict["sessions"] as? [String: Any] {
             if let t = integer(sessions["idle_ttl_sec"]) { base.sessions.idleTTLSec = t }
+            if let t = integer(sessions["continuity_rollover_tool_calls"]) { base.sessions.continuityRolloverToolCalls = t }
         }
         if let c = dict["coordinator"] as? [String: Any] {
             if let v = c["enabled"] as? Bool { base.coordinator.enabled = v }

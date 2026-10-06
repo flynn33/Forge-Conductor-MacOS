@@ -1,6 +1,6 @@
 # Versioning policy
 
-**UI implementation and QA complete.** Current
+**Preceding UI implementation and QA complete.** The
 0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
 successful executions**, with zero failures/skips. The separate native view
 matrix passed **21 unique methods in 22 invocations**; all **463 selected PNGs**
@@ -11,7 +11,11 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.17.0 (27)**. The Graphite/Compute UI implementation and
+Current identity is **0.18.0 (28)**. The new Xcode CLI tools and adjustable
+continuity setting advance the feature-release component. Current validation
+is recorded in [the repair record](LMSTUDIO-RUNTIME-REPAIR.md).
+
+Preceding identity was **0.17.0 (27)**. The Graphite/Compute UI implementation and
 native QA/check-refresh passed; exact owner publication/readback/synchronization refs are retained externally; version alignment and a signed build
 are not shipment qualification. Historical receipts keep their tested identity.
 
@@ -50,19 +54,22 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.17.0`, build `27`. The backward-compatible
-Graphite presentation advances the feature-release component and resets the
+The current product version is `0.18.0`, build `28`. The backward-compatible
+Xcode CLI tools and continuity setting advance the feature-release component and resets the
 patch component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
 marketing-version settings and all 16 build-number settings align.
 
-The latest exact-reference source audit passed 15/15 checks over 434 inputs.
-The matching current 434-input ordinary Debug build passed strict signing/
+The preceding 0.17.0 exact-reference source audit passed 15/15 checks over 434 inputs.
+That preceding 0.17.0 434-input ordinary Debug build passed strict signing/
 compiled-library/exact reference packaging and four scoped manual ordinary
-workflows. Current native QA and finalchecks passed; owner exact owner publication/readback/synchronization refs are retained externally; the prior433-input artifact retains its
-checkpoint identity. [Compute Cores](COMPUTE-CORES.md#current-material-source-audit)
-records exact corrected audit/candidate/checkpoint hashes. The fifth material
-pilot and current 116-distinct production coverage passed; current native view/
-control QA, current-source check refresh passed; exact owner publication refs are retained externally in [Graphite Workbench](GRAPHITE-WORKBENCH.md).
+workflows. Its native QA and final checks passed; exact owner publication/
+readback/synchronization refs are retained externally. The prior 433-input
+artifact retains its checkpoint identity.
+[Compute Cores](COMPUTE-CORES.md#current-material-source-audit) records exact
+corrected audit/candidate/checkpoint hashes. The fifth material pilot,
+116-distinct production coverage, native view/control QA and source check
+refresh belong to that preceding checkpoint; exact owner publication refs are
+retained externally in [Graphite Workbench](GRAPHITE-WORKBENCH.md).
 Exact source/wiki publication refs are recorded externally without
 self-referential commits. Prior passes retain their tested inputs.
 

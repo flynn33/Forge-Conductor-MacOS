@@ -182,6 +182,43 @@ final class SourceDerivedSuccessorPreflightTests: XCTestCase, @unchecked Sendabl
         }
     }
 
+    func testCompletedStepReplayAtSavedToolLimitOnePreservesHistoricalChildChain() async throws {
+        try await withFixture { fixture in
+            let reserved = try sourceDerivedUnwrap(try await fixture.repository.pendingAutomaticContinuation(runID: fixture.run.runID))
+            let first = try fixture.stepper()
+            let (intent, pending, context) = try await fixture.prepare(first)
+            _ = try await first.execute(intent, run: pending, context: context, lease: fixture.lease)
+            let completed = await fixture.transport.snapshot()
+            XCTAssertTrue(completed.consumedExactOutput)
+            let current = try sourceDerivedUnwrap(try await fixture.repository.autonomousRun(pending.runID))
+            XCTAssertEqual(current.specification.work.pendingIntent, intent, "Simulate interruption before applying the step outcome")
+            let completedTurn = try sourceDerivedUnwrap(try await fixture.repository.providerTurn(reserved.intent.turnID))
+            let reformattedUsage = try fixture.reformatCompletedUsage(completedTurn)
+            let retainedTurn = try sourceDerivedUnwrap(try await fixture.repository.providerTurn(reserved.intent.turnID))
+            XCTAssertEqual(retainedTurn.usageJSON, reformattedUsage)
+            XCTAssertNotEqual(retainedTurn.usageJSON, completedTurn.usageJSON)
+            XCTAssertEqual(retainedTurn.intent, completedTurn.intent)
+            XCTAssertEqual(retainedTurn.state, .completed)
+            XCTAssertEqual(retainedTurn.providerRequestID, completedTurn.providerRequestID)
+            XCTAssertEqual(retainedTurn.providerResponseID, completedTurn.providerResponseID)
+            _ = try fixture.app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 1))
+            XCTAssertEqual(fixture.app.config.model.sessions.continuityRolloverToolCalls, 1)
+            let restarted = try fixture.stepper()
+            let replay = try await restarted.execute(intent, run: current, context: context, lease: fixture.lease)
+            guard case .continued(let work) = replay else { return XCTFail("Expected exact completed response replay") }
+            XCTAssertEqual(work.metadata["provider_response_id"], "successor-consumed")
+            let after = await fixture.transport.snapshot()
+            XCTAssertEqual(after.probes, completed.probes)
+            XCTAssertEqual(after.roots.count, completed.roots.count)
+            XCTAssertEqual(after.followups.count, completed.followups.count)
+            XCTAssertEqual(after.followups.last?.input, completed.followups.last?.input)
+            let replayedTurn = try await fixture.repository.providerTurn(reserved.intent.turnID)
+            XCTAssertEqual(replayedTurn, retainedTurn, "Semantic usage replay must not rewrite a completed receipt")
+            let countRequest = try await fixture.repository.pendingContextBudgetActionRequest(runID: pending.runID)
+            XCTAssertNil(countRequest, "Historical source replay must finish its retained child chain without a new count request")
+        }
+    }
+
     func testCompletedLookupRejectsDifferentResponseIDAndUsage() async throws {
         for scenario in [SourceDerivedLookupScenario.differentResponseID, .differentUsage] {
             try await assertRejectedCompletedLookup(scenario)
@@ -310,6 +347,268 @@ final class SourceDerivedSuccessorPreflightTests: XCTestCase, @unchecked Sendabl
             XCTAssertEqual(settled.probes, unknown.probes)
             XCTAssertEqual(settled.followups.count, unknown.followups.count)
             XCTAssertFalse(try sourceDerivedUnwrap(fixture.operation()).isResumed)
+        }
+    }
+
+    func testPendingFeedbackNoticePreservesExactSourcePrefixAndCompletedReplay() async throws {
+        try await withFixture { fixture in
+            let notices = try StjornarvaldPolicyNoticeRepository(paths: fixture.app.paths)
+            try await queueFeedbackNotice(fixture, notices: notices)
+            let policy = StjornarvaldCodingAgentPolicyReporter(repository: notices)
+            await fixture.transport.expectPolicyNoticeOnFeedback()
+            let sessionID = try sourceDerivedUnwrap(fixture.run.activeSessionID)
+            let identity = ContextBudgetIdentity(runID: fixture.run.runID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration, sessionID: sessionID)
+            await fixture.transport.observeFeedbackDispatch { request in
+                let state = try sourceDerivedUnwrap(try await fixture.repository.contextBudgetState(identity: identity))
+                let latest = try sourceDerivedUnwrap(state.latestObservation)
+                let prefix = try sourceDerivedUnwrap(latest.accounting?.toolResultAccounting?.prefixes.last)
+                let actual = try await SourceBootstrapFixtureWire.continuation(request, maximumOutputTokens: 1_024)
+                let exactBytes = try sourceDerivedUnwrap(actual.serializedInputByteCount)
+                XCTAssertGreaterThan(exactBytes, prefix.inputBytes)
+                let outputOnly = LMStudioContinuationRequest(operationID: request.operationID, modelKey: request.modelKey,
+                    previousResponseID: request.previousResponseID, input: [request.input[0]], tools: request.tools,
+                    idempotencyKey: request.idempotencyKey)
+                let original = try await SourceBootstrapFixtureWire.continuation(outputOnly, maximumOutputTokens: 1_024)
+                XCTAssertEqual(original.serializedInputByteCount, prefix.inputBytes,
+                    "The escaped production encoder's existing output prefix is retained exactly")
+                let history = try await fixture.repository.contextBudgetObservations(identity: identity)
+                let before = try sourceDerivedUnwrap(history.first { $0.triggerPoint == .afterToolResult
+                    && $0.providerResponseID == request.previousResponseID })
+                let delta = try ContextBudgetMath.estimateTokens(serializedBytes: exactBytes - prefix.inputBytes,
+                    policy: state.configuration.policy)
+                XCTAssertEqual(latest.used, before.used + delta, "Charge exact additive wire input bytes once")
+            }
+            let first = try fixture.stepper(policyContext: policy)
+            let (intent, pending, context) = try await fixture.prepare(first)
+            let result = try await first.execute(intent, run: pending, context: context, lease: fixture.lease)
+            guard case .continued(let work) = result else { return XCTFail("Expected source feedback consumption: \(result)") }
+            XCTAssertEqual(work.metadata["provider_response_id"], "successor-consumed")
+            XCTAssertEqual(try notices.deliveryState("managed:\(intent.idempotencyKey):1"), .presented)
+            let completed = await fixture.transport.snapshot()
+            XCTAssertEqual(completed.followups.last?.input.count, 2)
+            let beforeBudget = try await fixture.repository.contextBudgetState(identity: identity)
+            let beforeHistory = try await fixture.repository.contextBudgetObservations(identity: identity)
+            let current = try sourceDerivedUnwrap(try await fixture.repository.autonomousRun(pending.runID))
+            let replay = try fixture.stepper(policyContext: policy)
+            let outcome = try await replay.execute(intent, run: current, context: context, lease: fixture.lease)
+            guard case .continued(let replayedWork) = outcome else { return XCTFail("Expected exact retained notice replay") }
+            XCTAssertEqual(replayedWork.metadata["provider_response_id"], "successor-consumed")
+            let after = await fixture.transport.snapshot()
+            XCTAssertEqual(after.probes, completed.probes)
+            XCTAssertEqual(after.roots, completed.roots)
+            XCTAssertEqual(after.followups, completed.followups, "Replay must not POST or rewrite accepted child input")
+            let afterBudget = try await fixture.repository.contextBudgetState(identity: identity)
+            let afterHistory = try await fixture.repository.contextBudgetObservations(identity: identity)
+            XCTAssertEqual(afterBudget, beforeBudget)
+            XCTAssertEqual(afterHistory, beforeHistory)
+        }
+    }
+
+    func testOutputOnlyCompletedChildDefersNewNoticeWithoutRewritingReplay() async throws {
+        try await withFixture { fixture in
+            let first = try fixture.stepper()
+            let (intent, pending, context) = try await fixture.prepare(first)
+            _ = try await first.execute(intent, run: pending, context: context, lease: fixture.lease)
+            let completed = await fixture.transport.snapshot()
+            XCTAssertEqual(completed.followups.last?.input.count, 1)
+            let notices = try StjornarvaldPolicyNoticeRepository(paths: fixture.app.paths)
+            try await queueFeedbackNotice(fixture, notices: notices)
+            let policy = StjornarvaldCodingAgentPolicyReporter(repository: notices)
+            let current = try sourceDerivedUnwrap(try await fixture.repository.autonomousRun(pending.runID))
+            let replay = try fixture.stepper(policyContext: policy)
+            let outcome = try await replay.execute(intent, run: current, context: context, lease: fixture.lease)
+            guard case .continued = outcome else { return XCTFail("Expected original output-only child replay") }
+            let after = await fixture.transport.snapshot()
+            XCTAssertEqual(after.probes, completed.probes)
+            XCTAssertEqual(after.roots, completed.roots)
+            XCTAssertEqual(after.followups, completed.followups)
+            XCTAssertEqual(try notices.deliveryState("managed:\(intent.idempotencyKey):1"), .deliveryDeferred)
+            let remaining = await policy.pendingNotices(projectID: fixture.run.projectID.description,
+                projectGeneration: 1, runID: fixture.run.runID.description, sessionID: fixture.run.activeSessionID,
+                clientID: nil, maximumCount: 8, maximumBytes: 16 * 1_024)
+            XCTAssertEqual(remaining.count, 1, "A newly queued notice cannot change an already frozen child hash")
+        }
+    }
+
+    func testOptionalFeedbackNoticeDefersAtActualProviderBodyCap() async throws {
+        try await withFixture { fixture in
+            let notices = try StjornarvaldPolicyNoticeRepository(paths: fixture.app.paths)
+            try await queueFeedbackNotice(fixture, notices: notices)
+            let policy = StjornarvaldCodingAgentPolicyReporter(repository: notices)
+            await fixture.transport.limitFeedbackBodyToOutputOnly()
+            let stepper = try fixture.stepper(policyContext: policy)
+            let (intent, pending, context) = try await fixture.prepare(stepper)
+            let outcome = try await stepper.execute(intent, run: pending, context: context, lease: fixture.lease)
+            guard case .continued(let work) = outcome else { return XCTFail("Optional notice blocked valid source tool output") }
+            XCTAssertEqual(work.metadata["provider_response_id"], "successor-consumed")
+            let snapshot = await fixture.transport.snapshot()
+            XCTAssertTrue(snapshot.consumedExactOutput)
+            XCTAssertEqual(snapshot.followups.last?.input.count, 1)
+            let controls = await fixture.transport.policyControls()
+            XCTAssertEqual(controls.rejectedNoticePreflights, 1, "Production serializer must reject the notice-bearing body before POST")
+            XCTAssertNotNil(controls.feedbackMaximumRequestBytes)
+            XCTAssertEqual(try notices.deliveryState("managed:\(intent.idempotencyKey):1"), .deliveryDeferred)
+            let remaining = await policy.pendingNotices(projectID: fixture.run.projectID.description,
+                projectGeneration: 1, runID: fixture.run.runID.description, sessionID: fixture.run.activeSessionID,
+                clientID: nil, maximumCount: 8, maximumBytes: 16 * 1_024)
+            XCTAssertEqual(remaining.count, 1)
+        }
+    }
+
+    func testSourceFeedbackPrefixReceiptSurvivesReopenAndRejectsChangedFullInput() async throws {
+        try await withFixture { fixture in
+            let notices = try StjornarvaldPolicyNoticeRepository(paths: fixture.app.paths)
+            try await queueFeedbackNotice(fixture, notices: notices)
+            await fixture.transport.expectPolicyNoticeOnFeedback()
+            let stepper = try fixture.stepper(policyContext: StjornarvaldCodingAgentPolicyReporter(repository: notices))
+            let (intent, pending, context) = try await fixture.prepare(stepper)
+            let outcome = try await stepper.execute(intent, run: pending, context: context, lease: fixture.lease)
+            guard case .continued = outcome else { return XCTFail("Notice output was not consumed: \(outcome)") }
+            let row = try fixture.feedbackPreflightRow()
+            let receipt = try sourceDerivedUnwrap(try await fixture.repository.sourceDerivedProviderTurnPreflight(
+                turnID: row.turnID, lease: fixture.lease))
+            let snapshot = await fixture.transport.snapshot()
+            guard let input = snapshot.followups.last?.input.first,
+                  case .functionCallOutput(let callID, let output) = input else { return XCTFail("Missing actual output prefix") }
+            let prefix = try ForgeJSONCanonicalizationV1.data(from: [["type": "function_call_output", "call_id": callID, "output": output]])
+            XCTAssertEqual(receipt.toolOutputsPrefixSHA256, JSONSupport.sha256Hex(prefix))
+            XCTAssertNotEqual(receipt.intent.inputSHA256, receipt.toolOutputsPrefixSHA256,
+                "Actual notice child preserves its full input identity separately from the exact output prefix")
+            let reopened = try ProjectControlPlaneRepository(databaseURL: fixture.app.paths.controlPlaneSQLite)
+            do {
+                let restored = try await reopened.sourceDerivedProviderTurnPreflight(turnID: row.turnID, lease: fixture.lease)
+                XCTAssertEqual(restored, receipt, "FULL-durable prefix and all actual input/wire/scope identities survive owner reopen")
+                await reopened.close()
+            } catch { await reopened.close(); throw error }
+            do {
+                _ = try await fixture.repository.beginSourceDerivedProviderTurn(intent: receipt.intent,
+                    preflight: receipt.preflight, capabilities: receipt.capabilities, lease: fixture.lease,
+                    actualInput: Data("[]".utf8))
+                XCTFail("A different full input acquired retained prefix authority")
+            } catch { XCTAssertEqual(error as? NativeSourceConversationError, .integrityFailure) }
+            let request = try sourceDerivedUnwrap(snapshot.followups.last)
+            guard request.input.count == 2, case .message(let role, let text) = request.input[1] else {
+                return XCTFail("Missing actual notice suffix")
+            }
+            let exactInput = try ForgeJSONCanonicalizationV1.data(from: [
+                ["type": "function_call_output", "call_id": callID, "output": output],
+                ["type": "message", "role": role, "content": text],
+            ])
+            XCTAssertEqual(JSONSupport.sha256Hex(exactInput), receipt.intent.inputSHA256)
+            for scope in 0..<4 {
+                let wrong = ProviderTurnIntent(turnID: receipt.intent.turnID, runID: receipt.intent.runID,
+                    sessionID: scope == 0 ? UUID().uuidString.lowercased() : receipt.intent.sessionID,
+                    operationID: scope == 1 ? UUID() : receipt.intent.operationID,
+                    projectID: scope == 2 ? ProjectID() : receipt.intent.projectID,
+                    projectGeneration: scope == 3 ? ProjectGeneration(receipt.intent.projectGeneration.rawValue == 1 ? 2 : 1) : receipt.intent.projectGeneration, kind: receipt.intent.kind,
+                    idempotencyKey: receipt.intent.idempotencyKey, previousResponseID: receipt.intent.previousResponseID,
+                    inputSHA256: receipt.intent.inputSHA256, toolSchemaSHA256: receipt.intent.toolSchemaSHA256)
+                do {
+                    _ = try await fixture.repository.beginSourceDerivedProviderTurn(intent: wrong,
+                        preflight: receipt.preflight, capabilities: receipt.capabilities, lease: fixture.lease, actualInput: exactInput)
+                    XCTFail("Correct prefix bytes may not authorize another session, operation, project, or generation")
+                } catch { XCTAssertEqual(error as? AutonomyError, .intentConflict) }
+            }
+            let retained = try await fixture.repository.sourceDerivedProviderTurnPreflight(turnID: row.turnID, lease: fixture.lease)
+            XCTAssertEqual(retained, receipt)
+            let after = await fixture.transport.snapshot()
+            XCTAssertEqual(after.probes, snapshot.probes)
+            XCTAssertEqual(after.roots, snapshot.roots)
+            XCTAssertEqual(after.followups, snapshot.followups, "Rejected replay may neither POST nor rewrite actual input")
+        }
+    }
+
+    func testSourceFeedbackPrefixTamperAndLegacyOmissionCannotAuthorizeNoticeChild() async throws {
+        try await withFixture { fixture in
+            let notices = try StjornarvaldPolicyNoticeRepository(paths: fixture.app.paths)
+            try await queueFeedbackNotice(fixture, notices: notices)
+            await fixture.transport.expectPolicyNoticeOnFeedback()
+            let stepper = try fixture.stepper(policyContext: StjornarvaldCodingAgentPolicyReporter(repository: notices))
+            let (intent, pending, context) = try await fixture.prepare(stepper)
+            let outcome = try await stepper.execute(intent, run: pending, context: context, lease: fixture.lease)
+            guard case .continued = outcome else { return XCTFail("Notice output was not consumed: \(outcome)") }
+            let row = try fixture.feedbackPreflightRow()
+            let activation = try sourceDerivedUnwrap(try await fixture.repository.sourceActivationReceipt(
+                runID: fixture.run.runID, operationID: fixture.acceptance.operationID, lease: fixture.lease))
+            let original = try JSONSupport.object(from: Data(row.json.utf8))
+            let originalPrefix = try sourceDerivedUnwrap(original["toolOutputsPrefixSHA256"] as? String)
+            XCTAssertEqual(originalPrefix.utf8.count, 64)
+            let before = await fixture.transport.snapshot()
+            for corruption in 0..<6 {
+                var object = original
+                switch corruption {
+                case 0: object["toolOutputsPrefixSHA256"] = (originalPrefix.hasPrefix("0") ? "1" : "0") + originalPrefix.dropFirst()
+                case 1: object.removeValue(forKey: "toolOutputsPrefixSHA256")
+                case 2: object["toolOutputsPrefixSHA256"] = NSNull()
+                case 3: object["toolOutputsPrefixSHA256"] = "invalid-prefix"
+                case 4: object["leaseEpoch"] = 0
+                default:
+                    var changedIntent = try sourceDerivedUnwrap(object["intent"] as? [String: Any])
+                    let originalInput = try sourceDerivedUnwrap(changedIntent["inputSHA256"] as? String)
+                    changedIntent["inputSHA256"] = (originalInput.hasPrefix("0") ? "1" : "0") + originalInput.dropFirst()
+                    object["intent"] = changedIntent
+                }
+                if corruption >= 4 {
+                    XCTAssertEqual(object["toolOutputsPrefixSHA256"] as? String, originalPrefix,
+                        "Whole-receipt validation rejects drift even when the prefix SQL predicate still matches")
+                }
+                let changed = try ForgeJSONCanonicalizationV1.data(from: object)
+                let changedRow = SourceDerivedFixture.FeedbackPreflightRow(turnID: row.turnID,
+                    json: String(decoding: changed, as: UTF8.self), sha: JSONSupport.sha256Hex(changed))
+                try fixture.replaceFeedbackPreflight(from: row, to: changedRow)
+                do {
+                    do {
+                        _ = try await fixture.repository.sourceActivationReceipt(runID: fixture.run.runID,
+                            operationID: fixture.acceptance.operationID, lease: fixture.lease)
+                        XCTFail("Unproven or malformed additive input cannot sustain source resumption")
+                    } catch { XCTAssertTrue(error is ContinuitySourceActivationError || error is NativeSourceConversationError) }
+                    try fixture.replaceFeedbackPreflight(from: changedRow, to: row)
+                } catch { try? fixture.replaceFeedbackPreflight(from: changedRow, to: row); throw error }
+                let restored = try await fixture.repository.sourceActivationReceipt(runID: fixture.run.runID,
+                    operationID: fixture.acceptance.operationID, lease: fixture.lease)
+                XCTAssertEqual(restored, activation, "Restoration revalidates the exact original receipt rather than replacing proof")
+            }
+            let after = await fixture.transport.snapshot()
+            XCTAssertEqual(after.probes, before.probes)
+            XCTAssertEqual(after.roots, before.roots)
+            XCTAssertEqual(after.followups, before.followups)
+        }
+    }
+
+    func testOutputOnlySourceFeedbackKeepsLegacyPreflightEncoding() async throws {
+        try await withFixture { fixture in
+            let stepper = try fixture.stepper()
+            let (intent, pending, context) = try await fixture.prepare(stepper)
+            let outcome = try await stepper.execute(intent, run: pending, context: context, lease: fixture.lease)
+            guard case .continued = outcome else { return XCTFail("Legacy output-only continuation did not resume: \(outcome)") }
+            let row = try fixture.feedbackPreflightRow()
+            let object = try JSONSupport.object(from: Data(row.json.utf8))
+            XCTAssertNil(object["toolOutputsPrefixSHA256"], "Nil attestation remains omitted from legacy JSON")
+            let decoded = try JSONDecoder().decode(SourceDerivedProviderTurnStoredPreflight.self, from: Data(row.json.utf8))
+            XCTAssertNil(decoded.toolOutputsPrefixSHA256)
+            let receipt = try decoded.validatedReceipt(sha256: row.sha)
+            XCTAssertNil(receipt.toolOutputsPrefixSHA256)
+            let actual = try await fixture.repository.sourceDerivedProviderTurnPreflight(turnID: row.turnID, lease: fixture.lease)
+            XCTAssertEqual(actual, receipt)
+            XCTAssertTrue(try sourceDerivedUnwrap(fixture.operation()).isResumed)
+        }
+    }
+
+    private func queueFeedbackNotice(_ fixture: SourceDerivedFixture, notices: StjornarvaldPolicyNoticeRepository) async throws {
+        let rule = try sourceDerivedUnwrap(RavenForgeDevelopmentPolicyAdapter().rules().first)
+        let log = try StjornarvaldPolicyLogStore(databaseURL: fixture.app.paths.stjornarvaldPolicyLogSQLite,
+            jsonlURL: fixture.app.paths.stjornarvaldPolicyLogJSONL)
+        let candidate = PolicyViolationCandidate(rule: rule, observationID: UUID(),
+            scope: .init(projectID: fixture.run.projectID.description, projectGeneration: 1,
+                runID: fixture.run.runID.description, sessionID: fixture.run.activeSessionID),
+            subjectIdentity: "owned-feedback-runtime", summary: "A shipping runtime is outside the native stack.",
+            evidenceReferences: ["fixture-target-membership"], explanation: "A scoped feedback notice must be delivered.",
+            confidence: 0.95, suggestedCorrection: "Remove the non-native shipping runtime.", conditionIdentity: "runtime")
+        let finding = PolicyDetectorFinding(detectorID: "feedback-notice-fixture", disposition: .violation, candidate: candidate)
+        let result = try StjornarvaldViolationLifecycleService(store: log).apply(finding, occurredAt: Date())
+        guard case .recorded(_, let event) = result, try notices.queue(event) != nil else {
+            throw AutonomyError.invalidRequest("Owned source notice fixture did not queue its event")
         }
     }
 
@@ -469,14 +768,19 @@ private final class SourceDerivedFixture: @unchecked Sendable {
         try LMStudioManagedModelProvider(storageDirectory: app.paths.home.appendingPathComponent("ordinary-provider"), transport: transport)
     }
 
-    func stepper(provider suppliedProvider: (any ManagedModelProvider)? = nil) throws -> ManagedProjectRunStepExecutor {
+    func stepper(provider suppliedProvider: (any ManagedModelProvider)? = nil,
+        policyContext: any PolicyContextProviding = NoPolicyContextProvider()) throws -> ManagedProjectRunStepExecutor {
         let provider: any ManagedModelProvider = try suppliedProvider ?? self.provider()
         let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
         let budget = PersistedManagedRunBudgetEvaluator(repository: repository,
-            policyResolver: { [app] in try app.config.budgetPolicySelection(scope: $0) })
+            policyResolver: { [app] in try app.config.budgetPolicySelection(scope: $0) },
+            toolCallThresholdResolver: { [app] in
+                try app.config.refreshIfChanged()
+                return app.config.model.sessions.continuityRolloverToolCalls
+            })
         return try ManagedProjectRunStepExecutor(repository: repository, providerResolver: { _ in provider },
             toolDefinitionResolver: { try catalog.providerToolDefinitions(allowedToolNames: $0) }, broker: broker,
-            budget: budget, sourceResumption: { [worker, app] run, lease in
+            budget: budget, policyContext: policyContext, sourceResumption: { [worker, app] run, lease in
                 try await worker.reconcileSourceResumption(run: run, lease: lease,
                     policyResolver: { try app.config.budgetPolicySelection(scope: $0) })
             })
@@ -505,6 +809,74 @@ private final class SourceDerivedFixture: @unchecked Sendable {
     func operation() throws -> ContinuitySourceBootstrapOperation? {
         try ContinuityStateEngine(memory: app.projectMemory).sourceBootstrap(operationID: acceptance.operationID,
             authorization: acceptance.authorization)
+    }
+
+    struct FeedbackPreflightRow {
+        let turnID: UUID
+        let json: String
+        let sha: String
+    }
+
+    func feedbackPreflightRow() throws -> FeedbackPreflightRow {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(app.paths.controlPlaneSQLite.path, &handle,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK, let handle else {
+            if let handle { sqlite3_close_v2(handle) }
+            throw NativeSourceConversationError.integrityFailure
+        }
+        defer { sqlite3_close_v2(handle) }
+        sqlite3_busy_timeout(handle, 3_000)
+        let sql = "SELECT turn_id,source_preflight_json,source_preflight_sha256 FROM provider_turns WHERE run_id=? AND provider_response_id='successor-consumed' AND state='completed' LIMIT 2"
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        guard sqlite3_bind_text(statement, 1, run.runID.description, -1, transient) == SQLITE_OK,
+              sqlite3_step(statement) == SQLITE_ROW else { throw NativeSourceConversationError.integrityFailure }
+        func text(_ index: Int32, maximum: Int) throws -> String {
+            guard sqlite3_column_type(statement, index) == SQLITE_TEXT,
+                  (1...maximum).contains(Int(sqlite3_column_bytes(statement, index))),
+                  let pointer = sqlite3_column_text(statement, index) else { throw NativeSourceConversationError.integrityFailure }
+            return String(cString: pointer)
+        }
+        let id = try sourceDerivedUnwrap(UUID(uuidString: text(0, maximum: 36)))
+        let json = try text(1, maximum: SourceDerivedProviderTurnStoredPreflight.maximumBytes)
+        let sha = try text(2, maximum: 64)
+        guard sqlite3_step(statement) == SQLITE_DONE, JSONSupport.sha256Hex(Data(json.utf8)) == sha else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        return .init(turnID: id, json: json, sha: sha)
+    }
+
+    func replaceFeedbackPreflight(from old: FeedbackPreflightRow, to new: FeedbackPreflightRow) throws {
+        guard old.turnID == new.turnID, new.json.utf8.count <= SourceDerivedProviderTurnStoredPreflight.maximumBytes,
+              JSONSupport.sha256Hex(Data(new.json.utf8)) == new.sha else { throw NativeSourceConversationError.integrityFailure }
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(app.paths.controlPlaneSQLite.path, &handle,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK, let handle else {
+            if let handle { sqlite3_close_v2(handle) }
+            throw NativeSourceConversationError.integrityFailure
+        }
+        defer { sqlite3_close_v2(handle) }
+        sqlite3_busy_timeout(handle, 3_000)
+        var statement: OpaquePointer?
+        let sql = "UPDATE provider_turns SET source_preflight_json=?,source_preflight_sha256=? WHERE turn_id=? AND run_id=? AND state='completed' AND source_preflight_json=? AND source_preflight_sha256=?"
+        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        let bindings = [new.json, new.sha, old.turnID.uuidString.lowercased(), run.runID.description, old.json, old.sha]
+        for (offset, value) in bindings.enumerated() {
+            guard sqlite3_bind_text(statement, Int32(offset + 1), value, -1, transient) == SQLITE_OK else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+        }
+        guard sqlite3_step(statement) == SQLITE_DONE, sqlite3_changes(handle) == 1 else {
+            throw NativeSourceConversationError.integrityFailure
+        }
     }
 
     func reformatCompletedUsage(_ completed: ProviderTurnRecord) throws -> String {
@@ -712,10 +1084,23 @@ private actor SourceDerivedTransport: LMStudioManagedTransportObservedDispatchin
     private var unknownReceiptAvailable = false
     private var ordinaryDispatchObserver: (@Sendable () async throws -> Void)?
     private var budgetChecks = 0
+    private var expectFeedbackNotice = false
+    private var capFeedbackBody = false
+    private var feedbackMaximumRequestBytes: Int?
+    private var rejectedNoticePreflights = 0
+    private var feedbackDispatchObserver: (@Sendable (LMStudioContinuationRequest) async throws -> Void)?
     init(file: URL, marker: String, sourceOnly: Bool = false) {
         self.file = file; self.marker = marker; self.sourceOnly = sourceOnly
     }
     func setMode(_ mode: Mode) { self.mode = mode }
+    func expectPolicyNoticeOnFeedback() { expectFeedbackNotice = true }
+    func limitFeedbackBodyToOutputOnly() { capFeedbackBody = true }
+    func observeFeedbackDispatch(_ observer: @escaping @Sendable (LMStudioContinuationRequest) async throws -> Void) {
+        feedbackDispatchObserver = observer
+    }
+    func policyControls() -> (rejectedNoticePreflights: Int, feedbackMaximumRequestBytes: Int?) {
+        (rejectedNoticePreflights, feedbackMaximumRequestBytes)
+    }
     func allowUnknownReceipt() { unknownReceiptAvailable = true }
     func observeFirstOrdinaryDispatch(_ observer: @escaping @Sendable () async throws -> Void) {
         ordinaryDispatchObserver = observer
@@ -732,7 +1117,23 @@ private actor SourceDerivedTransport: LMStudioManagedTransportObservedDispatchin
         try await SourceBootstrapFixtureWire.root(request, maximumOutputTokens: 1_024)
     }
     func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight {
-        try await SourceBootstrapFixtureWire.continuation(request,
+        if capFeedbackBody, request.previousResponseID == "successor-work-response",
+           let first = request.input.first, case .functionCallOutput(_, let output) = first, output != "0" {
+            if feedbackMaximumRequestBytes == nil {
+                var outputOnly = request
+                outputOnly.input = [request.input[0]]
+                let baseline = try await SourceBootstrapFixtureWire.continuation(outputOnly, maximumOutputTokens: 1_024)
+                feedbackMaximumRequestBytes = max(1_024, baseline.bodyByteCount + 32)
+            }
+            do {
+                return try await SourceBootstrapFixtureWire.continuation(request,
+                    maximumRequestBytes: sourceDerivedUnwrap(feedbackMaximumRequestBytes), maximumOutputTokens: 1_024)
+            } catch {
+                if request.input.count == 2 { rejectedNoticePreflights += 1 }
+                throw error
+            }
+        }
+        return try await SourceBootstrapFixtureWire.continuation(request,
             maximumRequestBytes: mode == .smallBody ? 1_024 : 512 * 1_024,
             maximumOutputTokens: mode == .oversizedOutput ? 4_096 : 1_024)
     }
@@ -773,6 +1174,9 @@ private actor SourceDerivedTransport: LMStudioManagedTransportObservedDispatchin
             try await observer()
             budgetChecks += 1
         }
+        if request.previousResponseID == "successor-work-response", let observer = feedbackDispatchObserver {
+            try await observer(request)
+        }
         followups.append(request)
         switch request.previousResponseID {
         case "successor-bootstrap-root":
@@ -792,9 +1196,14 @@ private actor SourceDerivedTransport: LMStudioManagedTransportObservedDispatchin
             return try turn(responseID: "successor-work-response", parent: request.previousResponseID,
                 callID: "successor-read-call", name: "fs_read", arguments: ["path": file.path])
         case "successor-work-response":
-            guard request.input.count == 1, case .functionCallOutput(let callID, let output) = request.input[0],
+            guard request.input.count == (expectFeedbackNotice ? 2 : 1),
+                  case .functionCallOutput(let callID, let output) = request.input[0],
                   callID == "successor-read-call", try JSONSupport.object(from: Data(output.utf8))["content"] as? String == marker else {
                 throw NativeSourceConversationError.integrityFailure
+            }
+            if expectFeedbackNotice {
+                guard case .message(let role, let text) = request.input[1], role == "user",
+                      text.contains("STJORNARVALD POLICY CONTEXT") else { throw NativeSourceConversationError.integrityFailure }
             }
             consumedExactOutput = true
             return answer(responseID: "successor-consumed", parent: request.previousResponseID)

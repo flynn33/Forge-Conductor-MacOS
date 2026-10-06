@@ -72,6 +72,7 @@ public enum ProductionToolReplayCatalog {
         "bash.run",
         "python.run",
         "powershell.run",
+        "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
         "project_memory.initialize",
         "project_memory.remember",
     ]
@@ -151,6 +152,11 @@ public enum ProductionToolReplayCatalog {
         "bash.run": .reconciled,
         "python.run": .reconciled,
         "powershell.run": .reconciled,
+        "xcode.discover": .reconciled,
+        "xcode.run": .reconciled,
+        "xcode.result": .reconciled,
+        "xcode.debug": .reconciled,
+        "xcode.simulator": .reconciled,
         "job.status": .readOnly,
         "job.read_output": .readOnly,
         "job.cancel": .idempotent,
@@ -224,6 +230,7 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
     private let controlPlane: ProjectControlPlaneRepository
     private let runtimeJobs: RuntimeJobRepository
     private let memory: ProjectMemoryService
+    private let xcodeExecutable: URL
 
     public init(
         controlPlane: ProjectControlPlaneRepository,
@@ -233,6 +240,15 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
         self.controlPlane = controlPlane
         self.runtimeJobs = runtimeJobs
         self.memory = memory
+        self.xcodeExecutable = URL(fileURLWithPath: "/usr/bin/xcrun")
+    }
+
+    init(
+        controlPlane: ProjectControlPlaneRepository, runtimeJobs: RuntimeJobRepository,
+        memory: ProjectMemoryService, xcodeExecutable: URL
+    ) {
+        self.controlPlane = controlPlane; self.runtimeJobs = runtimeJobs
+        self.memory = memory; self.xcodeExecutable = xcodeExecutable
     }
 
     public func prepare(
@@ -246,6 +262,10 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
             return try gitDescriptor(call: call, context: context)
         case "project_memory.update":
             return try projectMemoryUpdateDescriptor(call: call, context: context)
+        case "xcode.run", "xcode.result":
+            return try await ProjectInstructionCompletionGate.xcodeCompletionDescriptor(
+                call: call, context: context, repository: controlPlane, runtimeJobs: runtimeJobs, xcrunURL: xcodeExecutable
+            )
         default:
             return nil
         }
@@ -265,6 +285,8 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
         switch call.toolName {
         case "process.run", "shell.run", "bash.run", "python.run", "powershell.run":
             return try await reconcileRuntimeSubmission(call: call, context: context)
+        case "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator":
+            return try await reconcileXcodeSubmission(call: call, context: context)
         case "fs_edit", "fs_delete", "fs_move":
             return try reconcileFilesystem(
                 invocation: invocation,
@@ -295,6 +317,27 @@ public struct ProductionToolInvocationReconciler: ToolInvocationReconciling, Sen
         default:
             return .unresolved
         }
+    }
+
+    private func reconcileXcodeSubmission(
+        call: BrokeredToolCall,
+        context: ToolInvocationContext
+    ) async throws -> ToolReconciliationOutcome {
+        let command = try XcodeCLIService.command(
+            tool: call.toolName, arguments: call.arguments, context: context
+        )
+        guard let key = command.idempotencyKey else { return .unresolved }
+        guard let record = try await runtimeJobs.existingJob(
+            projectID: context.projectID,
+            generation: context.projectGeneration,
+            idempotencyKey: key
+        ) else { return .safeToExecute }
+        guard record.runID == context.runID, record.idempotencyKey == key else {
+            return .unresolved
+        }
+        let fingerprint = try XcodeCLIService.nativeCommandFingerprint(command: command, executable: xcodeExecutable)
+        guard XcodeCLIService.storedCommandMatches(record, fingerprint: fingerprint) else { return .unresolved }
+        return .completed(.success(XcodeCLIToolPack.receipt(record, command: command)))
     }
 
     private func reconcileRuntimeSubmission(

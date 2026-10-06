@@ -12,6 +12,7 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
         case completed
         case incomplete
         case ambiguousAfterReceipt
+        case ambiguousAfterCompletedReceipt
     }
 
     struct Snapshot: Sendable {
@@ -56,7 +57,7 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
             responseID: "resp_provider_root",
             previousResponseID: nil,
             model: responseModel ?? request.modelKey ?? "fixture/tool-model",
-            status: mode == .completed ? "completed" : "incomplete",
+            status: mode == .completed || mode == .ambiguousAfterCompletedReceipt ? "completed" : "incomplete",
             assistantText: "Visible assistant response.",
             functionCalls: [LMStudioFunctionCall(
                 itemID: "item_provider_tool",
@@ -68,6 +69,9 @@ private actor ScriptedProviderBridgeTransport: LMStudioManagedTransporting {
         )
         receipts[request.idempotencyKey] = turn
         if case .ambiguousAfterReceipt = mode {
+            throw LMStudioProviderError.deadlineExceeded(phase: "total")
+        }
+        if case .ambiguousAfterCompletedReceipt = mode {
             throw LMStudioProviderError.deadlineExceeded(phase: "total")
         }
         return turn
@@ -423,6 +427,63 @@ final class ManagedModelProviderBridgeTests: XCTestCase {
         } catch LMStudioProviderError.conflict {}
         let restartedSnapshot = await restartedTransport.snapshot()
         XCTAssertNil(restartedSnapshot.rootRequest)
+    }
+
+    func testLocalIntentConflictObservationPreservesLegacyConflictAndLeaseAcrossReopen() async throws {
+        let root = providerBridgeTemporaryRoot("local-intent-observation")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let request = try ProviderRootRequest(operationID: UUID(), idempotencyKey: "local-intent-observation-key",
+            modelKey: "fixture/tool-model", input: "Leave a bounded ambiguous provider intent.", tools: [])
+        let original = try LMStudioManagedModelProvider(storageDirectory: root,
+            transport: ScriptedProviderBridgeTransport(mode: .ambiguousAfterCompletedReceipt))
+        do { _ = try await original.createRoot(request); XCTFail("Fixture must leave an unresolved intent") }
+        catch LMStudioProviderError.deadlineExceeded {}
+        let ledgerURL = root.appendingPathComponent("managed-provider-receipts.json")
+        let before = try JSONSupport.object(from: Data(contentsOf: ledgerURL))
+        let beforeRecord = try XCTUnwrap((before["records"] as? [[String: Any]])?.first)
+        XCTAssertNil(beforeRecord["local_intent_conflict"], "An absent legacy observation means unknown")
+        let freshTransport = ScriptedProviderBridgeTransport()
+        let reopened = try LMStudioManagedModelProvider(storageDirectory: root, transport: freshTransport)
+        for _ in 0..<2 {
+            do { _ = try await reopened.createRoot(request); XCTFail("A live intent must still fence duplicate inference") }
+            catch let error as LMStudioProviderError {
+                XCTAssertEqual(error, .conflict)
+                XCTAssertEqual(error.managedProviderFailureCode, "lmstudio_conflict")
+                XCTAssertEqual(error.managedProviderFailureDisposition, .waitingProvider)
+                XCTAssertEqual(error.localizedDescription, "LM Studio reported a request conflict")
+            }
+        }
+        let data = try Data(contentsOf: ledgerURL)
+        let after = try JSONSupport.object(from: data)
+        let records = try XCTUnwrap(after["records"] as? [[String: Any]])
+        XCTAssertEqual(records.count, 1)
+        let current = try XCTUnwrap(records.first)
+        XCTAssertEqual(current["updated_at"] as? String, beforeRecord["updated_at"] as? String)
+        XCTAssertEqual(current["status"] as? String, "intent")
+        XCTAssertEqual(current["request_fingerprint_sha256"] as? String, beforeRecord["request_fingerprint_sha256"] as? String)
+        let observation = try XCTUnwrap(current["local_intent_conflict"] as? [String: Any])
+        XCTAssertEqual(observation["origin"] as? String, "local_unexpired_intent")
+        XCTAssertEqual(observation["error_code"] as? String, "lmstudio_conflict")
+        XCTAssertEqual(observation["request_id"] as? String, request.operationID.uuidString.lowercased())
+        let recordedAt = try XCTUnwrap(ISO8601.date(from: try XCTUnwrap(observation["observed_at"] as? String)))
+        let expires = try XCTUnwrap(ISO8601.date(from: try XCTUnwrap(observation["lease_expires_at"] as? String)))
+        let claimedAt = try XCTUnwrap(ISO8601.date(from: try XCTUnwrap(beforeRecord["updated_at"] as? String)))
+        XCTAssertEqual(expires.timeIntervalSince(claimedAt), 660)
+        XCTAssertGreaterThan(expires, recordedAt)
+        XCTAssertLessThanOrEqual(try JSONSerialization.data(withJSONObject: observation).count, 2_048)
+        let snapshot = await freshTransport.snapshot()
+        XCTAssertNil(snapshot.rootRequest)
+        // The original transport has a receipt; reconciliation must retain the observation
+        // without changing the accepted-turn or typed terminal contract.
+        let recovered = try await original.lookup(idempotencyKey: request.idempotencyKey)
+        XCTAssertNotNil(recovered)
+        let accepted = try LMStudioManagedModelProvider(storageDirectory: root, transport: ScriptedProviderBridgeTransport())
+        let replay = try await accepted.lookup(idempotencyKey: request.idempotencyKey)
+        XCTAssertEqual(replay, recovered)
+        let acceptedObject = try JSONSupport.object(from: Data(contentsOf: ledgerURL))
+        let acceptedRecord = try XCTUnwrap((acceptedObject["records"] as? [[String: Any]])?.first)
+        XCTAssertEqual(acceptedRecord["status"] as? String, "accepted")
+        XCTAssertEqual(acceptedRecord["local_intent_conflict"] as? NSDictionary, observation as NSDictionary)
     }
 
     func testDurableProviderReceiptLedgerCompactsToBoundedRecordCount() async throws {

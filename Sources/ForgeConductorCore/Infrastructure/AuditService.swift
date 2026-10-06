@@ -153,7 +153,7 @@ public final class AuditService: @unchecked Sendable {
                 return
             }
             defer { mirrorLock.unlock() }
-            try paths.ensureLayout()
+            try paths.ensureStorageLayout()
             var lineObj: [String: Any] = [
                 "timestamp": ISO8601.string(from: event.timestamp),
                 "tool": request.tool,

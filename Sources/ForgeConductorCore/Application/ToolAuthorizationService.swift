@@ -448,6 +448,9 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     preservesFinalComponent: false
                 ),
             ]
+        case "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator":
+            // The typed Xcode boundary resolves its operands relative to cwd.
+            return [access("cwd")].compactMap { $0 }
         default:
             return []
         }
@@ -655,10 +658,12 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
     private static let cwdTools: Set<String> = [
         "git_status", "git_diff", "git_log", "git_add", "git_commit", "shell_exec",
         "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+        "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
     ]
 
-    private static let runtimeExecutionTools: Set<String> = [
+    static let runtimeExecutionTools: Set<String> = [
         "shell_exec", "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+        "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
     ]
 
 }

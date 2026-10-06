@@ -130,6 +130,17 @@ final class RuneForgeAppTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
+    func testZeroViolationsRetainsExplicitEvaluationCoverageAndUnknownFallback() async {
+        let coverage = "Automatic detection covers 1 of 15 indexed Raven rules; other rules are guidance."
+        let viewModel = RuneForgeViewModel(client: SnapshotRuneForgeClient(
+            snapshot: policySnapshot(events: [], limitations: [coverage])))
+        XCTAssertEqual(viewModel.evaluationCoverageDescription,
+                       "Automatic policy evaluation coverage is unavailable.")
+        await viewModel.refreshNow()
+        XCTAssertTrue(viewModel.violations.isEmpty)
+        XCTAssertEqual(viewModel.evaluationCoverageDescription, coverage)
+    }
+
     func testProjectLogIDsIncludeRegisteredAndObservedProjectsExactlyOnce() {
         let observed = policyEvent(sequence: 1, projectID: "project-observed")
         XCTAssertEqual(
@@ -153,7 +164,108 @@ final class RuneForgeAppTests: XCTestCase {
         XCTAssertEqual(RuneForgeViewModel.eventStateTitle(.disputed), "Interpretation observation")
     }
 
-    private func policySnapshot(events: [PolicyViolationEvent]) -> StjornarvaldManagerSnapshot {
+    func testNewerPolicyReorderSurvivesOlderLateSuccess() async throws {
+        try await assertNewerPolicyReorderSurvivesOlderCompletion(.success)
+    }
+
+    func testNewerPolicyReorderSurvivesOlderLateCancellation() async throws {
+        try await assertNewerPolicyReorderSurvivesOlderCompletion(.cancelled)
+    }
+
+    func testNewerPolicyReorderSurvivesOlderLateFailure() async throws {
+        try await assertNewerPolicyReorderSurvivesOlderCompletion(.failure)
+    }
+
+    func testCurrentPolicyReorderCancellationRestoresPriorOrder() async throws {
+        try await assertCurrentPolicyReorderRestoresPriorOrder(.cancelled)
+    }
+
+    func testCurrentPolicyReorderFailureRestoresPriorOrderAndError() async throws {
+        try await assertCurrentPolicyReorderRestoresPriorOrder(.failure)
+    }
+
+    private func assertCurrentPolicyReorderRestoresPriorOrder(
+        _ completion: ControlledRuneReorderClient.Completion
+    ) async throws {
+        let sources = ["A", "B", "C"].map {
+            DevelopmentPolicySource(displayName: $0, selectedPath: "/tmp/rune-current-reorder-\($0)")
+        }
+        let client = ControlledRuneReorderClient(
+            snapshot: policySnapshot(events: [], sources: sources)
+        )
+        let model = RuneForgeViewModel(client: client)
+        defer {
+            model.stop()
+            client.cancelPendingRequests()
+        }
+        await model.refreshNow()
+        model.movePolicySource(sources[0].id.description, to: sources[2].id.description)
+        try await waitUntil { client.requestCount == 1 }
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), [sources[1].id, sources[2].id, sources[0].id])
+        client.complete(request: 0, with: completion)
+        try await waitUntil { client.returnedRequests == [0] }
+        await Task.yield()
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), sources.map(\.id))
+        XCTAssertEqual(client.pendingRequestCount, 0)
+        XCTAssertNil(model.noticeMessage)
+        switch completion {
+        case .failure: XCTAssertNotNil(model.errorMessage)
+        case .cancelled: XCTAssertNil(model.errorMessage)
+        case .success: XCTFail("This rollback control requires cancellation or failure")
+        }
+    }
+
+    private func assertNewerPolicyReorderSurvivesOlderCompletion(
+        _ completion: ControlledRuneReorderClient.Completion
+    ) async throws {
+        let sources = ["A", "B", "C"].map {
+            DevelopmentPolicySource(displayName: $0, selectedPath: "/tmp/rune-reorder-\($0)")
+        }
+        let client = ControlledRuneReorderClient(
+            snapshot: policySnapshot(events: [], sources: sources)
+        )
+        let model = RuneForgeViewModel(client: client)
+        defer {
+            model.stop()
+            client.cancelPendingRequests()
+        }
+        await model.refreshNow()
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), sources.map(\.id))
+
+        model.movePolicySource(sources[0].id.description, to: sources[2].id.description)
+        try await waitUntil { client.requestCount == 1 }
+        let olderOrder = [sources[1].id, sources[2].id, sources[0].id]
+        XCTAssertEqual(client.requestedOrders.first, olderOrder)
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), olderOrder)
+
+        model.movePolicySource(sources[1].id.description, to: sources[0].id.description)
+        try await waitUntil { client.requestCount == 2 }
+        let newerOrder = [sources[2].id, sources[0].id, sources[1].id]
+        XCTAssertEqual(client.requestedOrders.last, newerOrder)
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), newerOrder)
+
+        client.complete(request: 1, with: .success)
+        try await waitUntil { client.returnedRequests == [1] }
+        await Task.yield()
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), newerOrder)
+        XCTAssertEqual(model.noticeMessage, "Development Policy priority updated.")
+        XCTAssertNil(model.errorMessage)
+
+        // The protocol client deliberately finishes an already-cancelled request
+        // after the newer response. Its same-main-actor return is the completion
+        // witness; no network delay or unbounded sleep establishes this order.
+        client.complete(request: 0, with: completion)
+        try await waitUntil { client.returnedRequests == [1, 0] }
+        await Task.yield()
+        XCTAssertEqual(client.cancelledAtReturn[0], true)
+        XCTAssertEqual(client.requestCount, 2)
+        XCTAssertEqual(client.pendingRequestCount, 0)
+        XCTAssertEqual(model.sources.compactMap(\.sourceID), newerOrder)
+        XCTAssertEqual(model.noticeMessage, "Development Policy priority updated.")
+        XCTAssertNil(model.errorMessage)
+    }
+
+    private func policySnapshot(events: [PolicyViolationEvent], limitations: [String] = [], sources: [DevelopmentPolicySource] = []) -> StjornarvaldManagerSnapshot {
         let sourceID = PolicySourceID()
         return StjornarvaldManagerSnapshot(
             schemaVersion: StjornarvaldManagerSnapshot.schemaVersion,
@@ -177,10 +289,10 @@ final class RuneForgeAppTests: XCTestCase {
                 revision: "fixture-revision",
                 sourceID: sourceID
             ),
-            sources: [],
+            sources: sources,
             violationEvents: events,
             nextEventCursor: nil,
-            limitations: []
+            limitations: limitations
         )
     }
 
@@ -363,4 +475,74 @@ private struct ConfirmingRuneForgeClient: RuneForgeManagerClientProtocol {
         filters: StjornarvaldExportFilters,
         requestID: UUID
     ) async throws -> StjornarvaldExportReceipt { throw URLError(.cannotConnectToHost) }
+}
+
+@MainActor
+private final class ControlledRuneReorderClient: RuneForgeManagerClientProtocol {
+    enum Completion { case success, cancelled, failure }
+    private let snapshot: StjornarvaldManagerSnapshot
+    private var continuations: [Int: CheckedContinuation<[DevelopmentPolicySource], Error>] = [:]
+    private(set) var requestedOrders: [[PolicySourceID]] = []
+    private(set) var returnedRequests: [Int] = []
+    private(set) var cancelledAtReturn: [Int: Bool] = [:]
+    var requestCount: Int { requestedOrders.count }
+    var pendingRequestCount: Int { continuations.count }
+
+    init(snapshot: StjornarvaldManagerSnapshot) { self.snapshot = snapshot }
+
+    func reorderRuneForgeSources(sourceIDs: [PolicySourceID]) async throws -> [DevelopmentPolicySource] {
+        guard requestedOrders.count < 2 else { throw URLError(.badServerResponse) }
+        let request = requestedOrders.count
+        requestedOrders.append(sourceIDs)
+        defer {
+            cancelledAtReturn[request] = Task.isCancelled
+            returnedRequests.append(request)
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            continuations[request] = continuation
+        }
+    }
+
+    func complete(request: Int, with completion: Completion) {
+        guard let continuation = continuations.removeValue(forKey: request) else {
+            XCTFail("Missing pending reorder request \(request)")
+            return
+        }
+        switch completion {
+        case .success:
+            let byID = Dictionary(uniqueKeysWithValues: snapshot.sources.map { ($0.id, $0) })
+            continuation.resume(returning: requestedOrders[request].compactMap { byID[$0] })
+        case .cancelled: continuation.resume(throwing: CancellationError())
+        case .failure: continuation.resume(throwing: URLError(.cannotConnectToHost))
+        }
+    }
+
+    func cancelPendingRequests() {
+        let pending = continuations.values
+        continuations.removeAll()
+        for continuation in pending { continuation.resume(throwing: CancellationError()) }
+    }
+
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot { snapshot }
+    func addRuneForgeSource(path: String, requestID: UUID) async throws -> DevelopmentPolicySource {
+        throw URLError(.unsupportedURL)
+    }
+    func refreshRuneForgeSource(sourceID: PolicySourceID, requestID: UUID) async throws -> DevelopmentPolicySource {
+        throw URLError(.unsupportedURL)
+    }
+    func removeRuneForgeSource(sourceID: PolicySourceID, requestID: UUID) async throws -> DevelopmentPolicySource {
+        throw URLError(.unsupportedURL)
+    }
+    func runeForgeViolations(cursor: Int64, limit: Int,
+                             state: PolicyViolationProjectionState?) async throws -> StjornarvaldViolationPage {
+        StjornarvaldViolationPage(violations: [], nextCursor: nil, controlsExecution: false)
+    }
+    func scheduleRuneForgeScan(requestID: UUID, reason: String) async throws -> StjornarvaldScanReceipt {
+        throw URLError(.unsupportedURL)
+    }
+    func requestRuneForgeExport(format: StjornarvaldExportFormat, destination: String,
+                               filters: StjornarvaldExportFilters,
+                               requestID: UUID) async throws -> StjornarvaldExportReceipt {
+        throw URLError(.unsupportedURL)
+    }
 }

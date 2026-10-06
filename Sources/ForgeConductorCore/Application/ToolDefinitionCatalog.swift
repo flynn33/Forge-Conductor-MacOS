@@ -275,7 +275,7 @@ public enum ManagerToolCategory: String, Codable, Sendable, Equatable, CaseItera
         if toolID.hasPrefix("fs_") { return .files }
         if toolID.hasPrefix("search_") { return .search }
         if toolID.hasPrefix("git_") { return .sourceControl }
-        if toolID == "shell_exec" { return .commands }
+        if toolID == "shell_exec" || toolID.hasPrefix("xcode.") { return .commands }
         if toolID.hasPrefix("project_memory.") || toolID.hasPrefix("memory_") {
             return .projectMemory
         }
@@ -639,6 +639,7 @@ private enum ProductionToolDefinitionSource {
             ?? ProjectMemoryToolPack.description(for: name)
             ?? ContinuityLifecycleToolPack.description(for: name)
             ?? RuntimeJobToolPack.description(for: name)
+            ?? XcodeCLIToolPack.description(for: name)
             ?? baseDescriptions[name]
     }
 
@@ -647,6 +648,7 @@ private enum ProductionToolDefinitionSource {
             ?? ProjectMemoryToolPack.schema(for: name)
             ?? ContinuityLifecycleToolPack.schema(for: name)
             ?? RuntimeJobToolPack.schema(for: name)
+            ?? XcodeCLIToolPack.schema(for: name)
             ?? baseSchema(for: name)
     }
 
@@ -837,6 +839,21 @@ private enum ProductionToolDefinitionSource {
                 "type": "object",
                 "properties": ["path": ["type": "string"] as [String: Any]] as [String: Any],
                 "required": name == "fs_list" ? [] as [String] : ["path"],
+            ]
+        case "fs_glob":
+            return [
+                "type": "object",
+                "properties": [
+                    "pattern": [
+                        "type": "string",
+                        "description": "Filename pattern for native find -name; defaults to *.",
+                    ] as [String: Any],
+                    "path": [
+                        "type": "string",
+                        "description": "Search root; defaults to the current project working directory.",
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
             ]
         case "fs_delete_recovery":
             return [

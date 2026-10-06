@@ -772,6 +772,46 @@ public actor ProjectControlPlaneRepository {
         }
     }
 
+    /// Bounded provenance lookup, including inactive registrations. A returned
+    /// record identifies a path's owner; it does not authorize project work.
+    func knownProjects(
+        containingCanonicalPaths paths: [String],
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: ProjectControlRecord] {
+        guard paths.count <= 100,
+              paths.allSatisfy({ $0.hasPrefix("/") && !$0.contains("\0") && $0.utf8.count <= 4_096 }) else {
+            throw ProjectContextError.invalidIdentifier("project provenance paths")
+        }
+        try Task.checkCancellation()
+        try cancellation?.checkCancellation()
+        return try controlledOperation(cancellation: cancellation) { connection in
+            var projects: [String: ProjectControlRecord] = [:]
+            for path in Set(paths).sorted() {
+                try Task.checkCancellation()
+                try cancellation?.checkCancellation()
+                if let project = try connection.first(
+                    """
+                    SELECT project_id,display_name,canonical_root,generation,lifecycle_state,
+                           repository_fingerprint,bookmark_reference,created_at,updated_at
+                    FROM control_projects
+                    WHERE canonical_root=?
+                       OR (canonical_root='/' AND substr(?,1,1)='/')
+                       OR substr(?,1,length(canonical_root)+1)=canonical_root || '/'
+                    ORDER BY length(canonical_root) DESC,
+                             CASE lifecycle_state WHEN 'active' THEN 0 WHEN 'archived' THEN 2 ELSE 1 END,
+                             updated_at DESC,project_id DESC
+                    LIMIT 1
+                    """,
+                    bindings: [.text(path), .text(path), .text(path)],
+                    map: Self.decodeProject
+                ) {
+                    projects[path] = project
+                }
+            }
+            return projects
+        }
+    }
+
     func project(
         repositoryFingerprint: String,
         cancellation: ToolCallCancellation? = nil
@@ -1216,19 +1256,26 @@ public actor ProjectControlPlaneRepository {
     }
 
     /// Newest-first project rows for the read-only native operator surface.
-    public func operatorProjects(limit: Int) throws -> [ProjectControlRecord] {
+    public func operatorProjects(
+        limit: Int,
+        lifecycleState: ProjectLifecycleState? = nil
+    ) throws -> [ProjectControlRecord] {
         guard (1...100).contains(limit) else {
             throw AutonomyError.invalidRequest("operator project limit must be between 1 and 100")
         }
+        var bindings: [ControlPlaneSQLiteBinding] = []
+        if let lifecycleState { bindings.append(.text(lifecycleState.rawValue)) }
+        bindings.append(.int64(Int64(limit)))
         return try requiredConnection().all(
             """
             SELECT project_id,display_name,canonical_root,generation,lifecycle_state,
                    repository_fingerprint,bookmark_reference,created_at,updated_at
             FROM control_projects
             WHERE lifecycle_state!='archived'
+            \(lifecycleState == nil ? "" : "AND lifecycle_state=?")
             ORDER BY updated_at DESC,project_id DESC LIMIT ?
             """,
-            bindings: [.int64(Int64(limit))],
+            bindings: bindings,
             map: Self.decodeProject
         )
     }
@@ -1352,7 +1399,8 @@ public actor ProjectControlPlaneRepository {
     /// every other project out of the operator snapshot.
     public func operatorBindings(
         projectIDs: [ProjectID],
-        limitPerProject: Int = 16
+        limitPerProject: Int = 16,
+        ownerKind: ProjectBindingOwnerKind? = nil
     ) throws -> [ProjectID: [ProjectContextBinding]] {
         guard projectIDs.count <= 100, (1...32).contains(limitPerProject) else {
             throw AutonomyError.invalidRequest("operator binding query is outside bounds")
@@ -1361,15 +1409,19 @@ public actor ProjectControlPlaneRepository {
         var result: [ProjectID: [ProjectContextBinding]] = [:]
         result.reserveCapacity(projectIDs.count)
         for projectID in projectIDs {
+            var queryBindings: [ControlPlaneSQLiteBinding] = [.text(projectID.description)]
+            if let ownerKind { queryBindings.append(.text(ownerKind.rawValue)) }
+            queryBindings.append(.int64(Int64(limitPerProject)))
             result[projectID] = try connection.all(
                 """
                 SELECT binding_id,owner_kind,owner_id,project_id,project_generation,run_id,
                        authorization_scope_json,lease_owner,lease_expires_at,active,created_at,updated_at
                 FROM project_bindings
                 WHERE project_id=? AND active=1
+                \(ownerKind == nil ? "" : "AND owner_kind=?")
                 ORDER BY updated_at DESC,binding_id DESC LIMIT ?
                 """,
-                bindings: [.text(projectID.description), .int64(Int64(limitPerProject))],
+                bindings: queryBindings,
                 map: Self.decodeBinding
             )
         }
@@ -9148,17 +9200,22 @@ public actor ProjectControlPlaneRepository {
                     connection: connection
                 )
             }
+            var eventMetadata = [
+                "from_state": transition.expectedState.rawValue,
+                "to_state": transition.nextState.rawValue,
+                "revision": String(transition.expectedRevision + 1),
+            ]
+            if let errorCode = transition.errorCode { eventMetadata["error_code"] = errorCode }
+            if let errorSummary = transition.errorSummary {
+                eventMetadata["error_summary"] = DiagnosticRedaction.sanitizedError(errorSummary)
+            }
             try appendAutonomyEventUnlocked(
                 runID: runID,
                 projectID: current.projectID,
                 eventType: transition.eventType,
                 severity: transition.errorCode == nil ? .info : .warning,
                 summary: transition.eventSummary,
-                metadata: [
-                    "from_state": transition.expectedState.rawValue,
-                    "to_state": transition.nextState.rawValue,
-                    "revision": String(transition.expectedRevision + 1),
-                ],
+                metadata: eventMetadata,
                 connection: connection
             )
             guard let updated = try autonomousRunUnlocked(runID, connection: connection) else {
@@ -9336,6 +9393,35 @@ public actor ProjectControlPlaneRepository {
                 throw ProjectContextError.integrityFailure("completed run could not be read back")
             }
             return completed
+        }
+    }
+
+    /// Failure observation only: an expired execution lease cannot authorize work,
+    /// but it must not prevent the supervisor from retaining its first failed activation.
+    func recordFirstAutonomousActivationFailure(
+        runID: RunID, errorCode: String, errorType: String, errorSummary: String
+    ) throws {
+        let connection = try requiredConnection()
+        try connection.transaction(fullDurability: true) {
+            guard let run = try autonomousRunUnlocked(runID, connection: connection) else {
+                throw AutonomyError.runNotFound(runID)
+            }
+            let recorded = try connection.scalarInt("""
+                SELECT EXISTS(SELECT 1 FROM autonomy_events INDEXED BY idx_events_run_sequence
+                    WHERE run_id=? AND event_type='autonomous_activation_first_failure')
+                """, bindings: [.text(runID.description)])
+            guard recorded == 0 else { return }
+            try appendAutonomyEventUnlocked(
+                runID: runID, projectID: run.projectID,
+                eventType: "autonomous_activation_first_failure", severity: .warning,
+                summary: "The first failed activation was retained before recovery",
+                metadata: [
+                    "error_code": Self.utf8Prefix(errorCode, maximumBytes: 256),
+                    "error_type": Self.utf8Prefix(errorType, maximumBytes: 256),
+                    "error_summary": DiagnosticRedaction.sanitizedError(errorSummary),
+                    "project_generation": String(run.projectGeneration.rawValue),
+                ], connection: connection
+            )
         }
     }
 
@@ -10100,8 +10186,9 @@ public actor ProjectControlPlaneRepository {
     /// one FULL transaction. An existing submission is always lookup-only.
     func beginSourceDerivedProviderTurn(intent: ProviderTurnIntent, preflight: ProviderRequestPreflight,
         capabilities: ProviderCapabilities, lease: RunLease, bootstrapGrant: ContinuityBootstrapGrant? = nil,
-        cancellation: ToolCallCancellation? = nil) throws -> SourceDerivedProviderTurnAdmission {
+        actualInput: Data? = nil, cancellation: ToolCallCancellation? = nil) throws -> SourceDerivedProviderTurnAdmission {
         try Self.validate(intent)
+        let prefixSHA256 = try Self.sourceToolOutputPrefixSHA256(actualInput: actualInput, intent: intent)
         return try controlledTransaction(cancellation: cancellation, fullDurability: true, beforeCommitValidation: {
             _ = try self.sourceDerivedTurnAuthorityUnlocked(turnID: intent.turnID, lease: lease,
                 bootstrapGrant: bootstrapGrant, connection: self.requiredConnection())
@@ -10112,7 +10199,8 @@ public actor ProjectControlPlaneRepository {
             try validateSourceDerivedPreflightUnlocked(preflight, capabilities: capabilities, intent: intent,
                 carryover: carryover, connection: connection)
             if let retained = try sourceDerivedPreflightUnlocked(current, connection: connection) {
-                guard retained.intent == intent, retained.preflight == preflight, retained.capabilities == capabilities else {
+                guard retained.intent == intent, retained.preflight == preflight, retained.capabilities == capabilities,
+                      actualInput == nil || retained.toolOutputsPrefixSHA256 == prefixSHA256 else {
                     throw AutonomyError.intentConflict
                 }
                 guard current.state != .intent else { throw NativeSourceConversationError.integrityFailure }
@@ -10126,7 +10214,7 @@ public actor ProjectControlPlaneRepository {
             let timestamp = ISO8601.string(from: clock.now())
             let stored = SourceDerivedProviderTurnStoredPreflight(version: 1, intent: current.intent,
                 preflight: .init(preflight), capabilities: capabilities, submissionID: UUID(),
-                leaseOwner: lease.ownerID, leaseEpoch: lease.epoch, recordedAt: timestamp)
+                leaseOwner: lease.ownerID, leaseEpoch: lease.epoch, recordedAt: timestamp, toolOutputsPrefixSHA256: prefixSHA256)
             let bytes = try NativeSourceJournalCoding.encode(stored, maximum: SourceDerivedProviderTurnStoredPreflight.maximumBytes)
             let sha = JSONSupport.sha256Hex(bytes)
             _ = try stored.validatedReceipt(sha256: sha)
@@ -10141,6 +10229,36 @@ public actor ProjectControlPlaneRepository {
                 bootstrapGrant: bootstrapGrant, connection: connection)
             return .dispatch
         }
+    }
+
+    private static func sourceToolOutputPrefixSHA256(actualInput: Data?, intent: ProviderTurnIntent) throws -> String? {
+        guard let actualInput else { return nil }
+        guard !actualInput.isEmpty, actualInput.count <= ManagedModelProviderContract.maximumContinuationInputBytes,
+              JSONSupport.sha256Hex(actualInput) == intent.inputSHA256 else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        guard intent.kind == .toolContinuation else { return nil }
+        guard let values = try JSONSerialization.jsonObject(with: actualInput) as? [[String: Any]],
+              values.count <= ManagedModelProviderContract.maximumMessageCount,
+              try ForgeJSONCanonicalizationV1.data(from: values) == actualInput else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        guard values.count >= 2, let notice = values.last, notice["type"] as? String == "message" else { return nil }
+        guard Set(notice.keys) == Set(["type", "role", "content"]), notice["role"] as? String == "user",
+              let text = notice["content"] as? String, text.hasPrefix("STJORNARVALD POLICY CONTEXT\n"),
+              text.utf8.count <= StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes else {
+            throw NativeSourceConversationError.integrityFailure
+        }
+        var callIDs = Set<String>()
+        for output in values.dropLast() {
+            guard Set(output.keys) == Set(["type", "call_id", "output"]),
+                  output["type"] as? String == "function_call_output",
+                  let callID = output["call_id"] as? String, !callID.isEmpty, callID.utf8.count <= 512,
+                  callIDs.insert(callID).inserted, output["output"] is String else {
+                throw NativeSourceConversationError.integrityFailure
+            }
+        }
+        return JSONSupport.sha256Hex(try ForgeJSONCanonicalizationV1.data(from: Array(values.dropLast())))
     }
 
     /// Restores the original observation before a recovery caller considers a
@@ -10677,6 +10795,78 @@ public actor ProjectControlPlaneRepository {
             bindings: [.text(runID.description), .int64(Int64(limit))],
             map: Self.decodeToolInvocation
         )
+    }
+
+    /// Reuses the broker's unique provider-call journal through the current
+    /// committed result. Returned errors count; interrupted effects do not.
+    func completedEligibleToolInvocationCount(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        limit: Int,
+        throughProviderCallID: String,
+        toolName: String
+    ) throws -> (count: Int, isRetainedTail: Bool) {
+        guard AppConfig.SessionsConfig.continuityRolloverToolCallRange.contains(limit),
+              !throughProviderCallID.isEmpty, throughProviderCallID.utf8.count <= 1_024,
+              !toolName.isEmpty, toolName.utf8.count <= 256 else {
+            throw AutonomyError.invalidRequest("managed tool-count boundary or limit is invalid")
+        }
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        return try controlledOperation(cancellation: cancellation) { connection in
+            let owner = ProjectBindingOwner(kind: .providerSession, id: sessionID)
+            guard let binding = try bindingUnlocked(owner: owner, includeInactive: false, connection: connection),
+                  binding.runID == run.runID, binding.projectID == run.projectID,
+                  binding.projectGeneration == run.projectGeneration else {
+                throw ProjectContextError.projectContextRequired(owner)
+            }
+            _ = try requiredActiveProjectUnlocked(run.projectID, generation: run.projectGeneration,
+                                                 connection: connection)
+            try requireActiveProviderSessionUnlocked(owner: owner, binding: binding, connection: connection)
+            let identityBindings: [ControlPlaneSQLiteBinding] = [
+                .text(run.runID.description), .text(sessionID), .text(run.projectID.description),
+                .int64(try Self.sqliteGeneration(run.projectGeneration))
+            ]
+            guard let currentRowID = try connection.first(
+                """
+                SELECT rowid,tool_name,result_sha256,result_summary FROM tool_invocations
+                WHERE run_id=? AND session_id=? AND project_id=? AND project_generation=? AND provider_call_id=?
+                  AND state='completed' AND result_sha256 IS NOT NULL AND result_summary IS NOT NULL LIMIT 1
+                """, bindings: identityBindings + [.text(throughProviderCallID)], map: { row in
+                    guard row.int64(0) > 0,
+                          try row.strictText(1, maximumBytes: 256) == toolName,
+                          let sha = try row.strictText(2, maximumBytes: 64), sha.count == 64,
+                          let result = try row.strictText(3, maximumBytes: 65_536),
+                          JSONSupport.sha256Hex(result) == sha else {
+                        throw ProjectContextError.integrityFailure("invalid managed count result boundary")
+                    }
+                    return row.int64(0)
+                }) else {
+                throw AutonomyError.invalidRequest("managed count requires the exact committed tool result")
+            }
+            let laterResult = try connection.scalarInt(
+                """
+                SELECT EXISTS(SELECT 1 FROM tool_invocations
+                WHERE run_id=? AND session_id=? AND project_id=? AND project_generation=? AND rowid>?
+                  AND state='completed' AND result_sha256 IS NOT NULL AND result_summary IS NOT NULL LIMIT 1)
+                """, bindings: identityBindings + [.int64(currentRowID)]
+            )
+            let tools = ContinuityAutomation.progressTools.sorted()
+            let placeholders = Array(repeating: "?", count: tools.count).joined(separator: ",")
+            let bindings = identityBindings + [.int64(currentRowID)]
+                + tools.map { ControlPlaneSQLiteBinding.text($0) } + [.int64(Int64(limit))]
+            let count = try connection.scalarInt(
+                """
+                SELECT COUNT(*) FROM (
+                    SELECT 1 FROM tool_invocations
+                    WHERE run_id=? AND session_id=? AND project_id=? AND project_generation=? AND rowid<=?
+                      AND state='completed' AND result_sha256 IS NOT NULL AND result_summary IS NOT NULL
+                      AND tool_name IN (\(placeholders))
+                    LIMIT ?
+                )
+                """, bindings: bindings
+            )
+            return (count, laterResult == 0)
+        }
     }
 
     /// Bounded complete invocation history used only by manager-owned completion
@@ -11357,9 +11547,10 @@ public actor ProjectControlPlaneRepository {
         let inputSHA = JSONSupport.sha256Hex(try ForgeJSONCanonicalizationV1.data(from: outputs))
         let followingIDs = try connection.all("""
             SELECT turn_id FROM provider_turns WHERE run_id=? AND operation_id=? AND session_id=? AND request_kind='tool_continuation'
-              AND previous_response_id=? AND state='completed' AND input_sha256=? ORDER BY rowid LIMIT 2
+              AND previous_response_id=? AND state='completed'
+              AND (input_sha256=? OR json_extract(source_preflight_json,'$.toolOutputsPrefixSHA256')=?) ORDER BY rowid LIMIT 2
             """, bindings: [.text(activation.runID.description), .text(activation.operationID.uuidString.lowercased()),
-                .text(automatic.intent.sessionID), .text(responseID), .text(inputSHA)], map: { try $0.strictText(0, maximumBytes: 36) })
+                .text(automatic.intent.sessionID), .text(responseID), .text(inputSHA), .text(inputSHA)], map: { try $0.strictText(0, maximumBytes: 36) })
         guard !followingIDs.isEmpty else { return nil }
         guard followingIDs.count == 1, let id = followingIDs[0].flatMap(UUID.init(uuidString:)),
               let following = try providerTurnUnlocked(id, connection: connection),
@@ -11367,6 +11558,11 @@ public actor ProjectControlPlaneRepository {
               following.intent.projectGeneration == activation.authorization.projectGeneration,
               let followingResponseID = following.providerResponseID, !followingResponseID.isEmpty,
               following.providerRequestID?.isEmpty == false else { throw ContinuitySourceActivationError.proofRequired }
+        if following.intent.inputSHA256 != inputSHA {
+            guard let attested = try sourceDerivedPreflightUnlocked(following, connection: connection),
+                  attested.intent == Self.sourceDerivedIntent(following.intent),
+                  attested.toolOutputsPrefixSHA256 == inputSHA else { return nil }
+        }
         return try ContinuitySourceResumptionReceipt(activationReceipt: activation, providerResponseID: responseID,
             toolContinuationTurnID: id, toolContinuationProviderResponseID: followingResponseID, toolOutputsInputSHA256: inputSHA,
             toolInvocationID: successful.0.invocationID, toolName: successful.0.toolName,

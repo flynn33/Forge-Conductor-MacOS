@@ -21,6 +21,124 @@ final class LMStudioContractFixtureTests: XCTestCase {
         super.tearDown()
     }
 
+    func testOrdinaryRESTPreflightOutputFloorSurvivesNilPreflightConfiguration() async throws {
+        let directory = try terminalMetadataDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provider = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+        let capabilities = try await provider.probe()
+        let request = try ProviderRootRequest(operationID: UUID(), idempotencyKey: "ordinary-output-floor",
+            modelKey: "fixture/tool-model", input: "bounded ordinary request", tools: [])
+        let preflight = try await provider.preflightRoot(request)
+        XCTAssertEqual(capabilities.contextLength, 32_768)
+        XCTAssertEqual(capabilities.maximumContextLength, 131_072)
+        XCTAssertEqual(preflight.limits.maximumOutputTokens, 4_096)
+        let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+        let before = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, providerPreflight: preflight)
+        let observation = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, providerPreflight: nil)
+        XCTAssertEqual(before.capacity.capacity, 32_768)
+        XCTAssertEqual(observation.capacity, before.capacity)
+        XCTAssertEqual(before.reserves.outputTokens, 4_096)
+        XCTAssertEqual(observation.reserves.outputTokens, 4_096,
+            "The immutable REST request output bound remains reserved at ordinary observation hooks")
+        XCTAssertEqual(observation.reserves, before.reserves)
+    }
+
+    func testOrdinaryRESTOutputFloorSurvivesCachedObservationAndEvaluatorRestart() async throws {
+        let root = try terminalMetadataDirectory()
+        let repository = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control-plane.sqlite3"))
+        do {
+            let provider = try LMStudioManagedModelProvider(storageDirectory: root.appendingPathComponent("provider"),
+                transport: makeTransport())
+            let capabilities = try await provider.probe()
+            let request = try ProviderRootRequest(operationID: UUID(), idempotencyKey: "ordinary-cached-output-floor",
+                modelKey: "fixture/tool-model", input: "fixture-terminal-text", tools: [])
+            let preflight = try await provider.preflightRoot(request)
+            let turn = try await provider.createRoot(request)
+            XCTAssertEqual(capabilities.contextLength, 32_768)
+            XCTAssertEqual(preflight.limits.maximumOutputTokens, 4_096)
+            let projectID = ProjectID()
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            _ = try await repository.registerProjectUnchecked(projectID: projectID, displayName: "Ordinary Output Floor",
+                canonicalRoot: projectRoot)
+            let run = try await repository.createAutonomousRun(AutonomousRunRequest(projectID: projectID,
+                projectGeneration: .initial, mission: "Preserve the immutable ordinary REST output floor",
+                providerID: capabilities.providerID, modelKey: capabilities.modelKey,
+                specification: AutonomousRunSpecification(allowedTools: ["fixture.read"], completionGates: ["tests"]),
+                authorizationScope: ToolAuthorizationScope(canonicalRoots: [projectRoot], allowedTools: ["fixture.read"],
+                    networkAllowed: false, maximumInlineOutputBytes: 64 * 1_024)))
+            let lease = try await repository.acquireRunLease(runID: run.runID, ownerID: "ordinary-floor-manager")
+            let sessionID = "ordinary-floor-session-" + UUID().uuidString.lowercased()
+            try await repository.reserveProviderSession(ProviderSessionIntent(sessionID: sessionID, runID: run.runID,
+                projectID: projectID, projectGeneration: .initial, providerID: capabilities.providerID,
+                adapterID: "lmstudio-rest", modelKey: capabilities.modelKey, providerResponseID: turn.responseID,
+                idempotencyKey: request.idempotencyKey, contextCapacity: capabilities.contextLength), lease: lease)
+            _ = try await repository.releaseRunLease(lease)
+            let identity = ContextBudgetIdentity(runID: run.runID, projectID: projectID,
+                projectGeneration: .initial, sessionID: sessionID)
+            let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+            let evaluator = PersistedManagedRunBudgetEvaluator(repository: repository, policyResolver: { _ in selection })
+            let accounting = ManagedBudgetInputAccounting(inputBytes: request.input.utf8.count, toolSchemaBytes: 0,
+                toolSchemaSHA256: String(repeating: "a", count: 64), pendingInputID: String(repeating: "b", count: 64),
+                inputAlreadyRetained: false, providerPreflight: preflight)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: sessionID,
+                capabilities: capabilities, accounting: accounting)
+            let beforeValue = try await repository.contextBudgetState(identity: identity)
+            let before = try XCTUnwrap(beforeValue)
+            XCTAssertEqual(before.configuration.capacity.capacity, 32_768)
+            XCTAssertEqual(before.configuration.reserves.outputTokens, 4_096)
+            _ = try await evaluator.observeProviderTurn(turn, run: run, sessionID: sessionID, capabilities: capabilities)
+            let observedValue = try await repository.contextBudgetState(identity: identity)
+            let observed = try XCTUnwrap(observedValue)
+            XCTAssertEqual(observed.configuration, before.configuration,
+                "The cached supervisor must retain its request reserve at a nil-preflight provider observation")
+            XCTAssertEqual(observed.latestObservation?.used, 4_223)
+            _ = try await evaluator.observeToolResult(serializedBytes: 120, providerResponseID: turn.responseID,
+                run: run, sessionID: sessionID, capabilities: capabilities)
+            let toolValue = try await repository.contextBudgetState(identity: identity)
+            let tool = try XCTUnwrap(toolValue)
+            XCTAssertEqual(tool.configuration, before.configuration)
+            XCTAssertEqual(tool.latestObservation?.used, 4_273)
+            let restarted = PersistedManagedRunBudgetEvaluator(repository: repository, policyResolver: { _ in selection })
+            _ = try await restarted.observeToolResult(serializedBytes: 120, providerResponseID: turn.responseID,
+                run: run, sessionID: sessionID, capabilities: capabilities)
+            let restoredValue = try await repository.contextBudgetState(identity: identity)
+            let restored = try XCTUnwrap(restoredValue)
+            XCTAssertEqual(restored.configuration, before.configuration,
+                "A fresh evaluator must restore the same reserve before an ordinary nil-preflight hook")
+            XCTAssertEqual(restored.latestObservation?.used, 4_323)
+            let observation = try XCTUnwrap(restored.latestObservation)
+            XCTAssertEqual(observation.reserves.outputTokens, 4_096)
+            XCTAssertEqual(observation.accounting?.admittedTotalTokens, observation.used + observation.fixedReserve)
+            let pending = try await repository.contextBudgetActionRequest(identity: identity)
+            XCTAssertNil(pending)
+        } catch {
+            await repository.close()
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
+        await repository.close()
+        try FileManager.default.removeItem(at: root)
+    }
+
+    func testConfigurableOutputLimitKeepsLegacyDefaultAndFiniteProductBounds() throws {
+        let configuration = LMStudioProviderConfiguration(baseURL: URL(string: "https://lmstudio.fixture")!, modelKey: "fixture/tool-model")
+        XCTAssertEqual(configuration.maximumOutputTokens, 4_096)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(configuration)) as? [String: Any])
+        object.removeValue(forKey: "maximum_output_tokens")
+        let legacy = try JSONDecoder().decode(LMStudioProviderConfiguration.self,
+            from: JSONSerialization.data(withJSONObject: object)).validated()
+        XCTAssertEqual(legacy.maximumOutputTokens, 4_096)
+        for valid in [1, 4_096, 8_192, 65_536] { XCTAssertNoThrow(try makeTransport(maximumOutputTokens: valid)) }
+        for invalid in [0, 65_537] { XCTAssertThrowsError(try makeTransport(maximumOutputTokens: invalid)) }
+        for invalid in [true, 1.5, "8192"] as [Any] {
+            object["maximum_output_tokens"] = invalid
+            XCTAssertThrowsError(try JSONDecoder().decode(LMStudioProviderConfiguration.self,
+                from: JSONSerialization.data(withJSONObject: object)))
+        }
+    }
+
     func testLoadedModelFixtureDeclaresToolCapabilityAndContext() async throws {
         let request = URLRequest(url: URL(string: "http://lmstudio.fixture/api/v1/models")!)
         let (data, response) = try await session.data(for: request)
@@ -185,6 +303,129 @@ final class LMStudioContractFixtureTests: XCTestCase {
         }
     }
 
+    func testFullOutputTokenSSEFixtureHasCoherentBoundedLifecycle() throws {
+        let data = try LMStudioContractFixtureServer.fullOutputTokenSSEFixture()
+        let stream = try XCTUnwrap(String(data: data, encoding: .utf8))
+        let fixtureEvents = try events(from: stream)
+        let dataLines = stream.split(separator: "\n").filter { $0.hasPrefix("data: ") }
+        let deltas = fixtureEvents.filter { $0["type"] as? String == "response.output_text.delta" }
+        let streamedText = deltas.compactMap { $0["delta"] as? String }.joined()
+        let maximumLineBytes = stream.split(separator: "\n").map { $0.utf8.count }.max() ?? 0
+        let maximumEventBytes = dataLines.map { $0.dropFirst(6).utf8.count }.max() ?? 0
+        if let path = ProcessInfo.processInfo.environment["FORGE_LMSTUDIO_SSE_FIXTURE_EVIDENCE"], !path.isEmpty {
+            let evidence: [String: Any] = ["body_bytes": data.count, "body_sha256": JSONSupport.sha256Hex(data),
+                "json_events": fixtureEvents.count, "data_events_including_done": dataLines.count,
+                "text_delta_events": deltas.count, "maximum_line_bytes": maximumLineBytes,
+                "maximum_event_bytes": maximumEventBytes, "text_bytes": streamedText.utf8.count]
+            try JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys])
+                .write(to: URL(fileURLWithPath: path), options: .withoutOverwriting)
+        }
+        XCTAssertEqual(deltas.count, 4_096)
+        XCTAssertEqual(fixtureEvents.count, 4_103)
+        XCTAssertEqual(dataLines.count, 4_104)
+        XCTAssertEqual(dataLines.last.map { String($0) }, "data: [DONE]")
+        XCTAssertTrue(fixtureEvents.enumerated().allSatisfy {
+            $0.element["sequence_number"] as? Int == $0.offset
+        })
+        let completed = try XCTUnwrap(fixtureEvents.last?["response"] as? [String: Any])
+        XCTAssertEqual(completed["status"] as? String, "completed")
+        let output = try XCTUnwrap((completed["output"] as? [[String: Any]])?.first)
+        let part = try XCTUnwrap((output["content"] as? [[String: Any]])?.first)
+        let text = try XCTUnwrap(part["text"] as? String)
+        XCTAssertEqual(streamedText, text)
+        XCTAssertEqual(text, String(repeating: "x", count: 4_096))
+        let usage = try XCTUnwrap(completed["usage"] as? [String: Any])
+        XCTAssertEqual(usage["input_tokens"] as? Int, 512)
+        XCTAssertEqual(usage["output_tokens"] as? Int, 4_096)
+        XCTAssertEqual(usage["total_tokens"] as? Int, 4_608)
+        XCTAssertLessThan(data.count, 2 * 1024 * 1024)
+        XCTAssertLessThanOrEqual(maximumLineBytes, 64 * 1024)
+        XCTAssertLessThanOrEqual(maximumEventBytes, 256 * 1024)
+        XCTAssertLessThanOrEqual(text.utf8.count, 512 * 1024)
+    }
+
+    func testRESTClientAcceptsFull4096TokenOutputWithLifecycleEvents() async throws {
+        let configuration = LMStudioProviderConfiguration(
+            baseURL: URL(string: "https://lmstudio.fixture")!, modelKey: "fixture/tool-model",
+            connectTimeoutSeconds: 1, firstByteTimeoutSeconds: 1,
+            idleTimeoutSeconds: 1, totalTimeoutSeconds: 2,
+            maximumJSONBytes: 1024 * 1024, maximumRequestBytes: 512 * 1024,
+            maximumSSELineBytes: 64 * 1024, maximumSSEEventBytes: 256 * 1024,
+            maximumResponseBytes: 2 * 1024 * 1024, maximumTextBytes: 512 * 1024,
+            maximumToolArgumentBytes: 256 * 1024, maximumOutputTokens: 4_096
+        )
+        let fixtureSession = URLSessionConfiguration.ephemeral
+        fixtureSession.protocolClasses = [LMStudioContractFixtureServer.self]
+        let client = try LMStudioRESTClient(configuration: configuration, sessionConfiguration: fixtureSession)
+        let turn = try await client.createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-full-output-token-sse", userInput: "bounded fixture output",
+            tools: [], idempotencyKey: "fixture-full-4096-output"
+        ))
+        XCTAssertEqual(turn.responseID, "resp_full_output_token_fixture")
+        XCTAssertNil(turn.previousResponseID)
+        XCTAssertEqual(turn.model, "fixture/tool-model")
+        XCTAssertEqual(turn.status, "completed")
+        XCTAssertEqual(turn.assistantText, String(repeating: "x", count: 4_096))
+        XCTAssertTrue(turn.functionCalls.isEmpty)
+        XCTAssertTrue(turn.usageWasReported)
+        XCTAssertEqual(turn.usage.inputTokens, 512)
+        XCTAssertEqual(turn.usage.outputTokens, 4_096)
+        XCTAssertEqual(turn.usage.totalTokens, 4_608)
+    }
+
+    func testRESTClientKeepsExact5120EventCapWithZeroOutputLifecycle() async throws {
+        for count in [5_120, 5_121] {
+            let data = try LMStudioContractFixtureServer.eventCountCapSSEFixture(dataEventCount: count)
+            let stream = try XCTUnwrap(String(data: data, encoding: .utf8))
+            let fixtureEvents = try events(from: stream)
+            let dataLines = stream.split(separator: "\n").filter { $0.hasPrefix("data: ") }
+            XCTAssertEqual(dataLines.count, count)
+            XCTAssertEqual(fixtureEvents.count, count - 1)
+            XCTAssertTrue(fixtureEvents.enumerated().allSatisfy {
+                $0.element["sequence_number"] as? Int == $0.offset
+            })
+            XCTAssertEqual(fixtureEvents.filter { $0["type"] as? String == "response.in_progress" }.count,
+                count - 3)
+            XCTAssertLessThan(data.count, 2 * 1024 * 1024)
+            XCTAssertLessThanOrEqual(stream.split(separator: "\n").map { $0.utf8.count }.max() ?? 0, 64 * 1024)
+            XCTAssertLessThanOrEqual(dataLines.map { $0.dropFirst(6).utf8.count }.max() ?? 0, 256 * 1024)
+        }
+        let configuration = LMStudioProviderConfiguration(
+            baseURL: URL(string: "https://lmstudio.fixture")!, modelKey: "fixture/tool-model",
+            connectTimeoutSeconds: 1, firstByteTimeoutSeconds: 1,
+            idleTimeoutSeconds: 1, totalTimeoutSeconds: 2,
+            maximumJSONBytes: 1024 * 1024, maximumRequestBytes: 512 * 1024,
+            maximumSSELineBytes: 64 * 1024, maximumSSEEventBytes: 256 * 1024,
+            maximumResponseBytes: 2 * 1024 * 1024, maximumTextBytes: 512 * 1024,
+            maximumToolArgumentBytes: 256 * 1024, maximumOutputTokens: 4_096
+        )
+        let fixtureSession = URLSessionConfiguration.ephemeral
+        fixtureSession.protocolClasses = [LMStudioContractFixtureServer.self]
+        let client = try LMStudioRESTClient(configuration: configuration, sessionConfiguration: fixtureSession)
+        let accepted = try await client.createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-event-count-cap-5120", userInput: "bounded fixture metadata",
+            tools: [], idempotencyKey: "fixture-exact-5120-events"
+        ))
+        XCTAssertEqual(accepted.responseID, "resp_event_count_cap_fixture")
+        XCTAssertNil(accepted.previousResponseID)
+        XCTAssertEqual(accepted.status, "completed")
+        XCTAssertEqual(accepted.assistantText, "")
+        XCTAssertTrue(accepted.functionCalls.isEmpty)
+        XCTAssertTrue(accepted.usageWasReported)
+        XCTAssertEqual(accepted.usage.inputTokens, 16)
+        XCTAssertEqual(accepted.usage.outputTokens, 0)
+        XCTAssertEqual(accepted.usage.totalTokens, 16)
+        do {
+            _ = try await client.createRoot(LMStudioRootRequest(
+                systemPrompt: "fixture-event-count-cap-5121", userInput: "bounded fixture metadata",
+                tools: [], idempotencyKey: "fixture-exceeded-5121-events"
+            ))
+            XCTFail("One event above the REST cap must be rejected despite unchanged byte and output limits")
+        } catch {
+            XCTAssertEqual(error as? LMStudioProviderError, .limitExceeded("SSE event count"))
+        }
+    }
+
     func testManagedTransportSendsConfiguredOutputTokenBound() async throws {
         let transport = try makeTransport(maximumOutputTokens: 321)
         let turn = try await transport.createRoot(LMStudioRootRequest(
@@ -280,6 +521,39 @@ final class LMStudioContractFixtureTests: XCTestCase {
         ))
     }
 
+    func testDecoderEnforcesExactPublishedEventCountCapWithinByteBounds() throws {
+        let event = Data("data: x\n\n".utf8)
+        var decoder = LMStudioSSEDecoder(maximumLineBytes: 64, maximumEventBytes: 64,
+            maximumTotalBytes: event.count * (LMStudioSSEDecoder.maximumEvents + 1))
+        for _ in 0..<LMStudioSSEDecoder.maximumEvents {
+            let frames = try decoder.feed(event)
+            XCTAssertEqual(frames.count, 1)
+            XCTAssertEqual(frames.first?.data, Data("x".utf8))
+        }
+        XCTAssertThrowsError(try decoder.feed(event)) { error in
+            XCTAssertEqual(error as? LMStudioProviderError, .limitExceeded("SSE event count"))
+        }
+    }
+
+    func testDecoderKeepsIndependentEventAndTotalByteBounds() throws {
+        var exactEvent = LMStudioSSEDecoder(maximumLineBytes: 8, maximumEventBytes: 3,
+            maximumTotalBytes: 64)
+        XCTAssertEqual(try exactEvent.feed(Data("data: x\ndata: x\n\n".utf8)).first?.data,
+            Data("x\nx".utf8))
+        var exceededEvent = LMStudioSSEDecoder(maximumLineBytes: 8, maximumEventBytes: 3,
+            maximumTotalBytes: 64)
+        XCTAssertThrowsError(try exceededEvent.feed(Data("data: xx\ndata: x\n\n".utf8))) { error in
+            XCTAssertEqual(error as? LMStudioProviderError, .limitExceeded("SSE event"))
+        }
+        let event = Data("data: x\n\n".utf8)
+        var total = LMStudioSSEDecoder(maximumLineBytes: 64, maximumEventBytes: 64,
+            maximumTotalBytes: event.count)
+        XCTAssertEqual(try total.feed(event).count, 1)
+        XCTAssertThrowsError(try total.feed(Data("\n".utf8))) { error in
+            XCTAssertEqual(error as? LMStudioProviderError, .limitExceeded("total streaming response"))
+        }
+    }
+
     func testV2CanonicalDigestMatchesCoreAcrossSlashContainingWireValues() throws {
         let object: [String: Any] = [
             "path": "/fixture/project",
@@ -344,6 +618,133 @@ final class LMStudioContractFixtureTests: XCTestCase {
             ),
             .responseTruncated
         )
+    }
+
+    func testStructuredProviderSignalsIgnoreConfigurationAndQuotedOutput() throws {
+        let unrelatedBodies = [
+            #"{"status":"incomplete","max_output_tokens":512,"incomplete_details":{"reason":"content_filter"}}"#,
+            #"{"status":"failed","max_output_tokens":512,"error":{"code":"invalid_request","message":"Request rejected"}}"#,
+            #"{"status":"failed","error":{"code":"invalid_request","message":"Request rejected"},"output":[{"type":"message","content":[{"type":"output_text","text":"This example discusses context overflow and truncated output."}]}]}"#,
+        ]
+        for body in unrelatedBodies {
+            XCTAssertNil(LMStudioProviderSignalClassifier.classify(body),
+                "Configuration and response content are not authoritative failure reasons")
+            XCTAssertNil(LMStudioProviderSignalClassifier.classify(Data(body.utf8)))
+        }
+        XCTAssertEqual(LMStudioProviderSignalClassifier.classify(
+            #"{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"message","content":[{"type":"output_text","text":"This example discusses context overflow."}]}]}"#
+        ), .responseTruncated, "An explicit incomplete reason owns classification")
+        XCTAssertEqual(LMStudioProviderSignalClassifier.classify(
+            #"{"status":"failed","max_output_tokens":512,"error":{"code":"context_length_exceeded","message":"Context exhausted"}}"#
+        ), .contextOverflow)
+
+        // These supported plaintext errors are intentionally not JSON response bodies.
+        for signal in ["context_length_exceeded", "context window exceeded",
+                       "context limit exceeded", "maximum context length",
+                       "context overflow", "too many tokens"] {
+            XCTAssertEqual(LMStudioProviderSignalClassifier.classify(signal), .contextOverflow)
+            XCTAssertEqual(LMStudioProviderSignalClassifier.classify(Data(signal.utf8)), .contextOverflow)
+        }
+        for signal in ["response_truncated", "response truncated", "truncation",
+                       "truncated", "max_output_tokens"] {
+            XCTAssertEqual(LMStudioProviderSignalClassifier.classify(signal), .responseTruncated)
+            XCTAssertEqual(LMStudioProviderSignalClassifier.classify(Data(signal.utf8)), .responseTruncated)
+        }
+    }
+
+    func testHTTPStatusAndRetryDelaySurviveUnrelatedConfigurationAndQuotedContent() throws {
+        let cases: [(Int, String, LMStudioProviderError)] = [
+            (401, "invalid_api_token", .unauthorized),
+            (403, "permission_denied", .forbidden),
+            (404, "model_not_found", .endpointNotFound),
+            (409, "response_conflict", .conflict),
+            (429, "rate_limit_exceeded", .rateLimited(retryNanoseconds: 2_000_000_000)),
+            (500, "server_error", .serverFailure(status: 500)),
+        ]
+        for (status, code, expected) in cases {
+            let metadataOnly = try JSONSerialization.data(withJSONObject: [
+                "error": ["code": code, "message": "Deterministic fixture error"],
+                "request": ["max_output_tokens": 512],
+            ] as [String: Any])
+            XCTAssertEqual(LMStudioHTTPErrorClassifier.classify(
+                status: status, retryAfter: "2", body: metadataOnly), expected)
+            let quotedContentOnly = try JSONSerialization.data(withJSONObject: [
+                "error": ["code": code, "message": "Deterministic fixture error"],
+                "output": [["type": "message", "content": [[
+                    "type": "output_text", "text": "Quoted context overflow or truncated output."
+                ]]]],
+            ] as [String: Any])
+            XCTAssertEqual(LMStudioHTTPErrorClassifier.classify(
+                status: status, retryAfter: "2", body: quotedContentOnly), expected)
+        }
+        // Existing supported 400 payload and legacy plaintext behavior stay available.
+        XCTAssertEqual(LMStudioHTTPErrorClassifier.classify(status: 400,
+            body: Data(#"{"error":{"message":"maximum context length exceeded"}}"#.utf8)), .contextOverflow)
+        XCTAssertEqual(LMStudioHTTPErrorClassifier.classify(status: 400,
+            body: Data("response truncated".utf8)), .responseTruncated)
+    }
+
+    func testManagedSSEClassificationUsesFailureReasonAndStillRejectsIncompleteTurns() async throws {
+        let transport = try makeTransport()
+        let cases: [(String, LMStudioProviderError)] = [
+            ("fixture-signal-incomplete-unknown", .malformedResponse(
+                "provider response ended without a completed result")),
+            ("fixture-signal-failed-unknown", .malformedResponse(
+                "provider response ended without a completed result")),
+            ("fixture-signal-completed-event-noncompleted", .malformedResponse(
+                "stream ended without a completed response")),
+            ("fixture-signal-truncation-reason", .responseTruncated),
+            ("fixture-signal-overflow-reason", .contextOverflow),
+        ]
+        for (marker, expected) in cases {
+            do {
+                _ = try await transport.createRoot(LMStudioRootRequest(
+                    systemPrompt: marker, userInput: "bounded fixture input", tools: [],
+                    idempotencyKey: marker
+                ))
+                XCTFail("An incomplete provider turn must never be accepted")
+            } catch {
+                XCTAssertEqual(error as? LMStudioProviderError, expected, marker)
+            }
+            let rejectedReceipt = await transport.receipt(forIdempotencyKey: marker)
+            XCTAssertNil(rejectedReceipt, "Classification must not admit a partial receipt")
+        }
+        let completed = try await transport.createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-signal-completed-benign", userInput: "bounded fixture input",
+            tools: [], idempotencyKey: "fixture-signal-completed-benign"
+        ))
+        XCTAssertEqual(completed.status, "completed")
+        XCTAssertEqual(completed.assistantText, "Quoted context overflow or truncated output.")
+        XCTAssertTrue(completed.functionCalls.isEmpty)
+        let completedReceipt = await transport.receipt(forIdempotencyKey: "fixture-signal-completed-benign")
+        XCTAssertEqual(completedReceipt?.responseID, completed.responseID)
+    }
+
+    func testProviderSignalStructuredShapesAndPlaintextFallbackBoundaries() {
+        let cases: [(String, LMStudioProviderError?)] = [
+            (#"{"error":{"type":"context_length_exceeded"}}"#, .contextOverflow),
+            (#"{"error":{"code":"response_truncated","message":"Quoted context overflow"}}"#, .responseTruncated),
+            (#"{"reason":"context overflow"}"#, nil),
+            (#"{"code":"context_length_exceeded"}"#, nil),
+            (#"{"type":"response_truncated"}"#, nil),
+            (#"{"message":"context overflow"}"#, nil),
+            (#"{"incomplete_details":{"reason":false},"error":{"code":["context_length_exceeded"],"message":512}}"#, nil),
+            (#""context overflow""#, nil),
+            (#"[{"error":{"code":"context_length_exceeded"}}]"#, nil),
+            ("null", nil),
+            (#"{"error":{"message":"context overflow""#, .contextOverflow),
+            ("Maximum CONTEXT length exceeded.", .contextOverflow),
+        ]
+        for (body, expected) in cases {
+            XCTAssertEqual(LMStudioProviderSignalClassifier.classify(body), expected)
+            XCTAssertEqual(LMStudioProviderSignalClassifier.classify(Data(body.utf8)), expected)
+        }
+        XCTAssertNil(LMStudioProviderSignalClassifier.classify(Data()))
+        XCTAssertNil(LMStudioProviderSignalClassifier.classify(Data([0xff, 0xfe])))
+        let oversizedLegacy = "context overflow" + String(repeating: " ", count: 64 * 1_024)
+        XCTAssertNil(LMStudioProviderSignalClassifier.classify(Data(oversizedLegacy.utf8)))
+        XCTAssertEqual(LMStudioProviderSignalClassifier.classify(oversizedLegacy), .contextOverflow,
+            "The direct String legacy overload remains unchanged outside the bounded Data call path")
     }
 
     func testKeychainAuthorizationFeedsBearerHeaderWithoutPersistingReference() async throws {
@@ -475,6 +876,190 @@ final class LMStudioContractFixtureTests: XCTestCase {
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
         XCTAssertEqual((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type"), "text/event-stream")
         return try XCTUnwrap(String(data: data, encoding: .utf8))
+    }
+
+    func testReasoningOnlyTerminalMetadataKeepsEmptyDerivedStopAndPersistsExactReceipt() async throws {
+        let directory = try terminalMetadataDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provider = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+        let request = try ProviderRootRequest(operationID: UUID(), idempotencyKey: "terminal-reasoning-owned",
+            modelKey: "fixture/tool-model", input: "fixture-terminal-reasoning", tools: [])
+        let turn = try await provider.createRoot(request)
+        XCTAssertTrue(turn.completed)
+        XCTAssertEqual(turn.finishReason, .stop, "This remains the existing derived managed signal")
+        XCTAssertTrue(turn.messages.isEmpty)
+        XCTAssertTrue(turn.toolCalls.isEmpty)
+        let ledger = try terminalLedger(directory)
+        let record = try XCTUnwrap((ledger["records"] as? [[String: Any]])?.first)
+        let metadata = try XCTUnwrap(record["terminal_metadata"] as? [String: Any])
+        XCTAssertEqual(record["request_id"] as? String, turn.requestID)
+        XCTAssertEqual(metadata["responseID"] as? String, turn.responseID)
+        XCTAssertEqual(metadata["status"] as? String, "completed")
+        XCTAssertEqual(metadata["outputItemCount"] as? Int, 1)
+        XCTAssertEqual(metadata["outputItemTypeCounts"] as? [String: Int], ["reasoning": 1])
+        XCTAssertEqual(metadata["reasoningTokens"] as? Int, 4_095)
+        XCTAssertEqual(metadata["outputTextBytes"] as? Int, 0)
+        XCTAssertEqual(metadata["functionArgumentBytes"] as? Int, 0)
+        XCTAssertEqual(metadata["parsedTextBytes"] as? Int, 0)
+        XCTAssertEqual(metadata["parsedFunctionCallCount"] as? Int, 0)
+        XCTAssertEqual(metadata["streamEOFObserved"] as? Bool, true)
+        XCTAssertEqual(metadata["metadataComplete"] as? Bool, true)
+        let diagnostic = try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys])
+        XCTAssertLessThanOrEqual(diagnostic.count, 4_096)
+        XCTAssertFalse(String(decoding: diagnostic, as: UTF8.self).contains("fixture-private-reasoning-content"))
+        let restarted = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+        let recovered = try await restarted.lookupRecorded(idempotencyKey: request.idempotencyKey)
+        XCTAssertEqual(recovered, turn)
+    }
+
+    func testTerminalMetadataMeasuresActualTextAndFunctionArgumentBytes() async throws {
+        let transport = try makeTransport()
+        for kind in ["text", "tool"] {
+            let turn = try await transport.createRoot(LMStudioRootRequest(
+                systemPrompt: "fixture-terminal-" + kind, userInput: "bounded input", tools: [],
+                idempotencyKey: "terminal-metadata-" + kind))
+            let metadata = try XCTUnwrap(turn.terminalMetadata)
+            XCTAssertEqual(metadata.responseID, turn.responseID)
+            XCTAssertEqual(metadata.status, "completed")
+            XCTAssertTrue(metadata.streamEOFObserved)
+            XCTAssertTrue(metadata.metadataComplete)
+            XCTAssertEqual(metadata.outputItemCount, 1)
+            XCTAssertNil(metadata.reasoningTokens, "Absent reasoning usage must remain unknown")
+            if kind == "text" {
+                XCTAssertEqual(turn.assistantText, "Observed café ✓.")
+                XCTAssertEqual(metadata.outputItemTypeCounts, ["message": 1])
+                XCTAssertEqual(metadata.outputTextBytes, turn.assistantText.utf8.count)
+                XCTAssertEqual(metadata.streamedTextBytes, 0, "This fixture exercises completed-message fallback")
+                XCTAssertEqual(metadata.parsedTextBytes, turn.assistantText.utf8.count)
+                XCTAssertEqual(metadata.functionArgumentBytes, 0)
+                XCTAssertTrue(turn.functionCalls.isEmpty)
+            } else {
+                let call = try XCTUnwrap(turn.functionCalls.first)
+                XCTAssertEqual(turn.functionCalls.count, 1)
+                XCTAssertEqual(metadata.outputItemTypeCounts, ["function_call": 1])
+                XCTAssertEqual(metadata.functionArgumentBytes, call.arguments.utf8.count)
+                XCTAssertEqual(metadata.outputTextBytes, 0)
+                XCTAssertEqual(metadata.parsedFunctionCallCount, 1)
+            }
+        }
+    }
+
+    func testLegacyReceiptAbsentOrNullTerminalMetadataRemainsUnknownAndReplayable() async throws {
+        let directory = try terminalMetadataDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let request = try ProviderRootRequest(operationID: UUID(), idempotencyKey: "terminal-legacy-owned",
+            modelKey: "fixture/tool-model", input: "fixture-terminal-reasoning", tools: [])
+        let first = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+        let turn = try await first.createRoot(request)
+        for explicitNull in [false, true] {
+            var ledger = try terminalLedger(directory)
+            var records = try XCTUnwrap(ledger["records"] as? [[String: Any]])
+            XCTAssertEqual(records.count, 1)
+            if explicitNull { records[0]["terminal_metadata"] = NSNull() }
+            else { records[0].removeValue(forKey: "terminal_metadata") }
+            ledger["records"] = records
+            try OwnerOnlyAtomicFile.write(try JSONSerialization.data(withJSONObject: ledger),
+                to: directory.appendingPathComponent("managed-provider-receipts.json"))
+            let restarted = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+            let replay = try await restarted.lookupRecorded(idempotencyKey: request.idempotencyKey)
+            XCTAssertEqual(replay, turn)
+            let retained = try XCTUnwrap((terminalLedger(directory)["records"] as? [[String: Any]])?.first)
+            XCTAssertTrue(retained["terminal_metadata"] == nil || retained["terminal_metadata"] is NSNull)
+        }
+    }
+
+    func testTerminalMetadataCannotAcceptIncompleteOrLostTransportEOF() async throws {
+        for (kind, expected) in [("incomplete", LMStudioProviderError.responseTruncated),
+                                 ("lost-eof", LMStudioProviderError.providerUnavailable)] {
+            let directory = try terminalMetadataDirectory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let provider = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+            let request = try ProviderRootRequest(operationID: UUID(), idempotencyKey: "terminal-" + kind,
+                modelKey: "fixture/tool-model", input: "fixture-terminal-" + kind, tools: [])
+            do {
+                _ = try await provider.createRoot(request)
+                XCTFail("A terminal frame alone cannot create an accepted receipt without completed transport")
+            } catch { XCTAssertEqual(error as? LMStudioProviderError, expected) }
+            let record = try XCTUnwrap((terminalLedger(directory)["records"] as? [[String: Any]])?.first)
+            XCTAssertEqual(record["status"] as? String, "intent")
+            XCTAssertTrue(record["turn"] == nil || record["turn"] is NSNull)
+            XCTAssertTrue(record["terminal_metadata"] == nil || record["terminal_metadata"] is NSNull)
+        }
+    }
+
+    func testTerminalMetadataCannotBeReboundToAnotherResponse() async throws {
+        let directory = try terminalMetadataDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let provider = try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())
+        _ = try await provider.createRoot(try ProviderRootRequest(operationID: UUID(),
+            idempotencyKey: "terminal-metadata-response-identity", modelKey: "fixture/tool-model",
+            input: "fixture-terminal-reasoning", tools: []))
+        var ledger = try terminalLedger(directory)
+        var records = try XCTUnwrap(ledger["records"] as? [[String: Any]])
+        var metadata = try XCTUnwrap(records[0]["terminal_metadata"] as? [String: Any])
+        metadata["responseID"] = "resp_another_owned_response"
+        records[0]["terminal_metadata"] = metadata; ledger["records"] = records
+        try OwnerOnlyAtomicFile.write(try JSONSerialization.data(withJSONObject: ledger),
+            to: directory.appendingPathComponent("managed-provider-receipts.json"))
+        XCTAssertThrowsError(try LMStudioManagedModelProvider(storageDirectory: directory, transport: makeTransport())) {
+            XCTAssertEqual($0 as? LMStudioProviderError,
+                .receiptStorage("terminal metadata does not match its bounded accepted response"))
+        }
+    }
+
+    func testFractionalReasoningMetadataRemainsUnknownWithoutChangingCompletion() async throws {
+        let turn = try await makeTransport().createRoot(LMStudioRootRequest(
+            systemPrompt: "fixture-terminal-fractional-reasoning", userInput: "bounded input", tools: [],
+            idempotencyKey: "terminal-fractional-reasoning"))
+        let metadata = try XCTUnwrap(turn.terminalMetadata)
+        XCTAssertEqual(turn.status, "completed")
+        XCTAssertTrue(turn.assistantText.isEmpty)
+        XCTAssertTrue(turn.functionCalls.isEmpty)
+        XCTAssertNil(metadata.reasoningTokens, "The original decimal token must not round into a diagnostic integer")
+        XCTAssertFalse(metadata.metadataComplete)
+        XCTAssertTrue(metadata.streamEOFObserved)
+    }
+
+    func testMalformedOptionalTerminalContainersRemainUnknownWithoutChangingCompletion() async throws {
+        let transport = try makeTransport()
+        for kind in ["malformed-incomplete-string", "malformed-incomplete-array",
+                     "malformed-usage-string", "malformed-usage-array", "null-containers"] {
+            let turn = try await transport.createRoot(LMStudioRootRequest(
+                systemPrompt: "fixture-terminal-" + kind, userInput: "bounded input", tools: [],
+                idempotencyKey: "terminal-container-" + kind))
+            let metadata = try XCTUnwrap(turn.terminalMetadata)
+            XCTAssertEqual(turn.status, "completed")
+            XCTAssertEqual(turn.usage.outputTokens, 4_095)
+            XCTAssertTrue(turn.assistantText.isEmpty)
+            XCTAssertTrue(turn.functionCalls.isEmpty)
+            XCTAssertEqual(metadata.responseID, turn.responseID)
+            XCTAssertTrue(metadata.streamEOFObserved)
+            XCTAssertEqual(metadata.outputItemCount, 1)
+            XCTAssertEqual(metadata.outputItemTypeCounts, ["reasoning": 1])
+            XCTAssertNil(metadata.incompleteReason)
+            XCTAssertNil(metadata.reasoningTokens)
+            if kind == "null-containers" {
+                XCTAssertTrue(metadata.metadataComplete, "Explicit null optional containers stay absent and unknown")
+                XCTAssertEqual(metadata.outputTextBytes, 0)
+                XCTAssertEqual(metadata.functionArgumentBytes, 0)
+            } else {
+                XCTAssertFalse(metadata.metadataComplete, "A present unsupported optional container cannot claim complete metadata")
+                XCTAssertNil(metadata.outputTextBytes)
+                XCTAssertNil(metadata.functionArgumentBytes)
+            }
+        }
+    }
+
+    private func terminalMetadataDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-terminal-metadata-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        return directory
+    }
+
+    private func terminalLedger(_ directory: URL) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: OwnerOnlyAtomicFile.read(
+            from: directory.appendingPathComponent("managed-provider-receipts.json"), maximumBytes: 64 * 1_024)) as? [String: Any])
     }
 
     private func makeTransport(

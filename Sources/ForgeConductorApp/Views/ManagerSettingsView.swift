@@ -394,6 +394,8 @@ struct ManagerSettingsView: View {
             }
             .frame(width: 200, alignment: .leading)
             Toggle("Auto-restart HTTP if it drops", isOn: $model.setAutoRestart)
+            Divider()
+            ContinuityRolloverSettingsControl(toolCalls: $model.setContinuityRolloverToolCalls)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -680,6 +682,41 @@ struct ManagerSettingsView: View {
             .labeledContentStyle(ManagerValueRowStyle())
             .foregroundStyle(path == nil ? GraphitePalette.textSecondary : GraphitePalette.textPrimary)
             .accessibilityIdentifier("runtime-capability-\(id)")
+    }
+}
+
+struct ContinuityRolloverSettingsControl: View {
+    @Binding var toolCalls: Int
+
+    private var boundedToolCalls: Binding<Int> {
+        Binding(
+            get: { toolCalls },
+            set: { value in
+                let range = AppConfig.SessionsConfig.continuityRolloverToolCallRange
+                toolCalls = min(range.upperBound, max(range.lowerBound, value))
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Automatic continuity").font(.callout.weight(.medium))
+            HStack(spacing: 12) {
+                TextField("Rollover after tool calls", value: boundedToolCalls, format: .number.grouping(.never))
+                    .frame(width: 200)
+                    .accessibilityIdentifier("settings-continuity-rollover-tool-calls")
+                Stepper("Adjust rollover tool-call limit", value: boundedToolCalls,
+                        in: AppConfig.SessionsConfig.continuityRolloverToolCallRange)
+                    .labelsHidden()
+                    .accessibilityIdentifier("settings-continuity-rollover-stepper")
+            }
+            Text("Rollover after tool calls: 1–10,000. Successful and failed eligible calls both count toward this limit. Ordinary MCP chats checkpoint every \(min(ContinuityAutomation.checkpointEveryTools, max(1, toolCalls))) calls and retain the two-hour safeguard. Managed runs also use this saved limit; context capacity or 32 model tool rounds can trigger an earlier rollover.")
+                .font(.caption)
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("settings-continuity-rollover-explanation")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

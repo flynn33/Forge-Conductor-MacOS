@@ -1,5 +1,129 @@
 # Forge Conductor user guide
 
+The current native hosted rollover-control test passed numeric edits and public
+accessibility stepper actions, including the 1 and 10,000 boundaries and default
+200. This verifies the rendered control and staged settings binding; ordinary
+current Manager save and LM Studio GUI rollover remain separate acceptance.
+
+Manager → Settings now includes **Rollover after tool calls** (1–10,000;
+default 200). Use **Save settings** to persist it. Running MCP helpers refresh
+saved limits at status and eligible work boundaries; successful and failed
+eligible work calls both count. Status reads preserve counters and pending
+editor values. If the stored configuration is missing or malformed, status
+remains readable using cached settings and reports `configuration_refresh`
+with `state: failed` and `using_cached_settings: true`; healthy responses omit it.
+The new native Xcode tools and policy coverage limits are described in
+[the runtime repair record](docs/LMSTUDIO-RUNTIME-REPAIR.md). The latest repair
+accepts bounded Responses lifecycle frames within a finite event budget while
+preserving byte, output and timeout protections. Full source v8 and five signed
+native SSE controls passed. The original live failure's raw-stream validity is
+unknown; ordinary GUI rollover and SIGKILL recovery remain pending.
+Current validation
+is in progress. The completed full Swift v3 source checkpoint selected 2,181
+Core cases: 2,168 passed, 13 explicitly skipped, zero failed; filesystem
+qualification passed 30 cases without skips. Later playbook guidance passed
+14 catalog cases with strict deep XCTest verification. The status/storage
+repairs passed six focused and 300 affected source cases without skips/failures;
+full Swift v4 then passed 2,174 of 2,187 Core cases, with 13 explicit skips and
+zero failures, plus 30 filesystem qualification cases without skips. These
+source results do not qualify the remaining native/live gates.
+At the v7 test freeze after that checkpoint, only the live test fixture changed;
+production and the other 438 frozen inputs stayed unchanged. Its gate correction
+passed the ownership control. Live v3–v5 failed; v5 showed the fixture's old cutoff was below
+the actual initial input plus reserve, requesting rollover before a provider
+turn. The opt-in fixture cutoff/diagnostics were corrected with original
+assertions preserved and initial-normal checks added. Live v6 then failed one
+case without skips after normal initial admission and actual provider-exact
+rollover: successor bootstrap failed with `lmstudio_response_truncated`, without
+ACK/crash/recovery proof. Its incomplete reason is unknown. All 14 original
+process identities/MCP registration were preserved, with no owned survivors.
+The v7 fixture compiled; the normal class selected five cases, with three passes,
+two disabled live skips and zero failures. Separately, live v7 passed one actual
+owned Manager/API case without skips in 487.293 seconds: exact ACK, injected
+in-process error/recovery, predecessor sealing, automatic continuation/marker
+read and stable replay. All three phases used one SwiftPM XCTest process and
+preserved original processes/MCP registration. This does not qualify ordinary
+LM Studio GUI rollover, a SIGKILL matrix or compiled native v2 execution; those
+remaining gates and earlier unexplained failure causes stay open.
+After v7, the semantic classifier repair passed its four regressions without
+skips/failures after their 39 original assertion failures. It preserves status
+fallback and incomplete-response rejection. Normal affected classes selected 52
+cases: 51 passed, one explicit live skip, zero failed. Native v2/live v7 predate
+this repair. Later full v5 failed one descendant-count fixture assertion:
+2,191 Core selected, 2,177 passed, 13 skipped, one failed; filesystem qualification
+passed 30 cases. A controlled test confirmed kernel identities can precede shell
+PID records. The fixture correction preserves the limit and cleanup checks;
+normal Runtime validation passed 112 of 113 cases with one PowerShell skip and
+no failures.
+On October 6, full v6 returned terminal zero: 2,192 Core cases selected,
+2,179 passed, 13 explicitly skipped and none failed; filesystem qualification
+passed all 30 cases without skips/failures. All 439 frozen inputs remained
+unchanged during the run: five full-v4 paths changed, 434 unchanged. Skipped
+capabilities remain unqualified.
+Later native v3 Debug/Release builds and all five roles' strict signature/
+metadata/settings checks passed against 439 unchanged inputs. Release required
+one owned post-build SIGINT. Four classifier XCTests passed through the signed
+v3 Debug CLI, with native/serve exits zero and lossless output. Typed readback
+verified exactly four passed cases, no extras/skips/failures, and clean exits
+from both result jobs and serve. Those builds predate the later Runtime/Queue test
+fixtures and Rune reorder repair. Ordinary GUI, SIGKILL, Compute, LLDB, simulator
+XCTest and owner-signing gates remain open.
+A later Rune reorder repair keeps the newer command's order when an older request
+finishes late; current cancellation/failure still restores its prior order. The
+three original controlled cases failed four assertions, then five focused and all
+15 normal Rune cases passed without skips/failures. Separately, a Queue test-only
+actor annotation followed five AppKit warnings: focused one, normal 38 and one
+fresh native case passed, with clean native/serve exits. Typed build/summary/
+inventory readback then confirmed exactly that one actual Passed Queue case,
+zero failures/skips, all three native result jobs and serve exited zero, and
+configuration bytes were unchanged. Refreshed native v4 Debug/Release builds
+passed with lossless EOF and all 439 inputs unchanged; all five roles' strict
+identity/metadata/settings controls passed in both configurations and all 579
+independent audit checks passed. Debug required no cleanup signals; Release
+recorded two exact owned post-build SIGINT signals, with no owned survivors.
+Rune v4 executed zero tests because its selection used the wrong native test
+bundle; `TEST SUCCEEDED` and helper success flags do not qualify those tests.
+The corrected Rune v5 app-hosted selection executed exactly five cases: five
+passed, zero failures/skips, in 0.246 (0.248) seconds, with native/serve exits
+zero and lossless output. Full Swift v7 returned terminal zero: 2,197 Core cases
+selected, 2,184 passed, 13 explicitly skipped and none failed; all 30 filesystem
+cases passed. Exact case reconciliation and complete raw EOF verified 2,227
+actual selected cases and 2,214 passes, with all 439 inputs unchanged. Skipped
+capabilities remain unqualified. SIGKILL recovery remains pending; the first
+candidate attempt failed preparation before any Manager launch. These checks
+do not qualify ordinary GUI rollover, installed or full-runtime behavior, or
+shipment.
+The earlier October 5 source checkpoint passed 19 focused tests and
+499 of 505 selected affected cases, with six explicit skips and zero failures.
+A later adapter protocol checkpoint passed 33 of 34 selected cases, with one
+live-provider skip and zero failures; it does not qualify ordinary GUI overlap.
+Debug/Release v1 builds and signature checks passed before the status/storage
+fixes. Retained v2 Debug/Release builds and all five roles' strict identity checks
+passed against 439 frozen inputs; both compiled CLI/native Xcode version jobs
+completed with lossless output and clean serve exits. One exact Rune app-hosted
+coverage test and one v2 candidate identity/version-drift test passed
+without skips. Native v5 exercised policy notices/history/corrections through
+separate owned clients with clean Manager/serve exits. Earlier UI receipts
+retain their tested versions. A separate bounded v6 model probe completed one
+interpretation of the authentic retained review notice; it did not prove
+compliance, correction or general future behavior. The retained-v9 new→old→new
+CLI fixture passed in a fresh owned home with a synthetic historical seal, not
+a real successor acknowledgement or installed-build test. Both simulator v3 and
+alternate iOS 26.5 v4 completed build/boot, but boot readiness timed out before
+XCTest. Exact owned cleanup preserved all 32 baseline devices. Ordinary GUI
+rollover, LLDB, Compute and simulator
+XCTest remain unqualified.
+The later direct simulator startup control outside Forge reproduced the same
+migration wait and timed out at 300 seconds before XCTest. Exact owned cleanup
+preserved all 32 baseline devices; the underlying cause remains unknown.
+The subsequent owned iOS 26.5 namespace diagnostic also reached the 300-second
+readiness timeout before XCTest. Exact-PID logs retained recurring AddressBook
+migration duration updates, while namespace snapshots preserved the same two
+migration PIDs. Simulator AddressBook TCC approval and a log of two pending XPC
+transactions establish no host debugger authorization or migration cause.
+Exact owned shutdown/delete exited zero and all 32 baseline device bytes were
+unchanged; simulator XCTest remains unqualified.
+
 <!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
 ## Compute PCB refinement — verified native scope
 
@@ -65,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.17.0**, build **27** (current source; candidate qualification is separate from installation).
+Version **0.18.0**, build **28** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -235,6 +359,14 @@ the ordered policy, records a separate bounded log for each project, and sends
 the model a structured notice containing the exact violated policy identity and
 applicable policy content. CLU does not take over task execution.
 
+Automatic detection currently covers **1 of 15 indexed Raven rules**:
+`RFD-NATIVE-001` evaluates declared Xcode production membership. The other
+fourteen remain policy guidance without executable detectors; importing policy
+text does not create a detector, and zero violations does not prove compliance.
+Resource-only JS/MJS declarations retain an advisory violation at 0.45 confidence
+pending review, with unchanged identity and prior history. This grants no
+exemption or correction. Policy notices do not deny tools or stop development.
+
 Use Rune Forge export controls to write the selected project's log as JSONL,
 JSON, Markdown, or CSV.
 
@@ -260,6 +392,15 @@ making development changes. Then give the model the task in LM Studio as usual.
 
 Forge Conductor does not start this work through a Managed Run.
 
+When inspecting jobs, `job.list` may return fewer complete rows to fit the
+response byte budget. If `has_more` is true, pass the returned `next_cursor`'s
+paired `before_created_at` and `before_job_id` fields as arguments to the next
+`job.list` call. This preserves jobs with equal timestamps. Existing
+timestamp-only cursors retain their exclusive-time behavior. Xcode receipt
+budgets are checked before job admission; submission still does not establish
+native success, and native exit 65 remains a failure. Byte-paged
+`job.read_output` and base64 recovery remain available.
+
 ## 7. Automatic continuity
 
 The model can save compact checkpoints while it works. At context pressure it
@@ -279,6 +420,21 @@ action in the Continuity view:
 
 5. The successor must acknowledge the exact handoff identifier.
 6. Forge records the predecessor as sealed only after that acknowledgement.
+
+If the rollover limit is crossed while a checkpoint is being prepared, the
+current source retains that request until the handoff and actual counts commit
+together. A projection-file warning does not hide the committed SQL handoff.
+The source rejects acknowledgement reuse after contents change under the same
+handoff ID; the changed work requires a fresh handoff ID. Adapter protocol
+fixtures also verify that concurrent bootstrap cannot replace an active intent,
+a late acknowledgement cannot revive explicit cancellation, and an interrupted
+intent can retry after restart.
+
+Current ordinary LM Studio GUI rollover/threshold acceptance and debugger
+execution remain unverified; actual live GUI overlap remains unqualified.
+The separately tested managed API handoff and automatic continuation do not
+qualify the GUI trigger, successor consumption, or predecessor sealing; see the
+[current repair record](docs/LMSTUDIO-RUNTIME-REPAIR.md).
 
 The operation is idempotent across watchdog ticks and Manager restart. When a
 failure reaches diagnostics, the current source records the selected handoff,

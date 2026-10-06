@@ -115,7 +115,8 @@ public protocol TelemetryProviding: AnyObject, Sendable {
     /// Current live frame (host from continuous engine + last forge composition).
     /// Not a multi-second poll — call freely; host half is always the latest sample.
     func currentFrame() -> TelemetrySnapshot
-    /// Edge compatibility: `force` recomposes forge once; otherwise same as `currentFrame()`.
+    /// Call off the UI actor. An idle service samples once without starting
+    /// a stream; `force` recomposes Forge when continuous sampling is running.
     func snapshotTyped(force: Bool) throws -> TelemetrySnapshot
     func snapshot(force: Bool) throws -> [String: Any]
     func health() -> TelemetryHealthReport
@@ -139,11 +140,17 @@ public protocol RealtimeMetricsStreaming: AnyObject, Sendable {
     /// Actual samples completed in the last second.
     var measuredSampleHz: Double { get }
     var isRunning: Bool { get }
+    /// Collects one current full sample without starting a recurring stream.
+    func collectCurrentMetrics() -> SystemMetrics
     func start(targetHz: Double)
     func stop()
     @discardableResult
     func addListener(_ block: @escaping (SystemMetrics) -> Void) -> UUID
     func removeListener(_ id: UUID)
+}
+
+public extension RealtimeMetricsStreaming {
+    func collectCurrentMetrics() -> SystemMetrics { latestSystem }
 }
 
 /// Product: Deploy Forge stdio MCP (primary + failover) into LM Studio.

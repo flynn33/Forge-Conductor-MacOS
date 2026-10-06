@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import XCTest
 #if SWIFT_PACKAGE
@@ -9,6 +10,169 @@ import XCTest
 
 @MainActor
 final class GraphiteWorkbenchAppTests: XCTestCase {
+#if !SWIFT_PACKAGE
+    func testContinuityRolloverSettingsRenderNativeEditableControlsAndBoundRange() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw ContinuityRolloverControlTestFailure("Run the native continuity settings fixture in the ForgeConductorAppTests application host with a display")
+        }
+        let state = ContinuityRolloverControlTestState()
+        let host = NSHostingView(rootView: ContinuityRolloverControlTestView(state: state))
+        host.frame = NSRect(x: 0, y: 0, width: 640, height: 220)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.title = "Continuity rollover validation \(UUID().uuidString)"
+        window.contentView = host
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        host.layoutSubtreeIfNeeded()
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        while nativeDescendants(of: host).compactMap({ $0 as? NSTextField }).filter(\.isEditable).isEmpty,
+              ProcessInfo.processInfo.systemUptime < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+            host.layoutSubtreeIfNeeded()
+        }
+        let fields = nativeDescendants(of: host).compactMap { $0 as? NSTextField }.filter(\.isEditable)
+        XCTAssertEqual(fields.count, 1)
+        let field = try XCTUnwrap(fields.first)
+        XCTAssertEqual(field.stringValue, "200")
+        let elements = try await continuityControlElements(windowTitle: window.title)
+        let text = try XCTUnwrap(elements["settings-continuity-rollover-tool-calls"])
+        let stepper = try XCTUnwrap(elements["settings-continuity-rollover-stepper"])
+        XCTAssertNotNil(elements["settings-continuity-rollover-explanation"])
+        XCTAssertEqual(try continuityAXAttribute(text, kAXValueAttribute) as? String, "200")
+
+        // SwiftUI exposes semantic increment/decrement actions. Its backing
+        // NSStepper stores a delta, rather than the model's absolute range.
+        try continuityAXAction(stepper, kAXIncrementAction)
+        try await requireContinuityValue(201, state: state, field: field)
+        try continuityAXAction(stepper, kAXDecrementAction)
+        try await requireContinuityValue(200, state: state, field: field)
+
+        try await editContinuityValue("1", window: window, state: state, field: field)
+        try continuityAXAction(stepper, kAXDecrementAction)
+        try await requireContinuityValue(1, state: state, field: field)
+        try continuityAXAction(stepper, kAXIncrementAction)
+        try await requireContinuityValue(2, state: state, field: field)
+
+        try await editContinuityValue("10000", window: window, state: state, field: field)
+        try continuityAXAction(stepper, kAXIncrementAction)
+        try await requireContinuityValue(10_000, state: state, field: field)
+        try continuityAXAction(stepper, kAXDecrementAction)
+        try await requireContinuityValue(9_999, state: state, field: field)
+
+        try await editContinuityValue("3", window: window, state: state, field: field)
+        try continuityAXAction(stepper, kAXIncrementAction)
+        try await requireContinuityValue(4, state: state, field: field)
+        try await editContinuityValue("1234", window: window, state: state, field: field)
+    }
+
+    private func editContinuityValue(_ value: String, window: NSWindow,
+                                     state: ContinuityRolloverControlTestState, field: NSTextField) async throws {
+        guard window.makeFirstResponder(field), let editor = field.currentEditor() as? NSTextView else {
+            throw ContinuityRolloverControlTestFailure("The rendered numeric field did not begin native editing")
+        }
+        editor.insertText(value, replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+        window.endEditing(for: field)
+        _ = window.makeFirstResponder(nil)
+        try await requireContinuityValue(try XCTUnwrap(Int(value)), state: state, field: field)
+    }
+
+    private func requireContinuityValue(_ expected: Int, state: ContinuityRolloverControlTestState,
+                                        field: NSTextField) async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        while (state.limit != expected || field.stringValue != String(expected)),
+              ProcessInfo.processInfo.systemUptime < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(state.limit, expected, "The actual native edit/action must update the staged settings binding")
+        XCTAssertEqual(field.stringValue, String(expected), "The rendered field must display the same staged value")
+    }
+
+    private func continuityControlElements(windowTitle: String) async throws -> [String: AXUIElement] {
+        let required: Set<String> = ["settings-continuity-rollover-tool-calls",
+                                     "settings-continuity-rollover-stepper", "settings-continuity-rollover-explanation"]
+        let application = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        repeat {
+            let windows = try continuityAXChildren(application, kAXWindowsAttribute, limit: 32)
+            let matches = try windows.filter { try continuityAXAttribute($0, kAXTitleAttribute) as? String == windowTitle }
+            if let window = matches.first, matches.count == 1 {
+                var pending = [window]
+                var seen: [AXUIElement] = []
+                var found: [String: AXUIElement] = [:]
+                while !pending.isEmpty, seen.count < 128,
+                      ProcessInfo.processInfo.systemUptime < deadline {
+                    let element = pending.removeLast()
+                    guard !seen.contains(where: { CFEqual($0, element) }) else { continue }
+                    seen.append(element)
+                    if let identifier = try continuityAXAttribute(element, kAXIdentifierAttribute) as? String,
+                       required.contains(identifier) {
+                        guard found[identifier] == nil else {
+                            throw ContinuityRolloverControlTestFailure("Duplicate semantic control identifier \(identifier)")
+                        }
+                        found[identifier] = element
+                    }
+                    pending.append(contentsOf: try continuityAXChildren(element, kAXChildrenAttribute,
+                                                                         limit: 128 - seen.count - pending.count))
+                }
+                guard pending.isEmpty else {
+                    throw ContinuityRolloverControlTestFailure("The native accessibility observation exceeded its bounded tree/deadline")
+                }
+                if Set(found.keys) == required { return found }
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        throw ContinuityRolloverControlTestFailure("The actual hosted controls did not expose all three stable accessibility identifiers")
+    }
+
+    private func continuityAXAttribute(_ element: AXUIElement, _ name: String) throws -> Any? {
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+        guard result == .success || result == .attributeUnsupported || result == .noValue else {
+            throw ContinuityRolloverControlTestFailure("Native \(name) observation failed: AXError \(result.rawValue)")
+        }
+        return value
+    }
+
+    private func continuityAXChildren(_ element: AXUIElement, _ name: String, limit: Int) throws -> [AXUIElement] {
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        var count = 0
+        let result = AXUIElementGetAttributeValueCount(element, name as CFString, &count)
+        if result == .attributeUnsupported || result == .noValue { return [] }
+        guard result == .success, count <= limit else {
+            throw ContinuityRolloverControlTestFailure("Native \(name) exceeded its bound or failed: AXError \(result.rawValue), count \(count)")
+        }
+        guard count > 0 else { return [] }
+        var values: CFArray?
+        let copied = AXUIElementCopyAttributeValues(element, name as CFString, 0, count, &values)
+        guard copied == .success, let children = values as? [AXUIElement] else {
+            throw ContinuityRolloverControlTestFailure("Native \(name) children failed: AXError \(copied.rawValue)")
+        }
+        return children
+    }
+
+    private func continuityAXAction(_ element: AXUIElement, _ action: String) throws {
+        AXUIElementSetMessagingTimeout(element, 0.1)
+        let result = AXUIElementPerformAction(element, action as CFString)
+        guard result == .success else {
+            throw ContinuityRolloverControlTestFailure("Native \(action) failed: AXError \(result.rawValue)")
+        }
+    }
+
+    private func nativeDescendants(of root: NSView) -> [NSView] {
+        var pending = [root]
+        var result: [NSView] = []
+        while let next = pending.popLast(), result.count < 1_024 {
+            result.append(next)
+            pending.append(contentsOf: next.subviews)
+        }
+        return result
+    }
+#endif
+
     func testWorkbenchControlsDefaultHiddenAndPersistOnlyExplicitChoices() throws {
         let suite = "forge.workbench.tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -237,3 +401,22 @@ final class GraphiteWorkbenchAppTests: XCTestCase {
             + 0.0722 * linear(rgb.blueComponent)
     }
 }
+
+#if !SWIFT_PACKAGE
+@MainActor
+private final class ContinuityRolloverControlTestState: ObservableObject {
+    @Published var limit = 200
+}
+
+@MainActor
+private struct ContinuityRolloverControlTestView: View {
+    @ObservedObject var state: ContinuityRolloverControlTestState
+    var body: some View { ContinuityRolloverSettingsControl(toolCalls: $state.limit) }
+}
+
+private struct ContinuityRolloverControlTestFailure: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
+}
+#endif

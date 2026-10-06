@@ -35,6 +35,94 @@ final class DiagnosticBoundaryTests: XCTestCase {
         XCTAssertTrue(try String(contentsOf: paths.masterDiagnostics, encoding: .utf8).contains("caller_owned_after_graph_shutdown"))
     }
 
+    func testBootstrapSharesDiagnosticOwnerWhenPersistenceCreatesTheIdenticalHome() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-diagnostic-created-home-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: home.path))
+        let paths = AppPaths(home: home)
+        let diagnostics = DiagnosticLog(paths: paths)
+        defer { _ = diagnostics.shutdown(timeout: 2) }
+        func operand(_ url: URL) -> String {
+            "absolute=\(String(url.absoluteString.prefix(512))), path=\(String(url.path.prefix(512))), hasDirectoryPath=\(url.hasDirectoryPath), isFileURL=\(url.isFileURL)"
+        }
+        let inputBefore = operand(home)
+        let diagnosticBefore = operand(diagnostics.homeURL.standardizedFileURL)
+        diagnostics.info("shared_owner_created_before_bootstrap", category: .bootstrap)
+        XCTAssertTrue(diagnostics.flush(timeout: 2), "The owned diagnostic directory-creation barrier must drain")
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: home.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: paths.configJSON.path),
+                       "Diagnostic persistence must not create application configuration")
+
+        let freshPaths = AppPaths(home: home)
+        let diagnosticOperand = diagnostics.homeURL.standardizedFileURL
+        let bootstrapOperand = freshPaths.home.standardizedFileURL
+        let operands = "inputBefore={\(inputBefore)}; diagnosticBefore={\(diagnosticBefore)}; diagnosticAfter={\(operand(diagnosticOperand))}; bootstrapAfter={\(operand(bootstrapOperand))}; URL_equal=\(diagnosticOperand == bootstrapOperand); path_equal=\(diagnosticOperand.path == bootstrapOperand.path)"
+        let app: ForgeApp
+        do {
+            app = try ForgeApp.bootstrap(home: home, diagnostics: diagnostics)
+        } catch {
+            let native = error as NSError
+            XCTFail("The identical explicit home must accept its prepared diagnostic owner after persistence creates the directory. Received failure(type=\(String(reflecting: type(of: error))), domain=\(native.domain), code=\(native.code), error=\(String(String(describing: error).prefix(512)))); \(operands)")
+            return
+        }
+        defer { app.shutdown() }
+        XCTAssertTrue(app.diagnostics === diagnostics, operands)
+        XCTAssertEqual(app.paths.home.path, freshPaths.home.path, operands)
+    }
+
+    func testBootstrapSharesDiagnosticOwnerAcrossDirectoryHintsForTheSameHome() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-diagnostic-directory-hint-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let fileHint = URL(fileURLWithPath: home.path, isDirectory: false)
+        let directoryHint = URL(fileURLWithPath: home.path, isDirectory: true)
+        XCTAssertEqual(fileHint.standardizedFileURL.path, directoryHint.standardizedFileURL.path)
+        XCTAssertNotEqual(fileHint.standardizedFileURL, directoryHint.standardizedFileURL)
+        XCTAssertEqual(fileHint.standardizedFileURL.appendingPathComponent("", isDirectory: true),
+                       directoryHint.standardizedFileURL.appendingPathComponent("", isDirectory: true))
+        for (attempt, homes) in [(fileHint, directoryHint), (directoryHint, fileHint)].enumerated() {
+            let (diagnosticHome, bootstrapHome) = homes
+            let diagnostics = DiagnosticLog(paths: AppPaths(home: diagnosticHome))
+            defer { _ = diagnostics.shutdown(timeout: 2) }
+            let app: ForgeApp
+            do {
+                app = try ForgeApp.bootstrap(home: bootstrapHome, diagnostics: diagnostics)
+            } catch {
+                XCTFail("Same-home directory hint attempt \(attempt) failed: \(error)")
+                return
+            }
+            XCTAssertTrue(app.diagnostics === diagnostics)
+            XCTAssertEqual(app.paths.home.path, home.path)
+            XCTAssertTrue(app.shutdown().completed)
+        }
+    }
+
+    func testBootstrapPreservesFileURLAuthorityIsolationAcrossDirectoryHints() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-diagnostic-authority-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        var components = try XCTUnwrap(URLComponents(url: home, resolvingAgainstBaseURL: true))
+        components.host = "forge-diagnostic-other-host.invalid"
+        let otherAuthority = try XCTUnwrap(components.url)
+        XCTAssertEqual(home.standardizedFileURL.path, otherAuthority.standardizedFileURL.path)
+        let standardizedAuthority = otherAuthority.standardizedFileURL
+        let normalized = standardizedAuthority.appendingPathComponent("", isDirectory: true)
+        XCTAssertEqual(normalized.host, standardizedAuthority.host)
+        XCTAssertEqual(normalized.absoluteString,
+                       standardizedAuthority.absoluteString.hasSuffix("/")
+                       ? standardizedAuthority.absoluteString : standardizedAuthority.absoluteString + "/")
+        XCTAssertNotEqual(home.standardizedFileURL.appendingPathComponent("", isDirectory: true), normalized)
+        let diagnostics = DiagnosticLog(paths: AppPaths(home: home))
+        defer { _ = diagnostics.shutdown(timeout: 2) }
+        XCTAssertThrowsError(try ForgeApp.bootstrap(home: otherAuthority, diagnostics: diagnostics)) { error in
+            XCTAssertEqual(error as? ForgeBootstrapError, .diagnosticHomeMismatch)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: home.path))
+    }
+
     func testBootstrapRejectsDiagnosticOwnerFromAnotherHomeBeforeCreatingLayout() throws {
         let first = FileManager.default.temporaryDirectory.appendingPathComponent("forge-diagnostic-first-\(UUID().uuidString)")
         let second = FileManager.default.temporaryDirectory.appendingPathComponent("forge-diagnostic-second-\(UUID().uuidString)")

@@ -12,13 +12,16 @@ tools:
   - fs_glob
   - fs_mkdir
   - search_text
-  - search_files
   - git_status
   - git_diff
   - git_log
   - shell_exec
-  - python_info
-  - python_exec
+  - runtime.capabilities
+  - python.run
+  - job.status
+  - job.read_output
+  - job.cancel
+  - job.list
   - pdf_write
   - pdf_from_file
 when_to_use:
@@ -75,7 +78,10 @@ Produce accurate documentation and **file artifacts** the user can open.
 
 ## Markdown workflow
 
-1. Discover docs layout: `fs_list`, `fs_glob("**/README*")`, `fs_glob("docs/**")`.
+1. Discover docs layout with `fs_list` and
+   `fs_glob(pattern="README*", path="<project>")` or
+   `fs_glob(pattern="*.md", path="<project>/docs")`. The pattern matches each
+   filename; use `search_text` for file contents.
 2. Read the modules you will describe (`fs_read`, `search_text`).
 3. Write/update Markdown via `fs_write` / `fs_edit`.
 4. Keep structure scannable: title, audience, setup, usage, ops, troubleshooting.
@@ -102,9 +108,23 @@ pdf_write(path="<project>/docs/PROJECT_MANUAL.pdf",
 **Optional alternatives only if pdf_* tools fail:**
 
 - `shell_exec` with `textutil` / `cupsfilter` on macOS
-- `python_exec` only as last resort — prefer `pdf_write`
+- For test or analysis scripts only, check `runtime.capabilities` and use optional
+  `python.run(script="...", replay_class="read_only")`; choose the replay class
+  that matches the script's effects. Poll `job.status` to terminal and inspect
+  `job.read_output`; use `job.cancel` for abandoned work. An unavailable optional
+  interpreter or a job receipt does not prove completion. Prefer `pdf_write`.
 
-Do **not** wait for reportlab, fpdf, or pandoc installs. `pdf_write` is stdlib.
+Do **not** wait for reportlab, fpdf, or pandoc installs. `pdf_write` is a built-in native tool.
+
+For `job.list` pages with `has_more: true`, pass both `before_created_at` and
+`before_job_id` from `next_cursor` on the next call, keeping the same `states`
+filter. This preserves jobs with equal creation timestamps; a page can contain
+fewer complete rows than the requested `limit` to fit the result budget.
+For `job.read_output`, continue at the returned `next_offset`, which counts
+bytes. A page can be shorter than `limit`; do not calculate its next offset from
+text character counts. When `data_base64` is present, decode it for exact bytes;
+`data` remains the text view. `eof` ends the retained stream, and
+`artifact_truncated: true` means the output is partial evidence.
 
 ## Quality bar
 

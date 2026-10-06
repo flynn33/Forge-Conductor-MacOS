@@ -5,6 +5,87 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class AutonomySupervisorTests: XCTestCase {
+    func testFailedActivationRetainsFirstTypedErrorWithoutChangingRunRecoveryState() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root)
+            let pool = try NativeProviderWorkAdmission(limit: 1)
+            let coordinator = FailingActivationEvidenceCoordinator(runID: fixture.run.runID)
+            let supervisor = try AutonomySupervisor(repository: repository, maximumConcurrentRuns: 1,
+                sourceBootstrap: nil, providerWorkAdmission: pool) { _ in coordinator }
+            do {
+                _ = try await supervisor.recoverOnManagerStart()
+                for expectedCalls in 1...2 {
+                    if expectedCalls == 2 { try await supervisor.activate(runID: fixture.run.runID) }
+                    for _ in 0..<2_000 {
+                        if (await supervisor.snapshot()).activeRunIDs.isEmpty { break }
+                        try await Task.sleep(for: .milliseconds(1))
+                    }
+                    let snapshot = await supervisor.snapshot()
+                    XCTAssertTrue(snapshot.activeRunIDs.isEmpty)
+                    XCTAssertTrue(snapshot.recentResults.isEmpty, "Failure must not become a success result")
+                    XCTAssertEqual(pool.activeCount, 0)
+                    let calls = await coordinator.callCount()
+                    XCTAssertEqual(calls, expectedCalls)
+                }
+                let beforeClose = try await repository.autonomousRun(fixture.run.runID)
+                XCTAssertEqual(beforeClose?.state, fixture.run.state)
+                XCTAssertEqual(beforeClose?.revision, fixture.run.revision)
+                XCTAssertNil(beforeClose?.lastErrorCode)
+                XCTAssertNil(beforeClose?.lastErrorSummary)
+                XCTAssertNil(beforeClose?.retryAt)
+                await supervisor.shutdown()
+                await repository.close()
+                let reopened = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control-plane.sqlite3"))
+                do {
+                    let events = try await reopened.autonomyEvents(runID: fixture.run.runID)
+                    let failures = events.filter { $0.eventType == "autonomous_activation_first_failure" }
+                    XCTAssertEqual(failures.count, 1)
+                    let first = try XCTUnwrap(failures.first)
+                    let firstMetadata = try JSONSupport.object(from: Data(first.metadataJSON.utf8))
+                    XCTAssertEqual(firstMetadata["error_code"] as? String, "autonomous_run_lease_expired")
+                    XCTAssertEqual(firstMetadata["error_summary"] as? String, "Run lease expired")
+                    XCTAssertEqual(first.projectID, fixture.run.projectID)
+                    XCTAssertLessThanOrEqual(try JSONSerialization.data(withJSONObject: firstMetadata).count, 8 * 1_024)
+                    let restored = try await reopened.autonomousRun(fixture.run.runID)
+                    XCTAssertEqual(restored?.state, fixture.run.state)
+                    XCTAssertEqual(restored?.revision, fixture.run.revision)
+                } catch { await reopened.close(); throw error }
+                await reopened.close()
+            } catch { await supervisor.shutdown(); throw error }
+        }
+    }
+
+    func testTransitionEventsRetainEarlierErrorsWhenLastErrorChanges() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root)
+            let lease = try await repository.acquireRunLease(runID: fixture.run.runID,
+                ownerID: "transition-error-evidence", policy: fixture.leasePolicy)
+            let firstSummary = "Failure while opening /Users/private-activation-home/example.txt"
+            let validating = try await repository.transitionAutonomousRun(runID: fixture.run.runID, lease: lease,
+                transition: .init(expectedState: .created, expectedRevision: fixture.run.revision,
+                    nextState: .validating, eventType: "fixture_first_error", eventSummary: "First fixture error",
+                    errorCode: "fixture_first_error", errorSummary: firstSummary))
+            let ready = try await repository.transitionAutonomousRun(runID: fixture.run.runID, lease: lease,
+                transition: .init(expectedState: .validating, expectedRevision: validating.revision,
+                    nextState: .ready, eventType: "fixture_second_error", eventSummary: "Second fixture error",
+                    errorCode: "fixture_second_error", errorSummary: "Second fixture error"))
+            XCTAssertEqual(ready.lastErrorCode, "fixture_second_error")
+            XCTAssertEqual(ready.lastErrorSummary, "Second fixture error")
+            let events = try await repository.autonomyEvents(runID: fixture.run.runID)
+            let first = try XCTUnwrap(events.first { $0.eventType == "fixture_first_error" })
+            let firstMetadata = try JSONSupport.object(from: Data(first.metadataJSON.utf8))
+            XCTAssertEqual(firstMetadata["error_code"] as? String, "fixture_first_error")
+            XCTAssertEqual(firstMetadata["error_summary"] as? String, DiagnosticRedaction.sanitizedError(firstSummary))
+            XCTAssertFalse(((firstMetadata["error_summary"] as? String) ?? "").contains("/Users/private-activation-home"))
+            XCTAssertEqual(firstMetadata["from_state"] as? String, "created")
+            XCTAssertEqual(firstMetadata["to_state"] as? String, "validating")
+            let second = try XCTUnwrap(events.first { $0.eventType == "fixture_second_error" })
+            let secondMetadata = try JSONSupport.object(from: Data(second.metadataJSON.utf8))
+            XCTAssertEqual(secondMetadata["error_code"] as? String, "fixture_second_error")
+            XCTAssertEqual(secondMetadata["error_summary"] as? String, "Second fixture error")
+        }
+    }
+
     func testRejectedCompletionHonorsPauseAndStopPolicies() async throws {
         for behavior in [AutonomousFailureBehavior.pauseForReview, .stopTask] {
             try await withRepository { repository, root in
@@ -3156,4 +3237,17 @@ private actor CapacityHeldCoordinator: ProjectRunCoordinating {
         continuation?.resume()
         continuation = nil
     }
+}
+
+private actor FailingActivationEvidenceCoordinator: ProjectRunCoordinating {
+    nonisolated let runID: RunID
+    private var calls = 0
+    init(runID: RunID) { self.runID = runID }
+    func runActivation() async throws -> ProjectRunActivationResult {
+        calls += 1
+        if calls == 1 { throw AutonomyError.leaseExpired }
+        throw AutonomyError.intentConflict
+    }
+    func callCount() -> Int { calls }
+    func stop() async {}
 }

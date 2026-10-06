@@ -48,6 +48,7 @@ public final class StjornarvaldObservationEmitter: StjornarvaldObservationRecord
     private let submitter: any PolicyObservationSubmitting
     private let shutdownSubmitter: @Sendable () async -> Void
     private let diagnostics: @Sendable (String) -> Void
+    private let nativeTargetProducer: StjornarvaldNativeTargetObservationProducer?
     private var pending: [DevelopmentObservation] = []
     private var worker: Task<Void, Never>?
     private var droppedCount: UInt64 = 0
@@ -55,10 +56,12 @@ public final class StjornarvaldObservationEmitter: StjornarvaldObservationRecord
 
     public init(
         submitter: any PolicyObservationSubmitting,
+        nativeTargetProducer: StjornarvaldNativeTargetObservationProducer? = nil,
         shutdown: @escaping @Sendable () async -> Void = {},
         diagnostics: @escaping @Sendable (String) -> Void = { _ in }
     ) {
         self.submitter = submitter
+        self.nativeTargetProducer = nativeTargetProducer
         shutdownSubmitter = shutdown
         self.diagnostics = diagnostics
     }
@@ -127,6 +130,15 @@ public final class StjornarvaldObservationEmitter: StjornarvaldObservationRecord
         while !Task.isCancelled {
             guard let observation = takeNextOrFinish() else { return }
             await submitter.submit(observation)
+            if let nativeObservation = await nativeTargetProducer?.observation(after: observation) {
+                if let durableClient = submitter as? StjornarvaldObservationClient {
+                    if await durableClient.submitRetained(nativeObservation) {
+                        await nativeTargetProducer?.confirmRetention(of: nativeObservation)
+                    }
+                } else {
+                    await submitter.submit(nativeObservation)
+                }
+            }
         }
         finishWorker()
     }
@@ -269,7 +281,7 @@ enum StjornarvaldProductObservationFactory {
         return JSONSupport.sha256Hex(encoded)
     }
 
-    private static func deterministicUUID(_ value: String) -> UUID {
+    static func deterministicUUID(_ value: String) -> UUID {
         let digest = String(JSONSupport.sha256Hex(value).prefix(32))
         let formatted = "\(digest.prefix(8))-\(digest.dropFirst(8).prefix(4))-\(digest.dropFirst(12).prefix(4))-\(digest.dropFirst(16).prefix(4))-\(digest.dropFirst(20))"
         return UUID(uuidString: formatted) ?? UUID()

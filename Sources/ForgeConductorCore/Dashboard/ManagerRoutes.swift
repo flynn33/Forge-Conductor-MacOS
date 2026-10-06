@@ -2718,7 +2718,7 @@ public final class ManagerRoutes: @unchecked Sendable {
                     ))
                 } else if method == "PUT" {
                     guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
-                          Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction", "token"]),
+                          Set(object.keys).isSubset(of: ["expectedRevision", "endpoint", "modelKey", "credentialAction", "token", "maximumOutputTokens"]),
                           let update = try? JSONDecoder().decode(ProviderConfigurationUpdate.self, from: body) else {
                         throw ProviderConfigurationError.invalidRequest
                     }

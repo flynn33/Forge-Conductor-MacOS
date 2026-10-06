@@ -106,11 +106,41 @@ enum SQLiteStoreMutationKind: String, Sendable {
     case memory
     case presence
     case session
+    case continuityProgress
+}
+
+struct InteractiveContinuityHandoffRecord: Sendable {
+    let packet: HandoffPacket
+    let writeSequence: Int64
+    let runtimeScopeKey: String?
+    let sealedSequence: Int64?
+
+    // Completion belongs to the handoff identifier. Reusing a completed ID
+    // cannot redeliver edited content against an earlier native acknowledgement.
+    var isSealed: Bool { sealedSequence != nil }
+}
+
+struct RuntimeContinuityCommit: Sendable {
+    let packet: HandoffPacket
+    let progressCount: Int
+    let failureCount: Int
+
+    var finalize: Bool { packet.resumeReady }
+    var reason: String {
+        Self.reason(finalize: finalize, progressCount: progressCount, failureCount: failureCount)
+    }
+
+    static func reason(finalize: Bool, progressCount: Int, failureCount: Int) -> String {
+        "auto_\(finalize ? "handoff" : "checkpoint") progress=\(progressCount) failed_tools=\(failureCount)"
+    }
 }
 
 /// SQLite3-backed store using the system library.
 public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unchecked Sendable {
-    static let schemaVersion = 8
+    static let schemaVersion = 9
+    static let maximumRuntimeContinuityScopes = 1_024
+    static let maximumRuntimeContinuityPackets = 10_000
+    static let runtimeContinuityPacketCapacityMessage = "Runtime continuity packet capacity reached (10000). Historical evidence was retained; remove only explicitly chosen old continuity data before retrying."
     private static let maximumHandoffQueryRows = 10_000
     private static let maximumPresenceQueryRows = 10_000
     private static let maximumSessionQueryRows = 10_000
@@ -462,6 +492,11 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         );
         CREATE INDEX IF NOT EXISTS idx_context_handoffs_updated
             ON context_handoffs(updated_at DESC);
+        CREATE TABLE IF NOT EXISTS runtime_continuity_progress (
+            scope_key TEXT PRIMARY KEY,
+            state_json BLOB NOT NULL CHECK(length(state_json) <= 131072),
+            updated_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS continuity_ingress_revisions (
             continuity_id TEXT NOT NULL,
             revision INTEGER NOT NULL CHECK(revision > 0),
@@ -524,6 +559,14 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         if try !tableHasColumnUnlocked(table: "context_handoffs", column: "client_id") {
             try execUnlocked("ALTER TABLE context_handoffs ADD COLUMN client_id TEXT;")
         }
+        if try !tableHasColumnUnlocked(table: "context_handoffs", column: "runtime_scope_key") {
+            try execUnlocked("ALTER TABLE context_handoffs ADD COLUMN runtime_scope_key TEXT CHECK(runtime_scope_key IS NULL OR length(runtime_scope_key)=64);")
+        }
+        if try !tableHasColumnUnlocked(table: "context_handoffs", column: "interactive_sealed_sequence") {
+            try execUnlocked("ALTER TABLE context_handoffs ADD COLUMN interactive_sealed_sequence INTEGER CHECK(interactive_sealed_sequence IS NULL OR interactive_sealed_sequence>0);")
+        }
+        try execUnlocked("CREATE INDEX IF NOT EXISTS idx_context_handoffs_runtime_scope ON context_handoffs(runtime_scope_key) WHERE runtime_scope_key IS NOT NULL;")
+        try execUnlocked("CREATE INDEX IF NOT EXISTS idx_context_handoffs_interactive_pending_scope ON context_handoffs(runtime_scope_key,write_sequence DESC) WHERE resume_ready=1 AND interactive_sealed_sequence IS NULL;")
         try execUnlocked("""
         UPDATE context_handoffs
         SET write_sequence = rowid
@@ -682,6 +725,231 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     }
 
     // MARK: - Context handoffs
+
+    func runtimeContinuityProgress(
+        scopeKey: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> RuntimeContinuityProgress? {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try runtimeContinuityProgressUnlocked(scopeKey: scopeKey)
+        }
+    }
+
+    func runtimeContinuityPacketScopeKey(
+        packetID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> String? {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try runtimeContinuityPacketScopeKeyUnlocked(packetID: packetID)
+        }
+    }
+
+    private func runtimeContinuityPacketScopeKeyUnlocked(packetID: String) throws -> String? {
+        try withStatementUnlocked("SELECT runtime_scope_key FROM context_handoffs WHERE id=?") { statement in
+            bind(statement, 1, packetID)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return nil }
+            guard result == SQLITE_ROW else { throw StoreError.execFailed("runtime continuity packet owner read failed") }
+            if sqlite3_column_type(statement, 0) == SQLITE_NULL { return nil }
+            guard sqlite3_column_type(statement, 0) == SQLITE_TEXT,
+                  sqlite3_column_bytes(statement, 0) == 64,
+                  let value = sqlite3_column_text(statement, 0) else {
+                throw StoreError.execFailed("runtime continuity packet owner is invalid")
+            }
+            let key = String(cString: value)
+            guard key.utf8.count == 64 else { throw StoreError.execFailed("runtime continuity packet owner is invalid") }
+            return key
+        }
+    }
+
+    private func recordRuntimeContinuityPacketScopeKeyUnlocked(packetID: String, scopeKey: String) throws {
+        if let existing = try runtimeContinuityPacketScopeKeyUnlocked(packetID: packetID), existing != scopeKey {
+            throw StoreError.conflict("runtime continuity packet belongs to another scope")
+        }
+        try withStatementUnlocked("UPDATE context_handoffs SET runtime_scope_key=? WHERE id=?") { statement in
+            bind(statement, 1, scopeKey)
+            bind(statement, 2, packetID)
+            try stepDone(statement)
+        }
+    }
+
+    func runtimeContinuityScopeCapacityReached(cancellation: ToolCallCancellation? = nil) throws -> Bool {
+        try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            (try queryIntUnlocked("SELECT COUNT(*) FROM runtime_continuity_progress") ?? 0) >= Self.maximumRuntimeContinuityScopes
+        }
+    }
+
+    private func requireRuntimeContinuityPacketCapacityUnlocked(packetID: String) throws {
+        let alreadyOwned = try withStatementUnlocked("SELECT runtime_scope_key FROM context_handoffs WHERE id=?") { statement in
+            bind(statement, 1, packetID)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return false }
+            guard result == SQLITE_ROW else { throw StoreError.execFailed("runtime continuity packet capacity read failed") }
+            return sqlite3_column_type(statement, 0) != SQLITE_NULL
+        }
+        if !alreadyOwned, (try queryIntUnlocked("SELECT COUNT(*) FROM context_handoffs WHERE runtime_scope_key IS NOT NULL") ?? 0) >= Self.maximumRuntimeContinuityPackets {
+            throw StoreError.execFailed(Self.runtimeContinuityPacketCapacityMessage)
+        }
+    }
+
+    @discardableResult
+    func updateRuntimeContinuityProgress(
+        scopeKey: String,
+        cancellation: ToolCallCancellation? = nil,
+        _ mutation: (inout RuntimeContinuityProgress) throws -> Void
+    ) throws -> RuntimeContinuityProgress {
+        guard scopeKey.utf8.count == 64 else { throw StoreError.execFailed("invalid continuity scope") }
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, mutationKind: .continuityProgress) {
+                let prior = try runtimeContinuityProgressUnlocked(scopeKey: scopeKey)
+                if prior == nil {
+                    guard (try queryIntUnlocked("SELECT COUNT(*) FROM runtime_continuity_progress") ?? 0)
+                            < Self.maximumRuntimeContinuityScopes else {
+                        throw StoreError.execFailed("runtime continuity scope capacity reached")
+                    }
+                }
+                var state = prior ?? RuntimeContinuityProgress()
+                try mutation(&state)
+                try writeRuntimeContinuityProgressUnlocked(state, scopeKey: scopeKey)
+                return state
+            }
+        }
+    }
+
+    private func runtimeContinuityProgressUnlocked(scopeKey: String) throws -> RuntimeContinuityProgress? {
+        try withStatementUnlocked("SELECT state_json FROM runtime_continuity_progress WHERE scope_key=?") { statement in
+            bind(statement, 1, scopeKey)
+            let result = sqlite3_step(statement)
+            if result == SQLITE_DONE { return nil }
+            guard result == SQLITE_ROW, let bytes = sqlite3_column_blob(statement, 0) else {
+                throw StoreError.execFailed("runtime continuity progress read failed")
+            }
+            let count = Int(sqlite3_column_bytes(statement, 0))
+            guard (1...131_072).contains(count) else { throw StoreError.execFailed("runtime continuity progress is too large") }
+            return try JSONDecoder().decode(RuntimeContinuityProgress.self, from: Data(bytes: bytes, count: count)).validated()
+        }
+    }
+
+    private func writeRuntimeContinuityProgressUnlocked(_ state: RuntimeContinuityProgress, scopeKey: String) throws {
+        let data = try JSONEncoder().encode(state.validated())
+        guard data.count <= 131_072 else { throw StoreError.execFailed("runtime continuity progress is too large") }
+        try withStatementUnlocked("""
+            INSERT INTO runtime_continuity_progress(scope_key,state_json,updated_at) VALUES(?,?,?)
+            ON CONFLICT(scope_key) DO UPDATE SET state_json=excluded.state_json,updated_at=excluded.updated_at
+            """) { statement in
+            bind(statement, 1, scopeKey)
+            bindIngressBytes(statement, 2, data)
+            bind(statement, 3, ISO8601.string(from: clock.now()))
+            try stepDone(statement)
+        }
+    }
+
+    @discardableResult
+    func handoffUpsertCompletingRuntimeProgress(
+        _ packet: HandoffPacket,
+        claim: RuntimeContinuityProgressClaim,
+        preparePacket: ((HandoffPacket, Bool, Int, Int) throws -> HandoffPacket)? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> RuntimeContinuityCommit {
+        let committedAt = clock.now()
+        let timestamp = ISO8601.string(from: committedAt)
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                guard var progress = try runtimeContinuityProgressUnlocked(scopeKey: claim.scopeKey),
+                      progress.epoch == claim.epoch, progress.pending == claim,
+                      packet.id == claim.packetID, packet.resumeReady == claim.finalize else {
+                    throw StoreError.conflict("runtime continuity claim changed before packet commit")
+                }
+                let finalize = claim.finalize || progress.rolloverRequested == true
+                let progressCount = finalize ? progress.progressCount : claim.progressCount
+                let failureCount = finalize ? progress.failureCount : claim.failureCount
+                // Preparation is a bounded, synchronous value transformation. It
+                // must not reenter storage, touch files or suspend under this fence.
+                let committedPacket: HandoffPacket
+                if let preparePacket {
+                    committedPacket = try preparePacket(packet, finalize, progressCount, failureCount)
+                } else {
+                    guard packet.resumeReady == finalize else {
+                        throw StoreError.conflict("runtime continuity promotion requires packet preparation")
+                    }
+                    committedPacket = packet
+                }
+                guard committedPacket.id == packet.id,
+                      committedPacket.clientID == packet.clientID,
+                      committedPacket.cwd == packet.cwd,
+                      committedPacket.resumeReady == finalize else {
+                    throw StoreError.conflict("runtime continuity preparation changed packet identity or outcome")
+                }
+                let json = try JSONSupport.string(from: committedPacket.asDictionary())
+                try requireRuntimeContinuityPacketCapacityUnlocked(packetID: committedPacket.id)
+                try handoffUpsertUnlocked(committedPacket, json: json, timestamp: timestamp, cancellation: cancellation)
+                try recordRuntimeContinuityPacketScopeKeyUnlocked(packetID: committedPacket.id, scopeKey: claim.scopeKey)
+                progress.lastCheckpointCount = progressCount
+                progress.lastCheckpointFailureCount = failureCount
+                progress.lastCheckpointAt = finalize ? committedAt : claim.claimedAt
+                progress.latestPacketID = committedPacket.id
+                progress.latestRuntimeCheckpointID = finalize ? nil : committedPacket.id
+                progress.capacityFailure = nil
+                progress.pending = nil
+                if finalize {
+                    progress.rolloverRequested = nil
+                    progress.lastHandoffCount = progressCount
+                    progress.lastHandoffFailureCount = failureCount
+                    progress.lastHandoffAt = committedAt
+                    progress.blocked = true
+                    progress.lastHandoffID = committedPacket.id
+                    progress.lastResumeSeed = RuntimeContinuityProgress.resumeSeed(for: committedPacket)
+                }
+                try writeRuntimeContinuityProgressUnlocked(progress, scopeKey: claim.scopeKey)
+                return RuntimeContinuityCommit(packet: committedPacket, progressCount: progressCount, failureCount: failureCount)
+            }
+        }
+    }
+
+    func handoffUpsertRecordingRuntimeProgress(
+        _ packet: HandoffPacket,
+        scopeKey: String,
+        blockProgress: Bool = false,
+        expectedEpoch: String? = nil,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        guard scopeKey.utf8.count == 64 else { throw StoreError.execFailed("invalid continuity scope") }
+        guard !blockProgress || packet.resumeReady else { throw StoreError.conflict("runtime continuity block requires a resume-ready packet") }
+        let json = try JSONSupport.string(from: packet.asDictionary())
+        let timestamp = ISO8601.string(from: clock.now())
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                let prior = try runtimeContinuityProgressUnlocked(scopeKey: scopeKey)
+                if prior == nil {
+                    guard (try queryIntUnlocked("SELECT COUNT(*) FROM runtime_continuity_progress") ?? 0)
+                            < Self.maximumRuntimeContinuityScopes else {
+                        throw StoreError.execFailed("runtime continuity scope capacity reached")
+                    }
+                }
+                var progress = prior ?? RuntimeContinuityProgress()
+                if let expectedEpoch {
+                    guard progress.epoch == expectedEpoch, !progress.blocked else {
+                        throw StoreError.conflict("runtime continuity budget changed before packet commit")
+                    }
+                }
+                try requireRuntimeContinuityPacketCapacityUnlocked(packetID: packet.id)
+                try handoffUpsertUnlocked(packet, json: json, timestamp: timestamp, cancellation: cancellation)
+                try recordRuntimeContinuityPacketScopeKeyUnlocked(packetID: packet.id, scopeKey: scopeKey)
+                progress.latestPacketID = packet.id
+                progress.latestRuntimeCheckpointID = nil
+                progress.capacityFailure = nil
+                // A newer model save supersedes an unfinished inferred save.
+                // Its exact task is committed with the pointer, without resetting budgets.
+                progress.pending = nil
+                if packet.resumeReady {
+                    progress.lastHandoffID = packet.id
+                    progress.lastResumeSeed = RuntimeContinuityProgress.resumeSeed(for: packet)
+                }
+                if blockProgress { progress.blocked = true }
+                try writeRuntimeContinuityProgressUnlocked(progress, scopeKey: scopeKey)
+            }
+        }
+    }
 
     public func handoffUpsert(
         _ packet: HandoffPacket,
@@ -1566,9 +1834,14 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     /// selected; invalidation or a later legacy overwrite cannot remove ownership.
     public func handoffLegacyGet(
         id: String,
+        readScope: ContinuityPacketReadScope? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket? {
-        try withControlledStatement(
+        if let readScope {
+            return try handoffScopedReadPackets(readScope: readScope, id: id,
+                limit: 1, cancellation: cancellation).first
+        }
+        return try withControlledStatement(
             "SELECT id,packet_json FROM context_handoffs WHERE id=? AND "
                 + Self.legacyHandoffPredicate,
             cancellation: cancellation
@@ -1581,8 +1854,13 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
     public func handoffLegacyLatest(
         resumeReadyOnly: Bool = false,
         clientID: String? = nil,
+        readScope: ContinuityPacketReadScope? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket? {
+        if let readScope {
+            return try handoffScopedReadPackets(readScope: readScope, clientID: clientID,
+                resumeReadyOnly: resumeReadyOnly, limit: 1, cancellation: cancellation).first
+        }
         var predicates = [Self.legacyHandoffPredicate]
         if resumeReadyOnly { predicates.append("resume_ready=1") }
         if clientID != nil { predicates.append("client_id=?") }
@@ -1596,14 +1874,298 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
 
     public func handoffLegacyList(
         limit: Int = 20,
+        unscopedOnly: Bool = false,
+        excludingPacketIDs: Set<String> = [],
+        pendingInteractiveOnly: Bool = false,
+        readScope: ContinuityPacketReadScope? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [HandoffPacket] {
+        guard excludingPacketIDs.count <= 128,
+              excludingPacketIDs.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw StoreError.execFailed("continuity selection exclusions are invalid")
+        }
         let boundedLimit = max(1, min(limit, 100))
+        if let readScope {
+            return try handoffScopedReadPackets(readScope: readScope, resumeReadyOnly: false,
+                limit: boundedLimit, excludingPacketIDs: excludingPacketIDs,
+                unscopedOnly: unscopedOnly, pendingInteractiveOnly: pendingInteractiveOnly,
+                cancellation: cancellation)
+        }
+        if !excludingPacketIDs.isEmpty {
+            let ids = excludingPacketIDs.sorted()
+            let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ",")
+            return try handoffList(
+                sql: "SELECT id,packet_json FROM context_handoffs WHERE " + Self.legacyHandoffPredicate
+                    + (unscopedOnly ? " AND runtime_scope_key IS NULL" : "")
+                    + (pendingInteractiveOnly ? " AND resume_ready=1 AND interactive_sealed_sequence IS NULL" : "")
+                    + " AND id NOT IN (\(placeholders)) ORDER BY write_sequence DESC LIMIT \(boundedLimit)",
+                bindings: ids, cancellation: cancellation
+            )
+        }
         return try handoffList(
             sql: "SELECT id,packet_json FROM context_handoffs WHERE "
-                + Self.legacyHandoffPredicate + " ORDER BY write_sequence DESC LIMIT \(boundedLimit)",
+                + Self.legacyHandoffPredicate + (unscopedOnly ? " AND runtime_scope_key IS NULL" : "")
+                + (pendingInteractiveOnly ? " AND resume_ready=1 AND interactive_sealed_sequence IS NULL" : "")
+                + " ORDER BY write_sequence DESC LIMIT \(boundedLimit)",
             cancellation: cancellation
         )
+    }
+
+    /// Separate current-owned and NULL legacy metadata scans keep newer foreign
+    /// history from crowding the returned page. Each scan has the existing
+    /// inventory bound; only the newest requested matching packets are decoded.
+    private func handoffScopedReadPackets(
+        readScope: ContinuityPacketReadScope,
+        id: String? = nil,
+        clientID: String? = nil,
+        resumeReadyOnly: Bool = false,
+        limit: Int,
+        excludingPacketIDs: Set<String> = [],
+        unscopedOnly: Bool = false,
+        pendingInteractiveOnly: Bool = false,
+        cancellation: ToolCallCancellation?
+    ) throws -> [HandoffPacket] {
+        let keys = readScope.runtimeScopeKeys.sorted()
+        guard keys.count <= 33, keys.allSatisfy({ $0.utf8.count == 64 }),
+              excludingPacketIDs.count <= 128,
+              excludingPacketIDs.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw StoreError.execFailed("continuity read scope is outside bounds")
+        }
+        let boundedLimit = max(1, min(limit, 100))
+        guard let suppliedRoots = readScope.canonicalRoots else {
+            guard keys.isEmpty else { throw StoreError.execFailed("unbound continuity read cannot select runtime scopes") }
+            var predicates = [Self.legacyHandoffPredicate, "runtime_scope_key IS NULL"]
+            var bindings: [String] = []
+            if let id { predicates.append("id=?"); bindings.append(id) }
+            if let clientID { predicates.append("client_id=?"); bindings.append(clientID) }
+            if resumeReadyOnly { predicates.append("resume_ready=1") }
+            if pendingInteractiveOnly { predicates.append("resume_ready=1 AND interactive_sealed_sequence IS NULL") }
+            if !excludingPacketIDs.isEmpty {
+                let excluded = excludingPacketIDs.sorted()
+                predicates.append("id NOT IN (" + Array(repeating: "?", count: excluded.count).joined(separator: ",") + ")")
+                bindings.append(contentsOf: excluded)
+            }
+            return try handoffList(sql: "SELECT id,packet_json FROM context_handoffs WHERE "
+                + predicates.joined(separator: " AND ") + " ORDER BY write_sequence DESC LIMIT \(boundedLimit)",
+                bindings: bindings, cancellation: cancellation)
+        }
+        guard !suppliedRoots.isEmpty, suppliedRoots.count <= 32,
+              suppliedRoots.allSatisfy({ $0.path.utf8.count <= 4_096 }) else {
+            throw StoreError.execFailed("continuity read roots are outside bounds")
+        }
+        let roots = suppliedRoots.map { $0.resolvingSymlinksInPath().standardizedFileURL.path }
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            var selected: [(id: String, sequence: Int64)] = []
+            var canonicalPaths: [String: String] = [:]
+            func owns(_ cwd: String) -> Bool {
+                guard !cwd.isEmpty, cwd.utf8.count <= 4_096 else { return false }
+                let canonical: String
+                if let cached = canonicalPaths[cwd] { canonical = cached }
+                else {
+                    canonical = ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
+                    if canonicalPaths.count == 64, let first = canonicalPaths.keys.first {
+                        canonicalPaths.removeValue(forKey: first)
+                    }
+                    canonicalPaths[cwd] = canonical
+                }
+                return roots.contains { canonical == $0 || canonical.hasPrefix($0 == "/" ? "/" : $0 + "/") }
+            }
+            var ownershipQueries: [(String, [String])] = [("runtime_scope_key IS NULL", [])]
+            if !unscopedOnly, !keys.isEmpty {
+                ownershipQueries.insert(("runtime_scope_key IN (" + Array(repeating: "?", count: keys.count).joined(separator: ",") + ")", keys), at: 0)
+            }
+            for (ownership, scopeBindings) in ownershipQueries {
+                try cancellation?.checkCancellation()
+                var predicates = [Self.legacyHandoffPredicate, ownership]
+                var bindings = scopeBindings
+                if let id { predicates.append("id=?"); bindings.append(id) }
+                if let clientID { predicates.append("client_id=?"); bindings.append(clientID) }
+                if resumeReadyOnly { predicates.append("resume_ready=1") }
+                if pendingInteractiveOnly { predicates.append("resume_ready=1 AND interactive_sealed_sequence IS NULL") }
+                if !excludingPacketIDs.isEmpty {
+                    let excluded = excludingPacketIDs.sorted()
+                    predicates.append("id NOT IN (" + Array(repeating: "?", count: excluded.count).joined(separator: ",") + ")")
+                    bindings.append(contentsOf: excluded)
+                }
+                let sql = """
+                    SELECT id,write_sequence,CASE WHEN json_valid(CAST(packet_json AS TEXT))
+                        THEN json_extract(CAST(packet_json AS TEXT),'$.task.cwd') ELSE NULL END
+                    FROM context_handoffs WHERE \(predicates.joined(separator: " AND "))
+                    ORDER BY write_sequence DESC LIMIT \(id == nil ? Self.maximumHandoffQueryRows : 1)
+                    """
+                try withStatementUnlocked(sql) { statement in
+                    for (index, value) in bindings.enumerated() { bind(statement, Int32(index + 1), value) }
+                    while true {
+                        try cancellation?.checkCancellation()
+                        let result = sqlite3_step(statement)
+                        if result == SQLITE_DONE { break }
+                        guard result == SQLITE_ROW else { throw sqliteStepError(result) }
+                        let sequence = sqlite3_column_int64(statement, 1)
+                        if selected.count == boundedLimit, sequence <= selected.last!.sequence { break }
+                        if ownership != "runtime_scope_key IS NULL" || readScope.legacyRequiresProjectRoot {
+                            guard sqlite3_column_type(statement, 2) == SQLITE_TEXT,
+                                  sqlite3_column_bytes(statement, 2) <= 4_096,
+                                  let cwd = sqlite3_column_text(statement, 2), owns(String(cString: cwd)) else { continue }
+                        }
+                        guard let packetID = sqlite3_column_text(statement, 0) else { continue }
+                        selected.append((String(cString: packetID), sequence))
+                        selected.sort { $0.sequence > $1.sequence }
+                        if selected.count > boundedLimit { selected.removeLast() }
+                    }
+                }
+            }
+            var packets: [HandoffPacket] = []
+            for candidate in selected {
+                try cancellation?.checkCancellation()
+                let scopePredicate = unscopedOnly || keys.isEmpty ? "runtime_scope_key IS NULL"
+                    : "(runtime_scope_key IS NULL OR runtime_scope_key IN ("
+                        + Array(repeating: "?", count: keys.count).joined(separator: ",") + "))"
+                let selectedPacket = try withStatementUnlocked(
+                    "SELECT id,packet_json,runtime_scope_key FROM context_handoffs WHERE id=? AND " + Self.legacyHandoffPredicate
+                        + " AND " + scopePredicate
+                ) { statement -> (packet: HandoffPacket, runtimeOwned: Bool)? in
+                    bind(statement, 1, candidate.id)
+                    if !unscopedOnly, !keys.isEmpty {
+                        for (index, key) in keys.enumerated() { bind(statement, Int32(index + 2), key) }
+                    }
+                    guard let packet = try handoffPacketFromFirstRow(statement, cancellation: cancellation) else { return nil }
+                    return (packet, sqlite3_column_type(statement, 2) != SQLITE_NULL)
+                }
+                if let selectedPacket {
+                    if !selectedPacket.runtimeOwned, !readScope.legacyRequiresProjectRoot {
+                        packets.append(selectedPacket.packet)
+                    } else if let cwd = selectedPacket.packet.cwd, owns(cwd) {
+                        packets.append(selectedPacket.packet)
+                    }
+                }
+            }
+            return packets
+        }
+    }
+
+    func interactiveContinuityHandoffRecord(
+        packetID: String,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> InteractiveContinuityHandoffRecord? {
+        guard !packetID.isEmpty, packetID.utf8.count <= 256 else {
+            throw StoreError.execFailed("interactive continuity packet identity is invalid")
+        }
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            try interactiveContinuityHandoffRecordUnlocked(packetID: packetID, cancellation: cancellation)
+        }
+    }
+
+    private func interactiveContinuityHandoffRecordUnlocked(
+        packetID: String,
+        cancellation: ToolCallCancellation?
+    ) throws -> InteractiveContinuityHandoffRecord? {
+        try withStatementUnlocked("""
+            SELECT id,packet_json,write_sequence,runtime_scope_key,interactive_sealed_sequence
+            FROM context_handoffs WHERE id=? AND \(Self.legacyHandoffPredicate)
+            """) { statement in
+            bind(statement, 1, packetID)
+            guard let packet = try handoffPacketFromFirstRow(statement, cancellation: cancellation) else { return nil }
+            let sequence = sqlite3_column_int64(statement, 2)
+            guard sequence > 0 else { throw StoreError.conflict("interactive continuity packet sequence is invalid") }
+            return InteractiveContinuityHandoffRecord(packet: packet, writeSequence: sequence,
+                runtimeScopeKey: textCol(statement, 3),
+                sealedSequence: sqlite3_column_type(statement, 4) == SQLITE_NULL ? nil : sqlite3_column_int64(statement, 4))
+        }
+    }
+
+    /// The caller holds current project-generation authority and has received
+    /// the exact successor acknowledgement. The packet itself remains unchanged.
+    func sealInteractiveContinuityHandoff(
+        expected: InteractiveContinuityHandoffRecord,
+        cancellation: ToolCallCancellation? = nil
+    ) throws {
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                guard let current = try interactiveContinuityHandoffRecordUnlocked(
+                    packetID: expected.packet.id, cancellation: cancellation),
+                      current.writeSequence == expected.writeSequence,
+                      current.packet == expected.packet, current.packet.resumeReady,
+                      current.runtimeScopeKey == expected.runtimeScopeKey else {
+                    throw StoreError.conflict("interactive continuity packet changed before completion")
+                }
+                if current.isSealed { return }
+                try withStatementUnlocked("UPDATE context_handoffs SET interactive_sealed_sequence=write_sequence WHERE id=?") { statement in
+                    bind(statement, 1, expected.packet.id)
+                    try stepDone(statement)
+                }
+            }
+        }
+    }
+
+    /// Import only the existing bounded compatibility ledger. Its IDs have the
+    /// established no-redelivery meaning even when a model later edits that ID.
+    func importInteractiveContinuitySeals(
+        packetIDs: [String], cancellation: ToolCallCancellation? = nil
+    ) throws {
+        let ids = Array(Set(packetIDs)).sorted()
+        guard ids.count <= 128, ids.allSatisfy({ UUID(uuidString: $0) != nil }) else {
+            throw StoreError.execFailed("interactive continuity completion inventory is invalid")
+        }
+        guard !ids.isEmpty else { return }
+        try withLockedSQLiteOperation(cancellation: cancellation) {
+            try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                for id in ids {
+                    try cancellation?.checkCancellation()
+                    try withStatementUnlocked("""
+                        UPDATE context_handoffs SET interactive_sealed_sequence=write_sequence
+                        WHERE id=? AND resume_ready=1 AND write_sequence>0
+                          AND interactive_sealed_sequence IS NULL AND \(Self.legacyHandoffPredicate)
+                        """) { statement in
+                        bind(statement, 1, id)
+                        try stepDone(statement)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Current trusted binding keys select directly through the scope index;
+    /// newer fenced history cannot hide a still-current handoff.
+    func handoffRuntimeLatest(
+        scopeKeys: Set<String>,
+        excludingPacketIDs: Set<String> = [],
+        pendingInteractiveOnly: Bool = false,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> (packet: HandoffPacket, writeSequence: Int64)? {
+        guard scopeKeys.count <= 1_600, scopeKeys.allSatisfy({ $0.utf8.count == 64 }) else {
+            throw StoreError.execFailed("runtime continuity selection scope is invalid")
+        }
+        guard !scopeKeys.isEmpty else { return nil }
+        guard excludingPacketIDs.count <= 128,
+              excludingPacketIDs.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }) else {
+            throw StoreError.execFailed("continuity selection exclusions are invalid")
+        }
+        let keys = scopeKeys.sorted()
+        let excluded = excludingPacketIDs.sorted()
+        return try withLockedSQLiteOperation(cancellation: cancellation, checkAfterSuccess: true) {
+            var latest: (packet: HandoffPacket, writeSequence: Int64)?
+            for start in stride(from: 0, to: keys.count, by: 256) {
+                try cancellation?.checkCancellation()
+                let chunk = Array(keys[start..<min(start + 256, keys.count)])
+                let parameters = Array(repeating: "?", count: chunk.count).joined(separator: ",")
+                let exclusion = excluded.isEmpty ? "" : " AND id NOT IN ("
+                    + Array(repeating: "?", count: excluded.count).joined(separator: ",") + ")"
+                let sql = "SELECT id,packet_json,write_sequence FROM context_handoffs WHERE resume_ready=1 AND "
+                    + Self.legacyHandoffPredicate + " AND runtime_scope_key IN (\(parameters))"
+                    + (pendingInteractiveOnly ? " AND interactive_sealed_sequence IS NULL" : "")
+                    + exclusion + " ORDER BY write_sequence DESC LIMIT 1"
+                let candidate = try withStatementUnlocked(sql) { statement -> (packet: HandoffPacket, writeSequence: Int64)? in
+                    for (index, key) in chunk.enumerated() { bind(statement, Int32(index + 1), key) }
+                    for (index, id) in excluded.enumerated() { bind(statement, Int32(chunk.count + index + 1), id) }
+                    guard let packet = try handoffPacketFromFirstRow(statement, cancellation: cancellation) else { return nil }
+                    return (packet, sqlite3_column_int64(statement, 2))
+                }
+                if let candidate, candidate.writeSequence > (latest?.writeSequence ?? Int64.min) {
+                    latest = candidate
+                }
+            }
+            return latest
+        }
     }
 
     public func handoffLegacyListAll(
@@ -1693,9 +2255,11 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
 
     private func handoffList(
         sql: String,
+        bindings: [String] = [],
         cancellation: ToolCallCancellation?
     ) throws -> [HandoffPacket] {
         try withControlledStatement(sql, cancellation: cancellation) { stmt in
+            for (index, value) in bindings.enumerated() { bind(stmt, Int32(index + 1), value) }
             var out: [HandoffPacket] = []
             while true {
                 try cancellation?.checkCancellation()

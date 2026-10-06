@@ -7,6 +7,19 @@
 import Foundation
 import Darwin
 
+/// Native tools supply current project scope; nil retains the direct legacy API.
+public struct ContinuityPacketReadScope: Sendable {
+    let runtimeScopeKeys: Set<String>
+    let canonicalRoots: [URL]?
+    let legacyRequiresProjectRoot: Bool
+
+    init(runtimeScopeKeys: Set<String>, canonicalRoots: [URL]?, legacyRequiresProjectRoot: Bool = true) {
+        self.runtimeScopeKeys = runtimeScopeKeys
+        self.canonicalRoots = canonicalRoots
+        self.legacyRequiresProjectRoot = legacyRequiresProjectRoot
+    }
+}
+
 /// Context + agent continuity control plane (stdio MCP / same serve binary).
 public final class ContextContinuityService: @unchecked Sendable {
     static let maximumAgentSnapshots = 128
@@ -41,6 +54,11 @@ public final class ContextContinuityService: @unchecked Sendable {
     }
 
     // MARK: - Public tool operations
+
+    public static func interactiveRolloverNonce(handoffID: String) -> String {
+        let hex = JSONSupport.sha256Hex("lmstudio-gui-rollover:\(handoffID)")
+        return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))"
+    }
 
     /// Records proof that an ordinary MCP client consumed the exact resume-ready
     /// packet through `get_forge_status(resume=true)`. A rollover nonce prevents
@@ -356,20 +374,77 @@ public final class ContextContinuityService: @unchecked Sendable {
         return payload
     }
 
+    func persistRuntimeModelPacket(
+        arguments: [String: Any],
+        clientID: ClientID,
+        context: ToolInvocationContext,
+        scopeKey: String,
+        finalize: Bool,
+        cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
+        guard context.clientID == clientID else { throw StoreError.conflict("runtime continuity client changed") }
+        let persisted = try mutateAndPersist(runtimeScopeKey: scopeKey, cancellation: cancellation) {
+            let current = try store.runtimeContinuityProgress(scopeKey: scopeKey, cancellation: cancellation)
+            let explicitID = ToolArgHelpers.string(arguments, "handoff_id") ?? ToolArgHelpers.string(arguments, "id")
+            let priorID = explicitID ?? current?.latestPacketID
+            let prior = try priorID.flatMap { try store.handoffLegacyGet(id: $0, cancellation: cancellation) }
+            if let explicitID, prior == nil { throw StoreError.notFound("Unknown handoff packet: \(explicitID)") }
+            func ownsPath(_ cwd: String) -> Bool {
+                let path = ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
+                return context.authorizationScope.canonicalRoots.contains { root in
+                    let canonical = root.resolvingSymlinksInPath().standardizedFileURL.path
+                    return path == canonical || path.hasPrefix(canonical + "/")
+                }
+            }
+            if let prior, prior.cwd.map(ownsPath) != true {
+                throw StoreError.conflict("handoff packet is outside the selected project")
+            }
+            var args = arguments
+            if let cwd = ToolArgHelpers.string(args, "cwd"), !ownsPath(cwd) {
+                throw StoreError.conflict("handoff workspace is outside the selected project")
+            }
+            if args["cwd"] == nil { args["cwd"] = context.authorizationScope.canonicalRoots.first?.path }
+            let packetID = explicitID ?? (prior?.resumeReady == false ? prior?.id : nil) ?? UUID().uuidString.lowercased()
+            var packet = try buildPacket(arguments: args, clientID: clientID, source: .model,
+                finalize: finalize, runtimePacketID: packetID, runtimePriorPacketID: prior?.id,
+                cancellation: cancellation)
+            packet.resumeReady = finalize
+            if finalize, packet.resumeSeed.isEmpty {
+                packet.resumeSeed = packet.defaultResumeSeed()
+                packet.resumeSeedIsCustom = false
+            }
+            return packet
+        }
+        let packet = persisted.packet
+        diagnostics.info(finalize ? "session_handoff" : "session_checkpoint", [
+            "handoff_id": packet.id, "client_id": clientID.rawValue,
+            "source": HandoffSource.model.rawValue, "agents": "\(packet.agents.count)",
+        ], category: .general)
+        var payload = successPayload(packet, action: finalize ? "handoff" : "checkpoint", projectionWarning: persisted.projectionWarning)
+        if finalize {
+            payload["handoff_required"] = true
+            payload["message"] = "Handoff saved. Forge will start the successor LM Studio session and request get_forge_status with resume=true after the rollover delay."
+        }
+        return payload
+    }
+
     public func get(
         id: String? = nil,
         preferResumeReady: Bool = false,
+        readScope: ContinuityPacketReadScope? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
         let packet: HandoffPacket?
         if let id, !id.isEmpty {
-            packet = try store.handoffLegacyGet(id: id, cancellation: cancellation)
+            packet = try store.handoffLegacyGet(id: id, readScope: readScope, cancellation: cancellation)
         } else {
             packet = try store.handoffLegacyLatest(
                 resumeReadyOnly: preferResumeReady,
+                readScope: readScope,
                 cancellation: cancellation
             ) ?? store.handoffLegacyLatest(
                 resumeReadyOnly: false,
+                readScope: readScope,
                 cancellation: cancellation
             )
         }
@@ -397,9 +472,10 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     public func list(
         limit: Int = 10,
+        readScope: ContinuityPacketReadScope? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
-        let packets = try store.handoffLegacyList(limit: limit, cancellation: cancellation)
+        let packets = try store.handoffLegacyList(limit: limit, readScope: readScope, cancellation: cancellation)
         return [
             "ok": true,
             "count": packets.count,
@@ -453,14 +529,17 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     /// Compact status for forge_status.
     public func statusSummary(
+        readScope: ContinuityPacketReadScope? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
         let latest = try store.handoffLegacyLatest(
             resumeReadyOnly: false,
+            readScope: readScope,
             cancellation: cancellation
         )
         let resume = try store.handoffLegacyLatest(
             resumeReadyOnly: true,
+            readScope: readScope,
             cancellation: cancellation
         )
         let open = try store.sessionList(cancellation: cancellation).filter(\.status.isOpen)
@@ -494,21 +573,70 @@ public final class ContextContinuityService: @unchecked Sendable {
         attemptID: UUID? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket {
+        try autoPersist(
+            clientID: clientID, reason: reason, finalize: finalize, inferred: inferred,
+            attemptID: attemptID, runtimeClaim: nil, runtimePriorPacketID: nil,
+            cancellation: cancellation
+        ).packet
+    }
+
+    func autoPersistRuntime(
+        clientID: ClientID,
+        reason: String,
+        inferred: [String: Any],
+        attemptID: UUID,
+        claim: RuntimeContinuityProgressClaim,
+        priorPacketID: String?,
+        cancellation: ToolCallCancellation?
+    ) throws -> RuntimeContinuityCommit {
+        let persisted = try autoPersist(
+            clientID: clientID, reason: reason, finalize: claim.finalize, inferred: inferred,
+            attemptID: attemptID, runtimeClaim: claim, runtimePriorPacketID: priorPacketID,
+            cancellation: cancellation
+        )
+        return RuntimeContinuityCommit(packet: persisted.packet,
+            progressCount: persisted.runtimeProgressCount, failureCount: persisted.runtimeFailureCount)
+    }
+
+    private func autoPersist(
+        clientID: ClientID,
+        reason: String,
+        finalize: Bool,
+        inferred: [String: Any],
+        attemptID: UUID?,
+        runtimeClaim: RuntimeContinuityProgressClaim?,
+        runtimePriorPacketID: String?,
+        cancellation: ToolCallCancellation?
+    ) throws -> PersistenceOutcome {
         var candidateID: String?
         var failureStage = "continuity_lock"
         let persisted: PersistenceOutcome
+        let runtimePreparation: ((HandoffPacket, Bool, Int, Int) throws -> HandoffPacket)?
+        if runtimeClaim != nil {
+            let useDefaultHandoffStatus = inferred["status"] == nil
+            runtimePreparation = { packet, finalize, progressCount, failureCount in
+                Self.prepareRuntimePacket(packet, finalize: finalize,
+                    progressCount: progressCount, failureCount: failureCount,
+                    useDefaultHandoffStatus: useDefaultHandoffStatus)
+            }
+        } else {
+            runtimePreparation = nil
+        }
         do {
-            persisted = try mutateAndPersist(cancellation: cancellation, stageObserver: { failureStage = $0 }) {
+            persisted = try mutateAndPersist(runtimeClaim: runtimeClaim,
+                runtimePacketPreparation: runtimePreparation,
+                cancellation: cancellation, stageObserver: { failureStage = $0 }) {
                 failureStage = "latest_packet_lookup"
                 var args = inferred
-                if let latest = try store.handoffLegacyLatest(
-                    clientID: clientID.rawValue,
-                    cancellation: cancellation
-                ) ?? store.handoffLegacyLatest(
-                    resumeReadyOnly: false,
-                    cancellation: cancellation
-                ) {
-                    args["handoff_id"] = latest.id
+                let latest: HandoffPacket?
+                if runtimeClaim != nil {
+                    latest = try runtimePriorPacketID.flatMap { try store.handoffLegacyGet(id: $0, cancellation: cancellation) }
+                } else {
+                    latest = try store.handoffLegacyLatest(clientID: clientID.rawValue, cancellation: cancellation)
+                        ?? store.handoffLegacyLatest(resumeReadyOnly: false, cancellation: cancellation)
+                }
+                if let latest {
+                    if runtimeClaim == nil { args["handoff_id"] = latest.id }
                     // Runtime inference fills blanks only. A model/budget packet already
                     // has the structured task; overwriting it would drop operator state.
                     if !latest.goal.isEmpty { args.removeValue(forKey: "goal") }
@@ -522,7 +650,7 @@ public final class ContextContinuityService: @unchecked Sendable {
                 }
                 // Soft auto-checkpoints must not invent a status. Forcing
                 // "in_progress" is what made an exploration packet look like a live resume.
-                if finalize, args["status"] == nil {
+                if finalize, runtimeClaim == nil, args["status"] == nil {
                     args["status"] = "handoff_ready"
                 }
                 failureStage = "packet_build"
@@ -532,12 +660,14 @@ public final class ContextContinuityService: @unchecked Sendable {
                     source: .auto,
                     finalize: finalize,
                     preserveAuthorIdentity: true,
+                    runtimePacketID: runtimeClaim?.packetID,
+                    runtimePriorPacketID: runtimePriorPacketID,
                     cancellation: cancellation
                 )
-                if packet.goal.isEmpty {
+                if packet.goal.isEmpty, runtimeClaim == nil {
                     packet.goal = finalize ? "Auto-handoff: \(reason)" : "Auto-checkpoint: \(reason)"
                 }
-                if finalize {
+                if finalize, runtimeClaim == nil {
                     let note = "Runtime continuity: \(reason)"
                     if packet.narrative.isEmpty {
                         packet.narrative = note
@@ -547,7 +677,7 @@ public final class ContextContinuityService: @unchecked Sendable {
                         )
                     }
                 }
-                if finalize {
+                if finalize, runtimeClaim == nil {
                     packet.resumeReady = true
                     if !packet.resumeSeedIsCustom {
                         packet.resumeSeed = packet.defaultResumeSeed()
@@ -573,23 +703,53 @@ public final class ContextContinuityService: @unchecked Sendable {
             ], category: .general)
             throw error
         }
-        diagnostics.info(finalize ? "auto_handoff_persist" : "auto_checkpoint_persist", [
+        let actualFinalize = runtimeClaim == nil ? finalize : persisted.packet.resumeReady
+        let actualReason = runtimeClaim == nil ? reason : RuntimeContinuityCommit(
+            packet: persisted.packet, progressCount: persisted.runtimeProgressCount,
+            failureCount: persisted.runtimeFailureCount).reason
+        diagnostics.info(actualFinalize ? "auto_handoff_persist" : "auto_checkpoint_persist", [
             "handoff_id": persisted.packet.id,
             "attempt_id": attemptID?.uuidString ?? "unavailable_for_direct_call",
             "client_id": clientID.rawValue,
-            "reason": reason,
-            "operation": finalize ? "handoff" : "checkpoint",
-            "finalize": finalize ? "true" : "false",
+            "reason": actualReason,
+            "operation": actualFinalize ? "handoff" : "checkpoint",
+            "finalize": actualFinalize ? "true" : "false",
             "resume_ready": persisted.packet.resumeReady ? "true" : "false",
             "source": persisted.packet.source.rawValue,
             "save_outcome": "committed",
-            "successor_request_state": finalize
+            "successor_request_state": actualFinalize
                 ? "deferred_to_interactive_successor" : "not_applicable_checkpoint",
         ], category: .general)
-        if finalize {
+        if actualFinalize {
             try? writeNextChatHint(persisted.packet)
         }
-        return persisted.packet
+        return persisted
+    }
+
+    private static func prepareRuntimePacket(
+        _ candidate: HandoffPacket,
+        finalize: Bool,
+        progressCount: Int,
+        failureCount: Int,
+        useDefaultHandoffStatus: Bool
+    ) -> HandoffPacket {
+        var packet = candidate
+        let reason = RuntimeContinuityCommit.reason(finalize: finalize,
+            progressCount: progressCount, failureCount: failureCount)
+        if packet.goal.isEmpty {
+            packet.goal = finalize ? "Auto-handoff: \(reason)" : "Auto-checkpoint: \(reason)"
+        }
+        if finalize {
+            if useDefaultHandoffStatus { packet.status = "handoff_ready" }
+            let note = "Runtime continuity: \(reason)"
+            if packet.narrative.isEmpty { packet.narrative = note }
+            else if !packet.narrative.contains(note) {
+                packet.narrative = String("\(packet.narrative)\n\n\(note)".prefix(HandoffPacket.maxNarrativeChars))
+            }
+        }
+        packet.resumeReady = finalize
+        if !packet.resumeSeedIsCustom { packet.resumeSeed = packet.defaultResumeSeed() }
+        return packet
     }
 
     /// Auto-checkpoint used by budget policy (identical tool-loop / pressure).
@@ -665,6 +825,80 @@ public final class ContextContinuityService: @unchecked Sendable {
 
     // MARK: - Build / persist
 
+    func budgetRuntimeCheckpoint(
+        clientID: ClientID,
+        reason: String,
+        context: ToolInvocationContext,
+        scopeKey: String,
+        blockProgress: Bool,
+        cancellation: ToolCallCancellation?
+    ) throws -> HandoffPacket {
+        guard context.clientID == clientID else { throw StoreError.conflict("runtime continuity client changed") }
+        let startingProgress: RuntimeContinuityProgress
+        if let existing = try store.runtimeContinuityProgress(scopeKey: scopeKey, cancellation: cancellation) {
+            startingProgress = existing
+        } else {
+            startingProgress = try store.updateRuntimeContinuityProgress(scopeKey: scopeKey, cancellation: cancellation) { _ in }
+        }
+        let persisted = try mutateAndPersist(
+            runtimeScopeKey: scopeKey, runtimeBlockProgress: blockProgress,
+            runtimeExpectedEpoch: startingProgress.epoch,
+            cancellation: cancellation
+        ) {
+            let current = try store.runtimeContinuityProgress(scopeKey: scopeKey, cancellation: cancellation)
+            guard current?.epoch == startingProgress.epoch, current?.blocked == false else {
+                throw StoreError.conflict("runtime continuity budget changed before packet build")
+            }
+            let priorID = current?.latestPacketID
+            let prior = try priorID.flatMap { try store.handoffLegacyGet(id: $0, cancellation: cancellation) }
+            if let prior {
+                guard try store.runtimeContinuityPacketScopeKey(packetID: prior.id, cancellation: cancellation) == scopeKey,
+                      let cwd = prior.cwd,
+                      context.authorizationScope.canonicalRoots.contains(where: { root in
+                          let path = ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
+                          let canonical = root.resolvingSymlinksInPath().standardizedFileURL.path
+                          return path == canonical || path.hasPrefix(canonical + "/")
+                      }) else { throw StoreError.conflict("budget handoff is outside the selected runtime scope") }
+            }
+            let reusesPendingBudget = prior?.source == .budget && prior?.resumeReady == true
+                && current?.lastHandoffID == prior?.id
+            let reusesOpenCheckpoint = prior?.resumeReady == false
+            let packetID = (reusesPendingBudget || reusesOpenCheckpoint) ? prior?.id : nil
+            var args: [String: Any] = ["status": "budget_pressure"]
+            if let root = context.authorizationScope.canonicalRoots.first { args["cwd"] = root.path }
+            var packet = try buildPacket(
+                arguments: args,
+                clientID: clientID, source: .budget, finalize: true,
+                runtimePacketID: packetID ?? UUID().uuidString.lowercased(),
+                runtimePriorPacketID: prior?.id, cancellation: cancellation
+            )
+            if packet.goal.isEmpty { packet.goal = "Auto-checkpoint: \(reason)" }
+            if packet.nextActions.isEmpty {
+                packet.nextActions = [
+                    "Wait for Forge to create the successor chat",
+                    "Resume through get_forge_status with resume=true",
+                    "Continue from open agents",
+                ]
+            }
+            let note = "Budget trigger: \(reason)"
+            if packet.narrative.isEmpty { packet.narrative = note }
+            else if !packet.narrative.contains(note) {
+                packet.narrative = String("\(packet.narrative)\n\n\(note)".prefix(HandoffPacket.maxNarrativeChars))
+            }
+            packet.resumeReady = true
+            if !packet.resumeSeedIsCustom { packet.resumeSeed = packet.defaultResumeSeed() }
+            return packet
+        }
+        let packet = persisted.packet
+        diagnostics.warn("budget_handoff", [
+            "handoff_id": packet.id, "client_id": clientID.rawValue, "reason": reason,
+            "project_id": context.projectID.description,
+            "project_generation": "\(context.projectGeneration.rawValue)",
+        ], category: .tools)
+        try? writeNextChatHint(packet)
+        return packet
+    }
+
     private func buildPacket(
         arguments: [String: Any],
         clientID: ClientID,
@@ -672,6 +906,8 @@ public final class ContextContinuityService: @unchecked Sendable {
         finalize: Bool,
         preserveAuthorIdentity: Bool = false,
         authorization: ContinuityIngressAuthorization? = nil,
+        runtimePacketID: String? = nil,
+        runtimePriorPacketID: String? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> HandoffPacket {
         try cancellation?.checkCancellation()
@@ -684,7 +920,18 @@ public final class ContextContinuityService: @unchecked Sendable {
             source: source,
             clientID: clientID.rawValue
         )
-        if let existingID {
+        if let runtimePacketID {
+            if let runtimePriorPacketID,
+               let prior = try store.handoffLegacyGet(id: runtimePriorPacketID, cancellation: cancellation) {
+                base = prior
+            }
+            if base.id != runtimePacketID { base.createdAt = now }
+            base.id = runtimePacketID
+            base.updatedAt = now
+            base.source = source
+            base.clientID = clientID.rawValue
+            base.resumeReady = finalize
+        } else if let existingID {
             let prior: HandoffPacket?
             if let authorization {
                 // Authorize the exact source identity before reading any prior
@@ -778,7 +1025,7 @@ public final class ContextContinuityService: @unchecked Sendable {
                 clientID: clientID,
                 cancellation: cancellation
             )
-            if existingID != nil {
+            if existingID != nil || runtimePriorPacketID != nil {
                 // A resumed chat may checkpoint the recovered packet before it has
                 // reattached every listed agent. Keep prior snapshots whose durable
                 // sessions are still open, replacing them as the new client reattaches.
@@ -794,9 +1041,18 @@ public final class ContextContinuityService: @unchecked Sendable {
             // Legacy client-scoped snapshots remain available on their existing
             // path. A shared transport does not authorize importing another task's
             // agent goal, directory or open sessions into a scoped handoff.
-            if let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
+            if runtimePacketID == nil,
+               let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
                 if base.goal.isEmpty { base.goal = binding.goal }
                 if base.cwd == nil || base.cwd?.isEmpty == true { base.cwd = binding.cwd }
+            }
+            if runtimePacketID != nil, let cwd = base.cwd {
+                let root = ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
+                base.agents = base.agents.filter { agent in
+                    guard let agentCWD = agent.cwd else { return false }
+                    let path = ToolArgHelpers.resolvePath(agentCWD).resolvingSymlinksInPath().standardizedFileURL.path
+                    return path == root || path.hasPrefix(root + "/")
+                }
             }
         }
 
@@ -910,11 +1166,18 @@ public final class ContextContinuityService: @unchecked Sendable {
         var packet: HandoffPacket
         var projectionWarning: String?
         var ingressCommit: ContinuityHandoffCommit? = nil
+        var runtimeProgressCount = 0
+        var runtimeFailureCount = 0
     }
 
     private func mutateAndPersist(
         authorization: ContinuityIngressAuthorization? = nil,
         automaticHandoffEnabled: Bool = false,
+        runtimeClaim: RuntimeContinuityProgressClaim? = nil,
+        runtimePacketPreparation: ((HandoffPacket, Bool, Int, Int) throws -> HandoffPacket)? = nil,
+        runtimeScopeKey: String? = nil,
+        runtimeBlockProgress: Bool = false,
+        runtimeExpectedEpoch: String? = nil,
         cancellation: ToolCallCancellation?,
         stageObserver: ((String) -> Void)? = nil,
         _ mutation: () throws -> HandoffPacket
@@ -933,7 +1196,9 @@ public final class ContextContinuityService: @unchecked Sendable {
         return try withPersistenceFileLock(cancellation: cancellation) {
             try cancellation?.checkCancellation()
             stageObserver?("packet_mutation")
-            let packet = try mutation()
+            var packet = try mutation()
+            var runtimeProgressCount = 0
+            var runtimeFailureCount = 0
             let ingress: ContinuityHandoffCommit?
             if let authorization {
                 stageObserver?("authorized_handoff_commit")
@@ -942,6 +1207,20 @@ public final class ContextContinuityService: @unchecked Sendable {
                     automaticHandoffEnabled: automaticHandoffEnabled,
                     cancellation: cancellation
                 )
+            } else if let runtimeClaim {
+                stageObserver?("runtime_handoff_commit")
+                let committed = try store.handoffUpsertCompletingRuntimeProgress(packet, claim: runtimeClaim,
+                    preparePacket: runtimePacketPreparation, cancellation: cancellation)
+                packet = committed.packet
+                runtimeProgressCount = committed.progressCount
+                runtimeFailureCount = committed.failureCount
+                ingress = nil
+            } else if let runtimeScopeKey {
+                stageObserver?("runtime_model_handoff_commit")
+                try store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: runtimeScopeKey,
+                    blockProgress: runtimeBlockProgress, expectedEpoch: runtimeExpectedEpoch,
+                    cancellation: cancellation)
+                ingress = nil
             } else {
                 stageObserver?("handoff_upsert")
                 try store.handoffUpsert(packet, cancellation: cancellation)
@@ -952,17 +1231,20 @@ public final class ContextContinuityService: @unchecked Sendable {
             if ingress != nil {
                 // Shared legacy projections carry no task authorization. Keep
                 // scoped packets at the exact, authorized SQLite read boundary.
-                return PersistenceOutcome(packet: packet, projectionWarning: nil, ingressCommit: ingress)
+                return PersistenceOutcome(packet: packet, projectionWarning: nil, ingressCommit: ingress,
+                    runtimeProgressCount: runtimeProgressCount, runtimeFailureCount: runtimeFailureCount)
             }
             do {
                 try writeProjections(packet)
-                return PersistenceOutcome(packet: packet, projectionWarning: nil, ingressCommit: ingress)
+                return PersistenceOutcome(packet: packet, projectionWarning: nil, ingressCommit: ingress,
+                    runtimeProgressCount: runtimeProgressCount, runtimeFailureCount: runtimeFailureCount)
             } catch {
                 diagnostics.warn("continuity_projection_write_failed", [
                     "handoff_id": packet.id,
                     "error": "\(error)",
                 ], category: .general)
-                return PersistenceOutcome(packet: packet, projectionWarning: "\(error)", ingressCommit: ingress)
+                return PersistenceOutcome(packet: packet, projectionWarning: "\(error)", ingressCommit: ingress,
+                    runtimeProgressCount: runtimeProgressCount, runtimeFailureCount: runtimeFailureCount)
             }
         }
     }

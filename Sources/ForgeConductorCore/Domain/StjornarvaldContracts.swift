@@ -334,13 +334,32 @@ public struct DevelopmentObservationScope: Codable, Sendable, Equatable {
     }
 }
 
+public enum NativeTargetDeclaredRole: String, Codable, Sendable, Hashable, CaseIterable {
+    case source, resource, copy, synchronized
+
+    static func valid(_ roles: [String: [Self]]?, paths: [String]) -> Bool {
+        guard let roles else { return true }
+        guard roles.count <= 10_000 else { return false }
+        let knownPaths = Set(paths)
+        return roles.allSatisfy { path, values in
+            path.utf8.count <= 4_096 && knownPaths.contains(path)
+                && !values.isEmpty && values.count <= allCases.count
+                && Set(values).count == values.count
+        }
+    }
+}
+
 public struct NativeTargetObservationEvidence: Codable, Sendable, Equatable {
     public let shippingRuntimePaths: [String]
     public let targetMembershipComplete: Bool
+    /// Declared graph roles do not establish an interpreter or the resource consumer.
+    public let declaredPathRoles: [String: [NativeTargetDeclaredRole]]?
 
-    public init(shippingRuntimePaths: [String], targetMembershipComplete: Bool) {
+    public init(shippingRuntimePaths: [String], targetMembershipComplete: Bool,
+                declaredPathRoles: [String: [NativeTargetDeclaredRole]]? = nil) {
         self.shippingRuntimePaths = Array(shippingRuntimePaths.prefix(10_000))
         self.targetMembershipComplete = targetMembershipComplete
+        self.declaredPathRoles = declaredPathRoles
     }
 }
 

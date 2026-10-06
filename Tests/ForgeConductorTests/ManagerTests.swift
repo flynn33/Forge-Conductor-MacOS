@@ -5,6 +5,7 @@
 import XCTest
 import Security
 import Darwin
+import SQLite3
 import ForgeFilesystemProtocol
 #if SWIFT_PACKAGE
 import ForgeNativeSessionHostPlugin
@@ -561,7 +562,7 @@ private actor ManagerInteractiveContinuityAdapter: SessionHostAdapter {
         creations.append(request)
         if failCreation { throw NSError(domain: "InteractiveCreateFixture", code: 41) }
         return HostSession(
-            id: "interactive-successor-session",
+            id: "interactive-successor-session-\(request.operationID)",
             providerSessionID: "resp_interactive_successor",
             model: "fixture/tool-model"
         )
@@ -1197,6 +1198,198 @@ final class ManagerTests: XCTestCase {
         XCTAssertEqual(afterRestart.bootstrapCount, 1)
     }
 
+    func testInteractiveContinuitySkipsResetFencedPacketAndSelectsCurrentScopedHandoff() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent("interactive-scoped-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let adapter = ManagerInteractiveContinuityAdapter()
+        let registry = HostAdapterRegistry()
+        registry.register(
+            manifest: HostPluginManifest(
+                identifier: ManagerNode.nativeSessionHostAdapterID,
+                version: "interactive-fixture", minimumContractVersion: 1,
+                hostType: "lmstudio-interactive-fixture",
+                capabilities: managerProviderHostCapabilities(), configurationKeys: [],
+                privacyRequirements: [], migrationVersion: 1
+            ), factory: { _ in adapter }
+        )
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(path: projectRoot.path)
+        let projectID = ProjectID(try XCTUnwrap(
+            (registered["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        ))
+        let clientID = ClientID("interactive-generation-client")
+        let scope = ToolAuthorizationScope(
+            canonicalRoots: [projectRoot], allowedTools: ["*"], networkAllowed: false,
+            maximumInlineOutputBytes: 65_536
+        )
+        let originalBinding = try app.projectContexts.bind(
+            owner: ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue),
+            projectID: projectID, generation: .initial, authorizationScope: scope
+        )
+        let originalScopeKey = app.continuityAutomation.runtimeScopeKey(
+            originalBinding.invocationContext(clientID: clientID)
+        )
+        let oldPacket = HandoffPacket(
+            id: UUID().uuidString, resumeReady: true, clientID: clientID.rawValue,
+            goal: "Old generation work", status: "ready", cwd: projectRoot.path,
+            nextActions: ["Old generation action"]
+        )
+        try app.store.handoffUpsertRecordingRuntimeProgress(oldPacket, scopeKey: originalScopeKey)
+        _ = try node.resetProjectGeneration(projectID: projectID, expectedGeneration: .initial)
+        XCTAssertNil(try node.operatorSnapshot().interactiveContinuity)
+        let ignored = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertNil(ignored)
+        let beforeCurrent = await adapter.observed()
+        XCTAssertEqual(beforeCurrent.createCount, 0)
+        XCTAssertNotNil(try app.store.handoffGet(id: oldPacket.id), "Reset must retain the historical packet")
+
+        let currentBinding = try app.projectContexts.bind(
+            owner: ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue),
+            projectID: projectID, generation: ProjectGeneration(2), authorizationScope: scope
+        )
+        let currentPacket = HandoffPacket(
+            id: UUID().uuidString, resumeReady: true, clientID: clientID.rawValue,
+            goal: "Current generation work", status: "ready", cwd: projectRoot.path,
+            nextActions: ["Current generation action"]
+        )
+        try app.store.handoffUpsertRecordingRuntimeProgress(
+            currentPacket,
+            scopeKey: app.continuityAutomation.runtimeScopeKey(currentBinding.invocationContext(clientID: clientID))
+        )
+        // Fenced history must not crowd out the valid current handoff.
+        for _ in 0..<120 {
+            let historicalPacket = HandoffPacket(
+                id: UUID().uuidString, resumeReady: true, clientID: clientID.rawValue,
+                goal: "Retained old generation work", status: "ready", cwd: projectRoot.path,
+                nextActions: ["Old generation action"]
+            )
+            try app.store.handoffUpsertRecordingRuntimeProgress(historicalPacket, scopeKey: originalScopeKey)
+        }
+        XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.handoffID, currentPacket.id)
+        let resumed = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(resumed, currentPacket.id)
+        let observed = await adapter.observed()
+        XCTAssertEqual(observed.createCount, 1)
+        XCTAssertEqual(observed.bootstrappedHandoffID, currentPacket.id)
+        XCTAssertNotNil(try app.store.handoffGet(id: oldPacket.id))
+    }
+
+    func testInteractiveContinuityValidatesDesktopAuthorityAndFiltersOtherBindingOwners() async throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 10_000))
+        let app = try ForgeApp.bootstrap(home: home, clock: clock)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("interactive-authority-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let adapter = ManagerInteractiveContinuityAdapter()
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: HostPluginManifest(identifier: ManagerNode.nativeSessionHostAdapterID,
+            version: "interactive-fixture", minimumContractVersion: 1, hostType: "lmstudio-interactive-fixture",
+            capabilities: managerProviderHostCapabilities(), configurationKeys: [], privacyRequirements: [], migrationVersion: 1),
+            factory: { _ in adapter })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(path: root.path)
+        let projectID = ProjectID(try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+        let scope = ToolAuthorizationScope(canonicalRoots: [root], allowedTools: ["*"], networkAllowed: false,
+            maximumInlineOutputBytes: 65_536)
+        let staleClient = ClientID("persisted-stale-desktop-attachment")
+        // Persisted attachment rows can remain active after their native run authority is gone.
+        let stale = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: staleClient.rawValue),
+            projectID: projectID, generation: .initial, runID: RunID(), authorizationScope: scope,
+            leaseOwner: DesktopProviderMCPAttachmentContract.attachedMarkerPrefix + String(repeating: "a", count: 64))
+        let stalePacket = HandoffPacket(resumeReady: true, clientID: staleClient.rawValue,
+            goal: "Retain stale native attachment evidence", cwd: root.path)
+        try app.store.handoffUpsertRecordingRuntimeProgress(stalePacket,
+            scopeKey: app.continuityAutomation.runtimeScopeKey(stale.invocationContext(clientID: staleClient)))
+        XCTAssertThrowsError(try app.projectContexts.invocationContext(for: staleClient)) {
+            XCTAssertEqual($0 as? DesktopProviderMCPAttachmentError, .staleAuthority)
+        }
+        XCTAssertNil(try node.operatorSnapshot().interactiveContinuity)
+        let rejected = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertNil(rejected)
+        let noCreation = await adapter.observed()
+        XCTAssertEqual(noCreation.createCount, 0)
+
+        let currentClient = ClientID("current-ordinary-chat")
+        let current = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: currentClient.rawValue),
+            projectID: projectID, generation: .initial, authorizationScope: scope)
+        let currentPacket = HandoffPacket(resumeReady: true, clientID: currentClient.rawValue,
+            goal: "Resume current ordinary chat", cwd: root.path)
+        try app.store.handoffUpsertRecordingRuntimeProgress(currentPacket,
+            scopeKey: app.continuityAutomation.runtimeScopeKey(current.invocationContext(clientID: currentClient)))
+        for _ in 0..<20 {
+            clock.date = clock.date.addingTimeInterval(1)
+            _ = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .runtimeJob, id: UUID().uuidString.lowercased()),
+                projectID: projectID, generation: .initial, authorizationScope: scope)
+        }
+        let unfiltered = try await app.projectContexts.repository.operatorBindings(projectIDs: [projectID])
+        XCTAssertFalse((unfiltered[projectID] ?? []).contains { $0.owner.kind == .mcpClient })
+        let filtered = try await app.projectContexts.repository.operatorBindings(projectIDs: [projectID], ownerKind: .mcpClient)
+        XCTAssertEqual(Set((filtered[projectID] ?? []).map { $0.owner.id }), [currentClient.rawValue, staleClient.rawValue])
+        XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.handoffID, currentPacket.id)
+        let selected = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(selected, currentPacket.id)
+        let observed = await adapter.observed()
+        XCTAssertEqual(observed.createCount, 1)
+        XCTAssertEqual(observed.bootstrappedHandoffID, currentPacket.id)
+        XCTAssertNotNil(try app.store.handoffGet(id: stalePacket.id))
+    }
+
+    func testInteractiveContinuityCompletedScopedHandoffDoesNotStarveAnotherProject() async throws {
+        try await assertInteractiveContinuityDoesNotStarveOlderProject(scoped: true)
+    }
+
+    func testInteractiveContinuityCompletedLegacyHandoffDoesNotStarveAnotherProject() async throws {
+        try await assertInteractiveContinuityDoesNotStarveOlderProject(scoped: false)
+    }
+
+    private func assertInteractiveContinuityDoesNotStarveOlderProject(scoped: Bool) async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let adapter = ManagerInteractiveContinuityAdapter()
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: HostPluginManifest(identifier: ManagerNode.nativeSessionHostAdapterID,
+            version: "interactive-fixture", minimumContractVersion: 1, hostType: "lmstudio-interactive-fixture",
+            capabilities: managerProviderHostCapabilities(), configurationKeys: [], privacyRequirements: [], migrationVersion: 1),
+            factory: { _ in adapter })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        var packets: [HandoffPacket] = []
+        for index in 0..<2 {
+            let root = home.appendingPathComponent("interactive-starvation-\(index)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let registered = try node.registerProject(path: root.path, displayName: "Pending Project \(index)")
+            let projectID = ProjectID(try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+            let client = ClientID("interactive-starvation-\(index)")
+            let packet = HandoffPacket(resumeReady: true, clientID: client.rawValue,
+                goal: "Resume pending project \(index)", cwd: root.path, nextActions: ["Continue project \(index)"])
+            if scoped {
+                let binding = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: client.rawValue),
+                    projectID: projectID, generation: .initial, authorizationScope: ToolAuthorizationScope(
+                        canonicalRoots: [root], allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+                try app.store.handoffUpsertRecordingRuntimeProgress(packet,
+                    scopeKey: app.continuityAutomation.runtimeScopeKey(binding.invocationContext(clientID: client)))
+            } else { try app.store.handoffUpsert(packet) }
+            packets.append(packet)
+        }
+        XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.handoffID, packets[1].id)
+        let first = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(first, packets[1].id)
+        // The completed newest packet must no longer hide the older project's pending handoff.
+        XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.handoffID, packets[0].id)
+        let second = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(second, packets[0].id)
+        let completed = try XCTUnwrap(node.operatorSnapshot().interactiveContinuity)
+        XCTAssertEqual(completed.handoffID, packets[1].id)
+        XCTAssertEqual(completed.state, "completed")
+        let replay = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(replay, packets[1].id)
+        let observed = await adapter.observed()
+        XCTAssertEqual(observed.createCount, 2)
+        XCTAssertEqual(observed.bootstrapCount, 2)
+        XCTAssertEqual(try app.store.handoffLegacyList().count, 2)
+    }
+
     func testInteractiveContinuityFailureKeepsSelectedHandoffAndStage() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }
@@ -1560,6 +1753,92 @@ final class ManagerTests: XCTestCase {
                 return XCTFail("Unexpected manager response error: \(error)")
             }
         }
+    }
+
+    func testContinuityReadinessFencesGenerationsAndRetainsPausedRunHistory() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let projectRoot = home.appendingPathComponent("readiness-generation-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let node = ManagerNode(app: app)
+        let registered = try node.registerProject(path: projectRoot.path)
+        let projectID = ProjectID(try XCTUnwrap(
+            (registered["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        ))
+        let runID = RunID()
+        let repository = app.projectContexts.repository
+        try await repository.reserveContinuityRun(
+            runID: runID, projectID: projectID, projectGeneration: .initial,
+            mission: "Preserve paused history across project reset", mode: .managedAutonomous
+        )
+        let operationID = UUID()
+        _ = try await repository.enqueueContinuityCommand(ContinuityCommandRequest(
+            operationID: operationID, runID: runID, projectID: projectID,
+            projectGeneration: .initial, type: .checkpoint, requestedBy: "readiness-test",
+            reason: "Retain the historical checkpoint command", idempotencyKey: "readiness-\(operationID)",
+            payloadSHA256: String(repeating: "a", count: 64)
+        ))
+        let originalRecord = try await repository.autonomousRun(runID)
+        let original = try XCTUnwrap(originalRecord)
+        XCTAssertEqual(original.state, .checkpointing)
+        let lease = try await repository.acquireRunLease(runID: runID, ownerID: "readiness-test")
+        _ = try await repository.transitionAutonomousRun(
+            runID: runID, lease: lease, transition: AutonomousRunTransition(
+                expectedState: original.state, expectedRevision: original.revision, nextState: .paused,
+                eventType: "test_paused", eventSummary: "Pause continuity before reset",
+                errorCode: "fixture_pause", errorSummary: "The selected XCTest run failed."
+            )
+        )
+        _ = try await repository.releaseRunLease(lease)
+
+        let paused = try node.operatorSnapshot(limit: 100)
+        let pausedReadiness = try XCTUnwrap(paused.continuityReadiness.first { $0.runID == runID })
+        XCTAssertEqual(pausedReadiness.state, .blocked)
+        XCTAssertTrue(pausedReadiness.automatic, "Paused automatic tasks must remain visible to attention summaries")
+        XCTAssertEqual(pausedReadiness.recoveryAction, .reviewRun)
+        XCTAssertTrue(pausedReadiness.detail.contains("paused"))
+        XCTAssertTrue(pausedReadiness.detail.contains("XCTest run failed"))
+
+        _ = try node.resetProjectGeneration(projectID: projectID, expectedGeneration: .initial)
+        let reset = try node.operatorSnapshot(limit: 100)
+        let resetReadiness = try XCTUnwrap(reset.continuityReadiness.first { $0.projectID == projectID })
+        XCTAssertEqual(resetReadiness.projectGeneration, ProjectGeneration(2))
+        XCTAssertNil(resetReadiness.runID)
+        XCTAssertEqual(resetReadiness.state, .ready)
+        XCTAssertTrue(reset.runs.contains { $0.runID == runID.description && $0.state == "paused" })
+        XCTAssertTrue(reset.continuityOperations.contains { $0.operationID == operationID.uuidString.lowercased() })
+        XCTAssertEqual(reset.projects.first { $0.projectID == projectID.description }?.continuity.state, "unavailable")
+        let exactProjectStatus = try node.projectStatus(projectID: projectID)
+        XCTAssertEqual((exactProjectStatus["continuity"] as? [String: Any])?["state"] as? String, "unavailable")
+
+        let currentRunID = RunID()
+        try await repository.reserveContinuityRun(
+            runID: currentRunID, projectID: projectID, projectGeneration: ProjectGeneration(2),
+            mission: "Monitor only the current generation", mode: .managedAutonomous
+        )
+        let current = try node.operatorSnapshot(limit: 100)
+        XCTAssertEqual(current.continuityReadiness.map(\.runID), [currentRunID])
+        XCTAssertEqual(current.continuityReadiness.first?.state, .monitoring)
+        XCTAssertTrue(current.runs.contains { $0.runID == runID.description })
+
+        let currentLease = try await repository.acquireRunLease(
+            runID: currentRunID, ownerID: "readiness-test"
+        )
+        let storedCurrentRecord = try await repository.autonomousRun(currentRunID)
+        let currentRecord = try XCTUnwrap(storedCurrentRecord)
+        _ = try await repository.transitionAutonomousRun(
+            runID: currentRunID, lease: currentLease, transition: AutonomousRunTransition(
+                expectedState: currentRecord.state, expectedRevision: currentRecord.revision,
+                nextState: .failedTerminal, eventType: "test_settled",
+                eventSummary: "Settle the current task before archiving its project"
+            )
+        )
+        _ = try await repository.releaseRunLease(currentLease)
+        _ = try node.removeProject(projectID: projectID, expectedGeneration: ProjectGeneration(2))
+        let archived = try node.operatorSnapshot(limit: 100)
+        XCTAssertTrue(archived.continuityReadiness.isEmpty)
+        XCTAssertTrue(archived.runs.contains { $0.runID == currentRunID.description })
+        XCTAssertTrue(archived.continuityOperations.contains { $0.operationID == operationID.uuidString.lowercased() })
     }
 
     func testExactOperatorActivityRetainsRequestedRunContinuityWhenAnotherRunIsNewer() async throws {
@@ -2298,6 +2577,50 @@ final class ManagerTests: XCTestCase {
             "final_config_sha256": JSONSupport.sha256Hex(try Data(contentsOf: app.paths.configJSON)),
         ])
         _ = node
+    }
+
+    func testRuntimeToolAvailabilityTracksShellSettingsWithoutLosingSelections() throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("runtime-tool-availability", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let manager = ManagerNode(app: app)
+        let registered = try manager.registerProject(path: root.path)
+        let projectID = ProjectID(try XCTUnwrap(
+            (registered["project_id"] as? String).flatMap(UUID.init(uuidString:))
+        ))
+        let runtimeTools: Set<String> = [
+            "shell_exec", "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+            "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
+        ]
+        let initial = try manager.projectToolPermissions(projectID: projectID, expectedGeneration: .initial)
+        XCTAssertTrue(runtimeTools.isSubset(of: Set(initial.tools.filter(\.available).map(\.id))))
+        let selected = try manager.updateProjectToolPermissions(ManagerToolPermissionUpdate(
+            projectID: projectID.description, projectGeneration: 1,
+            expectedPreferenceRevision: initial.preferenceRevision, selectionMode: .explicit,
+            selectedToolIDs: runtimeTools.sorted()
+        ))
+        XCTAssertEqual(Set(selected.effectiveToolIDs), runtimeTools)
+
+        _ = try manager.updateSettings(["shell": ["enabled": false]], apply: true)
+        let disabled = try manager.projectToolPermissions(projectID: projectID, expectedGeneration: .initial)
+        XCTAssertEqual(Set(disabled.selectedToolIDs), runtimeTools)
+        XCTAssertTrue(disabled.effectiveToolIDs.isEmpty)
+        XCTAssertEqual(disabled.preferenceRevision, selected.preferenceRevision)
+        for toolID in runtimeTools {
+            let entry = try XCTUnwrap(disabled.tools.first { $0.id == toolID })
+            XCTAssertFalse(entry.available, toolID)
+            XCTAssertEqual(entry.unavailableReason, "Shell access is disabled in Manager settings.")
+        }
+        XCTAssertTrue(try XCTUnwrap(disabled.tools.first { $0.id == "fs_read" }).available)
+        XCTAssertTrue(runtimeTools.isDisjoint(with: Set(try manager.operatorSnapshot().runPreparation.allowedTools)))
+
+        _ = try manager.updateSettings(["shell": ["enabled": true]], apply: true)
+        let restored = try manager.projectToolPermissions(projectID: projectID, expectedGeneration: .initial)
+        XCTAssertEqual(Set(restored.selectedToolIDs), runtimeTools)
+        XCTAssertEqual(Set(restored.effectiveToolIDs), runtimeTools)
+        XCTAssertEqual(restored.preferenceRevision, selected.preferenceRevision)
+        XCTAssertTrue(runtimeTools.isSubset(of: Set(restored.tools.filter(\.available).map(\.id))))
     }
 
     func testManagerSettingsPersist() throws {
@@ -10009,5 +10332,949 @@ final class ManagerTests: XCTestCase {
             code: 3,
             userInfo: [NSLocalizedDescriptionKey: "Could not reserve a distinct loopback port"]
         )
+    }
+}
+
+private enum FinalReviewInteractiveGateError: Error { case timedOut }
+
+private actor FinalReviewInteractiveAwaitAdapter: SessionHostAdapter {
+    enum Point: Sendable, Equatable { case capabilities, lookup }
+    nonisolated let identifier = ManagerNode.nativeSessionHostAdapterID
+    nonisolated let version = "final-review-await-fixture"
+    private let underlying = ManagerInteractiveContinuityAdapter()
+    private let point: Point
+    private let reached: XCTestExpectation
+    private var released = false
+    private var didGate = false
+    private var timedOut = false
+
+    init(point: Point, reached: XCTestExpectation) {
+        self.point = point
+        self.reached = reached
+    }
+
+    private func pauseIfNeeded(at point: Point) async throws {
+        guard self.point == point, !didGate else { return }
+        didGate = true
+        reached.fulfill()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !released {
+            try Task.checkCancellation()
+            guard ContinuousClock.now < deadline else {
+                timedOut = true
+                throw FinalReviewInteractiveGateError.timedOut
+            }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
+
+    func release() { released = true }
+    func gateTimedOut() -> Bool { timedOut }
+
+    func capabilities() async throws -> HostCapabilities {
+        try await pauseIfNeeded(at: .capabilities)
+        return try await underlying.capabilities()
+    }
+
+    func session(forIdempotencyKey key: String) async throws -> HostSession? {
+        try await pauseIfNeeded(at: .lookup)
+        return try await underlying.session(forIdempotencyKey: key)
+    }
+
+    func createSession(_ request: SessionCreationRequest) async throws -> HostSession {
+        try await underlying.createSession(request)
+    }
+
+    func bootstrap(_ session: HostSession, handoff: ContinuityHandoff) async throws {
+        try await underlying.bootstrap(session, handoff: handoff)
+    }
+
+    func awaitAcknowledgement(session: HostSession, handoffID: String,
+                              timeout: Duration) async throws -> HandoffAcknowledgement {
+        try await underlying.awaitAcknowledgement(session: session, handoffID: handoffID, timeout: timeout)
+    }
+
+    func cancel(operationID: String) async { await underlying.cancel(operationID: operationID) }
+    func observedCounts() async -> (creates: Int, bootstraps: Int) {
+        let observed = await underlying.observed()
+        return (observed.createCount, observed.bootstrapCount)
+    }
+}
+
+private actor FinalReviewInteractiveNativeTransport: NativeSessionTransport {
+    private var createCount = 0
+    private var bootstrapCount = 0
+
+    func createSession(request: SessionCreationRequest,
+                       deadline: ContinuousClock.Instant) async throws -> NativeTransportSession {
+        try Task.checkCancellation()
+        guard ContinuousClock.now < deadline else { throw NativeHostPluginError.deadlineExceeded }
+        createCount += 1
+        return NativeTransportSession(providerSessionID: "review-provider-\(request.operationID)", model: "fixture-model")
+    }
+
+    func bootstrap(_ request: NativeBootstrapRequest) async throws -> NativeBootstrapResponse {
+        try Task.checkCancellation()
+        guard ContinuousClock.now < request.deadline else { throw NativeHostPluginError.deadlineExceeded }
+        bootstrapCount += 1
+        return NativeBootstrapResponse(chunks: [try JSONSupport.data(from: [
+            "handoff_id": request.handoffID,
+            "successor_session_id": request.successorSessionID,
+        ])], inputTokens: 100, outputTokens: 8)
+    }
+
+    func cancel(operationID: String, providerSessionID: String?) async {}
+    func observedCounts() -> (creates: Int, bootstraps: Int) { (createCount, bootstrapCount) }
+}
+
+extension ManagerTests {
+    private enum FinalReviewProjectMutation: Equatable { case reset, archive }
+
+    func testInteractiveContinuityRevalidatesGenerationAfterAdapterCapabilityAwait() async throws {
+        try await assertFinalReviewInteractiveAuthorityAcrossAwait(point: .capabilities, mutation: .reset)
+    }
+
+    func testInteractiveContinuityRevalidatesLifecycleAfterSuccessorLookupAwait() async throws {
+        try await assertFinalReviewInteractiveAuthorityAcrossAwait(point: .lookup, mutation: .archive)
+    }
+
+    func testInteractiveContinuityAdapterAwaitPreservesCurrentAuthority() async throws {
+        try await assertFinalReviewInteractiveAuthorityAcrossAwait(point: .lookup, mutation: nil)
+    }
+
+    private func assertFinalReviewInteractiveAuthorityAcrossAwait(
+        point: FinalReviewInteractiveAwaitAdapter.Point, mutation: FinalReviewProjectMutation?
+    ) async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("review-await-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let reached = expectation(description: "Manager reached the actual adapter await")
+        let adapter = FinalReviewInteractiveAwaitAdapter(point: point, reached: reached)
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: HostPluginManifest(
+            identifier: ManagerNode.nativeSessionHostAdapterID, version: "final-review-await-fixture",
+            minimumContractVersion: 1, hostType: "lmstudio-interactive-fixture",
+            capabilities: managerProviderHostCapabilities(), configurationKeys: [],
+            privacyRequirements: [], migrationVersion: 1), factory: { _ in adapter })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(path: root.path)
+        let projectID = ProjectID(try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+        let client = ClientID("review-await-client")
+        let binding = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: client.rawValue),
+            projectID: projectID, generation: .initial, authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [root], allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+        let scopeKey = app.continuityAutomation.runtimeScopeKey(binding.invocationContext(clientID: client))
+        let packet = HandoffPacket(resumeReady: true, clientID: client.rawValue,
+            goal: "Keep current generation authority across adapter awaits", cwd: root.path,
+            nextActions: ["Continue only while the saved project is active and current"])
+        try app.store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: scopeKey)
+        let canonical = try XCTUnwrap(app.store.handoffLegacyGet(id: packet.id))
+
+        let operation = Task { try await node.processInteractiveContinuityOnce(ignoreDelay: true) }
+        await fulfillment(of: [reached], timeout: 2)
+        do {
+            switch mutation {
+            case .reset: _ = try node.resetProjectGeneration(projectID: projectID, expectedGeneration: .initial)
+            case .archive: _ = try node.removeProject(projectID: projectID, expectedGeneration: .initial)
+            case nil: break
+            }
+        } catch {
+            await adapter.release()
+            _ = try? await operation.value
+            throw error
+        }
+        if mutation != nil {
+            XCTAssertThrowsError(try app.projectContexts.invocationContext(for: client),
+                "Fixture must use the supported mutation that invalidates the actual MCP authority")
+        }
+        await adapter.release()
+        var result: String?
+        do { result = try await operation.value }
+        catch { if mutation == nil { throw error } }
+        let timedOut = await adapter.gateTimedOut()
+        XCTAssertFalse(timedOut, "A gate timeout is not proof that stale dispatch was prevented")
+        let observed = await adapter.observedCounts()
+        if mutation != nil {
+            XCTAssertNil(result, "A project invalidated during an adapter await must not complete its saved handoff")
+            XCTAssertEqual(observed.creates, 0, "Revalidate before successor creation after an adapter await")
+            XCTAssertEqual(observed.bootstraps, 0, "An invalidated project must not dispatch its task to the host")
+            let sealed = app.paths.managedProvidersDir.appendingPathComponent("interactive-continuity-sealed.json")
+            if FileManager.default.fileExists(atPath: sealed.path) {
+                let values = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: sealed)) as? [String])
+                XCTAssertFalse(values.contains(packet.id))
+            }
+        } else {
+            XCTAssertEqual(result, packet.id)
+            XCTAssertEqual(observed.creates, 1)
+            XCTAssertEqual(observed.bootstraps, 1)
+            XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.state, "completed")
+        }
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), canonical)
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id), scopeKey)
+    }
+
+    func testInteractiveContinuityDurableCompletionSurvivesSealedLedgerCapacityAndRestart() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("review-sealed-capacity-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let storage = home.appendingPathComponent("review-native-ledger", isDirectory: true)
+        let transport = FinalReviewInteractiveNativeTransport()
+        let native = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: ForgeNativeSessionHostPlugin.manifest, factory: { _ in native })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(path: root.path)
+        let projectID = ProjectID(try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+        let client = ClientID("review-sealed-capacity-client")
+        let binding = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: client.rawValue),
+            projectID: projectID, generation: .initial, authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [root], allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+        let scopeKey = app.continuityAutomation.runtimeScopeKey(binding.invocationContext(clientID: client))
+        var canonicalPackets: [HandoffPacket] = []
+        let sealedURL = app.paths.managedProvidersDir.appendingPathComponent("interactive-continuity-sealed.json")
+        for index in 0..<129 {
+            let packet = HandoffPacket(resumeReady: true, clientID: client.rawValue,
+                goal: "Complete current-scope work \(index)", cwd: root.path, nextActions: ["Continue \(index)"])
+            try app.store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: scopeKey)
+            let result = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+            XCTAssertEqual(result, packet.id)
+            canonicalPackets.append(try XCTUnwrap(app.store.handoffLegacyGet(id: packet.id)))
+            if index == 127 {
+                // Positive control at the existing ring boundary: completed fallback remains visible,
+                // and idempotent idle replay neither mutates the seal file nor invokes transport.
+                let boundedSeal = try Data(contentsOf: sealedURL)
+                XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.state, "completed")
+                let replay = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+                XCTAssertEqual(replay, packet.id)
+                XCTAssertEqual(try Data(contentsOf: sealedURL), boundedSeal)
+                let observed = await transport.observedCounts()
+                XCTAssertEqual(observed.creates, 128)
+                XCTAssertEqual(observed.bootstraps, 128)
+            }
+        }
+        let latestID = try XCTUnwrap(canonicalPackets.last?.id)
+        let nativeLedgerURL = storage.appendingPathComponent("native-session-ledger.json")
+        let nativeLedgerBefore = try Data(contentsOf: nativeLedgerURL)
+        let ledger = try JSONSupport.object(from: nativeLedgerBefore)
+        let records = try XCTUnwrap(ledger["records"] as? [[String: Any]])
+        XCTAssertEqual(records.count, 129)
+        XCTAssertEqual(Set(records.compactMap { $0["handoffID"] as? String }), Set(canonicalPackets.map(\.id)))
+        XCTAssertTrue(records.allSatisfy { ($0["status"] as? String) == "acknowledged" })
+        let sealedBefore = try Data(contentsOf: sealedURL)
+        let seals = try XCTUnwrap(try JSONSerialization.jsonObject(with: sealedBefore) as? [String])
+        XCTAssertEqual(seals.count, 128, "Keep the existing bounded compatibility ledger")
+        XCTAssertFalse(seals.contains(try XCTUnwrap(canonicalPackets.first?.id)), "Fixture crossed the actual eviction boundary")
+
+        let beforeReplay = try XCTUnwrap(node.operatorSnapshot().interactiveContinuity)
+        XCTAssertEqual(beforeReplay.handoffID, latestID, "Old durable completion must not be selected as pending after ring eviction")
+        XCTAssertEqual(beforeReplay.state, "completed")
+        let replay = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(replay, latestID, "Preserve the existing newest-completed idle replay result")
+        XCTAssertEqual(try Data(contentsOf: sealedURL), sealedBefore, "Idle replay must not rotate old durable completions into the bounded seal ring")
+
+        // The actual native adapter's durable acknowledgement prevents duplicate GUI effects.
+        // These assertions distinguish repeated Manager selection/marking from new session creation.
+        let observed = await transport.observedCounts()
+        XCTAssertEqual(observed.creates, 129)
+        XCTAssertEqual(observed.bootstraps, 129)
+        XCTAssertEqual(try Data(contentsOf: nativeLedgerURL), nativeLedgerBefore)
+        for packet in canonicalPackets {
+            XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), packet)
+            XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id), scopeKey)
+            let sealed = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+            XCTAssertEqual(sealed.sealedSequence, sealed.writeSequence)
+        }
+        let restartedNative = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+        let restartedRegistry = HostAdapterRegistry()
+        restartedRegistry.register(manifest: ForgeNativeSessionHostPlugin.manifest, factory: { _ in restartedNative })
+        let restarted = ManagerNode(app: app, hostAdapterRegistry: restartedRegistry)
+        let recovered = try XCTUnwrap(restarted.operatorSnapshot().interactiveContinuity)
+        XCTAssertEqual(recovered.handoffID, latestID)
+        XCTAssertEqual(recovered.state, "completed")
+    }
+}
+
+extension ManagerTests {
+    func testInteractiveContinuityDurableSealSurvivesProjectionFailureAndSameIDEdit() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("seal-projection-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let adapter = ManagerInteractiveContinuityAdapter()
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: HostPluginManifest(identifier: ManagerNode.nativeSessionHostAdapterID,
+            version: "interactive-fixture", minimumContractVersion: 1, hostType: "lmstudio-interactive-fixture",
+            capabilities: managerProviderHostCapabilities(), configurationKeys: [], privacyRequirements: [], migrationVersion: 1),
+            factory: { _ in adapter })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(path: root.path)
+        let projectID = ProjectID(try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+        let packet = HandoffPacket(resumeReady: true, clientID: "legacy-projection-client",
+            goal: "Keep the exact acknowledged payload", cwd: root.path, nextActions: ["Continue the original task"])
+        try app.store.handoffUpsert(packet)
+        let canonical = try XCTUnwrap(app.store.handoffLegacyGet(id: packet.id))
+        let projection = app.paths.managedProvidersDir.appendingPathComponent("interactive-continuity-sealed.json")
+        try FileManager.default.createDirectory(at: projection, withIntermediateDirectories: true)
+        let completed = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(completed, packet.id)
+        let sealed = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertTrue(sealed.isSealed)
+        XCTAssertEqual(sealed.packet, canonical)
+        XCTAssertEqual(sealed.writeSequence, sealed.sealedSequence)
+        XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.state, "completed")
+        var edited = canonical
+        edited.goal = "An edited task requires a fresh handoff identifier before delivery"
+        edited.nextActions = ["Do not reuse the old acknowledgement for this payload"]
+        try app.store.handoffUpsert(edited)
+        let editedRecord = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertTrue(editedRecord.isSealed, "Preserve the existing completed-ID no-redelivery contract")
+        XCTAssertNotEqual(editedRecord.writeSequence, editedRecord.sealedSequence)
+        let restarted = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let replay = try await restarted.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(replay, packet.id)
+        XCTAssertEqual(try restarted.operatorSnapshot().interactiveContinuity?.state, "completed")
+        let observed = await adapter.observed()
+        XCTAssertEqual(observed.createCount, 1)
+        XCTAssertEqual(observed.bootstrapCount, 1, "Never dispatch edited same-ID content against its prior acknowledgement")
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), editedRecord.packet)
+        _ = try node.removeProject(projectID: projectID, expectedGeneration: .initial)
+        XCTAssertNil(try restarted.operatorSnapshot().interactiveContinuity, "Archived NULL legacy packets cannot become successor work")
+        let archived = try await restarted.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertNil(archived)
+    }
+
+    func testInteractiveContinuityStoreSealRejectsChangedRevisionAndRollsBackOnFailure() throws {
+        let path = home.appendingPathComponent("seal-atomic.sqlite")
+        let initial = try SQLiteStore(path: path)
+        let packet = HandoffPacket(resumeReady: true, clientID: "seal-atomic-client", goal: "Exact revision", cwd: home.path)
+        try initial.handoffUpsert(packet)
+        let expected = try XCTUnwrap(initial.interactiveContinuityHandoffRecord(packetID: packet.id))
+        initial.close()
+        let failing = try SQLiteStore(path: path, postMigrationCommitObserver: nil, beforeMutationCommitObserver: { kind in
+            if kind == .handoff { throw StoreError.execFailed("injected interactive seal interruption") }
+        })
+        XCTAssertThrowsError(try failing.sealInteractiveContinuityHandoff(expected: expected))
+        XCTAssertFalse(try XCTUnwrap(failing.interactiveContinuityHandoffRecord(packetID: packet.id)).isSealed)
+        XCTAssertEqual(try failing.handoffLegacyGet(id: packet.id), expected.packet)
+        failing.close()
+        let reopened = try SQLiteStore(path: path)
+        defer { reopened.close() }
+        var changed = expected.packet
+        changed.goal = "A newer explicit revision"
+        try reopened.handoffUpsert(changed)
+        XCTAssertThrowsError(try reopened.sealInteractiveContinuityHandoff(expected: expected))
+        let current = try XCTUnwrap(reopened.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertFalse(current.isSealed)
+        XCTAssertNotEqual(current.writeSequence, expected.writeSequence)
+        try reopened.sealInteractiveContinuityHandoff(expected: current)
+        try reopened.sealInteractiveContinuityHandoff(expected: current)
+        let sealed = try XCTUnwrap(reopened.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertEqual(sealed.packet, current.packet)
+        XCTAssertEqual(sealed.writeSequence, current.writeSequence)
+        XCTAssertEqual(sealed.sealedSequence, current.writeSequence)
+        let cancelled = ToolCallCancellation(timeoutSeconds: 2)
+        cancelled.cancel()
+        XCTAssertThrowsError(try reopened.sealInteractiveContinuityHandoff(expected: current, cancellation: cancelled))
+        XCTAssertThrowsError(try reopened.importInteractiveContinuitySeals(packetIDs: (0..<129).map { _ in UUID().uuidString }))
+    }
+
+    func testInteractiveContinuityPreMarkerSchemaNineReopensWithoutRewritingPacketsOrNewBackup() throws {
+        let path = home.appendingPathComponent("pre-marker-v9.sqlite")
+        let initial = try SQLiteStore(path: path)
+        let packet = HandoffPacket(resumeReady: true, clientID: "pre-marker-v9-client", goal: "Preserve historical bytes", cwd: home.path)
+        try initial.handoffUpsert(packet)
+        let canonical = try XCTUnwrap(initial.handoffLegacyGet(id: packet.id))
+        initial.close()
+        try managerInteractiveFixtureSQL(path: path, sql: """
+            BEGIN IMMEDIATE;
+            CREATE TABLE pre_marker_context_handoffs (
+                id TEXT PRIMARY KEY,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,source TEXT NOT NULL,
+                resume_ready INTEGER NOT NULL DEFAULT 0,packet_json TEXT NOT NULL,client_id TEXT,
+                write_sequence INTEGER NOT NULL DEFAULT 0,runtime_scope_key TEXT
+            );
+            INSERT INTO pre_marker_context_handoffs SELECT id,created_at,updated_at,source,resume_ready,
+                packet_json,client_id,write_sequence,runtime_scope_key FROM context_handoffs;
+            DROP TABLE context_handoffs;
+            ALTER TABLE pre_marker_context_handoffs RENAME TO context_handoffs;
+            COMMIT;
+            """)
+        let bytesBefore = try managerInteractiveFixtureText(path: path, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(packet.id)';")
+        let migrated = try SQLiteStore(path: path)
+        XCTAssertEqual(try migrated.handoffLegacyGet(id: packet.id), canonical)
+        let record = try XCTUnwrap(migrated.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertNil(record.sealedSequence)
+        try migrated.importInteractiveContinuitySeals(packetIDs: [packet.id])
+        XCTAssertEqual(try migrated.interactiveContinuityHandoffRecord(packetID: packet.id)?.sealedSequence, record.writeSequence)
+        migrated.close()
+        XCTAssertEqual(try managerInteractiveFixtureText(path: path, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(packet.id)';"), bytesBefore)
+        XCTAssertEqual(try managerInteractiveFixtureText(path: path, sql: "SELECT version FROM schema_version;"), "9")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: path.appendingPathExtension("migration-manifest.json").path),
+            "Unreleased same-version additive DDL does not create a new versioned backup/receipt")
+        let reopened = try SQLiteStore(path: path)
+        defer { reopened.close() }
+        XCTAssertTrue(try XCTUnwrap(reopened.interactiveContinuityHandoffRecord(packetID: packet.id)).isSealed)
+        XCTAssertEqual(try reopened.handoffLegacyGet(id: packet.id), canonical)
+    }
+}
+
+private func managerInteractiveFixtureSQL(path: URL, sql: String) throws {
+    var connection: OpaquePointer?
+    guard sqlite3_open_v2(path.path, &connection, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let connection else {
+        if let connection { sqlite3_close(connection) }
+        throw StoreError.openFailed("owned interactive fixture could not open")
+    }
+    defer { sqlite3_close(connection) }
+    var message: UnsafeMutablePointer<CChar>?
+    guard sqlite3_exec(connection, sql, nil, nil, &message) == SQLITE_OK else {
+        let description = message.map { String(cString: $0) } ?? "unknown fixture error"
+        sqlite3_free(message)
+        throw StoreError.execFailed(description)
+    }
+}
+
+private func managerInteractiveFixtureText(path: URL, sql: String) throws -> String {
+    var connection: OpaquePointer?
+    guard sqlite3_open_v2(path.path, &connection, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let connection else {
+        if let connection { sqlite3_close(connection) }
+        throw StoreError.openFailed("owned interactive fixture could not open")
+    }
+    defer { sqlite3_close(connection) }
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(connection, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+        throw StoreError.execFailed("owned interactive fixture query failed")
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_step(statement) == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) else {
+        throw StoreError.notFound("owned interactive fixture value missing")
+    }
+    return String(cString: value)
+}
+
+extension ManagerTests {
+    private enum FinalReviewLegacyProvenanceCase { case archivedRoot, noRootOrSlug, activeRoot, activeSlug }
+
+    func testInteractiveContinuityKnownRootLookupIsLiteralDeepestAndPrefersLiveReregistration() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let repository = app.projectContexts.repository
+        let filesystemRoot = try await repository.registerProjectUnchecked(
+            projectID: ProjectID(), displayName: "Owned lookup fixture for filesystem root",
+            canonicalRoot: URL(fileURLWithPath: "/"))
+        let wildcardRoot = home.appendingPathComponent("literal%_root", isDirectory: true)
+        let wildcard = try await repository.registerProjectUnchecked(
+            projectID: ProjectID(), displayName: "Literal wildcard root", canonicalRoot: wildcardRoot)
+        _ = try await repository.archiveProject(projectID: wildcard.projectID, expectedGeneration: .initial)
+        let parentRoot = home.appendingPathComponent("parent", isDirectory: true)
+        let parent = try await repository.registerProjectUnchecked(
+            projectID: ProjectID(), displayName: "Active parent", canonicalRoot: parentRoot)
+        let childRoot = parentRoot.appendingPathComponent("child", isDirectory: true)
+        let child = try await repository.registerProjectUnchecked(
+            projectID: ProjectID(), displayName: "Archived deepest owner", canonicalRoot: childRoot)
+        _ = try await repository.archiveProject(projectID: child.projectID, expectedGeneration: .initial)
+        let literalPath = wildcardRoot.appendingPathComponent("nested/file").path
+        let wildcardImpostor = home.appendingPathComponent("literalXXroot/nested/file").path
+        let siblingPath = home.appendingPathComponent("parent-sibling/file").path
+        let childPath = childRoot.appendingPathComponent("nested/file").path
+        let owners = try await repository.knownProjects(containingCanonicalPaths: [
+            "/", literalPath, wildcardImpostor, siblingPath, childPath, parentRoot.path,
+        ])
+        XCTAssertEqual(owners["/"]?.projectID, filesystemRoot.projectID)
+        XCTAssertEqual(owners[literalPath]?.projectID, wildcard.projectID)
+        XCTAssertEqual(owners[literalPath]?.lifecycleState, .archived)
+        XCTAssertEqual(owners[wildcardImpostor]?.projectID, filesystemRoot.projectID,
+            "Percent and underscore in registered roots must remain literal characters")
+        XCTAssertEqual(owners[siblingPath]?.projectID, filesystemRoot.projectID,
+            "A shared text prefix without a slash boundary does not establish provenance")
+        XCTAssertEqual(owners[parentRoot.path]?.projectID, parent.projectID)
+        XCTAssertEqual(owners[childPath]?.projectID, child.projectID)
+        XCTAssertEqual(owners[childPath]?.lifecycleState, .archived,
+            "A deeper archived registration must not fall back to its active parent")
+
+        let replacement = try await repository.registerProjectUnchecked(
+            projectID: ProjectID(), displayName: "Live same-root replacement", canonicalRoot: childRoot)
+        let replaced = try await repository.knownProjects(containingCanonicalPaths: [childPath])
+        XCTAssertEqual(replaced[childPath]?.projectID, replacement.projectID)
+        XCTAssertEqual(replaced[childPath]?.lifecycleState, .active)
+        let historical = try await repository.project(child.projectID)
+        XCTAssertEqual(historical?.lifecycleState, .archived,
+            "Live same-root selection must preserve the archived registration")
+    }
+
+    func testInteractiveContinuityKnownRootLookupBoundsInputAndPreservesUnknownProvenance() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let repository = app.projectContexts.repository
+        let unknown = home.appendingPathComponent("unregistered/child").path
+        let owners = try await repository.knownProjects(containingCanonicalPaths: Array(repeating: unknown, count: 100))
+        XCTAssertTrue(owners.isEmpty)
+        for paths in [Array(repeating: unknown, count: 101), ["relative/path"], ["/invalid\0path"]] {
+            do {
+                _ = try await repository.knownProjects(containingCanonicalPaths: paths)
+                XCTFail("Out-of-bound provenance input unexpectedly succeeded")
+            } catch {
+                XCTAssertEqual(error as? ProjectContextError, .invalidIdentifier("project provenance paths"))
+            }
+        }
+    }
+
+    func testInteractiveContinuityArchivedLegacyRootCannotFallBackToUnrelatedSoleActiveProject() async throws {
+        try await assertFinalReviewLegacyProvenance(.archivedRoot)
+    }
+
+    func testInteractiveContinuityLegacyWithoutRootOrSlugRetainsSoleProjectCompatibility() async throws {
+        try await assertFinalReviewLegacyProvenance(.noRootOrSlug)
+    }
+
+    func testInteractiveContinuityLegacyActiveRootSelectsExactProjectAmongMultipleProjects() async throws {
+        try await assertFinalReviewLegacyProvenance(.activeRoot)
+    }
+
+    func testInteractiveContinuityLegacyActiveSlugSelectsExactProjectAmongMultipleProjects() async throws {
+        try await assertFinalReviewLegacyProvenance(.activeSlug)
+    }
+
+    private func assertFinalReviewLegacyProvenance(_ fixture: FinalReviewLegacyProvenanceCase) async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let firstRoot = home.appendingPathComponent("legacy-provenance-first", isDirectory: true)
+        let secondRoot = home.appendingPathComponent("legacy-provenance-unrelated", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondRoot, withIntermediateDirectories: true)
+        let adapter = ManagerInteractiveContinuityAdapter()
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: HostPluginManifest(identifier: ManagerNode.nativeSessionHostAdapterID,
+            version: "interactive-fixture", minimumContractVersion: 1, hostType: "lmstudio-interactive-fixture",
+            capabilities: managerProviderHostCapabilities(), configurationKeys: [], privacyRequirements: [], migrationVersion: 1),
+            factory: { _ in adapter })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let first = try node.registerProject(path: firstRoot.path, displayName: "Exact Legacy Project")
+        let firstID = ProjectID(try XCTUnwrap((first["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+        var packet = HandoffPacket(resumeReady: true, clientID: "unscoped-legacy-provenance",
+            goal: "Resume only the project actually identified by this legacy packet",
+            nextActions: ["Continue the saved task"])
+        switch fixture {
+        case .archivedRoot:
+            packet.cwd = firstRoot.path
+            try app.store.handoffUpsert(packet)
+            _ = try node.removeProject(projectID: firstID, expectedGeneration: .initial)
+            _ = try node.registerProject(path: secondRoot.path, displayName: "Unrelated Sole Active Project")
+        case .noRootOrSlug:
+            try app.store.handoffUpsert(packet)
+        case .activeRoot:
+            packet.cwd = firstRoot.path
+            try app.store.handoffUpsert(packet)
+            _ = try node.registerProject(path: secondRoot.path, displayName: "Unrelated Active Project")
+        case .activeSlug:
+            packet.projectSlug = "Exact Legacy Project"
+            try app.store.handoffUpsert(packet)
+            _ = try node.registerProject(path: secondRoot.path, displayName: "Unrelated Active Project")
+        }
+        let canonical = try XCTUnwrap(app.store.handoffLegacyGet(id: packet.id))
+        XCTAssertNil(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id),
+            "Fixture preserves a legacy NULL owner, not an invented runtime scope")
+        let status = try node.operatorSnapshot().interactiveContinuity
+        let result = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        let observed = await adapter.observed()
+        switch fixture {
+        case .archivedRoot:
+            XCTAssertNil(status, "Explicit archived-root provenance must not select the unrelated sole active project")
+            XCTAssertNil(result)
+            XCTAssertEqual(observed.createCount, 0)
+            XCTAssertEqual(observed.bootstrapCount, 0)
+            XCTAssertFalse(try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id)).isSealed)
+        case .noRootOrSlug, .activeRoot, .activeSlug:
+            XCTAssertEqual(status?.handoffID, packet.id)
+            XCTAssertEqual(status?.projectID, firstID.description)
+            XCTAssertEqual(result, packet.id)
+            XCTAssertEqual(observed.createCount, 1)
+            XCTAssertEqual(observed.bootstrapCount, 1)
+            XCTAssertEqual(observed.projectID, firstID.description)
+            XCTAssertEqual(observed.bootstrappedProjectID, firstID.description)
+            XCTAssertEqual(try node.operatorSnapshot().interactiveContinuity?.state, "completed")
+        }
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), canonical)
+        XCTAssertNil(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id))
+    }
+}
+
+private actor FinalReviewAckRevisionTransport: NativeSessionTransport {
+    struct Delivery: Sendable, Equatable {
+        let handoffID: String
+        let digest: String
+        let mission: String
+    }
+    private var creates = 0
+    private var deliveries: [Delivery] = []
+
+    func createSession(request: SessionCreationRequest,
+                       deadline: ContinuousClock.Instant) async throws -> NativeTransportSession {
+        try Task.checkCancellation()
+        guard ContinuousClock.now < deadline, creates < 3 else { throw NativeHostPluginError.deadlineExceeded }
+        creates += 1
+        return NativeTransportSession(providerSessionID: "revision-provider-\(request.operationID)", model: "fixture-model")
+    }
+
+    func bootstrap(_ request: NativeBootstrapRequest) async throws -> NativeBootstrapResponse {
+        try Task.checkCancellation()
+        guard ContinuousClock.now < request.deadline, deliveries.count < 3 else {
+            throw NativeHostPluginError.deadlineExceeded
+        }
+        let object = try JSONSupport.object(from: request.canonicalHandoff)
+        guard let handoff = ContinuityHandoff.fromDictionary(object) else {
+            throw NativeHostPluginError.malformedResponse("fixture handoff could not decode")
+        }
+        let canonical = try handoff.validated()
+        guard canonical.handoffID == request.handoffID,
+              canonical.contentSHA256 == request.handoffSHA256 else {
+            throw NativeHostPluginError.malformedResponse("fixture handoff digest differs")
+        }
+        deliveries.append(Delivery(handoffID: request.handoffID, digest: request.handoffSHA256,
+                                  mission: canonical.mission))
+        return NativeBootstrapResponse(chunks: [try JSONSupport.data(from: [
+            "handoff_id": request.handoffID, "successor_session_id": request.successorSessionID,
+        ])], inputTokens: 100, outputTokens: 8)
+    }
+
+    func cancel(operationID: String, providerSessionID: String?) async {}
+    func observed() -> (creates: Int, deliveries: [Delivery]) { (creates, deliveries) }
+}
+
+private actor FinalReviewAckBeforeSealAdapter: SessionHostAdapter {
+    struct Attempt: Sendable, Equatable {
+        let handoffID: String
+        let digest: String
+    }
+    nonisolated let identifier = ManagerNode.nativeSessionHostAdapterID
+    nonisolated let version = "ack-before-seal-fixture"
+    private let native: ForgeNativeSessionHostAdapter
+    private let reached: XCTestExpectation
+    private var released = false
+    private var gated = false
+    private var timedOut = false
+    private var actualAcknowledgement: HandoffAcknowledgement?
+    private var attempts: [Attempt] = []
+
+    init(native: ForgeNativeSessionHostAdapter, reached: XCTestExpectation) {
+        self.native = native
+        self.reached = reached
+    }
+
+    func capabilities() async throws -> HostCapabilities { try await native.capabilities() }
+    func session(forIdempotencyKey key: String) async throws -> HostSession? {
+        try await native.session(forIdempotencyKey: key)
+    }
+    func createSession(_ request: SessionCreationRequest) async throws -> HostSession {
+        try await native.createSession(request)
+    }
+    func bootstrap(_ session: HostSession, handoff: ContinuityHandoff) async throws {
+        guard attempts.count < 3 else { throw FinalReviewInteractiveGateError.timedOut }
+        attempts.append(Attempt(handoffID: handoff.handoffID, digest: handoff.contentSHA256))
+        try await native.bootstrap(session, handoff: handoff)
+        guard !gated else { return }
+        // This is the real adapter's persisted acknowledgement, read after its
+        // bootstrap returned. Editing before this point would test a different path.
+        actualAcknowledgement = try await native.awaitAcknowledgement(
+            session: session, handoffID: handoff.handoffID, timeout: .seconds(1))
+        gated = true
+        reached.fulfill()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !released {
+            try Task.checkCancellation()
+            guard ContinuousClock.now < deadline else {
+                timedOut = true
+                throw FinalReviewInteractiveGateError.timedOut
+            }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
+    func awaitAcknowledgement(session: HostSession, handoffID: String,
+                              timeout: Duration) async throws -> HandoffAcknowledgement {
+        try await native.awaitAcknowledgement(session: session, handoffID: handoffID, timeout: timeout)
+    }
+    func cancel(operationID: String) async { await native.cancel(operationID: operationID) }
+    func release() { released = true }
+    func observed() -> (acknowledgement: HandoffAcknowledgement?, attempts: [Attempt], timedOut: Bool) {
+        (actualAcknowledgement, attempts, timedOut)
+    }
+}
+
+extension ManagerTests {
+    func testInteractiveContinuityNeverSealsEditedUnloadedPayloadAgainstPriorNativeAcknowledgement() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("ack-revision-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let transport = FinalReviewAckRevisionTransport()
+        let native = try ForgeNativeSessionHostAdapter(
+            storageDirectory: home.appendingPathComponent("ack-revision-ledger"), transport: transport)
+        let reached = expectation(description: "Actual original native acknowledgement is durable before SQL seal")
+        let adapter = FinalReviewAckBeforeSealAdapter(native: native, reached: reached)
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: ForgeNativeSessionHostPlugin.manifest, factory: { _ in adapter })
+        let node = ManagerNode(app: app, hostAdapterRegistry: registry)
+        let registered = try node.registerProject(path: root.path)
+        let projectID = ProjectID(try XCTUnwrap((registered["project_id"] as? String).flatMap(UUID.init(uuidString:))))
+        let client = ClientID("native-ack-revision-client")
+        let binding = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: client.rawValue),
+            projectID: projectID, generation: .initial, authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [root], allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+        let scopeKey = app.continuityAutomation.runtimeScopeKey(binding.invocationContext(clientID: client))
+        let packet = HandoffPacket(resumeReady: true, clientID: client.rawValue,
+            goal: "Original actually loaded task", cwd: root.path, nextActions: ["Continue the original task"])
+        try app.store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: scopeKey)
+        let original = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+        let operation = Task { try await node.processInteractiveContinuityOnce(ignoreDelay: true) }
+        await fulfillment(of: [reached], timeout: 2)
+        let paused = await adapter.observed()
+        guard let actualAck = paused.acknowledgement else {
+            await adapter.release()
+            _ = try? await operation.value
+            XCTFail("No actual native acknowledgement was observed; the edit interleaving was not established")
+            return
+        }
+        XCTAssertEqual(actualAck.handoffID, packet.id)
+        let originalDelivery = await transport.observed()
+        XCTAssertEqual(originalDelivery.creates, 1)
+        XCTAssertEqual(originalDelivery.deliveries.count, 1)
+        XCTAssertEqual(originalDelivery.deliveries.first?.handoffID, packet.id)
+        XCTAssertEqual(originalDelivery.deliveries.first?.mission, packet.goal)
+        XCTAssertEqual(originalDelivery.deliveries.first?.digest, paused.attempts.first?.digest)
+
+        var edited: HandoffPacket
+        do {
+            let beforeEdit = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+            XCTAssertEqual(beforeEdit.packet, original.packet)
+            XCTAssertEqual(beforeEdit.writeSequence, original.writeSequence)
+            XCTAssertFalse(beforeEdit.isSealed, "The edit must occur after native acknowledgement and before SQL seal")
+            edited = original.packet
+            edited.goal = "Changed task that no successor loaded"
+            edited.nextActions = ["Continue the changed task only after its own bootstrap"]
+            try app.store.handoffUpsertRecordingRuntimeProgress(edited, scopeKey: scopeKey)
+        } catch {
+            await adapter.release()
+            _ = try? await operation.value
+            throw error
+        }
+        let changed = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertEqual(changed.packet.id, original.packet.id)
+        XCTAssertGreaterThan(changed.writeSequence, original.writeSequence)
+        XCTAssertEqual(changed.runtimeScopeKey, original.runtimeScopeKey)
+        XCTAssertFalse(changed.isSealed)
+        await adapter.release()
+        do {
+            _ = try await operation.value
+            XCTFail("The initial Manager attempt must reject the revision changed across bootstrap")
+        } catch let error as StoreError {
+            guard case .conflict = error else { throw error }
+        }
+        let firstFailure = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "manager_interactive_continuity_deferred"
+        })
+        XCTAssertEqual(firstFailure.fields["handoff_id"], packet.id)
+        XCTAssertEqual(firstFailure.fields["failure_stage"], "project_authority_after_successor_bootstrap")
+        XCTAssertEqual(firstFailure.fields["creation_attempted"], "true")
+        XCTAssertEqual(firstFailure.fields["completion_committed"], "false")
+        let firstStart = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+            $0.event == "manager_interactive_continuity_attempt"
+        })
+        XCTAssertEqual(firstStart.fields["attempt_id"], firstFailure.fields["attempt_id"])
+        XCTAssertFalse(try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id)).isSealed)
+        let firstGate = await adapter.observed()
+        XCTAssertFalse(firstGate.timedOut)
+
+        var retryResult: String?
+        var retryError: Error?
+        do { retryResult = try await node.processInteractiveContinuityOnce(ignoreDelay: true) }
+        catch { retryError = error }
+        XCTAssertEqual(retryError as? NativeHostPluginError, .malformedResponse(
+            "acknowledged handoff content changed; use a fresh handoff identity"))
+        let retry = await adapter.observed()
+        let loaded = await transport.observed()
+        let firstAttempt = try XCTUnwrap(retry.attempts.first)
+        let retryAttempt = try XCTUnwrap(retry.attempts.last)
+        XCTAssertEqual(retry.attempts.count, 2)
+        XCTAssertEqual(firstAttempt.handoffID, retryAttempt.handoffID)
+        XCTAssertNotEqual(firstAttempt.digest, retryAttempt.digest,
+            "The retry actually supplied changed semantic content under the original ID")
+        XCTAssertEqual(loaded.creates, 1, "A revision mismatch must not multiply sessions")
+        XCTAssertEqual(loaded.deliveries, originalDelivery.deliveries,
+            "The real native adapter has loaded and acknowledged only the original payload")
+        XCTAssertFalse(loaded.deliveries.contains { $0.digest == retryAttempt.digest })
+        XCTAssertNil(retryResult, "An old native acknowledgement must not complete a never-loaded revision")
+        let afterRetry = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packet.id))
+        XCTAssertFalse(afterRetry.isSealed, "Never mark the changed payload complete against the prior native acknowledgement")
+        XCTAssertEqual(afterRetry.packet, changed.packet)
+        XCTAssertEqual(afterRetry.writeSequence, changed.writeSequence)
+        XCTAssertEqual(afterRetry.runtimeScopeKey, scopeKey)
+
+        // Positive recovery: the changed task uses a fresh handoff identity and
+        // receives its own real transport delivery/acknowledgement and SQL seal.
+        let fresh = HandoffPacket(resumeReady: true, clientID: client.rawValue,
+            goal: edited.goal, cwd: root.path, nextActions: edited.nextActions)
+        XCTAssertNotEqual(fresh.id, packet.id)
+        try app.store.handoffUpsertRecordingRuntimeProgress(fresh, scopeKey: scopeKey)
+        let freshBefore = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: fresh.id))
+        XCTAssertGreaterThan(freshBefore.writeSequence, changed.writeSequence)
+        let recovered = try await node.processInteractiveContinuityOnce(ignoreDelay: true)
+        XCTAssertEqual(recovered, fresh.id)
+        let recoveredTransport = await transport.observed()
+        XCTAssertEqual(recoveredTransport.creates, 2)
+        XCTAssertEqual(recoveredTransport.deliveries.count, 2)
+        XCTAssertEqual(recoveredTransport.deliveries.last?.handoffID, fresh.id)
+        XCTAssertEqual(recoveredTransport.deliveries.last?.mission, edited.goal)
+        let recoveredAdapter = await adapter.observed()
+        XCTAssertEqual(recoveredTransport.deliveries.last?.digest, recoveredAdapter.attempts.last?.digest)
+        let freshAfter = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: fresh.id))
+        XCTAssertTrue(freshAfter.isSealed)
+        XCTAssertEqual(freshAfter.packet, freshBefore.packet)
+        XCTAssertEqual(freshAfter.writeSequence, freshBefore.writeSequence)
+        XCTAssertEqual(freshAfter.sealedSequence, freshBefore.writeSequence)
+        XCTAssertEqual(freshAfter.runtimeScopeKey, scopeKey)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), changed.packet)
+    }
+}
+
+
+extension ManagerTests {
+    func testManagerSettingsReadsPersistedContinuityLimitWithoutToolBoundary() throws {
+        try assertManagerSettingsReadRefreshesContinuity(dictionaryRead: false)
+        try assertManagerSettingsReadRefreshesContinuity(dictionaryRead: true)
+    }
+
+    private func assertManagerSettingsReadRefreshesContinuity(dictionaryRead: Bool) throws {
+        let fixtureHome = home.appendingPathComponent(dictionaryRead ? "dictionary-read" : "model-read", isDirectory: true)
+        let writer = try ForgeApp.bootstrap(home: fixtureHome)
+        defer { writer.shutdown() }
+        let writerManager = ManagerNode(app: writer)
+        let reader = try ForgeApp.bootstrap(home: fixtureHome)
+        defer { reader.shutdown() }
+        let readerManager = ManagerNode(app: reader)
+        XCTAssertEqual(writerManager.settingsModel().continuityRolloverToolCalls, 200)
+        XCTAssertEqual(readerManager.settingsModel().continuityRolloverToolCalls, 200)
+        _ = try writer.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3))
+        let persisted = try Data(contentsOf: writer.paths.configJSON)
+        XCTAssertEqual(reader.config.model.sessions.continuityRolloverToolCalls, 200)
+
+        // No status or eligible work boundary occurs between the external save
+        // and the exact settings entry point used by Reload from disk.
+        let refreshed: ManagerSettings
+        if dictionaryRead {
+            refreshed = try ManagerSettings(dictionary: readerManager.settings())
+        } else {
+            refreshed = readerManager.settingsModel()
+        }
+        XCTAssertEqual(refreshed.continuityRolloverToolCalls, 3)
+        XCTAssertEqual(reader.config.model.sessions.continuityRolloverToolCalls, 3)
+        XCTAssertNil(refreshed.budgetPolicyIssue)
+        XCTAssertNotNil(refreshed.budgetPolicy)
+        XCTAssertEqual(try Data(contentsOf: writer.paths.configJSON), persisted)
+    }
+
+    func testManagerSettingsRefreshRetainsUnsavedShellOptOut() throws {
+        let writer = try ForgeApp.bootstrap(home: home)
+        defer { writer.shutdown() }
+        let writerManager = ManagerNode(app: writer)
+        let reader = try ForgeApp.bootstrap(home: home)
+        defer { reader.shutdown() }
+        let readerManager = ManagerNode(app: reader)
+        XCTAssertEqual(writerManager.settingsModel().continuityRolloverToolCalls, 200)
+        XCTAssertEqual(readerManager.settingsModel().continuityRolloverToolCalls, 200)
+        _ = try reader.config.update(ManagerSettingsPatch(shellEnabled: false), save: false)
+        XCTAssertFalse(reader.config.model.shell.enabled)
+        XCTAssertTrue(reader.config.model.shell.userDisabled)
+        _ = try writer.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3))
+        let persisted = try Data(contentsOf: writer.paths.configJSON)
+        let durable = try JSONSupport.object(from: persisted)
+        XCTAssertEqual((durable["shell"] as? [String: Any])?["enabled"] as? Bool, true)
+        XCTAssertEqual(reader.config.model.sessions.continuityRolloverToolCalls, 200)
+
+        let refreshed = readerManager.settingsModel()
+        XCTAssertEqual(refreshed.continuityRolloverToolCalls, 3)
+        XCTAssertFalse(refreshed.shellEnabled)
+        XCTAssertTrue(refreshed.shellUserDisabled)
+        XCTAssertEqual(refreshed.shellPolicyOrigin, "user_disabled")
+        let dictionary = try ManagerSettings(dictionary: readerManager.settings())
+        XCTAssertEqual(dictionary.continuityRolloverToolCalls, 3)
+        XCTAssertFalse(dictionary.shellEnabled)
+        XCTAssertTrue(dictionary.shellUserDisabled)
+        XCTAssertEqual(try Data(contentsOf: writer.paths.configJSON), persisted)
+        XCTAssertFalse(reader.config.model.shell.enabled)
+        XCTAssertTrue(reader.config.model.shell.userDisabled)
+    }
+
+    func testManagerSettingsCachedRecoveryForMalformedAndMissingConfigurations() throws {
+        try assertManagerSettingsCachedRecovery(malformed: true)
+        try assertManagerSettingsCachedRecovery(malformed: false)
+    }
+
+    private func assertManagerSettingsCachedRecovery(malformed: Bool) throws {
+        let fixtureHome = home.appendingPathComponent(malformed ? "malformed-read" : "missing-read", isDirectory: true)
+        let writer = try ForgeApp.bootstrap(home: fixtureHome)
+        defer { writer.shutdown() }
+        _ = try writer.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3, shellEnabled: false))
+        let writerManager = ManagerNode(app: writer)
+        let reader = try ForgeApp.bootstrap(home: fixtureHome)
+        defer { reader.shutdown() }
+        let readerManager = ManagerNode(app: reader)
+        XCTAssertEqual(writerManager.settingsModel().continuityRolloverToolCalls, 3)
+        let warm = readerManager.settingsModel()
+        XCTAssertEqual(warm.continuityRolloverToolCalls, 3)
+        XCTAssertFalse(warm.shellEnabled)
+        XCTAssertTrue(warm.shellUserDisabled)
+        XCTAssertNil(warm.budgetPolicyIssue)
+        XCTAssertNotNil(warm.budgetPolicy)
+        XCTAssertTrue(writer.audit.flushAttempts(timeout: 5))
+        XCTAssertTrue(reader.audit.flushAttempts(timeout: 5))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let cached = try encoder.encode(reader.config.model)
+        let original = try Data(contentsOf: writer.paths.configJSON)
+        let damaged: Data?
+        if malformed {
+            var object = try JSONSupport.object(from: original)
+            object["budget_policy"] = ["schema_version": 999]
+            let bytes = try JSONSupport.data(from: object)
+            try bytes.write(to: writer.paths.configJSON, options: .atomic)
+            damaged = bytes
+        } else {
+            try FileManager.default.removeItem(at: writer.paths.configJSON)
+            damaged = nil
+            XCTAssertFalse(FileManager.default.fileExists(atPath: writer.paths.configJSON.path))
+        }
+
+        let recovered = readerManager.settingsModel()
+        XCTAssertEqual(recovered.continuityRolloverToolCalls, 3)
+        XCTAssertFalse(recovered.shellEnabled)
+        XCTAssertTrue(recovered.shellUserDisabled)
+        XCTAssertEqual(recovered.shellPolicyOrigin, "user_disabled")
+        XCTAssertNil(recovered.budgetPolicy)
+        XCTAssertFalse(try XCTUnwrap(recovered.budgetPolicyIssue).isEmpty)
+        let dictionary = readerManager.settings()
+        XCTAssertEqual(dictionary["ok"] as? Bool, true)
+        XCTAssertEqual((dictionary["sessions"] as? [String: Any])?["continuity_rollover_tool_calls"] as? Int, 3)
+        XCTAssertFalse(try XCTUnwrap(dictionary["budget_policy_issue"] as? String).isEmpty)
+        XCTAssertNil(dictionary["budget_policy"])
+        XCTAssertTrue(writer.audit.flushAttempts(timeout: 5))
+        XCTAssertTrue(reader.audit.flushAttempts(timeout: 5))
+        XCTAssertEqual(try encoder.encode(reader.config.model), cached)
+        if let damaged {
+            XCTAssertEqual(try Data(contentsOf: writer.paths.configJSON), damaged)
+        } else {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: writer.paths.configJSON.path))
+        }
+
+        // Repair only the owned fixture file. A healthy settings read must clear
+        // the existing diagnostic without recreating defaults or losing opt-out.
+        try original.write(to: writer.paths.configJSON, options: .atomic)
+        let healthy = readerManager.settingsModel()
+        XCTAssertEqual(healthy.continuityRolloverToolCalls, 3)
+        XCTAssertFalse(healthy.shellEnabled)
+        XCTAssertTrue(healthy.shellUserDisabled)
+        XCTAssertNil(healthy.budgetPolicyIssue)
+        XCTAssertNotNil(healthy.budgetPolicy)
+        XCTAssertEqual(try encoder.encode(reader.config.model), cached)
+        XCTAssertEqual(try Data(contentsOf: writer.paths.configJSON), original)
     }
 }

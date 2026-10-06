@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import MetalKit
 import SwiftUI
 import XCTest
@@ -660,7 +661,16 @@ final class ComputeChipNativeLifecycleTests: XCTestCase, @unchecked Sendable {
         cover.isOpaque = true; cover.backgroundColor = .black
         defer { cover.orderOut(nil); cover.close() }
         cover.orderFrontRegardless()
-        await require { !initial.window.occlusionState.contains(.visible)
+        await require(failureDescription:
+            "Stage full occlusion; application_active=\(NSApp.isActive); " +
+            "initial_visible=\(initial.window.isVisible); initial_on_active_space=\(initial.window.isOnActiveSpace); " +
+            "initial_occlusion=\(initial.window.occlusionState.rawValue); initial_frame=\(NSStringFromRect(initial.window.frame)); " +
+            "initial_level=\(initial.window.level.rawValue); cover_visible=\(cover.isVisible); " +
+            "cover_on_active_space=\(cover.isOnActiveSpace); cover_occlusion=\(cover.occlusionState.rawValue); " +
+            "cover_frame=\(NSStringFromRect(cover.frame)); cover_level=\(cover.level.rawValue); " +
+            "rendering_eligible=\(initial.surface.isRenderingEligible); " +
+            "active_clocks=\(initial.diagnostics.snapshot().activeClocks); in_flight_slots=\(initial.diagnostics.snapshot().inFlightSlots)"
+        ) { !initial.window.occlusionState.contains(.visible)
             && initial.diagnostics.snapshot().activeClocks == 0 && initial.diagnostics.snapshot().inFlightSlots == 0 }
         XCTAssertTrue(initial.window.isVisible, "This assertion distinguishes native occlusion from orderOut")
         let occluded = initial.diagnostics.snapshot().submissions
@@ -690,6 +700,129 @@ final class ComputeChipNativeLifecycleTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(released.failedCommands, 0, "Cycle \(cycle)")
             retain("reopen-cycle-\(cycle)-released", released)
         }
+    }
+
+    func testNativeCoverOrderingComparisonCapturesOwnedWindowServerEvidence() async throws {
+        let initial = mount(paused: true)
+        NSApp.activate(ignoringOtherApps: true)
+        initial.window.makeKeyAndOrderFront(nil)
+        initial.window.orderFrontRegardless()
+        var snapshots: [[String: Any]] = []
+        var outcomes: [[String: Any]] = []
+        let started = ProcessInfo.processInfo.systemUptime
+        func exposed() -> Bool {
+            NSApp.isActive && initial.window.isKeyWindow && initial.window.isVisible
+                && initial.window.occlusionState.contains(.visible)
+        }
+        let ready = await wait(timeout: 4, predicate: exposed)
+        snapshots.append(coverOrderingSnapshot("startup", initial: initial, cover: nil))
+        guard ready else {
+            try retainCoverOrderingEvidence(snapshots: snapshots, outcomes: outcomes, elapsed: ProcessInfo.processInfo.systemUptime - started)
+            XCTFail("The actual native XCTest host must be active, key and exposed before comparing cover order")
+            throw NSError(domain: "ComputeNativeCoverOrdering", code: 1)
+        }
+        await require { initial.diagnostics.snapshot().completedCommands > 0 }
+
+        for variant in ["original-order-front", "explicit-above-initial", "floating-order-front"] {
+            let cover = NSWindow(contentRect: initial.window.frame.insetBy(dx: -24, dy: -24),
+                                 styleMask: [.borderless], backing: .buffered, defer: false)
+            cover.isReleasedWhenClosed = false
+            cover.isOpaque = true; cover.backgroundColor = .black
+            defer { cover.orderOut(nil); cover.close() }
+            switch variant {
+            case "explicit-above-initial": cover.order(.above, relativeTo: initial.window.windowNumber)
+            case "floating-order-front": cover.level = .floating; cover.orderFrontRegardless()
+            default: cover.orderFrontRegardless()
+            }
+            snapshots.append(coverOrderingSnapshot(variant + "-start", initial: initial, cover: cover))
+            let phaseStart = ProcessInfo.processInfo.systemUptime
+            let deadline = phaseStart + 4
+            var visibleSamples: [Bool] = []
+            while ProcessInfo.processInfo.systemUptime < deadline && visibleSamples.count < 48 {
+                visibleSamples.append(initial.window.occlusionState.contains(.visible))
+                await events(0.1)
+            }
+            let terminalOccluded = !initial.window.occlusionState.contains(.visible)
+            let stayedVisible = initial.window.isVisible
+            outcomes.append([
+                "variant": variant, "elapsed_seconds": ProcessInfo.processInfo.systemUptime - phaseStart,
+                "occlusion_visible_samples": visibleSamples, "any_occluded_sample": visibleSamples.contains(false),
+                "terminal_fully_occluded": terminalOccluded, "initial_window_still_visible": stayedVisible,
+            ])
+            snapshots.append(coverOrderingSnapshot(variant + "-terminal", initial: initial, cover: cover))
+            XCTAssertTrue(stayedVisible, "Native occlusion must remain distinct from orderOut: \(variant)")
+            cover.orderOut(nil)
+            initial.window.makeKeyAndOrderFront(nil)
+            let recovered = await wait(timeout: 4, predicate: exposed)
+            snapshots.append(coverOrderingSnapshot(variant + "-recovery", initial: initial, cover: cover))
+            guard recovered else {
+                try retainCoverOrderingEvidence(snapshots: snapshots, outcomes: outcomes, elapsed: ProcessInfo.processInfo.systemUptime - started)
+                XCTFail("The native window must recover active/key/exposed state after \(variant)")
+                throw NSError(domain: "ComputeNativeCoverOrdering", code: 2)
+            }
+        }
+        try retainCoverOrderingEvidence(snapshots: snapshots, outcomes: outcomes, elapsed: ProcessInfo.processInfo.systemUptime - started)
+        XCTAssertTrue(outcomes.dropFirst().contains { ($0["terminal_fully_occluded"] as? Bool) == true
+            && ($0["initial_window_still_visible"] as? Bool) == true },
+                      "At least one explicit-order or floating native control must demonstrate full occlusion")
+        XCTAssertTrue(exposed(), "The fixture must finish exposed and recoverable")
+    }
+
+    private func coverOrderingSnapshot(_ phase: String, initial: ComputeNativeFixture, cover: NSWindow?) -> [String: Any] {
+        let capturedRows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        let rows = capturedRows ?? []
+        var ownRows: [[String: Any]] = []
+        for (index, row) in rows.prefix(512).enumerated() {
+            guard (row[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == getpid() else { continue }
+            let bounds = row[kCGWindowBounds as String] as? [String: Any] ?? [:]
+            let numericBounds = Dictionary(uniqueKeysWithValues: ["X", "Y", "Width", "Height"].compactMap { key -> (String, Double)? in
+                guard let value = bounds[key] as? NSNumber, value.doubleValue.isFinite else { return nil }
+                return (key, value.doubleValue)
+            })
+            ownRows.append([
+                "global_front_to_back_index": index,
+                "window_number": (row[kCGWindowNumber as String] as? NSNumber)?.intValue ?? -1,
+                "layer": (row[kCGWindowLayer as String] as? NSNumber)?.intValue ?? -1,
+                "alpha": (row[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? -1,
+                "bounds": numericBounds,
+            ])
+        }
+        func window(_ value: NSWindow) -> [String: Any] {
+            ["window_number": value.windowNumber, "is_visible": value.isVisible, "is_key": value.isKeyWindow,
+             "on_active_space": value.isOnActiveSpace, "occlusion_state": value.occlusionState.rawValue,
+             "level": value.level.rawValue, "frame": NSStringFromRect(value.frame)]
+        }
+        let observation = initial.diagnostics.snapshot()
+        return [
+            "phase": phase, "uptime": ProcessInfo.processInfo.systemUptime, "app_active": NSApp.isActive,
+            "app_activation_policy": NSApp.activationPolicy().rawValue,
+            "frontmost_pid": NSWorkspace.shared.frontmostApplication?.processIdentifier ?? -1,
+            "initial": window(initial.window), "cover": cover.map { window($0) as Any } ?? NSNull(),
+            "own_pid": getpid(), "own_windowserver_rows": ownRows, "windowserver_total_row_count": rows.count,
+            "windowserver_snapshot_available": capturedRows != nil,
+            "windowserver_scanned_row_count": min(512, rows.count), "windowserver_scan_truncated": rows.count > 512,
+            "active_clocks_context_only": observation.activeClocks, "in_flight_slots_context_only": observation.inFlightSlots,
+        ]
+    }
+
+    private func retainCoverOrderingEvidence(snapshots: [[String: Any]], outcomes: [[String: Any]], elapsed: Double) throws {
+        let json: [String: Any] = [
+            "schema_version": 1, "scope": "Actual app-hosted paused Compute fixture; owned PID window metadata only",
+            "phase_deadline_seconds": 4, "elapsed_seconds": elapsed, "snapshots": snapshots, "outcomes": outcomes,
+            "coordinate_systems": "CGWindow bounds use desktop upper-left coordinates; AppKit frames use lower-left coordinates",
+            "occlusion_predicate": "Initial window remains isVisible and its native occlusionState lacks visible",
+            "clock_evidence": "Paused and stale data can stop clocks independently; clocks are not occlusion proof",
+        ]
+        let data = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+        guard data.count <= 2 * 1_024 * 1_024 else {
+            throw NSError(domain: "ComputeNativeCoverOrdering", code: 3, userInfo: [NSLocalizedDescriptionKey: "Owned window evidence exceeds 2 MiB"])
+        }
+        try directEvidence.save(data, name: "compute-native-cover-ordering", extension: "json")
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "compute-native-cover-ordering"; attachment.lifetime = .keepAlways
+        if !directEvidence.isEnabled { add(attachment) }
+        XCTAssertTrue(snapshots.allSatisfy { ($0["windowserver_snapshot_available"] as? Bool) == true },
+                      "The native comparison requires actual WindowServer metadata")
     }
 
     func testPowerStateNotificationFromBackgroundDeliversOnMainActorAndDetaches() async throws {
@@ -748,10 +881,13 @@ final class ComputeChipNativeLifecycleTests: XCTestCase, @unchecked Sendable {
         }
         return predicate()
     }
-    private func require(file: StaticString = #filePath, line: UInt = #line,
+    private func require(failureDescription: @autoclosure () -> String = "",
+                         file: StaticString = #filePath, line: UInt = #line,
                          predicate: @escaping () -> Bool) async {
         let succeeded = await wait(predicate: predicate)
-        XCTAssertTrue(succeeded, "Expected bounded native Compute transition", file: file, line: line)
+        let detail = succeeded ? "" : failureDescription()
+        XCTAssertTrue(succeeded, "Expected bounded native Compute transition" + (detail.isEmpty ? "" : ": \(detail)"),
+                      file: file, line: line)
     }
     private func events(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
     private func retain(_ name: String, _ snapshot: ComputeChipRendererObservation) {

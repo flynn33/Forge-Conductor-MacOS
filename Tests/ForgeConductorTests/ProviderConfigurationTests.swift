@@ -201,10 +201,10 @@ final class ProviderConfigurationTests: XCTestCase {
     private func request(_ revision: String = "0", endpoint: String = "http://127.0.0.1:1234",
                          endpointMode: LMStudioEndpointMode? = nil,
                          model: String? = "fixture/tool-model", action: ProviderCredentialAction = .keep,
-                         token: String? = nil) -> ProviderConfigurationUpdate {
+                         token: String? = nil, maximumOutputTokens: Int? = nil) -> ProviderConfigurationUpdate {
         ProviderConfigurationUpdate(expectedRevision: revision, endpoint: endpoint,
                                     endpointMode: endpointMode, modelKey: model,
-                                    credentialAction: action, token: token)
+                                    credentialAction: action, token: token, maximumOutputTokens: maximumOutputTokens)
     }
 
     private func linkedRequest(
@@ -424,6 +424,91 @@ final class ProviderConfigurationTests: XCTestCase {
         catch let error as LMStudioProviderError {
             guard case .invalidConfiguration = error else { return XCTFail("Unexpected cleared credential failure") }
         }
+    }
+
+    func testMaximumOutputTokenLegacySnapshotAndUpdateDecodingKeepDefaultsAndOmission() throws {
+        let snapshot = ProviderConfigurationSnapshot(
+            revision: "legacy", endpoint: "http://127.0.0.1:1234", modelKey: nil,
+            credentialConfigured: false, saved: true, maximumOutputTokens: 8_192
+        )
+        let snapshotData = try JSONEncoder().encode(snapshot)
+        XCTAssertEqual(try JSONDecoder().decode(ProviderConfigurationSnapshot.self, from: snapshotData), snapshot)
+        var legacySnapshot = try XCTUnwrap(JSONSerialization.jsonObject(with: snapshotData) as? [String: Any])
+        legacySnapshot.removeValue(forKey: "maximumOutputTokens")
+        for explicitNull in [false, true] {
+            if explicitNull { legacySnapshot["maximumOutputTokens"] = NSNull() }
+            let decoded = try JSONDecoder().decode(ProviderConfigurationSnapshot.self,
+                from: JSONSerialization.data(withJSONObject: legacySnapshot))
+            XCTAssertEqual(decoded.maximumOutputTokens, 4_096)
+            XCTAssertEqual(decoded.revision, "legacy")
+        }
+        let omittedData = try JSONEncoder().encode(request())
+        var legacyUpdate = try XCTUnwrap(JSONSerialization.jsonObject(with: omittedData) as? [String: Any])
+        XCTAssertNil(legacyUpdate["maximumOutputTokens"])
+        for explicitNull in [false, true] {
+            if explicitNull { legacyUpdate["maximumOutputTokens"] = NSNull() }
+            let decoded = try JSONDecoder().decode(ProviderConfigurationUpdate.self,
+                from: JSONSerialization.data(withJSONObject: legacyUpdate))
+            XCTAssertNil(decoded.maximumOutputTokens)
+            XCTAssertEqual(decoded.expectedRevision, "0")
+        }
+        let configuration = LMStudioProviderConfiguration(modelKey: "fixture/tool-model", maximumOutputTokens: 8_192)
+        let configurationData = try JSONEncoder().encode(configuration)
+        let roundTrip = try JSONDecoder().decode(LMStudioProviderConfiguration.self, from: configurationData).validated()
+        XCTAssertEqual(roundTrip.maximumOutputTokens, 8_192)
+        var legacyConfiguration = try XCTUnwrap(JSONSerialization.jsonObject(with: configurationData) as? [String: Any])
+        legacyConfiguration.removeValue(forKey: "maximum_output_tokens")
+        let legacy = try JSONDecoder().decode(LMStudioProviderConfiguration.self,
+            from: JSONSerialization.data(withJSONObject: legacyConfiguration)).validated()
+        XCTAssertEqual(legacy.maximumOutputTokens, 4_096)
+    }
+
+    func testMaximumOutputTokensPersistBeyondLegacyCeilingAndOmittedUpdateSurvivesRestart() async throws {
+        let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
+        let clean = try await service.read()
+        XCTAssertEqual(clean.maximumOutputTokens, 4_096)
+        let saved = try await service.update(request(clean.revision, maximumOutputTokens: 65_536))
+        XCTAssertEqual(saved.maximumOutputTokens, 65_536)
+        let persisted = try XCTUnwrap(LMStudioProviderConfiguration.loadIfPresent(in: directory))
+        XCTAssertEqual(persisted.maximumOutputTokens, 65_536)
+        let path = directory.appendingPathComponent(LMStudioProviderConfiguration.fileName)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [String: Any])
+        XCTAssertEqual((object["maximum_output_tokens"] as? NSNumber)?.intValue, 65_536)
+        let restarted = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
+        let reopened = try await restarted.read()
+        XCTAssertEqual(reopened, saved)
+        let kept = try await restarted.update(request(reopened.revision))
+        XCTAssertEqual(kept.maximumOutputTokens, 65_536)
+        XCTAssertNotEqual(kept.revision, saved.revision)
+        XCTAssertEqual(credentials.count, 0)
+    }
+
+    func testInvalidMaximumOutputTokensAndStaleRevisionPreserveCommittedBytes() async throws {
+        let service = LMStudioConfigurationService(storageDirectory: directory, credentials: credentials)
+        let saved = try await service.update(request(maximumOutputTokens: 8_192))
+        let path = directory.appendingPathComponent(LMStudioProviderConfiguration.fileName)
+        let before = try Data(contentsOf: path)
+        for invalid in [0, 65_537] {
+            do {
+                _ = try await service.update(request(saved.revision, maximumOutputTokens: invalid))
+                XCTFail("Accepted out-of-range output limit \(invalid)")
+            } catch {
+                XCTAssertEqual(error as? ProviderConfigurationError, .invalidRequest)
+            }
+            let retained = try await service.read()
+            XCTAssertEqual(retained, saved)
+            XCTAssertEqual(try Data(contentsOf: path), before)
+        }
+        do {
+            _ = try await service.update(request("0", maximumOutputTokens: 16_384))
+            XCTFail("Accepted a stale output-limit revision")
+        } catch {
+            XCTAssertEqual(error as? ProviderConfigurationError, .revisionConflict)
+        }
+        let retained = try await service.read()
+        XCTAssertEqual(retained, saved)
+        XCTAssertEqual(try Data(contentsOf: path), before)
+        XCTAssertEqual(credentials.count, 0)
     }
 
     func testCleanSettingsSaveThroughServiceSurvivesOwnerRestartWithOwnerOnlyFile() async throws {

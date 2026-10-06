@@ -774,12 +774,175 @@ final class ContextBudgetSupervisorTests: XCTestCase {
         }
     }
 
-    private func runtimeCapabilities(_ tokens: Int) throws -> ProviderCapabilities {
+    func testAdditiveFeedbackChargesOnlyNewRequestBytesAndReplayOnce() async throws {
+        try await withFixture(capacity: 65_536) { fixture in
+            let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+            let evaluator = PersistedManagedRunBudgetEvaluator(repository: fixture.repository, policyResolver: { _ in selection })
+            let runValue = try await fixture.repository.autonomousRun(fixture.identity.runID)
+            let run = try XCTUnwrap(runValue)
+            let capabilities = try runtimeCapabilities(65_536)
+            let schema = String(repeating: "a", count: 64)
+            let first = ManagedBudgetInputAccounting(inputBytes: 600, toolSchemaBytes: 300,
+                toolSchemaSHA256: schema, pendingInputID: String(repeating: "b", count: 64), inputAlreadyRetained: false)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, accounting: first)
+            let usage = try ProviderUsage(capacity: 65_536, inputTokens: 500, outputTokens: 200,
+                totalTokens: 900, source: .providerExact, confidence: 1)
+            let turn = try ProviderTurn(requestID: "additive-request", responseID: "additive-response", providerID: "lmstudio",
+                providerVersion: "fixture", modelKey: "fixture/model", messages: ["response"], toolCalls: [],
+                usage: usage, completed: true, finishReason: .stop)
+            _ = try await evaluator.observeProviderTurn(turn, run: run, sessionID: fixture.identity.sessionID, capabilities: capabilities)
+            _ = try await evaluator.observeToolResult(serializedBytes: 240, providerResponseID: turn.responseID,
+                run: run, sessionID: fixture.identity.sessionID, capabilities: capabilities)
+            let beforeValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let before = try XCTUnwrap(beforeValue)
+            XCTAssertEqual(before.latestObservation?.used, 800)
+            let feedback = ManagedBudgetInputAccounting(inputBytes: 360, toolSchemaBytes: 300,
+                toolSchemaSHA256: schema, pendingInputID: String(repeating: "c", count: 64),
+                inputAlreadyRetained: true, previouslyRetainedInputBytes: 240)
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, accounting: feedback)
+            let afterValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            let after = try XCTUnwrap(afterValue)
+            XCTAssertEqual(after.latestObservation?.used, 850, "Charge the 120 new notice bytes; do not re-charge the 240 retained output bytes")
+            let restarted = PersistedManagedRunBudgetEvaluator(repository: fixture.repository, policyResolver: { _ in selection })
+            _ = try await restarted.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                capabilities: capabilities, accounting: feedback)
+            let replayValue = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+            XCTAssertEqual(replayValue?.latestObservation?.used, 850, "The exact pending input retry retains no second notice")
+            for invalid in [-1, 361] {
+                let bad = ManagedBudgetInputAccounting(inputBytes: 360, toolSchemaBytes: 300,
+                    toolSchemaSHA256: schema, pendingInputID: String(repeating: "e", count: 64),
+                    inputAlreadyRetained: true, previouslyRetainedInputBytes: invalid)
+                let saved = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+                let history = try await fixture.repository.contextBudgetObservations(identity: fixture.identity)
+                do {
+                    _ = try await evaluator.evaluateBeforeProviderTurn(run: run, sessionID: fixture.identity.sessionID,
+                        capabilities: capabilities, accounting: bad)
+                    XCTFail("Invalid retained-byte accounting was admitted")
+                } catch { guard case ContextBudgetError.invalidObservation = error else { return XCTFail("Unexpected accounting error: \(error)") } }
+                let rejected = try await fixture.repository.contextBudgetState(identity: fixture.identity)
+                let rejectedHistory = try await fixture.repository.contextBudgetObservations(identity: fixture.identity)
+                XCTAssertEqual(rejected, saved)
+                XCTAssertEqual(rejectedHistory, history)
+            }
+        }
+    }
+
+    func testRequestedOutputLimitPreservesLegacyWireAndValidatesConstructorBounds() throws {
+        let legacy = try runtimeCapabilities(32_768)
+        let legacyData = try JSONEncoder().encode(legacy)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: legacyData) as? [String: Any])
+        XCTAssertNil(object["requestedMaximumOutputTokens"])
+        XCTAssertNil(legacy.requestedMaximumOutputTokens)
+        let absent = try JSONDecoder().decode(ProviderCapabilities.self, from: legacyData)
+        XCTAssertEqual(absent, legacy)
+        object["requestedMaximumOutputTokens"] = NSNull()
+        let explicitNull = try JSONDecoder().decode(ProviderCapabilities.self,
+            from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(explicitNull, legacy)
+        let nullRoundTrip = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(explicitNull)) as? [String: Any])
+        XCTAssertNil(nullRoundTrip["requestedMaximumOutputTokens"])
+        let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+        let legacyConfiguration = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: absent, selection: selection)
+        XCTAssertEqual(legacyConfiguration.reserves.outputTokens, 2_048, "Unknown historic output limits retain the legacy reserve")
+        for invalid in [0, ManagedModelProviderContract.maximumContextTokens + 1] {
+            XCTAssertThrowsError(try runtimeCapabilities(32_768, requestedOutputTokens: invalid)) {
+                guard case ManagedModelProviderContractError.invalidValue = $0 else {
+                    return XCTFail("Expected a provider capability bound error, got \($0)")
+                }
+            }
+        }
+        let lower = try runtimeCapabilities(32_768, requestedOutputTokens: 1)
+        XCTAssertEqual(lower.requestedMaximumOutputTokens, 1)
+        let upper = try runtimeCapabilities(32_768, requestedOutputTokens: ManagedModelProviderContract.maximumContextTokens)
+        XCTAssertEqual(upper.requestedMaximumOutputTokens, ManagedModelProviderContract.maximumContextTokens)
+        let current = try runtimeCapabilities(32_768, requestedOutputTokens: 8_192)
+        XCTAssertEqual(try JSONDecoder().decode(ProviderCapabilities.self, from: JSONEncoder().encode(current)), current)
+        for invalid in [true, 1.5, "8192"] as [Any] {
+            object["requestedMaximumOutputTokens"] = invalid
+            XCTAssertThrowsError(try JSONDecoder().decode(ProviderCapabilities.self,
+                from: JSONSerialization.data(withJSONObject: object)))
+        }
+    }
+
+    func testRequestedOutputLimitRejectsPreflightMismatchAndContextHeadroomViolation() throws {
+        let selection = try BudgetPolicyState.default.resolve(.globalDefault)
+        let capabilities = try runtimeCapabilities(32_768, requestedOutputTokens: 8_192)
+        let valid = try outputLimitPreflight(8_192)
+        let before = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, providerPreflight: valid)
+        let after = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities, selection: selection)
+        XCTAssertEqual(before, after)
+        XCTAssertEqual(before.capacity.capacity, 32_768)
+        XCTAssertEqual(before.reserves.outputTokens, 8_192)
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, providerPreflight: outputLimitPreflight(4_096))) {
+            XCTAssertEqual($0 as? ContextBudgetError, .configurationMismatch)
+        }
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, providerPreflight: outputLimitPreflight(8_192, modelKey: "foreign/model"))) {
+            XCTAssertEqual($0 as? ContextBudgetError, .configurationMismatch)
+        }
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(
+            capabilities: runtimeCapabilities(4_096, requestedOutputTokens: 8_192), selection: selection)) {
+            XCTAssertEqual($0 as? ContextBudgetError, .insufficientUsableCapacity)
+        }
+        let manual = try BudgetPolicyState(globalPolicy: BudgetPolicy(context:
+            BudgetContextPolicy(mode: .manual, maxContextTokens: 4_096))).resolve(.globalDefault)
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities, selection: manual)) {
+            XCTAssertEqual($0 as? ContextBudgetError, .insufficientUsableCapacity)
+        }
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(
+            capabilities: runtimeCapabilities(8_192, requestedOutputTokens: 8_192), selection: selection),
+            "A cap equal to capacity must still leave required input and non-output reserves")
+    }
+
+    func testRequestedOutputLimitCannotRaiseInheritedCeilingOrLowerOriginalReserve() throws {
+        let inherited = try InheritedSourceContextBudget(carryover: NativeSourceBudgetCarryover(
+            conversationID: UUID(), taskID: UUID(), runID: RunID(), acceptanceSHA256: String(repeating: "a", count: 64),
+            ceilings: .init(effectiveContextTokens: 32_768, maximumOutputTokens: 4_096, tools: BudgetToolPolicy(),
+                reserves: .init(outputTokens: 8_192, schemaTokens: 32, handoffTokens: 512,
+                    recoveryTokens: 256, futureToolTokens: 128, safetyTokens: 64),
+                checkpointRatio: 0.60, rolloverRatio: 0.70, emergencyRatio: 0.80),
+            priorSourceReadCallsAtEnrollment: 2, providerStageCount: 4, admittedProviderCalls: 5,
+            observedInputTokens: 50_000, observedOutputTokens: 2_000, exactUsageStageCount: 4,
+            journalSHA256: String(repeating: "b", count: 64)))
+        let selection = try BudgetPolicyState(globalPolicy: BudgetPolicy(context: BudgetContextPolicy(mode: .auto,
+            maxContextTokens: 131_072, responseReserveTokens: 0, futureToolReserveTokens: 0,
+            handoffReserveTokens: 0, recoveryReserveTokens: 0, safetyReserveTokens: 0))).resolve(.globalDefault)
+        let capabilities = try runtimeCapabilities(65_536, requestedOutputTokens: 1_024)
+        let before = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, inheritance: inherited, providerPreflight: outputLimitPreflight(1_024))
+        let after = try PersistedManagedRunBudgetEvaluator.configuration(capabilities: capabilities,
+            selection: selection, inheritance: inherited)
+        XCTAssertEqual(before, after)
+        XCTAssertEqual(after.capacity.capacity, 32_768)
+        XCTAssertEqual(after.reserves, inherited.reserves)
+        XCTAssertEqual(after.resolvedPolicy?.inheritedSourceBudget, inherited)
+        XCTAssertThrowsError(try PersistedManagedRunBudgetEvaluator.configuration(
+            capabilities: runtimeCapabilities(65_536, requestedOutputTokens: 8_192),
+            selection: selection, inheritance: inherited)) {
+            XCTAssertEqual($0 as? ContextBudgetError, .insufficientUsableCapacity)
+        }
+    }
+
+    private func outputLimitPreflight(_ outputTokens: Int, modelKey: String = "fixture/model") throws -> ProviderRequestPreflight {
+        let limits = try ProviderExecutionLimits(maximumOutputTokens: outputTokens, maximumRequestBytes: 65_536,
+            maximumResponseBytes: 65_536, maximumTextBytes: 32_768, maximumToolArgumentBytes: 16_384,
+            maximumJSONBytes: 65_536, maximumSSELineBytes: 8_192, maximumSSEEventBytes: 16_384,
+            connectTimeoutSeconds: 1, firstByteTimeoutSeconds: 1, idleTimeoutSeconds: 1, totalTimeoutSeconds: 2)
+        return try ProviderRequestPreflight(kind: .root, modelKey: modelKey, configurationRevision: "fixture-output-limit",
+            configurationFingerprintSHA256: String(repeating: "a", count: 64), limits: limits,
+            bodySHA256: String(repeating: "b", count: 64), bodyByteCount: 1_024, serializedInputByteCount: 100)
+    }
+
+    private func runtimeCapabilities(_ tokens: Int, requestedOutputTokens: Int? = nil) throws -> ProviderCapabilities {
         try ProviderCapabilities(providerID: "lmstudio", providerVersion: "fixture", modelKey: "fixture/model",
             providerInstanceID: "fixture-instance", contextLength: tokens, maximumContextLength: 131_072,
             statefulResponses: true, streaming: true, customTools: true, mcp: false,
             structuredOutput: true, usageReporting: true, idempotencyLookup: true,
-            capabilityFingerprintSHA256: String(repeating: "a", count: 64))
+            capabilityFingerprintSHA256: String(repeating: "a", count: 64), requestedMaximumOutputTokens: requestedOutputTokens)
     }
 
     private var smallReserves: ContextBudgetReserves {

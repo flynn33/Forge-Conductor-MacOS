@@ -1112,6 +1112,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         "pdf_write", "pdf_from_file",
         "runtime.capabilities", "process.run", "shell.run", "bash.run", "python.run",
         "powershell.run", "job.status", "job.read_output", "job.cancel", "job.list",
+        "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
         "project_memory.remember", "project_memory.search", "project_memory.get",
         "project_memory.update", "project_memory.list_recent", "project_memory.status",
     ]
@@ -1124,7 +1125,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
     public init(paths: AppPaths, clock: any Clock = SystemClock()) throws {
         self.paths = paths
         self.clock = clock
-        try paths.ensureLayout()
+        try paths.ensureStorageLayout()
         Self.cleanupAbandonedStages(paths.instructionPackageStoreDir)
         if FileManager.default.fileExists(atPath: paths.instructionPackageQueue.path) {
             let data = try OwnerOnlyAtomicFile.read(

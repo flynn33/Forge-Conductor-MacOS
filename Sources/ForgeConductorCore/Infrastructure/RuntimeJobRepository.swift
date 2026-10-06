@@ -49,7 +49,7 @@ enum RuntimeJobCommitKind: Sendable, Equatable {
 }
 
 public actor RuntimeJobRepository {
-    public static let schemaVersion = 5
+    public static let schemaVersion = 6
     public static let maximumListLimit = 100
     public static let maximumTerminalJobsPerProject = 256
     public static let maximumTerminalJobsGlobal = 2_048
@@ -350,6 +350,11 @@ public actor RuntimeJobRepository {
                 generation: request.context.projectGeneration,
                 idempotencyKey: idempotency
                ) {
+                guard existing.projectID == request.context.projectID,
+                      existing.projectGeneration == request.context.projectGeneration,
+                      existing.runID == request.context.runID || request.context.runID == nil else {
+                    throw RuntimeJobError.jobScopeMismatch(existing.jobID)
+                }
                 return existing
             }
             try execute(
@@ -969,9 +974,13 @@ public actor RuntimeJobRepository {
         context: ToolInvocationContext,
         states: Set<RuntimeJobState> = [],
         limit: Int = 20,
-        beforeCreatedAt: String? = nil
+        beforeCreatedAt: String? = nil,
+        beforeJobID: UUID? = nil
     ) throws -> [RuntimeJobRecord] {
         try validateCurrentProject(context)
+        guard beforeJobID == nil || beforeCreatedAt != nil else {
+            throw RuntimeJobError.invalidRequest("job list cursor requires before_created_at with before_job_id")
+        }
         let boundedLimit = min(max(1, limit), Self.maximumListLimit)
         var sql = Self.selectRecord + " WHERE j.project_id=? AND j.project_generation=?"
         var bindings: [SQLiteBinding] = [
@@ -989,8 +998,14 @@ public actor RuntimeJobRepository {
             }
         }
         if let beforeCreatedAt {
-            sql += " AND j.created_at<?"
-            bindings.append(.text(try Self.bounded(beforeCreatedAt, maximumBytes: 128, field: "list cursor")))
+            let timestamp = try Self.bounded(beforeCreatedAt, maximumBytes: 128, field: "list cursor")
+            if let beforeJobID {
+                sql += " AND (j.created_at<? OR (j.created_at=? AND j.job_id<?))"
+                bindings.append(contentsOf: [.text(timestamp), .text(timestamp), .text(beforeJobID.uuidString.lowercased())])
+            } else {
+                sql += " AND j.created_at<?"
+                bindings.append(.text(timestamp))
+            }
         }
         sql += " ORDER BY j.created_at DESC,j.job_id DESC LIMIT ?"
         bindings.append(.int64(Int64(boundedLimit)))
@@ -1372,7 +1387,7 @@ public actor RuntimeJobRepository {
             SELECT job_id,stream,inline_text,artifact_relative_path,
                    artifact_device_identifier,artifact_file_identifier,
                    byte_count,retained_byte_count,sha256,inline_truncated,
-                   artifact_truncated,artifact_evicted_at
+                   artifact_truncated,artifact_evicted_at,producer_end_reason,producer_read_errno
             FROM runtime_job_output_streams WHERE job_id=? AND stream=? LIMIT 1
             """,
             bindings: [.text(Self.uuid(jobID)), .text(stream.rawValue)]
@@ -1410,20 +1425,31 @@ public actor RuntimeJobRepository {
                 "output artifact path and identity must be committed together"
             )
         }
+        guard (output.producerEndReason == .readError && output.producerReadErrno.map { $0 > 0 } == true)
+                || (output.producerEndReason != .readError && output.producerReadErrno == nil) else {
+            throw RuntimeJobError.invalidRequest("producer read error and errno must be committed together")
+        }
+        guard output.producerEndReason != .readError && output.producerEndReason != .forcedClose
+                || output.artifactTruncated else {
+            throw RuntimeJobError.invalidRequest("producer output loss must retain the truncation flag")
+        }
         try execute(
             """
             INSERT INTO runtime_job_output_streams(
                 job_id,stream,inline_text,artifact_relative_path,
                 artifact_device_identifier,artifact_file_identifier,
-                byte_count,retained_byte_count,sha256,inline_truncated,artifact_truncated
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                byte_count,retained_byte_count,sha256,inline_truncated,artifact_truncated,
+                producer_end_reason,producer_read_errno
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(job_id,stream) DO UPDATE SET
                 inline_text=excluded.inline_text,artifact_relative_path=excluded.artifact_relative_path,
                 artifact_device_identifier=excluded.artifact_device_identifier,
                 artifact_file_identifier=excluded.artifact_file_identifier,
                 byte_count=excluded.byte_count,retained_byte_count=excluded.retained_byte_count,
                 sha256=excluded.sha256,inline_truncated=excluded.inline_truncated,
-                artifact_truncated=excluded.artifact_truncated,artifact_evicted_at=NULL
+                artifact_truncated=excluded.artifact_truncated,artifact_evicted_at=NULL,
+                producer_end_reason=excluded.producer_end_reason,
+                producer_read_errno=excluded.producer_read_errno
             """,
             bindings: [
                 .text(Self.uuid(output.jobID)), .text(output.stream.rawValue),
@@ -1433,6 +1459,8 @@ public actor RuntimeJobRepository {
                 .int64(Self.sqliteBytes(output.retainedByteCount)),
                 .text(normalizedSHA256), .int64(output.inlineTruncated ? 1 : 0),
                 .int64(output.artifactTruncated ? 1 : 0),
+                .optionalText(output.producerEndReason?.rawValue),
+                .optionalInt64(output.producerReadErrno.map(Int64.init)),
             ]
         )
     }
@@ -1871,6 +1899,34 @@ public actor RuntimeJobRepository {
                         database: connection
                     )
                 }
+                if try !rawTableHasColumn(
+                    table: "runtime_job_output_streams",
+                    column: "producer_end_reason",
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
+                ) {
+                    try rawExecute(
+                        """
+                        ALTER TABLE runtime_job_output_streams ADD COLUMN producer_end_reason TEXT
+                        CHECK(producer_end_reason IN ('eof','read_error','forced_close'))
+                        """,
+                        database: connection
+                    )
+                }
+                if try !rawTableHasColumn(
+                    table: "runtime_job_output_streams",
+                    column: "producer_read_errno",
+                    database: connection,
+                    stepObserver: tableInfoStepObserver
+                ) {
+                    try rawExecute(
+                        """
+                        ALTER TABLE runtime_job_output_streams ADD COLUMN producer_read_errno INTEGER
+                        CHECK(producer_read_errno>0 AND producer_read_errno<=2147483647)
+                        """,
+                        database: connection
+                    )
+                }
                 try rawExecute(idempotencyReceiptSchema, database: connection)
                 try rawExecute(
                     """
@@ -2252,6 +2308,20 @@ public actor RuntimeJobRepository {
                 )) else {
             throw RuntimeJobError.storageFailure("incomplete runtime artifact identity")
         }
+        let producerText = optionalText(statement, column: 12)
+        let producerEndReason = producerText.flatMap(RuntimeOutputProducerEndReason.init(rawValue:))
+        let producerErrnoValue = try optionalNonnegativeUInt64(statement, column: 13)
+        let producerReadErrno = producerErrnoValue.flatMap(Int32.init(exactly:))
+        guard (producerText == nil || producerEndReason != nil),
+              (producerErrnoValue == nil || producerReadErrno != nil),
+              (producerEndReason == .readError && producerReadErrno.map { $0 > 0 } == true)
+                || (producerEndReason != .readError && producerReadErrno == nil) else {
+            throw RuntimeJobError.storageFailure("invalid producer end evidence")
+        }
+        guard producerEndReason != .readError && producerEndReason != .forcedClose
+                || sqlite3_column_int(statement, 10) != 0 else {
+            throw RuntimeJobError.storageFailure("producer output loss has no truncation flag")
+        }
         return RuntimeJobOutputMetadata(
             jobID: jobID,
             stream: stream,
@@ -2264,7 +2334,9 @@ public actor RuntimeJobRepository {
             sha256: sha256,
             inlineTruncated: sqlite3_column_int(statement, 9) != 0,
             artifactTruncated: sqlite3_column_int(statement, 10) != 0,
-            artifactEvicted: sqlite3_column_type(statement, 11) != SQLITE_NULL
+            artifactEvicted: sqlite3_column_type(statement, 11) != SQLITE_NULL,
+            producerEndReason: producerEndReason,
+            producerReadErrno: producerReadErrno
         )
     }
 
@@ -2430,6 +2502,8 @@ public actor RuntimeJobRepository {
         inline_truncated INTEGER NOT NULL CHECK(inline_truncated IN (0,1)),
         artifact_truncated INTEGER NOT NULL CHECK(artifact_truncated IN (0,1)),
         artifact_evicted_at TEXT,
+        producer_end_reason TEXT CHECK(producer_end_reason IN ('eof','read_error','forced_close')),
+        producer_read_errno INTEGER CHECK(producer_read_errno>0 AND producer_read_errno<=2147483647),
         PRIMARY KEY(job_id,stream)
     );
     """

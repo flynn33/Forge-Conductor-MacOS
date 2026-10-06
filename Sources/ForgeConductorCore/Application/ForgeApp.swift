@@ -32,6 +32,7 @@ public final class ForgeApp: @unchecked Sendable {
     /// Read-side access to the ordered Development Policy sources selected in
     /// Rune Forge. The manager remains the mutation and indexing owner.
     public let developmentPolicySources: (any DevelopmentPolicySourceReading)?
+    private let developmentPolicySourceCatalog: StjornarvaldPolicySourceCatalog?
     public let stjornarvaldObservations: StjornarvaldObservationEmitter
     public let clock: any Clock
     public let lmStudioDeploy: LMStudioDeployService
@@ -70,7 +71,7 @@ public final class ForgeApp: @unchecked Sendable {
         projectContexts: ProjectContextService,
         continuityControl: ContinuityControlService,
         runtimeJobs: RuntimeJobSubsystem,
-        developmentPolicySources: (any DevelopmentPolicySourceReading)?,
+        developmentPolicySources: StjornarvaldPolicySourceCatalog?,
         stjornarvaldObservations: StjornarvaldObservationEmitter,
         clock: any Clock,
         lmStudioDeploy: LMStudioDeployService
@@ -91,6 +92,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.continuityControl = continuityControl
         self.runtimeJobs = runtimeJobs
         self.developmentPolicySources = developmentPolicySources
+        self.developmentPolicySourceCatalog = developmentPolicySources
         self.stjornarvaldObservations = stjornarvaldObservations
         self.clock = clock
         self.lmStudioDeploy = lmStudioDeploy
@@ -100,11 +102,18 @@ public final class ForgeApp: @unchecked Sendable {
     public static func bootstrap(
         home: URL? = nil,
         clock: any Clock = SystemClock(),
-        diagnostics startupDiagnostics: DiagnosticLog? = nil
+        diagnostics startupDiagnostics: DiagnosticLog? = nil,
+        startTelemetry: Bool = true
     ) throws -> ForgeApp {
         let paths = AppPaths(home: home)
-        if let startupDiagnostics, startupDiagnostics.homeURL.standardizedFileURL != paths.home.standardizedFileURL {
-            throw ForgeBootstrapError.diagnosticHomeMismatch
+        if let startupDiagnostics {
+            let diagnosticHome = startupDiagnostics.homeURL.standardizedFileURL
+                .appendingPathComponent("", isDirectory: true)
+            let bootstrapHome = paths.home.standardizedFileURL
+                .appendingPathComponent("", isDirectory: true)
+            if diagnosticHome != bootstrapHome {
+                throw ForgeBootstrapError.diagnosticHomeMismatch
+            }
         }
         try paths.ensureLayout()
         _ = try? FilesystemQuarantineLedger(paths: paths).reconcile()
@@ -162,17 +171,19 @@ public final class ForgeApp: @unchecked Sendable {
             diagnostics: diagnostics,
             clock: clock
         )
+        let projectMemory = ProjectMemoryService(paths: paths, clock: clock)
+        let projectContexts = try ProjectContextService(
+            databaseURL: paths.controlPlaneSQLite,
+            clock: clock
+        )
         let continuityAutomation = ContinuityAutomation(
             store: store,
             sessions: sessions,
             continuity: continuity,
             diagnostics: diagnostics,
-            clock: clock
-        )
-        let projectMemory = ProjectMemoryService(paths: paths, clock: clock)
-        let projectContexts = try ProjectContextService(
-            databaseURL: paths.controlPlaneSQLite,
-            clock: clock
+            clock: clock,
+            projectContexts: projectContexts,
+            configStore: config
         )
         let continuityControl = ContinuityControlService(
             memory: projectMemory,
@@ -220,6 +231,7 @@ public final class ForgeApp: @unchecked Sendable {
         )
         let stjornarvaldObservations = StjornarvaldObservationEmitter(
             submitter: observationClient,
+            nativeTargetProducer: StjornarvaldNativeTargetObservationProducer(projectContexts: projectContexts),
             shutdown: { await observationClient.shutdown() },
             diagnostics: { message in
                 diagnostics.warn(
@@ -258,7 +270,7 @@ public final class ForgeApp: @unchecked Sendable {
         let isTemp = paths.home.path.contains("/T/") || paths.home.path.contains("forge-test")
             || paths.home.path.contains("forge-native") || paths.home.path.contains("forge-doc")
             || paths.home.path.contains("forge-contract") || paths.home.path.contains("forge-dash")
-        if !isTemp {
+        if startTelemetry && !isTemp {
             app.telemetry.startBackgroundRefresh(intervalSec: 0.5)
         }
 
@@ -266,7 +278,7 @@ public final class ForgeApp: @unchecked Sendable {
             "version": version,
             "home": paths.home.path,
             "agents": "\(catalog.all().count)",
-            "telemetry": "continuous-native",
+            "telemetry": startTelemetry && !isTemp ? "continuous-native" : "on-demand-native",
             "sample_hz_target": "\(Int(RealtimeMetricsEngine.defaultTargetHz))",
             "tools": "\(toolCount)",
         ], category: .bootstrap)
@@ -296,6 +308,13 @@ public final class ForgeApp: @unchecked Sendable {
         projectMemory.closeAll()
         projectContexts.close()
         guard audit.shutdownAttempts(timeout: 2) else {
+            return RuntimeJobShutdownReport(
+                completed: false,
+                unresolvedJobIDs: report.unresolvedJobIDs,
+                persistencePendingJobIDs: report.persistencePendingJobIDs
+            )
+        }
+        guard developmentPolicySourceCatalog?.close() ?? true else {
             return RuntimeJobShutdownReport(
                 completed: false,
                 unresolvedJobIDs: report.unresolvedJobIDs,

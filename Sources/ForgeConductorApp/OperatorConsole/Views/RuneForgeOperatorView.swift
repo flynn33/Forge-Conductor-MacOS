@@ -201,6 +201,11 @@ struct RuneForgeOperatorView: View {
                     Text("No current policy violations")
                         .font(.caption)
                         .foregroundStyle(GraphitePalette.textSecondary)
+                    Text(viewModel.evaluationCoverageDescription)
+                        .font(.caption)
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("rune-evaluation-coverage")
                 }
                 ForEach(viewModel.violations, id: \.violation.id) { item in
                     Button {

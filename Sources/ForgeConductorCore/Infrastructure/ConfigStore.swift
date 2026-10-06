@@ -20,6 +20,8 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
     private let mutationLock = NSLock()
     // Guarded by mutationLock. Save flushes only explicitly requested fields.
     private var pendingPatch: [String: Any] = [:]
+    // Guarded by mutationLock. Native tools refresh only after a durable file change.
+    private var lastObservedConfigurationFingerprint: String?
 
     /// Thread-safe snapshot of the typed configuration.
     public var model: AppConfig {
@@ -68,6 +70,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             try withConfigurationMutation { _ in
                 reloadSerialized()
                 pendingPatch = [:]
+                lastObservedConfigurationFingerprint = nil
             }
         } catch {
             lock.lock()
@@ -75,6 +78,35 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             _budgetPolicyError = ManagerSettingsValidationError(field: "budget_policy", reason: "configuration_unavailable")
             lock.unlock()
         }
+    }
+
+    /// Called on the tool execution boundary, never from a rendering loop.
+    /// Reuses the bounded configuration lock and reapplies staged local edits.
+    public func refreshIfChanged() throws {
+        try withConfigurationMutation { deadline in
+            let observed = try configurationFingerprint()
+            guard observed != lastObservedConfigurationFingerprint else { return }
+            try Self.withConfigFileLock(paths: paths, deadline: deadline) {
+                let source = try Self.readConfiguration(paths: paths)
+                try ManagerSettingsNormalizer.validateContinuityRollover(source.object)
+                var config = AppConfig.fromDictionary(source.object)
+                config.budgetPolicy = try Self.decodeBudgetPolicy(source.object)
+                _ = try Self.statusForCurrentConfig(configData: source.data, config: config, paths: paths)
+                config = config.applying(patch: pendingPatch)
+                try Self.validateForPersistence(config)
+                publish(config)
+                lastObservedConfigurationFingerprint = try configurationFingerprint()
+            }
+        }
+    }
+
+    private func configurationFingerprint() throws -> String {
+        var metadata = stat()
+        let result = paths.configJSON.path.withCString { Darwin.lstat($0, &metadata) }
+        guard result == 0 else {
+            throw ManagerSettingsValidationError(field: "config", reason: "configuration_unavailable")
+        }
+        return "\(metadata.st_dev):\(metadata.st_ino):\(metadata.st_size):\(metadata.st_mtimespec.tv_sec):\(metadata.st_mtimespec.tv_nsec):\(metadata.st_ctimespec.tv_sec):\(metadata.st_ctimespec.tv_nsec)"
     }
 
     private func reloadSerialized() {
@@ -175,6 +207,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
             return values
         }
         try ManagerSettingsNormalizer.validateLegacyBudgetKeys(patch)
+        try ManagerSettingsNormalizer.validateContinuityRollover(patch)
         return try withConfigurationMutation { deadline in
             if save { return try persistPatch(patch, deadline: deadline).asDictionary() }
             let proposed = model.applying(patch: patch)
@@ -263,6 +296,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         let requested = Self.deepMergeStatic(pendingPatch, patch)
         return try Self.withConfigFileLock(paths: paths, deadline: deadline) {
             let source = try Self.readConfiguration(paths: paths)
+            try ManagerSettingsNormalizer.validateContinuityRollover(source.object)
             let currentPolicy = try Self.decodeBudgetPolicy(source.object)
             let current = AppConfig.fromDictionary(source.object)
             _ = try Self.statusForCurrentConfig(configData: source.data, config: current, paths: paths)
@@ -409,6 +443,7 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
         try paths.ensureLayout()
         return try Self.withConfigFileLock(paths: paths) {
             let source = try Self.readConfiguration(paths: paths)
+            try ManagerSettingsNormalizer.validateContinuityRollover(source.object)
             let policy: BudgetPolicyState
             do { policy = try Self.decodeBudgetPolicy(source.object) }
             catch {
@@ -802,6 +837,10 @@ public final class ConfigStore: ConfigurationProviding, @unchecked Sendable {
     }
 
     private static func validateForPersistence(_ config: AppConfig) throws {
+        guard AppConfig.SessionsConfig.continuityRolloverToolCallRange.contains(config.sessions.continuityRolloverToolCalls) else {
+            throw ManagerSettingsValidationError(field: "sessions.continuity_rollover_tool_calls",
+                reason: "expected_finite_integer_in_range", permittedRange: "1...10000")
+        }
         guard let policy = config.budgetPolicy else {
             throw ManagerSettingsValidationError(field: "budget_policy", reason: "configuration_unavailable")
         }

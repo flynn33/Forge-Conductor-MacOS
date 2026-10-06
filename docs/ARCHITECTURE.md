@@ -1,6 +1,6 @@
 # Forge Conductor architecture
 
-Version: `0.17.0`; build: `27`.
+Version: `0.18.0`; build: `28`.
 
 Forge Conductor is a native macOS control plane and MCP server for work carried
 out in externally owned model conversations. The current LM Studio workflow
@@ -47,8 +47,13 @@ starts a local one. Provider configuration, project mutation, policy catalog
 changes, exports, cache maintenance, and operator snapshots use bounded typed
 Manager routes.
 
-The Manager owns no foreground LM Studio UI automation. It interacts with LM
-Studio only through supported CLI, REST, and MCP boundaries.
+The Manager owns the interactive-continuity schedule and invokes the statically
+registered native session host adapter. That adapter uses
+`LMStudioGUIChatDriver` and public macOS Accessibility controls to create a
+foreground LM Studio successor. Provider operations also use CLI, REST, and MCP
+boundaries. Source support and historical host receipts remain separate from
+current live-host qualification; see the
+[runtime repair record](LMSTUDIO-RUNTIME-REPAIR.md).
 
 ## Project and instruction ownership
 
@@ -103,6 +108,13 @@ retry. A reused PID is never signaled. Public macOS process snapshots are not
 atomic and the out-of-group tracker is not durable across a Manager crash;
 unrestricted same-user code that escapes entirely between observations remains
 an explicit native-shell trust boundary.
+Xcode job receipt ceilings include the complete canonical durable wrapper before
+admission. `job.list` returns complete rows within that byte budget and an
+optional paired timestamp/UUID cursor (`before_created_at`, `before_job_id`),
+ordered by timestamp then ID. Timestamp ties remain traversable; legacy
+exclusive timestamp-only cursors are unchanged. Byte-paged output and base64
+recovery retain their existing contracts.
+
 Filesystem delete and move retain explicit protection against `/`, user and
 Manager homes, mounted-volume roots, active workspace roots, and any ancestor
 whose removal would contain one of those roots. Authorization performs the
@@ -118,6 +130,13 @@ same-user files backing those services.
 
 ## Provider ownership
 
+The Responses REST transport owns a private finite 5,120-event SSE work budget
+for content and lifecycle frames. The public decoder retains its 4,096-event
+default and initializer contract. Independent line/event/response/text/argument,
+output-token and timeout guards remain at their existing owners. The event cap
+is a numeric work bound rather than a token-to-frame guarantee; response
+completion and exact acknowledgement remain required.
+
 Provider selection, LM Studio **Connect and Check**, the Advanced connection
 check, and probe converge on one Manager preparation path. That path validates
 Manager authentication, the saved endpoint, optional credential, supported CLI
@@ -131,9 +150,19 @@ non-selectable.
 
 ## Automatic continuity
 
+The status tool refreshes persisted configuration before reading continuity
+policy, preserving staged patches. A refresh failure returns explicitly marked
+cached settings and a bounded diagnostic so recovery remains available. Audit
+and queue storage initialization preserves directory and permission contracts
+without creating default configuration; app/config initialization owns defaults.
+
 The ordinary LM Studio model writes compact checkpoints and a resume-ready
 handoff at context pressure. The authoritative handoff commit precedes any host
-effect. Manager then exposes a 30-second Dashboard countdown.
+effect. A request arriving during checkpoint preparation stays sticky without
+rewriting the live claim. SQLite consumes it with the actual packet, counts,
+progress pointers and hard block in one transaction; rollback retains it for
+restart recovery. Projection failure reports committed SQL truth. Manager then
+exposes a 30-second Dashboard countdown.
 
 At expiry, the statically registered LM Studio host adapter:
 
@@ -145,6 +174,14 @@ At expiry, the statically registered LM Studio host adapter:
 5. validates the exact handoff identifier in that receipt;
 6. durably records acknowledgement and predecessor sealing; and
 7. reuses the same identity after retry or Manager restart.
+
+The V1 native adapter has bounded per-instance live-bootstrap ownership. It
+rejects duplicate same-session intent replacement and revalidates current owner,
+status, exact handoff ID/digest and cancellation after the transport await before
+persisting acknowledgement. Same-ID changed-content receipt reuse is refused;
+cold interruption/restart retry remains available. Existing V2 cancellation
+contracts and the ledger/schema/public fields are unchanged. These source and
+protocol controls do not establish current ordinary GUI rollover or GUI overlap.
 
 The adapter ledger and GUI intent/submitted records are bounded and owner-only.
 A host failure retains the same handoff and publishes a bounded redacted

@@ -1,5 +1,8 @@
 import Foundation
 import XCTest
+#if SWIFT_PACKAGE
+import ForgeNativeSessionHostPlugin
+#endif
 @testable import ForgeConductorCore
 
 final class StjornarvaldPolicyNoticeTests: XCTestCase {
@@ -190,6 +193,251 @@ final class StjornarvaldPolicyNoticeTests: XCTestCase {
         XCTAssertTrue(contextState.deferred.isEmpty)
     }
 
+    func testToolQueuedManagedNoticeReachesImmediateFeedbackWithoutChangingCanonicalOutput() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stj-managed-feedback-notice-\(UUID().uuidString)", isDirectory: true)
+        let repository = try ProjectControlPlaneRepository(
+            databaseURL: root.appendingPathComponent("control.sqlite3")
+        )
+        defer {
+            Task { await repository.close() }
+            try? FileManager.default.removeItem(at: root)
+        }
+        let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+        let projectID = ProjectID()
+        _ = try await repository.registerProjectUnchecked(
+            projectID: projectID, displayName: "Policy Context Fixture", canonicalRoot: projectRoot
+        )
+        let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+            projectID: projectID,
+            projectGeneration: .initial,
+            mission: "Read the fixture, then request completion on the immediate feedback",
+            providerID: "notice-provider",
+            adapterID: "notice-adapter",
+            modelKey: "notice-model",
+            specification: AutonomousRunSpecification(
+                allowedTools: ["fixture.read"], completionGates: ["tests"]
+            ),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [projectRoot], allowedTools: ["fixture.read"], networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+        ))
+        let noticeFixture = try NoticeFixture()
+        defer { noticeFixture.cleanup() }
+        let provider = ToolFeedbackNoticeProvider()
+        let toolExecutor = ToolFeedbackNoticeExecutor(fixture: noticeFixture)
+        let context = StjornarvaldCodingAgentPolicyReporter(repository: noticeFixture.notices)
+        let broker = ToolInvocationBroker(
+            repository: repository,
+            executor: toolExecutor,
+            classifier: StaticToolReplayClassifier(classifications: ["fixture.read": .readOnly])
+        )
+        let stepper = try ManagedProjectRunStepExecutor(
+            repository: repository,
+            providerResolver: { _ in provider },
+            toolDefinitionResolver: { _ in [] },
+            broker: broker,
+            policyContext: context
+        )
+        let lease = try await repository.acquireRunLease(runID: run.runID, ownerID: "notice-test")
+        defer { Task { _ = try? await repository.releaseRunLease(lease) } }
+        var running = run
+        for state in [AutonomousRunState.validating, .ready, .starting, .running] {
+            running = try await repository.transitionAutonomousRun(
+                runID: running.runID,
+                lease: lease,
+                transition: AutonomousRunTransition(
+                    expectedState: running.state,
+                    expectedRevision: running.revision,
+                    nextState: state,
+                    eventType: "notice_test_\(state.rawValue)",
+                    eventSummary: "Advance managed notice fixture"
+                )
+            )
+        }
+        let preparedIntent = try await stepper.prepareNextStep(for: running)
+        let intent = try XCTUnwrap(preparedIntent)
+        let pending = try await repository.persistRunSideEffectIntent(
+            runID: running.runID,
+            lease: lease,
+            expectedRevision: running.revision,
+            intent: intent
+        )
+        let invocationContext = ToolInvocationContext(
+            projectID: pending.projectID,
+            projectGeneration: pending.projectGeneration,
+            clientID: ClientID("notice-test"),
+            runID: pending.runID,
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: [projectRoot], allowedTools: ["fixture.read"], networkAllowed: false,
+                maximumInlineOutputBytes: 64 * 1_024
+            )
+        )
+        let outcome = try await stepper.execute(
+            intent, run: pending, context: invocationContext, lease: lease
+        )
+        guard case .completionRequestedWithWork(let summary, _) = outcome else {
+            return XCTFail("same-feedback notice delivery must preserve the provider completion outcome")
+        }
+        XCTAssertEqual(summary, "NOTICE_FEEDBACK_SEEN")
+        let inputs = await provider.snapshot()
+        XCTAssertEqual(inputs.rootCalls, 1)
+        XCTAssertEqual(inputs.continuationCalls, 1)
+        XCTAssertEqual(inputs.previousResponseID, "notice-feedback-root")
+        XCTAssertFalse(inputs.rootInput.contains("STJORNARVALD POLICY CONTEXT"),
+            "The notice is queued by the tool, after the root input is already dispatched.")
+        let feedback = try XCTUnwrap(inputs.feedbackInput)
+        let items = try XCTUnwrap(try JSONSerialization.jsonObject(with: feedback) as? [[String: Any]])
+        let outputs = items.filter { $0["type"] as? String == "function_call_output" }
+        XCTAssertEqual(outputs.count, 1)
+        let output = try XCTUnwrap(outputs.first)
+        XCTAssertEqual(output["call_id"] as? String, "notice-feedback-read")
+        XCTAssertEqual(output["output"] as? String,
+            try JSONSupport.canonicalJSON(ToolFeedbackNoticeExecutor.result.payload))
+        XCTAssertEqual(toolExecutor.callCount, 1)
+        let noticeScope = try XCTUnwrap(toolExecutor.scope)
+        XCTAssertEqual(noticeScope.projectID, pending.projectID.description)
+        XCTAssertEqual(noticeScope.projectGeneration, 1)
+        XCTAssertEqual(noticeScope.runID, pending.runID.description)
+        XCTAssertNotNil(noticeScope.sessionID)
+        let supplied = try XCTUnwrap(String(data: feedback, encoding: .utf8))
+        XCTAssertTrue(supplied.contains("STJORNARVALD POLICY CONTEXT"),
+            "A notice queued by this exact tool effect must reach its immediate feedback turn.")
+        XCTAssertTrue(supplied.contains("Stjornarvald has not changed tools"))
+        XCTAssertEqual(try noticeFixture.notices.deliveryState("managed:\(intent.idempotencyKey):1"),
+            .presented, "Mark presented only after the provider accepted that additive feedback context.")
+    }
+
+    func testOrdinaryLMStudioNoticeDefersAtMeasuredWholeBodyCapWithoutSourceCarryover() async throws {
+        let transport = OrdinaryNoticeBodyCapTransport()
+        let provider = LMStudioManagedModelProvider(transport: transport)
+        try await withToolFeedbackNoticeFixture(provider: provider) { fixture in
+            let carryover = try await fixture.repository.nativeSourceBudgetCarryover(runID: fixture.pending.runID)
+            XCTAssertNil(carryover, "Exercise ordinary managed provider path, not source carryover admission")
+            let outcome = try await fixture.stepper.execute(fixture.intent, run: fixture.pending,
+                context: fixture.context, lease: fixture.lease)
+            guard case .completionRequestedWithWork = outcome else { return XCTFail("Optional notice blocked ordinary valid tool feedback") }
+            let controls = await transport.snapshot()
+            XCTAssertEqual(controls.rootCalls, 1)
+            XCTAssertEqual(controls.feedbackCalls, 1)
+            XCTAssertEqual(controls.rejectedNoticePreflights, 1)
+            XCTAssertGreaterThan(try XCTUnwrap(controls.maximumRequestBytes), try XCTUnwrap(controls.baseBodyBytes))
+            XCTAssertGreaterThan(try XCTUnwrap(controls.noticeBodyBytes), try XCTUnwrap(controls.maximumRequestBytes))
+            XCTAssertEqual(controls.feedbackInput.count, 1)
+            guard case .functionCallOutput(let callID, let output) = controls.feedbackInput[0] else {
+                return XCTFail("Original ordinary function output was lost")
+            }
+            XCTAssertEqual(callID, "notice-feedback-read")
+            XCTAssertEqual(output, try JSONSupport.canonicalJSON(ToolFeedbackNoticeExecutor.result.payload))
+            XCTAssertEqual(fixture.executor.callCount, 1)
+            XCTAssertEqual(try fixture.notices.deliveryState("managed:\(fixture.intent.idempotencyKey):1"), .deliveryDeferred)
+        }
+    }
+
+    func testLegacyLMStudioTransportWithoutOptionalPreflightKeepsOutputAndNoticePending() async throws {
+        let transport = OrdinaryNoticeBodyCapTransport()
+        let provider = LMStudioManagedModelProvider(transport: OrdinaryNoticeLegacyTransport(base: transport))
+        try await withToolFeedbackNoticeFixture(provider: provider) { fixture in
+            let outcome = try await fixture.stepper.execute(fixture.intent, run: fixture.pending,
+                context: fixture.context, lease: fixture.lease)
+            guard case .completionRequestedWithWork = outcome else { return XCTFail("Optional preflight refinement blocked legacy transport") }
+            let controls = await transport.snapshot()
+            XCTAssertEqual(controls.rootCalls, 1)
+            XCTAssertEqual(controls.feedbackCalls, 1)
+            XCTAssertEqual(controls.rejectedNoticePreflights, 0)
+            XCTAssertEqual(controls.feedbackInput.count, 1)
+            XCTAssertEqual(try fixture.notices.deliveryState("managed:\(fixture.intent.idempotencyKey):1"), .deliveryDeferred)
+        }
+    }
+
+    func testFeedbackNoticeDefersAt128ItemsWithoutDroppingToolOutputs() async throws {
+        let count = ManagedModelProviderContract.maximumMessageCount
+        let provider = ToolFeedbackNoticeProvider(callCount: count)
+        try await withToolFeedbackNoticeFixture(provider: provider, callCount: count) { fixture in
+            let outcome = try await fixture.stepper.execute(fixture.intent, run: fixture.pending,
+                context: fixture.context, lease: fixture.lease)
+            guard case .completionRequestedWithWork = outcome else { return XCTFail("Optional notice changed full output-batch outcome") }
+            let snapshot = await provider.snapshot()
+            let input = try XCTUnwrap(snapshot.feedbackInput)
+            let items = try XCTUnwrap(JSONSerialization.jsonObject(with: input) as? [[String: Any]])
+            XCTAssertEqual(items.count, count)
+            for (index, item) in items.enumerated() {
+                XCTAssertEqual(item["type"] as? String, "function_call_output")
+                XCTAssertEqual(item["call_id"] as? String, ToolFeedbackNoticeProvider.callID(index, count: count))
+                XCTAssertEqual(item["output"] as? String, try JSONSupport.canonicalJSON(ToolFeedbackNoticeExecutor.result.payload))
+            }
+            XCTAssertEqual(fixture.executor.callCount, count)
+            XCTAssertEqual(try fixture.notices.deliveryState("managed:\(fixture.intent.idempotencyKey):1"), .deliveryDeferred)
+        }
+    }
+
+    func testFeedbackNoticeDefersAt512KiBWithoutChangingEscapedOutputBytes() async throws {
+        let count = 64
+        let empty = ToolResult.success(["value": ""])
+        let skeleton: [[String: Any]] = try (0..<count).map { index in
+            ["type": "function_call_output", "call_id": ToolFeedbackNoticeProvider.callID(index, count: count),
+             "output": try JSONSupport.canonicalJSON(empty.payload)]
+        }
+        let skeletonBytes = try JSONSerialization.data(withJSONObject: skeleton,
+            options: [.sortedKeys, .withoutEscapingSlashes]).count
+        let padding = (ManagedModelProviderContract.maximumContinuationInputBytes - 100 - skeletonBytes) / count
+        let result = ToolResult.success(["value": String(repeating: "x", count: padding)])
+        let provider = ToolFeedbackNoticeProvider(callCount: count)
+        try await withToolFeedbackNoticeFixture(provider: provider, callCount: count, result: result) { fixture in
+            let outcome = try await fixture.stepper.execute(fixture.intent, run: fixture.pending,
+                context: fixture.context, lease: fixture.lease)
+            guard case .completionRequestedWithWork = outcome else { return XCTFail("Optional notice blocked valid near-cap output") }
+            let snapshot = await provider.snapshot()
+            let input = try XCTUnwrap(snapshot.feedbackInput)
+            XCTAssertLessThanOrEqual(input.count, ManagedModelProviderContract.maximumContinuationInputBytes)
+            XCTAssertGreaterThan(input.count, ManagedModelProviderContract.maximumContinuationInputBytes - 200)
+            let items = try XCTUnwrap(JSONSerialization.jsonObject(with: input) as? [[String: Any]])
+            XCTAssertEqual(items.count, count)
+            let expected = try JSONSupport.canonicalJSON(result.payload)
+            XCTAssertTrue(items.allSatisfy { $0["type"] as? String == "function_call_output" && $0["output"] as? String == expected })
+            XCTAssertEqual(fixture.executor.callCount, count)
+            XCTAssertEqual(try fixture.notices.deliveryState("managed:\(fixture.intent.idempotencyKey):1"), .deliveryDeferred)
+        }
+    }
+
+    func testRejectedLegacyFeedbackNeverMarksPolicyNoticePresented() async throws {
+        for mode in [ToolFeedbackNoticeProvider.Mode.wrongProvider, .incomplete] {
+            let provider = ToolFeedbackNoticeProvider(mode: mode)
+            try await withToolFeedbackNoticeFixture(provider: provider) { fixture in
+                do {
+                    _ = try await fixture.stepper.execute(fixture.intent, run: fixture.pending,
+                        context: fixture.context, lease: fixture.lease)
+                    XCTFail("Mismatched or incomplete feedback response was accepted")
+                } catch { XCTAssertEqual(error as? ManagedModelProviderContractError, .incompleteTerminalResponse) }
+                let snapshot = await provider.snapshot()
+                XCTAssertTrue(String(decoding: try XCTUnwrap(snapshot.feedbackInput), as: UTF8.self).contains("STJORNARVALD POLICY CONTEXT"))
+                XCTAssertEqual(try fixture.notices.deliveryState("managed:\(fixture.intent.idempotencyKey):1"), .deliveryDeferred)
+                let scope = try XCTUnwrap(fixture.executor.scope)
+                let pending = try fixture.notices.pending(targetKind: .managedProvider,
+                    targetIdentity: StjornarvaldPolicyNoticeRepository.managedTargetIdentity(projectID: try XCTUnwrap(scope.projectID),
+                        generation: try XCTUnwrap(scope.projectGeneration), runID: try XCTUnwrap(scope.runID), sessionID: scope.sessionID),
+                    maximumCount: 8, maximumBytes: 16 * 1_024)
+                XCTAssertEqual(pending.count, 1)
+            }
+        }
+    }
+
+    func testFeedbackNoticeDefersWhenBudgetRequestsRolloverBeforeSubmission() async throws {
+        let provider = ToolFeedbackNoticeProvider()
+        try await withToolFeedbackNoticeFixture(provider: provider, budget: FeedbackBeforeTurnRolloverBudget()) { fixture in
+            let outcome = try await fixture.stepper.execute(fixture.intent, run: fixture.pending,
+                context: fixture.context, lease: fixture.lease)
+            guard case .rolloverRequired = outcome else { return XCTFail("Expected ordinary budget rollover deferral") }
+            let snapshot = await provider.snapshot()
+            XCTAssertEqual(snapshot.rootCalls, 1)
+            XCTAssertEqual(snapshot.continuationCalls, 0, "Deferral must not POST notice-bearing feedback")
+            XCTAssertEqual(fixture.executor.callCount, 1)
+            XCTAssertEqual(try fixture.notices.deliveryState("managed:\(fixture.intent.idempotencyKey):1"), .deliveryDeferred)
+        }
+    }
+
     func testOrdinaryMCPAddsSeparateContentWithoutChangingCanonicalResult() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("stj-mcp-notice-\(UUID().uuidString)", isDirectory: true)
@@ -287,6 +535,93 @@ final class StjornarvaldPolicyNoticeTests: XCTestCase {
         XCTAssertEqual(state, .presented)
     }
 
+    func testInteractiveCacheDiscoversLaterNoticeInUnchangedScopeAndBecomesIdle() async throws {
+        let fixture = try NoticeFixture()
+        defer { fixture.cleanup() }
+        let clientID = "long-lived-mcp-client"
+        let cache = StjornarvaldInteractivePolicyNoticeCache(
+            repository: fixture.notices, projectID: fixture.projectID,
+            projectGeneration: fixture.generation, clientID: clientID
+        )
+        for _ in 0..<100 where cache.refreshState().workerActive {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(cache.refreshState().workerActive)
+        let event = try fixture.record(.violation, observationID: UUID(), occurredAt: Date(),
+            scope: DevelopmentObservationScope(projectID: fixture.projectID,
+                projectGeneration: fixture.generation, clientID: clientID))
+        _ = try fixture.notices.queue(event)
+        var presentation: PolicyNoticePresentation?
+        for _ in 0..<100 where presentation == nil {
+            presentation = cache.presentation(deliveryID: "late-same-scope",
+                projectID: fixture.projectID, projectGeneration: fixture.generation,
+                clientID: clientID, maximumCount: 8, maximumBytes: 16 * 1_024)
+            XCTAssertLessThanOrEqual(cache.refreshState().pendingTargetCount, 1)
+            if presentation == nil { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        let delivered = try XCTUnwrap(presentation)
+        XCTAssertEqual(delivered.notices.map(\.violationID), [event.violationID])
+        cache.didPresent(delivered)
+        for _ in 0..<100 {
+            if try fixture.notices.deliveryState(delivered.id) == .presented,
+               !cache.refreshState().workerActive { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(try fixture.notices.deliveryState(delivered.id), .presented)
+        XCTAssertFalse(cache.refreshState().workerActive)
+        XCTAssertEqual(cache.refreshState().pendingTargetCount, 0)
+        XCTAssertNil(cache.presentation(deliveryID: "different-generation",
+            projectID: fixture.projectID, projectGeneration: fixture.generation + 1,
+            clientID: clientID, maximumCount: 8, maximumBytes: 16 * 1_024))
+    }
+
+    func testInteractiveCacheSuppressesReceiptWhileAnEarlierReadPublishes() async throws {
+        let fixture = try NoticeFixture()
+        defer { fixture.cleanup() }
+        let client = "receipt-interleaving-client"
+        let event = try fixture.record(.violation, observationID: UUID(), occurredAt: Date(),
+            scope: DevelopmentObservationScope(projectID: fixture.projectID,
+                projectGeneration: fixture.generation, clientID: client))
+        _ = try fixture.notices.queue(event)
+        let gate = NoticeCacheInterleavingGate()
+        defer { gate.releaseRead.signal(); gate.releaseReceipt.signal() }
+        let cache = StjornarvaldInteractivePolicyNoticeCache(repository: fixture.notices,
+            projectID: fixture.projectID, projectGeneration: fixture.generation, clientID: client,
+            checkpoint: { gate.visit($0) })
+        for _ in 0..<100 where cache.refreshState().workerActive {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(cache.refreshState().workerActive)
+        gate.arm()
+        let presentation = try XCTUnwrap(cache.presentation(deliveryID: "receipt-race-first",
+            projectID: fixture.projectID, projectGeneration: fixture.generation,
+            clientID: client, maximumCount: 8, maximumBytes: 16 * 1_024))
+        XCTAssertEqual(gate.readEntered.wait(timeout: .now() + 2), .success)
+        cache.didPresent(presentation)
+        XCTAssertEqual(cache.refreshState().pendingPresentedNoticeCount, 1)
+        XCTAssertLessThanOrEqual(cache.refreshState().pendingPresentedNoticeCount,
+                                StjornarvaldInteractivePolicyNoticeCache.maximumPendingPresentedNoticeIDs)
+        gate.releaseRead.signal()
+        XCTAssertEqual(gate.receiptEntered.wait(timeout: .now() + 2), .success)
+        // The read fetched this notice before didPresent. Its late publication
+        // must not expose it again while the durable receipt is still pending.
+        XCTAssertNil(cache.presentation(deliveryID: "receipt-race-second",
+            projectID: fixture.projectID, projectGeneration: fixture.generation,
+            clientID: client, maximumCount: 8, maximumBytes: 16 * 1_024))
+        XCTAssertEqual(cache.refreshState().pendingPresentedNoticeCount, 1)
+        gate.releaseReceipt.signal()
+        for _ in 0..<100 {
+            if try fixture.notices.deliveryState(presentation.id) == .presented,
+               cache.refreshState().pendingPresentedNoticeCount == 0,
+               !cache.refreshState().workerActive { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(try fixture.notices.deliveryState(presentation.id), .presented)
+        XCTAssertEqual(cache.refreshState().pendingPresentedNoticeCount, 0)
+        XCTAssertFalse(cache.refreshState().workerActive)
+        XCTAssertFalse(gate.didTimeOut)
+    }
+
     func testInteractiveManagerReservationIsReplayStableAndBatchReceiptIsValidated() throws {
         let fixture = try NoticeFixture()
         defer { fixture.cleanup() }
@@ -346,6 +681,43 @@ final class StjornarvaldPolicyNoticeTests: XCTestCase {
         XCTAssertLessThanOrEqual(text.utf8.count, 1_024)
         XCTAssertTrue(text.contains("Policy:"))
         XCTAssertTrue(text.contains("Development continues"))
+    }
+}
+
+private final class NoticeCacheInterleavingGate: @unchecked Sendable {
+    let readEntered = DispatchSemaphore(value: 0)
+    let receiptEntered = DispatchSemaphore(value: 0)
+    let releaseRead = DispatchSemaphore(value: 0)
+    let releaseReceipt = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var readArmed = false
+    private var receiptArmed = false
+    private var timedOut = false
+    var didTimeOut: Bool {
+        lock.lock(); defer { lock.unlock() }; return timedOut
+    }
+    func arm() {
+        lock.lock(); readArmed = true; receiptArmed = true; lock.unlock()
+    }
+    func visit(_ checkpoint: StjornarvaldInteractivePolicyNoticeCache.Checkpoint) {
+        lock.lock()
+        let shouldWait: Bool
+        let entered: DispatchSemaphore
+        let release: DispatchSemaphore
+        switch checkpoint {
+        case .beforeCachePublication:
+            shouldWait = readArmed; readArmed = false
+            entered = readEntered; release = releaseRead
+        case .beforeReceiptPersistence:
+            shouldWait = receiptArmed; receiptArmed = false
+            entered = receiptEntered; release = releaseReceipt
+        }
+        lock.unlock()
+        guard shouldWait else { return }
+        entered.signal()
+        if release.wait(timeout: .now() + 2) == .timedOut {
+            lock.lock(); timedOut = true; lock.unlock()
+        }
     }
 }
 
@@ -565,4 +937,338 @@ private final class StaticInteractiveNoticeProvider:
     }
 
     func didPresent(_ presentation: PolicyNoticePresentation) {}
+}
+
+private actor ToolFeedbackNoticeProvider: ManagedModelProvider {
+    struct Snapshot: Sendable {
+        let rootCalls: Int
+        let continuationCalls: Int
+        let rootInput: String
+        let feedbackInput: Data?
+        let previousResponseID: String?
+    }
+    enum Mode: Sendable { case normal, wrongProvider, incomplete }
+    nonisolated let providerID = "notice-provider"
+    private let callCount: Int
+    private let mode: Mode
+    init(callCount: Int = 1, mode: Mode = .normal) { self.callCount = callCount; self.mode = mode }
+    nonisolated static func callID(_ index: Int, count: Int) -> String {
+        count == 1 ? "notice-feedback-read" : "notice-feedback-read-\(index)"
+    }
+    private var receipts: [String: ProviderTurn] = [:]
+    private var rootCalls = 0
+    private var continuationCalls = 0
+    private var rootInput = ""
+    private var feedbackInput: Data?
+    private var previousResponseID: String?
+
+    func probe() async throws -> ProviderCapabilities {
+        try ProviderCapabilities(
+            providerID: providerID,
+            providerVersion: "fixture-1",
+            modelKey: "notice-model",
+            providerInstanceID: "notice-instance",
+            contextLength: 32_768,
+            maximumContextLength: 65_536,
+            statefulResponses: true,
+            streaming: true,
+            customTools: true,
+            mcp: false,
+            structuredOutput: false,
+            usageReporting: true,
+            idempotencyLookup: true,
+            capabilityFingerprintSHA256: String(repeating: "d", count: 64)
+        )
+    }
+
+    func createRoot(_ request: ProviderRootRequest) async throws -> ProviderTurn {
+        if let existing = receipts[request.idempotencyKey] { return existing }
+        guard rootCalls == 0 else { throw AutonomyError.invalidRequest("feedback fixture root duplicated") }
+        rootCalls += 1
+        rootInput = request.input
+        let turn = try ProviderTurn(
+            requestID: "notice-feedback-request-root", responseID: "notice-feedback-root",
+            providerID: providerID, providerVersion: "fixture-1", modelKey: "notice-model",
+            providerInstanceID: "notice-instance", messages: [],
+            toolCalls: try (0..<callCount).map { index in
+                try ProviderToolCall(callID: Self.callID(index, count: callCount), name: "fixture.read", argumentsJSON: Data("{}".utf8))
+            }, usage: nil, completed: true, finishReason: .toolCalls
+        )
+        receipts[request.idempotencyKey] = turn
+        return turn
+    }
+
+    func continueSession(_ request: ProviderContinuationRequest) async throws -> ProviderTurn {
+        if let existing = receipts[request.idempotencyKey] { return existing }
+        guard continuationCalls == 0, request.previousResponseID == "notice-feedback-root" else {
+            throw AutonomyError.invalidRequest("feedback fixture continuation duplicated or misbound")
+        }
+        continuationCalls += 1
+        feedbackInput = request.input
+        previousResponseID = request.previousResponseID
+        let turn = try ProviderTurn(
+            requestID: "notice-feedback-request-final", responseID: "notice-feedback-final",
+            previousResponseID: request.previousResponseID,
+            providerID: mode == .wrongProvider ? "different-provider" : providerID, providerVersion: "fixture-1", modelKey: "notice-model",
+            providerInstanceID: "notice-instance",
+            messages: ["{\"forge_run_status\":\"completion_requested\",\"summary\":\"NOTICE_FEEDBACK_SEEN\"}"],
+            toolCalls: [], usage: nil, completed: mode != .incomplete, finishReason: .stop
+        )
+        receipts[request.idempotencyKey] = turn
+        return turn
+    }
+
+    func lookup(idempotencyKey: String) async throws -> ProviderTurn? { receipts[idempotencyKey] }
+    func cancel(requestID: String) async {}
+    func snapshot() -> Snapshot {
+        Snapshot(rootCalls: rootCalls, continuationCalls: continuationCalls, rootInput: rootInput,
+            feedbackInput: feedbackInput, previousResponseID: previousResponseID)
+    }
+}
+
+private final class ToolFeedbackNoticeExecutor: ToolExecuting, @unchecked Sendable {
+    static let result = ToolResult.success(["value": "UNCHANGED_CANONICAL_TOOL_RESULT"])
+    var toolNames: [String] { ["fixture.read"] }
+    private let fixture: NoticeFixture
+    private let maximumCalls: Int
+    private let returnedResult: ToolResult
+    private(set) var callCount = 0
+    private(set) var scope: DevelopmentObservationScope?
+
+    init(fixture: NoticeFixture, maximumCalls: Int = 1, result: ToolResult = ToolFeedbackNoticeExecutor.result) {
+        self.fixture = fixture; self.maximumCalls = maximumCalls; self.returnedResult = result
+    }
+    func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {
+        throw AutonomyError.invalidRequest("feedback fixture requires the actual bound invocation context")
+    }
+    func call(name: String, arguments: [String: Any], context: ToolInvocationContext) throws -> ToolResult {
+        guard name == "fixture.read", arguments.isEmpty, callCount < maximumCalls,
+              let runID = context.runID, let sessionID = context.providerSessionID,
+              let generation = Int(exactly: context.projectGeneration.rawValue) else {
+            throw AutonomyError.invalidRequest("feedback fixture tool effect duplicated or unbound")
+        }
+        callCount += 1
+        let scope = DevelopmentObservationScope(projectID: context.projectID.description,
+            projectGeneration: generation, runID: runID.description, sessionID: sessionID,
+            clientID: context.clientID.rawValue)
+        self.scope = scope
+        if callCount == 1 {
+            let now = Date()
+            let event = try fixture.record(.violation, observationID: UUID(), occurredAt: now, scope: scope)
+            guard try fixture.notices.queue(event, now: now) != nil else {
+                throw AutonomyError.invalidRequest("feedback fixture failed to queue its source-owned notice")
+            }
+        }
+        return returnedResult
+    }
+}
+
+private struct ToolFeedbackNoticeRunFixture {
+    let repository: ProjectControlPlaneRepository
+    let stepper: ManagedProjectRunStepExecutor
+    let intent: RunSideEffectIntent
+    let pending: AutonomousRunRecord
+    let context: ToolInvocationContext
+    let lease: RunLease
+    let notices: StjornarvaldPolicyNoticeRepository
+    let executor: ToolFeedbackNoticeExecutor
+}
+
+private func withToolFeedbackNoticeFixture(provider: any ManagedModelProvider,
+    callCount: Int = 1, result: ToolResult = ToolFeedbackNoticeExecutor.result,
+    budget: any ManagedRunBudgetEvaluating = NoManagedRunBudgetEvaluator(),
+    body: (ToolFeedbackNoticeRunFixture) async throws -> Void) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stj-managed-feedback-notice-\(UUID().uuidString)", isDirectory: true)
+        let repository = try ProjectControlPlaneRepository(
+            databaseURL: root.appendingPathComponent("control.sqlite3")
+        )
+        var ownedLease: RunLease?
+        do {
+            let projectRoot = root.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+            let projectID = ProjectID()
+            _ = try await repository.registerProjectUnchecked(
+                projectID: projectID, displayName: "Policy Context Fixture", canonicalRoot: projectRoot
+            )
+            let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+                projectID: projectID,
+                projectGeneration: .initial,
+                mission: "Read the fixture, then request completion on the immediate feedback",
+                providerID: provider.providerID,
+                adapterID: "notice-adapter",
+                modelKey: "notice-model",
+                specification: AutonomousRunSpecification(
+                    allowedTools: ["fixture.read"], completionGates: ["tests"]
+                ),
+                authorizationScope: ToolAuthorizationScope(
+                    canonicalRoots: [projectRoot], allowedTools: ["fixture.read"], networkAllowed: false,
+                    maximumInlineOutputBytes: 64 * 1_024
+                )
+            ))
+            let noticeFixture = try NoticeFixture()
+            defer { noticeFixture.cleanup() }
+            let toolExecutor = ToolFeedbackNoticeExecutor(fixture: noticeFixture, maximumCalls: callCount, result: result)
+            let context = StjornarvaldCodingAgentPolicyReporter(repository: noticeFixture.notices)
+            let broker = ToolInvocationBroker(
+                repository: repository,
+                executor: toolExecutor,
+                classifier: StaticToolReplayClassifier(classifications: ["fixture.read": .readOnly])
+            )
+            let stepper = try ManagedProjectRunStepExecutor(
+                repository: repository,
+                providerResolver: { _ in provider },
+                toolDefinitionResolver: { _ in [] },
+                broker: broker,
+                budget: budget,
+                policyContext: context
+            )
+            let lease = try await repository.acquireRunLease(runID: run.runID, ownerID: "notice-test")
+            ownedLease = lease
+            var running = run
+            for state in [AutonomousRunState.validating, .ready, .starting, .running] {
+                running = try await repository.transitionAutonomousRun(
+                    runID: running.runID,
+                    lease: lease,
+                    transition: AutonomousRunTransition(
+                        expectedState: running.state,
+                        expectedRevision: running.revision,
+                        nextState: state,
+                        eventType: "notice_test_\(state.rawValue)",
+                        eventSummary: "Advance managed notice fixture"
+                    )
+                )
+            }
+            let preparedIntent = try await stepper.prepareNextStep(for: running)
+            let intent = try XCTUnwrap(preparedIntent)
+            let pending = try await repository.persistRunSideEffectIntent(
+                runID: running.runID,
+                lease: lease,
+                expectedRevision: running.revision,
+                intent: intent
+            )
+            let invocationContext = ToolInvocationContext(
+                projectID: pending.projectID,
+                projectGeneration: pending.projectGeneration,
+                clientID: ClientID("notice-test"),
+                runID: pending.runID,
+                authorizationScope: ToolAuthorizationScope(
+                    canonicalRoots: [projectRoot], allowedTools: ["fixture.read"], networkAllowed: false,
+                    maximumInlineOutputBytes: 64 * 1_024
+                )
+            )
+            let fixture = ToolFeedbackNoticeRunFixture(repository: repository, stepper: stepper, intent: intent,
+                pending: pending, context: invocationContext, lease: lease, notices: noticeFixture.notices, executor: toolExecutor)
+            try await body(fixture)
+            _ = try await repository.releaseRunLease(lease)
+            ownedLease = nil
+            await repository.close()
+            try FileManager.default.removeItem(at: root)
+        } catch {
+            if let ownedLease { _ = try? await repository.releaseRunLease(ownedLease) }
+            await repository.close()
+            try? FileManager.default.removeItem(at: root)
+            throw error
+        }
+}
+
+private struct FeedbackBeforeTurnRolloverBudget: ManagedRunBudgetEvaluating {
+    func evaluateBeforeProviderTurn(run: AutonomousRunRecord, sessionID: String,
+        capabilities: ProviderCapabilities, serializedInputBytes: Int) async throws -> ContextBudgetAction { .normal }
+    func evaluateBeforeProviderTurn(run: AutonomousRunRecord, sessionID: String,
+        capabilities: ProviderCapabilities, accounting: ManagedBudgetInputAccounting) async throws -> ContextBudgetAction {
+        accounting.inputAlreadyRetained ? .rollover : .normal
+    }
+    func observeProviderTurn(_ turn: ProviderTurn, run: AutonomousRunRecord, sessionID: String,
+        capabilities: ProviderCapabilities) async throws -> ContextBudgetAction { .normal }
+    func observeToolResult(serializedBytes: Int, providerResponseID: String, run: AutonomousRunRecord,
+        sessionID: String, capabilities: ProviderCapabilities) async throws -> ContextBudgetAction { .normal }
+    func observeProviderOverflow(run: AutonomousRunRecord, sessionID: String,
+        capabilities: ProviderCapabilities) async throws -> ContextBudgetAction { .emergency }
+}
+
+private actor OrdinaryNoticeBodyCapTransport: LMStudioManagedTransportRequestPreflighting {
+    struct Snapshot: Sendable {
+        let rootCalls: Int
+        let feedbackCalls: Int
+        let rejectedNoticePreflights: Int
+        let baseBodyBytes: Int?
+        let noticeBodyBytes: Int?
+        let maximumRequestBytes: Int?
+        let feedbackInput: [LMStudioResponseInput]
+    }
+    private var rootCalls = 0
+    private var feedbackCalls = 0
+    private var rejectedNoticePreflights = 0
+    private var baseBodyBytes: Int?
+    private var noticeBodyBytes: Int?
+    private var maximumRequestBytes: Int?
+    private var feedbackInput: [LMStudioResponseInput] = []
+    private var receipts: [String: LMStudioResponseTurn] = [:]
+    func probe() async throws -> LMStudioProviderCapabilities {
+        .init(modelKey: "notice-model", loadedInstanceID: "notice-instance",
+            contextLength: 32_768, maximumContextLength: 65_536, parallelism: 1, flashAttention: true,
+            trainedForToolUse: true, streamingVerified: true, functionToolContractVerified: true,
+            usageReportingVerified: true, capabilityFingerprintSHA256: String(repeating: "a", count: 64),
+            contractProbeResponseID: "ordinary-notice-probe")
+    }
+    func preflightRoot(_ request: LMStudioRootRequest) async throws -> ProviderRequestPreflight {
+        try await SourceBootstrapFixtureWire.root(request)
+    }
+    func preflightContinuation(_ request: LMStudioContinuationRequest) async throws -> ProviderRequestPreflight {
+        var base = request
+        base.input = [request.input[0]]
+        let normal = try await SourceBootstrapFixtureWire.continuation(base)
+        baseBodyBytes = normal.bodyByteCount
+        maximumRequestBytes = max(1_024, normal.bodyByteCount + 32)
+        if request.input.count == 2 {
+            noticeBodyBytes = try await SourceBootstrapFixtureWire.continuation(request).bodyByteCount
+        }
+        do {
+            return try await SourceBootstrapFixtureWire.continuation(request,
+                maximumRequestBytes: try XCTUnwrap(maximumRequestBytes))
+        } catch {
+            if request.input.count == 2 { rejectedNoticePreflights += 1 }
+            throw error
+        }
+    }
+    func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightRoot(request)
+        rootCalls += 1
+        let turn = LMStudioResponseTurn(responseID: "notice-feedback-root", previousResponseID: nil,
+            model: "notice-model", status: "completed", assistantText: "",
+            functionCalls: [.init(itemID: "ordinary-notice-read", callID: "notice-feedback-read",
+                name: "fixture.read", arguments: "{}")],
+            usage: .init(inputTokens: 0, outputTokens: 0, totalTokens: 0), usageWasReported: false)
+        receipts[request.idempotencyKey] = turn
+        return turn
+    }
+    func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn {
+        _ = try await preflightContinuation(request)
+        feedbackCalls += 1
+        feedbackInput = request.input
+        let turn = LMStudioResponseTurn(responseID: "notice-feedback-final", previousResponseID: request.previousResponseID,
+            model: "notice-model", status: "completed",
+            assistantText: "{\"forge_run_status\":\"completion_requested\",\"summary\":\"NOTICE_FEEDBACK_SEEN\"}",
+            functionCalls: [], usage: .init(inputTokens: 0, outputTokens: 0, totalTokens: 0),
+            usageWasReported: false)
+        receipts[request.idempotencyKey] = turn
+        return turn
+    }
+    func receipt(forIdempotencyKey key: String) async -> LMStudioResponseTurn? { receipts[key] }
+    func cancel(operationID: String) async {}
+    func snapshot() -> Snapshot {
+        .init(rootCalls: rootCalls, feedbackCalls: feedbackCalls, rejectedNoticePreflights: rejectedNoticePreflights,
+            baseBodyBytes: baseBodyBytes, noticeBodyBytes: noticeBodyBytes,
+            maximumRequestBytes: maximumRequestBytes, feedbackInput: feedbackInput)
+    }
+}
+
+private struct OrdinaryNoticeLegacyTransport: LMStudioManagedTransporting {
+    let base: OrdinaryNoticeBodyCapTransport
+    func probe() async throws -> LMStudioProviderCapabilities { try await base.probe() }
+    func createRoot(_ request: LMStudioRootRequest) async throws -> LMStudioResponseTurn { try await base.createRoot(request) }
+    func continueSession(_ request: LMStudioContinuationRequest) async throws -> LMStudioResponseTurn { try await base.continueSession(request) }
+    func receipt(forIdempotencyKey key: String) async -> LMStudioResponseTurn? { await base.receipt(forIdempotencyKey: key) }
+    func cancel(operationID: String) async { await base.cancel(operationID: operationID) }
 }

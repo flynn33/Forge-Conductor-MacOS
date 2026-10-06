@@ -8,6 +8,127 @@ import Darwin
 
 /// Proves host telemetry is a continuous stream — not a multi-second snapshot product.
 final class RealtimeStreamTests: XCTestCase {
+    func testHeadlessSnapshotsRemainFreshWithoutRecurringCollectors() throws {
+        let home = URL(fileURLWithPath: "/private/tmp/forge-serve-telemetry-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home, startTelemetry: false)
+        defer { app.shutdown() }
+        XCTAssertFalse(app.telemetry.realtimeEngine.isRunning)
+        let sampleDelivery = expectation(description: "idle engine does not publish recurring samples")
+        sampleDelivery.isInverted = true
+        let listener = app.telemetry.realtimeEngine.addListener { _ in sampleDelivery.fulfill() }
+        defer { app.telemetry.realtimeEngine.removeListener(listener) }
+
+        let first = try app.telemetry.snapshotTyped()
+        Thread.sleep(forTimeInterval: 0.02)
+        let second = try app.telemetry.snapshotTyped()
+        XCTAssertGreaterThan(second.system.ts, first.system.ts)
+        XCTAssertEqual(second.updated, second.system.ts)
+        XCTAssertEqual(app.telemetry.currentFrame().system.ts, second.system.ts)
+        let system = try app.telemetry.systemOnly()
+        XCTAssertGreaterThan(try XCTUnwrap(system["ts"] as? Double), second.system.ts)
+        let snapshot = try app.telemetry.snapshot(force: true)
+        XCTAssertTrue(TelemetryContract.validate(snapshot: snapshot).isEmpty)
+        XCTAssertFalse((snapshot["history"] as? [[String: Any]] ?? []).isEmpty)
+        XCTAssertEqual(app.telemetry.healthDictionary()["stream_running"] as? Bool, false)
+        XCTAssertFalse(app.telemetry.realtimeEngine.isRunning)
+        wait(for: [sampleDelivery], timeout: 0.15)
+    }
+
+    func testDefaultBootstrapRetainsContinuousGUIAndManagerTelemetry() throws {
+        let home = URL(fileURLWithPath: "/private/tmp/forge-telemetry-owner-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        XCTAssertTrue(app.telemetry.realtimeEngine.isRunning)
+        XCTAssertEqual(app.telemetry.realtimeEngine.targetSampleHz, 30)
+        let delivered = expectation(description: "default bootstrap maintains continuous sampling")
+        let deliveryLock = NSLock()
+        var didDeliver = false
+        let listener = app.telemetry.realtimeEngine.addListener { _ in
+            deliveryLock.lock()
+            let first = !didDeliver
+            didDeliver = true
+            deliveryLock.unlock()
+            if first { delivered.fulfill() }
+        }
+        defer { app.telemetry.realtimeEngine.removeListener(listener) }
+        wait(for: [delivered], timeout: 2)
+        app.telemetry.stopBackgroundRefresh()
+        XCTAssertFalse(app.telemetry.realtimeEngine.isRunning)
+    }
+
+    func testStoppedCurrentFrameReadDoesNotCollectOnMainActor() async throws {
+        let home = URL(fileURLWithPath: "/private/tmp/forge-frame-read-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home, startTelemetry: false)
+        defer { app.shutdown() }
+        let collector = SingleSampleSystemCollector()
+        let engine = RealtimeMetricsEngine(systemCollector: collector)
+        let telemetry = TelemetryService(
+            paths: app.paths, store: app.store, catalog: app.catalog, realtimeEngine: engine
+        )
+        collector.resetObservations()
+        let fresh = try await Task.detached { try telemetry.snapshotTyped() }.value
+        XCTAssertEqual(collector.observations.calls, 1)
+        XCTAssertFalse(collector.observations.collectedOnMainThread)
+        let cached = await MainActor.run { telemetry.currentFrame() }
+        XCTAssertEqual(cached.system.ts, fresh.system.ts)
+        XCTAssertEqual(collector.observations.calls, 1)
+        XCTAssertFalse(engine.isRunning)
+    }
+
+    func testColdCurrentFrameOnMainActorUsesPlaceholderUntilExplicitOffMainSample() async throws {
+        let home = URL(fileURLWithPath: "/private/tmp/forge-cold-frame-\(UUID().uuidString)")
+        let system = SingleSampleSystemCollector()
+        let forge = CountingForgeCollector(home: home.path)
+        let telemetry = TelemetryService(paths: AppPaths(home: home), systemCollector: system,
+            forgeCollector: forge)
+        system.resetObservations()
+        let cold = await MainActor.run { telemetry.currentFrame() }
+        XCTAssertEqual(forge.observations.calls, 0)
+        XCTAssertEqual(system.observations.calls, 0)
+        XCTAssertEqual(cold.forge.home, home.path)
+        XCTAssertEqual(cold.forge.presenceCount, 0)
+        XCTAssertFalse(cold.forge.files.storeSQLite)
+        XCTAssertTrue(TelemetryContract.validate(snapshot: cold.asDictionary()).isEmpty)
+        XCTAssertFalse(telemetry.realtimeEngine.isRunning)
+
+        let fresh = try await Task.detached { try telemetry.snapshotTyped() }.value
+        XCTAssertEqual(forge.observations.calls, 1)
+        XCTAssertFalse(forge.observations.collectedOnMainThread)
+        XCTAssertEqual(system.observations.calls, 1)
+        XCTAssertFalse(system.observations.collectedOnMainThread)
+        XCTAssertEqual(fresh.forge.presenceCount, 7)
+        XCTAssertTrue(fresh.forge.files.storeSQLite)
+        let cached = await MainActor.run { telemetry.currentFrame() }
+        XCTAssertEqual(cached.forge, fresh.forge)
+        XCTAssertEqual(forge.observations.calls, 1)
+        XCTAssertFalse(telemetry.realtimeEngine.isRunning)
+    }
+
+    func testConcurrentSingleSamplesAreSerializedAndDoNotStartAStream() {
+        let collector = SingleSampleSystemCollector()
+        let engine = RealtimeMetricsEngine(systemCollector: collector)
+        collector.resetObservations()
+        let finished = expectation(description: "bounded concurrent single samples complete")
+        finished.expectedFulfillmentCount = 8
+        for _ in 0..<8 {
+            DispatchQueue.global(qos: .userInitiated).async {
+                _ = engine.collectCurrentMetrics()
+                finished.fulfill()
+            }
+        }
+        wait(for: [finished], timeout: 2)
+        XCTAssertEqual(collector.observations.calls, 8)
+        XCTAssertEqual(collector.observations.maximumConcurrentCalls, 1)
+        XCTAssertFalse(collector.observations.collectedOnMainThread)
+        XCTAssertFalse(engine.isRunning)
+        engine.stop()
+        Thread.sleep(forTimeInterval: 0.08)
+        XCTAssertEqual(collector.observations.calls, 8)
+    }
+
     func testHostStreamAdvancesWithoutSnapshotAPI() {
         let engine = RealtimeMetricsEngine()
         let requiredSamples = 8
@@ -199,5 +320,64 @@ final class RealtimeStreamTests: XCTestCase {
         XCTAssertEqual(h["stream"] as? String, "realtime")
         XCTAssertEqual(h["runtime"] as? String, "swift-native-realtime")
         XCTAssertEqual(h["ok"] as? Bool, true)
+    }
+}
+
+private final class CountingForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
+    private let lock = NSLock()
+    private let home: String
+    private var calls = 0
+    private var collectedOnMainThread = false
+    init(home: String) { self.home = home }
+    var observations: (calls: Int, collectedOnMainThread: Bool) {
+        lock.lock(); defer { lock.unlock() }; return (calls, collectedOnMainThread)
+    }
+    func collect() -> ForgeSnapshot {
+        lock.lock()
+        calls += 1
+        collectedOnMainThread = collectedOnMainThread || Thread.isMainThread
+        lock.unlock()
+        var result = ForgeSnapshot.empty(home: home)
+        result.presenceCount = 7
+        result.files = ForgeFilesPresence(storeSQLite: true, auditJSONL: false, managerState: false)
+        return result
+    }
+}
+
+private final class SingleSampleSystemCollector: SystemMetricsCollecting, @unchecked Sendable {
+    private let lock = NSLock()
+    private let template = SystemCollector().collectMetrics()
+    private var calls = 0
+    private var activeCalls = 0
+    private var maximumConcurrentCalls = 0
+    private var collectedOnMainThread = false
+
+    var observations: (calls: Int, maximumConcurrentCalls: Int, collectedOnMainThread: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        return (calls, maximumConcurrentCalls, collectedOnMainThread)
+    }
+
+    func resetObservations() {
+        lock.lock(); defer { lock.unlock() }
+        calls = 0
+        maximumConcurrentCalls = 0
+        collectedOnMainThread = false
+    }
+
+    func collectMetrics() -> SystemMetrics {
+        lock.lock()
+        calls += 1
+        activeCalls += 1
+        maximumConcurrentCalls = max(maximumConcurrentCalls, activeCalls)
+        collectedOnMainThread = collectedOnMainThread || Thread.isMainThread
+        let timestamp = Double(calls)
+        lock.unlock()
+        Thread.sleep(forTimeInterval: 0.005)
+        var result = template
+        result.ts = timestamp
+        lock.lock()
+        activeCalls -= 1
+        lock.unlock()
+        return result
     }
 }

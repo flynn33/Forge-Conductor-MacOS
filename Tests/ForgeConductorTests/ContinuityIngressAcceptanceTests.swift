@@ -354,7 +354,7 @@ final class ContinuityIngressAcceptanceTests: XCTestCase {
         let standard = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self, from: standardBytes)
         XCTAssertEqual(standard.state, .completed)
         XCTAssertEqual(standard.sourceVersion, 0)
-        XCTAssertEqual(standard.targetVersion, 5)
+        XCTAssertEqual(standard.targetVersion, 6)
         try AcceptanceSQLite.installLegacyRunConstraint(database)
 
         let upgraded = try ForgeApp.bootstrap(home: home)
@@ -365,7 +365,13 @@ final class ContinuityIngressAcceptanceTests: XCTestCase {
         XCTAssertEqual(restored, run)
         XCTAssertEqual(restoredLease, lease)
         XCTAssertEqual(restoredBinding, binding)
-        XCTAssertEqual(try AcceptanceSQLite.integer(database, "SELECT version FROM runtime_job_schema_version WHERE singleton=1"), 5)
+        XCTAssertEqual(try AcceptanceSQLite.integer(database, "SELECT version FROM runtime_job_schema_version WHERE singleton=1"), 6)
+        XCTAssertEqual(try AcceptanceSQLite.integer(database, """
+            SELECT COUNT(*) FROM pragma_table_info('runtime_job_output_streams')
+            WHERE ((name='producer_end_reason' AND type='TEXT')
+                OR (name='producer_read_errno' AND type='INTEGER'))
+                AND "notnull"=0 AND dflt_value IS NULL
+            """), 2, "Producer-end provenance remains nullable without inventing an EOF default")
         XCTAssertEqual(try AcceptanceSQLite.integer(database, "SELECT COUNT(*) FROM pragma_foreign_key_check"), 0)
         XCTAssertEqual(try Data(contentsOf: standardURL), standardBytes)
         let ingressURL = VerifiedMigrationBackup.activeManifestURL(for: database, scope: .continuityIngress)
@@ -382,6 +388,13 @@ final class ContinuityIngressAcceptanceTests: XCTestCase {
         activeApp = reopened
         let repeated = try await reopened.projectContexts.repository.autonomousRun(run.runID)
         XCTAssertEqual(repeated, run)
+        XCTAssertEqual(try AcceptanceSQLite.integer(database, "SELECT version FROM runtime_job_schema_version WHERE singleton=1"), 6)
+        XCTAssertEqual(try AcceptanceSQLite.integer(database, """
+            SELECT COUNT(*) FROM pragma_table_info('runtime_job_output_streams')
+            WHERE ((name='producer_end_reason' AND type='TEXT')
+                OR (name='producer_read_errno' AND type='INTEGER'))
+                AND "notnull"=0 AND dflt_value IS NULL
+            """), 2)
         XCTAssertEqual(try Data(contentsOf: standardURL), standardBytes)
         XCTAssertTrue(reopened.shutdown().completed)
         activeApp = nil

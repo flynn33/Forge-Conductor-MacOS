@@ -132,7 +132,8 @@ public struct RavenNativeStackObservationDetector: PolicyObservationDetecting {
                 subjectIdentity: observation.subjectIdentity,
                 shippingRuntimePaths: nativeTarget.shippingRuntimePaths,
                 evidenceReferences: observation.evidenceReferences,
-                targetMembershipComplete: nativeTarget.targetMembershipComplete
+                targetMembershipComplete: nativeTarget.targetMembershipComplete,
+                declaredPathRoles: nativeTarget.declaredPathRoles
             ),
             rule: rule
         )

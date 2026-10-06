@@ -288,6 +288,121 @@ private actor ScriptedManagedTransport: LMStudioManagedTransporting {
     }
 }
 
+// This protocol fixture gates a response before it exists. cancel() records the
+// request but permits one deliberately late valid response to reach the adapter.
+private enum NativeACKGateOutcome: Sendable, Equatable {
+    case acknowledged
+    case cancelled
+    case failed(String)
+
+    static func failure(_ error: any Error) -> Self {
+        if let native = error as? NativeHostPluginError, native == .cancelled {
+            return .cancelled
+        }
+        return .failed(String(String(describing: error).prefix(256)))
+    }
+}
+
+private struct NativeACKGateSnapshot: Sendable {
+    let enteredDigests: [String]
+    let completedDigests: [String]
+    let finishedDigests: [String]
+    let cancelledOperations: [String]
+}
+
+private actor NativeACKRevisionGateTransport: NativeSessionTransport {
+    nonisolated let bootstrapTimeout = Duration.seconds(4)
+    private var entered: Set<String> = []
+    private var released: Set<String> = []
+    private var completed: [String] = []
+    private var finished: Set<String> = []
+    private var cancellations: Set<String> = []
+    private var closed = false
+    private var createKey: String?
+
+    func createSession(
+        request: SessionCreationRequest,
+        deadline: ContinuousClock.Instant
+    ) async throws -> NativeTransportSession {
+        guard ContinuousClock.now < deadline else { throw NativeHostPluginError.deadlineExceeded }
+        guard createKey == nil || createKey == request.idempotencyKey else {
+            throw NativeHostPluginError.malformedResponse("gate fixture permits one native session")
+        }
+        createKey = request.idempotencyKey
+        return NativeTransportSession(providerSessionID: "ack-gate-provider", model: "fixture-model")
+    }
+
+    func bootstrap(_ request: NativeBootstrapRequest) async throws -> NativeBootstrapResponse {
+        guard !closed else { throw NativeHostPluginError.cancelled }
+        guard entered.count < 2, !entered.contains(request.handoffSHA256) else {
+            throw NativeHostPluginError.malformedResponse("duplicate or excess gate bootstrap")
+        }
+        let object = try JSONSerialization.jsonObject(with: request.canonicalHandoff)
+        guard let dictionary = object as? [String: Any],
+              let encoded = ContinuityHandoff.fromDictionary(dictionary) else {
+            throw NativeHostPluginError.malformedResponse("gate received malformed canonical handoff")
+        }
+        let validated = try encoded.validated()
+        guard validated.handoffID == request.handoffID,
+              validated.contentSHA256 == request.handoffSHA256 else {
+            throw NativeHostPluginError.malformedResponse("gate handoff identity or digest differs")
+        }
+        entered.insert(request.handoffSHA256)
+        let localDeadline = ContinuousClock.now.advanced(by: bootstrapTimeout)
+        for _ in 0..<800 {
+            guard !closed else { throw NativeHostPluginError.cancelled }
+            guard ContinuousClock.now < request.deadline,
+                  ContinuousClock.now < localDeadline else {
+                throw NativeHostPluginError.deadlineExceeded
+            }
+            if released.contains(request.handoffSHA256) {
+                // Only this branch creates/completes an ACK. Waiting and cancel()
+                // cannot manufacture a completed provider response.
+                completed.append(request.handoffSHA256)
+                return NativeBootstrapResponse(chunks: [try JSONSupport.data(from: [
+                    "handoff_id": request.handoffID,
+                    "successor_session_id": request.successorSessionID,
+                ])], inputTokens: 100, outputTokens: 8)
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw NativeHostPluginError.deadlineExceeded
+    }
+
+    func cancel(operationID: String, providerSessionID: String?) async {
+        // Deliberately keep an already-started transport return independently
+        // controllable; NativeSessionTransport does not promise a join here.
+        if cancellations.count < 2 { cancellations.insert(operationID) }
+    }
+
+    func release(_ digest: String) { if entered.contains(digest) { released.insert(digest) } }
+    func taskFinished(_ digest: String) { if finished.count < 2 { finished.insert(digest) } }
+    func close() { closed = true }
+
+    func snapshot() -> NativeACKGateSnapshot {
+        NativeACKGateSnapshot(enteredDigests: entered.sorted(), completedDigests: completed,
+            finishedDigests: finished.sorted(), cancelledOperations: cancellations.sorted())
+    }
+
+    func waitForEntry(_ digest: String) async throws {
+        for _ in 0..<200 {
+            if entered.contains(digest) { return }
+            guard !closed else { throw NativeHostPluginError.cancelled }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw NativeHostPluginError.deadlineExceeded
+    }
+
+    func allowSecondAttemptToReachGateOrFinish(_ digest: String) async throws {
+        // A future repair may reject or serialize B before transport. This
+        // bounded coordination delay does not require the buggy second entry.
+        for _ in 0..<200 {
+            if entered.contains(digest) || finished.contains(digest) { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
+}
+
 final class NativeSessionHostPluginTests: XCTestCase {
     func testSourceOnlyCancellationCannotOverwriteAnotherAdaptersNewLegacyReceipt() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("source-cancel-ledger-\(UUID().uuidString)")
@@ -417,9 +532,17 @@ final class NativeSessionHostPluginTests: XCTestCase {
         XCTAssertNoThrow(try boundary.validated())
         boundary.maximumOutputTokens = 4_096
         XCTAssertNoThrow(try boundary.validated())
+        boundary.maximumOutputTokens = 4_097
+        XCTAssertNoThrow(try boundary.validated())
+        boundary.maximumOutputTokens = 8_192
+        XCTAssertNoThrow(try boundary.validated())
+        boundary.maximumOutputTokens = 65_536
+        XCTAssertNoThrow(try boundary.validated())
         boundary.maximumOutputTokens = 0
         XCTAssertThrowsError(try boundary.validated())
-        boundary.maximumOutputTokens = 4_097
+        boundary.maximumOutputTokens = 65_537
+        XCTAssertThrowsError(try boundary.validated())
+        boundary.maximumOutputTokens = Int.max
         XCTAssertThrowsError(try boundary.validated())
 
         let encoded = try JSONEncoder().encode(configuration)
@@ -1636,6 +1759,106 @@ final class NativeSessionHostPluginTests: XCTestCase {
         }
     }
 
+    #if canImport(AppKit)
+    func testInteractiveNativeAdapterRejectsForeignDeploymentReceiptBeforeGUIActions() async throws {
+        let root = temporaryRoot("gui-foreign-deployment-receipt")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let acknowledgementDirectory = root.appendingPathComponent("acknowledgements", isDirectory: true)
+        try FileManager.default.createDirectory(at: acknowledgementDirectory, withIntermediateDirectories: true)
+        let transport = LMStudioInteractiveSessionTransport(
+            guiDriver: LMStudioGUIChatDriver(), acknowledgementDirectory: acknowledgementDirectory
+        )
+        let storage = root.appendingPathComponent("native-host", isDirectory: true)
+        let adapter = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+        let operationID = UUID().uuidString.lowercased()
+        let projectID = UUID().uuidString.lowercased()
+        let owner = "lm-studio:" + String(repeating: "5", count: 64)
+        let foreign = "lm-studio:" + String(repeating: "6", count: 64)
+        let session = try await adapter.createSession(SessionCreationRequest(
+            operationID: operationID, projectID: projectID,
+            predecessorSessionID: owner, idempotencyKey: "gui-foreign-receipt"
+        ))
+        var handoff = try makeHandoff(projectID: projectID, operationID: operationID, mission: "Validate deployment ownership")
+        handoff.handoffID = operationID
+        handoff.predecessorSession["session_id"] = owner
+        handoff.project["repository_root"] = root.path
+        handoff = try handoff.validated()
+        let acknowledgementURL = acknowledgementDirectory.appendingPathComponent("\(handoff.handoffID.lowercased()).json")
+        try OwnerOnlyAtomicFile.write(try JSONSupport.data(from: [
+            "schema_version": 1, "handoff_id": handoff.handoffID,
+            "rollover_nonce": LMStudioInteractiveSessionTransport.rolloverNonce(operationID: operationID),
+            "tool": "get_forge_status", "resume": true, "client_id": foreign,
+            "acknowledged_at": "2026-10-05T23:00:00Z",
+        ]), to: acknowledgementURL)
+        // Recover the retained ledger owner. This matching receipt is consumed
+        // before the production driver can access LM Studio's AX surface.
+        let restarted = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+        do {
+            try await restarted.bootstrap(session, handoff: handoff)
+            XCTFail("A foreign deployment receipt must not acknowledge the native successor")
+        } catch let error as NativeHostPluginError {
+            guard case .malformedResponse(let message) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(message, "LM Studio GUI successor acknowledgement client identity differs")
+        }
+        do {
+            _ = try await restarted.awaitAcknowledgement(session: session, handoffID: handoff.handoffID, timeout: .milliseconds(1))
+            XCTFail("The foreign receipt must leave the successor unacknowledged")
+        } catch NativeHostPluginError.deadlineExceeded {}
+    }
+
+    func testInteractiveNativeAdapterAcceptsMatchingScopedAndLegacyReceiptsAfterRestart() async throws {
+        for owner in ["lm-studio:" + String(repeating: "7", count: 64), "lmstudio-predecessor"] {
+            let root = temporaryRoot("gui-matching-deployment-receipt")
+            defer { try? FileManager.default.removeItem(at: root) }
+            let acknowledgementDirectory = root.appendingPathComponent("acknowledgements", isDirectory: true)
+            try FileManager.default.createDirectory(at: acknowledgementDirectory, withIntermediateDirectories: true)
+            let transport = LMStudioInteractiveSessionTransport(
+                guiDriver: LMStudioGUIChatDriver(), acknowledgementDirectory: acknowledgementDirectory
+            )
+            let storage = root.appendingPathComponent("native-host", isDirectory: true)
+            let adapter = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+            let operationID = UUID().uuidString.lowercased()
+            let projectID = UUID().uuidString.lowercased()
+            let session = try await adapter.createSession(SessionCreationRequest(
+                operationID: operationID, projectID: projectID,
+                predecessorSessionID: owner, idempotencyKey: "gui-matching-receipt"
+            ))
+            var handoff = try makeHandoff(projectID: projectID, operationID: operationID, mission: "Validate matching deployment")
+            handoff.handoffID = operationID
+            handoff.predecessorSession["session_id"] = owner
+            handoff.project["repository_root"] = root.path
+            handoff = try handoff.validated()
+            let acknowledgementURL = acknowledgementDirectory.appendingPathComponent("\(handoff.handoffID.lowercased()).json")
+            let receipt = try JSONSupport.data(from: [
+                "schema_version": 1, "handoff_id": handoff.handoffID,
+                "rollover_nonce": LMStudioInteractiveSessionTransport.rolloverNonce(operationID: operationID),
+                "tool": "get_forge_status", "resume": true, "client_id": owner,
+                "acknowledged_at": "2026-10-05T23:00:00Z",
+            ])
+            try OwnerOnlyAtomicFile.write(receipt, to: acknowledgementURL)
+            let restarted = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+            try await restarted.bootstrap(session, handoff: handoff)
+            let recovered = try ForgeNativeSessionHostAdapter(storageDirectory: storage, transport: transport)
+            let acknowledgement = try await recovered.awaitAcknowledgement(
+                session: session, handoffID: handoff.handoffID, timeout: .milliseconds(1)
+            )
+            XCTAssertEqual(acknowledgement.handoffID, handoff.handoffID)
+            XCTAssertEqual(acknowledgement.successorSessionID, session.id)
+            XCTAssertEqual(acknowledgement.adapterID, ForgeNativeSessionHostPlugin.identifier)
+            XCTAssertEqual(try OwnerOnlyAtomicFile.read(from: acknowledgementURL, maximumBytes: 8_192), receipt)
+            let ledger = try XCTUnwrap(JSONSerialization.jsonObject(
+                with: Data(contentsOf: storage.appendingPathComponent("native-session-ledger.json"))
+            ) as? [String: Any])
+            XCTAssertEqual(ledger["schemaVersion"] as? Int, 1)
+            let record = try XCTUnwrap((ledger["records"] as? [[String: Any]])?.first)
+            XCTAssertEqual(record["predecessorSessionID"] as? String, owner)
+            XCTAssertEqual(record["status"] as? String, "acknowledged")
+        }
+    }
+    #endif
+
     func testFullAutonomousRolloverPersistsOnlyCompactIdentifiers() async throws {
         let fixture = try makeProjectFixture("autonomous")
         defer {
@@ -1677,6 +1900,221 @@ final class NativeSessionHostPluginTests: XCTestCase {
             adapter: restarted, idempotencyKey: "native-autonomous-rollover"
         )
         XCTAssertEqual(replay, completed)
+    }
+
+    func testConcurrentNativeBootstrapCannotAcknowledgeUncompletedHandoffDigest() async throws {
+        let root = temporaryRoot("v1-concurrent-ack-digest")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let transport = NativeACKRevisionGateTransport()
+        let adapter = try ForgeNativeSessionHostAdapter(storageDirectory: root, transport: transport)
+        let request = SessionCreationRequest(
+            operationID: UUID().uuidString.lowercased(), projectID: UUID().uuidString.lowercased(),
+            predecessorSessionID: "ack-gate-predecessor", idempotencyKey: "v1-concurrent-ack-digest"
+        )
+        let session = try await adapter.createSession(request)
+        let a = try makeHandoff(projectID: request.projectID, operationID: request.operationID,
+            mission: "Load revision A before returning its acknowledgement")
+        var secondHandoff = a
+        secondHandoff.mission = "Revision B must not borrow A's completed acknowledgement"
+        let b = try secondHandoff.validated()
+        XCTAssertEqual(a.handoffID, b.handoffID)
+        XCTAssertNotEqual(a.contentSHA256, b.contentSHA256)
+
+        var tasks: [Task<NativeACKGateOutcome, Never>] = []
+        let first = Task { () -> NativeACKGateOutcome in
+            let outcome: NativeACKGateOutcome
+            do { try await adapter.bootstrap(session, handoff: a); outcome = .acknowledged }
+            catch { outcome = .failure(error) }
+            await transport.taskFinished(a.contentSHA256)
+            return outcome
+        }
+        tasks.append(first)
+        do {
+            try await transport.waitForEntry(a.contentSHA256)
+            let beforeSecond = try nativeACKGateRecord(root: root, sessionID: session.id)
+            XCTAssertEqual(beforeSecond["status"] as? String, "bootstrapping")
+            XCTAssertEqual(beforeSecond["handoffSHA256"] as? String, a.contentSHA256)
+            let second = Task { () -> NativeACKGateOutcome in
+                let outcome: NativeACKGateOutcome
+                do { try await adapter.bootstrap(session, handoff: b); outcome = .acknowledged }
+                catch { outcome = .failure(error) }
+                await transport.taskFinished(b.contentSHA256)
+                return outcome
+            }
+            tasks.append(second)
+            try await transport.allowSecondAttemptToReachGateOrFinish(b.contentSHA256)
+            let beforeResponse = await transport.snapshot()
+            XCTAssertTrue(beforeResponse.enteredDigests.contains(a.contentSHA256))
+            XCTAssertTrue(beforeResponse.completedDigests.isEmpty,
+                "No ACK exists before release(A), including any rejected/serialized B attempt")
+            await transport.release(a.contentSHA256)
+            let firstOutcome = await first.value
+            XCTAssertEqual(firstOutcome, .acknowledged)
+            let completed = await transport.snapshot()
+            XCTAssertEqual(completed.completedDigests, [a.contentSHA256],
+                "Only revision A received a completed transport acknowledgement")
+
+            let retained = try nativeACKGateRecord(root: root, sessionID: session.id)
+            XCTAssertEqual(retained["status"] as? String, "acknowledged")
+            XCTAssertEqual(retained["handoffID"] as? String, a.handoffID)
+            XCTAssertEqual(retained["handoffSHA256"] as? String, a.contentSHA256,
+                "An ACK for A must not persist B's digest")
+            XCTAssertNotEqual(retained["handoffSHA256"] as? String, b.contentSHA256)
+            let acknowledgement = try await adapter.awaitAcknowledgement(
+                session: session, handoffID: a.handoffID, timeout: .seconds(1))
+            XCTAssertEqual(acknowledgement.handoffID, a.handoffID)
+            XCTAssertEqual(acknowledgement.successorSessionID, session.id)
+
+            // Same-content completed receipt replay must remain usable both in
+            // the live adapter and after restart, without another transport ACK.
+            do { try await adapter.bootstrap(session, handoff: a) }
+            catch { XCTFail("Completed A receipt replay rejected: \(error)") }
+            let restarted = try ForgeNativeSessionHostAdapter(storageDirectory: root, transport: transport)
+            do { try await restarted.bootstrap(session, handoff: a) }
+            catch { XCTFail("Restarted completed A receipt replay rejected: \(error)") }
+            let restartedAck = try await restarted.awaitAcknowledgement(
+                session: session, handoffID: a.handoffID, timeout: .seconds(1))
+            XCTAssertEqual(restartedAck, acknowledgement)
+
+            // B's in-flight task is still gated and no B response has completed.
+            // A replay of B must never return a successful receipt using A's ACK.
+            var replayAcceptedB = false
+            do { try await adapter.bootstrap(session, handoff: b); replayAcceptedB = true }
+            catch {}
+            XCTAssertFalse(replayAcceptedB, "Uncompleted B borrowed the successful A receipt")
+            let afterReplay = await transport.snapshot()
+            XCTAssertEqual(afterReplay.completedDigests, [a.contentSHA256])
+        } catch {
+            await finishNativeACKGate(transport, tasks: tasks)
+            throw error
+        }
+        await finishNativeACKGate(transport, tasks: tasks)
+    }
+
+    func testExplicitNativeBootstrapCancellationCannotBeResurrectedByLateACK() async throws {
+        let root = temporaryRoot("v1-explicit-cancel-late-ack")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let transport = NativeACKRevisionGateTransport()
+        let adapter = try ForgeNativeSessionHostAdapter(storageDirectory: root, transport: transport)
+        let request = SessionCreationRequest(
+            operationID: UUID().uuidString.lowercased(), projectID: UUID().uuidString.lowercased(),
+            predecessorSessionID: "ack-gate-predecessor", idempotencyKey: "v1-explicit-cancel-late-ack"
+        )
+        let session = try await adapter.createSession(request)
+        let handoff = try makeHandoff(projectID: request.projectID, operationID: request.operationID,
+            mission: "Cancel before any native bootstrap response completes")
+        let owner = Task { () -> NativeACKGateOutcome in
+            do { try await adapter.bootstrap(session, handoff: handoff); return .acknowledged }
+            catch { return .failure(error) }
+        }
+        do {
+            try await transport.waitForEntry(handoff.contentSHA256)
+            let beforeCancel = await transport.snapshot()
+            XCTAssertTrue(beforeCancel.completedDigests.isEmpty,
+                "This fixture has no completed response at cancellation")
+            await adapter.cancel(operationID: request.operationID)
+            let cancelled = await transport.snapshot()
+            XCTAssertEqual(cancelled.cancelledOperations, [request.operationID])
+            XCTAssertTrue(cancelled.completedDigests.isEmpty)
+            let cancelledRow = try nativeACKGateRecord(root: root, sessionID: session.id)
+            XCTAssertEqual(cancelledRow["status"] as? String, "cancelled")
+
+            // Explicit cancellation is already durable; now return the exact
+            // otherwise-valid ACK to exercise the adapter's post-await fence.
+            await transport.release(handoff.contentSHA256)
+            let outcome = await owner.value
+            XCTAssertEqual(outcome, .cancelled)
+            let late = await transport.snapshot()
+            XCTAssertEqual(late.completedDigests, [handoff.contentSHA256],
+                "The cancelled adapter was offered an actual late identity-matching ACK")
+            let retained = try nativeACKGateRecord(root: root, sessionID: session.id)
+            XCTAssertEqual(retained["status"] as? String, "cancelled")
+            do {
+                _ = try await adapter.awaitAcknowledgement(
+                    session: session, handoffID: handoff.handoffID, timeout: .seconds(1))
+                XCTFail("Explicitly cancelled operation returned a handoff acknowledgement")
+            } catch NativeHostPluginError.deadlineExceeded {}
+            let restarted = try ForgeNativeSessionHostAdapter(storageDirectory: root, transport: transport)
+            let restoredSession = try await restarted.session(forIdempotencyKey: request.idempotencyKey)
+            XCTAssertNil(restoredSession)
+            do {
+                _ = try await restarted.awaitAcknowledgement(
+                    session: session, handoffID: handoff.handoffID, timeout: .seconds(1))
+                XCTFail("Restart resurrected the explicitly cancelled receipt")
+            } catch NativeHostPluginError.deadlineExceeded {}
+        } catch {
+            await finishNativeACKGate(transport, tasks: [owner])
+            throw error
+        }
+        await finishNativeACKGate(transport, tasks: [owner])
+    }
+
+    func testInterruptedNativeBootstrapCanRetryItsDurableIntentAfterRestart() async throws {
+        let root = temporaryRoot("v1-restart-pending-bootstrap")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let transport = NativeACKRevisionGateTransport()
+        let adapter = try ForgeNativeSessionHostAdapter(storageDirectory: root, transport: transport)
+        let request = SessionCreationRequest(operationID: UUID().uuidString.lowercased(),
+            projectID: UUID().uuidString.lowercased(), predecessorSessionID: "ack-gate-predecessor",
+            idempotencyKey: "v1-restart-pending-bootstrap")
+        let session = try await adapter.createSession(request)
+        let handoff = try makeHandoff(projectID: request.projectID, operationID: request.operationID,
+            mission: "Retry the durable unacknowledged intent after interruption")
+        let owner = Task { () -> NativeACKGateOutcome in
+            do { try await adapter.bootstrap(session, handoff: handoff); return .acknowledged }
+            catch { return .failure(error) }
+        }
+        do {
+            try await transport.waitForEntry(handoff.contentSHA256)
+            owner.cancel()
+            let interrupted = await owner.value
+            XCTAssertNotEqual(interrupted, .acknowledged)
+            let gate = await transport.snapshot()
+            XCTAssertTrue(gate.completedDigests.isEmpty)
+            let pending = try nativeACKGateRecord(root: root, sessionID: session.id)
+            XCTAssertEqual(pending["status"] as? String, "bootstrapping")
+            XCTAssertEqual(pending["handoffSHA256"] as? String, handoff.contentSHA256)
+            let restarted = try ForgeNativeSessionHostAdapter(storageDirectory: root,
+                transport: LocalLogicalSessionTransport())
+            let restored = try await restarted.session(forIdempotencyKey: request.idempotencyKey)
+            XCTAssertEqual(restored, session)
+            try await restarted.bootstrap(session, handoff: handoff)
+            let acknowledgement = try await restarted.awaitAcknowledgement(
+                session: session, handoffID: handoff.handoffID, timeout: .seconds(1))
+            XCTAssertEqual(acknowledgement.handoffID, handoff.handoffID)
+            XCTAssertEqual(acknowledgement.successorSessionID, session.id)
+            let committed = try nativeACKGateRecord(root: root, sessionID: session.id)
+            XCTAssertEqual(committed["status"] as? String, "acknowledged")
+            XCTAssertEqual(committed["handoffSHA256"] as? String, handoff.contentSHA256)
+        } catch {
+            await finishNativeACKGate(transport, tasks: [owner])
+            throw error
+        }
+        await finishNativeACKGate(transport, tasks: [owner])
+    }
+
+    private func finishNativeACKGate(
+        _ transport: NativeACKRevisionGateTransport,
+        tasks: [Task<NativeACKGateOutcome, Never>]
+    ) async {
+        await transport.close()
+        for task in tasks { task.cancel() }
+        for task in tasks { _ = await task.value }
+    }
+
+    private func nativeACKGateRecord(root: URL, sessionID: String) throws -> [String: Any] {
+        let ledgerURL = root.appendingPathComponent("native-session-ledger.json")
+        let size = try XCTUnwrap(ledgerURL.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+        XCTAssertLessThanOrEqual(size, ForgeNativeSessionHostAdapter.maximumLedgerBytes)
+        guard size <= ForgeNativeSessionHostAdapter.maximumLedgerBytes else {
+            throw NativeHostPluginError.storageLimit
+        }
+        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL))
+        let ledger = try XCTUnwrap(object as? [String: Any])
+        XCTAssertEqual(ledger["schemaVersion"] as? Int, 1)
+        let rows = try XCTUnwrap(ledger["records"] as? [[String: Any]])
+        XCTAssertEqual(rows.count, 1)
+        return try XCTUnwrap(rows.first { $0["sessionID"] as? String == sessionID })
     }
 
     func testRateLimitRetryIdempotencyAndConcurrentProjects() async throws {

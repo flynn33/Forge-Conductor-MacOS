@@ -82,7 +82,7 @@ public struct AgentToolPack: ToolPackHandling {
                 ?? ToolArgHelpers.string(arguments, "id")
                 ?? ToolArgHelpers.string(arguments, "name")
                 ?? "explore"
-            let cwd = ToolArgHelpers.string(arguments, "cwd")
+            let cwd = ToolArgHelpers.string(arguments, "cwd") ?? context?.authorizationScope.canonicalRoots.first?.path
             try cancellation?.checkCancellation()
             let payload = try app.sessions.start(
                 agentID: id,
@@ -128,6 +128,14 @@ public struct AgentToolPack: ToolPackHandling {
         app: ForgeApp,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
+        try cancellation?.checkCancellation()
+        var configurationRefreshError: String?
+        do {
+            try app.config.refreshIfChanged()
+        } catch {
+            configurationRefreshError = String(error.localizedDescription.unicodeScalars.prefix(256))
+        }
+        try cancellation?.checkCancellation()
         let presence = try app.store.presenceRecords(cancellation: cancellation)
         let openSessions = try app.store.sessionList(
             cancellation: cancellation
@@ -136,7 +144,7 @@ public struct AgentToolPack: ToolPackHandling {
             includeSystem: false,
             cancellation: cancellation
         )) ?? 0
-        let continuity = (try? app.continuity.statusSummary(cancellation: cancellation)) ?? [:]
+        let automation = try app.continuityAutomation.snapshot(for: clientID, cancellation: cancellation)
         let projects = try app.projectContexts.operatorProjects(
             cancellation: cancellation
         )
@@ -152,11 +160,8 @@ public struct AgentToolPack: ToolPackHandling {
             "presence_count": presence.count,
             "open_sessions": openSessions.count,
             "open_session_ids": openSessions.map(\.id.rawValue),
-            "continuity": continuity,
-            "auto_continuity": try app.continuityAutomation.snapshot(
-                for: clientID,
-                cancellation: cancellation
-            ),
+            "continuity": [:] as [String: Any],
+            "auto_continuity": automation,
             "projects": projects.map { project in
                 [
                     "project_id": project.projectID.description,
@@ -181,6 +186,13 @@ public struct AgentToolPack: ToolPackHandling {
             ] as [String: Any]],
             "pid": ProcessInfo.processInfo.processIdentifier,
         ]
+        if let configurationRefreshError {
+            payload["configuration_refresh"] = [
+                "state": "failed",
+                "using_cached_settings": true,
+                "error": configurationRefreshError,
+            ] as [String: Any]
+        }
         var policySources: [DevelopmentPolicySource] = []
         var policyCatalogError: String?
         if let catalog = app.developmentPolicySources {
@@ -345,11 +357,20 @@ public struct AgentToolPack: ToolPackHandling {
         if !locations.isEmpty {
             payload["locations"] = locations
         }
+        let readScope = try app.continuityAutomation.packetReadScope(context: effectiveContext, cancellation: cancellation)
+        var continuity = (try? app.continuity.statusSummary(readScope: readScope, cancellation: cancellation)) ?? [:]
+        if var policy = continuity["auto"] as? [String: Any] {
+            policy["checkpoint_every_tools"] = automation["checkpoint_every_tools"]
+            policy["handoff_every_tools"] = automation["handoff_every_tools"]
+            continuity["auto"] = policy
+        }
+        payload["continuity"] = continuity
         if ToolArgHelpers.bool(arguments, "resume") == true {
             let requestedHandoffID = ToolArgHelpers.string(arguments, "handoff_id")
             let resumed = try app.continuity.get(
                 id: requestedHandoffID,
                 preferResumeReady: true,
+                readScope: readScope,
                 cancellation: cancellation
             )
             payload["resume"] = resumed
@@ -357,18 +378,36 @@ public struct AgentToolPack: ToolPackHandling {
                 guard resumed["found"] as? Bool == true,
                       resumed["resume_ready"] as? Bool == true,
                       let actualHandoffID = resumed["handoff_id"] as? String,
+                      let object = resumed["packet"] as? [String: Any],
+                      let packet = HandoffPacket.fromDictionary(object),
                       requestedHandoffID?.lowercased() == actualHandoffID.lowercased() else {
                     throw ProjectMemoryError.invalidRequest(
                         "rollover acknowledgement requires the exact resume-ready handoff"
                     )
                 }
-                payload["interactive_resume_acknowledgement"] = try app.continuity
+                payload["interactive_resume_acknowledgement"] = try app.continuityAutomation
                     .recordInteractiveResumeAcknowledgement(
-                        handoffID: actualHandoffID,
+                        packet: packet,
                         rolloverNonce: rolloverNonce,
                         clientID: clientID,
                         cancellation: cancellation
                     )
+            }
+            if resumed["found"] as? Bool == true,
+               let object = resumed["packet"] as? [String: Any],
+               let packet = HandoffPacket.fromDictionary(object) {
+                let nonce = ToolArgHelpers.string(arguments, "rollover_nonce")
+                let matchesNonce = nonce == nil || nonce?.lowercased()
+                    == ContextContinuityService.interactiveRolloverNonce(handoffID: packet.id).lowercased()
+                // Any nonce receipt must be durable before releasing the predecessor.
+                // The legacy receipt API remains available; only the GUI's exact
+                // expected nonce can release a scoped continuity budget.
+                payload["context_budget_cleared"] = matchesNonce
+                    ? try app.continuityAutomation.clearBlockReportingResult(
+                        clientID: clientID, packet: packet, cancellation: cancellation)
+                    : false
+                payload["auto_continuity"] = try app.continuityAutomation.snapshot(
+                    for: clientID, cancellation: cancellation)
             }
         }
         let result = ToolResult.success(payload)

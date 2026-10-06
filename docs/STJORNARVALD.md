@@ -1,5 +1,170 @@
 # Rune Forge Development Policy and Stjornarvald
 
+**Owner publication/installation checkpoint — 0.18.0 (28).** The owner requests
+publication of the current source/docs and wiki synchronization, then will handle
+installation. Further product repair waits for the owner's installation report.
+The actual managed policy mission remains **unverified**: its latest attempt
+stopped before model activation on an invalid harness mission. No installed or
+all-feature acceptance is claimed. [Checkpoint and limits](LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
+
+Managed policy feedback and source replay now pass **93 affected source cases**
+(two disjoint selections: 65 + 28, zero failures/skips) on `5af17b77…`, including
+the original notice-bearing replay failure. Prior baseline, compiler and
+61-pass/one-failure receipts remain NONPASS. Fresh Debug13 reached native build
+success but retained a cleanup NONPASS; a separate incremental confirmation
+passed unforced. Both targeted native XCTest regressions, post-test five-role Debug
+identity and settings now pass. The actual managed notice/correction mission
+remains unverified. [Evidence and limits](LMSTUDIO-RUNTIME-REPAIR.md#managed-policy-feedback-and-source-replay--source-checkpoint).
+
+The separate retained `e3762543…`/v11b saved-count rollover mission passed
+through same-handoff V2 acknowledgement/seal, one successor marker and completed
+feedback, native validated completion, and ordinary count/output restoration.
+This proves that owned continuity mission; it does not establish model notice
+comprehension, new detector coverage or full-policy acceptance. Existing policy
+and earlier negative scopes remain unchanged. [Mission evidence and limits](LMSTUDIO-RUNTIME-REPAIR.md#forge-owned-saved-count-rollover-mission--pass).
+
+The newer managed-session policy correction at `e3762543…` passes both source
+controls within the **same six passing controls** (0 failures/skips): native
+target capture checks the current accepted run/session binding before/after
+traversal and isolates retained digests by run/session. Invalid, foreign and
+stale ownership stays rejected; ordinary MCP capture and **one automatic
+detector/14 guidance-only rules** are retained. Earlier negative receipts and
+fixture setup corrections remain recorded; old modes and detector/cache
+assertions are preserved. The four affected
+source classes report **115 passed/four explicitly skipped/zero failures**,
+including all 25 Stjornarvald integration controls; skipped native package and
+signed-candidate/older-peer controls are not passes. Fresh Release, incremental
+Debug confirmation, settings and platform signatures are positive in their own
+scopes; original Debug cleanup remains NONPASS. The same6 compiled native Core controls passed, including both managed-policy
+producer/detector/cache ownership cases. This is native test proof; model/session
+notice understanding and fresh managed-policy model runtime remain unverified.
+Two separate signed-candidate controls passed; the four historical source-area
+skips remain, and the other two Autonomy opt-in controls were not run.
+The private v10 replay below retains its `80f542fa…` scope. [Evidence and pending
+validation](LMSTUDIO-RUNTIME-REPAIR.md#applied-policy-diagnostics-and-debug-signing-corrections--source-and-native-scopes).
+
+The current **private native Stjornarvald v10 replay passed** in 10.182 seconds
+on the same `80f542fa…` inputs. It detected the declared production Python fixture,
+presented its notice over MCP and recorded correction after membership removal;
+resource-only JavaScript stayed advisory, alias roles raised the native finding,
+and an unavailable graph preserved history. Manager and both MCP processes
+returned zero with full captured EOF and unforced cleanup; 439 inputs, five
+candidate binaries, ten protected identities and registration remained unchanged.
+Automatic coverage is still **one of 15 indexed rules**, with 14 guidance-only
+rules. This private detector/correction/transport fixture establishes no model
+comprehension, policy GUI, installed or full-policy compliance; historical job
+page EOF receives no native producer-EOF credit. Exact evidence is in the repair
+record.
+
+## Current private Stjornarvald native v10 replay — scoped pass
+
+The current private fixture at source `80f542fa…` completed in **10.182 seconds**.
+Declared production Python membership opened a finding at confidence **0.99**;
+one notice was marked `presented` to the exact scoped MCP client, and removing
+that membership recorded correction at **0.98**. A fresh resource-only JavaScript
+declaration retained an advisory review finding at **0.45**. Adding source/copy
+aliases for the same file produced the native finding at **0.99**; an unavailable
+graph retained that history and open state, and actual membership removal
+recorded correction. The fixture script was declared evidence and was not
+executed as production application behavior.
+
+Manager and both owned MCP stdio processes returned **0**, with complete bounded
+captured EOF and unforced cleanup. Root's independent reconciliation retains the
+same **439 source inputs**, five candidate binary hashes, original ten protected
+identities and registration, and confirms all three owned PIDs absent. Evidence
+is at `assessment/native-candidate-v10/`: summary
+`57092a8d8dc14b7544e0ab4a3fcfd428cf205e5b6cc8b5b54ce535d74c71718a`,
+root reconciliation
+`6a9f1ba2c825088beff58ba33536469149223c2cf492f09f7d93f9778b313d3c`.
+
+This is **current native private detector/correction/MCP transport proof**.
+`RFD-NATIVE-001` remains the only automatic detector among **15 indexed rules**;
+14 are guidance only. Presented transport does not prove model comprehension or
+correction by a model. Declared resource roles do not decide browser-resource
+policy applicability or inspect binary runtime contents. No Rune Forge GUI,
+ordinary chat, installed product, full-policy compliance or full-feature
+acceptance is qualified. The older fixture job's terminal/page reads do not
+establish native producer EOF. Earlier source/native receipts, explicit skips
+and all NONPASS results remain retained. This replay changes no production
+source, signing, shell capability, detector scope or canonical graph.
+
+The current `80f542fa…` checkpoint passed full source v14 (2,310 executed:
+2,297 passes, 13 explicit skips, zero failures), both Swift products, signed
+native v10 Debug/Release builds and all 51 selected Debug cases (49 Core plus
+two app-hosted controls, no skips/failures). Both configurations passed five-role
+platform identity and all four effective-settings queries; builds/tests had
+complete EOF, the same 439 inputs and unforced cleanup. Skips receive no pass
+credit. This changes no detector, completion, producer EOF or signing contract;
+actual model/GUI/Simulator/crash/installed acceptance remains separate and open.
+Earlier scopes and negative receipts remain retained; exact current identities
+and receipts are in the repair record.
+
+The subsequent output-setting source checkpoint passed all 14 focused controls,
+then 166 of 168 selected ordinary class cases with two explicit opt-in skips and
+no failures. Both had native zero, full EOF, stable 439 inputs and unforced cleanup.
+This adds deterministic compatibility/settings/HTTP/view-model coverage at
+`80f542fa…`; live LM Studio and real-Keychain opt-ins were skipped. Refreshed
+full-source/native, onscreen GUI, larger-output host and installed acceptance
+remain open. Earlier checkpoints below retain their exact source/artifact scope;
+no detector, completion or producer-evidence requirement is changed. Exact
+methods and receipts are in the repair record.
+
+The later Provider output-setting/reserve slice has source-only coverage: two
+reproduced REST budget failures passed after repair, followed by all 33 REST cases
+and one output-boundary case passing. Its saved 1–65,536 output allowance defaults
+to 4,096 and is a requested transport bound, not a service ceiling. This changes
+shared provider/budget inputs after the `c1805d1a…` policy checkpoint below; it adds
+no detector coverage or fresh policy/model/installed qualification. Settings API
+and UI parity, refreshed native/source coverage and larger-output host use remain
+pending; the accepted empty continuation's cause remains unknown. Exact receipts
+are in the repair record.
+
+The latest full source v13 checkpoint executed **2,297** cases: **2,284 passed**,
+**13 explicitly skipped**, none failed; native zero, full **688,301-byte** EOF,
+all 439 inputs unchanged and unforced cleanup. Both Swift products compiled.
+This includes the two catalog lifecycle controls and establishes source
+regression coverage, rather than refreshed policy/model runtime qualification.
+Canonical native v8 Release compilation passed; Debug xcodebuild returned zero
+but its capture remains **NONPASS** after SIGINT to tracked PID 52101. The
+process's first ancestry/path is unknown; no Forge leak or hang is established.
+The subsequent canonical native v9 Debug build and 37-case selection passed
+with complete EOF, all 439 inputs stable and unforced cleanup. Both catalog lifecycle
+controls passed natively; all five Debug roles and effective settings passed.
+This adds native catalog lifecycle evidence without expanding automatic policy
+detection beyond the existing one of 15 indexed rules. The actual-model metadata
+diagnostic observed a completed empty successor response and remains unqualified
+for its full mission. Current policy/model/installed feature acceptance remains
+separate. No cause for the old tracked process or process exemption is inferred.
+Exact receipts are in the repair record.
+
+
+Current signed candidate v6 runtime checks passed intentional violations,
+ordinary MCP notice delivery, same-identity correction and project/client
+isolation. Unavailable graph input preserved the existing open violation and
+historical events. The executable detector covers RFD-NATIVE-001; the other 14
+indexed Raven rules remain guidance. A zero count does not establish full policy
+compliance. Exact receipts and bounds are in [the repair record](LMSTUDIO-RUNTIME-REPAIR.md).
+
+The later source lifecycle control retained the application and catalog reader
+through completed shutdown. Its valid baseline left the same three DB/WAL/SHM
+descriptors open and allowed a read, failing two assertions. The catalog now has
+an explicit serialized close, and the application closes that concrete owner
+before returning completed shutdown. A failed SQLite close retains the handle
+and returns incomplete shutdown; that fault branch was not injected. Successful
+close is idempotent; throwing reads/mutations report `unavailable("closed")`.
+The existing nonthrowing scheduling wrapper cannot add durable work after close.
+Both focused controls and all 11 ordinary catalog cases passed without
+failures/skips, with descriptor-release and durable reopen/replay assertions,
+full output, stable 439 inputs and unforced cleanup. The initial path-observer,
+compiler and valid physical-baseline negatives remain retained. This is source
+lifecycle evidence at `c1805d1a…`, with the existing policy reader contract and
+detector scope preserved. The later full v13 source suite passed; native v8
+Release compilation passed and Debug remains NONPASS at forced cleanup.
+Both catalog controls subsequently passed in the selected native 37-case run at the
+same source identity; strict Debug identity/settings also passed. General
+current policy/model/installed qualification remains pending; exact receipts
+are in the repair record.
+
 This document is the current product record for the native **Development
 Policy** feature, its **Rune Forge** operator surface, and the manager-owned
 **Stjornarvald** policy engine. Typed contracts, durable policy history, the
@@ -513,9 +678,9 @@ Forge and Guided Mode tests passed 9/9. Native UI tests passed 5/5, covering all
 destinations, all guide routes, immediate opaque-source acceptance during
 Manager outage, the native source picker, and four-format native export.
 
-The current source authority is version `0.17.0`, build `27`. RF-SJ-10 created
-no release archive or shipment artifact. The later October 3 bootstrap repair
-completed a universal Developer ID archive/export and isolated native candidate
+The RF-SJ-10 historical source authority was version `0.17.0`, build `27`.
+RF-SJ-10 created no release archive or shipment artifact. The later October 3
+bootstrap repair completed a universal Developer ID archive/export and isolated native candidate
 checks, recorded in [qualification status](QUALIFICATION-STATUS.md). Installation,
 notarization, distribution, and a full LM Studio workflow remain unqualified;
 the owner retains those shipping steps. See the
@@ -539,11 +704,162 @@ generation. These presentation
 changes do not alter the RF-SJ non-interference contract, policy evaluation,
 notice delivery, or canonical development results.
 
-Rune Forge Development Policy and Stjornarvald are implemented. Every selected
-policy source is accepted; Raven Forge Development is continuously applied;
-detected violations are reported to the coding agent and retained in the
-exportable policy log; and fault-injection evidence shows Stjornarvald does not
-interfere with development.
+Rune Forge Development Policy and Stjornarvald accept selected policy sources
+and retain source-linked rules. Automatic detection currently covers **1 of 15
+indexed Raven rules**: `RFD-NATIVE-001` evaluates declared Xcode production
+source/resource/copy membership from observed work. Binary runtime contents
+are not inspected. The other fourteen rules remain policy guidance without
+executable detectors; zero violations does not establish full policy compliance.
+Detected violations are reported to the coding agent and retained in the
+exportable policy log. The current `0.18.0 (28)`
+[runtime repair record](LMSTUDIO-RUNTIME-REPAIR.md) separates the signed native
+detector/notice proof from model comprehension and full policy coverage.
+The later SSE source checkpoint passed 2,219 of 2,232 full-suite cases with
+13 explicit skips and no failures, plus five exact signed-native SSE controls.
+These are transport/source checks; they add no Raven detector coverage or
+model-comprehension qualification.
+Fault-injection evidence retains the development non-interference boundary.
+
+The October 6 read-only installed `0.17.0` UI check displayed **Observing**,
+one active policy source, zero current violations and **Continuing**. Its Rune
+Forge view explicitly limits automatic detection to native-stack evidence.
+The Dashboard displayed 191 observations and a paused background task. This is
+current installed UI evidence, not acceptance of the repaired candidate or proof
+of compliance. Navigation returned to the Dashboard; no project, policy source,
+setting, registration or chat was changed. The semantic receipt is
+`candidate-probes/documentation-sse-closeout-proposal-v1/root-installed-UI-readback-v1.json`.
+
+Optional `declaredPathRoles` metadata preserves legacy observation decoding and
+records source/resource/copy/synchronized graph roles; it does not attest the
+resource consumer or binary runtime use. Complete resource-only JS/MJS membership
+produces a 0.45-confidence assessment with review assumptions and alternatives,
+still recorded as a violation with the same condition identity, immutable prior
+events and advisory notices. It grants no exemption or correction. Python,
+source/copy/synchronized script membership and legacy evidence without roles
+retain conservative 0.99 positive findings. Malformed roles are rejected at
+observation intake; unsupported or oversized graph activity cannot clear a
+known violation. The native v5 declared-membership/notice controls passed as
+recorded below; model behavior beyond one observed historical notice and full
+policy applicability remain unqualified.
+
+The completed full Swift v3 source checkpoint selected 2,181 Core cases:
+2,168 passed, 13 explicitly skipped, zero failed; filesystem qualification
+passed 30 cases without skips. Later playbook guidance passed a fresh 14-case
+catalog rebuild and strict deep XCTest verification. The status/storage repairs
+passed six focused and 300 affected source cases without skips/failures. These
+results add no native policy or model qualification. Full Swift v4 subsequently
+passed 2,174 of 2,187 Core cases, with 13 explicit skips and zero failures, plus
+30 filesystem qualification cases without skips. Retained v2 Debug/Release
+builds and five-role strict identity checks passed against 439 frozen inputs;
+the exact Rune coverage/unknown-state app-hosted test passed one actual case
+without skips/failures. These scoped checks do not establish full policy or
+model acceptance.
+At the v7 test freeze after the full-v4 checkpoint, only the live test fixture
+changed; production and the other 438 frozen inputs stayed unchanged. Its gate
+correction passed the ownership control. Live v3–v5 each failed one case without skips. The v5
+numeric receipt proved that the old fixture cutoff requested rollover before
+a provider turn; corrected opt-in cutoffs, bounded diagnostics and added
+initial-normal checks preserve original assertions. Live v6 then failed one case
+without skips in 670.805 seconds after normal initial admission and real
+provider-exact rollover. Successor bootstrap's one attempt was blocked with
+`lmstudio_response_truncated`; no ACK/crash/recovery proof was obtained. The
+incomplete reason and the caught coordinator cancellation's origin remain
+unknown; no policy/lifecycle root cause is established. All 14 original process
+identities/MCP registration were preserved, with no owned survivors. The v7
+fixture compiled; its normal class selected five cases, with three passes, two
+disabled live skips and zero failures in 0.323 seconds, terminal zero. Separately,
+live v7 passed one actual owned Manager/API case without skips/failures in
+487.293 seconds: exact V2 ACK, injected in-process post-commit error/recovery,
+predecessor sealing, automatic continuation/one marker read and stable replay.
+All three phases used one SwiftPM XCTest process and preserved all 14 original
+identities/MCP registration. It qualifies that API fixture, not ordinary GUI
+rollover, SIGKILL recovery, compiled native v2 execution or additional policy
+rules. Earlier cancellation/v6 incomplete attribution remains unknown. See the
+repair record for the retained failures and remaining gates.
+The later semantic-classifier repair passed four regressions without skips/failures
+after their 39 original assertion failures. Normal affected classes selected 52
+cases: 51 passed, one explicit live skip, zero failed. Native v2/live v7 predate
+this source change; v6's unretained bootstrap failure remains unattributed.
+Later full v5 failed one descendant fixture assertion: 2,191 Core selected,
+2,177 passed, 13 skipped, one failed; filesystem qualification passed 30 cases.
+A controlled kernel-versus-shell witness test passed, and the fixture-only
+correction's normal Runtime class passed 112 of 113 cases, with one PowerShell
+skip and zero failures.
+On October 6, full v6 returned terminal zero: 2,192 Core cases selected,
+2,179 passed, 13 explicitly skipped and none failed, plus 30 filesystem passes
+without skips/failures. All 439 frozen inputs remained unchanged during the run:
+five full-v4 paths changed, 434 unchanged. Skipped capabilities remain unqualified.
+Native v3 Debug/Release builds and five-role strict signature/
+metadata/settings checks passed against 439 unchanged inputs; Release needed
+one owned post-build SIGINT. Four native classifier cases passed via the signed
+v3 Debug CLI with native/serve exits zero and lossless output. Typed readback
+verified exactly those four passed cases without extras/skips/failures; both
+result jobs and serve exited zero. These builds predate the later Runtime/Queue
+test fixtures and Rune reorder repair. These checks add no rule coverage or model qualification; ordinary GUI,
+SIGKILL, Compute, LLDB, simulator XCTest and owner-signing gates remain open.
+After full v6, three controlled Rune reorder cases failed four assertions when
+older requests finished after the newer order. Command UUID ownership now fences
+late success/cancellation/error; current-request rollback remains. Five focused
+and all 15 normal Rune cases passed without skips/failures. A separate Queue
+test-only actor annotation followed five AppKit warnings; focused one, normal 38
+and one fresh native case passed with native/serve exits zero. Typed Queue build,
+summary and inventory readback confirmed exactly that one actual Passed case,
+zero failures/skips, all three native result jobs and serve exited zero, and
+configuration bytes were unchanged. Refreshed canonical native v4 Debug/Release
+builds passed with lossless EOF and all 439 inputs unchanged. All five roles'
+strict identity/metadata/settings controls passed in both configurations; the
+independent audit passed all 579 checks. Debug required no cleanup signals;
+Release required two exact owned post-build SIGINT signals, with no owned
+survivors. Native Rune v4 selected the wrong test bundle and executed zero tests
+despite `TEST SUCCEEDED` and helper success flags; it remains a non-pass. The
+corrected Rune v5 app-hosted selection executed exactly five cases: five passed,
+zero skips/failures, in 0.246 (0.248) seconds, with native/serve exits zero and
+lossless output. Full Swift v7 returned terminal zero: 2,197 Core selected,
+2,184 passed, 13 explicitly skipped and none failed; all 30 filesystem cases
+passed. Exact reconciliation verified 2,227 actual selected cases and 2,214
+passes, complete raw EOF and all 439 inputs unchanged. Skipped capabilities
+remain unqualified. SIGKILL recovery remains pending; its first candidate
+attempt failed preparation before any Manager launch. These scoped source/Rune
+checks add no rule/model qualification, installed or full-runtime proof, or
+shipment acceptance.
+A later direct simulator startup control outside Forge reproduced the same
+migration wait and timed out before XCTest; exact owned cleanup preserved all
+32 baseline devices. It adds no policy coverage or simulator qualification,
+and the underlying wait cause remains unknown.
+The later owned iOS 26.5 namespace diagnostic also reached the 300-second
+readiness timeout before XCTest. Complete exact-PID logs retained recurring
+AddressBook migration duration updates and wrapper events; the simulator
+AddressBook TCC allow record and two reported pending XPC transactions establish
+no host debugger authorization or migration cause. Exact owned shutdown/delete
+exited zero and all 32 baseline device bytes were unchanged. This adds no policy
+coverage or simulator XCTest qualification.
+The earlier October 5 affected-source checkpoint selected 505 tests: 499 passed, six
+were explicitly skipped, and none failed. It includes all 23 integration and
+nine notice cases without skips; this is source evidence. The separate later
+adapter protocol checkpoint passed 33 of 34 selected cases with one live-provider
+skip; it adds no native policy or model qualification. The earlier native v3
+Python-resource violation/notice/correction proof retains its own identity.
+Native v4 completed its first-project controls but remains unqualified because
+the second-project fixture reused the first deployment's durable scope;
+Manager and serve both exited zero. Native v5 then passed through separate
+deployment/stdio clients: Python 0.99 violation/notice, same-ID resource-only JS
+0.45 review with prior history unchanged, fresh resource-only review, source
+alias 0.99 and genuine 0.98 removal corrections. Manager and both serve processes
+exited zero. This proves the signed candidate's declared-membership detector,
+durable history and ordinary MCP notice flow in owned fixtures. It does not
+prove binary runtime use, model comprehension or the other fourteen rules.
+The separate model-notice v6 probe completed one authentic retained notice
+interpretation in 26.944 seconds with actual Qwen context 262144 before/after.
+It matched confidence 0.45, review required, compliance unproven, execution not
+blocked, correction unverified, the review action and exact revision/violation
+ID. The earlier v5 timeout remains retained. This is one historical
+interpretation after the fixture's separate correction, not proof of future
+model behavior, ordinary GUI rollover or the other fourteen rules.
+Browser-resource policy applicability remains open. Retained-v9 native
+compatibility also passed its owned synthetic-seal fixture; it adds no real
+successor acknowledgement or policy coverage. Simulator XCTest remains
+unqualified after both the v3 and alternate iOS 26.5 v4 boot-readiness timeouts;
+no XCTest executed in either attempt.
 
 `get_forge_status` now exposes the pinned governing identity and every active
 selected source path in durable priority order. A required bootstrap action

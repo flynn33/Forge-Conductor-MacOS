@@ -1259,3 +1259,112 @@ private final class MutationTrigger: @unchecked Sendable {
         return remainingMatches == 0
     }
 }
+
+extension LegacyContinuityCancellationTests {
+    func testAuditMirrorDoesNotRecreateMissingConfigurationOrLoseCachedShellOptOut() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        XCTAssertTrue(app.config.model.shell.enabled)
+        XCTAssertFalse(app.config.model.shell.userDisabled)
+        _ = try app.config.update([
+            "shell": ["enabled": false, "user_disabled": true, "policy_origin": "user_disabled"]
+        ])
+        let client = ClientID("audit-config-opt-out-preservation")
+        let before = try app.tools.call(name: "forge_status", arguments: [:], clientID: client)
+        XCTAssertTrue(before.ok, "\(before.payload)")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let cachedModel = try encoder.encode(app.config.model)
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+        XCTAssertFalse(app.config.model.shell.enabled)
+        XCTAssertTrue(app.config.model.shell.userDisabled)
+        // The owned app is initialized. Audit must preserve storage initialization without recreating configuration.
+        try FileManager.default.removeItem(at: app.paths.configJSON)
+        try FileManager.default.removeItem(at: app.paths.auditJSONL)
+        try FileManager.default.removeItem(at: app.paths.cacheDir)
+        let tool = "audit_config_opt_out_fixture"
+        try app.audit.append(tool: tool, status: "ok", clientID: client.rawValue,
+            args: ["scope": "owned-audit-fixture"], durationMs: 1, mutating: true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.cacheDir.path))
+        XCTAssertEqual(try encoder.encode(app.config.model), cachedModel)
+        let durable = try XCTUnwrap(try app.audit.recent(limit: 10).first { $0.tool == tool })
+        XCTAssertEqual(durable.clientID, client.rawValue)
+        XCTAssertEqual(durable.status, "ok")
+        XCTAssertNotNil(durable.argsDigest)
+        XCTAssertNotNil(durable.argsJSON)
+        let firstMirror = try String(contentsOf: app.paths.auditJSONL, encoding: .utf8)
+        let firstLines = try firstMirror.split(whereSeparator: \.isNewline).map {
+            try JSONSupport.object(from: Data($0.utf8))
+        }
+        XCTAssertEqual(firstLines.count, 1)
+        XCTAssertEqual(firstLines.first?["tool"] as? String, tool)
+        XCTAssertEqual(firstLines.first?["status"] as? String, "ok")
+
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        cancelled.cancel()
+        XCTAssertThrowsError(try app.tools.call(name: "get_forge_status", arguments: [:],
+            clientID: client, cancellation: cancelled)) { error in
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        let expired = try app.tools.call(name: "get_forge_status", arguments: [:], clientID: client,
+            cancellation: ToolCallCancellation(timeoutSeconds: 0))
+        XCTAssertFalse(expired.ok)
+        XCTAssertEqual(expired.payload["code"] as? String, "deadline_exceeded")
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.cacheDir.path))
+        let controls = try app.audit.recent(limit: 10).filter { $0.clientID == client.rawValue }
+        XCTAssertEqual(controls.filter { $0.status == "cancelled" }.count, 1)
+        XCTAssertEqual(controls.filter { $0.status == "deadline_exceeded" }.count, 1)
+
+        // No project is registered: this status probe isolates AuditService from
+        // the separate ProjectInstructionQueueStore layout initialization path.
+        let recovered = try app.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+        XCTAssertTrue(recovered.ok, "\(recovered.payload)")
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+        let current = recovered.payload["auto_continuity"] as? [String: Any]
+        let legacy = (recovered.payload["continuity"] as? [String: Any])?["auto"] as? [String: Any]
+        for policy in [current, legacy] {
+            XCTAssertEqual(policy?["handoff_every_tools"] as? Int, 200)
+            XCTAssertEqual(policy?["checkpoint_every_tools"] as? Int, 50)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.cacheDir.path))
+        XCTAssertFalse(app.config.model.shell.enabled)
+        XCTAssertTrue(app.config.model.shell.userDisabled)
+        XCTAssertEqual(try encoder.encode(app.config.model), cachedModel)
+        let mirror = try String(contentsOf: app.paths.auditJSONL, encoding: .utf8)
+        let rows = try mirror.split(whereSeparator: \.isNewline).map {
+            try JSONSupport.object(from: Data($0.utf8))
+        }
+        XCTAssertEqual(rows.filter { $0["tool"] as? String == tool }.count, 1)
+        XCTAssertEqual(rows.filter { $0["status"] as? String == "cancelled" }.count, 1)
+        XCTAssertEqual(rows.filter { $0["status"] as? String == "deadline_exceeded" }.count, 1)
+        XCTAssertEqual(rows.filter { $0["tool"] as? String == "get_forge_status" && $0["status"] as? String == "ok" }.count, 1)
+    }
+
+    func testAuditMirrorCreatesStorageDirectoriesWithoutCreatingDefaultConfiguration() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let mirrorPaths = AppPaths(home: tempHome.appendingPathComponent("new-audit-mirror-parent", isDirectory: true))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: mirrorPaths.home.path))
+        let audit = AuditService(store: app.store, paths: mirrorPaths)
+        let tool = "audit_parent_only_fixture"
+        try audit.append(tool: tool, status: "ok", clientID: "audit-parent-only",
+            args: ["owned": true], mutating: true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mirrorPaths.auditJSONL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: mirrorPaths.configJSON.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mirrorPaths.agentsDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mirrorPaths.cacheDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: mirrorPaths.logsDir.path))
+        XCTAssertEqual(try audit.recent(limit: 1).first?.tool, tool)
+        let mirror = try String(contentsOf: mirrorPaths.auditJSONL, encoding: .utf8)
+        let lines = mirror.split(whereSeparator: \.isNewline)
+        XCTAssertEqual(lines.count, 1)
+        let row = try JSONSupport.object(from: Data(try XCTUnwrap(lines.first).utf8))
+        XCTAssertEqual(row["tool"] as? String, tool)
+        XCTAssertEqual(row["client_id"] as? String, "audit-parent-only")
+    }
+}

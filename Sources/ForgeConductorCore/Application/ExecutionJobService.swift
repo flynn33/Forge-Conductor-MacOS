@@ -4,6 +4,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import Security
 
 public protocol RuntimeJobContextValidating: Sendable {
     func validateCaller(_ context: ToolInvocationContext) async throws
@@ -543,6 +544,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
               (1...24 * 60 * 60).contains(limits.maximumCPUSecondsPerProcess),
               (16...4_096).contains(limits.maximumOpenFilesPerProcess),
               (1...(16 * 1_024 * 1_024 * 1_024)).contains(limits.maximumFileBytesPerProcess),
+              (1...RuntimeJobLimits.maximumNativeXcodeFileBytesPerProcess).contains(limits.nativeXcodeFileBytesPerProcess),
               (0...(1_024 * 1_024 * 1_024)).contains(limits.maximumCoreBytesPerProcess) else {
             throw RuntimeJobError.invalidRequest("runtime job limits are internally inconsistent")
         }
@@ -981,6 +983,11 @@ public actor ExecutionJobService: ExecutionJobServicing {
             generation: request.context.projectGeneration,
             idempotencyKey: key
            ) {
+            guard existing.projectID == request.context.projectID,
+                  existing.projectGeneration == request.context.projectGeneration,
+                  existing.runID == request.context.runID || request.context.runID == nil else {
+                throw RuntimeJobError.jobScopeMismatch(existing.jobID)
+            }
             return (existing.jobID, true)
         }
         guard pending.count + active.count < limits.maximumQueuedJobs + limits.maximumConcurrentJobs else {
@@ -1013,6 +1020,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 jobID: jobID,
                 request: request,
                 canonicalWorkingDirectory: validated.workingDirectory,
+                fileSizeProfile: validated.fileSizeProfile,
                 spool: spool
             )
             // This is the last cancellation boundary before the durable queued
@@ -1030,7 +1038,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 timeout: request.timeout,
                 maximumInlineOutputBytes: validated.inlineBytes,
                 replayClass: request.replayClass,
-                idempotencyKey: request.idempotencyKey
+                idempotencyKey: request.idempotencyKey,
+                fileSizeProfile: validated.fileSizeProfile
             )
             let persisted = try await repository.createJob(
                 jobID: jobID,
@@ -1180,7 +1189,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
         context: ToolInvocationContext,
         states: Set<RuntimeJobState> = [],
         limit: Int = 20,
-        beforeCreatedAt: String? = nil
+        beforeCreatedAt: String? = nil,
+        beforeJobID: UUID? = nil
     ) async throws -> [RuntimeJobRecord] {
         try Task.checkCancellation()
         try await ensureStarted()
@@ -1189,7 +1199,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
             context: context,
             states: states,
             limit: limit,
-            beforeCreatedAt: beforeCreatedAt
+            beforeCreatedAt: beforeCreatedAt,
+            beforeJobID: beforeJobID
         )
         try Task.checkCancellation()
         return records
@@ -1245,7 +1256,9 @@ public actor ExecutionJobService: ExecutionJobServicing {
             totalObservedBytes: metadata.byteCount,
             eof: next >= metadata.retainedByteCount,
             artifactTruncated: metadata.artifactTruncated,
-            sha256: metadata.sha256
+            sha256: metadata.sha256,
+            producerEndReason: metadata.producerEndReason,
+            producerReadErrno: metadata.producerReadErrno
         )
     }
 
@@ -1766,12 +1779,12 @@ public actor ExecutionJobService: ExecutionJobServicing {
             )
             return
         }
-        let readersFinished = await process.waitForReaders(
+        var readersFinished = await process.waitForReaders(
             maximumMilliseconds: limits.forcedTerminationGraceMilliseconds
         )
         if !readersFinished {
             process.forceCloseReaders()
-            _ = await process.waitForReaders(
+            readersFinished = await process.waitForReaders(
                 maximumMilliseconds: limits.forcedTerminationGraceMilliseconds
             )
         }
@@ -1805,6 +1818,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
             state = .timedOut
         } else if descendantEvidence.exceededLimit {
             state = .failed
+        } else if !readersFinished {
+            state = .failed
         } else if exit?.exitCode == 0 {
             state = .completed
         } else {
@@ -1832,12 +1847,14 @@ public actor ExecutionJobService: ExecutionJobServicing {
                     ? (descendantEvidence.trackingCapacityExceeded
                         ? "runtime_descendant_tracking_capacity_exceeded"
                         : "runtime_descendant_limit_exceeded")
-                    : (state == .failed ? "runtime_exit_nonzero" : nil),
+                    : (!readersFinished ? "runtime_output_drain_unconfirmed"
+                        : (state == .failed ? "runtime_exit_nonzero" : nil)),
                 errorSummary: descendantEvidence.exceededLimit
                     ? (descendantEvidence.trackingCapacityExceeded
                         ? "Descendant discovery exceeded its hard identity cap; all recorded identities were signaled, but unobserved descendants could not be proven absent"
                         : "Runtime process group exceeded its descendant-process budget")
-                    : (state == .failed ? "Process exited with code \(exit?.exitCode ?? 255)" : nil),
+                    : (!readersFinished ? "Runtime pipe readers did not close within their bounded drain deadline"
+                        : (state == .failed ? "Process exited with code \(exit?.exitCode ?? 255)" : nil)),
                 expectedContext: item.jobContext
             )
         } catch let error as ProjectContextError {
@@ -2154,12 +2171,12 @@ public actor ExecutionJobService: ExecutionJobServicing {
         process: RuntimeActiveProcess,
         completion: PendingTerminationCompletion
     ) async {
-        let readersFinished = await process.waitForReaders(
+        var readersFinished = await process.waitForReaders(
             maximumMilliseconds: limits.forcedTerminationGraceMilliseconds
         )
         if !readersFinished {
             process.forceCloseReaders()
-            _ = await process.waitForReaders(
+            readersFinished = await process.waitForReaders(
                 maximumMilliseconds: limits.forcedTerminationGraceMilliseconds
             )
         }
@@ -2175,6 +2192,11 @@ public actor ExecutionJobService: ExecutionJobServicing {
         var terminalState = completion.terminalState
         var errorCode = completion.errorCode
         var errorSummary = completion.errorSummary
+        if !readersFinished {
+            if terminalState == .completed { terminalState = .failed }
+            errorCode = "runtime_output_drain_unconfirmed"
+            errorSummary = "Runtime pipe readers did not close within their bounded drain deadline"
+        }
         let resultSHA = JSONSupport.sha256Hex(
             outputs.sorted { $0.stream.rawValue < $1.stream.rawValue }
                 .map { "\($0.stream.rawValue):\($0.sha256):\($0.byteCount)" }
@@ -2565,7 +2587,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
     private func validate(_ request: RuntimeJobRequest) throws -> (
         workingDirectory: URL,
         timeoutSeconds: Int,
-        inlineBytes: Int
+        inlineBytes: Int,
+        fileSizeProfile: RuntimeFileSizeProfile
     ) {
         try Self.validateProfile(kind: request.kind, profile: request.profile)
         guard request.arguments.count <= limits.maximumArguments else {
@@ -2598,13 +2621,15 @@ public actor ExecutionJobService: ExecutionJobServicing {
         )
         let cwd = try Self.validatedWorkingDirectory(request.canonicalWorkingDirectory)
         try validateCapability(for: request.profile)
-        return (cwd, timeoutSeconds, inlineBytes)
+        let fileSizeProfile = try effectiveFileSizeProfile(for: request, workingDirectory: cwd)
+        return (cwd, timeoutSeconds, inlineBytes, fileSizeProfile)
     }
 
     private func buildPlan(
         jobID: UUID,
         request: RuntimeJobRequest,
         canonicalWorkingDirectory: URL,
+        fileSizeProfile: RuntimeFileSizeProfile,
         spool: RuntimeOutputSpool
     ) throws -> (plan: RuntimeProcessPlan, summary: String, requestArtifactRelativePath: String?) {
         var environment = processEnvironment
@@ -2618,9 +2643,9 @@ public actor ExecutionJobService: ExecutionJobServicing {
         environment["FORGE_RUNTIME_LIMIT_OPEN_FILES"] = String(
             limits.maximumOpenFilesPerProcess
         )
-        environment["FORGE_RUNTIME_LIMIT_FILE_BYTES"] = String(
-            limits.maximumFileBytesPerProcess
-        )
+        let fileBytes = fileSizeProfile == .standard
+            ? limits.maximumFileBytesPerProcess : limits.nativeXcodeFileBytesPerProcess
+        environment["FORGE_RUNTIME_LIMIT_FILE_BYTES"] = String(fileBytes)
         environment["FORGE_RUNTIME_LIMIT_CORE_BYTES"] = String(
             limits.maximumCoreBytesPerProcess
         )
@@ -2664,7 +2689,16 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 artifactRoot.appendingPathComponent(requestArtifact!).path,
             ]
         }
-        let summary = "\(request.profile.rawValue):\(executable.lastPathComponent):argv=\(arguments.count):script_bytes=\(request.script?.utf8.count ?? 0)"
+        var summary = "\(request.profile.rawValue):\(executable.lastPathComponent):argv=\(arguments.count):script_bytes=\(request.script?.utf8.count ?? 0)"
+        if fileSizeProfile != .standard {
+            summary += ":file_size_profile=\(fileSizeProfile.rawValue):file_size_bytes=\(fileBytes)"
+        }
+        if request.profile == .directProcess {
+            summary += ":command_fingerprint_v1=" + (try Self.commandFingerprint(
+                executable: executable, arguments: arguments, workingDirectory: canonicalWorkingDirectory,
+                script: request.script, kind: request.kind, profile: request.profile, fileSizeProfile: fileSizeProfile
+            ))
+        }
         // Every model runtime is an owner-authorized native process. Project
         // context selects durable ownership and the default working directory;
         // it is not a Seatbelt or filesystem boundary. The launch gate,
@@ -2682,6 +2716,99 @@ public actor ExecutionJobService: ExecutionJobServicing {
             summary,
             requestArtifact
         )
+    }
+
+    private func effectiveFileSizeProfile(
+        for request: RuntimeJobRequest, workingDirectory: URL
+    ) throws -> RuntimeFileSizeProfile {
+        switch request.fileSizeProfile {
+        case .standard:
+            return Self.isVerifiedNativeXcodebuild(request, environment: processEnvironment, workingDirectory: workingDirectory)
+                ? .nativeXcodebuildSparseCAS : .standard
+        case .nativeXcodeSparseCAS:
+            guard request.kind == .process, request.profile == .directProcess,
+                  request.script == nil, request.executable != nil,
+                  let tool = request.arguments.first,
+                  ["xcodebuild", "xcresulttool", "lldb", "simctl"].contains(tool) else {
+                throw RuntimeJobError.invalidRequest("Native Xcode file-size profile requires a typed direct Xcode command")
+            }
+            return .nativeXcodeSparseCAS
+        case .nativeXcodebuildSparseCAS:
+            guard Self.isVerifiedNativeXcodebuild(request, environment: processEnvironment, workingDirectory: workingDirectory) else {
+                throw RuntimeJobError.invalidRequest("Native xcodebuild profile requires a verified direct native executable")
+            }
+            return .nativeXcodebuildSparseCAS
+        }
+    }
+
+    /// Recognizes direct Apple commands without interpreting a shell program or
+    /// trusting an executable's basename. Lookup failure retains the generic cap
+    /// and the command's ordinary native error/exit behavior.
+    static func isVerifiedNativeXcodebuild(
+        _ request: RuntimeJobRequest, environment: [String: String], workingDirectory: URL
+    ) -> Bool {
+        guard request.kind == .process, request.profile == .directProcess,
+              request.script == nil, let requested = request.executable else { return false }
+        let executable = RuntimePathCanonicalizer.canonicalExistingURL(requested)
+        if executable.lastPathComponent == "xcodebuild",
+           appleExecutable(executable, identifier: "com.apple.dt.xcodebuild") {
+            return true
+        }
+        let lookupOptions: [String]
+        if executable.path == "/usr/bin/xcrun",
+           appleExecutable(executable, identifier: "com.apple.xcrun"),
+           let options = xcodebuildLookupOptions(arguments: request.arguments) {
+            lookupOptions = options
+        } else if executable.path == "/usr/bin/xcodebuild",
+                  appleExecutable(executable, identifier: "com.apple.dt.xcode_select.xtool-shim-public") {
+            lookupOptions = []
+        } else { return false }
+        guard appleExecutable(URL(fileURLWithPath: "/usr/bin/xcrun"), identifier: "com.apple.xcrun"),
+           let result = try? ProcessRunner(inheritEnvironment: false).run(
+            executable: "/usr/bin/xcrun", arguments: lookupOptions + ["--find", "xcodebuild"],
+            currentDirectory: workingDirectory.path, environment: environment,
+            timeoutSec: 2, maximumOutputBytes: Int(PATH_MAX)
+        ), result.exitCode == 0, !result.timedOut,
+           !result.stdoutTruncated, !result.stderrTruncated else { return false }
+        let path = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard path.hasPrefix("/"), !path.contains("\n"), !path.contains("\r"), !path.contains("\0") else { return false }
+        return appleExecutable(RuntimePathCanonicalizer.canonicalExistingURL(URL(fileURLWithPath: path)), identifier: "com.apple.dt.xcodebuild")
+    }
+
+    static func xcodebuildLookupOptions(arguments: [String]) -> [String]? {
+        var options: [String] = []
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            if argument == "xcodebuild" { return options }
+            if ["--sdk", "--toolchain"].contains(argument) {
+                guard index + 1 < arguments.count, !arguments[index + 1].isEmpty,
+                      !arguments[index + 1].hasPrefix("-") else { return nil }
+                options += [argument, arguments[index + 1]]
+                index += 2
+            } else if ["-n", "--no-cache", "-k", "--kill-cache"].contains(argument) {
+                // Resolve as if the caller invalidated/bypassed the cache, but
+                // the recognition probe itself never mutates that global cache.
+                options.append("--no-cache")
+                index += 1
+            } else if ["-r", "--run", "-v", "--verbose", "-l", "--log"].contains(argument) {
+                index += 1
+            } else { return nil }
+        }
+        return nil
+    }
+
+    private static func appleExecutable(_ executable: URL, identifier: String) -> Bool {
+        guard FileManager.default.isExecutableFile(atPath: executable.path) else { return false }
+        var code: SecStaticCode?
+        var requirement: SecRequirement?
+        guard SecStaticCodeCreateWithPath(executable as CFURL, [], &code) == errSecSuccess,
+              let code,
+              SecRequirementCreateWithString(("anchor apple and identifier \"" + identifier + "\"") as CFString, [], &requirement) == errSecSuccess,
+              let requirement else { return false }
+        var flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate)
+        flags.formUnion(.noNetworkAccess)
+        return SecStaticCodeCheckValidity(code, flags, requirement) == errSecSuccess
     }
 
     private func stageScript(
@@ -3054,5 +3181,31 @@ public actor ExecutionJobService: ExecutionJobServicing {
 
     private static func isCPUHeavy(_ kind: RuntimeKind) -> Bool {
         kind == .python || kind == .powershell
+    }
+}
+
+extension ExecutionJobService {
+    /// Versioned native intent identity; output budgets and timeout remain effective service-owned metadata.
+    static func commandFingerprint(
+        executable: URL, arguments: [String], workingDirectory: URL, script: String?,
+        kind: RuntimeKind, profile: RuntimeExecutionProfile, fileSizeProfile: RuntimeFileSizeProfile
+    ) throws -> String {
+        JSONSupport.sha256Hex(try JSONSupport.canonicalJSON([
+            "version": 1,
+            "executable": RuntimePathCanonicalizer.canonicalURL(executable).path,
+            "arguments": arguments,
+            "working_directory": RuntimePathCanonicalizer.canonicalURL(workingDirectory).path,
+            "script": script.map { $0 as Any } ?? NSNull(),
+            "kind": kind.rawValue, "profile": profile.rawValue, "file_size_profile": fileSizeProfile.rawValue
+        ]))
+    }
+
+    static func storedCommandFingerprint(_ summary: String) -> String? {
+        let prefix = "command_fingerprint_v1="
+        let fields = summary.split(separator: ":").filter { $0.hasPrefix(prefix) }
+        guard fields.count == 1 else { return nil }
+        let digest = String(fields[0].dropFirst(prefix.count))
+        guard digest.utf8.count == 64, digest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else { return nil }
+        return digest
     }
 }

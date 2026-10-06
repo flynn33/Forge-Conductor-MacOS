@@ -90,6 +90,15 @@ public struct RuntimeJobShutdownReport: Sendable, Equatable {
     }
 }
 
+/// Internal admission policy selected by the typed Xcode adapter or verified
+/// native xcodebuild recognition. It is absent from public initializers and MCP
+/// schemas, so callers cannot supply their own sparse-CAS allowance.
+enum RuntimeFileSizeProfile: String, Sendable {
+    case standard
+    case nativeXcodeSparseCAS = "native_xcode_sparse_cas_v1"
+    case nativeXcodebuildSparseCAS = "native_xcodebuild_sparse_cas_v1"
+}
+
 public struct RuntimeJobRequest: Sendable {
     public let kind: RuntimeKind
     public let profile: RuntimeExecutionProfile
@@ -102,6 +111,7 @@ public struct RuntimeJobRequest: Sendable {
     public let maximumInlineOutputBytes: Int
     public let replayClass: RuntimeReplayClass
     public let idempotencyKey: String?
+    let fileSizeProfile: RuntimeFileSizeProfile
     let didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
 
     public init(
@@ -117,6 +127,29 @@ public struct RuntimeJobRequest: Sendable {
         replayClass: RuntimeReplayClass,
         idempotencyKey: String? = nil
     ) {
+        self.init(
+            kind: kind, profile: profile, context: context, executable: executable,
+            arguments: arguments, script: script, canonicalWorkingDirectory: canonicalWorkingDirectory,
+            timeout: timeout, maximumInlineOutputBytes: maximumInlineOutputBytes,
+            replayClass: replayClass, idempotencyKey: idempotencyKey, fileSizeProfile: .standard
+        )
+    }
+
+    init(
+        kind: RuntimeKind,
+        profile: RuntimeExecutionProfile,
+        context: ToolInvocationContext,
+        executable: URL? = nil,
+        arguments: [String] = [],
+        script: String? = nil,
+        canonicalWorkingDirectory: URL,
+        timeout: Duration,
+        maximumInlineOutputBytes: Int = 64 * 1_024,
+        replayClass: RuntimeReplayClass,
+        idempotencyKey: String? = nil,
+        fileSizeProfile: RuntimeFileSizeProfile,
+        persistenceObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) {
         self.kind = kind
         self.profile = profile
         self.context = context
@@ -128,7 +161,8 @@ public struct RuntimeJobRequest: Sendable {
         self.maximumInlineOutputBytes = maximumInlineOutputBytes
         self.replayClass = replayClass
         self.idempotencyKey = idempotencyKey
-        didPersist = nil
+        self.fileSizeProfile = fileSizeProfile
+        didPersist = persistenceObserver
     }
 
     init(
@@ -145,18 +179,13 @@ public struct RuntimeJobRequest: Sendable {
         idempotencyKey: String? = nil,
         persistenceObserver: @escaping @Sendable (RuntimeJobRecord) -> Void
     ) {
-        self.kind = kind
-        self.profile = profile
-        self.context = context
-        self.executable = executable
-        self.arguments = arguments
-        self.script = script
-        self.canonicalWorkingDirectory = canonicalWorkingDirectory
-        self.timeout = timeout
-        self.maximumInlineOutputBytes = maximumInlineOutputBytes
-        self.replayClass = replayClass
-        self.idempotencyKey = idempotencyKey
-        didPersist = persistenceObserver
+        self.init(
+            kind: kind, profile: profile, context: context, executable: executable,
+            arguments: arguments, script: script, canonicalWorkingDirectory: canonicalWorkingDirectory,
+            timeout: timeout, maximumInlineOutputBytes: maximumInlineOutputBytes,
+            replayClass: replayClass, idempotencyKey: idempotencyKey, fileSizeProfile: .standard,
+            persistenceObserver: persistenceObserver
+        )
     }
 }
 
@@ -186,6 +215,12 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
     public let updatedAt: String
 }
 
+public enum RuntimeOutputProducerEndReason: String, Codable, Sendable {
+    case eof
+    case readError = "read_error"
+    case forcedClose = "forced_close"
+}
+
 public struct RuntimeJobOutputMetadata: Codable, Sendable, Equatable {
     public let jobID: UUID
     public let stream: RuntimeOutputStream
@@ -199,6 +234,9 @@ public struct RuntimeJobOutputMetadata: Codable, Sendable, Equatable {
     public let inlineTruncated: Bool
     public let artifactTruncated: Bool
     public let artifactEvicted: Bool
+    // Missing in historical output: absence is unknown, never EOF evidence.
+    public let producerEndReason: RuntimeOutputProducerEndReason?
+    public let producerReadErrno: Int32?
 }
 
 public struct RuntimeOutputSlice: Sendable, Equatable {
@@ -212,6 +250,8 @@ public struct RuntimeOutputSlice: Sendable, Equatable {
     public let eof: Bool
     public let artifactTruncated: Bool
     public let sha256: String
+    public let producerEndReason: RuntimeOutputProducerEndReason?
+    public let producerReadErrno: Int32?
 }
 
 public enum RuntimeExecutableProbeState: String, Codable, Sendable, CaseIterable {
@@ -279,6 +319,8 @@ public struct RuntimeCapabilities: Codable, Sendable, Equatable {
 }
 
 public struct RuntimeJobLimits: Sendable, Equatable {
+    static let defaultFileBytesPerProcess = 1_024 * 1_024 * 1_024
+    static let maximumNativeXcodeFileBytesPerProcess = 32 * 1_024 * 1_024 * 1_024
     public let maximumConcurrentJobs: Int
     public let maximumCPUHeavyJobs: Int
     public let maximumQueuedJobs: Int
@@ -297,6 +339,7 @@ public struct RuntimeJobLimits: Sendable, Equatable {
     public let maximumCPUSecondsPerProcess: Int
     public let maximumOpenFilesPerProcess: Int
     public let maximumFileBytesPerProcess: Int
+    let nativeXcodeFileBytesPerProcess: Int
     public let maximumCoreBytesPerProcess: Int
 
     public init(
@@ -317,7 +360,7 @@ public struct RuntimeJobLimits: Sendable, Equatable {
         maximumDescendantProcessesPerJob: Int = 16,
         maximumCPUSecondsPerProcess: Int = 4 * 60 * 60,
         maximumOpenFilesPerProcess: Int = 256,
-        maximumFileBytesPerProcess: Int = 1_024 * 1_024 * 1_024,
+        maximumFileBytesPerProcess: Int? = nil,
         maximumCoreBytesPerProcess: Int = 0
     ) {
         self.maximumConcurrentJobs = maximumConcurrentJobs
@@ -337,7 +380,13 @@ public struct RuntimeJobLimits: Sendable, Equatable {
         self.maximumDescendantProcessesPerJob = maximumDescendantProcessesPerJob
         self.maximumCPUSecondsPerProcess = maximumCPUSecondsPerProcess
         self.maximumOpenFilesPerProcess = maximumOpenFilesPerProcess
-        self.maximumFileBytesPerProcess = maximumFileBytesPerProcess
+        self.maximumFileBytesPerProcess = maximumFileBytesPerProcess ?? Self.defaultFileBytesPerProcess
+        // An explicitly configured cap is authoritative for every profile.
+        // Omission retains the generic 1 GiB default and permits the typed
+        // Xcode adapter's bounded 12/24 GiB sparse CAS mappings.
+        nativeXcodeFileBytesPerProcess = maximumFileBytesPerProcess.map {
+            min($0, Self.maximumNativeXcodeFileBytesPerProcess)
+        } ?? Self.maximumNativeXcodeFileBytesPerProcess
         self.maximumCoreBytesPerProcess = maximumCoreBytesPerProcess
     }
 

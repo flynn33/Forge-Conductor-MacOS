@@ -928,6 +928,9 @@ public final class StjornarvaldCodingAgentPolicyReporter: CodingAgentPolicyRepor
 
 public final class StjornarvaldInteractivePolicyNoticeCache:
     InteractivePolicyNoticeProviding, @unchecked Sendable {
+    static let maximumPendingPresentedNoticeIDs = 512
+    static let maximumPendingPresentationReceipts = 64
+    enum Checkpoint { case beforeCachePublication, beforeReceiptPersistence }
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "forge.stjornarvald.notice-cache", qos: .utility)
     private let databaseURL: URL
@@ -935,9 +938,15 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
     private let initialProjectGeneration: Int?
     private let clientID: String
     private let diagnostics: @Sendable (String) -> Void
+    private let checkpoint: @Sendable (Checkpoint) -> Void
     private var repository: StjornarvaldPolicyNoticeRepository?
     private var cached: [CodingAgentPolicyNotice] = []
     private var cachedTargetIdentity: String?
+    private var desiredTargetIdentity: String?
+    private var pendingRefreshTargetIdentity: String?
+    private var refreshWorkerActive = false
+    private var pendingPresentedNoticeCounts: [UUID: Int] = [:]
+    private var pendingPresentationReceiptCount = 0
 
     public init(
         paths: AppPaths,
@@ -951,6 +960,7 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
         initialProjectGeneration = projectGeneration
         self.clientID = clientID
         self.diagnostics = diagnostics
+        checkpoint = { _ in }
         refresh(
             projectID: projectID,
             projectGeneration: projectGeneration,
@@ -958,18 +968,28 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
         )
     }
 
-    public init(
+    public convenience init(
         repository: StjornarvaldPolicyNoticeRepository,
         projectID: String? = nil,
         projectGeneration: Int? = nil,
         clientID: String,
         diagnostics: @escaping @Sendable (String) -> Void = { _ in }
     ) {
+        self.init(repository: repository, projectID: projectID,
+            projectGeneration: projectGeneration, clientID: clientID,
+            diagnostics: diagnostics, checkpoint: { _ in })
+    }
+
+    init(repository: StjornarvaldPolicyNoticeRepository, projectID: String? = nil,
+         projectGeneration: Int? = nil, clientID: String,
+         diagnostics: @escaping @Sendable (String) -> Void = { _ in },
+         checkpoint: @escaping @Sendable (Checkpoint) -> Void) {
         databaseURL = repository.databaseURL
         initialProjectID = projectID
         initialProjectGeneration = projectGeneration
         self.clientID = clientID
         self.diagnostics = diagnostics
+        self.checkpoint = checkpoint
         self.repository = repository
         refresh(
             projectID: projectID,
@@ -994,13 +1014,9 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
         if targetChanged { cached = [] }
         let notices = Array(cached.prefix(min(max(maximumCount, 1), 8)))
         lock.unlock()
-        if targetChanged {
-            refresh(
-                projectID: projectID,
-                projectGeneration: projectGeneration,
-                clientID: clientID
-            )
-        }
+        // Evaluation occurs independently of this process. Request a bounded
+        // asynchronous read even when this long-lived client's scope is unchanged.
+        requestRefresh(targetIdentity: targetIdentity)
         guard let text = StjornarvaldPolicyNoticeFormatter.interactivePresentation(
             notices: notices, maximumBytes: maximumBytes
         ) else { return nil }
@@ -1018,20 +1034,44 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
         let delivered = Set(presentation.notices.map(\.id))
         lock.lock()
         cached.removeAll { delivered.contains($0.id) }
-        lock.unlock()
+        guard pendingPresentationReceiptCount < Self.maximumPendingPresentationReceipts,
+              Set(pendingPresentedNoticeCounts.keys).union(delivered).count <= Self.maximumPendingPresentedNoticeIDs else {
+            lock.unlock()
+            diagnostics("stjornarvald MCP presentation receipt deferred: pending receipt bound reached")
+            return
+        }
+        pendingPresentationReceiptCount += 1
+        for id in delivered { pendingPresentedNoticeCounts[id, default: 0] += 1 }
+        // Enqueue while holding the admission lock so a subsequent requested
+        // read cannot overtake this receipt at the serial persistence boundary.
         queue.async { [weak self] in
             guard let self else { return }
+            self.checkpoint(.beforeReceiptPersistence)
             do {
                 let repository = try self.repositoryOrOpen()
                 try repository.recordInteractivePresentation(presentation)
+                self.finishPendingReceipt(delivered)
                 self.refreshNow(
                     repository: repository,
                     targetIdentity: presentation.targetIdentity
                 )
             } catch {
+                self.finishPendingReceipt(delivered)
                 self.diagnostics("stjornarvald MCP presentation receipt deferred: \(error.localizedDescription)")
             }
         }
+        lock.unlock()
+    }
+
+    private func finishPendingReceipt(_ delivered: Set<UUID>) {
+        lock.lock()
+        pendingPresentationReceiptCount -= 1
+        for id in delivered {
+            if let count = pendingPresentedNoticeCounts[id], count > 1 {
+                pendingPresentedNoticeCounts[id] = count - 1
+            } else { pendingPresentedNoticeCounts.removeValue(forKey: id) }
+        }
+        lock.unlock()
     }
 
     public func refresh() {
@@ -1052,17 +1092,51 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
             generation: projectGeneration,
             clientID: clientID
         )
+        requestRefresh(targetIdentity: targetIdentity)
+    }
+
+    func refreshState() -> (workerActive: Bool, pendingTargetCount: Int, pendingPresentedNoticeCount: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (refreshWorkerActive, pendingRefreshTargetIdentity == nil ? 0 : 1,
+                pendingPresentedNoticeCounts.count)
+    }
+
+    private func requestRefresh(targetIdentity: String) {
+        lock.lock()
+        desiredTargetIdentity = targetIdentity
+        pendingRefreshTargetIdentity = targetIdentity
+        let shouldStart = !refreshWorkerActive
+        if shouldStart { refreshWorkerActive = true }
+        lock.unlock()
+        guard shouldStart else { return }
         queue.async { [weak self] in
             guard let self else { return }
-            do {
-                self.refreshNow(
-                    repository: try self.repositoryOrOpen(),
-                    targetIdentity: targetIdentity
-                )
-            }
-            catch {
-                self.diagnostics("stjornarvald MCP notice cache refresh deferred: \(error.localizedDescription)")
-            }
+            self.drainRefreshRequests()
+        }
+    }
+
+    private func drainRefreshRequests() {
+        lock.lock()
+        guard let targetIdentity = pendingRefreshTargetIdentity else {
+            refreshWorkerActive = false
+            lock.unlock()
+            return
+        }
+        pendingRefreshTargetIdentity = nil
+        lock.unlock()
+        do {
+            refreshNow(repository: try repositoryOrOpen(), targetIdentity: targetIdentity)
+        } catch {
+            diagnostics("stjornarvald MCP notice cache refresh deferred: \(error.localizedDescription)")
+        }
+        lock.lock()
+        let shouldContinue = pendingRefreshTargetIdentity != nil
+        if !shouldContinue { refreshWorkerActive = false }
+        lock.unlock()
+        // Yield between reads so delivery receipts share this serial queue.
+        if shouldContinue {
+            queue.async { [weak self] in self?.drainRefreshRequests() }
         }
     }
 
@@ -1092,9 +1166,12 @@ public final class StjornarvaldInteractivePolicyNoticeCache:
                 maximumCount: 8,
                 maximumBytes: StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes
             )
+            checkpoint(.beforeCachePublication)
             lock.lock()
-            cached = notices
-            cachedTargetIdentity = targetIdentity
+            if desiredTargetIdentity == targetIdentity {
+                cached = notices.filter { pendingPresentedNoticeCounts[$0.id] == nil }
+                cachedTargetIdentity = targetIdentity
+            }
             lock.unlock()
         } catch {
             diagnostics("stjornarvald MCP notice cache read deferred: \(error.localizedDescription)")

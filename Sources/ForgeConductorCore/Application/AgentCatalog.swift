@@ -137,16 +137,21 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 id: "implement",
                 displayName: "Implement",
                 description: "Implement features and bugfixes with focused, verified code changes.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "git_status", "git_diff", "git_add", "git_commit"],
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "git_status", "git_diff", "git_add", "git_commit", "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push"],
                 whenToUse: ["Feature or bugfix with known scope"],
-                firstMoves: ["fs_read surrounding code", "minimal edit", "run tests when safe", "agent_run_complete"],
+                firstMoves: ["fs_read surrounding code", "minimal edit", "xcode.run relevant Xcode tests or build, or shell_exec for other runners", "poll job.status to terminal and read job.read_output; xcode.result test_summary verifies actual test counts", "agent_run_complete"],
                 doneDefinition: ["Change on disk", "how_to_verify concrete", "agent_run_complete"],
                 outputSchema: ["what_changed", "files_touched", "how_to_verify", "residual_risks"],
                 handoff: ["test", "review", "precommit-audit"],
                 qualityBar: ["Smallest correct change", "Match modularity", "Always agent_run_complete"],
                 body: """
                 You are Implement. Read before write. Prefer fs_edit for surgical patches.
+                Use xcode.discover and xcode.run for Xcode; poll job.status to a terminal result
+                and read job.read_output. For tests inspect xcode.result test_summary and actual
+                test counts. build-for-testing compiles tests but does not execute them; zero
+                selected tests, skips, a timeout, or a job receipt is not a pass. shell_exec
+                remains available for direct native commands and other runners.
                 Do not git_push. Always agent_run_complete with what_changed, files_touched,
                 how_to_verify, residual_risks.
                 """,
@@ -156,7 +161,7 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 id: "docs",
                 displayName: "Docs",
                 description: "Write Markdown documentation and export PDF manuals via native tools.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "git_status", "git_diff", "git_log"],
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
                 whenToUse: ["README", "PDF manual", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
@@ -168,6 +173,12 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 You are Docs. Write accurate documentation with tools.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched
                 and call agent_run_complete. Never claim PDF done without a file on disk.
+                Find filenames with fs_glob(pattern="*.md", path="<project>/docs");
+                patterns match filenames, not relative paths. For test or analysis scripts,
+                check runtime.capabilities before optional python.run(script="...",
+                replay_class="read_only"); choose the replay class that matches the effects.
+                Poll job.status to terminal, read job.read_output, and cancel abandoned work.
+                An unavailable interpreter or a job receipt does not prove completion.
                 """,
                 source: "builtin"
             ),
@@ -175,16 +186,25 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 id: "debug",
                 displayName: "Debug",
                 description: "Diagnose failures from logs, stack traces, and failing tests with evidence.",
-                tools: ["fs_read", "fs_list", "fs_glob", "search_text", "shell_exec", "git_status", "git_diff", "git_log"],
+                tools: ["fs_read", "fs_list", "fs_glob", "search_text", "shell_exec", "git_status", "git_diff", "git_log", "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator", "job.status", "job.read_output", "job.cancel", "job.list", "runtime.capabilities", "python.run"],
                 toolsForbidden: ["git_push"],
                 whenToUse: ["Failing tests", "crashes", "unexpected behavior"],
-                firstMoves: ["Capture exact error", "trace path with fs_read/search_text", "agent_run_complete"],
+                firstMoves: ["Capture exact error", "trace path with fs_read/search_text", "xcode.run reproducer; poll job.status to terminal and read job.read_output", "xcode.result test_summary verifies actual test counts; build-for-testing only compiles", "agent_run_complete"],
                 doneDefinition: ["Root cause with evidence", "agent_run_complete"],
                 outputSchema: ["symptom", "repro", "root_cause", "fix", "verify"],
                 handoff: ["test", "implement", "review"],
                 qualityBar: ["Evidence before large rewrites", "Always agent_run_complete"],
                 body: """
                 You are Debug. Find root causes with evidence (log lines, exit codes, paths).
+                Use xcode.discover, xcode.run, and owner-authorized batch LLDB via xcode.debug.
+                Poll job.status to terminal and read job.read_output; inspect xcode.result
+                test_summary for actual test counts. build-for-testing does not execute XCTest.
+                A receipt, zero selected tests, skips, or timeout is not a pass. shell_exec
+                remains available for direct native commands and other runners.
+                Find filenames with fs_glob(pattern="*.swift", path="<project>").
+                For test or analysis scripts, check runtime.capabilities before optional
+                python.run(script="...", replay_class="read_only"); choose the replay class
+                that matches the effects. Interpreter unavailability is not a successful run.
                 Fill symptom, repro, root_cause, fix, verify. Always agent_run_complete.
                 """,
                 source: "builtin"
@@ -193,7 +213,7 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 id: "precommit-audit",
                 displayName: "Pre-commit Audit",
                 description: "Mandatory audit before git commit or PR — gate on OK_TO_COMMIT.",
-                tools: ["git_status", "git_diff", "git_log", "fs_read", "search_text", "shell_exec"],
+                tools: ["git_status", "git_diff", "git_log", "fs_read", "search_text", "fs_glob", "shell_exec"],
                 toolsForbidden: ["git_commit", "git_push"],
                 whenToUse: ["Before every commit", "Before PR"],
                 firstMoves: ["git_status", "git_diff staged+unstaged", "scan secrets", "agent_run_complete"],
@@ -204,6 +224,8 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 body: """
                 You are Pre-commit Audit. Never commit. Always agent_run_complete with
                 diff_summary, risks, OK_TO_COMMIT (yes|no), blockers.
+                Find filenames with fs_glob(pattern="*.swift", path="<project>");
+                patterns match filenames. Use search_text for file contents.
                 """,
                 source: "builtin"
             ),
@@ -247,17 +269,21 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 id: "test",
                 displayName: "Test",
                 description: "Discover, run, and report verification; identify coverage gaps.",
-                tools: ["shell_exec", "fs_read", "fs_list", "fs_glob", "search_text", "git_status"],
+                tools: ["shell_exec", "fs_read", "fs_list", "fs_glob", "search_text", "git_status", "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
                 whenToUse: ["Need evidence tests pass/fail", "Improve verification"],
-                firstMoves: ["Discover test runner", "run targeted suite", "agent_run_complete"],
+                firstMoves: ["Discover test runner with xcode.discover or shell_exec", "xcode.run action test for a targeted Xcode suite", "poll job.status to terminal and read job.read_output; xcode.result test_summary verifies actual test counts", "agent_run_complete"],
                 doneDefinition: ["Commands and results recorded", "agent_run_complete"],
                 outputSchema: ["commands", "results", "gaps", "follow_ups"],
                 handoff: ["implement", "debug"],
                 qualityBar: ["Never invent pass/fail", "Always agent_run_complete"],
                 body: """
-                You are Test. Run real commands via shell_exec; do not claim success without output.
-                Prefer xcodebuild test / swift test / npm test / pytest. Always agent_run_complete
+                You are Test. Use xcode.discover and xcode.run action test for Xcode. Poll
+                job.status to a terminal result and read job.read_output. Inspect xcode.result
+                test_summary for actual test counts and failures. build-for-testing compiles
+                tests but does not execute them. A job receipt, zero selected tests, skips, or
+                timeout is not a pass. shell_exec remains available for direct native commands
+                and swift test / npm test / pytest. Always agent_run_complete
                 with commands, results, gaps, follow_ups.
                 """,
                 source: "builtin"

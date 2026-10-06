@@ -262,7 +262,7 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         retainObservation("ordered-out-value-updates", before: orderedOutBaseline)
 
         let beforeReorder = counter(.gaugeDraws)
-        await presentFixtureWindow(fixture, stage: "ordered-front")
+        try await presentFixtureWindow(fixture, stage: "ordered-front")
         XCTAssertTrue(fixture.window.isVisible)
         let exposedAfterReorder = await waitUntil(timeout: 5) {
             fixture.window.occlusionState.contains(.visible)
@@ -424,7 +424,7 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         self.fixture = fixture
         // Ordered-in windows can remain fully obscured by another application.
         // Establish real exposure before measuring automatic visible frames.
-        await presentFixtureWindow(fixture, stage: "initial")
+        try await presentFixtureWindow(fixture, stage: "initial")
         XCTAssertTrue(fixture.window.isVisible)
         let exposed = await waitUntil(timeout: 5) {
             fixture.window.occlusionState.contains(.visible)
@@ -441,7 +441,7 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         return fixture
     }
 
-    private func presentFixtureWindow(_ fixture: NativeGaugeWindow, stage: String) async {
+    private func presentFixtureWindow(_ fixture: NativeGaugeWindow, stage: String) async throws {
         // The fixture orders out its last window and can lose activation to the
         // test runner. Cooperative activate() cannot reclaim it without that
         // application's participation. Use the public foreground activation
@@ -452,8 +452,13 @@ final class NativeGaugeLifecycleTests: XCTestCase, @unchecked Sendable {
         let activated = await waitUntil(timeout: 5) {
             NSApp.isActive && fixture.window.isKeyWindow
         }
-        if !activated { retainObservation("\(stage)-activation-failure", before: nil) }
-        XCTAssertTrue(activated, "The native application host and exact fixture window must become active before qualifying visible rendering")
+        guard activated else {
+            retainObservation("\(stage)-activation-failure", before: nil)
+            throw NativeGaugeTestFailure(
+                "The native application host and exact fixture window must become active before qualifying visible rendering " +
+                "(stage: \(stage), application_active: \(NSApp.isActive), fixture_key: \(fixture.window.isKeyWindow))"
+            )
+        }
     }
 
     private func requireProductionSurfaces(in fixture: NativeGaugeWindow) throws -> [MTKView] {

@@ -1049,6 +1049,7 @@ final class ProjectInstructionQueueTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testMixedFormatPackageAccountsForUTF16PDFDOCXRTFHTMLAndJSON() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -1945,5 +1946,69 @@ final class ProjectInstructionQueueTests: XCTestCase {
             createdAt: "2027-01-15T08:00:00Z",
             updatedAt: "2027-01-15T08:00:03Z"
         )
+    }
+}
+
+extension ProjectInstructionQueueTests {
+    func testInstructionQueueInitializationPreservesMissingConfigurationAndCachedShellOptOut() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-queue-storage-owner-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        XCTAssertTrue(app.config.model.shell.enabled)
+        XCTAssertFalse(app.config.model.shell.userDisabled)
+        _ = try app.config.update([
+            "shell": ["enabled": false, "user_disabled": true, "policy_origin": "user_disabled"]
+        ])
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let cachedModel = try encoder.encode(app.config.model)
+        let originalConfig = try Data(contentsOf: app.paths.configJSON)
+        let projectID = ProjectID()
+        let original = try ProjectInstructionQueueStore(paths: app.paths)
+        let originalSnapshot = try original.snapshotPage(projectID: projectID, generation: .initial, cursor: 0, limit: 128)
+        XCTAssertEqual(originalSnapshot.projectID, projectID)
+        XCTAssertEqual(originalSnapshot.projectGeneration, .initial)
+        XCTAssertEqual(originalSnapshot.totalPackages, 0)
+        XCTAssertTrue(originalSnapshot.packages.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), originalConfig)
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+
+        try FileManager.default.removeItem(at: app.paths.configJSON)
+        try FileManager.default.removeItem(at: app.paths.cacheDir)
+        let reopened = try ProjectInstructionQueueStore(paths: app.paths)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.cacheDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.instructionPackageStoreDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.paths.configMigrationsDir.path))
+        let reopenedSnapshot = try reopened.snapshotPage(projectID: projectID, generation: .initial, cursor: 0, limit: 128)
+        XCTAssertEqual(reopenedSnapshot, originalSnapshot)
+        XCTAssertFalse(app.config.model.shell.enabled)
+        XCTAssertTrue(app.config.model.shell.userDisabled)
+        XCTAssertEqual(try encoder.encode(app.config.model), cachedModel)
+        if FileManager.default.fileExists(atPath: app.paths.configJSON.path) {
+            let recreated = try JSONSupport.object(from: Data(contentsOf: app.paths.configJSON))
+            let shell = recreated["shell"] as? [String: Any]
+            XCTAssertEqual(shell?["enabled"] as? Bool, false)
+            XCTAssertEqual(shell?["user_disabled"] as? Bool, true)
+        }
+
+        // Cold storage creation retains the queue's existing directory contract,
+        // while initial app bootstrap remains the owner of default configuration.
+        let coldPaths = AppPaths(home: home.appendingPathComponent("new-queue-storage-parent", isDirectory: true))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: coldPaths.home.path))
+        let coldQueue = try ProjectInstructionQueueStore(paths: coldPaths)
+        let coldSnapshot = try coldQueue.snapshotPage(projectID: projectID, generation: .initial, cursor: 0, limit: 128)
+        XCTAssertEqual(coldSnapshot, originalSnapshot)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: coldPaths.home.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: coldPaths.agentsDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: coldPaths.cacheDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: coldPaths.logsDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: coldPaths.instructionPackageStoreDir.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: coldPaths.configJSON.path))
+        let protected = try FileManager.default.attributesOfItem(atPath: coldPaths.interactiveResumeAcknowledgementsDir.path)
+        XCTAssertEqual((protected[.posixPermissions] as? NSNumber)?.intValue, 0o700)
     }
 }

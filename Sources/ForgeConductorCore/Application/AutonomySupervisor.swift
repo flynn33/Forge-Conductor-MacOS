@@ -39,6 +39,7 @@ public actor AutonomySupervisor {
     private let providerWorkAdmission: NativeProviderWorkAdmission
     private let shutdownDrainAttempts: Int
     private let clock: any Clock
+    private let diagnostics: (any DiagnosticRecording)?
 
     private var acceptingRuns = false
     private var coordinators: [RunID: any ProjectRunCoordinating] = [:]
@@ -68,6 +69,7 @@ public actor AutonomySupervisor {
         repository: ProjectControlPlaneRepository,
         maximumConcurrentRuns: Int,
         clock: any Clock = SystemClock(),
+        diagnostics: (any DiagnosticRecording)? = nil,
         coordinatorFactory: @escaping CoordinatorFactory
     ) throws {
         guard (1...16).contains(maximumConcurrentRuns) else {
@@ -76,6 +78,7 @@ public actor AutonomySupervisor {
         self.repository = repository
         self.maximumConcurrentRuns = maximumConcurrentRuns
         self.clock = clock
+        self.diagnostics = diagnostics
         self.coordinatorFactory = coordinatorFactory
         self.sourceBootstrap = nil
         self.providerWorkAdmission = try NativeProviderWorkAdmission(limit: maximumConcurrentRuns)
@@ -89,6 +92,7 @@ public actor AutonomySupervisor {
         sourceBootstrap: SourceBootstrapScheduling?,
         providerWorkAdmission: NativeProviderWorkAdmission? = nil,
         shutdownDrainAttempts: Int = 400,
+        diagnostics: (any DiagnosticRecording)? = nil,
         coordinatorFactory: @escaping CoordinatorFactory
     ) throws {
         guard (1...16).contains(maximumConcurrentRuns) else {
@@ -104,6 +108,7 @@ public actor AutonomySupervisor {
         self.sourceBootstrap = sourceBootstrap
         self.providerWorkAdmission = try providerWorkAdmission ?? NativeProviderWorkAdmission(limit: maximumConcurrentRuns)
         self.shutdownDrainAttempts = shutdownDrainAttempts
+        self.diagnostics = diagnostics
     }
 
     /// Manager-start seam: call immediately after opening/migrating the control-plane
@@ -289,6 +294,30 @@ public actor AutonomySupervisor {
         guard activationPermits[runID] == permit else {
             providerWorkAdmission.release(permit)
             return
+        }
+        if case .failure(let error) = result {
+            let code = (error as? any ManagedProviderFailure)?.managedProviderFailureCode
+                ?? (error as? AutonomyError)?.code
+                ?? (error is CancellationError ? "activation_cancelled" : "activation_failed")
+            let fields = [
+                "run_id": runID.description,
+                "error_code": code,
+                "error_type": String(reflecting: type(of: error)),
+                "error_description": DiagnosticRedaction.sanitizedError(error.localizedDescription),
+            ]
+            diagnostics?.error("autonomous_activation_failed", fields, category: .manager)
+            do {
+                try await repository.recordFirstAutonomousActivationFailure(
+                    runID: runID, errorCode: code,
+                    errorType: fields["error_type"] ?? "Error",
+                    errorSummary: fields["error_description"] ?? "Activation failed"
+                )
+            } catch {
+                diagnostics?.error("autonomous_activation_failure_persistence_failed", [
+                    "run_id": runID.description,
+                    "error_description": DiagnosticRedaction.sanitizedError(error.localizedDescription),
+                ], category: .manager)
+            }
         }
         activationPermits.removeValue(forKey: runID)
         tasks.removeValue(forKey: runID)

@@ -306,6 +306,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private var completedInteractiveHandoffIDs: [String] = []
     private var interactiveContinuityLastError: String?
 
+    private struct InteractiveContinuitySelection: Sendable {
+        let record: InteractiveContinuityHandoffRecord
+        let project: ProjectControlRecord
+        let context: ToolInvocationContext?
+    }
+
     public convenience init(
         app: ForgeApp,
         managedAutonomyFactory: @escaping ManagedAutonomyFactory = {
@@ -564,6 +570,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         let policy: BudgetPolicyState?
         let policyIssue: String?
         do {
+            try app.config.refreshIfChanged()
             policy = try app.config.budgetPolicySnapshot()
             policyIssue = nil
         } catch {
@@ -580,6 +587,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             watchdogIntervalSec: cfg.manager.watchdogIntervalSec,
             openBrowserOnStart: cfg.manager.openBrowserOnStart,
             sessionIdleTTLSec: cfg.sessions.idleTTLSec,
+            continuityRolloverToolCalls: cfg.sessions.continuityRolloverToolCalls,
             shellEnabled: shell.enabled,
             shellUserDisabled: shell.userDisabled,
             shellPolicyVersion: shell.policyVersion,
@@ -868,8 +876,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
         }
 
+        let currentProjectGenerations = Dictionary(uniqueKeysWithValues:
+            persisted.projects.filter { $0.lifecycleState == .active }
+                .map { ($0.projectID, $0.generation) }
+        )
         let continuityByProject = Dictionary(
-            persisted.continuity.map { ($0.command.projectID, $0) },
+            persisted.continuity.filter {
+                currentProjectGenerations[$0.command.projectID] == $0.command.projectGeneration
+            }.map { ($0.command.projectID, $0) },
             uniquingKeysWith: { first, _ in first }
         )
         let projectRows = try persisted.projects.map { project in
@@ -1582,7 +1596,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 projectID: projectID
             )
             var continuity: ManagerOperatorContinuityReadModel?
-            if let command {
+            if let command, project.lifecycleState == .active,
+               command.projectGeneration == project.generation {
                 var evidenceByOperation: [UUID: ManagerOperatorContinuityEvidence] = [:]
                 do {
                     let memory = try app.projectMemory.repositoryForProject(
@@ -3625,7 +3640,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private func toolUnavailableReasons() -> [String: String] {
         var reasons: [String: String] = [:]
         if !app.config.shellPolicyStatus.enabled {
-            reasons["shell_exec"] = "Shell access is disabled in Manager settings."
+            for tool in ToolAuthorizationService.runtimeExecutionTools {
+                reasons[tool] = "Shell access is disabled in Manager settings."
+            }
         }
         return reasons
     }
@@ -5260,7 +5277,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
         var projected: [ManagerContinuityReadiness] = []
         var projectsWithCurrentRuns = Set<ProjectID>()
-        for detail in runs where !detail.run.state.isTerminal {
+        let currentProjectGenerations = Dictionary(uniqueKeysWithValues:
+            projects.filter { $0.lifecycleState == .active }
+                .map { ($0.projectID, $0.generation) }
+        )
+        for detail in runs where !detail.run.state.isTerminal
+            && currentProjectGenerations[detail.run.projectID] == detail.run.projectGeneration {
             projectsWithCurrentRuns.insert(detail.run.projectID)
             projected.append(
                 operatorContinuityReadiness(
@@ -5329,7 +5351,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 .none
             )
         }
-        if let continuity {
+        if run.state != .paused, let continuity {
             switch continuity.command.state {
             case .queued:
                 if continuity.command.type == .checkpoint {
@@ -5501,7 +5523,16 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 "Review the recorded project condition in Events & Evidence; Forge retains durable task state.",
                 .reviewRun
             )
-        case .created, .validating, .ready, .starting, .running, .paused,
+        case .paused:
+            let reason = operatorSummary(run.lastErrorSummary, maximumCharacters: 512)
+            return (
+                .blocked,
+                reason.map { "This task is paused. \($0)" }
+                    ?? "This task is paused; automatic continuity monitoring is suspended.",
+                "Open Projects, then Run Details, to review and resume the paused task. Its saved state is retained.",
+                .reviewRun
+            )
+        case .created, .validating, .ready, .starting, .running,
              .validatingCompletion, .cancelRequested:
             return (
                 .monitoring,
@@ -6506,12 +6537,14 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         var existingSessionReused = false
         var acknowledgementReceived = false
         do {
-            guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true) else {
+            try app.store.importInteractiveContinuitySeals(packetIDs: interactiveCompatibilitySeals())
+            let projects = try await app.projectContexts.repository.operatorProjects(limit: 100)
+            guard let packet = try interactivePacket(projects: projects) else {
                 return nil
             }
             handoffID = packet.id
             stage = "completed_identity_check"
-            guard !interactiveHandoffAlreadyCompleted(packet.id) else { return packet.id }
+            guard try !interactiveHandoffAlreadyCompleted(packet.id) else { return packet.id }
             app.diagnostics.info("manager_interactive_continuity_attempt", [
                 "attempt_id": attemptID,
                 "handoff_id": handoffID,
@@ -6532,16 +6565,12 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     try await Task.sleep(for: .seconds(remaining))
                 }
             }
-            try Task.checkCancellation()
-
             stage = "project_resolution"
-            let projects = try await app.projectContexts.repository.operatorProjects(limit: 100)
-            guard let project = Self.interactiveProject(for: packet, projects: projects) else {
-                throw ProjectMemoryError.invalidRequest(
-                    "No registered project matches interactive handoff \(packet.id)"
-                )
-            }
+            let selection = try interactiveSelection(packet: packet, projects: projects)
+            let project = selection.project
             projectID = project.projectID.description
+            stage = "project_authority_after_countdown"
+            try await revalidateInteractiveSelection(selection)
             stage = "handoff_preparation"
             let handoff = try Self.interactiveHandoff(packet: packet, project: project)
             stage = "host_adapter_resolution"
@@ -6553,6 +6582,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             )
             stage = "host_capability_check"
             let capabilities = try await adapter.capabilities()
+            stage = "project_authority_after_capability_check"
+            try await revalidateInteractiveSelection(selection)
             guard capabilities.create, capabilities.bootstrap,
                   capabilities.idempotency || capabilities.queryByIdempotencyKey else {
                 throw ContinuityRunError.hostCapabilityUnavailable
@@ -6560,7 +6591,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             let idempotencyKey = "interactive-continuity:\(packet.id)"
             let session: HostSession
             stage = "successor_lookup"
-            if let existing = try await adapter.session(forIdempotencyKey: idempotencyKey) {
+            let existing = try await adapter.session(forIdempotencyKey: idempotencyKey)
+            stage = "project_authority_after_successor_lookup"
+            try await revalidateInteractiveSelection(selection)
+            if let existing {
                 session = existing
                 existingSessionReused = true
             } else {
@@ -6579,10 +6613,15 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     predecessorSessionID: packet.clientID ?? "lmstudio-interactive",
                     idempotencyKey: idempotencyKey
                 ))
+                successorSessionID = session.id
+                stage = "project_authority_after_successor_creation"
+                try await revalidateInteractiveSelection(selection)
             }
             successorSessionID = session.id
             stage = "successor_bootstrap"
             try await adapter.bootstrap(session, handoff: handoff)
+            stage = "project_authority_after_successor_bootstrap"
+            try await revalidateInteractiveSelection(selection)
             stage = "successor_acknowledgement"
             let acknowledgement = try await adapter.awaitAcknowledgement(
                 session: session,
@@ -6596,8 +6635,18 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                     "interactive successor acknowledgement identity differs"
                 )
             }
+            stage = "project_authority_after_successor_acknowledgement"
+            try await revalidateInteractiveSelection(selection)
             stage = "completion_commit"
-            try markInteractiveHandoffCompleted(packet.id)
+            try await sealInteractiveSelection(selection)
+            do {
+                try markInteractiveHandoffCompleted(packet.id)
+            } catch {
+                app.diagnostics.warn("manager_interactive_completion_projection_deferred", [
+                    "handoff_id": packet.id, "completion_committed": "true",
+                    "error": error.localizedDescription,
+                ], category: .manager)
+            }
             app.diagnostics.info(
                 "manager_interactive_continuity_completed",
                 [
@@ -6639,10 +6688,84 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         }
     }
 
-    private func interactiveHandoffAlreadyCompleted(_ handoffID: String) -> Bool {
+    private func interactiveCompatibilitySeals() -> [String] {
         lock.lock()
         defer { lock.unlock() }
-        return completedInteractiveHandoffIDs.contains(handoffID)
+        return completedInteractiveHandoffIDs
+    }
+
+    private func interactiveHandoffAlreadyCompleted(_ handoffID: String) throws -> Bool {
+        if interactiveCompatibilitySeals().contains(handoffID) { return true }
+        return try app.store.interactiveContinuityHandoffRecord(packetID: handoffID)?.isSealed == true
+    }
+
+    private func interactiveSelection(
+        packet: HandoffPacket, projects: [ProjectControlRecord]
+    ) throws -> InteractiveContinuitySelection {
+        guard let project = Self.interactiveProject(for: packet, projects: projects.filter { $0.lifecycleState == .active }) else {
+            throw ProjectMemoryError.invalidRequest("No registered project matches interactive handoff \(packet.id)")
+        }
+        guard let record = try app.store.interactiveContinuityHandoffRecord(packetID: packet.id),
+              record.packet == packet, packet.resumeReady else {
+            throw StoreError.conflict("interactive continuity selection changed before dispatch")
+        }
+        var context: ToolInvocationContext?
+        if let scopeKey = record.runtimeScopeKey {
+            guard let clientID = packet.clientID else { throw ProjectContextError.projectScopeMismatch }
+            let current = try app.projectContexts.invocationContext(for: ClientID(clientID))
+            guard current.projectID == project.projectID,
+                  current.projectGeneration == project.generation,
+                  current.runID == nil, current.providerSessionID == nil,
+                  app.continuityAutomation.runtimeScopeKey(current) == scopeKey else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            context = current
+        }
+        return InteractiveContinuitySelection(record: record, project: project, context: context)
+    }
+
+    private func revalidateInteractiveSelection(_ selection: InteractiveContinuitySelection) async throws {
+        try Task.checkCancellation()
+        guard let project = try await app.projectContexts.repository.project(selection.project.projectID) else {
+            throw ProjectContextError.projectNotFound(selection.project.projectID)
+        }
+        guard project.generation == selection.project.generation else {
+            throw ProjectContextError.staleProjectGeneration(expected: selection.project.generation, actual: project.generation)
+        }
+        guard project.lifecycleState == .active else { throw ProjectContextError.projectNotActive(project.lifecycleState) }
+        guard project.canonicalRoot == selection.project.canonicalRoot else { throw ProjectContextError.projectScopeMismatch }
+        if let context = selection.context {
+            try app.projectContexts.validate(context)
+            let current = try app.projectContexts.invocationContext(for: context.clientID)
+            guard current == context,
+                  app.continuityAutomation.runtimeScopeKey(current) == selection.record.runtimeScopeKey else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+        }
+        guard let current = try app.store.interactiveContinuityHandoffRecord(packetID: selection.record.packet.id),
+              current.writeSequence == selection.record.writeSequence,
+              current.packet == selection.record.packet,
+              current.runtimeScopeKey == selection.record.runtimeScopeKey else {
+            throw StoreError.conflict("interactive continuity packet changed during host operation")
+        }
+        try Task.checkCancellation()
+    }
+
+    private func sealInteractiveSelection(_ selection: InteractiveContinuitySelection) async throws {
+        try Task.checkCancellation()
+        let store = app.store
+        let record = selection.record
+        if let context = selection.context {
+            try await app.projectContexts.repository.commitIfCurrent(
+                context: context, owner: ProjectBindingOwner(kind: .mcpClient, id: context.clientID.rawValue),
+                resultKind: "interactive_continuity_completion", mutation: {
+                    try store.sealInteractiveContinuityHandoff(expected: record)
+                })
+        } else {
+            try await app.projectContexts.repository.withActiveProjectGeneration(
+                projectID: selection.project.projectID, expectedGeneration: selection.project.generation,
+                operation: { try store.sealInteractiveContinuityHandoff(expected: record) })
+        }
     }
 
     private func markInteractiveHandoffCompleted(_ handoffID: String) throws {
@@ -6690,7 +6813,7 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
     private func interactiveContinuityStatus(
         projects: [ProjectControlRecord]
     ) throws -> ManagerInteractiveContinuityStatus? {
-        guard let packet = try app.store.handoffLegacyLatest(resumeReadyOnly: true),
+        guard let packet = try interactivePacket(projects: projects),
               let updatedAt = ISO8601.date(from: packet.updatedAt) else {
             return nil
         }
@@ -6698,8 +6821,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             .projectID.description
         let dueAt = updatedAt.addingTimeInterval(Self.interactiveRolloverDelaySeconds)
         let remaining = max(0, Int(ceil(dueAt.timeIntervalSince(app.clock.now()))))
+        let completed = try interactiveHandoffAlreadyCompleted(packet.id)
         lock.lock()
-        let completed = completedInteractiveHandoffIDs.contains(packet.id)
         let lastError = interactiveContinuityLastError
         lock.unlock()
         let state: String
@@ -6727,15 +6850,100 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         )
     }
 
+    private func interactivePacket(projects: [ProjectControlRecord]) throws -> HandoffPacket? {
+        let projects = projects.filter { $0.lifecycleState == .active }
+        let bindings = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.app.projectContexts.repository.operatorBindings(
+                projectIDs: projects.map(\.projectID), ownerKind: .mcpClient)
+        }
+        var currentKeys = Set<String>()
+        var contextsByKey: [String: ToolInvocationContext] = [:]
+        for project in projects {
+            for binding in bindings[project.projectID] ?? [] where binding.owner.kind == .mcpClient {
+                guard binding.projectGeneration == project.generation else { continue }
+                let context: ToolInvocationContext
+                do {
+                    context = try app.projectContexts.invocationContext(for: ClientID(binding.owner.id))
+                } catch let error as ProjectContextError {
+                    switch error {
+                    case .projectContextRequired, .projectScopeMismatch, .staleProjectGeneration,
+                         .projectNotFound, .projectNotActive:
+                        continue
+                    default: throw error
+                    }
+                } catch is DesktopProviderMCPAttachmentError {
+                    continue
+                }
+                guard context.projectID == project.projectID,
+                      context.projectGeneration == project.generation else { continue }
+                let key = app.continuityAutomation.runtimeScopeKey(context)
+                currentKeys.insert(key)
+                contextsByKey[key] = context
+            }
+        }
+        let receipts = try Self.waitForAsync(timeoutSeconds: 10) {
+            try await self.app.projectContexts.repository.operatorLatestResetReceipts(projectIDs: projects.map(\.projectID))
+        }
+        func candidate(excluding completed: Set<String>, pendingOnly: Bool) throws -> HandoffPacket? {
+            if let selected = try app.store.handoffRuntimeLatest(scopeKeys: currentKeys, excludingPacketIDs: completed,
+                pendingInteractiveOnly: pendingOnly),
+               let project = Self.interactiveProject(for: selected.packet, projects: projects),
+               let ownerKey = try app.store.runtimeContinuityPacketScopeKey(packetID: selected.packet.id),
+               let context = contextsByKey[ownerKey],
+               context.projectID == project.projectID,
+               context.clientID.rawValue == selected.packet.clientID {
+                return selected.packet
+            }
+            let legacyPackets = try app.store.handoffLegacyList(
+                limit: 100, unscopedOnly: true, excludingPacketIDs: completed,
+                pendingInteractiveOnly: pendingOnly
+            ).filter(\.resumeReady)
+            let pathsByID = Dictionary(uniqueKeysWithValues: legacyPackets.compactMap { packet in
+                Self.interactiveCanonicalPath(packet.cwd).map { (packet.id, $0) }
+            })
+            let knownProjects = try Self.waitForAsync(timeoutSeconds: 10) {
+                try await self.app.projectContexts.repository.knownProjects(
+                    containingCanonicalPaths: Array(pathsByID.values))
+            }
+            for packet in legacyPackets {
+                if let path = pathsByID[packet.id], let known = knownProjects[path],
+                   known.lifecycleState != .active {
+                    continue
+                }
+                if let project = Self.interactiveProject(for: packet, projects: projects),
+                   project.generation > .initial {
+                    if let receipt = receipts[project.projectID],
+                       let resetAt = ISO8601.date(from: receipt.completedAt),
+                       let savedAt = ISO8601.date(from: packet.updatedAt), savedAt < resetAt {
+                        continue
+                    }
+                }
+                return packet
+            }
+            return nil
+        }
+        lock.lock()
+        let completed = Set(completedInteractiveHandoffIDs)
+        lock.unlock()
+        if let pending = try candidate(excluding: completed, pendingOnly: true) { return pending }
+        // Keep completed status and idempotent replay visible when no other
+        // project has pending work; completed history cannot starve that work.
+        if let historical = try candidate(excluding: [], pendingOnly: false),
+           try interactiveHandoffAlreadyCompleted(historical.id) {
+            return historical
+        }
+        return nil
+    }
+
     private static func interactiveProject(
         for packet: HandoffPacket,
         projects: [ProjectControlRecord]
     ) -> ProjectControlRecord? {
-        if let cwd = packet.cwd, !cwd.isEmpty {
-            let candidate = URL(fileURLWithPath: cwd).standardizedFileURL.path
+        if let candidate = interactiveCanonicalPath(packet.cwd) {
             let matches = projects.filter {
                 let root = $0.canonicalRoot.standardizedFileURL.path
-                return candidate == root || candidate.hasPrefix(root + "/")
+                return candidate == root || (root == "/" && candidate.hasPrefix("/"))
+                    || candidate.hasPrefix(root + "/")
             }
             if let longest = matches.max(by: {
                 $0.canonicalRoot.path.count < $1.canonicalRoot.path.count
@@ -6750,6 +6958,11 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             if matches.count == 1 { return matches[0] }
         }
         return projects.count == 1 ? projects[0] : nil
+    }
+
+    private static func interactiveCanonicalPath(_ cwd: String?) -> String? {
+        guard let cwd, !cwd.isEmpty, !cwd.contains("\0"), cwd.utf8.count <= 4_096 else { return nil }
+        return ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     private static func interactiveHandoff(

@@ -177,6 +177,10 @@ final class RuneForgeViewModel: ObservableObject {
     @Published private(set) var governingPolicy: GoverningPolicyIdentity?
     @Published private(set) var health: StjornarvaldManagerHealth?
     @Published private(set) var limitations: [String] = []
+    var evaluationCoverageDescription: String {
+        limitations.first { $0.hasPrefix("Automatic detection") }
+            ?? "Automatic policy evaluation coverage is unavailable."
+    }
     @Published private(set) var isLoading = false
     @Published private(set) var isExporting = false
     @Published private(set) var errorMessage: String?
@@ -186,6 +190,7 @@ final class RuneForgeViewModel: ObservableObject {
     private var pollingTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var commandTask: Task<Void, Never>?
+    private var commandID: UUID?
 
     init(client: any RuneForgeManagerClientProtocol) {
         self.client = client
@@ -344,17 +349,21 @@ final class RuneForgeViewModel: ObservableObject {
             errorMessage = "Wait for every selected policy source to finish registering before reordering."
             return
         }
-        runCommand { [weak self] in
+        let reorderCommandID = UUID()
+        runCommand(id: reorderCommandID) { [weak self] in
             guard let self else { return }
             do {
                 let persisted = try await client.reorderRuneForgeSources(sourceIDs: orderedIDs)
+                guard commandID == reorderCommandID else { return }
                 let remote = persisted.map(RuneForgeSourceItem.init)
                 let builtIn = sources.filter { $0.origin == .builtInRavenForge }
                 sources = Array((builtIn + remote).prefix(Self.maximumSources))
                 noticeMessage = "Development Policy priority updated."
             } catch is CancellationError {
+                guard commandID == reorderCommandID else { return }
                 sources = prior
             } catch {
+                guard commandID == reorderCommandID else { return }
                 sources = prior
                 errorMessage = error.localizedDescription
             }
@@ -527,7 +536,8 @@ final class RuneForgeViewModel: ObservableObject {
         }
     }
 
-    private func runCommand(_ operation: @escaping @MainActor () async -> Void) {
+    private func runCommand(id: UUID = UUID(), _ operation: @escaping @MainActor () async -> Void) {
+        commandID = id
         commandTask?.cancel()
         commandTask = Task { await operation() }
     }

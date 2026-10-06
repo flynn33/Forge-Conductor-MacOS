@@ -294,7 +294,32 @@ final class AppBootstrapAppTests: XCTestCase {
         var cancellations = 0
         XCTAssertTrue(operation.start(diagnosticsFactory: { diagnostics }) { result in
             guard case .failure(is CancellationError) = result else {
-                return XCTFail("Cancelled shared bootstrap published an application")
+                let bounded = { (value: String) in
+                    String(decoding: value.utf8.prefix(256), as: UTF8.self)
+                }
+                let outcome: String
+                switch result {
+                case .failure(let error):
+                    let nativeError = error as NSError
+                    outcome = "failure type=" + bounded(String(reflecting: type(of: error)))
+                        + " domain=" + bounded(DiagnosticRedaction.redactedValue(nativeError.domain, forKey: "error_domain"))
+                        + " code=" + String(nativeError.code)
+                        + " error=" + bounded(DiagnosticRedaction.sanitizedError(String(describing: error)))
+                case .success(_):
+                    outcome = "success(AppBootstrapSnapshot)"
+                }
+                let diagnosticFields = ["error", "error_type", "error_domain", "error_code", "bootstrap_stage"]
+                let recent = diagnostics.recent(limit: 8).map { record in
+                    let fields = diagnosticFields.compactMap { key -> String? in
+                        guard let value = record.fields[key] else { return nil }
+                        return key + "=" + bounded(DiagnosticRedaction.redactedValue(value, forKey: key))
+                    }.joined(separator: ",")
+                    return bounded(DiagnosticRedaction.redactedValue(record.event, forKey: "event"))
+                        + "[" + record.category.rawValue + "/" + record.severity.rawValue + "]{" + fields + "}"
+                }.joined(separator: " | ")
+                let details = outcome + "; diagnostic_ring=" + recent
+                return XCTFail("Cancelled shared bootstrap published an application; "
+                    + String(decoding: details.utf8.prefix(3_840), as: UTF8.self))
             }
             cancellations += 1
         })

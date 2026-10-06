@@ -1,6 +1,7 @@
 // Advances one managed-autonomy rollover through the durable V2 state machine.
 
 import Foundation
+import CoreFoundation
 
 /// Test-only termination seams for the documented managed-rollover crash matrix.
 /// Several logical host boundaries are co-located by the atomic V2 adapter call, but
@@ -93,7 +94,8 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
         let lastToolCallID = run.specification.work.metadata["managed_last_tool_call_id"]
         let lastToolOutput = run.specification.work.metadata["managed_last_tool_output"]
         let completedWork: [[String: Any]]
-        if let lastToolName, let lastToolCallID, let lastToolOutput {
+        if let lastToolName, let lastToolCallID, let lastToolOutput,
+           !Self.lastToolInvocationFailed(run.specification.work) {
             let summary = Self.boundedUTF8(
                 "Completed \(lastToolName): \(lastToolOutput)",
                 maximumBytes: 8_192
@@ -213,6 +215,23 @@ public struct DefaultManagedContinuityHandoffBuilder: ManagedContinuityHandoffBu
                 "acknowledgement_contract_version": 2,
             ]
         ).validated()
+    }
+
+    private static func lastToolInvocationFailed(_ work: AutonomousRunWork) -> Bool {
+        if let rawOutcome = work.metadata[ManagedToolInvocationOutcome.metadataKey],
+           let outcome = ManagedToolInvocationOutcome(rawValue: rawOutcome) {
+            return outcome == .failed
+        }
+        // Only a complete bounded legacy payload can establish a failed invocation.
+        // Records without an outcome retain their existing completion presentation.
+        guard let output = work.metadata["managed_last_tool_output"],
+              output.utf8.count <= 4 * 1_024,
+              let object = try? JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: Any],
+              let ok = object["ok"] as? NSNumber,
+              CFGetTypeID(ok) == CFBooleanGetTypeID() else {
+            return false
+        }
+        return !ok.boolValue
     }
 
     private static func stringArray(_ value: String?) -> [String] {

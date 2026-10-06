@@ -1609,3 +1609,156 @@ private func XCTAssertThrowsErrorAsync(
         XCTFail("Expected expression to throw", file: file, line: line)
     } catch {}
 }
+
+extension ManagedContinuityWorkerTests {
+    func testFailedBrokerToolEffectIsNotCompletedWorkInHandoff() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: false)
+        XCTAssertFalse(handoff.completedWork.contains {
+            $0["id"] as? String == "call-builder-read" && $0["status"] as? String == "completed"
+        })
+        XCTAssertTrue((handoff.nextActions.first?["action"] as? String)?.contains("not_found") == true)
+    }
+
+    func testSuccessfulBrokerToolEffectRemainsCompletedWorkInHandoff() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: true)
+        XCTAssertEqual(handoff.completedWork.first?["id"] as? String, "call-builder-read")
+        XCTAssertEqual(handoff.completedWork.first?["status"] as? String, "completed")
+    }
+
+    func testHistoricalLastToolMetadataStillCarriesCompletedWork() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: nil)
+        XCTAssertEqual(handoff.completedWork.first?["id"] as? String, "call-write-step-15")
+        XCTAssertEqual(handoff.completedWork.first?["status"] as? String, "completed")
+        XCTAssertTrue((handoff.completedWork.first?["summary"] as? String)?.contains("continuity-step-15.txt") == true)
+        XCTAssertEqual(handoff.nextActions.first?["action"] as? String, "Continue after bootstrap")
+    }
+
+    func testTypedFailedOutcomeExcludesUnparseableLastToolOutput() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: false,
+            outcomeOverride: "failed", outputOverride: "{\"ok\":")
+        XCTAssertFalse(handoff.completedWork.contains { $0["id"] as? String == "call-builder-read" })
+    }
+
+    func testTypedFailedOutcomeExcludesOutputBeyondLegacyParseBound() async throws {
+        let output = String(repeating: "x", count: 4 * 1_024 + 1)
+        XCTAssertEqual(output.utf8.count, 4_097)
+        let handoff = try await failedProgressHandoffFixture(succeeds: false,
+            outcomeOverride: "failed", outputOverride: output)
+        XCTAssertFalse(handoff.completedWork.contains { $0["id"] as? String == "call-builder-read" })
+    }
+
+    func testTypedQueuedSubmissionRetainsCompletedInvocationWithoutNativePassClaim() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: true,
+            outcomeOverride: "succeeded", submissionOnly: true)
+        XCTAssertEqual(handoff.completedWork.first?["id"] as? String, "call-builder-read")
+        XCTAssertEqual(handoff.completedWork.first?["status"] as? String, "completed")
+        let summary = try XCTUnwrap(handoff.completedWork.first?["summary"] as? String)
+        XCTAssertTrue(summary.contains("\"state\":\"queued\""))
+        XCTAssertTrue(summary.contains("\"submission_only\":true"))
+        XCTAssertFalse(summary.contains("exit_code"))
+        XCTAssertEqual(handoff.validation["passed_gates"] as? [String], [])
+    }
+
+    func testLegacyNumericZeroRetainsUnknownOutcomeCompatibility() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: nil, outputOverride: "{\"ok\":0}")
+        XCTAssertEqual(handoff.completedWork.first?["id"] as? String, "call-write-step-15")
+        XCTAssertEqual(handoff.completedWork.first?["status"] as? String, "completed")
+    }
+
+    func testLegacyBooleanFalseExcludesFailedInvocation() async throws {
+        let handoff = try await failedProgressHandoffFixture(succeeds: nil, outputOverride: "{\"ok\":false}")
+        XCTAssertFalse(handoff.completedWork.contains { $0["id"] as? String == "call-write-step-15" })
+    }
+
+    private func failedProgressHandoffFixture(
+        succeeds: Bool?,
+        outcomeOverride: String? = nil,
+        outputOverride: String? = nil,
+        submissionOnly: Bool = false
+    ) async throws -> ContinuityHandoffV2 {
+        let fixture = try await makeFixture(label: "tool-outcome-handoff", continuityState: .running)
+        defer { fixture.destroy() }
+        do {
+            var run = fixture.run
+            var work = run.specification.work
+            if let succeeds {
+                let executor = BuilderToolOutcomeExecutor(succeeds: succeeds, submissionOnly: submissionOnly)
+                let broker = ToolInvocationBroker(repository: fixture.repository, executor: executor,
+                    classifier: try StaticToolReplayClassifier(productionToolNames: executor.toolNames,
+                        classifications: ["fixture.read": .readOnly]))
+                let turn = ProviderTurnIntent(runID: run.runID, sessionID: fixture.predecessorSessionID,
+                    projectID: run.projectID, projectGeneration: run.projectGeneration,
+                    kind: .normalContinuation, idempotencyKey: "builder-outcome:\(run.runID.description)",
+                    previousResponseID: "response-predecessor", inputSHA256: String(repeating: "3", count: 64))
+                _ = try await fixture.repository.persistProviderTurnIntent(turn, lease: fixture.lease)
+                let context = try await fixture.repository.invocationContext(
+                    for: ProjectBindingOwner(kind: .providerSession, id: fixture.predecessorSessionID))
+                let result = try await broker.invoke(BrokeredToolCall(providerCallID: "call-builder-read",
+                    toolName: "fixture.read", arguments: [:], idempotencyKey: "builder-read:\(run.runID.description)"),
+                    turnID: turn.turnID, context: context, lease: fixture.lease)
+                XCTAssertEqual(result.ok, succeeds)
+                XCTAssertEqual(result.isError, !succeeds)
+                let invocationValue = try await fixture.repository.toolInvocation(
+                    sessionID: fixture.predecessorSessionID, providerCallID: "call-builder-read")
+                let invocation = try XCTUnwrap(invocationValue)
+                XCTAssertEqual(invocation.state, .completed)
+                let storedResult = try XCTUnwrap(invocation.resultSummary)
+                XCTAssertEqual(invocation.resultSHA256, JSONSupport.sha256Hex(storedResult))
+                let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(storedResult.utf8)) as? [String: Any])
+                XCTAssertEqual(object["ok"] as? Bool, succeeds)
+                XCTAssertEqual(object["is_error"] as? Bool, !succeeds)
+                work.metadata["managed_last_tool_name"] = "fixture.read"
+                work.metadata["managed_last_tool_call_id"] = "call-builder-read"
+                work.metadata["managed_last_tool_output"] = try JSONSupport.canonicalJSON(result.payload)
+                work.nextAction = succeeds ? "Completed fixture.read; proceed to the next action"
+                    : "Failed fixture.read with not_found; repair the still-open read action"
+            }
+            if let outputOverride { work.metadata["managed_last_tool_output"] = outputOverride }
+            if let outcomeOverride { work.metadata["managed_last_tool_outcome"] = outcomeOverride }
+            if succeeds != nil || outputOverride != nil || outcomeOverride != nil {
+                let currentValue = try await fixture.repository.autonomousRun(run.runID)
+                let current = try XCTUnwrap(currentValue)
+                run = try await fixture.repository.transitionAutonomousRun(runID: run.runID, lease: fixture.lease,
+                    transition: AutonomousRunTransition(expectedState: current.state, expectedRevision: current.revision,
+                        nextState: .rollingOver, eventType: "fixture_tool_result_progress", eventSummary: "Saved exact broker result", work: work))
+            }
+            let projectValue = try await fixture.repository.project(run.projectID)
+            let project = try XCTUnwrap(projectValue)
+            let predecessorValue = try await fixture.repository.providerSession(fixture.predecessorSessionID)
+            let predecessor = try XCTUnwrap(predecessorValue)
+            let requestValue = try await fixture.repository.contextBudgetActionRequest(identity: fixture.budgetIdentity)
+            let request = try XCTUnwrap(requestValue)
+            let observationValue = try await fixture.repository.contextBudgetObservation(observationID: request.observationID)
+            let observation = try XCTUnwrap(observationValue)
+            let delivery = try await fixture.repository.instructionDeliveryProgress(run: run)
+            let handoff = try DefaultManagedContinuityHandoffBuilder().buildHandoff(
+                operationID: request.continuityOperationID, handoffID: UUID(), bootstrapNonce: String(repeating: "a", count: 64),
+                run: run, project: project, predecessor: predecessor, actionRequest: request,
+                observation: observation, instructionDelivery: delivery)
+            await fixture.repository.close()
+            return handoff
+        } catch {
+            await fixture.repository.close()
+            throw error
+        }
+    }
+}
+
+private final class BuilderToolOutcomeExecutor: ToolExecuting, @unchecked Sendable {
+    let succeeds: Bool
+    let submissionOnly: Bool
+    init(succeeds: Bool, submissionOnly: Bool = false) {
+        self.succeeds = succeeds
+        self.submissionOnly = submissionOnly
+    }
+    var toolNames: [String] { ["fixture.read"] }
+    func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult { result() }
+    func call(name: String, arguments: [String: Any], context: ToolInvocationContext) throws -> ToolResult { result() }
+    private func result() -> ToolResult {
+        if succeeds && submissionOnly {
+            return .success(["job_id": UUID().uuidString.lowercased(), "state": "queued", "submission_only": true])
+        }
+        return succeeds ? .success(["value": "fixture-output"])
+            : .failure(code: "not_found", message: "The fixture read did not produce an effect")
+    }
+}

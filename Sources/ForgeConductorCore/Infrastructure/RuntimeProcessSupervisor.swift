@@ -1077,6 +1077,8 @@ final class RuntimeOutputSpool: @unchecked Sendable {
         var hasher = SHA256()
         var artifactIdentity: ArtifactIdentity?
         var artifactTruncated = false
+        var producerEndReason: RuntimeOutputProducerEndReason?
+        var producerReadErrno: Int32?
         var writeError: Error?
     }
 
@@ -1229,6 +1231,20 @@ final class RuntimeOutputSpool: @unchecked Sendable {
         states[stream] = state
     }
 
+    func endProducer(
+        stream: RuntimeOutputStream,
+        reason: RuntimeOutputProducerEndReason,
+        readErrno: Int32? = nil
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finalized, var state = states[stream], state.producerEndReason == nil else { return }
+        state.producerEndReason = reason
+        state.producerReadErrno = reason == .readError ? readErrno : nil
+        if reason != .eof { state.artifactTruncated = true }
+        states[stream] = state
+    }
+
     func finalize() throws -> [RuntimeJobOutputMetadata] {
         lock.lock()
         defer { lock.unlock() }
@@ -1329,7 +1345,9 @@ final class RuntimeOutputSpool: @unchecked Sendable {
             sha256: digest,
             inlineTruncated: inlineTruncated,
             artifactTruncated: state.artifactTruncated,
-            artifactEvicted: false
+            artifactEvicted: false,
+            producerEndReason: state.producerEndReason,
+            producerReadErrno: state.producerReadErrno
         )
     }
 
@@ -1820,14 +1838,14 @@ private final class RuntimeProcessExitMonitor: @unchecked Sendable {
     }
 }
 
-private final class RuntimePipeReader: @unchecked Sendable {
+final class RuntimePipeReader: @unchecked Sendable {
     private let descriptor: Int32
     private let stream: RuntimeOutputStream
     private let spool: RuntimeOutputSpool
     private let stateLock = NSLock()
     private var didStart = false
     private var didFinish = false
-    private var didClose = false
+    private var closeRequested = false
 
     init(descriptor: Int32, stream: RuntimeOutputStream, spool: RuntimeOutputSpool) {
         self.descriptor = descriptor
@@ -1850,33 +1868,71 @@ private final class RuntimePipeReader: @unchecked Sendable {
         didStart = true
         stateLock.unlock()
         DispatchQueue.global(qos: .utility).async { [self] in
+            // Close requests leave this worker as the sole descriptor owner
+            // until it has stopped reading, preventing reads from a reused FD.
+            defer {
+                Darwin.close(descriptor)
+                stateLock.lock()
+                didFinish = true
+                stateLock.unlock()
+            }
+            let flags = Darwin.fcntl(descriptor, F_GETFL)
+            guard flags >= 0, Darwin.fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+                let saved = errno
+                recordProducerEnd(reason: .readError, readErrno: saved)
+                return
+            }
             var buffer = [UInt8](repeating: 0, count: 16 * 1_024)
             while true {
+                stateLock.lock()
+                let shouldClose = closeRequested
+                stateLock.unlock()
+                if shouldClose { return }
                 let count = buffer.withUnsafeMutableBytes { bytes in
                     Darwin.read(descriptor, bytes.baseAddress, bytes.count)
                 }
+                let saved = errno
                 if count > 0 {
                     spool.append(Data(buffer.prefix(count)), stream: stream)
                     continue
                 }
-                if count < 0 && errno == EINTR { continue }
-                break
+                if count == 0 {
+                    recordProducerEnd(reason: .eof)
+                    return
+                }
+                if saved == EINTR { continue }
+                if saved == EAGAIN || saved == EWOULDBLOCK {
+                    var pending = pollfd(fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0)
+                    let result = Darwin.poll(&pending, 1, 10)
+                    if result < 0, errno != EINTR {
+                        let pollError = errno
+                        recordProducerEnd(reason: .readError, readErrno: pollError)
+                        return
+                    }
+                    continue
+                }
+                recordProducerEnd(reason: .readError, readErrno: saved)
+                return
             }
-            close()
-            stateLock.lock()
-            didFinish = true
-            stateLock.unlock()
         }
+    }
+
+    private func recordProducerEnd(reason: RuntimeOutputProducerEndReason, readErrno: Int32? = nil) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard !closeRequested else { return }
+        spool.endProducer(stream: stream, reason: reason, readErrno: readErrno)
     }
 
     func close() {
         stateLock.lock()
-        guard !didClose else {
+        guard !didFinish, !closeRequested else {
             stateLock.unlock()
             return
         }
-        didClose = true
+        closeRequested = true
+        // Serialize the request with actual EOF: only an already-recorded EOF wins.
+        spool.endProducer(stream: stream, reason: .forcedClose)
         stateLock.unlock()
-        Darwin.close(descriptor)
     }
 }

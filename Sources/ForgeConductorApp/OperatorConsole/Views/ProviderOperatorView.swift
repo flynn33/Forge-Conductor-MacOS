@@ -314,6 +314,17 @@ struct ProviderOperatorView: View {
                         .foregroundStyle(GraphitePalette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Maximum output tokens")
+                        .font(.system(size: 13, weight: .medium))
+                    TextField("Maximum output tokens", value: $viewModel.maximumOutputTokens, format: .number)
+                        .textFieldStyle(GraphiteFieldStyle())
+                        .accessibilityIdentifier("provider-maximum-output-tokens")
+                    Text("Includes reasoning and the answer. Default: 4,096. Supported range: 1–65,536. Save before starting a new run.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !viewModel.availableModels.isEmpty {
                     Picker("Available models", selection: $viewModel.modelKey) {
                         Text("Choose a model").tag("")

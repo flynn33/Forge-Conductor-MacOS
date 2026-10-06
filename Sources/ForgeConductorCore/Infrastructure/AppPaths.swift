@@ -142,6 +142,15 @@ public final class AppPaths: @unchecked Sendable {
 
     @discardableResult
     public func ensureLayout() throws -> URL {
+        try layout(createDefaultConfiguration: true)
+    }
+
+    @discardableResult
+    func ensureStorageLayout() throws -> URL {
+        try layout(createDefaultConfiguration: false)
+    }
+
+    private func layout(createDefaultConfiguration: Bool) throws -> URL {
         let fm = FileManager.default
         for dir in [
             home, agentsDir, cacheDir, logsDir, dashboardDir, exportsDir,
@@ -164,7 +173,7 @@ public final class AppPaths: @unchecked Sendable {
         ] {
             try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
         }
-        if !fm.fileExists(atPath: configJSON.path) {
+        if createDefaultConfiguration && !fm.fileExists(atPath: configJSON.path) {
             let cfg: [String: Any] = [
                 "config_schema_version": AppConfig.currentSchemaVersion,
                 "log_level": "info",

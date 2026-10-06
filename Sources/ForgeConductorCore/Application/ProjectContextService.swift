@@ -584,6 +584,75 @@ public final class ProjectContextService: @unchecked Sendable {
         }
     }
 
+    /// Current ordinary packet readers inspect at most the operator query's
+    /// existing maximum, with owner kind filtered before that bounded limit.
+    func continuityReadContexts(
+        for context: ToolInvocationContext,
+        cancellation: ToolCallCancellation?
+    ) throws -> [ToolInvocationContext] {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try await self.repository.validate(context, for: Self.owner(for: context), cancellation: control)
+            let contexts = try await self.continuityReadContexts(
+                projectID: context.projectID, generation: context.projectGeneration, control: control
+            )
+            try await self.repository.validate(context, for: Self.owner(for: context), cancellation: control)
+            return contexts
+        }
+    }
+
+    /// Context recovery may inspect the only active project without admitting
+    /// the new client to project tools or changing a durable binding.
+    func soleActiveContinuityReadProject(
+        cancellation: ToolCallCancellation?
+    ) throws -> (project: ProjectControlRecord, contexts: [ToolInvocationContext])? {
+        try wait(cancellation: cancellation, committedResultWins: false) { control in
+            try control.checkCancellation()
+            let projects = try await self.repository.operatorProjects(limit: 2, lifecycleState: .active)
+            guard projects.count == 1, let project = projects.first else { return nil }
+            let contexts = try await self.continuityReadContexts(
+                projectID: project.projectID, generation: project.generation, control: control
+            )
+            try control.checkCancellation()
+            let current = try await self.repository.operatorProjects(limit: 2, lifecycleState: .active)
+            guard current.count == 1, let revalidated = current.first,
+                  revalidated.projectID == project.projectID, revalidated.generation == project.generation,
+                  revalidated.canonicalRoot == project.canonicalRoot else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            return (project, contexts)
+        }
+    }
+
+    private func continuityReadContexts(
+        projectID: ProjectID, generation: ProjectGeneration, control: ToolCallCancellation
+    ) async throws -> [ToolInvocationContext] {
+        let bindings = try await repository.operatorBindings(
+            projectIDs: [projectID], limitPerProject: 32, ownerKind: .mcpClient
+        )[projectID] ?? []
+        var contexts: [ToolInvocationContext] = []
+        for binding in bindings where binding.projectGeneration == generation {
+            try control.checkCancellation()
+            do {
+                let current = try await repository.invocationContext(
+                    for: binding.owner, clientID: ClientID(binding.owner.id), cancellation: control
+                )
+                if current.projectID == projectID, current.projectGeneration == generation {
+                    contexts.append(current)
+                }
+            } catch let error as ProjectContextError {
+                switch error {
+                case .projectContextRequired, .projectScopeMismatch, .staleProjectGeneration,
+                     .projectNotFound, .projectNotActive:
+                    continue
+                default: throw error
+                }
+            } catch is DesktopProviderMCPAttachmentError {
+                continue
+            }
+        }
+        return contexts
+    }
+
     public func validate(
         _ context: ToolInvocationContext,
         for owner: ProjectBindingOwner,

@@ -104,7 +104,8 @@ public enum ForgeProcessEntry {
         do {
             let desktopProviderID = try desktopProviderID(inServeArguments: arguments)
             let app = try ForgeApp.bootstrap(
-                home: home ?? homeOverride(from: arguments)
+                home: home ?? homeOverride(from: arguments),
+                startTelemetry: false
             )
             // MCP owns stdout. Normal lifecycle diagnostics are persisted by
             // DiagnosticLog; keep stderr quiet unless startup actually fails.

@@ -1,5 +1,10 @@
 import Foundation
 
+public enum ProviderConfigurationContract {
+    public static let defaultMaximumOutputTokens = 4_096
+    public static let maximumOutputTokens = 65_536
+}
+
 /// Redacted configuration shared by the manager and native client. Revision is an
 /// opaque compare-and-swap token, including across manager restarts.
 public struct ProviderConfigurationSnapshot: Codable, Sendable, Equatable {
@@ -10,14 +15,17 @@ public struct ProviderConfigurationSnapshot: Codable, Sendable, Equatable {
     public let credentialConfigured: Bool
     public let saved: Bool
     public let credentialCleanupPending: Bool
+    public let maximumOutputTokens: Int
 
     public init(revision: String, endpoint: String,
                 endpointMode: LMStudioEndpointMode = .local, modelKey: String?,
-                credentialConfigured: Bool, saved: Bool, credentialCleanupPending: Bool = false) {
+                credentialConfigured: Bool, saved: Bool, credentialCleanupPending: Bool = false,
+                maximumOutputTokens: Int = ProviderConfigurationContract.defaultMaximumOutputTokens) {
         self.revision = revision; self.endpoint = endpoint; self.modelKey = modelKey
         self.endpointMode = endpointMode
         self.credentialConfigured = credentialConfigured; self.saved = saved
         self.credentialCleanupPending = credentialCleanupPending
+        self.maximumOutputTokens = maximumOutputTokens
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -28,6 +36,7 @@ public struct ProviderConfigurationSnapshot: Codable, Sendable, Equatable {
         case credentialConfigured
         case saved
         case credentialCleanupPending
+        case maximumOutputTokens
     }
 
     public init(from decoder: Decoder) throws {
@@ -43,7 +52,9 @@ public struct ProviderConfigurationSnapshot: Codable, Sendable, Equatable {
             saved: try values.decode(Bool.self, forKey: .saved),
             credentialCleanupPending: try values.decodeIfPresent(
                 Bool.self, forKey: .credentialCleanupPending
-            ) ?? false
+            ) ?? false,
+            maximumOutputTokens: try values.decodeIfPresent(Int.self, forKey: .maximumOutputTokens)
+                ?? ProviderConfigurationContract.defaultMaximumOutputTokens
         )
     }
 }
@@ -61,13 +72,16 @@ public struct ProviderConfigurationUpdate: Codable, Sendable {
     public let modelKey: String?
     public let credentialAction: ProviderCredentialAction
     public let token: String?
+    public let maximumOutputTokens: Int?
 
     public init(expectedRevision: String, endpoint: String,
                 endpointMode: LMStudioEndpointMode? = nil, modelKey: String?,
-                credentialAction: ProviderCredentialAction = .keep, token: String? = nil) {
+                credentialAction: ProviderCredentialAction = .keep, token: String? = nil,
+                maximumOutputTokens: Int? = nil) {
         self.expectedRevision = expectedRevision; self.endpoint = endpoint; self.modelKey = modelKey
         self.endpointMode = endpointMode
         self.credentialAction = credentialAction; self.token = token
+        self.maximumOutputTokens = maximumOutputTokens
     }
 }
 
@@ -208,7 +222,7 @@ public enum ProviderConfigurationError: String, Error, LocalizedError, Sendable 
         case .modelEndpointUnavailable: "The LM Studio model inventory endpoint is unavailable. Verify the server version and saved endpoint."
         case .connectionFailed: "LM Studio returned an invalid or unsupported response. Verify the server version and try again."
         case .unavailable: "Provider configuration is unavailable. Restart the manager from this build."
-        case .invalidRequest: "Invalid provider settings. Use an HTTP loopback or HTTPS origin, a bounded model identifier, and a valid credential action."
+        case .invalidRequest: "Invalid provider settings. Use an HTTP loopback or HTTPS origin, a bounded model identifier, a valid credential action, and an output token limit from 1 through 65,536."
         case .revisionConflict: "Provider settings changed. Refresh before saving again."
         case .busy: "Provider settings are busy. Finish or cancel active runs and wait for provider requests to settle, then retry."
         case .credentialUnavailable: "Keychain access failed or was denied. Unlock the login Keychain and retry. The last committed configuration is retained."

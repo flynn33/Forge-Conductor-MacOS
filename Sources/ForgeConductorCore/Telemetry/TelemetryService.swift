@@ -213,9 +213,11 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         RuntimeSignposts.endTelemetryPresentation(signpost, sequence: sequence)
     }
 
-    private func recomposeForgeAndPublish() {
+    @discardableResult
+    private func recomposeForgeAndPublish(publish: Bool = true) -> TelemetrySnapshot {
         let forge = forgeCollector.collect()
-        let system = realtimeEngine.latestSystem
+        let system = realtimeEngine.isRunning
+            ? realtimeEngine.latestSystem : realtimeEngine.collectCurrentMetrics()
         lock.lock()
         presentationSequence &+= 1
         let sequence = presentationSequence
@@ -242,7 +244,7 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
             runtime: Self.runtimeIdentifier
         )
         liveFrame = frame
-        let cbs = Array(listeners.values)
+        let cbs = publish ? Array(listeners.values) : []
         let historyCount = history.count
         lock.unlock()
         let signpost = RuntimeSignposts.beginTelemetryPresentation(sequence: sequence)
@@ -250,6 +252,7 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
         runtimeDiagnostics.set(.telemetryHistorySize, to: historyCount)
         for cb in cbs { cb(frame) }
         RuntimeSignposts.endTelemetryPresentation(signpost, sequence: sequence)
+        return frame
     }
 
     // MARK: - Current live frame (edge / tests)
@@ -257,16 +260,15 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
     /// Non-throwing read of the current live frame (host from engine, forge last composed).
     public func currentFrame() -> TelemetrySnapshot {
         lock.lock()
+        defer { lock.unlock() }
         if var frame = liveFrame {
             frame.system = realtimeEngine.latestSystem
             frame.history = Array(history.suffix(300))
             frame.updated = frame.system.ts
-            lock.unlock()
             return frame
         }
-        lock.unlock()
         let system = realtimeEngine.latestSystem
-        let forge = lastForge ?? forgeCollector.collect()
+        let forge = lastForge ?? ForgeSnapshot.empty(home: paths.home.path)
         let frame = TelemetrySnapshot(
             system: system,
             forge: forge,
@@ -274,17 +276,18 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
             history: [],
             runtime: Self.runtimeIdentifier
         )
-        lock.lock()
-        lastForge = forge
         liveFrame = frame
-        lock.unlock()
         return frame
     }
 
-    /// Compatibility: force=true recomposes forge once; otherwise returns live frame.
+    /// Call off the UI actor. An idle service takes one fresh
+    /// sample; a running stream recomposes Forge only when force is true.
     public func snapshotTyped(force: Bool = false) throws -> TelemetrySnapshot {
+        if !realtimeEngine.isRunning {
+            return recomposeForgeAndPublish(publish: false)
+        }
         if force {
-            recomposeForgeAndPublish()
+            return recomposeForgeAndPublish()
         }
         return currentFrame()
     }
@@ -320,7 +323,9 @@ public final class TelemetryService: TelemetryProviding, @unchecked Sendable {
     }
 
     public func systemOnly(force: Bool = false) throws -> [String: Any] {
-        realtimeEngine.latestSystem.asDictionary()
+        let system = realtimeEngine.isRunning
+            ? realtimeEngine.latestSystem : realtimeEngine.collectCurrentMetrics()
+        return system.asDictionary()
     }
 
     public func forgeOnly(force: Bool = false) throws -> [String: Any] {

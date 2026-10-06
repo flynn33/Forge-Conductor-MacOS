@@ -138,17 +138,20 @@ public struct RavenNativeStackEvidence: Sendable, Equatable {
     public let shippingRuntimePaths: [String]
     public let evidenceReferences: [String]
     public let targetMembershipComplete: Bool
+    public let declaredPathRoles: [String: [NativeTargetDeclaredRole]]?
 
     public init(
         subjectIdentity: String,
         shippingRuntimePaths: [String],
         evidenceReferences: [String],
-        targetMembershipComplete: Bool
+        targetMembershipComplete: Bool,
+        declaredPathRoles: [String: [NativeTargetDeclaredRole]]? = nil
     ) {
         self.subjectIdentity = subjectIdentity
         self.shippingRuntimePaths = Array(shippingRuntimePaths.prefix(10_000))
         self.evidenceReferences = Array(evidenceReferences.prefix(64))
         self.targetMembershipComplete = targetMembershipComplete
+        self.declaredPathRoles = declaredPathRoles
     }
 }
 
@@ -165,14 +168,20 @@ public struct RavenNativeStackDetector: Sendable {
         rule: PolicyRule,
         priorViolationOpen: Bool = false
     ) -> PolicyRuleAssessment {
-        guard evidence.targetMembershipComplete else {
+        guard evidence.targetMembershipComplete,
+              NativeTargetDeclaredRole.valid(evidence.declaredPathRoles,
+                                             paths: evidence.shippingRuntimePaths) else {
             return PolicyRuleAssessment(
                 rule: rule,
                 state: .ambiguous,
                 subjectIdentity: evidence.subjectIdentity,
-                summary: "Production target membership is incomplete; native-stack alignment is unresolved.",
+                summary: evidence.targetMembershipComplete
+                    ? "Declared production role metadata is malformed; native-stack alignment is unresolved."
+                    : "Production target membership is incomplete; native-stack alignment is unresolved.",
                 evidenceReferences: evidence.evidenceReferences,
-                assumptions: ["The supplied target-membership snapshot is partial."],
+                assumptions: [evidence.targetMembershipComplete
+                    ? "The supplied role metadata does not match bounded, known membership paths."
+                    : "The supplied target-membership snapshot is partial."],
                 alternatives: [
                     "The listed script is support-only and absent from the shipped runtime.",
                     "The production target includes interpreted runtime behavior not present in this snapshot.",
@@ -185,11 +194,32 @@ public struct RavenNativeStackDetector: Sendable {
             Self.interpretedRuntimeExtensions.contains(URL(fileURLWithPath: $0).pathExtension.lowercased())
         }
         if !interpreted.isEmpty {
+            if let roles = evidence.declaredPathRoles,
+               interpreted.allSatisfy({ path in
+                   ["js", "mjs"].contains(URL(fileURLWithPath: path).pathExtension.lowercased())
+                       && roles[path] == [.resource]
+               }) {
+                return PolicyRuleAssessment(
+                    rule: rule, state: .ambiguous, subjectIdentity: evidence.subjectIdentity,
+                    summary: "Resource-only JavaScript declarations require source/owner review; declared membership does not establish interpreted application behavior.",
+                    evidenceReferences: evidence.evidenceReferences + interpreted.prefix(16),
+                    assumptions: [
+                        "The supplied graph roles declare resource membership only; they are not runtime-use or producer-authenticity proof.",
+                        "The pinned native-stack rule does not decide the applicability of ancillary external-browser diagnostics from a resource declaration alone.",
+                    ],
+                    alternatives: [
+                        "The resource supports an ancillary external-browser diagnostic surface.",
+                        "The resource implements interpreted application behavior and violates the native-stack rule.",
+                    ],
+                    suggestedCorrection: "Review the actual resource consumer and project-specific policy applicability; retain the advisory finding until that boundary is resolved.",
+                    confidence: 0.45
+                )
+            }
             return PolicyRuleAssessment(
                 rule: rule,
                 state: .violation,
                 subjectIdentity: evidence.subjectIdentity,
-                summary: "The shipped production runtime includes interpreted application source.",
+                summary: "The declared production source/resource/copy membership includes interpreted application source.",
                 evidenceReferences: evidence.evidenceReferences + interpreted.prefix(16),
                 suggestedCorrection: rule.details?.suggestedCorrection,
                 confidence: 0.99
@@ -200,8 +230,8 @@ public struct RavenNativeStackDetector: Sendable {
             state: priorViolationOpen ? .corrected : .aligned,
             subjectIdentity: evidence.subjectIdentity,
             summary: priorViolationOpen
-                ? "The current complete target snapshot no longer includes interpreted application source."
-                : "The complete production target snapshot contains no interpreted application source.",
+                ? "The current declared production source/resource/copy membership no longer includes interpreted application source."
+                : "The declared production source/resource/copy membership contains no interpreted application source.",
             evidenceReferences: evidence.evidenceReferences,
             confidence: 0.98
         )

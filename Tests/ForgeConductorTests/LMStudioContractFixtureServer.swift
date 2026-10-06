@@ -87,6 +87,7 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
         var interChunkDelay: TimeInterval = 0
         var failureAfterFirstChunk: URLError.Code?
         var suspendBootstrap = false
+        var fixedChunkBytes: Int?
     }
 
     private let stateLock = NSLock()
@@ -111,7 +112,7 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
         if route.firstByteDelay > 0 {
             Thread.sleep(forTimeInterval: route.firstByteDelay)
         }
-        for (index, chunk) in Self.fragment(route.body).enumerated() {
+        for (index, chunk) in Self.fragment(route.body, fixedChunkBytes: route.fixedChunkBytes).enumerated() {
             if index > 0, route.interChunkDelay > 0 {
                 Thread.sleep(forTimeInterval: route.interChunkDelay)
             }
@@ -139,6 +140,26 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
                 encoding: .utf8
             ) ?? ""
             let shouldSuspend = requestText.contains("fixture-suspend-bootstrap") && Self.suspension.isEnabled
+            if requestText.contains("fixture-event-count-cap-5120")
+                || requestText.contains("fixture-event-count-cap-5121") {
+                guard object["max_output_tokens"] as? Int == 4_096,
+                      object["stream"] as? Bool == true else {
+                    return errorRoute(status: 400, code: "missing_event_count_output_bound")
+                }
+                let count = requestText.contains("fixture-event-count-cap-5121") ? 5_121 : 5_120
+                return Route(status: 200, contentType: "text/event-stream",
+                    body: try eventCountCapSSEFixture(dataEventCount: count), fixedChunkBytes: 4_096)
+            }
+            if requestText.contains("fixture-full-output-token-sse") {
+                guard object["max_output_tokens"] as? Int == 4_096,
+                      object["stream"] as? Bool == true else {
+                    return errorRoute(status: 400, code: "missing_full_output_token_bound")
+                }
+                return Route(status: 200, contentType: "text/event-stream",
+                    body: try fullOutputTokenSSEFixture(), fixedChunkBytes: 4_096)
+            }
+            if let metadataRoute = try terminalMetadataRoute(requestText) { return metadataRoute }
+            if let signalRoute = try semanticSignalFixture(requestText) { return signalRoute }
             if let usage = usageCounterFixture(requestText) { return usage }
             if requestText.contains("fixture-error-401") {
                 return errorRoute(status: 401, code: "invalid_api_token")
@@ -260,6 +281,92 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
         }
     }
 
+    private static func semanticSignalFixture(_ requestText: String) throws -> Route? {
+        let markers = ["fixture-signal-incomplete-unknown", "fixture-signal-failed-unknown",
+            "fixture-signal-completed-event-noncompleted", "fixture-signal-truncation-reason",
+            "fixture-signal-overflow-reason", "fixture-signal-completed-benign"]
+        guard let marker = markers.first(where: requestText.contains) else { return nil }
+        let quotedOutput: [[String: Any]] = [["type": "message", "content": [[
+            "type": "output_text", "text": "Quoted context overflow or truncated output."
+        ]]]]
+        var response: [String: Any] = [
+            "id": "resp_semantic_signal_fixture", "model": "fixture/tool-model",
+            "status": "incomplete", "max_output_tokens": 512, "output": [] as [Any],
+        ]
+        let event: String
+        switch marker {
+        case "fixture-signal-incomplete-unknown":
+            event = "response.incomplete"
+            response["incomplete_details"] = ["reason": "content_filter"]
+        case "fixture-signal-failed-unknown":
+            event = "response.failed"
+            response["status"] = "failed"
+            response["error"] = ["code": "invalid_request", "message": "Request rejected"]
+            response["output"] = quotedOutput
+        case "fixture-signal-completed-event-noncompleted":
+            event = "response.completed"
+            response["incomplete_details"] = ["reason": "content_filter"]
+        case "fixture-signal-truncation-reason":
+            event = "response.incomplete"
+            response["incomplete_details"] = ["reason": "max_output_tokens"]
+            response["output"] = quotedOutput
+        case "fixture-signal-overflow-reason":
+            event = "response.failed"
+            response["status"] = "failed"
+            response["error"] = ["code": "context_length_exceeded", "message": "Context exhausted"]
+        case "fixture-signal-completed-benign":
+            event = "response.completed"
+            response["status"] = "completed"
+            response["output"] = quotedOutput
+            response["usage"] = ["input_tokens": 8, "output_tokens": 8, "total_tokens": 16]
+        default:
+            return nil
+        }
+        return try eventStream([(event, ["type": event, "sequence_number": 0, "response": response])])
+    }
+
+    private static func terminalMetadataRoute(_ requestText: String) throws -> Route? {
+        let kinds = ["fractional-reasoning", "malformed-incomplete-string", "malformed-incomplete-array",
+                     "malformed-usage-string", "malformed-usage-array", "null-containers",
+                     "reasoning", "text", "tool", "incomplete", "lost-eof"]
+        guard let kind = kinds.first(where: { requestText.contains("fixture-terminal-" + $0) }) else { return nil }
+        var item: [String: Any] = ["id": "rs_terminal_fixture", "type": "reasoning",
+            "content": [["type": "reasoning_text", "text": "fixture-private-reasoning-content"]]]
+        var usage: [String: Any] = ["input_tokens": 128, "output_tokens": 4_095, "total_tokens": 4_223]
+        if kind == "reasoning" { usage["output_tokens_details"] = ["reasoning_tokens": 4_095] }
+        if kind == "text" {
+            item = ["id": "msg_terminal_fixture", "type": "message", "role": "assistant", "status": "completed",
+                "content": [["type": "output_text", "text": "Observed café ✓."]]]
+        }
+        if kind == "tool" {
+            item = ["id": "fc_terminal_fixture", "type": "function_call", "call_id": "call_terminal_fixture",
+                "name": "fixture.read", "arguments": #"{"path":"/fixture/owned-file"}"#]
+        }
+        if kind == "malformed-usage-string" { usage["output_tokens_details"] = "unsupported-container" }
+        if kind == "malformed-usage-array" { usage["output_tokens_details"] = [] as [String] }
+        if kind == "null-containers" { usage["output_tokens_details"] = NSNull() }
+        let status = kind == "incomplete" ? "incomplete" : "completed"
+        var response: [String: Any] = ["id": "resp_terminal_" + kind, "model": "fixture/tool-model",
+            "status": status, "output": [item], "usage": usage]
+        if kind == "incomplete" { response["incomplete_details"] = ["reason": "max_output_tokens"] }
+        if kind == "malformed-incomplete-string" { response["incomplete_details"] = "unsupported-container" }
+        if kind == "malformed-incomplete-array" { response["incomplete_details"] = [] as [String] }
+        if kind == "null-containers" { response["incomplete_details"] = NSNull() }
+        var route = try eventStream([(kind == "incomplete" ? "response.incomplete" : "response.completed",
+            ["type": kind == "incomplete" ? "response.incomplete" : "response.completed",
+             "sequence_number": 0, "response": response])])
+        if kind == "fractional-reasoning" {
+            let text = String(decoding: route.body, as: UTF8.self)
+            route.body = Data(text.replacingOccurrences(of: "\"usage\":{",
+                with: "\"usage\":{\"output_tokens_details\":{\"reasoning_tokens\":4095.00000000000000000001},").utf8)
+        }
+        if kind == "lost-eof" {
+            route.fixedChunkBytes = route.body.count
+            route.failureAfterFirstChunk = .networkConnectionLost
+        }
+        return route
+    }
+
     /// These counter bytes intentionally bypass JSONSerialization so decimal
     /// rounding cannot repair the malformed provider fixture before transport.
     private static func usageCounterFixture(_ requestText: String) -> Route? {
@@ -295,6 +402,98 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
     private static func fixture(_ name: String, extension value: String, contentType: String) throws -> Route {
         let data = try Data(contentsOf: fixtureDirectory.appendingPathComponent("\(name).\(value)"))
         return Route(status: 200, contentType: contentType, body: data)
+    }
+
+    static func fullOutputTokenSSEFixture() throws -> Data {
+        let responseID = "resp_full_output_token_fixture"
+        let itemID = "msg_full_output_token_fixture"
+        let text = String(repeating: "x", count: 4_096)
+        let part: [String: Any] = ["type": "output_text", "text": text, "annotations": []]
+        let item: [String: Any] = [
+            "id": itemID, "type": "message", "status": "completed",
+            "role": "assistant", "content": [part],
+        ]
+        var events: [(String, [String: Any])] = [
+            ("response.created", [
+                "type": "response.created", "sequence_number": 0,
+                "response": ["id": responseID, "object": "response",
+                    "created_at": 1_787_760_000, "status": "in_progress",
+                    "model": "fixture/tool-model", "output": [],
+                    "previous_response_id": NSNull(), "usage": NSNull()] as [String: Any],
+            ]),
+            ("response.output_item.added", [
+                "type": "response.output_item.added", "sequence_number": 1, "output_index": 0,
+                "item": ["id": itemID, "type": "message", "status": "in_progress",
+                    "role": "assistant", "content": []] as [String: Any],
+            ]),
+            ("response.content_part.added", [
+                "type": "response.content_part.added", "sequence_number": 2,
+                "item_id": itemID, "output_index": 0, "content_index": 0,
+                "part": ["type": "output_text", "text": "", "annotations": []] as [String: Any],
+            ]),
+        ]
+        for index in 0..<4_096 {
+            events.append(("response.output_text.delta", [
+                "type": "response.output_text.delta", "sequence_number": index + 3,
+                "item_id": itemID, "output_index": 0, "content_index": 0, "delta": "x",
+            ]))
+        }
+        events.append(contentsOf: [
+            ("response.output_text.done", [
+                "type": "response.output_text.done", "sequence_number": 4_099,
+                "item_id": itemID, "output_index": 0, "content_index": 0, "text": text,
+            ]),
+            ("response.content_part.done", [
+                "type": "response.content_part.done", "sequence_number": 4_100,
+                "item_id": itemID, "output_index": 0, "content_index": 0, "part": part,
+            ]),
+            ("response.output_item.done", [
+                "type": "response.output_item.done", "sequence_number": 4_101,
+                "output_index": 0, "item": item,
+            ]),
+            ("response.completed", [
+                "type": "response.completed", "sequence_number": 4_102,
+                "response": ["id": responseID, "object": "response",
+                    "created_at": 1_787_760_000, "completed_at": 1_787_760_001,
+                    "status": "completed", "model": "fixture/tool-model", "output": [item],
+                    "previous_response_id": NSNull(),
+                    "usage": ["input_tokens": 512, "output_tokens": 4_096, "total_tokens": 4_608]
+                ] as [String: Any],
+            ]),
+        ])
+        return try eventStream(events).body
+    }
+
+    static func eventCountCapSSEFixture(dataEventCount: Int) throws -> Data {
+        guard (5_120...5_121).contains(dataEventCount) else {
+            throw NSError(domain: "LMStudioContractFixtureServer", code: 400)
+        }
+        let responseID = "resp_event_count_cap_fixture"
+        var events: [(String, [String: Any])] = [
+            ("response.created", [
+                "type": "response.created", "sequence_number": 0,
+                "response": ["id": responseID, "object": "response",
+                    "created_at": 1_787_760_000, "status": "in_progress",
+                    "model": "fixture/tool-model", "output": [],
+                    "previous_response_id": NSNull(), "usage": NSNull()] as [String: Any],
+            ]),
+        ]
+        for sequence in 1...(dataEventCount - 3) {
+            events.append(("response.in_progress", [
+                "type": "response.in_progress", "sequence_number": sequence,
+                "response": ["id": responseID, "model": "fixture/tool-model", "status": "in_progress"],
+            ]))
+        }
+        events.append(("response.completed", [
+            "type": "response.completed", "sequence_number": dataEventCount - 2,
+            "response": ["id": responseID, "object": "response",
+                "created_at": 1_787_760_000, "completed_at": 1_787_760_001,
+                "status": "completed", "model": "fixture/tool-model", "output": [],
+                "previous_response_id": NSNull(),
+                "usage": ["input_tokens": 16, "output_tokens": 0, "total_tokens": 16]
+            ] as [String: Any],
+        ]))
+        return try eventStream(events).body
     }
 
     private static func argumentReconciliationRoute(semanticMismatch: Bool) throws -> Route {
@@ -558,7 +757,12 @@ final class LMStudioContractFixtureServer: URLProtocol, @unchecked Sendable {
         return Route(status: 200, contentType: "text/event-stream", body: stream)
     }
 
-    private static func fragment(_ data: Data) -> [Data] {
+    private static func fragment(_ data: Data, fixedChunkBytes: Int? = nil) -> [Data] {
+        if let fixedChunkBytes {
+            return stride(from: 0, to: data.count, by: fixedChunkBytes).map { offset in
+                data.subdata(in: offset..<min(offset + fixedChunkBytes, data.count))
+            }
+        }
         let sizes = [1, 2, 3, 5, 8, 13, 21]
         var result: [Data] = []
         var offset = 0

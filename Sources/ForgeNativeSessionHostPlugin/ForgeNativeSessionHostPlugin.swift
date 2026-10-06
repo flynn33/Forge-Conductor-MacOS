@@ -419,7 +419,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
         maximumResponseBytes: Int = 2 * 1024 * 1024,
         maximumTextBytes: Int = 512 * 1024,
         maximumToolArgumentBytes: Int = 256 * 1024,
-        maximumOutputTokens: Int = 4_096
+        maximumOutputTokens: Int = ProviderConfigurationContract.defaultMaximumOutputTokens
     ) {
         self.endpointMode = endpointMode
         self.baseURL = baseURL
@@ -505,7 +505,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
             ) ?? 256 * 1024,
             maximumOutputTokens: try values.decodeIfPresent(
                 Int.self, forKey: .maximumOutputTokens
-            ) ?? 4_096
+            ) ?? ProviderConfigurationContract.defaultMaximumOutputTokens
         )
         revision = try values.decodeIfPresent(String.self, forKey: .revision) ?? "0"
     }
@@ -560,7 +560,7 @@ public struct LMStudioProviderConfiguration: Codable, Sendable, Equatable {
               maximumToolArgumentBytes <= maximumResponseBytes else {
             throw LMStudioProviderError.invalidConfiguration("payload limits are outside supported bounds")
         }
-        guard (1...4_096).contains(maximumOutputTokens) else {
+        guard (1...ProviderConfigurationContract.maximumOutputTokens).contains(maximumOutputTokens) else {
             throw LMStudioProviderError.invalidConfiguration(
                 "maximum output tokens are outside supported bounds"
             )
@@ -871,6 +871,7 @@ public struct LMStudioProviderCapabilities: Sendable, Equatable {
     public var usageReportingVerified: Bool
     public var capabilityFingerprintSHA256: String
     public var contractProbeResponseID: String?
+    public var requestedMaximumOutputTokens: Int?
 
     public init(
         providerVersion: String = "unreported",
@@ -881,7 +882,8 @@ public struct LMStudioProviderCapabilities: Sendable, Equatable {
         functionToolContractVerified: Bool = false,
         usageReportingVerified: Bool = false,
         capabilityFingerprintSHA256: String = "",
-        contractProbeResponseID: String? = nil
+        contractProbeResponseID: String? = nil,
+        requestedMaximumOutputTokens: Int? = nil
     ) {
         self.providerVersion = providerVersion
         self.modelKey = modelKey
@@ -896,6 +898,7 @@ public struct LMStudioProviderCapabilities: Sendable, Equatable {
         self.usageReportingVerified = usageReportingVerified
         self.capabilityFingerprintSHA256 = capabilityFingerprintSHA256
         self.contractProbeResponseID = contractProbeResponseID
+        self.requestedMaximumOutputTokens = requestedMaximumOutputTokens
     }
 }
 
@@ -931,6 +934,49 @@ public struct LMStudioFunctionCall: Sendable, Equatable {
     }
 }
 
+/// Bounded terminal wire metadata for diagnosis; it carries no output content and
+/// is separate from the managed provider's derived finishReason.
+public struct LMStudioTerminalMetadata: Codable, Sendable, Equatable {
+    public let schemaVersion: Int
+    public let responseID: String
+    public let status: String
+    public let incompleteReason: String?
+    public let outputItemCount: Int?
+    public let outputItemTypeCounts: [String: Int]
+    public let outputTextBytes: Int?
+    public let functionArgumentBytes: Int?
+    public let reasoningTokens: Int?
+    public let streamedTextBytes: Int
+    public let parsedTextBytes: Int
+    public let parsedFunctionCallCount: Int
+    public let metadataComplete: Bool
+    public var streamEOFObserved: Bool
+
+    fileprivate static func safeLabel(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= 64 && value.utf8.allSatisfy {
+            (65...90).contains($0) || (97...122).contains($0)
+                || (48...57).contains($0) || $0 == 95 || $0 == 45
+        }
+    }
+
+    fileprivate func validate(forResponseID expected: String) throws {
+        let maximumBytes = 16 * 1024 * 1024
+        let boundedCounts: [Int?] = [outputItemCount, outputTextBytes, functionArgumentBytes,
+                                     streamedTextBytes, parsedTextBytes]
+        let counts = boundedCounts.compactMap { $0 }
+        guard schemaVersion == 1, responseID == expected, status == "completed",
+              streamEOFObserved, incompleteReason.map(Self.safeLabel) ?? true,
+              outputItemTypeCounts.count <= 16,
+              outputItemTypeCounts.allSatisfy({ Self.safeLabel($0.key) && (0...128).contains($0.value) }),
+              counts.allSatisfy({ (0...maximumBytes).contains($0) }),
+              (0...128).contains(parsedFunctionCallCount),
+              reasoningTokens.map({ (0...(ManagedModelProviderContract.maximumContextTokens * 2)).contains($0) }) ?? true,
+              try JSONEncoder().encode(self).count <= 4_096 else {
+            throw LMStudioProviderError.receiptStorage("terminal metadata does not match its bounded accepted response")
+        }
+    }
+}
+
 public struct LMStudioResponseTurn: Sendable, Equatable {
     public var responseID: String
     public var previousResponseID: String?
@@ -940,12 +986,14 @@ public struct LMStudioResponseTurn: Sendable, Equatable {
     public var functionCalls: [LMStudioFunctionCall]
     public var usage: LMStudioUsage
     public var usageWasReported: Bool
+    public var terminalMetadata: LMStudioTerminalMetadata?
 
     public init(
         responseID: String, previousResponseID: String?, model: String,
         status: String, assistantText: String,
         functionCalls: [LMStudioFunctionCall], usage: LMStudioUsage,
-        usageWasReported: Bool = true
+        usageWasReported: Bool = true,
+        terminalMetadata: LMStudioTerminalMetadata? = nil
     ) {
         self.responseID = responseID
         self.previousResponseID = previousResponseID
@@ -955,6 +1003,7 @@ public struct LMStudioResponseTurn: Sendable, Equatable {
         self.functionCalls = functionCalls
         self.usage = usage
         self.usageWasReported = usageWasReported
+        self.terminalMetadata = terminalMetadata
     }
 }
 
@@ -970,6 +1019,7 @@ public struct LMStudioSSEDecoder: Sendable {
     private let maximumLineBytes: Int
     private let maximumEventBytes: Int
     private let maximumTotalBytes: Int
+    private let maximumEventCount: Int
     private var lineBuffer = Data()
     private var eventName: String?
     private var eventData = Data()
@@ -977,9 +1027,16 @@ public struct LMStudioSSEDecoder: Sendable {
     private var emittedEvents = 0
 
     public init(maximumLineBytes: Int, maximumEventBytes: Int, maximumTotalBytes: Int) {
+        self.init(maximumLineBytes: maximumLineBytes, maximumEventBytes: maximumEventBytes,
+                  maximumTotalBytes: maximumTotalBytes, maximumEventCount: Self.maximumEvents)
+    }
+
+    fileprivate init(maximumLineBytes: Int, maximumEventBytes: Int, maximumTotalBytes: Int,
+                     maximumEventCount: Int) {
         self.maximumLineBytes = maximumLineBytes
         self.maximumEventBytes = maximumEventBytes
         self.maximumTotalBytes = maximumTotalBytes
+        self.maximumEventCount = maximumEventCount
     }
 
     public mutating func feed(_ chunk: Data) throws -> [LMStudioSSEFrame] {
@@ -1051,7 +1108,7 @@ public struct LMStudioSSEDecoder: Sendable {
             return nil
         }
         emittedEvents += 1
-        guard emittedEvents <= Self.maximumEvents else {
+        guard emittedEvents <= maximumEventCount else {
             throw LMStudioProviderError.limitExceeded("SSE event count")
         }
         let payload = eventData
@@ -1136,6 +1193,30 @@ public enum LMStudioProviderSignalClassifier {
     }
 
     public static func classify(_ value: String) -> LMStudioProviderError? {
+        if value.utf8.count <= 64 * 1024,
+           let decoded = try? JSONSerialization.jsonObject(
+               with: Data(value.utf8), options: [.fragmentsAllowed]
+           ) {
+            guard let object = decoded as? [String: Any] else { return nil }
+            if let details = object["incomplete_details"] as? [String: Any],
+               let reason = details["reason"] as? String,
+               let signal = classifyPlaintext(reason) {
+                return signal
+            }
+            if let error = object["error"] as? [String: Any] {
+                for field in ["code", "type", "message"] {
+                    if let value = error[field] as? String,
+                       let signal = classifyPlaintext(value) {
+                        return signal
+                    }
+                }
+            }
+            return nil
+        }
+        return classifyPlaintext(value)
+    }
+
+    private static func classifyPlaintext(_ value: String) -> LMStudioProviderError? {
         let normalized = value.lowercased()
         let overflowSignals = [
             "context_length_exceeded", "context window exceeded", "context limit exceeded",
@@ -1177,6 +1258,7 @@ private struct LMStudioResponseAccumulator {
     private var usage = LMStudioUsage(inputTokens: 0, outputTokens: 0, totalTokens: 0)
     private var usageWasReported = false
     private var terminalSeen = false
+    private var terminalMetadata: LMStudioTerminalMetadata?
     private var lastSequence = -1
 
     init(maximumEventBytes: Int, maximumTextBytes: Int, maximumToolArgumentBytes: Int) {
@@ -1253,7 +1335,13 @@ private struct LMStudioResponseAccumulator {
             }
             calls[itemID] = call
         case "response.completed":
-            try captureCompletedResponse(object["response"])
+            // Diagnostic counters are checked separately so an unsupported optional
+            // metadata field cannot change the existing response classification.
+            let exactReasoningCounter = (try? JSONSupport.validatingIntegerFields(
+                in: frame.data, maximumBytes: maximumEventBytes) { path in
+                path == ["response", "usage", "output_tokens_details", "reasoning_tokens"] ? .required : nil
+            }) != nil
+            try captureCompletedResponse(object["response"], exactReasoningCounter: exactReasoningCounter)
         case "response.incomplete", "response.failed":
             if let response = object["response"],
                JSONSerialization.isValidJSONObject(response),
@@ -1285,11 +1373,12 @@ private struct LMStudioResponseAccumulator {
         guard let text = String(data: assistantText, encoding: .utf8) else {
             throw LMStudioProviderError.malformedResponse("assistant text is not UTF-8")
         }
+        terminalMetadata?.streamEOFObserved = true
         return LMStudioResponseTurn(
             responseID: responseID, previousResponseID: previousResponseID,
             model: model, status: status, assistantText: text,
             functionCalls: normalizedCalls, usage: usage,
-            usageWasReported: usageWasReported
+            usageWasReported: usageWasReported, terminalMetadata: terminalMetadata
         )
     }
 
@@ -1308,7 +1397,7 @@ private struct LMStudioResponseAccumulator {
         previousResponseID = response["previous_response_id"] as? String
     }
 
-    private mutating func captureCompletedResponse(_ raw: Any?) throws {
+    private mutating func captureCompletedResponse(_ raw: Any?, exactReasoningCounter: Bool) throws {
         try captureResponse(raw)
         guard let response = raw as? [String: Any], let status = response["status"] as? String else {
             throw LMStudioProviderError.malformedResponse("completed response status is missing")
@@ -1319,6 +1408,7 @@ private struct LMStudioResponseAccumulator {
             throw signal
         }
         self.status = status
+        let streamedTextBytes = assistantText.count
         if let rawUsage = response["usage"], !(rawUsage is NSNull) {
             guard let values = rawUsage as? [String: Any],
                   let input = JSONSupport.exactInteger(values["input_tokens"]),
@@ -1370,7 +1460,62 @@ private struct LMStudioResponseAccumulator {
                 )
             }
         }
+        terminalMetadata = captureTerminalMetadata(response, streamedTextBytes: streamedTextBytes,
+            exactReasoningCounter: exactReasoningCounter)
         terminalSeen = true
+    }
+
+    private func captureTerminalMetadata(_ response: [String: Any], streamedTextBytes: Int,
+                                        exactReasoningCounter: Bool) -> LMStudioTerminalMetadata {
+        var complete = true
+        let rawDetails = response["incomplete_details"]
+        let details = rawDetails as? [String: Any]
+        if let rawDetails, !(rawDetails is NSNull), details == nil { complete = false }
+        let rawReason = details?["reason"]
+        var reason: String?
+        if let rawReason, !(rawReason is NSNull) {
+            if let value = rawReason as? String, LMStudioTerminalMetadata.safeLabel(value) { reason = value }
+            else { complete = false }
+        }
+        let output = response["output"] as? [Any]
+        var types: [String: Int] = [:]
+        var textBytes = 0, argumentBytes = 0
+        if let output {
+            if output.count > 128 { complete = false }
+            for rawItem in output.prefix(128) {
+                guard let item = rawItem as? [String: Any], let type = item["type"] as? String,
+                      LMStudioTerminalMetadata.safeLabel(type), types[type] != nil || types.count < 16 else {
+                    complete = false; continue
+                }
+                types[type, default: 0] += 1
+                if type == "function_call" {
+                    if let arguments = item["arguments"] as? String { argumentBytes += arguments.utf8.count }
+                    else { complete = false }
+                }
+                if type == "message" {
+                    guard let parts = item["content"] as? [[String: Any]] else { complete = false; continue }
+                    for part in parts where part["type"] as? String == "output_text" {
+                        if let text = part["text"] as? String { textBytes += text.utf8.count }
+                        else { complete = false }
+                    }
+                }
+            }
+        } else { complete = false }
+        let rawUsageDetails = (response["usage"] as? [String: Any])?["output_tokens_details"]
+        let usageDetails = rawUsageDetails as? [String: Any]
+        if let rawUsageDetails, !(rawUsageDetails is NSNull), usageDetails == nil { complete = false }
+        var reasoningTokens: Int?
+        if let raw = usageDetails?["reasoning_tokens"], !(raw is NSNull) {
+            if exactReasoningCounter, let count = JSONSupport.exactInteger(raw),
+               (0...(ManagedModelProviderContract.maximumContextTokens * 2)).contains(count) { reasoningTokens = count }
+            else { complete = false }
+        }
+        return LMStudioTerminalMetadata(schemaVersion: 1, responseID: responseID ?? "",
+            status: status ?? "", incompleteReason: reason, outputItemCount: output?.count,
+            outputItemTypeCounts: types, outputTextBytes: complete ? textBytes : nil,
+            functionArgumentBytes: complete ? argumentBytes : nil, reasoningTokens: reasoningTokens,
+            streamedTextBytes: streamedTextBytes, parsedTextBytes: assistantText.count,
+            parsedFunctionCallCount: callOrder.count, metadataComplete: complete, streamEOFObserved: false)
     }
 
     private mutating func registerCall(_ item: [String: Any]) throws {
@@ -1777,6 +1922,9 @@ private struct LMStudioResponsesPayload: Encodable {
 public actor LMStudioRESTClient {
     public static let capabilityCacheSeconds: Double = 15
     public static let capabilityProbeToolName = "forge_provider_contract_probe"
+    // Lifecycle frames share the stream with content fragments. Keep their
+    // work budget separate from the unchanged output-token and byte bounds.
+    private static let maximumResponseEvents = LMStudioSSEDecoder.maximumEvents + 1_024
 
     private let configuration: LMStudioProviderConfiguration
     private let executionLimits: ProviderExecutionLimits
@@ -2067,7 +2215,8 @@ public actor LMStudioRESTClient {
             functionToolContractVerified: true,
             usageReportingVerified: contractTurn.usageWasReported,
             capabilityFingerprintSHA256: JSONSupport.sha256Hex(fingerprintData),
-            contractProbeResponseID: contractTurn.responseID
+            contractProbeResponseID: contractTurn.responseID,
+            requestedMaximumOutputTokens: configuration.maximumOutputTokens
         )
         cachedCapabilities = (
             capabilities,
@@ -2359,7 +2508,8 @@ public actor LMStudioRESTClient {
         let decoder = LMStudioSSEDecoder(
             maximumLineBytes: configuration.maximumSSELineBytes,
             maximumEventBytes: configuration.maximumSSEEventBytes,
-            maximumTotalBytes: configuration.maximumResponseBytes
+            maximumTotalBytes: configuration.maximumResponseBytes,
+            maximumEventCount: Self.maximumResponseEvents
         )
         let accumulator = LMStudioResponseAccumulator(
             maximumEventBytes: configuration.maximumSSEEventBytes,
@@ -2549,6 +2699,24 @@ private enum LMStudioManagedProviderReceiptStatus: String, Codable {
     case accepted
 }
 
+private struct LMStudioLocalIntentConflictObservation: Codable {
+    var schemaVersion = 1
+    var origin = "local_unexpired_intent"
+    var errorCode = "lmstudio_conflict"
+    var requestID: String
+    var observedAt: String
+    var leaseExpiresAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case origin
+        case errorCode = "error_code"
+        case requestID = "request_id"
+        case observedAt = "observed_at"
+        case leaseExpiresAt = "lease_expires_at"
+    }
+}
+
 private struct LMStudioManagedProviderReceiptRecord: Codable {
     var idempotencyKeySHA256: String
     var requestFingerprintSHA256: String
@@ -2556,6 +2724,8 @@ private struct LMStudioManagedProviderReceiptRecord: Codable {
     var capabilities: ProviderCapabilities
     var status: LMStudioManagedProviderReceiptStatus
     var turn: ProviderTurn?
+    var terminalMetadata: LMStudioTerminalMetadata?
+    var localIntentConflict: LMStudioLocalIntentConflictObservation? = nil
     var updatedAt: String
 
     private enum CodingKeys: String, CodingKey {
@@ -2563,6 +2733,8 @@ private struct LMStudioManagedProviderReceiptRecord: Codable {
         case requestFingerprintSHA256 = "request_fingerprint_sha256"
         case requestID = "request_id"
         case capabilities, status, turn
+        case terminalMetadata = "terminal_metadata"
+        case localIntentConflict = "local_intent_conflict"
         case updatedAt = "updated_at"
     }
 }
@@ -2674,6 +2846,7 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
                 capabilities: capabilities,
                 status: .intent,
                 turn: nil,
+                terminalMetadata: nil,
                 updatedAt: ISO8601.string(from: now)
             ))
             try persist(ledger, protecting: digest)
@@ -2686,6 +2859,7 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
         requestFingerprint: String,
         turn: ProviderTurn,
         capabilities: ProviderCapabilities,
+        terminalMetadata: LMStudioTerminalMetadata? = nil,
         now: Date = Date()
     ) throws {
         let digest = JSONSupport.sha256Hex(idempotencyKey)
@@ -2707,6 +2881,7 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
             ledger.records[index].capabilities = capabilities
             ledger.records[index].status = .accepted
             ledger.records[index].turn = turn
+            ledger.records[index].terminalMetadata = terminalMetadata
             ledger.records[index].updatedAt = ISO8601.string(from: now)
             try persist(ledger, protecting: digest)
         }
@@ -2725,6 +2900,32 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
                     && $0.status == .intent
             }
             try persist(ledger, protecting: nil)
+        }
+    }
+
+    /// Records only the first local fence observation, without renewing the intent.
+    /// A failed diagnostic write leaves the legacy conflict and fencing behavior intact.
+    func recordLocalIntentConflict(
+        idempotencyKey: String, requestFingerprint: String, requestID: String,
+        now: Date = Date()
+    ) {
+        let digest = JSONSupport.sha256Hex(idempotencyKey)
+        try? withLedgerLock {
+            var ledger = try loadLedger()
+            guard let index = ledger.records.firstIndex(where: {
+                $0.idempotencyKeySHA256 == digest
+                    && $0.requestFingerprintSHA256 == requestFingerprint
+                    && $0.requestID == requestID
+            }) else { return }
+            let current = ledger.records[index]
+            guard current.status == .intent, current.localIntentConflict == nil,
+                  !Self.intentLeaseExpired(current, now: now),
+                  let updated = ISO8601.date(from: current.updatedAt) else { return }
+            ledger.records[index].localIntentConflict = LMStudioLocalIntentConflictObservation(
+                requestID: requestID, observedAt: ISO8601.string(from: now),
+                leaseExpiresAt: ISO8601.string(from: updated.addingTimeInterval(Self.intentLeaseSeconds))
+            )
+            try persist(ledger, protecting: digest)
         }
     }
 
@@ -2830,6 +3031,19 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
                     "the durable provider receipt ledger has invalid record identity"
                 )
             }
+            if let observation = record.localIntentConflict {
+                guard observation.schemaVersion == 1,
+                      observation.origin == "local_unexpired_intent",
+                      observation.errorCode == "lmstudio_conflict",
+                      observation.requestID == record.requestID,
+                      observation.observedAt.utf8.count <= 32,
+                      observation.leaseExpiresAt.utf8.count <= 32,
+                      let observed = ISO8601.date(from: observation.observedAt),
+                      let expires = ISO8601.date(from: observation.leaseExpiresAt),
+                      expires > observed else {
+                    throw LMStudioProviderError.receiptStorage("the local intent conflict observation is invalid")
+                }
+            }
             let capabilities = try Self.validated(record.capabilities)
             guard capabilities.providerID == "lmstudio" else {
                 throw LMStudioProviderError.receiptStorage(
@@ -2838,9 +3052,12 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
             }
             switch (record.status, record.turn) {
             case (.intent, nil):
-                break
+                guard record.terminalMetadata == nil else {
+                    throw LMStudioProviderError.receiptStorage("an unfinished receipt cannot own terminal metadata")
+                }
             case (.accepted, .some(let turn)):
                 let validatedTurn = try Self.validated(turn)
+                try record.terminalMetadata?.validate(forResponseID: validatedTurn.responseID)
                 guard validatedTurn.requestID == record.requestID,
                       validatedTurn.providerID == "lmstudio" else {
                     throw LMStudioProviderError.receiptStorage(
@@ -2871,7 +3088,8 @@ private struct LMStudioManagedProviderReceiptStore: Sendable {
             structuredOutput: capabilities.structuredOutput,
             usageReporting: capabilities.usageReporting,
             idempotencyLookup: capabilities.idempotencyLookup,
-            capabilityFingerprintSHA256: capabilities.capabilityFingerprintSHA256
+            capabilityFingerprintSHA256: capabilities.capabilityFingerprintSHA256,
+            requestedMaximumOutputTokens: capabilities.requestedMaximumOutputTokens
         )
     }
 
@@ -2943,7 +3161,8 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderObservedDispatchi
             structuredOutput: false,
             usageReporting: capabilities.usageReportingVerified,
             idempotencyLookup: true,
-            capabilityFingerprintSHA256: capabilities.capabilityFingerprintSHA256
+            capabilityFingerprintSHA256: capabilities.capabilityFingerprintSHA256,
+            requestedMaximumOutputTokens: capabilities.requestedMaximumOutputTokens
         )
         latestCapabilities = normalized
         latestObservedCapabilities = normalized
@@ -3072,7 +3291,7 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderObservedDispatchi
                 idempotencyKey: request.idempotencyKey,
                 requestFingerprint: fingerprint,
                 turn: normalized,
-                capabilities: capabilities
+                capabilities: capabilities, terminalMetadata: turn.terminalMetadata
             )
             return normalized
         } catch {
@@ -3172,7 +3391,7 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderObservedDispatchi
                 idempotencyKey: request.idempotencyKey,
                 requestFingerprint: fingerprint,
                 turn: normalized,
-                capabilities: capabilities
+                capabilities: capabilities, terminalMetadata: turn.terminalMetadata
             )
             return normalized
         } catch {
@@ -3228,7 +3447,7 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderObservedDispatchi
                     idempotencyKey: idempotencyKey,
                     requestFingerprint: record.requestFingerprintSHA256,
                     turn: normalized,
-                    capabilities: record.capabilities
+                    capabilities: record.capabilities, terminalMetadata: transportTurn.terminalMetadata
                 )
                 return normalized
             }
@@ -3279,11 +3498,15 @@ public actor LMStudioManagedModelProvider: ManagedModelProviderObservedDispatchi
                 idempotencyKey: idempotencyKey,
                 requestFingerprint: requestFingerprint,
                 turn: normalized,
-                capabilities: record.capabilities
+                capabilities: record.capabilities, terminalMetadata: transportTurn.terminalMetadata
             )
             return normalized
         }
         guard receiptStore.intentLeaseExpired(record) else {
+            receiptStore.recordLocalIntentConflict(
+                idempotencyKey: idempotencyKey, requestFingerprint: requestFingerprint,
+                requestID: record.requestID
+            )
             throw LMStudioProviderError.conflict
         }
         return nil
@@ -5204,6 +5427,7 @@ public struct NativeTransportSession: Sendable, Equatable {
 public struct NativeBootstrapRequest: Sendable {
     public var operationID: String
     public var projectID: String
+    public var predecessorSessionID: String?
     public var successorSessionID: String
     public var providerSessionID: String
     public var handoffID: String
@@ -5219,10 +5443,12 @@ public struct NativeBootstrapRequest: Sendable {
         handoffID: String,
         handoffSHA256: String,
         canonicalHandoff: Data,
+        predecessorSessionID: String? = nil,
         deadline: ContinuousClock.Instant
     ) {
         self.operationID = operationID
         self.projectID = projectID
+        self.predecessorSessionID = predecessorSessionID
         self.successorSessionID = successorSessionID
         self.providerSessionID = providerSessionID
         self.handoffID = handoffID
@@ -5264,6 +5490,7 @@ public struct LMStudioGUIChatRequest: Sendable, Equatable {
     public let rolloverNonce: String
     public let prompt: String
     public let acknowledgementURL: URL
+    public let expectedClientID: String?
     public let deadline: ContinuousClock.Instant
 
     public init(
@@ -5272,6 +5499,7 @@ public struct LMStudioGUIChatRequest: Sendable, Equatable {
         rolloverNonce: String,
         prompt: String,
         acknowledgementURL: URL,
+        expectedClientID: String? = nil,
         deadline: ContinuousClock.Instant
     ) {
         self.operationID = operationID
@@ -5279,6 +5507,7 @@ public struct LMStudioGUIChatRequest: Sendable, Equatable {
         self.rolloverNonce = rolloverNonce
         self.prompt = prompt
         self.acknowledgementURL = acknowledgementURL
+        self.expectedClientID = expectedClientID
         self.deadline = deadline
     }
 }
@@ -5424,6 +5653,11 @@ public actor LMStudioGUIChatDriver: LMStudioGUIChatDriving {
               let clientID = value["client_id"] as? String,
               let acknowledgedAt = value["acknowledged_at"] as? String else {
             return nil
+        }
+        if let expectedClientID = request.expectedClientID, clientID != expectedClientID {
+            throw NativeHostPluginError.malformedResponse(
+                "LM Studio GUI successor acknowledgement client identity differs"
+            )
         }
         return LMStudioGUIChatReceipt(
             visibleChatTitle: "LM Studio successor \(request.handoffID.prefix(8))",
@@ -5612,6 +5846,7 @@ public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
             throw NativeHostPluginError.deadlineExceeded
         }
         let nonce = Self.rolloverNonce(operationID: request.operationID)
+        let expectedClientID = Self.deploymentClientID(request.predecessorSessionID)
         let prompt = """
         get_forge_status
         resume=true
@@ -5628,10 +5863,16 @@ public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
             acknowledgementURL: acknowledgementDirectory.appendingPathComponent(
                 "\(request.handoffID.lowercased()).json"
             ),
+            expectedClientID: expectedClientID,
             deadline: request.deadline
         ))
         guard !cancelledOperations.contains(request.operationID) else {
             throw NativeHostPluginError.cancelled
+        }
+        if let expectedClientID, receipt.clientID != expectedClientID {
+            throw NativeHostPluginError.malformedResponse(
+                "LM Studio GUI successor acknowledgement client identity differs"
+            )
         }
         return NativeBootstrapResponse(chunks: [try JSONSupport.data(from: [
             "handoff_id": request.handoffID,
@@ -5650,9 +5891,17 @@ public actor LMStudioInteractiveSessionTransport: NativeSessionTransport {
         cancelledOperations.insert(operationID)
     }
 
+    private static func deploymentClientID(_ predecessor: String?) -> String? {
+        guard let predecessor, predecessor.hasPrefix("lm-studio:") else { return nil }
+        let digest = predecessor.utf8.dropFirst("lm-studio:".utf8.count)
+        guard digest.count == 64, digest.allSatisfy({
+            (0x30...0x39).contains($0) || (0x61...0x66).contains($0)
+        }) else { return nil }
+        return predecessor
+    }
+
     public static func rolloverNonce(operationID: String) -> String {
-        let hex = JSONSupport.sha256Hex("lmstudio-gui-rollover:\(operationID)")
-        return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))"
+        ContextContinuityService.interactiveRolloverNonce(handoffID: operationID)
     }
 }
 
@@ -5743,6 +5992,7 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
     private let transport: any NativeSessionTransport
     private var ledger: NativeSessionLedger
     private var cancelledOperations: Set<String> = []
+    private var activeBootstrapSessionIDs: Set<String> = []
 
     public init(storageDirectory: URL, transport: any NativeSessionTransport) throws {
         try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
@@ -5833,8 +6083,27 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
               let providerID = ledger.records[index].providerSessionID else {
             throw NativeHostPluginError.sessionNotFound(session.id)
         }
+        let owner = ledger.records[index]
+        guard owner.status != .cancelled, !cancelledOperations.contains(owner.operationID) else {
+            throw NativeHostPluginError.cancelled
+        }
         if ledger.records[index].status == .acknowledged,
-           ledger.records[index].handoffID == validated.handoffID { return }
+           ledger.records[index].handoffID == validated.handoffID {
+            guard ledger.records[index].handoffSHA256 == validated.contentSHA256 else {
+                throw NativeHostPluginError.malformedResponse(
+                    "acknowledged handoff content changed; use a fresh handoff identity"
+                )
+            }
+            return
+        }
+        guard !activeBootstrapSessionIDs.contains(session.id) else {
+            throw NativeHostPluginError.malformedResponse("native session bootstrap is already in progress")
+        }
+        guard activeBootstrapSessionIDs.count < Self.maximumRecords else {
+            throw NativeHostPluginError.storageLimit
+        }
+        activeBootstrapSessionIDs.insert(session.id)
+        defer { activeBootstrapSessionIDs.remove(session.id) }
         ledger.records[index].status = .bootstrapping
         ledger.records[index].handoffID = validated.handoffID
         ledger.records[index].handoffSHA256 = validated.contentSHA256
@@ -5842,15 +6111,32 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
         try persist()
 
         let response = try await transport.bootstrap(NativeBootstrapRequest(
-            operationID: ledger.records[index].operationID,
-            projectID: ledger.records[index].projectID,
+            operationID: owner.operationID,
+            projectID: owner.projectID,
             successorSessionID: session.id,
             providerSessionID: providerID,
             handoffID: validated.handoffID,
             handoffSHA256: validated.contentSHA256,
             canonicalHandoff: canonical,
+            predecessorSessionID: owner.predecessorSessionID,
             deadline: ContinuousClock.now.advanced(by: transport.bootstrapTimeout)
         ))
+        guard !cancelledOperations.contains(owner.operationID) else {
+            throw NativeHostPluginError.cancelled
+        }
+        guard let currentIndex = self.index(sessionID: session.id) else {
+            throw NativeHostPluginError.sessionNotFound(session.id)
+        }
+        let current = ledger.records[currentIndex]
+        guard current.status != .cancelled else { throw NativeHostPluginError.cancelled }
+        guard current.status == .bootstrapping,
+              current.operationID == owner.operationID, current.projectID == owner.projectID,
+              current.providerSessionID == providerID,
+              current.predecessorSessionID == owner.predecessorSessionID,
+              current.handoffID == validated.handoffID,
+              current.handoffSHA256 == validated.contentSHA256 else {
+            throw NativeHostPluginError.malformedResponse("native bootstrap intent changed before acknowledgement")
+        }
         let acknowledgement = try decodeBoundedAcknowledgement(response.chunks)
         guard acknowledgement["handoff_id"] as? String == validated.handoffID,
               acknowledgement["successor_session_id"] as? String == session.id else {
@@ -5859,10 +6145,10 @@ public actor ForgeNativeSessionHostAdapter: SessionHostAdapter {
         guard response.inputTokens >= 0, response.outputTokens >= 0 else {
             throw NativeHostPluginError.malformedResponse("negative usage")
         }
-        ledger.records[index].status = .acknowledged
-        ledger.records[index].inputTokens = response.inputTokens
-        ledger.records[index].outputTokens = response.outputTokens
-        ledger.records[index].updatedAt = ISO8601.string(from: Date())
+        ledger.records[currentIndex].status = .acknowledged
+        ledger.records[currentIndex].inputTokens = response.inputTokens
+        ledger.records[currentIndex].outputTokens = response.outputTokens
+        ledger.records[currentIndex].updatedAt = ISO8601.string(from: Date())
         try persist()
     }
 

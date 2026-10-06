@@ -1455,6 +1455,471 @@ final class ProjectControlPlaneRepositoryTests: XCTestCase {
         }
     }
 
+    func testManagedSavedToolCountIncludesTerminalErrorsDeduplicatesReplayAndSurvivesReopen() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "status", toolName: "get_forge_status")
+            for state in [ToolInvocationState.intent, .executing, .ambiguous, .failed, .cancelled, .quarantinedStale] {
+                _ = try await savedCountInvocation(repository, fixture: fixture, callID: "unfinished-" + state.rawValue,
+                    state: state)
+            }
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "legacy-no-result", result: nil)
+            let first = try await savedCountInvocation(repository, fixture: fixture, callID: "saved-first")
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "saved-second")
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "saved-error",
+                result: #"{"ok":false,"is_error":true,"error":{"code":"file_not_found"}}"#)
+            let count = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                sessionID: fixture.sessionID, limit: 10_000,
+                throughProviderCallID: "saved-error", toolName: "fs_read")
+            XCTAssertEqual(count.count, 3, "Only committed eligible terminal outcomes count, including returned errors")
+            let original = try await repository.toolInvocations(runID: fixture.run.runID, limit: 32)
+                .first { $0.providerCallID == first.providerCallID }
+            let replayed = try await repository.persistToolInvocationIntent(first, lease: fixture.lease)
+            XCTAssertEqual(replayed.invocationID, original?.invocationID)
+            XCTAssertEqual(replayed.state, .completed)
+            let afterReplay = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                sessionID: fixture.sessionID, limit: 10_000,
+                throughProviderCallID: "saved-error", toolName: "fs_read")
+            XCTAssertEqual(afterReplay.count, 3)
+            let earlier = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                sessionID: fixture.sessionID, limit: 3, throughProviderCallID: "saved-first", toolName: "fs_read")
+            XCTAssertEqual(earlier.count, 1)
+            XCTAssertFalse(earlier.isRetainedTail)
+            XCTAssertTrue(afterReplay.isRetainedTail)
+            await repository.close()
+            let reopened = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control-plane.sqlite3"),
+                clock: FixedClock(Date(timeIntervalSince1970: 1_000)))
+            do {
+                let afterReopen = try await reopened.completedEligibleToolInvocationCount(run: fixture.run,
+                    sessionID: fixture.sessionID, limit: 10_000,
+                throughProviderCallID: "saved-error", toolName: "fs_read")
+                XCTAssertEqual(afterReopen.count, 3)
+                let secondReplay = try await reopened.persistToolInvocationIntent(first, lease: fixture.lease)
+                XCTAssertEqual(secondReplay.invocationID, replayed.invocationID)
+                let afterSecondReplay = try await reopened.completedEligibleToolInvocationCount(run: fixture.run,
+                    sessionID: fixture.sessionID, limit: 10_000,
+                throughProviderCallID: "saved-error", toolName: "fs_read")
+                XCTAssertEqual(afterSecondReplay.count, 3)
+            } catch { await reopened.close(); throw error }
+            await reopened.close()
+        }
+    }
+
+    func testManagedSavedToolCountEnforcesBoundsAndExactProjectRunGeneration() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "one")
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "two")
+            for limit in [0, 10_001] {
+                do {
+                    _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                        sessionID: fixture.sessionID, limit: limit,
+                throughProviderCallID: "two", toolName: "fs_read")
+                    XCTFail("Out-of-range count bound was accepted")
+                } catch let error as AutonomyError {
+                    guard case .invalidRequest = error else { XCTFail("Unexpected error: \(error)"); continue }
+                }
+            }
+            let minimum = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                sessionID: fixture.sessionID, limit: 1,
+                throughProviderCallID: "two", toolName: "fs_read")
+            let maximum = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                sessionID: fixture.sessionID, limit: 10_000,
+                throughProviderCallID: "two", toolName: "fs_read")
+            XCTAssertEqual(minimum.count, 1)
+            XCTAssertEqual(maximum.count, 2)
+            for invalid in [savedCountRun(fixture.run, runID: RunID()),
+                savedCountRun(fixture.run, projectID: ProjectID()),
+                savedCountRun(fixture.run, generation: ProjectGeneration(2))] {
+                await assertContextError(code: "project_context_required") {
+                    _ = try await repository.completedEligibleToolInvocationCount(run: invalid,
+                        sessionID: fixture.sessionID, limit: 3,
+                throughProviderCallID: "two", toolName: "fs_read")
+                }
+            }
+            await assertContextError(code: "project_context_required") {
+                _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                    sessionID: "unknown-session", limit: 3,
+                throughProviderCallID: "two", toolName: "fs_read")
+            }
+        }
+    }
+
+    func testManagedSavedToolCountRejectsCandidateAndStartsNewAcceptedSessionAtZero() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "same-provider-call")
+            let candidateID = "count-candidate-" + UUID().uuidString.lowercased()
+            try await repository.reserveProviderSession(.init(sessionID: candidateID, runID: fixture.run.runID,
+                projectID: fixture.run.projectID, projectGeneration: fixture.run.projectGeneration,
+                providerID: "lmstudio", adapterID: "lmstudio-rest", modelKey: "fixture/model",
+                providerResponseID: "count-candidate-root", predecessorSessionID: fixture.sessionID,
+                handoffID: UUID(), operationID: UUID(), idempotencyKey: candidateID,
+                bootstrapNonceSHA256: JSONSupport.sha256Hex("owned count candidate nonce"),
+                handoffSHA256: JSONSupport.sha256Hex("owned count candidate handoff"),
+                status: .candidate, accepted: false, contextCapacity: 262_144),
+                lease: fixture.lease)
+            let candidate = try await repository.providerSession(candidateID)
+            XCTAssertEqual(candidate?.status, .candidate)
+            XCTAssertEqual(candidate?.accepted, false)
+            await assertContextError(code: "project_context_required") {
+                _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                    sessionID: candidateID, limit: 3,
+                throughProviderCallID: "same-provider-call", toolName: "fs_read")
+            }
+            let acceptedCandidate = try XCTUnwrap(candidate)
+            let operationID = try XCTUnwrap(acceptedCandidate.operationID)
+            var advancing = fixture.run
+            for state in [AutonomousRunState.validating, .ready, .starting, .running] {
+                advancing = try await repository.transitionAutonomousRun(runID: fixture.run.runID,
+                    lease: fixture.lease, transition: .init(expectedState: advancing.state,
+                        expectedRevision: advancing.revision, nextState: state,
+                        eventType: "saved_count_candidate_fixture", eventSummary: "Advance owned candidate fixture"))
+            }
+            advancing = try await repository.transitionAutonomousRun(runID: fixture.run.runID,
+                lease: fixture.lease, transition: .init(expectedState: advancing.state,
+                    expectedRevision: advancing.revision, nextState: .rollingOver,
+                    eventType: "saved_count_candidate_fixture", eventSummary: "Enter owned candidate acceptance boundary",
+                    activeSessionID: fixture.sessionID, activeOperationID: operationID))
+            let fenced = try await repository.fenceProviderSessionForContinuity(runID: fixture.run.runID,
+                operationID: operationID, predecessorSessionID: fixture.sessionID, lease: fixture.lease)
+            XCTAssertEqual(fenced.status, .fencing)
+            XCTAssertFalse(fenced.accepted)
+            // This repository component fixture supplies the complete validated
+            // receipt identity; actual host ACK/project-memory seal are tested
+            // by the existing ManagedContinuityWorker lifecycle tests.
+            let acceptance = ContinuitySuccessorAcceptance(operationID: operationID,
+                runID: fixture.run.runID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration, predecessorSessionID: fixture.sessionID,
+                candidateSessionID: acceptedCandidate.sessionID,
+                handoffID: try XCTUnwrap(acceptedCandidate.handoffID),
+                handoffSHA256: try XCTUnwrap(acceptedCandidate.handoffSHA256),
+                bootstrapNonceSHA256: try XCTUnwrap(acceptedCandidate.bootstrapNonceSHA256),
+                automaticContinuationInputSHA256: try JSONSupport.sha256Hex(ManagedContinuityWorker.automaticContinuationInput()),
+                automaticContinuationIdempotencyKey: "count-automatic-" + operationID.uuidString.lowercased())
+            let accepted = try await repository.acceptContinuitySuccessor(acceptance, lease: fixture.lease)
+            XCTAssertEqual(accepted.winner.sessionID, candidateID)
+            XCTAssertEqual(accepted.winner.status, .active)
+            XCTAssertTrue(accepted.winner.accepted)
+            XCTAssertEqual(accepted.automaticContinuation.intent.kind, .automaticContinuation)
+            let operationSessions = try await repository.providerSessions(operationID: operationID, limit: 4)
+            XCTAssertEqual(operationSessions.filter { $0.status == .active && $0.accepted }.count, 1)
+            let acceptedID = accepted.winner.sessionID
+            let storedNextRun = try await repository.autonomousRun(fixture.run.runID)
+            let nextRun = try XCTUnwrap(storedNextRun)
+            let absent = try await repository.toolInvocation(sessionID: acceptedID, providerCallID: "same-provider-call")
+            XCTAssertNil(absent)
+            await assertContextError(code: "project_context_required") {
+                _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                    sessionID: fixture.sessionID, limit: 3,
+                throughProviderCallID: "same-provider-call", toolName: "fs_read")
+            }
+            let turn = try await repository.persistProviderTurnIntent(.init(runID: fixture.run.runID,
+                sessionID: acceptedID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration, kind: .normalContinuation,
+                idempotencyKey: "next-turn", inputSHA256: JSONSupport.sha256Hex("next-input")), lease: fixture.lease)
+            let next = SavedCountRepositoryFixture(run: nextRun, lease: fixture.lease,
+                sessionID: acceptedID, turnID: turn.intent.turnID)
+            _ = try await savedCountInvocation(repository, fixture: next, callID: "same-provider-call")
+            let one = try await repository.completedEligibleToolInvocationCount(run: nextRun,
+                sessionID: acceptedID, limit: 3,
+                throughProviderCallID: "same-provider-call", toolName: "fs_read")
+            XCTAssertEqual(one.count, 1, "Call IDs are deduplicated within each exact accepted provider session")
+        }
+    }
+
+    func testManagedSavedToolCountRequestPreservesUsageAndSurvivesRaisedLimitReopenAndCachedFollowup() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            for index in 0..<3 {
+                _ = try await savedCountInvocation(repository, fixture: fixture, callID: "count-\(index)")
+            }
+            let capabilities = try savedCountCapabilities()
+            let evaluator = PersistedManagedRunBudgetEvaluator(repository: repository,
+                clock: FixedClock(Date(timeIntervalSince1970: 1_000)), toolCallThresholdResolver: { 3 })
+            let initial = try await evaluator.evaluateBeforeProviderTurn(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities, serializedInputBytes: 100)
+            XCTAssertEqual(initial, .normal)
+            let usage = try ProviderUsage(capacity: 262_144, inputTokens: 1_000, outputTokens: 64,
+                totalTokens: 1_064, source: .providerExact, confidence: 1)
+            let turn = try ProviderTurn(requestID: "count-usage-request", responseID: "count-usage-response",
+                providerID: "lmstudio", providerVersion: "count-fixture-1", modelKey: "fixture/model",
+                providerInstanceID: "count-fixture-instance", messages: [], toolCalls: [], usage: usage,
+                completed: true, finishReason: .stop)
+            let observed = try await evaluator.observeProviderTurn(turn, run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities)
+            XCTAssertEqual(observed, .normal)
+            let identity = ContextBudgetIdentity(runID: fixture.run.runID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration, sessionID: fixture.sessionID)
+            let storedBefore = try await repository.contextBudgetState(identity: identity)
+            let before = try XCTUnwrap(storedBefore)
+            let action = try await evaluator.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "count-2", toolName: "fs_read")
+            XCTAssertEqual(action, .rollover)
+            let storedRequest = try await repository.contextBudgetActionRequest(identity: identity)
+            let request = try XCTUnwrap(storedRequest)
+            let storedAfter = try await repository.contextBudgetState(identity: identity)
+            let after = try XCTUnwrap(storedAfter)
+            let source = try XCTUnwrap(before.latestObservation)
+            let result = try XCTUnwrap(after.latestObservation)
+            XCTAssertEqual(after.configuration, before.configuration)
+            XCTAssertEqual(result.capacity, 262_144)
+            XCTAssertEqual(result.used, source.used)
+            XCTAssertEqual(result.reserves, source.reserves)
+            XCTAssertEqual(result.remaining, source.remaining)
+            XCTAssertEqual(result.projectedNextTurn, source.projectedNextTurn)
+            XCTAssertEqual(result.source, source.source)
+            XCTAssertEqual(result.accounting, source.accounting)
+            XCTAssertEqual(result.thresholds, source.thresholds)
+            XCTAssertEqual(result.triggerPoint, .afterToolResult)
+            XCTAssertEqual(request.reason, "Automatic rollover at saved tool-call threshold (count=3, threshold=3)")
+            XCTAssertEqual(after.revision, before.revision + 1)
+            let repeated = try await evaluator.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "count-2", toolName: "fs_read")
+            XCTAssertEqual(repeated, .rollover)
+            let repeatedRequest = try await repository.contextBudgetActionRequest(identity: identity)
+            let repeatedState = try await repository.contextBudgetState(identity: identity)
+            XCTAssertEqual(repeatedRequest, request)
+            XCTAssertEqual(repeatedState?.revision, after.revision)
+            // A later operation on the same evaluator must reopen the actor after
+            // the count commit, rather than write from a stale cached revision.
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities, serializedInputBytes: 0)
+            let storedFollowup = try await repository.contextBudgetState(identity: identity)
+            let followup = try XCTUnwrap(storedFollowup)
+            XCTAssertEqual(followup.revision, after.revision + 1)
+            let raised = PersistedManagedRunBudgetEvaluator(repository: repository,
+                clock: FixedClock(Date(timeIntervalSince1970: 1_000)), toolCallThresholdResolver: { 10_000 })
+            let raisedAction = try await raised.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "count-2", toolName: "fs_read")
+            let earlyRaised = try await raised.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "count-0", toolName: "fs_read")
+            let middleRaised = try await raised.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "count-1", toolName: "fs_read")
+            XCTAssertEqual(earlyRaised, .normal)
+            XCTAssertEqual(middleRaised, .normal)
+            XCTAssertEqual(raisedAction, .rollover)
+            let raisedRequest = try await repository.contextBudgetActionRequest(identity: identity)
+            XCTAssertEqual(raisedRequest, request)
+            await repository.close()
+            let reopened = try ProjectControlPlaneRepository(databaseURL: root.appendingPathComponent("control-plane.sqlite3"),
+                clock: FixedClock(Date(timeIntervalSince1970: 1_000)))
+            do {
+                let restored = PersistedManagedRunBudgetEvaluator(repository: reopened,
+                    clock: FixedClock(Date(timeIntervalSince1970: 1_000)), toolCallThresholdResolver: { 10_000 })
+                let restoredAction = try await restored.evaluateToolCallCount(run: fixture.run,
+                    sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "count-2", toolName: "fs_read")
+                XCTAssertEqual(restoredAction, .rollover)
+                let restoredRequest = try await reopened.contextBudgetActionRequest(identity: identity)
+                XCTAssertEqual(restoredRequest, request)
+                let restoredState = try await reopened.contextBudgetState(identity: identity)
+                XCTAssertEqual(restoredState?.revision, followup.revision)
+            } catch { await reopened.close(); throw error }
+            await reopened.close()
+        }
+    }
+
+    func testManagedSavedToolCountResolverRejectsInvalidLimitBeforeCommittingBudget() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            for limit in [0, 10_001] {
+                let evaluator = PersistedManagedRunBudgetEvaluator(repository: repository,
+                    toolCallThresholdResolver: { limit })
+                do {
+                    _ = try await evaluator.evaluateToolCallCount(run: fixture.run,
+                        sessionID: fixture.sessionID, capabilities: savedCountCapabilities(),
+                        providerCallID: "missing-current", toolName: "fs_read")
+                    XCTFail("Invalid saved threshold was accepted")
+                } catch { XCTAssertEqual(error as? ContextBudgetError, .invalidPolicy) }
+            }
+            let identity = ContextBudgetIdentity(runID: fixture.run.runID, projectID: fixture.run.projectID,
+                projectGeneration: fixture.run.projectGeneration, sessionID: fixture.sessionID)
+            let request = try await repository.contextBudgetActionRequest(identity: identity)
+            let state = try await repository.contextBudgetState(identity: identity)
+            XCTAssertNil(request)
+            XCTAssertNil(state)
+        }
+    }
+
+    func testManagedSavedToolCountLoweredLimitWaitsForRetainedTailAndThenKeepsOneRequest() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            for index in 0..<6 {
+                _ = try await savedCountInvocation(repository, fixture: fixture, callID: "history-\(index)")
+            }
+            let capabilities = try savedCountCapabilities()
+            let evaluator = PersistedManagedRunBudgetEvaluator(repository: repository,
+                clock: FixedClock(Date(timeIntervalSince1970: 1_000)), toolCallThresholdResolver: { 3 })
+            _ = try await evaluator.evaluateBeforeProviderTurn(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities, serializedInputBytes: 100)
+            for index in 0..<5 {
+                let replay = try await evaluator.evaluateToolCallCount(run: fixture.run,
+                    sessionID: fixture.sessionID, capabilities: capabilities,
+                    providerCallID: "history-\(index)", toolName: "fs_read")
+                XCTAssertEqual(replay, .normal, "Lowering the limit must not lose already retained later results")
+                let pending = try await repository.pendingContextBudgetActionRequest(runID: fixture.run.runID)
+                XCTAssertNil(pending)
+            }
+            let tail = try await evaluator.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "history-5", toolName: "fs_read")
+            XCTAssertEqual(tail, .rollover)
+            let stored = try await repository.pendingContextBudgetActionRequest(runID: fixture.run.runID)
+            let request = try XCTUnwrap(stored)
+            XCTAssertEqual(request.reason, "Automatic rollover at saved tool-call threshold (count=3, threshold=3)")
+            let raised = PersistedManagedRunBudgetEvaluator(repository: repository,
+                toolCallThresholdResolver: { 10_000 })
+            for index in 0..<5 {
+                let replay = try await raised.evaluateToolCallCount(run: fixture.run,
+                    sessionID: fixture.sessionID, capabilities: capabilities,
+                    providerCallID: "history-\(index)", toolName: "fs_read")
+                XCTAssertEqual(replay, .normal)
+            }
+            let sticky = try await raised.evaluateToolCallCount(run: fixture.run,
+                sessionID: fixture.sessionID, capabilities: capabilities,
+                providerCallID: "history-5", toolName: "fs_read")
+            XCTAssertEqual(sticky, .rollover)
+            let after = try await repository.pendingContextBudgetActionRequest(runID: fixture.run.runID)
+            XCTAssertEqual(after, request)
+            let tools = try await repository.toolInvocations(runID: fixture.run.runID, limit: 8)
+            XCTAssertEqual(tools.count, 6)
+        }
+    }
+
+    func testManagedSavedToolCountRequiresMatchingCompletedCurrentCallAndToolName() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await savedCountFixture(repository, root: root)
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "current")
+            _ = try await savedCountInvocation(repository, fixture: fixture, callID: "unfinished", state: .executing)
+            for callID in ["absent", "unfinished"] {
+                do {
+                    _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                        sessionID: fixture.sessionID, limit: 3, throughProviderCallID: callID, toolName: "fs_read")
+                    XCTFail("A missing or unfinished current result was accepted as a count boundary")
+                } catch let error as AutonomyError {
+                    guard case .invalidRequest = error else { XCTFail("Unexpected error: \(error)"); continue }
+                }
+            }
+            await assertContextError(code: "integrity_failure") {
+                _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                    sessionID: fixture.sessionID, limit: 3, throughProviderCallID: "current", toolName: "fs_write")
+            }
+            let current = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                sessionID: fixture.sessionID, limit: 3, throughProviderCallID: "current", toolName: "fs_read")
+            XCTAssertEqual(current.count, 1)
+            XCTAssertTrue(current.isRetainedTail, "An unfinished later intent is not an already retained result")
+        }
+    }
+
+    func testManagedSavedToolCountRejectsCorruptOversizedAndNULCurrentResults() async throws {
+        let ordinary = #"{"ok":true,"is_error":false,"payload":{"content":"retained"}}"#
+        let oversized = String(repeating: "a", count: 65_537)
+        let nul = ordinary + "\u{0}untrusted-suffix"
+        let corruptions = [(ordinary, String(repeating: "0", count: 64)),
+            (oversized, JSONSupport.sha256Hex(oversized)), (nul, JSONSupport.sha256Hex(nul))]
+        for (summary, digest) in corruptions {
+            try await withRepository { repository, root in
+                let fixture = try await savedCountFixture(repository, root: root)
+                let intent = try await savedCountInvocation(repository, fixture: fixture, callID: "corrupt-current")
+                // The adversarial mutation affects only this owned source fixture.
+                // Production completion has already committed a valid result.
+                try ControlPlaneTransitionFixtureDatabase.withTransaction(at: root.appendingPathComponent("control-plane.sqlite3")) { database in
+                    if summary.contains("\u{0}") {
+                        let pieces = summary.components(separatedBy: "\u{0}")
+                        XCTAssertEqual(pieces.count, 2)
+                        try database.execute("UPDATE tool_invocations SET result_summary=CAST(? AS TEXT)||char(0)||CAST(? AS TEXT),result_sha256=? WHERE invocation_id=?",
+                            bindings: [pieces[0], pieces[1], digest, intent.invocationID.uuidString.lowercased()])
+                    } else {
+                        try database.execute("UPDATE tool_invocations SET result_summary=?,result_sha256=? WHERE invocation_id=?",
+                            bindings: [summary, digest, intent.invocationID.uuidString.lowercased()])
+                    }
+                    let storedBytes = try database.scalarInt("SELECT length(CAST(result_summary AS BLOB)) FROM tool_invocations WHERE invocation_id=?",
+                        bindings: [intent.invocationID.uuidString.lowercased()])
+                    XCTAssertEqual(storedBytes, summary.utf8.count, "The adversarial fixture must retain every intended byte")
+                }
+                await assertContextError(code: "integrity_failure") {
+                    _ = try await repository.completedEligibleToolInvocationCount(run: fixture.run,
+                        sessionID: fixture.sessionID, limit: 3,
+                        throughProviderCallID: "corrupt-current", toolName: "fs_read")
+                }
+                let pending = try await repository.pendingContextBudgetActionRequest(runID: fixture.run.runID)
+                XCTAssertNil(pending)
+            }
+        }
+    }
+
+    private func savedCountCapabilities() throws -> ProviderCapabilities {
+        try ProviderCapabilities(providerID: "lmstudio", providerVersion: "count-fixture-1",
+            modelKey: "fixture/model", providerInstanceID: "count-fixture-instance",
+            contextLength: 262_144, maximumContextLength: 262_144, statefulResponses: true,
+            streaming: true, customTools: true, mcp: false, structuredOutput: true,
+            usageReporting: true, idempotencyLookup: true,
+            capabilityFingerprintSHA256: String(repeating: "a", count: 64))
+    }
+
+    private func savedCountFixture(_ repository: ProjectControlPlaneRepository, root: URL) async throws -> SavedCountRepositoryFixture {
+        let projectRoot = root.appendingPathComponent("saved-count-" + UUID().uuidString.lowercased(), isDirectory: true)
+        let project = try await repository.registerProjectUnchecked(projectID: ProjectID(),
+            displayName: "Saved Count Repository Fixture", canonicalRoot: projectRoot)
+        let tools: Set<String> = ["fs_read", "get_forge_status"]
+        let created = try await repository.createAutonomousRun(.init(projectID: project.projectID,
+            projectGeneration: project.generation, mission: "Verify exact durable saved-count eligibility",
+            providerID: "lmstudio", modelKey: "fixture/model",
+            specification: .init(allowedTools: tools.sorted(), completionGates: ["tests"]),
+            authorizationScope: scope(root: projectRoot, tools: tools)))
+        let lease = try await repository.acquireRunLease(runID: created.runID, ownerID: "saved-count-repository-fixture")
+        let sessionID = "saved-count-" + UUID().uuidString.lowercased()
+        try await repository.reserveProviderSession(.init(sessionID: sessionID, runID: created.runID,
+            projectID: project.projectID, projectGeneration: project.generation, providerID: "lmstudio",
+            adapterID: "lmstudio-rest", modelKey: "fixture/model", providerResponseID: "count-root",
+            idempotencyKey: sessionID, contextCapacity: 262_144), lease: lease)
+        let turn = try await repository.persistProviderTurnIntent(.init(runID: created.runID, sessionID: sessionID,
+            projectID: project.projectID, projectGeneration: project.generation, kind: .normalContinuation,
+            idempotencyKey: "count-turn", inputSHA256: JSONSupport.sha256Hex("count-input")), lease: lease)
+        let storedRun = try await repository.autonomousRun(created.runID)
+        let run = try XCTUnwrap(storedRun)
+        return SavedCountRepositoryFixture(run: run, lease: lease, sessionID: sessionID, turnID: turn.intent.turnID)
+    }
+
+    @discardableResult
+    private func savedCountInvocation(_ repository: ProjectControlPlaneRepository,
+        fixture: SavedCountRepositoryFixture, callID: String, toolName: String = "fs_read",
+        state: ToolInvocationState = .completed, result: String? = #"{"ok":true,"content":"count fixture"}"#) async throws -> ToolInvocationIntent {
+        let intent = ToolInvocationIntent(turnID: fixture.turnID, runID: fixture.run.runID,
+            sessionID: fixture.sessionID, projectID: fixture.run.projectID,
+            projectGeneration: fixture.run.projectGeneration, providerCallID: callID, toolName: toolName,
+            replayClass: .readOnly, idempotencyKey: nil, argumentsSHA256: JSONSupport.sha256Hex("{}"))
+        let row = try await repository.persistToolInvocationIntent(intent, lease: fixture.lease)
+        if state == .intent { return intent }
+        _ = try await repository.transitionToolInvocation(invocationID: row.invocationID,
+            expected: .intent, to: .executing, lease: fixture.lease)
+        if state == .executing { return intent }
+        _ = try await repository.transitionToolInvocation(invocationID: row.invocationID,
+            expected: .executing, to: state, lease: fixture.lease,
+            resultSHA256: state == .completed ? result.map { JSONSupport.sha256Hex($0) } : nil,
+            resultSummary: state == .completed ? result : nil)
+        return intent
+    }
+
+    private func savedCountRun(_ value: AutonomousRunRecord, runID: RunID? = nil,
+        projectID: ProjectID? = nil, generation: ProjectGeneration? = nil) -> AutonomousRunRecord {
+        AutonomousRunRecord(runID: runID ?? value.runID, projectID: projectID ?? value.projectID,
+            projectGeneration: generation ?? value.projectGeneration, assignmentID: value.assignmentID,
+            mission: value.mission, state: value.state, continuityMode: value.continuityMode,
+            providerID: value.providerID, modelKey: value.modelKey, activeSessionID: value.activeSessionID,
+            activeOperationID: value.activeOperationID, specification: value.specification,
+            completionRequestJSON: value.completionRequestJSON, lastErrorCode: value.lastErrorCode,
+            lastErrorSummary: value.lastErrorSummary, retryAt: value.retryAt,
+            continuationPending: value.continuationPending, revision: value.revision,
+            createdAt: value.createdAt, updatedAt: value.updatedAt)
+    }
+
     private func budgetRepositoryIdentity(_ repository: ProjectControlPlaneRepository, root: URL) async throws -> ContextBudgetIdentity {
         let projectID = ProjectID()
         let projectRoot = root.appendingPathComponent("budget-project", isDirectory: true)
@@ -2624,4 +3089,11 @@ private final class MutationProbe: @unchecked Sendable {
         count += 1
         lock.unlock()
     }
+}
+
+private struct SavedCountRepositoryFixture {
+    let run: AutonomousRunRecord
+    let lease: RunLease
+    let sessionID: String
+    let turnID: UUID
 }

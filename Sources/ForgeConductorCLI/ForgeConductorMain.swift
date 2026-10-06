@@ -295,7 +295,7 @@ enum ForgeConductorMain {
         let desktopProviderID = try ForgeProcessEntry.desktopProviderID(
             inServeArguments: args
         )
-        let app = try ForgeApp.bootstrap(home: homeOverride(args))
+        let app = try ForgeApp.bootstrap(home: homeOverride(args), startTelemetry: false)
         let server = if let desktopProviderID {
             MCPServer(
                 app: app,

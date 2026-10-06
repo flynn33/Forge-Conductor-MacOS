@@ -371,7 +371,7 @@ public actor ManagedAutonomyRuntime {
         let providerRoot = app.paths.managedProvidersDir
         let clock = app.clock
         let installedRegistry = completionValidator == nil
-            ? InstalledNativeGateRegistry(repository: repository, paths: app.paths, clock: clock) : nil
+            ? InstalledNativeGateRegistry(repository: repository, paths: app.paths, clock: clock, runtimeJobs: app.runtimeJobs.service) : nil
         installedCompletionRegistry = installedRegistry
         let resolvedCompletionValidator: any RunCompletionValidating = completionValidator ?? installedRegistry!
         let resolvedManagerID = managerID
@@ -463,7 +463,8 @@ public actor ManagedAutonomyRuntime {
             maximumConcurrentRuns: concurrentRuns,
             clock: clock,
             sourceBootstrap: sourceBootstrap,
-            providerWorkAdmission: providerWorkAdmission
+            providerWorkAdmission: providerWorkAdmission,
+            diagnostics: app.diagnostics
         ) { runID in
             let broker = ToolInvocationBroker(
                 repository: repository,
@@ -477,7 +478,11 @@ public actor ManagedAutonomyRuntime {
                 repository: repository,
                 clock: clock,
                 policyOverride: validatedBudgetPolicy,
-                policyResolver: { scope in try app.config.budgetPolicySelection(scope: scope) }
+                policyResolver: { scope in try app.config.budgetPolicySelection(scope: scope) },
+                toolCallThresholdResolver: {
+                    try app.config.refreshIfChanged()
+                    return app.config.model.sessions.continuityRolloverToolCalls
+                }
             )
             let sourceCompletion = ManagedContinuityWorker(repository: repository, memory: app.projectMemory,
                 adapterResolver: adapterResolver)

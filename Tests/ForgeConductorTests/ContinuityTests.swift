@@ -4,6 +4,9 @@
 import XCTest
 import SQLite3
 import Darwin
+#if SWIFT_PACKAGE
+import ForgeNativeSessionHostPlugin
+#endif
 @testable import ForgeConductorCore
 
 final class ContinuityTests: XCTestCase {
@@ -3996,6 +3999,2113 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(observed.fields["successor_request_state"], "not_applicable_checkpoint")
     }
 
+    func testRuntimeContinuityCountsDurableJobToolsAndSeparatesFailedCalls() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("durable-job-progress")
+        try bindProjectContext(app, clientID: client)
+        let tools = ["process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+                     "job.status", "job.read_output", "job.list", "job.cancel",
+                     "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator"]
+        for index in 0..<ContinuityAutomation.checkpointEveryTools {
+            let tool = tools[index % tools.count]
+            let observation = app.continuityAutomation.observe(
+                tool: tool, arguments: ["cwd": tempHome.path], clientID: client,
+                succeeded: index.isMultiple(of: 2)
+            )
+            if index == ContinuityAutomation.checkpointEveryTools - 1 {
+                XCTAssertNotNil(observation)
+                XCTAssertEqual(observation?.finalize, false)
+            } else {
+                XCTAssertNil(observation)
+            }
+        }
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 25)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["failed_tool_count"] as? Int, 25)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 50)
+    }
+
+    func testRuntimeContinuityProgressSurvivesHelpersAndCombinesDeploymentRoles() throws {
+        let primary = try ForgeApp.bootstrap(home: tempHome)
+        defer { primary.shutdown() }
+        let primaryClient = MCPServer.defaultClientID(
+            deploymentID: "durable-continuity-deployment", role: .primary,
+            desktopProviderID: nil
+        )
+        let fallbackClient = MCPServer.defaultClientID(
+            deploymentID: "durable-continuity-deployment", role: .fallback,
+            desktopProviderID: nil
+        )
+        XCTAssertEqual(primaryClient, fallbackClient)
+        try bindProjectContext(primary, clientID: primaryClient)
+        for index in 0..<25 {
+            XCTAssertNil(primary.continuityAutomation.observe(
+                tool: "fs_read", arguments: ["path": tempHome.appendingPathComponent("read-\(index)").path],
+                clientID: primaryClient, succeeded: true
+            ))
+        }
+
+        let fallback = try ForgeApp.bootstrap(home: tempHome)
+        defer { fallback.shutdown() }
+        XCTAssertEqual(fallback.continuityAutomation.snapshot(for: fallbackClient)["progress_count"] as? Int, 25)
+        var last: ContinuityObservation?
+        for index in 25..<50 {
+            last = fallback.continuityAutomation.observe(
+                tool: "fs_read", arguments: ["path": tempHome.appendingPathComponent("read-\(index)").path],
+                clientID: fallbackClient, succeeded: true
+            )
+        }
+        XCTAssertEqual(last?.finalize, false)
+        XCTAssertEqual(primary.continuityAutomation.snapshot(for: primaryClient)["progress_count"] as? Int, 50)
+
+        let restarted = try ForgeApp.bootstrap(home: tempHome)
+        defer { restarted.shutdown() }
+        XCTAssertEqual(restarted.continuityAutomation.snapshot(for: primaryClient)["progress_count"] as? Int, 50)
+    }
+
+    func testRuntimeContinuityFirstElapsedCheckpointAndHandoffStartAtFirstProgress() throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("first-elapsed-continuity")
+        try bindProjectContext(app, clientID: client)
+        XCTAssertNil(app.continuityAutomation.observe(
+            tool: "git_status", arguments: ["cwd": tempHome.path], clientID: client,
+            succeeded: true
+        ))
+        clock.date = clock.date.addingTimeInterval(ContinuityAutomation.checkpointIntervalSec)
+        let checkpoint = app.continuityAutomation.observe(
+            tool: "git_status", arguments: ["cwd": tempHome.path], clientID: client,
+            succeeded: true
+        )
+        XCTAssertEqual(checkpoint?.finalize, false)
+        clock.date = Date(timeIntervalSince1970: 1_000 + ContinuityAutomation.handoffIntervalSec)
+        let handoff = app.continuityAutomation.observe(
+            tool: "git_status", arguments: ["cwd": tempHome.path], clientID: client,
+            succeeded: true
+        )
+        XCTAssertEqual(handoff?.finalize, true)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+    }
+
+    func testRuntimeContinuityProgressDoesNotFollowClientIntoAnotherProject() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("project-isolated-continuity")
+        let firstRoot = tempHome.appendingPathComponent("first-project", isDirectory: true)
+        let secondRoot = tempHome.appendingPathComponent("second-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondRoot, withIntermediateDirectories: true)
+        try bindProjectContext(app, clientID: client, root: firstRoot)
+        for _ in 0..<49 {
+            XCTAssertNil(app.continuityAutomation.observe(
+                tool: "fs_read", arguments: ["path": firstRoot.path], clientID: client,
+                succeeded: true
+            ))
+        }
+        let first = try app.projectContexts.invocationContext(for: client)
+        _ = try await app.projectContexts.repository.archiveProject(projectID: first.projectID, expectedGeneration: first.projectGeneration)
+        try bindProjectContext(app, clientID: client, root: secondRoot)
+        XCTAssertNil(app.continuityAutomation.observe(
+            tool: "fs_read", arguments: ["path": secondRoot.path], clientID: client,
+            succeeded: true
+        ))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        let oldProgress = try app.store.runtimeContinuityProgress(scopeKey: app.continuityAutomation.runtimeScopeKey(first))
+        XCTAssertEqual(oldProgress?.progressCount, 49)
+        let second = try app.projectContexts.invocationContext(for: client)
+        _ = try await app.projectContexts.repository.archiveProject(projectID: second.projectID, expectedGeneration: second.projectGeneration)
+        _ = try ManagerNode(app: app).registerProject(path: firstRoot.path)
+        try bindProjectContext(app, clientID: client, root: firstRoot)
+        let reactivated = try app.projectContexts.invocationContext(for: client)
+        XCTAssertEqual(reactivated.projectID, first.projectID)
+        XCTAssertGreaterThan(reactivated.projectGeneration.rawValue, first.projectGeneration.rawValue)
+        XCTAssertNotEqual(app.continuityAutomation.runtimeScopeKey(reactivated), app.continuityAutomation.runtimeScopeKey(first))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 0)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: app.continuityAutomation.runtimeScopeKey(first))?.progressCount, 49)
+    }
+
+    func testRuntimeContinuityLoopHandoffDoesNotCrossProjectBindingTransition() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        let client = MCPServer.defaultClientID(
+            deploymentID: "loop-project-transition", role: .primary, desktopProviderID: nil
+        )
+        let firstRoot = tempHome.appendingPathComponent("loop-first-project", isDirectory: true)
+        let secondRoot = tempHome.appendingPathComponent("loop-second-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondRoot, withIntermediateDirectories: true)
+        try bindProjectContext(app, clientID: client, root: firstRoot)
+        let firstContext = try app.projectContexts.invocationContext(for: client)
+        let firstScope = app.continuityAutomation.runtimeScopeKey(firstContext)
+        let savedFirst = try app.tools.call(name: "session_handoff", arguments: [
+            "goal": "Preserve the first project's completed handoff",
+            "cwd": firstRoot.path,
+            "next_actions": ["Continue only the first project's work"],
+            "narrative": "First-project history must remain intact",
+        ], clientID: client)
+        XCTAssertTrue(savedFirst.ok, "\(savedFirst.payload)")
+        let firstPacketID = try XCTUnwrap(savedFirst.payload["handoff_id"] as? String)
+        let canonicalFirst = try XCTUnwrap(app.store.handoffLegacyGet(id: firstPacketID))
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: firstPacketID), firstScope)
+
+        // Archiving is the supported generation-fenced transition: it invalidates
+        // the prior binding before this same deployment client selects B.
+        _ = try await app.projectContexts.repository.archiveProject(
+            projectID: firstContext.projectID, expectedGeneration: firstContext.projectGeneration
+        )
+        try bindProjectContext(app, clientID: client, root: secondRoot)
+        let secondContext = try app.projectContexts.invocationContext(for: client)
+        let secondScope = app.continuityAutomation.runtimeScopeKey(secondContext)
+        XCTAssertNotEqual(secondContext.projectID, firstContext.projectID)
+        XCTAssertNotEqual(secondScope, firstScope)
+        let path = secondRoot.appendingPathComponent("loop-owned.txt")
+        try "Second-project owned evidence\n".write(to: path, atomically: true, encoding: .utf8)
+
+        var softPacketID: String?
+        var hardPacketID: String?
+        for count in 1...9 {
+            let result = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            if count <= 8 {
+                XCTAssertTrue(result.ok, "call \(count): \(result.payload)")
+                XCTAssertFalse(result.isError, "call \(count)")
+                if count == 4 {
+                    XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
+                    softPacketID = try XCTUnwrap(result.payload["handoff_id"] as? String)
+                    XCTAssertNotEqual(softPacketID, firstPacketID)
+                    let packet = try XCTUnwrap(app.store.handoffLegacyGet(id: try XCTUnwrap(softPacketID)))
+                    XCTAssertEqual(packet.cwd, secondRoot.path)
+                    XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id), secondScope)
+                    XCTAssertEqual(try app.store.handoffLegacyGet(id: firstPacketID), canonicalFirst)
+                } else {
+                    XCTAssertNil(result.payload["handoff_required"], "call \(count)")
+                }
+            } else {
+                XCTAssertFalse(result.ok)
+                XCTAssertTrue(result.isError)
+                XCTAssertEqual(result.payload["code"] as? String, "identical_call_loop")
+                XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
+                hardPacketID = try XCTUnwrap(result.payload["handoff_id"] as? String)
+                XCTAssertEqual(hardPacketID, softPacketID)
+                XCTAssertNotEqual(hardPacketID, firstPacketID)
+                let packet = try XCTUnwrap(app.store.handoffLegacyGet(id: try XCTUnwrap(hardPacketID)))
+                XCTAssertEqual(packet.cwd, secondRoot.path)
+                XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id), secondScope)
+                XCTAssertEqual(try app.store.handoffLegacyGet(id: firstPacketID), canonicalFirst)
+            }
+        }
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let packetID = try XCTUnwrap(hardPacketID)
+        let resumed = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": packetID,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: packetID),
+        ], clientID: client)
+        XCTAssertTrue(resumed.ok, "\(resumed.payload)")
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 0)
+        let continued = try app.tools.call(name: "fs_list", arguments: ["path": secondRoot.path], clientID: client)
+        XCTAssertTrue(continued.ok, "\(continued.payload)")
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: firstPacketID), canonicalFirst)
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: firstPacketID), firstScope)
+    }
+
+    func testRuntimeContinuityFailedToolBudgetSavesAndBlocksWithoutInventingSuccess() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("failed-runtime-progress")
+        try bindProjectContext(app, clientID: client)
+        var checkpoints = 0
+        var final: ContinuityObservation?
+        for index in 0..<ContinuityAutomation.handoffEveryFailedTools {
+            let observed = app.continuityAutomation.observe(
+                tool: "shell_exec", arguments: ["cwd": tempHome.path, "command": "failing command \(index)"],
+                clientID: client, succeeded: false
+            )
+            if observed?.finalize == false { checkpoints += 1 }
+            if observed?.finalize == true { final = observed }
+        }
+        XCTAssertEqual(checkpoints, 3)
+        XCTAssertEqual(final?.finalize, true)
+        let snapshot = app.continuityAutomation.snapshot(for: client)
+        XCTAssertEqual(snapshot["progress_count"] as? Int, 0)
+        XCTAssertEqual(snapshot["failed_tool_count"] as? Int, 200)
+        XCTAssertEqual(snapshot["blocked"] as? Bool, true)
+        XCTAssertEqual(snapshot["external_context_usage"] as? String, "unavailable")
+        XCTAssertEqual(snapshot["session_identity_source"] as? String, "forge_logical_epoch")
+        let restored = try ForgeApp.bootstrap(home: tempHome)
+        defer { restored.shutdown() }
+        XCTAssertTrue(restored.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(restored.continuityAutomation.blockState(client).handoffID, final?.packet.id)
+    }
+
+    func testRuntimeContinuityLoopBudgetPointerAndBlockSurviveRestart() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        let client = ClientID("durable-loop-budget")
+        try bindProjectContext(app, clientID: client)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let scope = app.continuityAutomation.runtimeScopeKey(context)
+        let path = tempHome.appendingPathComponent("durable-loop-read.txt")
+        try "Durable loop evidence".write(to: path, atomically: true, encoding: .utf8)
+        var packetID: String?
+        for count in 1...9 {
+            let result = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            if count == 4 {
+                packetID = try XCTUnwrap(result.payload["handoff_id"] as? String)
+                XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+            } else if count == 9 {
+                XCTAssertEqual(result.payload["code"] as? String, "identical_call_loop")
+                XCTAssertEqual(result.payload["handoff_id"] as? String, packetID)
+            } else { XCTAssertTrue(result.ok, "\(result.payload)") }
+        }
+        let exactID = try XCTUnwrap(packetID)
+        let progress = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: scope))
+        XCTAssertTrue(progress.blocked)
+        XCTAssertEqual(progress.latestPacketID, exactID)
+        XCTAssertEqual(progress.lastHandoffID, exactID)
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: exactID), scope)
+        let canonical = try XCTUnwrap(app.store.handoffLegacyGet(id: exactID))
+        app.shutdown()
+        let restarted = try ForgeApp.bootstrap(home: tempHome)
+        defer { restarted.shutdown() }
+        XCTAssertTrue(restarted.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(try restarted.store.runtimeContinuityProgress(scopeKey: scope)?.epoch, progress.epoch)
+        let resumed = try restarted.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": exactID,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: exactID),
+        ], clientID: client)
+        XCTAssertTrue(resumed.ok, "\(resumed.payload)")
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertFalse(restarted.continuityAutomation.isBlocked(client))
+        XCTAssertNotEqual(try restarted.store.runtimeContinuityProgress(scopeKey: scope)?.epoch, progress.epoch)
+        XCTAssertEqual(try restarted.store.handoffLegacyGet(id: exactID), canonical)
+    }
+
+    func testRuntimeContinuityLoopBudgetFailureCancellationAndStaleEpochPreserveAtomicState() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("loop-budget-atomic-state")
+        try bindProjectContext(app, clientID: client)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let scope = app.continuityAutomation.runtimeScopeKey(context)
+        let saved = try app.tools.call(name: "session_handoff", arguments: [
+            "goal": "Preserve model-authored work", "next_actions": ["Finish the exact task"],
+        ], clientID: client)
+        let modelID = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        let model = try XCTUnwrap(app.store.handoffLegacyGet(id: modelID))
+        XCTAssertTrue(model.resumeReady, "Finalized model history must be cloned, while an open checkpoint keeps its identity")
+        let soft = try app.continuityAutomation.budgetAutoCheckpoint(
+            clientID: client, reason: "soft budget fixture", cancellation: nil
+        )
+        let canonicalSoft = try XCTUnwrap(app.store.handoffLegacyGet(id: soft.id))
+        XCTAssertNotEqual(soft.id, modelID)
+        XCTAssertEqual(soft.goal, model.goal)
+        XCTAssertEqual(soft.nextActions, model.nextActions)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: modelID), model)
+        let prior = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: scope))
+        XCTAssertFalse(prior.blocked)
+        XCTAssertEqual(prior.latestPacketID, soft.id)
+
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        cancelled.cancel()
+        XCTAssertThrowsError(try app.continuityAutomation.budgetAutoCheckpoint(
+            clientID: client, reason: "cancelled hard budget", blockProgress: true, cancellation: cancelled
+        )) { XCTAssertTrue($0 is CancellationError) }
+        try withSQLiteFixture(at: app.paths.storeSQLite) { database in
+            try executeSQLiteFixture(database, sql: """
+                CREATE TRIGGER fail_loop_budget_pointer BEFORE UPDATE ON runtime_continuity_progress
+                WHEN OLD.scope_key='\(scope)'
+                BEGIN SELECT RAISE(ABORT, 'forced loop budget pointer failure'); END;
+                """)
+        }
+        XCTAssertThrowsError(try app.continuityAutomation.budgetAutoCheckpoint(
+            clientID: client, reason: "failed hard budget", blockProgress: true, cancellation: nil
+        ))
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: soft.id), canonicalSoft)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: modelID), model)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: scope)?.latestPacketID, prior.latestPacketID)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: scope)?.epoch, prior.epoch)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        try withSQLiteFixture(at: app.paths.storeSQLite) { database in
+            try executeSQLiteFixture(database, sql: "DROP TRIGGER fail_loop_budget_pointer;")
+        }
+        XCTAssertTrue(try app.continuityAutomation.clearBlockReportingResult(clientID: client, packet: soft, cancellation: nil))
+        var stale = soft
+        stale.narrative = "A predecessor's in-flight hard save must not overwrite the successor"
+        XCTAssertThrowsError(try app.store.handoffUpsertRecordingRuntimeProgress(
+            stale, scopeKey: scope, blockProgress: true, expectedEpoch: prior.epoch
+        ))
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: soft.id), canonicalSoft)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertNotEqual(try app.store.runtimeContinuityProgress(scopeKey: scope)?.epoch, prior.epoch)
+    }
+
+    func testRuntimeContinuityConcurrentLoopBudgetSavesShareOneCurrentPacket() throws {
+        let first = try ForgeApp.bootstrap(home: tempHome)
+        defer { first.shutdown() }
+        let client = ClientID("concurrent-loop-budget")
+        try bindProjectContext(first, clientID: client)
+        let second = try ForgeApp.bootstrap(home: tempHome)
+        defer { second.shutdown() }
+        let identifiers = LockedFailureMessages()
+        let failures = LockedFailureMessages()
+        DispatchQueue.concurrentPerform(iterations: 2) { index in
+            do {
+                let owner = index == 0 ? first : second
+                let packet = try owner.continuityAutomation.budgetAutoCheckpoint(
+                    clientID: client, reason: "concurrent soft budget \(index)", cancellation: nil
+                )
+                identifiers.append(packet.id)
+            } catch { failures.append(String(describing: error)) }
+        }
+        XCTAssertEqual(failures.snapshot, [])
+        XCTAssertEqual(identifiers.snapshot.count, 2)
+        XCTAssertEqual(Set(identifiers.snapshot).count, 1)
+        let exactID = try XCTUnwrap(identifiers.snapshot.first)
+        let scope = first.continuityAutomation.runtimeScopeKey(try first.projectContexts.invocationContext(for: client))
+        XCTAssertEqual(try first.store.runtimeContinuityProgress(scopeKey: scope)?.latestPacketID, exactID)
+        XCTAssertFalse(first.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(try first.store.handoffLegacyList(limit: 10).count, 1)
+        let hard = try second.continuityAutomation.budgetAutoCheckpoint(
+            clientID: client, reason: "concurrent-owner hard budget", blockProgress: true, cancellation: nil
+        )
+        XCTAssertEqual(hard.id, exactID)
+        XCTAssertTrue(first.continuityAutomation.isBlocked(client))
+    }
+
+    func testRuntimeContinuityLoopBudgetCapacityFailurePreservesHistoryAndDoesNotInventBlock() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        let client = ClientID("loop-budget-capacity")
+        try bindProjectContext(app, clientID: client)
+        let scope = app.continuityAutomation.runtimeScopeKey(try app.projectContexts.invocationContext(for: client))
+        let historicalScope = JSONSupport.sha256Hex("retained loop-budget historical scope")
+        let historical = HandoffPacket(source: .model, resumeReady: true, goal: "Retain exact historical evidence", cwd: tempHome.path)
+        try app.store.handoffUpsertRecordingRuntimeProgress(historical, scopeKey: historicalScope)
+        let canonical = try XCTUnwrap(app.store.handoffLegacyGet(id: historical.id))
+        try withSQLiteFixture(at: app.paths.storeSQLite) { database in
+            try executeSQLiteFixture(database, sql: """
+                WITH RECURSIVE copies(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM copies WHERE n<9999)
+                INSERT INTO context_handoffs(id,created_at,updated_at,source,resume_ready,packet_json,client_id,write_sequence,runtime_scope_key)
+                SELECT printf('%08x-0000-4000-8000-000000000000',n),created_at,updated_at,source,resume_ready,
+                       replace(packet_json,id,printf('%08x-0000-4000-8000-000000000000',n)),client_id,n+1,runtime_scope_key
+                FROM context_handoffs,copies WHERE id='\(historical.id)';
+                """)
+        }
+        let path = tempHome.appendingPathComponent("capacity-loop-read.txt")
+        try "Capacity-limited owned evidence".write(to: path, atomically: true, encoding: .utf8)
+        for count in 1...9 {
+            let result = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertNil(result.payload["handoff_id"], "call \(count)")
+            if count <= 8 {
+                XCTAssertTrue(result.ok, "call \(count): \(result.payload)")
+                if count >= 4 {
+                    let attention = try XCTUnwrap(result.payload["continuity_attention"] as? [String: Any])
+                    XCTAssertEqual(attention["code"] as? String, "continuity_capacity_reached")
+                    XCTAssertEqual(attention["handoff_persisted"] as? Bool, false)
+                }
+            } else {
+                XCTAssertFalse(result.ok)
+                XCTAssertTrue(result.isError)
+                XCTAssertEqual(result.payload["code"] as? String, "continuity_persistence_failed")
+                XCTAssertEqual(result.payload["loop_code"] as? String, "identical_call_loop")
+                XCTAssertEqual(result.payload["handoff_persisted"] as? Bool, false)
+            }
+            XCTAssertFalse(app.continuityAutomation.isBlocked(client), "call \(count)")
+        }
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: historical.id), canonical)
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: historical.id), historicalScope)
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: scope)?.latestPacketID)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: scope)?.progressCount, 8)
+        XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs WHERE runtime_scope_key IS NOT NULL;"), 10_000)
+    }
+
+    func testRuntimeContinuityStatusMetadataViewsMatchConfiguredThreshold() throws {
+        for limit in [1, 3, 251, 10_000] {
+            let home = tempHome.appendingPathComponent("status-threshold-\(limit)", isDirectory: true)
+            let app = try ForgeApp.bootstrap(home: home)
+            defer { app.shutdown() }
+            let client = ClientID("metadata-threshold-\(limit)")
+            try bindProjectContext(app, clientID: client, root: home)
+            _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: limit))
+            let response = try app.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+            XCTAssertTrue(response.ok, "\(response.payload)")
+            let current = try XCTUnwrap(response.payload["auto_continuity"] as? [String: Any])
+            let continuity = try XCTUnwrap(response.payload["continuity"] as? [String: Any])
+            let legacy = try XCTUnwrap(continuity["auto"] as? [String: Any])
+            for snapshot in [current, legacy] {
+                XCTAssertEqual(snapshot["handoff_every_tools"] as? Int, limit)
+                XCTAssertEqual(snapshot["checkpoint_every_tools"] as? Int, min(50, limit))
+            }
+        }
+    }
+
+    func testRuntimeContinuityGenerationDeploymentAndLogicalEpochRemainIsolated() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let firstClient = MCPServer.defaultClientID(deploymentID: "first-deployment", role: .primary, desktopProviderID: nil)
+        let secondClient = MCPServer.defaultClientID(deploymentID: "second-deployment", role: .primary, desktopProviderID: nil)
+        try bindProjectContext(app, clientID: firstClient)
+        try bindProjectContext(app, clientID: secondClient)
+        _ = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: firstClient, succeeded: true)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: firstClient)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: secondClient)["progress_count"] as? Int, 0)
+        let originalEpoch = try XCTUnwrap(app.continuityAutomation.snapshot(for: firstClient)["continuity_epoch"] as? String)
+        try app.continuityAutomation.clearBlock(clientID: firstClient, cancellation: nil)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: firstClient)["progress_count"] as? Int, 0)
+        XCTAssertNotEqual(app.continuityAutomation.snapshot(for: firstClient)["continuity_epoch"] as? String, originalEpoch)
+
+        _ = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: firstClient, succeeded: true)
+        let prior = try app.projectContexts.invocationContext(for: firstClient)
+        _ = try app.projectContexts.beginReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        _ = try app.projectContexts.completeReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        try bindProjectContext(app, clientID: firstClient)
+        let current = try app.projectContexts.invocationContext(for: firstClient)
+        XCTAssertNotEqual(current.projectGeneration, prior.projectGeneration)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: firstClient)["progress_count"] as? Int, 0)
+        let oldProgress = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: app.continuityAutomation.runtimeScopeKey(prior)))
+        XCTAssertEqual(oldProgress.progressCount, 1)
+    }
+
+    func testRuntimeContinuityExpiredClaimRecoversExactPacketWithoutDuplicate() throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("expired-claim-progress")
+        try bindProjectContext(app, clientID: client)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let packetID = UUID().uuidString.lowercased()
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 50
+            progress.startedAt = clock.now()
+            progress.pending = RuntimeContinuityProgressClaim(
+                scopeKey: key, epoch: progress.epoch, packetID: packetID,
+                ownerID: UUID().uuidString, finalize: false, progressCount: 50, failureCount: 0,
+                claimedAt: clock.now(), expiresAt: clock.now().addingTimeInterval(30)
+            )
+        }
+        XCTAssertNil(app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true))
+        XCTAssertNil(try app.store.handoffGet(id: packetID))
+        clock.date = clock.date.addingTimeInterval(31)
+        let recovered = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true)
+        XCTAssertEqual(recovered?.packet.id, packetID)
+        let progress = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertNil(progress.pending)
+        XCTAssertEqual(progress.progressCount, 52)
+        XCTAssertEqual(progress.lastCheckpointCount, 50)
+        XCTAssertNil(app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true))
+        XCTAssertEqual(try app.store.handoffList(limit: 20).filter { $0.id == packetID }.count, 1)
+    }
+
+    func testRuntimeContinuityPacketAndProgressRollBackTogetherAndRecoverAfterReopen() throws {
+        let key = JSONSupport.sha256Hex("atomic-runtime-scope")
+        let path = tempHome.appendingPathComponent("atomic-progress.sqlite")
+        let fault = try SQLiteStore(path: path, postMigrationCommitObserver: nil, beforeMutationCommitObserver: { kind in
+            if kind == .handoff { throw StoreError.execFailed("injected handoff interruption") }
+        })
+        let created = try fault.updateRuntimeContinuityProgress(scopeKey: key) { progress in progress.progressCount = 200 }
+        let claim = RuntimeContinuityProgressClaim(
+            scopeKey: key, epoch: created.epoch, packetID: UUID().uuidString.lowercased(),
+            ownerID: UUID().uuidString, finalize: true, progressCount: 200, failureCount: 0,
+            claimedAt: Date(), expiresAt: Date().addingTimeInterval(30)
+        )
+        _ = try fault.updateRuntimeContinuityProgress(scopeKey: key) { progress in progress.pending = claim }
+        let packet = HandoffPacket(id: claim.packetID, source: .auto, resumeReady: true, goal: "Exact retained intent", cwd: tempHome.path)
+        XCTAssertThrowsError(try fault.handoffUpsertCompletingRuntimeProgress(packet, claim: claim))
+        XCTAssertNil(try fault.handoffGet(id: packet.id))
+        let retained = try XCTUnwrap(fault.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertFalse(retained.blocked)
+        XCTAssertEqual(retained.pending, claim)
+        fault.close()
+
+        let recovered = try SQLiteStore(path: path)
+        defer { recovered.close() }
+        try recovered.handoffUpsertCompletingRuntimeProgress(packet, claim: claim)
+        XCTAssertEqual(try recovered.handoffGet(id: packet.id)?.goal, "Exact retained intent")
+        let committed = try XCTUnwrap(recovered.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertTrue(committed.blocked)
+        XCTAssertNil(committed.pending)
+        XCTAssertEqual(committed.lastHandoffID, packet.id)
+        XCTAssertThrowsError(try recovered.handoffUpsertCompletingRuntimeProgress(packet, claim: claim))
+    }
+
+    func testRuntimeContinuityDoesNotMergeAnotherProjectPacketOrClearForIt() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let firstRoot = tempHome.appendingPathComponent("original-packet-project", isDirectory: true)
+        let secondRoot = tempHome.appendingPathComponent("runtime-packet-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondRoot, withIntermediateDirectories: true)
+        let original = HandoffPacket(goal: "Private original mission", cwd: firstRoot.path, nextActions: ["Private original next action"])
+        try app.store.handoffUpsert(original)
+        let originalJSON = try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(original.id)';")
+        let client = ClientID("other-project-runtime-packet")
+        try bindProjectContext(app, clientID: client, root: secondRoot)
+        var handoff: ContinuityObservation?
+        for _ in 0..<ContinuityAutomation.handoffEveryTools {
+            handoff = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": secondRoot.path], clientID: client, succeeded: true)
+        }
+        let saved = try XCTUnwrap(handoff?.packet)
+        XCTAssertNotEqual(saved.id, original.id)
+        XCTAssertEqual(saved.cwd, secondRoot.resolvingSymlinksInPath().standardizedFileURL.path)
+        XCTAssertNotEqual(saved.goal, original.goal)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(original.id)';"), originalJSON)
+        let epoch = app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String
+        try app.continuityAutomation.clearBlock(clientID: client, packet: original, cancellation: nil)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String, epoch)
+        try app.continuityAutomation.clearBlock(clientID: client, packet: saved, cancellation: nil)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 0)
+    }
+
+    func testRuntimeContinuityForeignContextGetDoesNotReportBudgetCleared() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let firstRoot = tempHome.appendingPathComponent("foreign-context", isDirectory: true)
+        let selectedRoot = tempHome.appendingPathComponent("selected-context", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+        let foreign = HandoffPacket(goal: "Foreign packet", cwd: firstRoot.path)
+        try app.store.handoffUpsert(foreign)
+        let client = ClientID("foreign-context-budget")
+        try bindProjectContext(app, clientID: client, root: selectedRoot)
+        var handoff: ContinuityObservation?
+        for _ in 0..<ContinuityAutomation.handoffEveryTools {
+            handoff = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": selectedRoot.path], clientID: client, succeeded: true)
+        }
+        let saved = try XCTUnwrap(handoff?.packet)
+        let refused = try app.tools.call(name: "context_get", arguments: ["handoff_id": foreign.id], clientID: client)
+        XCTAssertEqual(refused.payload["context_budget_cleared"] as? Bool, false)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let accepted = try app.tools.call(name: "context_get", arguments: ["handoff_id": saved.id], clientID: client)
+        XCTAssertEqual(accepted.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+    }
+
+    func testRuntimeContinuityV8MigrationPreservesPacketsMemoryAndVerifiedBackup() throws {
+        let path = tempHome.appendingPathComponent("runtime-migration.sqlite")
+        let baseline = try SQLiteStore(path: path)
+        let packet = HandoffPacket(source: .model, resumeReady: true, goal: "Preserve pre-migration work", cwd: tempHome.path)
+        try baseline.handoffUpsert(packet)
+        let originalJSON = try sqliteFixtureText(at: path, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(packet.id)';")
+        try baseline.memorySet(key: "existing/private", body: "Preserved memory", tags: ["existing"])
+        baseline.close()
+        // Version 8 has the same legacy tables and no runtime progress table.
+        try withSQLiteFixture(at: path) { database in
+            try executeSQLiteFixture(database, sql: "DROP TABLE runtime_continuity_progress; DROP INDEX idx_context_handoffs_interactive_pending_scope; DROP INDEX idx_context_handoffs_runtime_scope; ALTER TABLE context_handoffs DROP COLUMN interactive_sealed_sequence; ALTER TABLE context_handoffs DROP COLUMN runtime_scope_key; UPDATE schema_version SET version=8;")
+        }
+        let migrated = try SQLiteStore(path: path)
+        defer { migrated.close() }
+        XCTAssertEqual(try sqliteFixtureText(at: path, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(packet.id)';"), originalJSON)
+        XCTAssertEqual(try migrated.memoryGet(key: "existing/private"), "Preserved memory")
+        XCTAssertNil(try migrated.runtimeContinuityPacketScopeKey(packetID: packet.id))
+        XCTAssertEqual(try sqliteFixtureInt(at: path, sql: "SELECT version FROM schema_version;"), 9)
+        let state = try migrated.updateRuntimeContinuityProgress(scopeKey: JSONSupport.sha256Hex("new migrated scope")) { $0.progressCount = 1 }
+        XCTAssertEqual(state.progressCount, 1)
+        let backup = tempHome.appendingPathComponent("runtime-migration.pre-migration-v8.sqlite3")
+        XCTAssertEqual(try sqliteFixtureInt(at: backup, sql: "SELECT version FROM schema_version;"), 8)
+        XCTAssertEqual(try sqliteFixtureInt(at: backup, sql: "SELECT COUNT(*) FROM sqlite_master WHERE name='runtime_continuity_progress';"), 0)
+        XCTAssertEqual(try sqliteFixtureInt(at: backup, sql: "SELECT COUNT(*) FROM pragma_table_info('context_handoffs') WHERE name='runtime_scope_key';"), 0)
+        XCTAssertEqual(try sqliteFixtureInt(at: backup, sql: "SELECT COUNT(*) FROM pragma_table_info('context_handoffs') WHERE name='interactive_sealed_sequence';"), 0)
+        XCTAssertEqual(try sqliteFixtureInt(at: backup, sql: "SELECT COUNT(*) FROM context_handoffs;"), 1)
+        XCTAssertEqual(try sqliteFixtureText(at: backup, sql: "PRAGMA quick_check;"), "ok")
+        let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self, from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: path)))
+        XCTAssertEqual(manifest.state, .completed)
+        XCTAssertEqual(manifest.sourceVersion, 8)
+        XCTAssertEqual(manifest.targetVersion, 9)
+        XCTAssertEqual(manifest.backupSHA256, JSONSupport.sha256Hex(try Data(contentsOf: backup)))
+    }
+
+    func testRuntimeContinuityCheckpointAndOldGenerationReadsDoNotResetCurrentBudget() throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("read-preserves-runtime-budget")
+        try bindProjectContext(app, clientID: client)
+        let checkpoint = try app.tools.call(name: "session_checkpoint", arguments: ["goal": "Keep current work"], clientID: client)
+        let checkpointID = try XCTUnwrap(checkpoint.payload["handoff_id"] as? String)
+        for _ in 0..<25 {
+            _ = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true)
+        }
+        let oldEpoch = app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String
+        let read = try app.tools.call(name: "context_get", arguments: ["handoff_id": checkpointID], clientID: client)
+        XCTAssertEqual(read.payload["context_budget_cleared"] as? Bool, false)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 25)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String, oldEpoch)
+        let prior = try app.projectContexts.invocationContext(for: client)
+        _ = try app.projectContexts.beginReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        _ = try app.projectContexts.completeReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        try bindProjectContext(app, clientID: client)
+        _ = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true)
+        let newEpoch = app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String
+        let oldRead = try app.tools.call(name: "context_get", arguments: ["handoff_id": checkpointID], clientID: client)
+        XCTAssertEqual(oldRead.payload["context_budget_cleared"] as? Bool, false)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String, newEpoch)
+        clock.date = clock.date.addingTimeInterval(ContinuityAutomation.checkpointIntervalSec)
+        XCTAssertEqual(app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true)?.finalize, false)
+    }
+
+    func testRuntimeContinuityModelTaskSurvivesAutomaticCheckpointHandoffAndResume() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("structured-runtime-task")
+        try bindProjectContext(app, clientID: client)
+        let task: [String: Any] = ["goal": "Complete the real project", "narrative": "Exact saved evidence",
+                                   "next_actions": ["Run the remaining native verification"],
+                                   "blockers": ["Preserve this blocker"], "decisions": ["Preserve this decision"],
+                                   "key_files": ["Sources/Real.swift"]]
+        let checkpoint = try app.tools.call(name: "session_checkpoint", arguments: task, clientID: client)
+        XCTAssertTrue(checkpoint.ok, "\(checkpoint.payload)")
+        let originalID = try XCTUnwrap(checkpoint.payload["handoff_id"] as? String)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: key)?.latestPacketID, originalID)
+        var final: ContinuityObservation?
+        for index in 1...200 {
+            let saved = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true)
+            if index.isMultiple(of: 50) {
+                let packet = try XCTUnwrap(saved?.packet)
+                XCTAssertEqual(packet.goal, task["goal"] as? String)
+                XCTAssertEqual(packet.nextActions, task["next_actions"] as? [String])
+                XCTAssertEqual(packet.blockers, task["blockers"] as? [String])
+                XCTAssertEqual(packet.decisions, task["decisions"] as? [String])
+                XCTAssertEqual(packet.keyFiles, task["key_files"] as? [String])
+                XCTAssertTrue(packet.narrative.hasPrefix("Exact saved evidence"))
+            }
+            if saved?.finalize == true { final = saved }
+        }
+        let handoff = try XCTUnwrap(final?.packet)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(try app.store.handoffGet(id: originalID)?.narrative, "Exact saved evidence")
+        _ = try app.tools.call(name: "context_get", arguments: ["handoff_id": handoff.id], clientID: client)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: key)?.latestPacketID, handoff.id)
+        for _ in 0..<50 {
+            final = app.continuityAutomation.observe(tool: "job.read_output", arguments: [:], clientID: client, succeeded: true)
+        }
+        XCTAssertEqual(final?.packet.goal, task["goal"] as? String)
+        XCTAssertEqual(final?.packet.nextActions, task["next_actions"] as? [String])
+    }
+
+    func testRuntimeContinuityManualHandoffKeepsBudgetAndExactResumeIdentity() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("manual-runtime-handoff")
+        try bindProjectContext(app, clientID: client)
+        let checkpoint = try app.tools.call(name: "session_checkpoint", arguments: ["goal": "Manual saved project"], clientID: client)
+        let packetID = try XCTUnwrap(checkpoint.payload["handoff_id"] as? String)
+        for _ in 0..<25 {
+            _ = app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true)
+        }
+        let handoff = try app.tools.call(name: "session_handoff", arguments: ["handoff_id": packetID], clientID: client)
+        XCTAssertEqual(handoff.payload["handoff_id"] as? String, packetID)
+        XCTAssertEqual(handoff.payload["handoff_required"] as? Bool, true)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 25)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(app.continuityAutomation.blockState(client).handoffID, packetID)
+        let resumed = try app.tools.call(name: "context_get", arguments: ["handoff_id": packetID], clientID: client)
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 0)
+    }
+
+    func testRuntimeContinuityStatusResumeReleasesOnlyExactAcknowledgedHandoff() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("status-runtime-resume")
+        try bindProjectContext(app, clientID: client)
+        func reachHandoff() throws -> HandoffPacket {
+            var observed: ContinuityObservation?
+            for _ in 0..<200 {
+                observed = app.continuityAutomation.observe(tool: "job.status", arguments: [:], clientID: client, succeeded: true)
+            }
+            return try XCTUnwrap(observed?.packet)
+        }
+        let handoff = try reachHandoff()
+        let epoch = app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String
+        let expectedNonce = ContextContinuityService.interactiveRolloverNonce(handoffID: handoff.id)
+        let wrong = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": handoff.id, "rollover_nonce": UUID().uuidString], clientID: client)
+        XCTAssertEqual(wrong.payload["context_budget_cleared"] as? Bool, false)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let malformed = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": handoff.id, "rollover_nonce": "invalid-nonce"], clientID: client)
+        XCTAssertFalse(malformed.ok)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let acknowledgementPath = app.paths.interactiveResumeAcknowledgementsDir.appendingPathComponent("\(handoff.id).json")
+        try FileManager.default.removeItem(at: acknowledgementPath)
+        try FileManager.default.createDirectory(at: acknowledgementPath, withIntermediateDirectories: false)
+        let failedReceipt = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": handoff.id, "rollover_nonce": expectedNonce], clientID: client)
+        XCTAssertFalse(failedReceipt.ok)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        try FileManager.default.removeItem(at: acknowledgementPath)
+        let resumed = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": handoff.id, "rollover_nonce": expectedNonce], clientID: client)
+        XCTAssertTrue(resumed.ok, "\(resumed.payload)")
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 0)
+        XCTAssertNotEqual(app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String, epoch)
+        let current = try reachHandoff()
+        let oldRead = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": handoff.id], clientID: client)
+        XCTAssertEqual(oldRead.payload["context_budget_cleared"] as? Bool, false)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let manualResume = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": current.id], clientID: client)
+        XCTAssertEqual(manualResume.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+    }
+
+    func testRuntimeContinuityForeignDeploymentCannotPublishSuccessorAcknowledgement() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        let owner = MCPServer.defaultClientID(
+            deploymentID: "gui-handoff-owning-deployment", role: .primary, desktopProviderID: nil
+        )
+        let foreign = MCPServer.defaultClientID(
+            deploymentID: "gui-handoff-foreign-deployment", role: .primary, desktopProviderID: nil
+        )
+        XCTAssertNotEqual(owner, foreign)
+        try bindProjectContext(app, clientID: owner)
+        try bindProjectContext(app, clientID: foreign)
+        let ownerContext = try app.projectContexts.invocationContext(for: owner)
+        let foreignContext = try app.projectContexts.invocationContext(for: foreign)
+        XCTAssertEqual(ownerContext.projectID, foreignContext.projectID)
+        XCTAssertEqual(ownerContext.projectGeneration, foreignContext.projectGeneration)
+        let ownerScope = app.continuityAutomation.runtimeScopeKey(ownerContext)
+        XCTAssertNotEqual(ownerScope, app.continuityAutomation.runtimeScopeKey(foreignContext))
+
+        for index in 1...3 {
+            let path = tempHome.appendingPathComponent("gui-predecessor-\(index).txt")
+            try "Owned predecessor evidence \(index)".write(to: path, atomically: true, encoding: .utf8)
+            let result = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: owner)
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertEqual(app.continuityAutomation.isBlocked(owner), index == 3)
+        }
+        let handoff = try XCTUnwrap(app.store.handoffLegacyLatest(resumeReadyOnly: true))
+        XCTAssertEqual(handoff.clientID, owner.rawValue)
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: handoff.id), ownerScope)
+        let packetBefore = try XCTUnwrap(app.store.handoffLegacyGet(id: handoff.id))
+        let progressBefore = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: ownerScope))
+        let progressJSONBefore = try sqliteFixtureText(
+            at: app.paths.storeSQLite,
+            sql: "SELECT CAST(state_json AS TEXT) FROM runtime_continuity_progress WHERE scope_key='\(ownerScope)';"
+        )
+        XCTAssertTrue(progressBefore.blocked)
+        XCTAssertEqual(progressBefore.progressCount, 3)
+        let acknowledgementURL = app.paths.interactiveResumeAcknowledgementsDir
+            .appendingPathComponent("\(handoff.id).json")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: acknowledgementURL.path))
+        let arguments: [String: Any] = [
+            "resume": true,
+            "handoff_id": handoff.id,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: handoff.id),
+        ]
+
+        let rejected = try app.tools.call(name: "get_forge_status", arguments: arguments, clientID: foreign)
+        XCTAssertFalse(rejected.payload["context_budget_cleared"] as? Bool == true)
+        XCTAssertNil(
+            rejected.payload["interactive_resume_acknowledgement"],
+            "another deployment must not publish a receipt accepted by the GUI successor driver"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: acknowledgementURL.path),
+            "a matching nonce cannot acknowledge the owning deployment through a foreign client"
+        )
+        XCTAssertTrue(app.continuityAutomation.isBlocked(owner))
+        XCTAssertEqual(try sqliteFixtureText(
+            at: app.paths.storeSQLite,
+            sql: "SELECT CAST(state_json AS TEXT) FROM runtime_continuity_progress WHERE scope_key='\(ownerScope)';"
+        ), progressJSONBefore)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: handoff.id), packetBefore)
+
+        let accepted = try app.tools.call(name: "get_forge_status", arguments: arguments, clientID: owner)
+        XCTAssertTrue(accepted.ok, "\(accepted.payload)")
+        XCTAssertEqual(accepted.payload["context_budget_cleared"] as? Bool, true)
+        let receipt = try XCTUnwrap(accepted.payload["interactive_resume_acknowledgement"] as? [String: Any])
+        XCTAssertEqual(receipt["client_id"] as? String, owner.rawValue)
+        XCTAssertEqual(receipt["handoff_id"] as? String, handoff.id)
+        XCTAssertEqual(receipt["rollover_nonce"] as? String, arguments["rollover_nonce"] as? String)
+        let persisted = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: Data(contentsOf: acknowledgementURL)
+        ) as? [String: Any])
+        XCTAssertEqual(persisted["client_id"] as? String, owner.rawValue)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(owner))
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: ownerScope)?.progressCount, 0)
+        XCTAssertNotEqual(try app.store.runtimeContinuityProgress(scopeKey: ownerScope)?.epoch, progressBefore.epoch)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: handoff.id), packetBefore)
+    }
+
+    func testRuntimeContinuityOldGenerationCannotPublishSuccessorAcknowledgement() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        let client = MCPServer.defaultClientID(
+            deploymentID: "gui-handoff-generation-fence", role: .primary, desktopProviderID: nil
+        )
+        try bindProjectContext(app, clientID: client)
+        let prior = try app.projectContexts.invocationContext(for: client)
+        let priorScope = app.continuityAutomation.runtimeScopeKey(prior)
+        for index in 1...3 {
+            let path = tempHome.appendingPathComponent("prior-generation-\(index).txt")
+            try "Prior generation \(index)".write(to: path, atomically: true, encoding: .utf8)
+            XCTAssertTrue(try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client).ok)
+        }
+        let oldPacket = try XCTUnwrap(app.store.handoffLegacyLatest(resumeReadyOnly: true))
+        let oldProgressJSON = try sqliteFixtureText(at: app.paths.storeSQLite,
+            sql: "SELECT CAST(state_json AS TEXT) FROM runtime_continuity_progress WHERE scope_key='\(priorScope)';")
+        _ = try app.projectContexts.beginReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        _ = try app.projectContexts.completeReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        try bindProjectContext(app, clientID: client)
+        let current = try app.projectContexts.invocationContext(for: client)
+        let currentScope = app.continuityAutomation.runtimeScopeKey(current)
+        XCTAssertEqual(current.projectID, prior.projectID)
+        XCTAssertNotEqual(current.projectGeneration, prior.projectGeneration)
+        XCTAssertNotEqual(currentScope, priorScope)
+        let currentRead = try app.tools.call(name: "fs_list", arguments: ["path": tempHome.path], clientID: client)
+        XCTAssertTrue(currentRead.ok, "\(currentRead.payload)")
+        let currentProgressJSON = try sqliteFixtureText(at: app.paths.storeSQLite,
+            sql: "SELECT CAST(state_json AS TEXT) FROM runtime_continuity_progress WHERE scope_key='\(currentScope)';")
+        let receiptURL = app.paths.interactiveResumeAcknowledgementsDir.appendingPathComponent("\(oldPacket.id).json")
+        let rejected = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": oldPacket.id,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: oldPacket.id),
+        ], clientID: client)
+        XCTAssertFalse(rejected.ok)
+        XCTAssertTrue(rejected.isError)
+        XCTAssertNil(rejected.payload["interactive_resume_acknowledgement"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: receiptURL.path))
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: oldPacket.id), oldPacket)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite,
+            sql: "SELECT CAST(state_json AS TEXT) FROM runtime_continuity_progress WHERE scope_key='\(priorScope)';"), oldProgressJSON)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite,
+            sql: "SELECT CAST(state_json AS TEXT) FROM runtime_continuity_progress WHERE scope_key='\(currentScope)';"), currentProgressJSON)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 1)
+    }
+
+    func testRuntimeContinuityAcknowledgementReplayDoesNotResetSuccessorWork() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        let client = ClientID("gui-handoff-replay-owner")
+        try bindProjectContext(app, clientID: client)
+        let handoff = try app.tools.call(name: "session_handoff", arguments: [
+            "goal": "Resume this owned task", "next_actions": ["Read the successor's evidence"],
+        ], clientID: client)
+        XCTAssertTrue(handoff.ok, "\(handoff.payload)")
+        let packetID = try XCTUnwrap(handoff.payload["handoff_id"] as? String)
+        let canonical = try XCTUnwrap(app.store.handoffLegacyGet(id: packetID))
+        let arguments: [String: Any] = ["resume": true, "handoff_id": packetID,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: packetID)]
+        let first = try app.tools.call(name: "get_forge_status", arguments: arguments, clientID: client)
+        XCTAssertTrue(first.ok, "\(first.payload)")
+        XCTAssertEqual(first.payload["context_budget_cleared"] as? Bool, true)
+        let continued = try app.tools.call(name: "fs_list", arguments: ["path": tempHome.path], clientID: client)
+        XCTAssertTrue(continued.ok, "\(continued.payload)")
+        let beforeReplay = app.continuityAutomation.snapshot(for: client)
+        XCTAssertEqual(beforeReplay["tool_call_count"] as? Int, 1)
+        let replay = try app.tools.call(name: "get_forge_status", arguments: arguments, clientID: client)
+        XCTAssertTrue(replay.ok, "\(replay.payload)")
+        XCTAssertNotNil(replay.payload["interactive_resume_acknowledgement"])
+        XCTAssertEqual(replay.payload["context_budget_cleared"] as? Bool, false)
+        let afterReplay = app.continuityAutomation.snapshot(for: client)
+        XCTAssertEqual(afterReplay["tool_call_count"] as? Int, 1)
+        XCTAssertEqual(afterReplay["continuity_epoch"] as? String, beforeReplay["continuity_epoch"] as? String)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packetID), canonical)
+    }
+
+    func testRuntimeContinuityLegacyAcknowledgementRetainsWrongNonceCompatibility() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("legacy-gui-resume-receipt")
+        let packet = HandoffPacket(resumeReady: true, goal: "Legacy imported handoff", cwd: tempHome.path)
+        try app.store.handoffUpsert(packet)
+        XCTAssertNil(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id))
+        let wrongNonce = UUID().uuidString.lowercased()
+        XCTAssertNotEqual(wrongNonce, ContextContinuityService.interactiveRolloverNonce(handoffID: packet.id))
+        let result = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": packet.id, "rollover_nonce": wrongNonce,
+        ], clientID: client)
+        XCTAssertTrue(result.ok, "\(result.payload)")
+        XCTAssertEqual(result.payload["context_budget_cleared"] as? Bool, false)
+        let receipt = try XCTUnwrap(result.payload["interactive_resume_acknowledgement"] as? [String: Any])
+        XCTAssertEqual(receipt["client_id"] as? String, client.rawValue)
+        XCTAssertEqual(receipt["rollover_nonce"] as? String, wrongNonce)
+        let persisted = try JSONSupport.object(from: Data(contentsOf: app.paths.interactiveResumeAcknowledgementsDir
+            .appendingPathComponent("\(packet.id).json")))
+        XCTAssertEqual(persisted["rollover_nonce"] as? String, wrongNonce)
+        XCTAssertNil(try app.store.runtimeContinuityPacketScopeKey(packetID: packet.id))
+    }
+
+    func testRuntimeContinuityCancelledAcknowledgementDoesNotPublishReceipt() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("cancelled-gui-resume-receipt")
+        try bindProjectContext(app, clientID: client)
+        let handoff = try app.tools.call(name: "session_handoff", arguments: ["goal": "Preserve on cancellation"], clientID: client)
+        XCTAssertTrue(handoff.ok, "\(handoff.payload)")
+        let packet = try XCTUnwrap(app.store.handoffLegacyGet(id: try XCTUnwrap(handoff.payload["handoff_id"] as? String)))
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        cancelled.cancel()
+        XCTAssertThrowsError(try app.continuityAutomation.recordInteractiveResumeAcknowledgement(
+            packet: packet, rolloverNonce: ContextContinuityService.interactiveRolloverNonce(handoffID: packet.id),
+            clientID: client, cancellation: cancelled
+        )) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.interactiveResumeAcknowledgementsDir
+            .appendingPathComponent("\(packet.id).json").path))
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), packet)
+    }
+
+    func testRuntimeContinuityBoundReadersDoNotExposeAnotherProjectsScopedPacket() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let firstRoot = tempHome.appendingPathComponent("read-isolation-first", isDirectory: true)
+        let selectedRoot = tempHome.appendingPathComponent("read-isolation-selected", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+        try configureAllowedProjectRoot(app)
+        let firstClient = MCPServer.defaultClientID(
+            deploymentID: "read-isolation-first-deployment", role: .primary, desktopProviderID: nil
+        )
+        let selectedClient = MCPServer.defaultClientID(
+            deploymentID: "read-isolation-selected-deployment", role: .primary, desktopProviderID: nil
+        )
+        try bindProjectContext(app, clientID: firstClient, root: firstRoot)
+        try bindProjectContext(app, clientID: selectedClient, root: selectedRoot)
+        let firstContext = try app.projectContexts.invocationContext(for: firstClient)
+        let selectedContext = try app.projectContexts.invocationContext(for: selectedClient)
+        XCTAssertNotEqual(firstContext.projectID, selectedContext.projectID)
+        let selectedCheckpoint = try app.tools.call(name: "session_checkpoint", arguments: [
+            "goal": "Selected project's readable checkpoint", "cwd": selectedRoot.path,
+        ], clientID: selectedClient)
+        XCTAssertTrue(selectedCheckpoint.ok, "\(selectedCheckpoint.payload)")
+        let selectedID = try XCTUnwrap(selectedCheckpoint.payload["handoff_id"] as? String)
+        let foreignGoal = "FOREIGN-PROJECT-SCOPED-CONTINUITY-\(UUID().uuidString)"
+        let foreignHandoff = try app.tools.call(name: "session_handoff", arguments: [
+            "goal": foreignGoal, "cwd": firstRoot.path,
+            "narrative": "Confidential first-project task detail", "next_actions": ["Continue only the first project"],
+        ], clientID: firstClient)
+        XCTAssertTrue(foreignHandoff.ok, "\(foreignHandoff.payload)")
+        let foreignID = try XCTUnwrap(foreignHandoff.payload["handoff_id"] as? String)
+        let firstCanonical = try XCTUnwrap(app.store.handoffLegacyGet(id: foreignID))
+        let selectedCanonical = try XCTUnwrap(app.store.handoffLegacyGet(id: selectedID))
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: foreignID),
+            app.continuityAutomation.runtimeScopeKey(firstContext))
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: selectedID),
+            app.continuityAutomation.runtimeScopeKey(selectedContext))
+        XCTAssertEqual(try app.store.handoffLegacyLatest()?.id, foreignID, "Fixture requires the foreign packet to be globally newest")
+        let ownedPath = selectedRoot.appendingPathComponent("selected-evidence.txt")
+        try "Selected project evidence".write(to: ownedPath, atomically: true, encoding: .utf8)
+        XCTAssertTrue(try app.tools.call(name: "fs_read", arguments: ["path": ownedPath.path], clientID: selectedClient).ok)
+        let before = app.continuityAutomation.snapshot(for: selectedClient)
+        XCTAssertEqual(before["tool_call_count"] as? Int, 1)
+
+        let exact = try app.tools.call(name: "context_get", arguments: ["handoff_id": foreignID], clientID: selectedClient)
+        XCTAssertFalse(String(decoding: try JSONSupport.data(from: exact.payload), as: UTF8.self).contains(foreignGoal),
+            "an exact foreign scoped ID must not disclose another project's packet")
+        if exact.ok { XCTAssertEqual(exact.payload["found"] as? Bool, false) }
+
+        let latest = try app.tools.call(name: "context_get", arguments: [:], clientID: selectedClient)
+        XCTAssertTrue(latest.ok, "\(latest.payload)")
+        XCTAssertEqual(latest.payload["handoff_id"] as? String, selectedID,
+            "default context_get must select the bound project's checkpoint")
+        XCTAssertFalse(String(decoding: try JSONSupport.data(from: latest.payload), as: UTF8.self).contains(foreignGoal))
+
+        let list = try app.tools.call(name: "context_list", arguments: ["limit": 10], clientID: selectedClient)
+        XCTAssertTrue(list.ok, "\(list.payload)")
+        let rows = try XCTUnwrap(list.payload["handoffs"] as? [[String: Any]])
+        XCTAssertTrue(rows.contains { $0["id"] as? String == selectedID })
+        XCTAssertFalse(rows.contains { $0["id"] as? String == foreignID },
+            "bound context_list must exclude another project's runtime-scoped packet")
+        XCTAssertFalse(String(decoding: try JSONSupport.data(from: list.payload), as: UTF8.self).contains(foreignGoal))
+
+        let exactStatus = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": foreignID,
+        ], clientID: selectedClient)
+        XCTAssertFalse(String(decoding: try JSONSupport.data(from: exactStatus.payload), as: UTF8.self).contains(foreignGoal),
+            "status resume without a nonce must also honor project isolation")
+        if exactStatus.ok, let resume = exactStatus.payload["resume"] as? [String: Any] {
+            XCTAssertEqual(resume["found"] as? Bool, false)
+        }
+        let latestStatus = try app.tools.call(name: "get_forge_status", arguments: ["resume": true], clientID: selectedClient)
+        XCTAssertTrue(latestStatus.ok, "\(latestStatus.payload)")
+        let resumed = try XCTUnwrap(latestStatus.payload["resume"] as? [String: Any])
+        XCTAssertEqual(resumed["handoff_id"] as? String, selectedID)
+        XCTAssertFalse(String(decoding: try JSONSupport.data(from: resumed), as: UTF8.self).contains(foreignGoal))
+
+        let own = try app.tools.call(name: "context_get", arguments: ["handoff_id": selectedID], clientID: selectedClient)
+        XCTAssertTrue(own.ok, "\(own.payload)")
+        XCTAssertEqual(own.payload["handoff_id"] as? String, selectedID)
+        XCTAssertEqual(own.payload["context_budget_cleared"] as? Bool, false)
+        let after = app.continuityAutomation.snapshot(for: selectedClient)
+        XCTAssertEqual(after["tool_call_count"] as? Int, 1)
+        XCTAssertEqual(after["continuity_epoch"] as? String, before["continuity_epoch"] as? String)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: foreignID), firstCanonical)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: selectedID), selectedCanonical)
+    }
+
+    func testRuntimeContinuitySameProjectClientsRetainReadsButCannotAcknowledgeAnotherDeployment() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let owner = ClientID("shared-project-packet-owner")
+        let reader = ClientID("shared-project-packet-reader")
+        try bindProjectContext(app, clientID: owner)
+        try bindProjectContext(app, clientID: reader)
+        let saved = try app.tools.call(name: "session_handoff", arguments: ["goal": "Shared project's readable work"], clientID: owner)
+        XCTAssertTrue(saved.ok, "\(saved.payload)")
+        let id = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        let readings: [[String: Any]] = [["handoff_id": id], [:]]
+        for arguments in readings {
+            let result = try app.tools.call(name: "context_get", arguments: arguments, clientID: reader)
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertEqual(result.payload["handoff_id"] as? String, id)
+            XCTAssertEqual(result.payload["context_budget_cleared"] as? Bool, false)
+        }
+        let list = try app.tools.call(name: "context_list", arguments: ["limit": 1], clientID: reader)
+        XCTAssertEqual((list.payload["handoffs"] as? [[String: Any]])?.first?["id"] as? String, id)
+        let status = try app.tools.call(name: "get_forge_status", arguments: ["resume": true], clientID: reader)
+        XCTAssertTrue(status.ok, "\(status.payload)")
+        XCTAssertEqual((status.payload["resume"] as? [String: Any])?["handoff_id"] as? String, id)
+        XCTAssertEqual((status.payload["continuity"] as? [String: Any])?["resume_id"] as? String, id)
+        let nonceAttempt = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": id,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: id),
+        ], clientID: reader)
+        XCTAssertFalse(nonceAttempt.ok)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.interactiveResumeAcknowledgementsDir.appendingPathComponent("\(id).json").path))
+    }
+
+    func testRuntimeContinuityNativeUnboundReadersRetainOnlyLegacyPacketsAndBoundUnknownCWDIsHidden() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let owner = ClientID("native-read-bound-owner")
+        try bindProjectContext(app, clientID: owner)
+        let saved = try app.tools.call(name: "session_handoff", arguments: ["goal": "Owned runtime packet"], clientID: owner)
+        XCTAssertTrue(saved.ok, "\(saved.payload)")
+        let scopedID = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        let otherRoot = tempHome.appendingPathComponent("ambiguous-reader-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
+        let otherOwner = ClientID("native-read-other-project-owner")
+        try bindProjectContext(app, clientID: otherOwner, root: otherRoot)
+        let other = try app.tools.call(name: "session_handoff", arguments: ["goal": "Other active project's packet"], clientID: otherOwner)
+        let otherID = try XCTUnwrap(other.payload["handoff_id"] as? String)
+        let legacy = HandoffPacket(goal: "Legacy packet with unknown workspace")
+        try app.store.handoffUpsert(legacy)
+        let unbound = ClientID("native-reader-without-binding")
+        let scopedRead = try app.tools.call(name: "context_get", arguments: ["handoff_id": scopedID], clientID: unbound)
+        XCTAssertTrue(scopedRead.ok, "\(scopedRead.payload)")
+        XCTAssertEqual(scopedRead.payload["found"] as? Bool, false)
+        let legacyRead = try app.tools.call(name: "context_get", arguments: ["handoff_id": legacy.id], clientID: unbound)
+        XCTAssertTrue(legacyRead.ok, "\(legacyRead.payload)")
+        XCTAssertEqual(legacyRead.payload["handoff_id"] as? String, legacy.id)
+        let list = try app.tools.call(name: "context_list", arguments: [:], clientID: unbound)
+        XCTAssertEqual((list.payload["handoffs"] as? [[String: Any]])?.compactMap { $0["id"] as? String }, [legacy.id])
+        let boundUnknown = try app.tools.call(name: "context_get", arguments: ["handoff_id": legacy.id], clientID: owner)
+        XCTAssertEqual(boundUnknown.payload["found"] as? Bool, false)
+        XCTAssertEqual(boundUnknown.payload["context_budget_cleared"] as? Bool, false)
+        // Direct trusted service readers retain their original global API.
+        XCTAssertEqual(try app.continuity.get(id: scopedID)["found"] as? Bool, true)
+        XCTAssertEqual(try app.continuity.list()["count"] as? Int, 3)
+        let otherContext = try app.projectContexts.invocationContext(for: otherOwner)
+        _ = try await app.projectContexts.repository.archiveProject(
+            projectID: otherContext.projectID, expectedGeneration: otherContext.projectGeneration
+        )
+        let archived = try app.tools.call(name: "context_get", arguments: ["handoff_id": otherID], clientID: unbound)
+        XCTAssertEqual(archived.payload["found"] as? Bool, false)
+        let soleCurrent = try app.tools.call(name: "context_get", arguments: ["handoff_id": scopedID], clientID: unbound)
+        XCTAssertEqual(soleCurrent.payload["handoff_id"] as? String, scopedID)
+        XCTAssertEqual(soleCurrent.payload["context_budget_cleared"] as? Bool, false)
+        let soleLegacy = try app.tools.call(name: "context_get", arguments: ["handoff_id": legacy.id], clientID: unbound)
+        XCTAssertEqual(soleLegacy.payload["handoff_id"] as? String, legacy.id)
+        XCTAssertThrowsError(try app.projectContexts.invocationContext(for: unbound))
+    }
+
+    func testRuntimeContinuitySoleActiveReadRecoveryPreservesExplicitAdmissionAndOwnedEpoch() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let root = tempHome.appendingPathComponent("sole-active-reader-root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let path = root.appendingPathComponent("owned-progress.txt")
+        try Data("Owned predecessor progress".utf8).write(to: path)
+        try configureAllowedProjectRoot(app, root: root)
+        _ = try app.config.update(["sessions": ["continuity_rollover_tool_calls": 1]], save: false)
+        let owner = ClientID("sole-active-owned-predecessor")
+        let reader = ClientID("sole-active-unbound-recovery")
+        try bindProjectContext(app, clientID: owner, root: root)
+        let old = try app.tools.call(name: "session_handoff", arguments: ["goal": "Old generation handoff"], clientID: owner)
+        let oldID = try XCTUnwrap(old.payload["handoff_id"] as? String)
+        let oldContext = try app.projectContexts.invocationContext(for: owner)
+        _ = try app.projectContexts.beginReset(projectID: oldContext.projectID, expectedGeneration: oldContext.projectGeneration)
+        _ = try app.projectContexts.completeReset(projectID: oldContext.projectID, expectedGeneration: oldContext.projectGeneration)
+        try bindProjectContext(app, clientID: owner, root: root)
+        let checkpoint = try app.tools.call(name: "session_checkpoint", arguments: ["goal": "Current generation predecessor"], clientID: owner)
+        let checkpointID = try XCTUnwrap(checkpoint.payload["handoff_id"] as? String)
+        let trigger = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: owner)
+        XCTAssertTrue(trigger.ok, "\(trigger.payload)")
+        let handoffID = try XCTUnwrap(trigger.payload["auto_handoff_id"] as? String)
+        let before = app.continuityAutomation.snapshot(for: owner)
+        XCTAssertEqual(before["blocked"] as? Bool, true)
+        XCTAssertEqual(before["tool_call_count"] as? Int, 1)
+        let stale = try app.tools.call(name: "context_get", arguments: ["handoff_id": oldID], clientID: reader)
+        XCTAssertEqual(stale.payload["found"] as? Bool, false)
+        let recovered = try app.tools.call(name: "context_get", arguments: [:], clientID: reader)
+        XCTAssertTrue(recovered.ok, "\(recovered.payload)")
+        XCTAssertEqual(recovered.payload["handoff_id"] as? String, handoffID)
+        XCTAssertEqual(recovered.payload["context_budget_cleared"] as? Bool, false)
+        let list = try app.tools.call(name: "context_list", arguments: [:], clientID: reader)
+        let listedIDs = try XCTUnwrap((list.payload["handoffs"] as? [[String: Any]])?.compactMap { $0["id"] as? String })
+        XCTAssertEqual(listedIDs, [handoffID, checkpointID])
+        XCTAssertFalse(listedIDs.contains(oldID))
+        let currentContext = try app.projectContexts.invocationContext(for: owner)
+        let currentScope = app.continuityAutomation.runtimeScopeKey(currentContext)
+        for packetID in listedIDs {
+            let packet = try XCTUnwrap(app.store.handoffLegacyGet(id: packetID))
+            XCTAssertEqual(packet.cwd, currentContext.authorizationScope.canonicalRoots.first?.path)
+            XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: packetID), currentScope)
+        }
+        XCTAssertThrowsError(try app.projectContexts.invocationContext(for: reader)) { error in
+            guard case ProjectContextError.projectContextRequired = error else {
+                return XCTFail("read-only recovery unexpectedly changed admission: \(error)")
+            }
+        }
+        let shell = try app.tools.call(name: "shell_exec", arguments: ["command": "pwd", "cwd": root.path], clientID: reader)
+        XCTAssertFalse(shell.ok)
+        XCTAssertEqual(shell.payload["code"] as? String, "project_context_required")
+        let acknowledgement = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": handoffID,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: handoffID),
+        ], clientID: reader)
+        XCTAssertFalse(acknowledgement.ok)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.interactiveResumeAcknowledgementsDir
+            .appendingPathComponent("\(handoffID).json").path))
+        let after = app.continuityAutomation.snapshot(for: owner)
+        XCTAssertEqual(after["blocked"] as? Bool, true)
+        XCTAssertEqual(after["tool_call_count"] as? Int, 1)
+        XCTAssertEqual(after["continuity_epoch"] as? String, before["continuity_epoch"] as? String)
+    }
+
+    func testRuntimeContinuityReaderGenerationFenceAndStatusMetadataIgnoreOldPackets() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("reader-generation-fence")
+        try bindProjectContext(app, clientID: client)
+        let saved = try app.tools.call(name: "session_handoff", arguments: ["goal": "Previous generation's work"], clientID: client)
+        XCTAssertTrue(saved.ok, "\(saved.payload)")
+        let oldID = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        let prior = try app.projectContexts.invocationContext(for: client)
+        _ = try app.projectContexts.beginReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        _ = try app.projectContexts.completeReset(projectID: prior.projectID, expectedGeneration: prior.projectGeneration)
+        try bindProjectContext(app, clientID: client)
+        let noOwnedPacket = try app.tools.call(name: "context_get", arguments: [:], clientID: client)
+        XCTAssertEqual(noOwnedPacket.payload["found"] as? Bool, false)
+        let oldRead = try app.tools.call(name: "context_get", arguments: ["handoff_id": oldID], clientID: client)
+        XCTAssertEqual(oldRead.payload["found"] as? Bool, false)
+        let before = try app.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+        let noMetadata = try XCTUnwrap(before.payload["continuity"] as? [String: Any])
+        XCTAssertNil(noMetadata["latest_id"] as? String)
+        XCTAssertNil(noMetadata["resume_id"] as? String)
+        XCTAssertEqual(noMetadata["resume_ready"] as? Bool, false)
+        let current = try app.tools.call(name: "session_checkpoint", arguments: ["goal": "Current generation's checkpoint"], clientID: client)
+        let currentID = try XCTUnwrap(current.payload["handoff_id"] as? String)
+        let list = try app.tools.call(name: "context_list", arguments: [:], clientID: client)
+        XCTAssertEqual((list.payload["handoffs"] as? [[String: Any]])?.compactMap { $0["id"] as? String }, [currentID])
+        let after = try app.tools.call(name: "get_forge_status", arguments: ["resume": true], clientID: client)
+        XCTAssertEqual((after.payload["continuity"] as? [String: Any])?["latest_id"] as? String, currentID)
+        XCTAssertNil((after.payload["continuity"] as? [String: Any])?["resume_id"] as? String)
+        XCTAssertEqual((after.payload["resume"] as? [String: Any])?["handoff_id"] as? String, currentID)
+    }
+
+    func testRuntimeContinuityForeignLegacyHistoryCannotCrowdOwnedPacketAndSymlinkReadsRemainAvailable() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let root = tempHome.appendingPathComponent("reader-owned-root", isDirectory: true)
+        let foreignRoot = tempHome.appendingPathComponent("reader-foreign-root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: foreignRoot, withIntermediateDirectories: true)
+        let client = ClientID("reader-legacy-crowding")
+        try bindProjectContext(app, clientID: client, root: root)
+        let saved = try app.tools.call(name: "session_checkpoint", arguments: ["goal": "Keep this current owned checkpoint"], clientID: client)
+        let ownedID = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        for index in 0..<125 {
+            try app.store.handoffUpsert(HandoffPacket(resumeReady: true,
+                goal: "Foreign legacy work \(index)", cwd: foreignRoot.path))
+        }
+        let latest = try app.tools.call(name: "context_get", arguments: [:], clientID: client)
+        XCTAssertEqual(latest.payload["handoff_id"] as? String, ownedID)
+        let list = try app.tools.call(name: "context_list", arguments: ["limit": 1], clientID: client)
+        XCTAssertEqual((list.payload["handoffs"] as? [[String: Any]])?.first?["id"] as? String, ownedID)
+        let alias = tempHome.appendingPathComponent("reader-owned-alias", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        let legacy = HandoffPacket(resumeReady: true, goal: "Readable legacy symlink workspace", cwd: alias.path)
+        try app.store.handoffUpsert(legacy)
+        let exact = try app.tools.call(name: "context_get", arguments: ["handoff_id": legacy.id], clientID: client)
+        XCTAssertEqual(exact.payload["found"] as? Bool, true)
+        XCTAssertEqual(exact.payload["handoff_id"] as? String, legacy.id)
+        let two = try app.tools.call(name: "context_list", arguments: ["limit": 2], clientID: client)
+        XCTAssertEqual((two.payload["handoffs"] as? [[String: Any]])?.compactMap { $0["id"] as? String }, [legacy.id, ownedID])
+    }
+
+    func testRuntimeContinuitySharedNoncePreservesPluginProtocol() {
+        let cases = [
+            ("00000000-0000-4000-8000-000000000001", "7688eed4-77b0-34aa-ffbe-1a0559c87a08"),
+            ("AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE", "52032c4b-d13d-8ad6-7b04-8960c71d3e09"),
+        ]
+        for (packetID, expected) in cases {
+            XCTAssertEqual(ContextContinuityService.interactiveRolloverNonce(handoffID: packetID), expected)
+            XCTAssertEqual(LMStudioInteractiveSessionTransport.rolloverNonce(operationID: packetID), expected)
+        }
+    }
+
+    func testRuntimeContinuityModelPointerRollsBackWithPacketAndBoundsCustomSeed() throws {
+        let path = tempHome.appendingPathComponent("model-pointer.sqlite")
+        let key = JSONSupport.sha256Hex("atomic model scope")
+        let fault = try SQLiteStore(path: path, postMigrationCommitObserver: nil, beforeMutationCommitObserver: { kind in
+            if kind == .handoff { throw StoreError.execFailed("injected model pointer failure") }
+        })
+        _ = try fault.updateRuntimeContinuityProgress(scopeKey: key) { $0.progressCount = 25 }
+        var packet = HandoffPacket(source: .model, resumeReady: true, goal: "Model pointer", cwd: tempHome.path)
+        packet.resumeSeed = String(repeating: "🧪", count: 8_000)
+        packet.resumeSeedIsCustom = true
+        XCTAssertThrowsError(try fault.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: key))
+        XCTAssertNil(try fault.handoffGet(id: packet.id))
+        XCTAssertNil(try fault.runtimeContinuityProgress(scopeKey: key)?.latestPacketID)
+        XCTAssertEqual(try fault.runtimeContinuityProgress(scopeKey: key)?.progressCount, 25)
+        fault.close()
+        let recovered = try SQLiteStore(path: path)
+        defer { recovered.close() }
+        try recovered.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: key)
+        XCTAssertEqual(try recovered.handoffGet(id: packet.id)?.resumeSeed, packet.resumeSeed)
+        let progress = try XCTUnwrap(recovered.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(progress.latestPacketID, packet.id)
+        XCTAssertEqual(progress.lastHandoffID, packet.id)
+        XCTAssertEqual(progress.lastResumeSeed?.utf8.count, 16_384)
+        XCTAssertEqual(progress.progressCount, 25)
+        XCTAssertFalse(progress.blocked)
+    }
+
+    func testRuntimeContinuityConcurrentConnectionsDoNotLoseProgress() throws {
+        let path = tempHome.appendingPathComponent("concurrent-runtime.sqlite")
+        let first = try SQLiteStore(path: path)
+        let second = try SQLiteStore(path: path)
+        defer { first.close(); second.close() }
+        let key = JSONSupport.sha256Hex("shared concurrent runtime scope")
+        let failures = LockedFailureMessages()
+        DispatchQueue.concurrentPerform(iterations: 160) { index in
+            do {
+                let store = index.isMultiple(of: 2) ? first : second
+                _ = try store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+                    if index.isMultiple(of: 2) { progress.progressCount += 1 }
+                    else { progress.failureCount += 1 }
+                }
+            } catch { failures.append("writer \(index): \(error)") }
+        }
+        XCTAssertEqual(failures.snapshot, [])
+        let one = try XCTUnwrap(first.runtimeContinuityProgress(scopeKey: key))
+        let two = try XCTUnwrap(second.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(one.progressCount, 80)
+        XCTAssertEqual(one.failureCount, 80)
+        XCTAssertEqual(two.progressCount, one.progressCount)
+        XCTAssertEqual(two.failureCount, one.failureCount)
+        XCTAssertEqual(two.epoch, one.epoch)
+    }
+
+    func testRuntimeContinuityStoreBoundsAndCancellationPreserveExistingState() throws {
+        let path = tempHome.appendingPathComponent("bounded-runtime.sqlite")
+        let store = try SQLiteStore(path: path)
+        defer { store.close() }
+        let key = JSONSupport.sha256Hex("retained bounded runtime scope")
+        _ = try store.updateRuntimeContinuityProgress(scopeKey: key) { $0.progressCount = 7 }
+        XCTAssertThrowsError(try store.updateRuntimeContinuityProgress(scopeKey: key) { $0.lastTools = Array(repeating: "fs_read", count: 13) })
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        cancelled.cancel()
+        XCTAssertThrowsError(try store.updateRuntimeContinuityProgress(scopeKey: key, cancellation: cancelled) { $0.progressCount = 8 })
+        XCTAssertEqual(try store.runtimeContinuityProgress(scopeKey: key)?.progressCount, 7)
+        try withSQLiteFixture(at: path) { database in
+            try executeSQLiteFixture(database, sql: """
+                WITH RECURSIVE scopes(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM scopes WHERE n<1023)
+                INSERT INTO runtime_continuity_progress(scope_key,state_json,updated_at)
+                SELECT printf('%064d',n),state_json,updated_at FROM scopes,runtime_continuity_progress
+                WHERE scope_key='\(key)';
+                """)
+        }
+        XCTAssertThrowsError(try store.updateRuntimeContinuityProgress(scopeKey: JSONSupport.sha256Hex("scope beyond capacity")) { $0.progressCount = 1 })
+        XCTAssertEqual(try sqliteFixtureInt(at: path, sql: "SELECT COUNT(*) FROM runtime_continuity_progress;"), SQLiteStore.maximumRuntimeContinuityScopes)
+        _ = try store.updateRuntimeContinuityProgress(scopeKey: key) { $0.progressCount = 8 }
+        XCTAssertEqual(try store.runtimeContinuityProgress(scopeKey: key)?.progressCount, 8)
+    }
+
+    func testRuntimeContinuityThresholdSettingsPreserveDefaultsAndRejectInvalidValues() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        XCTAssertEqual(app.config.model.sessions.continuityRolloverToolCalls, 200)
+        let legacySessions = try JSONDecoder().decode(AppConfig.SessionsConfig.self,
+            from: Data("{\"idle_ttl_sec\":14400}".utf8))
+        XCTAssertEqual(legacySessions.continuityRolloverToolCalls, 200)
+        var legacyConfig = app.config.values
+        legacyConfig["sessions"] = ["idle_ttl_sec": 14_400]
+        XCTAssertEqual(AppConfig.fromDictionary(legacyConfig).sessions.continuityRolloverToolCalls, 200)
+        XCTAssertEqual(try ManagerSettings(dictionary: legacyConfig).continuityRolloverToolCalls, 200)
+        let originalFile = try Data(contentsOf: app.paths.configJSON)
+        let invalid: [Any] = [0, 10_001, -1, true, 3.5, "3", Double.infinity, Double.nan]
+        for value in invalid {
+            let patch: [String: Any] = ["sessions": ["continuity_rollover_tool_calls": value]]
+            XCTAssertThrowsError(try app.config.update(patch))
+            XCTAssertThrowsError(try ManagerSettingsNormalizer.validated(patch))
+            var invalidSettings = app.config.values
+            invalidSettings["sessions"] = ["continuity_rollover_tool_calls": value]
+            XCTAssertThrowsError(try ManagerSettings(dictionary: invalidSettings))
+            XCTAssertEqual(app.config.model.sessions.continuityRolloverToolCalls, 200)
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), originalFile)
+        }
+        for limit in [1, 3, 251, 10_000] {
+            _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: limit))
+            let fresh = ConfigStore(paths: app.paths)
+            XCTAssertEqual(fresh.model.sessions.continuityRolloverToolCalls, limit)
+            let settings = try ManagerSettings(dictionary: fresh.values)
+            XCTAssertEqual(settings.continuityRolloverToolCalls, limit)
+            XCTAssertEqual(try ManagerSettings(dictionary: settings.asDictionary()).continuityRolloverToolCalls, limit)
+            let encoded = try JSONEncoder().encode(fresh.model)
+            XCTAssertEqual(try JSONDecoder().decode(AppConfig.self, from: encoded).sessions.continuityRolloverToolCalls, limit)
+        }
+    }
+
+    func testRuntimeContinuityCustomThresholdsKeepSeparateCountersAndCheckpointCadence() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("custom-continuity-threshold")
+        try bindProjectContext(app, clientID: client)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        for succeeded in [true, false] {
+            XCTAssertNil(app.continuityAutomation.observe(tool: "job.status", arguments: [:], clientID: client, succeeded: succeeded))
+        }
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["failed_tool_count"] as? Int, 1)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        let thirdMixed = try XCTUnwrap(app.continuityAutomation.observe(tool: "job.status", arguments: [:], clientID: client, succeeded: false))
+        XCTAssertTrue(thirdMixed.finalize)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 3)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["failed_tool_count"] as? Int, 2)
+        XCTAssertTrue(try app.continuityAutomation.clearBlockReportingResult(clientID: client, packet: thirdMixed.packet, cancellation: nil))
+        for _ in 0..<2 {
+            XCTAssertNil(app.continuityAutomation.observe(tool: "xcode.result", arguments: [:], clientID: client, succeeded: false))
+        }
+        let thirdFailure = try XCTUnwrap(app.continuityAutomation.observe(tool: "xcode.result", arguments: [:], clientID: client, succeeded: false))
+        XCTAssertTrue(thirdFailure.finalize)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 0)
+        XCTAssertTrue(try app.continuityAutomation.clearBlockReportingResult(clientID: client, packet: thirdFailure.packet, cancellation: nil))
+
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 251))
+        var openCheckpointID: String?
+        for index in 1...251 {
+            let saved = app.continuityAutomation.observe(tool: "bash.run", arguments: ["cwd": tempHome.path], clientID: client, succeeded: true)
+            if index.isMultiple(of: 50) {
+                XCTAssertEqual(saved?.finalize, false)
+                if let openCheckpointID { XCTAssertEqual(saved?.packet.id, openCheckpointID) }
+                else { openCheckpointID = saved?.packet.id }
+            } else if index == 251 {
+                XCTAssertEqual(saved?.finalize, true)
+                XCTAssertEqual(saved?.packet.id, openCheckpointID)
+            } else { XCTAssertNil(saved) }
+            if index < 251 { XCTAssertFalse(app.continuityAutomation.isBlocked(client)) }
+        }
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["checkpoint_every_tools"] as? Int, 50)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["handoff_every_tools"] as? Int, 251)
+    }
+
+    func testRuntimeContinuityRunningHelpersRefreshPersistedThresholdWithoutLosingStagedSettings() throws {
+        let primary = try ForgeApp.bootstrap(home: tempHome)
+        defer { primary.shutdown() }
+        let client = MCPServer.defaultClientID(deploymentID: "threshold-live-deployment", role: .primary, desktopProviderID: nil)
+        try bindProjectContext(primary, clientID: client)
+        let fallback = try ForgeApp.bootstrap(home: tempHome)
+        defer { fallback.shutdown() }
+        for _ in 0..<2 {
+            XCTAssertNil(fallback.continuityAutomation.observe(tool: "process.run", arguments: ["cwd": tempHome.path], clientID: client, succeeded: true))
+        }
+        _ = try primary.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3))
+        XCTAssertEqual(fallback.config.model.sessions.continuityRolloverToolCalls, 200)
+        let final = try XCTUnwrap(fallback.continuityAutomation.observe(tool: "process.run", arguments: ["cwd": tempHome.path], clientID: client, succeeded: true))
+        XCTAssertTrue(final.finalize)
+        XCTAssertEqual(fallback.config.model.sessions.continuityRolloverToolCalls, 3)
+        let restarted = try ForgeApp.bootstrap(home: tempHome)
+        defer { restarted.shutdown() }
+        XCTAssertEqual(restarted.config.model.sessions.continuityRolloverToolCalls, 3)
+        XCTAssertTrue(restarted.continuityAutomation.isBlocked(client))
+
+        _ = try fallback.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 7), save: false)
+        _ = try primary.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 5))
+        try fallback.config.refreshIfChanged()
+        XCTAssertEqual(fallback.config.model.sessions.continuityRolloverToolCalls, 7)
+        XCTAssertEqual(ConfigStore(paths: primary.paths).model.sessions.continuityRolloverToolCalls, 5)
+    }
+
+    func testRuntimeContinuityAgentStartDefaultsToTrustedProjectRootAndForcesCheckpoint() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("agent-default-root")
+        try bindProjectContext(app, clientID: client)
+        let started = try app.tools.call(name: "agent_run_start", arguments: ["agent_id": "debug", "goal": "Keep specialist provenance"], clientID: client)
+        XCTAssertTrue(started.ok, "\(started.payload)")
+        XCTAssertEqual(started.payload["auto_continuity"] as? String, "checkpoint")
+        let sessionID = try XCTUnwrap(started.payload["session_id"] as? String)
+        let packetID = try XCTUnwrap(started.payload["auto_handoff_id"] as? String)
+        let packet = try XCTUnwrap(app.store.handoffGet(id: packetID))
+        let agent = try XCTUnwrap(packet.agents.first { $0.sessionID == sessionID })
+        XCTAssertEqual(agent.cwd, tempHome.resolvingSymlinksInPath().standardizedFileURL.path)
+        XCTAssertEqual(agent.goal, "Keep specialist provenance")
+        XCTAssertEqual(packet.goal, "Keep specialist provenance")
+        let completed = try app.tools.call(name: "agent_run_complete", arguments: ["session_id": sessionID], clientID: client)
+        XCTAssertTrue(completed.ok, "\(completed.payload)")
+        XCTAssertEqual(completed.payload["auto_continuity"] as? String, "checkpoint")
+        XCTAssertEqual(completed.payload["auto_handoff_id"] as? String, packetID)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 2)
+    }
+
+    func testRuntimeContinuityPendingJobStatusPollingDoesNotForceIdenticalCallHandoff() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("pending-job-status-continuity")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let submission = try app.tools.call(name: "process.run", arguments: [
+            "executable": "/bin/sleep", "arguments": ["20"], "cwd": tempHome.path,
+            "timeout_sec": 30, "replay_class": RuntimeReplayClass.readOnly.rawValue,
+        ], clientID: client)
+        XCTAssertTrue(submission.ok, "\(submission.payload)")
+        let jobText = try XCTUnwrap(submission.payload["job_id"] as? String)
+        let jobID = try XCTUnwrap(UUID(uuidString: jobText))
+        let runningDeadline = ContinuousClock.now.advanced(by: .seconds(3))
+        var owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        while owner.state != .running, ContinuousClock.now < runningDeadline {
+            try await Task.sleep(for: .milliseconds(25))
+            owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        }
+        XCTAssertEqual(owner.state, .running)
+        XCTAssertNotNil(owner.processIdentifier)
+        for count in 1...10 {
+            let status = try app.tools.call(name: "job.status", arguments: ["job_id": jobText], clientID: client)
+            XCTAssertTrue(status.ok, "poll \(count): \(status.payload)")
+            XCTAssertEqual(status.payload["state"] as? String, RuntimeJobState.running.rawValue)
+            XCTAssertNil(status.payload["handoff_required"], "poll \(count) forced a loop handoff while the owner runs")
+            XCTAssertNil(status.payload["auto_handoff_id"])
+        }
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 11)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs;"), 0)
+        let stillRunning = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        XCTAssertEqual(stillRunning.state, .running)
+        try await app.runtimeJobs.service.cancel(jobID: jobID, context: context)
+        let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+        XCTAssertEqual(cancelled.state, .cancelled)
+    }
+
+    func testRuntimeContinuityPendingUnavailableOutputRetainsErrorLoopProtection() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("pending-output-tail-continuity")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let submission = try app.tools.call(name: "process.run", arguments: [
+            "executable": "/bin/sleep", "arguments": ["20"], "cwd": tempHome.path,
+            "timeout_sec": 30, "replay_class": RuntimeReplayClass.readOnly.rawValue,
+        ], clientID: client)
+        XCTAssertTrue(submission.ok, "\(submission.payload)")
+        let jobText = try XCTUnwrap(submission.payload["job_id"] as? String)
+        let jobID = try XCTUnwrap(UUID(uuidString: jobText))
+        let runningDeadline = ContinuousClock.now.advanced(by: .seconds(3))
+        var owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        while owner.state != .running, ContinuousClock.now < runningDeadline {
+            try await Task.sleep(for: .milliseconds(25))
+            owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        }
+        XCTAssertEqual(owner.state, .running)
+        XCTAssertNotNil(owner.processIdentifier)
+        var softID: String?
+        for count in 1...10 {
+            let output = try app.tools.call(name: "job.read_output", arguments: [
+                "job_id": jobText, "stream": "stdout", "offset": 0, "limit": 64,
+            ], clientID: client)
+            XCTAssertFalse(output.ok, "poll \(count): \(output.payload)")
+            XCTAssertTrue(output.isError)
+            XCTAssertNil(output.payload["data"])
+            if count <= 8 {
+                XCTAssertEqual(output.payload["code"] as? String, "runtime_output_unavailable")
+                if count == 4 {
+                    XCTAssertEqual(output.payload["handoff_required"] as? Bool, true)
+                    softID = try XCTUnwrap(output.payload["handoff_id"] as? String)
+                } else { XCTAssertNil(output.payload["handoff_required"]) }
+            } else {
+                XCTAssertEqual(output.payload["code"] as? String, count == 9 ? "identical_call_loop" : "context_budget_exceeded")
+                XCTAssertEqual(output.payload["handoff_id"] as? String, softID)
+            }
+            XCTAssertNil(output.payload["auto_handoff_id"])
+        }
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["failed_tool_count"] as? Int, 8)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 9)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs;"), 1)
+        let stillRunning = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        XCTAssertEqual(stillRunning.state, .running)
+        try await app.runtimeJobs.service.cancel(jobID: jobID, context: context)
+        let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+        XCTAssertEqual(cancelled.state, .cancelled)
+    }
+
+    func testRuntimeContinuityPendingPollingHonorsConfiguredThresholdWhileOwnerRuns() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 12), save: false)
+        for tool in ["job.status"] {
+            let client = ClientID("pending-budget-" + tool)
+            let (jobID, jobText, context) = try await startContinuitySleepingOwner(app, clientID: client, root: tempHome)
+            let arguments: [String: Any] = ["job_id": jobText]
+            for _ in 0..<10 {
+                let poll = try app.tools.call(name: tool, arguments: arguments, clientID: client)
+                XCTAssertTrue(poll.ok, "\(poll.payload)")
+                XCTAssertNil(poll.payload["handoff_required"])
+            }
+            XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 11)
+            let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+            cancellation.cancel()
+            XCTAssertThrowsError(try app.tools.call(name: tool, arguments: arguments, clientID: client, cancellation: cancellation)) {
+                XCTAssertTrue($0 is CancellationError)
+            }
+            XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 11)
+            let triggering = try app.tools.call(name: tool, arguments: arguments, clientID: client)
+            XCTAssertTrue(triggering.ok, "\(triggering.payload)")
+            XCTAssertEqual(triggering.payload["auto_continuity"] as? String, "handoff")
+            let packetID = try XCTUnwrap(triggering.payload["auto_handoff_id"] as? String)
+            XCTAssertTrue(try XCTUnwrap(app.store.handoffGet(id: packetID)).resumeReady)
+            XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: packetID), app.continuityAutomation.runtimeScopeKey(context))
+            XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 12)
+            XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+            let owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+            XCTAssertEqual(owner.state, .running)
+            try await app.runtimeJobs.service.cancel(jobID: jobID, context: context)
+            let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+            XCTAssertEqual(cancelled.state, .cancelled)
+        }
+    }
+
+    func testRuntimeContinuityUnavailableOutputAttemptsHonorConfiguredThreshold() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        let client = ClientID("pending-unavailable-output-budget")
+        let (jobID, jobText, context) = try await startContinuitySleepingOwner(app, clientID: client, root: tempHome)
+        for count in 1...2 {
+            let output = try app.tools.call(name: "job.read_output", arguments: ["job_id": jobText, "stream": "stdout", "offset": 0], clientID: client)
+            XCTAssertFalse(output.ok)
+            XCTAssertTrue(output.isError)
+            XCTAssertEqual(output.payload["code"] as? String, "runtime_output_unavailable")
+            if count == 1 { XCTAssertNil(output.payload["auto_handoff_id"]) }
+            else {
+                XCTAssertEqual(output.payload["auto_continuity"] as? String, "handoff")
+                let packetID = try XCTUnwrap(output.payload["auto_handoff_id"] as? String)
+                XCTAssertTrue(try XCTUnwrap(app.store.handoffGet(id: packetID)).resumeReady)
+            }
+        }
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["failed_tool_count"] as? Int, 2)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 3)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        XCTAssertEqual(owner.state, .running)
+        try await app.runtimeJobs.service.cancel(jobID: jobID, context: context)
+        let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+        XCTAssertEqual(cancelled.state, .cancelled)
+    }
+
+    func testRuntimeContinuityTerminalJobReplayRetainsExactLoopThresholds() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        for tool in ["job.status", "job.read_output"] {
+            let client = ClientID("terminal-replay-" + tool)
+            try bindProjectContext(app, clientID: client)
+            let context = try app.projectContexts.invocationContext(for: client)
+            let submission = try app.tools.call(name: "process.run", arguments: [
+                "executable": "/bin/echo", "arguments": ["terminal evidence"], "cwd": tempHome.path,
+                "timeout_sec": 5, "replay_class": RuntimeReplayClass.readOnly.rawValue,
+            ], clientID: client)
+            XCTAssertTrue(submission.ok, "\(submission.payload)")
+            let jobText = try XCTUnwrap(submission.payload["job_id"] as? String)
+            let jobID = try XCTUnwrap(UUID(uuidString: jobText))
+            let terminal = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+            XCTAssertEqual(terminal.state, .completed)
+            var arguments: [String: Any] = ["job_id": jobText]
+            if tool == "job.read_output" { arguments.merge(["stream": "stdout", "offset": 0, "limit": 64]) { _, new in new } }
+            var softID: String?
+            for count in 1...9 {
+                let result = try app.tools.call(name: tool, arguments: arguments, clientID: client)
+                if count <= 8 {
+                    XCTAssertTrue(result.ok, "call \(count): \(result.payload)")
+                    if tool == "job.status" { XCTAssertEqual(result.payload["state"] as? String, "completed") }
+                    else { XCTAssertEqual(result.payload["data"] as? String, "terminal evidence\n") }
+                    if count == 4 {
+                        XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
+                        softID = try XCTUnwrap(result.payload["handoff_id"] as? String)
+                    } else { XCTAssertNil(result.payload["handoff_required"]) }
+                } else {
+                    XCTAssertFalse(result.ok)
+                    XCTAssertEqual(result.payload["code"] as? String, "identical_call_loop")
+                    XCTAssertEqual(result.payload["handoff_id"] as? String, softID)
+                }
+            }
+            XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        }
+    }
+
+    func testRuntimeContinuityForeignAndMalformedJobPollsRetainExactLoopThresholds() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        let ownerRoot = tempHome.appendingPathComponent("poll-owner", isDirectory: true)
+        let foreignRoot = tempHome.appendingPathComponent("poll-foreign", isDirectory: true)
+        try FileManager.default.createDirectory(at: ownerRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: foreignRoot, withIntermediateDirectories: true)
+        let (jobID, jobText, ownerContext) = try await startContinuitySleepingOwner(app, clientID: ClientID("poll-native-owner"), root: ownerRoot)
+        let scenarios: [(String, [String: Any], URL, String)] = [
+            ("job.status", ["job_id": jobText], foreignRoot, "runtime_job_scope_mismatch"),
+            ("job.read_output", ["job_id": jobText, "offset": 0], foreignRoot, "runtime_job_scope_mismatch"),
+            ("job.status", ["job_id": "not-a-uuid"], ownerRoot, "invalid_request"),
+            ("job.read_output", ["job_id": jobText, "offset": -1], ownerRoot, "invalid_request"),
+        ]
+        for (index, scenario) in scenarios.enumerated() {
+            let (tool, arguments, root, code) = scenario
+            let client = ClientID("rejected-poll-\(index)")
+            try bindProjectContext(app, clientID: client, root: root)
+            var softID: String?
+            for count in 1...9 {
+                let result = try app.tools.call(name: tool, arguments: arguments, clientID: client)
+                XCTAssertFalse(result.ok)
+                XCTAssertTrue(result.isError)
+                if count <= 8 {
+                    XCTAssertEqual(result.payload["code"] as? String, code, "call \(count): \(result.payload)")
+                    if count == 4 {
+                        XCTAssertEqual(result.payload["handoff_required"] as? Bool, true)
+                        softID = try XCTUnwrap(result.payload["handoff_id"] as? String)
+                    } else { XCTAssertNil(result.payload["handoff_required"]) }
+                } else {
+                    XCTAssertEqual(result.payload["code"] as? String, "identical_call_loop")
+                    XCTAssertEqual(result.payload["handoff_id"] as? String, softID)
+                }
+            }
+        }
+        let owner = try await app.runtimeJobs.service.status(jobID: jobID, context: ownerContext)
+        XCTAssertEqual(owner.state, .running)
+        try await app.runtimeJobs.service.cancel(jobID: jobID, context: ownerContext)
+        let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: ownerContext, maximumWait: .seconds(5))
+        XCTAssertEqual(cancelled.state, .cancelled)
+    }
+
+    private func startContinuitySleepingOwner(
+        _ app: ForgeApp,
+        clientID: ClientID,
+        root: URL
+    ) async throws -> (UUID, String, ToolInvocationContext) {
+        try bindProjectContext(app, clientID: clientID, root: root)
+        let context = try app.projectContexts.invocationContext(for: clientID)
+        let submission = try app.tools.call(name: "process.run", arguments: [
+            "executable": "/bin/sleep", "arguments": ["20"], "cwd": root.path,
+            "timeout_sec": 30, "replay_class": RuntimeReplayClass.readOnly.rawValue,
+        ], clientID: clientID)
+        XCTAssertTrue(submission.ok, "\(submission.payload)")
+        let text = try XCTUnwrap(submission.payload["job_id"] as? String)
+        let id = try XCTUnwrap(UUID(uuidString: text))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        var record = try await app.runtimeJobs.service.status(jobID: id, context: context)
+        while record.state != .running, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(25))
+            record = try await app.runtimeJobs.service.status(jobID: id, context: context)
+        }
+        XCTAssertEqual(record.state, .running)
+        XCTAssertNotNil(record.processIdentifier)
+        return (id, text, context)
+    }
+
+    func testRuntimeContinuityManagerOwnedContextsDoNotEnterOrdinaryChatEpochs() async throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("shared-mcp-and-native-client")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        let mcp = try app.projectContexts.invocationContext(for: client)
+        XCTAssertNil(app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path], clientID: client, succeeded: true))
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 1), save: false)
+        let nativeTools = ["fs_read", "process.run", "xcode.run", "bash.run"]
+        let runScope = ToolAuthorizationScope(canonicalRoots: [tempHome], allowedTools: Set(nativeTools),
+            networkAllowed: false, maximumInlineOutputBytes: 65_536)
+        let run = try await app.projectContexts.repository.createAutonomousRun(AutonomousRunRequest(
+            projectID: mcp.projectID, projectGeneration: mcp.projectGeneration,
+            mission: "Keep native lifecycle separate from ordinary chat", providerID: "lmstudio",
+            adapterID: "lmstudio-rest", modelKey: "fixture/model",
+            specification: AutonomousRunSpecification(allowedTools: nativeTools, completionGates: ["tests"]),
+            authorizationScope: runScope))
+        let runContext = try app.projectContexts.invocationContext(
+            for: ProjectBindingOwner(kind: .autonomousRun, id: run.runID.description), clientID: client)
+        let lease = try await app.projectContexts.repository.acquireRunLease(runID: run.runID, ownerID: "continuity-native-fixture")
+        let sessionID = "continuity-native-session-" + UUID().uuidString.lowercased()
+        try await app.projectContexts.repository.reserveProviderSession(ProviderSessionIntent(
+            sessionID: sessionID, runID: run.runID, projectID: run.projectID, projectGeneration: run.projectGeneration,
+            providerID: "lmstudio", adapterID: "lmstudio-rest", modelKey: "fixture/model",
+            providerResponseID: "continuity-native-root", idempotencyKey: "continuity-native-session-key", contextCapacity: 4_096), lease: lease)
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+        let providerContext = try app.projectContexts.invocationContext(
+            for: ProjectBindingOwner(kind: .providerSession, id: sessionID), clientID: client)
+        let nativeOnlyClient = ClientID("native-client-without-mcp-binding")
+        let nativeOnlyContext = try app.projectContexts.invocationContext(
+            for: ProjectBindingOwner(kind: .providerSession, id: sessionID), clientID: nativeOnlyClient)
+        let identity = ContextBudgetIdentity(runID: run.runID, projectID: run.projectID,
+            projectGeneration: run.projectGeneration, sessionID: sessionID)
+        let configuration = ContextBudgetConfiguration(
+            capacity: ContextCapacityResolution(providerID: "lmstudio", providerVersionFingerprint: "fixture-v1",
+                modelKey: "fixture/model", activeInstanceID: "fixture-instance", capacity: 4_096,
+                maximumContextLength: 131_072, requiresModelLoad: false),
+            reserves: ContextBudgetReserves(outputTokens: 256, schemaTokens: 128, handoffTokens: 256, recoveryTokens: 128),
+            policy: ContextBudgetPolicy(initialProjectedNextTurnTokens: 128))
+        let budget = try await ContextBudgetSupervisor.open(repository: app.projectContexts.repository,
+            identity: identity, configuration: configuration, clock: app.clock)
+        _ = try await budget.evaluate(ContextBudgetEvaluationRequest(triggerPoint: .afterProviderTurn,
+            providerResponseID: "continuity-native-root", measurement: .providerExact(usedTokens: 100)))
+        let before = try await app.projectContexts.repository.contextBudgetState(identity: identity)
+        for index in 0..<200 {
+            let context = index.isMultiple(of: 2) ? runContext : providerContext
+            XCTAssertNil(app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path],
+                clientID: client, succeeded: index.isMultiple(of: 3), trustedContext: context))
+            XCTAssertNil(app.continuityAutomation.observe(tool: "fs_read", arguments: ["path": tempHome.path],
+                clientID: nativeOnlyClient, succeeded: true, trustedContext: nativeOnlyContext))
+        }
+        for (index, context) in [runContext, providerContext, nativeOnlyContext].enumerated() {
+            let path = tempHome.appendingPathComponent("native-read-\(index).txt")
+            try Data("Native result".utf8).write(to: path)
+            let result = try app.tools.call(name: "fs_read", arguments: ["path": path.path], context: context)
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertNil(result.payload["auto_handoff_id"])
+        }
+        _ = try app.config.update(["shell": ["enabled": false]], save: false)
+        for (name, context) in zip(["process.run", "xcode.run", "bash.run"], [runContext, providerContext, nativeOnlyContext]) {
+            let denied = try app.tools.call(name: name, arguments: ["cwd": tempHome.path], context: context)
+            XCTAssertFalse(denied.ok)
+            XCTAssertTrue(denied.isError)
+            XCTAssertEqual(denied.payload["code"] as? String, "shell_disabled_by_user")
+            XCTAssertNil(denied.payload["auto_handoff_id"])
+        }
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 1)
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: nativeOnlyClient)["progress_count"] as? Int, 0)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs;"), 0)
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: app.continuityAutomation.runtimeScopeKey(providerContext)))
+        let after = try await app.projectContexts.repository.contextBudgetState(identity: identity)
+        XCTAssertEqual(after?.revision, before?.revision)
+        XCTAssertEqual(after?.latestObservation?.observationID, before?.latestObservation?.observationID)
+        let nativeRollover = try await budget.evaluate(ContextBudgetEvaluationRequest(triggerPoint: .afterProviderTurn,
+            providerResponseID: "continuity-native-pressure", measurement: .providerExact(usedTokens: 2_828)))
+        XCTAssertEqual(nativeRollover.observation.action, .rollover)
+        XCTAssertEqual(nativeRollover.actionRequest?.requestedAction, .rollover)
+    }
+
+    func testRuntimeContinuityRouterCountsDeniedEligibleAttemptsAndPreservesPolicyErrors() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("denied-runtime-continuity")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": false]], save: false)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        let names = ["process.run", "xcode.run", "bash.run"]
+        for (index, name) in names.enumerated() {
+            let result = try app.tools.call(name: name, arguments: ["cwd": tempHome.path], clientID: client)
+            XCTAssertFalse(result.ok)
+            XCTAssertTrue(result.isError)
+            XCTAssertEqual(result.payload["code"] as? String, "shell_disabled_by_user")
+            XCTAssertEqual(result.payload["retryable"] as? Bool, false)
+            XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, index + 1)
+            if index < 2 {
+                XCTAssertNil(result.payload["auto_handoff_id"])
+                XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+            } else {
+                let packetID = try XCTUnwrap(result.payload["auto_handoff_id"] as? String)
+                let packet = try XCTUnwrap(app.store.handoffGet(id: packetID))
+                XCTAssertTrue(packet.resumeReady)
+                XCTAssertEqual(packet.clientID, client.rawValue)
+                XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+            }
+        }
+        let snapshot = app.continuityAutomation.snapshot(for: client)
+        XCTAssertEqual(snapshot["progress_count"] as? Int, 0)
+        XCTAssertEqual(snapshot["failed_tool_count"] as? Int, 3)
+        let audits = try app.audit.recent(limit: 20).filter { $0.clientID == client.rawValue }
+        XCTAssertEqual(Set(audits.map(\.tool)), Set(names))
+        XCTAssertEqual(audits.filter { $0.status == "denied" }.count, 3)
+    }
+
+    func testRuntimeContinuityRouterCountsDeniedThrownAndFailedResultsTogether() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("mixed-router-failure-continuity")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": false]], save: false)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        let denied = try app.tools.call(name: "process.run", arguments: ["cwd": tempHome.path], clientID: client)
+        XCTAssertFalse(denied.ok)
+        XCTAssertTrue(denied.isError)
+        XCTAssertEqual(denied.payload["code"] as? String, "shell_disabled_by_user")
+        XCTAssertNil(denied.payload["auto_handoff_id"])
+        let throwingRouter = ToolRouter(app: app, packs: [ThrowingLoopToolPack(toolNames: ["fs_list"])])
+        let thrown = try throwingRouter.call(name: "fs_list", arguments: ["path": tempHome.path], clientID: client)
+        XCTAssertFalse(thrown.ok)
+        XCTAssertTrue(thrown.isError)
+        XCTAssertEqual(thrown.payload["code"] as? String, "tool_exception")
+        XCTAssertNil(thrown.payload["auto_handoff_id"])
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 2)
+        let failed = try app.tools.call(name: "fs_read", arguments: [:], clientID: client)
+        XCTAssertFalse(failed.ok)
+        XCTAssertTrue(failed.isError)
+        XCTAssertEqual(failed.payload["code"] as? String, "missing_path")
+        let packetID = try XCTUnwrap(failed.payload["auto_handoff_id"] as? String)
+        XCTAssertTrue(try XCTUnwrap(app.store.handoffGet(id: packetID)).resumeReady)
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        let snapshot = app.continuityAutomation.snapshot(for: client)
+        XCTAssertEqual(snapshot["progress_count"] as? Int, 0)
+        XCTAssertEqual(snapshot["failed_tool_count"] as? Int, 3)
+        XCTAssertEqual(snapshot["tool_call_count"] as? Int, 3)
+        let audits = try app.audit.recent(limit: 20).filter { $0.clientID == client.rawValue }
+        XCTAssertEqual(audits.filter { $0.status == "denied" }.count, 1)
+        XCTAssertEqual(audits.filter { $0.status == "error" }.count, 2)
+    }
+
+    func testRuntimeContinuityPacketOwnerIsAtomicImmutableAndSurvivesRestart() throws {
+        let path = tempHome.appendingPathComponent("packet-owner.sqlite")
+        let store = try SQLiteStore(path: path)
+        let firstKey = JSONSupport.sha256Hex("first project generation")
+        let secondKey = JSONSupport.sha256Hex("second project generation")
+        let legacy = HandoffPacket(source: .model, goal: "Legacy evidence", cwd: tempHome.path)
+        try store.handoffUpsert(legacy)
+        XCTAssertNil(try store.runtimeContinuityPacketScopeKey(packetID: legacy.id))
+        let packet = HandoffPacket(source: .model, goal: "Bound evidence", cwd: tempHome.path)
+        try store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: firstKey)
+        let originalJSON = try sqliteFixtureText(at: path, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(packet.id)';")
+        var changed = packet
+        changed.goal = "Conflicting replacement"
+        XCTAssertThrowsError(try store.handoffUpsertRecordingRuntimeProgress(changed, scopeKey: secondKey))
+        XCTAssertEqual(try store.runtimeContinuityPacketScopeKey(packetID: packet.id), firstKey)
+        XCTAssertEqual(try sqliteFixtureText(at: path, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(packet.id)';"), originalJSON)
+        XCTAssertNil(try store.runtimeContinuityProgress(scopeKey: secondKey))
+        // Existing legacy packet writes preserve the recorded scope association.
+        try store.handoffUpsert(packet)
+        XCTAssertEqual(try store.runtimeContinuityPacketScopeKey(packetID: packet.id), firstKey)
+        store.close()
+        let reopened = try SQLiteStore(path: path)
+        defer { reopened.close() }
+        XCTAssertEqual(try reopened.runtimeContinuityPacketScopeKey(packetID: packet.id), firstKey)
+        XCTAssertNil(try reopened.runtimeContinuityPacketScopeKey(packetID: legacy.id))
+        XCTAssertEqual(try reopened.runtimeContinuityProgress(scopeKey: firstKey)?.latestPacketID, packet.id)
+    }
+
+    func testRuntimeContinuityDirectScopeSelectionIsBoundedAndNotCrowdedByNewerHistory() throws {
+        let path = tempHome.appendingPathComponent("runtime-selection.sqlite")
+        let store = try SQLiteStore(path: path)
+        defer { store.close() }
+        let currentScope = JSONSupport.sha256Hex("current selection scope")
+        let historicalScope = JSONSupport.sha256Hex("historical selection scope")
+        let current = HandoffPacket(source: .auto, resumeReady: true, goal: "Current exact handoff", cwd: tempHome.path)
+        try store.handoffUpsertRecordingRuntimeProgress(current, scopeKey: currentScope)
+        let historical = HandoffPacket(source: .auto, resumeReady: true, goal: "Newer fenced history", cwd: tempHome.path)
+        try store.handoffUpsertRecordingRuntimeProgress(historical, scopeKey: historicalScope)
+        try withSQLiteFixture(at: path) { database in
+            try executeSQLiteFixture(database, sql: """
+                WITH RECURSIVE packets(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM packets WHERE n<120)
+                INSERT INTO context_handoffs(id,created_at,updated_at,source,resume_ready,packet_json,client_id,write_sequence,runtime_scope_key)
+                SELECT printf('%08x-0000-4000-8000-000000000000',n),created_at,updated_at,source,resume_ready,
+                       replace(packet_json,id,printf('%08x-0000-4000-8000-000000000000',n)),client_id,n+2,runtime_scope_key
+                FROM packets,context_handoffs WHERE id='\(historical.id)';
+                """)
+        }
+        XCTAssertFalse(try store.handoffLegacyList(limit: 100).contains { $0.id == current.id })
+        var keys = Set((1...1_599).map { JSONSupport.sha256Hex("empty selection scope \($0)") })
+        keys.insert(currentScope)
+        let selected = try XCTUnwrap(store.handoffRuntimeLatest(scopeKeys: keys))
+        XCTAssertEqual(selected.packet.id, current.id)
+        XCTAssertEqual(selected.writeSequence, 1)
+        XCTAssertNil(try store.handoffRuntimeLatest(scopeKeys: keys, excludingPacketIDs: [current.id]))
+        XCTAssertThrowsError(try store.handoffRuntimeLatest(scopeKeys: keys,
+            excludingPacketIDs: Set((0..<129).map { "excluded-packet-\($0)" })))
+        XCTAssertNil(try store.handoffRuntimeLatest(scopeKeys: []))
+        keys.insert(historicalScope)
+        XCTAssertThrowsError(try store.handoffRuntimeLatest(scopeKeys: keys))
+        XCTAssertThrowsError(try store.handoffRuntimeLatest(scopeKeys: ["invalid-key"]))
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        cancelled.cancel()
+        XCTAssertThrowsError(try store.handoffRuntimeLatest(scopeKeys: [currentScope], cancellation: cancelled))
+        let legacy = HandoffPacket(source: .model, resumeReady: true, goal: "Unscoped compatibility", cwd: tempHome.path)
+        try store.handoffUpsert(legacy)
+        XCTAssertEqual(try store.handoffLegacyList(limit: 100, unscopedOnly: true).map(\.id), [legacy.id])
+        XCTAssertEqual(try store.handoffLegacyList(limit: 100, unscopedOnly: true, excludingPacketIDs: [legacy.id]).count, 0)
+        XCTAssertThrowsError(try store.handoffLegacyList(excludingPacketIDs: Set((0..<129).map { "excluded-packet-\($0)" })))
+        // A more recent checkpoint does not replace a resume-ready handoff candidate.
+        let checkpoint = HandoffPacket(source: .auto, goal: "Open checkpoint", cwd: tempHome.path)
+        try store.handoffUpsertRecordingRuntimeProgress(checkpoint, scopeKey: currentScope)
+        XCTAssertEqual(try store.handoffRuntimeLatest(scopeKeys: [currentScope])?.packet.id, current.id)
+    }
+
+    func testRuntimeContinuityOpenCheckpointsReuseOnePacketAndAcknowledgementStartsNewHistory() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("checkpoint-row-reuse")
+        try bindProjectContext(app, clientID: client)
+        let model = try app.tools.call(name: "session_checkpoint", arguments: ["goal": "Keep authored history"], clientID: client)
+        let modelID = try XCTUnwrap(model.payload["handoff_id"] as? String)
+        let modelJSON = try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(modelID)';")
+        var final: ContinuityObservation?
+        var openID: String?
+        for index in 1...200 {
+            let saved = app.continuityAutomation.observe(tool: "job.read_output", arguments: [:], clientID: client, succeeded: true)
+            if index.isMultiple(of: 50) {
+                if let openID { XCTAssertEqual(saved?.packet.id, openID) } else { openID = saved?.packet.id }
+                final = saved
+            }
+        }
+        let finalized = try XCTUnwrap(final?.packet)
+        XCTAssertTrue(finalized.resumeReady)
+        XCTAssertNotEqual(finalized.id, modelID)
+        XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs WHERE runtime_scope_key IS NOT NULL;"), 2)
+        let finalizedJSON = try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(finalized.id)';")
+        let epoch = app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String
+        let resumed = try app.tools.call(name: "get_forge_status", arguments: ["resume": true, "handoff_id": finalized.id], clientID: client)
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+        XCTAssertNotEqual(app.continuityAutomation.snapshot(for: client)["continuity_epoch"] as? String, epoch)
+        var next: ContinuityObservation?
+        for _ in 0..<50 { next = app.continuityAutomation.observe(tool: "xcode.result", arguments: [:], clientID: client, succeeded: true) }
+        XCTAssertNotEqual(next?.packet.id, finalized.id)
+        XCTAssertNotEqual(next?.packet.id, modelID)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(modelID)';"), modelJSON)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(finalized.id)';"), finalizedJSON)
+    }
+
+    func testRuntimeContinuityPacketCapacityReportsAttentionAndRecoversWithoutDeletingHistory() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("packet-capacity-runtime")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
+        let file = tempHome.appendingPathComponent("capacity-read.txt")
+        try Data("Read succeeded".utf8).write(to: file)
+        let historical = HandoffPacket(source: .auto, resumeReady: true, goal: "Retain historical evidence", cwd: tempHome.path)
+        let historicalScope = JSONSupport.sha256Hex("historical runtime scope")
+        try app.store.handoffUpsertRecordingRuntimeProgress(historical, scopeKey: historicalScope)
+        let legacy = HandoffPacket(source: .model, goal: "Retain unscoped evidence", cwd: tempHome.path)
+        try app.store.handoffUpsert(legacy)
+        let historicalJSON = try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(historical.id)';")
+        try withSQLiteFixture(at: app.paths.storeSQLite) { database in
+            try executeSQLiteFixture(database, sql: """
+                WITH RECURSIVE packets(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM packets WHERE n<9999)
+                INSERT INTO context_handoffs(id,created_at,updated_at,source,resume_ready,packet_json,client_id,write_sequence,runtime_scope_key)
+                SELECT printf('%08x-0000-4000-8000-000000000000',n),created_at,updated_at,source,resume_ready,
+                       replace(packet_json,id,printf('%08x-0000-4000-8000-000000000000',n)),client_id,n,runtime_scope_key
+                FROM packets,context_handoffs WHERE id='\(historical.id)';
+                """)
+        }
+        for _ in 0..<2 {
+            let result = try app.tools.call(name: "fs_read", arguments: ["path": file.path], clientID: client)
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertNil(result.payload["continuity_attention"])
+        }
+        let triggering = try app.tools.call(name: "fs_read", arguments: ["path": file.path], clientID: client)
+        XCTAssertTrue(triggering.ok, "The read operation already succeeded: \(triggering.payload)")
+        XCTAssertNil(triggering.payload["auto_handoff_id"])
+        let attention = try XCTUnwrap(triggering.payload["continuity_attention"] as? [String: Any])
+        XCTAssertEqual(attention["code"] as? String, "continuity_capacity_reached")
+        XCTAssertEqual(attention["resource"] as? String, "runtime_continuity_packets")
+        XCTAssertEqual(attention["limit"] as? Int, 10_000)
+        XCTAssertEqual(attention["attention_required"] as? Bool, true)
+        XCTAssertEqual(attention["handoff_persisted"] as? Bool, false)
+        XCTAssertFalse(app.continuityAutomation.isBlocked(client))
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let pending = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key)?.pending)
+        XCTAssertTrue(pending.finalize)
+        XCTAssertNil(try app.store.handoffGet(id: pending.packetID))
+        let status = try app.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+        let snapshot = try XCTUnwrap(status.payload["auto_continuity"] as? [String: Any])
+        XCTAssertEqual(snapshot["continuity_attention_required"] as? Bool, true)
+        XCTAssertEqual((snapshot["continuity_attention"] as? [String: Any])?["code"] as? String, "continuity_capacity_reached")
+        let reopened = try SQLiteStore(path: app.paths.storeSQLite)
+        XCTAssertEqual(try reopened.runtimeContinuityProgress(scopeKey: key)?.capacityFailure, SQLiteStore.runtimeContinuityPacketCapacityMessage)
+        reopened.close()
+        // Binding an existing unscoped packet also consumes capacity and cannot evade the limit.
+        XCTAssertThrowsError(try app.store.handoffUpsertRecordingRuntimeProgress(legacy, scopeKey: key))
+        XCTAssertNil(try app.store.runtimeContinuityPacketScopeKey(packetID: legacy.id))
+        XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs WHERE runtime_scope_key IS NOT NULL;"), 10_000)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(historical.id)';"), historicalJSON)
+        // Simulate an operator explicitly choosing one disposable fixture row.
+        try withSQLiteFixture(at: app.paths.storeSQLite) { database in
+            try executeSQLiteFixture(database, sql: "DELETE FROM context_handoffs WHERE id='00000001-0000-4000-8000-000000000000';")
+        }
+        let recovered = try app.tools.call(name: "fs_read", arguments: ["path": file.path], clientID: client)
+        XCTAssertTrue(recovered.ok, "\(recovered.payload)")
+        XCTAssertEqual(recovered.payload["auto_handoff_id"] as? String, pending.packetID)
+        XCTAssertEqual(recovered.payload["auto_continuity"] as? String, "handoff")
+        XCTAssertNil(recovered.payload["continuity_attention"])
+        XCTAssertTrue(app.continuityAutomation.isBlocked(client))
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: key)?.capacityFailure)
+        XCTAssertEqual(try app.store.runtimeContinuityPacketScopeKey(packetID: pending.packetID), key)
+        XCTAssertEqual(try sqliteFixtureText(at: app.paths.storeSQLite, sql: "SELECT packet_json FROM context_handoffs WHERE id='\(historical.id)';"), historicalJSON)
+    }
+
+    func testRuntimeContinuityScopeCapacityReportsAttentionWithoutInventingProgress() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("scope-capacity-runtime")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        let file = tempHome.appendingPathComponent("scope-read.txt")
+        try Data("Read succeeded".utf8).write(to: file)
+        let seed = JSONSupport.sha256Hex("retained capacity seed")
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: seed) { $0.progressCount = 7 }
+        try withSQLiteFixture(at: app.paths.storeSQLite) { database in
+            try executeSQLiteFixture(database, sql: """
+                WITH RECURSIVE scopes(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM scopes WHERE n<1023)
+                INSERT INTO runtime_continuity_progress(scope_key,state_json,updated_at)
+                SELECT printf('%064d',n),state_json,updated_at FROM scopes,runtime_continuity_progress WHERE scope_key='\(seed)';
+                """)
+        }
+        let triggering = try app.tools.call(name: "fs_read", arguments: ["path": file.path], clientID: client)
+        XCTAssertTrue(triggering.ok, "\(triggering.payload)")
+        XCTAssertNil(triggering.payload["auto_handoff_id"])
+        let attention = try XCTUnwrap(triggering.payload["continuity_attention"] as? [String: Any])
+        XCTAssertEqual(attention["resource"] as? String, "runtime_continuity_scopes")
+        XCTAssertEqual(attention["limit"] as? Int, 1_024)
+        XCTAssertEqual(attention["code"] as? String, "continuity_capacity_reached")
+        let context = try app.projectContexts.invocationContext(for: client)
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: app.continuityAutomation.runtimeScopeKey(context)))
+        let snapshot = app.continuityAutomation.snapshot(for: client)
+        XCTAssertEqual(snapshot["progress_count"] as? Int, 0)
+        XCTAssertEqual(snapshot["continuity_attention_required"] as? Bool, true)
+        XCTAssertEqual((snapshot["continuity_attention"] as? [String: Any])?["resource"] as? String, "runtime_continuity_scopes")
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: seed)?.progressCount, 7)
+    }
+
     func testAutoCheckpointFailureRetainsPrecommitStageAndUnavailableHandoffID() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }
@@ -4145,7 +6255,7 @@ private enum ThrowingLoopToolPackError: Error {
 }
 
 private struct ThrowingLoopToolPack: ToolPackHandling {
-    let toolNames = ["throwing_test_tool"]
+    var toolNames = ["throwing_test_tool"]
 
     func handle(
         name: String,
@@ -4155,7 +6265,7 @@ private struct ThrowingLoopToolPack: ToolPackHandling {
         app: ForgeApp,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult? {
-        guard name == "throwing_test_tool" else { return nil }
+        guard toolNames.contains(name) else { return nil }
         try cancellation?.checkCancellation()
         throw ThrowingLoopToolPackError.forced
     }
@@ -4544,5 +6654,1025 @@ private func waitForMCPFixture(
     }
     return try outputData.split(separator: 0x0A, omittingEmptySubsequences: true).map { line in
         try JSONSupport.object(from: Data(line))
+    }
+}
+
+// This Clock belongs only to ContextContinuityService. Its sole packet-building
+// clock read is after the pending claim commit and before the handoff transaction.
+// The store and ContinuityAutomation keep their normal FixedClock, so holding
+// this gate never holds SQLite's progress transaction or changes expiry time.
+private final class FinalReviewPacketBuildClock: ForgeConductorCore.Clock, @unchecked Sendable {
+    let reached = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private let date: Date
+    private var armed = false
+    private var timedOut = false
+
+    init(_ date: Date) { self.date = date }
+    func arm() { lock.lock(); armed = true; lock.unlock() }
+    var didTimeOut: Bool { lock.lock(); defer { lock.unlock() }; return timedOut }
+    func now() -> Date {
+        lock.lock()
+        let shouldPause = armed
+        armed = false
+        lock.unlock()
+        if shouldPause {
+            reached.signal()
+            if release.wait(timeout: .now() + 5) != .success {
+                lock.lock(); timedOut = true; lock.unlock()
+            }
+        }
+        return date
+    }
+}
+
+private final class FinalReviewContinuityObservationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: ContinuityObservation?
+    func set(_ value: ContinuityObservation?) { lock.lock(); self.value = value; lock.unlock() }
+    var snapshot: ContinuityObservation? { lock.lock(); defer { lock.unlock() }; return value }
+}
+
+extension ContinuityTests {
+    func testRuntimeContinuityCrossedRolloverLimitIsServicedWhenPendingCheckpointCompletes() throws {
+        try assertFinalReviewPendingCheckpoint(crossThresholdWhilePending: true)
+    }
+
+    func testRuntimeContinuityPendingCheckpointBelowRolloverLimitPreservesOpenPacket() throws {
+        try assertFinalReviewPendingCheckpoint(crossThresholdWhilePending: false)
+    }
+
+    private func assertFinalReviewPendingCheckpoint(crossThresholdWhilePending: Bool) throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let primary = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { primary.shutdown() }
+        let client = MCPServer.defaultClientID(deploymentID: "review-pending-checkpoint-deployment",
+            role: .primary, desktopProviderID: nil)
+        try bindProjectContext(primary, clientID: client)
+        _ = try primary.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 251))
+        _ = try primary.config.update(["allowed_roots": [tempHome.path]], save: true)
+        let fallback = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { fallback.shutdown() }
+        let context = try primary.projectContexts.invocationContext(for: client)
+        let key = primary.continuityAutomation.runtimeScopeKey(context)
+        _ = try primary.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 249
+            progress.lastCheckpointCount = 200
+            progress.startedAt = clock.now()
+            progress.lastCheckpointAt = clock.now()
+            progress.lastTools = ["fs_read"]
+            progress.lastPaths = [tempHome.path]
+        }
+        let path = tempHome.appendingPathComponent("pending-checkpoint-owned.txt")
+        try "Bounded current-project read evidence\n".write(to: path, atomically: true, encoding: .utf8)
+
+        let packetClock = FinalReviewPacketBuildClock(clock.now())
+        let gatedContinuity = ContextContinuityService(paths: primary.paths, store: primary.store,
+            sessions: primary.sessions, diagnostics: primary.diagnostics, clock: packetClock)
+        let owner = ContinuityAutomation(store: primary.store, sessions: primary.sessions,
+            continuity: gatedContinuity, diagnostics: primary.diagnostics, clock: clock,
+            projectContexts: primary.projectContexts, configStore: primary.config)
+        let ownerResult = FinalReviewContinuityObservationBox()
+        let finished = DispatchGroup()
+        packetClock.arm()
+        finished.enter()
+        DispatchQueue.global().async {
+            defer { finished.leave() }
+            ownerResult.set(owner.observe(tool: "fs_read", arguments: ["path": path.path],
+                clientID: client, succeeded: true))
+        }
+        defer {
+            packetClock.release.signal()
+            XCTAssertEqual(finished.wait(timeout: .now() + 6), .success,
+                "The owned observer must finish before its app/store are shut down")
+        }
+        XCTAssertEqual(packetClock.reached.wait(timeout: .now() + 2), .success)
+        let held = try XCTUnwrap(fallback.store.runtimeContinuityProgress(scopeKey: key))
+        let claim = try XCTUnwrap(held.pending)
+        XCTAssertEqual(held.progressCount, 250)
+        XCTAssertEqual(claim.progressCount, 250)
+        XCTAssertFalse(claim.finalize)
+        XCTAssertGreaterThan(claim.expiresAt, clock.now())
+        XCTAssertNil(try fallback.store.handoffGet(id: claim.packetID))
+
+        if crossThresholdWhilePending {
+            // Real ToolRouter execution against another app/store connection.
+            // No fourth call is supplied after the pending owner resumes.
+            let result = try fallback.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertTrue(result.ok, "Keep the successful read outcome: \(result.payload)")
+            XCTAssertFalse(result.isError)
+            XCTAssertEqual(try fallback.store.runtimeContinuityProgress(scopeKey: key)?.progressCount, 251)
+        }
+        packetClock.release.signal()
+        XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(packetClock.didTimeOut, "Gate expiry is not a successful competing-writer reproduction")
+        let observation = try XCTUnwrap(ownerResult.snapshot)
+        let after = try XCTUnwrap(fallback.store.runtimeContinuityProgress(scopeKey: key))
+        let committed = try XCTUnwrap(fallback.store.handoffGet(id: claim.packetID))
+        XCTAssertNil(after.pending)
+        XCTAssertEqual(after.progressCount, crossThresholdWhilePending ? 251 : 250)
+        XCTAssertEqual(after.latestPacketID, claim.packetID)
+        XCTAssertEqual(try fallback.store.runtimeContinuityPacketScopeKey(packetID: committed.id), key)
+        XCTAssertEqual(committed.cwd, tempHome.path)
+        XCTAssertEqual(try fallback.store.handoffLegacyList(limit: 100).count, 1,
+            "Checkpoint-to-handoff promotion must retain one current open packet identity")
+        if crossThresholdWhilePending {
+            XCTAssertTrue(after.blocked,
+                "A successful pending checkpoint completion must service the already-crossed limit without another tool call")
+            XCTAssertEqual(after.lastHandoffID, claim.packetID)
+            XCTAssertTrue(committed.resumeReady)
+            XCTAssertTrue(observation.finalize)
+            let resumed = try fallback.tools.call(name: "get_forge_status", arguments: [
+                "resume": true, "handoff_id": claim.packetID,
+                "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: claim.packetID),
+            ], clientID: client)
+            XCTAssertTrue(resumed.ok)
+            XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+            let next = try XCTUnwrap(primary.store.runtimeContinuityProgress(scopeKey: key))
+            XCTAssertNotEqual(next.epoch, held.epoch)
+            XCTAssertEqual(next.progressCount, 0)
+            XCTAssertFalse(next.blocked)
+            XCTAssertEqual(try primary.store.handoffGet(id: committed.id), committed)
+        } else {
+            // Same gate, same checkpoint cadence; no premature rollover below 251.
+            XCTAssertFalse(after.blocked)
+            XCTAssertFalse(committed.resumeReady)
+            XCTAssertFalse(observation.finalize)
+            XCTAssertEqual(after.lastCheckpointCount, 250)
+            let result = try fallback.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertTrue(result.ok)
+            XCTAssertEqual(result.payload["handoff_id"] as? String, claim.packetID)
+            XCTAssertTrue(try primary.store.runtimeContinuityProgress(scopeKey: key)?.blocked == true)
+            XCTAssertTrue(try primary.store.handoffGet(id: claim.packetID)?.resumeReady == true)
+        }
+    }
+}
+
+private final class FinalReviewSecondObservationClock: ForgeConductorCore.Clock, @unchecked Sendable {
+    let reached = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private let date: Date
+    private var count = 0
+    private var timedOut = false
+    init(_ date: Date) { self.date = date }
+    var didTimeOut: Bool { lock.lock(); defer { lock.unlock() }; return timedOut }
+    func now() -> Date {
+        lock.lock(); count += 1; let shouldPause = count == 2; lock.unlock()
+        if shouldPause {
+            reached.signal()
+            if release.wait(timeout: .now() + 5) != .success {
+                lock.lock(); timedOut = true; lock.unlock()
+            }
+        }
+        return date
+    }
+}
+
+private final class FinalReviewCheckpointFailureOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var enabled = false
+    private var count = 0
+    func arm() { lock.lock(); enabled = true; lock.unlock() }
+    var failureCount: Int { lock.lock(); defer { lock.unlock() }; return count }
+    func shouldFail() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard enabled else { return false }
+        enabled = false
+        count += 1
+        return true
+    }
+}
+
+extension ContinuityTests {
+    func testRuntimeContinuityExpiredCheckpointAdoptedBySecondPassServicesCrossedLimit() throws {
+        try assertFinalReviewExpiredSecondClaim(crossLimit: true)
+    }
+
+    func testRuntimeContinuityExpiredCheckpointAdoptedBySecondPassStaysOpenBelowLimit() throws {
+        try assertFinalReviewExpiredSecondClaim(crossLimit: false)
+    }
+
+    private func assertFinalReviewExpiredSecondClaim(crossLimit: Bool) throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = MCPServer.defaultClientID(deploymentID: "expired-second-claim-deployment",
+            role: .primary, desktopProviderID: nil)
+        try bindProjectContext(app, clientID: client)
+        _ = try app.config.update(["allowed_roots": [tempHome.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 101))
+        let competing = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { competing.shutdown() }
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let path = tempHome.appendingPathComponent("expired-second-claim-owned.txt")
+        try "Owned current-project evidence\n".write(to: path, atomically: true, encoding: .utf8)
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 49
+            progress.startedAt = clock.now()
+        }
+
+        // A's injected clock is used only by Automation. Its second now() is
+        // the accountProgress:false pass, after checkpoint50 is already committed.
+        let secondPassClock = FinalReviewSecondObservationClock(clock.now())
+        let ownerA = ContinuityAutomation(store: app.store, sessions: app.sessions,
+            continuity: app.continuity, diagnostics: app.diagnostics, clock: secondPassClock,
+            projectContexts: app.projectContexts, configStore: app.config)
+        let fault = FinalReviewCheckpointFailureOnce()
+        let faultStore = try SQLiteStore(path: app.paths.storeSQLite, clock: clock,
+            postMigrationCommitObserver: nil, beforeMutationCommitObserver: { kind in
+                if kind == .handoff, fault.shouldFail() {
+                    throw StoreError.execFailed("injected checkpoint100 commit failure")
+                }
+            })
+        defer { faultStore.close() }
+        let packetClock = FinalReviewPacketBuildClock(clock.now())
+        let serviceB = ContextContinuityService(paths: app.paths, store: faultStore,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: packetClock)
+        let ownerB = ContinuityAutomation(store: faultStore, sessions: app.sessions,
+            continuity: serviceB, diagnostics: app.diagnostics, clock: clock,
+            projectContexts: app.projectContexts, configStore: app.config)
+        let boxA = FinalReviewContinuityObservationBox()
+        let boxB = FinalReviewContinuityObservationBox()
+        let finishedA = DispatchGroup()
+        let finishedB = DispatchGroup()
+        defer {
+            packetClock.release.signal()
+            secondPassClock.release.signal()
+            XCTAssertEqual(finishedB.wait(timeout: .now() + 6), .success)
+            XCTAssertEqual(finishedA.wait(timeout: .now() + 6), .success)
+        }
+        finishedA.enter()
+        DispatchQueue.global().async {
+            defer { finishedA.leave() }
+            boxA.set(ownerA.observe(tool: "fs_read", arguments: ["path": path.path], clientID: client, succeeded: true))
+        }
+        XCTAssertEqual(secondPassClock.reached.wait(timeout: .now() + 2), .success)
+        let firstCommit = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(firstCommit.progressCount, 50)
+        XCTAssertEqual(firstCommit.lastCheckpointCount, 50)
+        XCTAssertNil(firstCommit.pending)
+        let packetID = try XCTUnwrap(firstCommit.latestPacketID)
+        let packet50 = try XCTUnwrap(competing.store.handoffGet(id: packetID))
+        XCTAssertFalse(packet50.resumeReady)
+
+        // Seed the same valid earlier-call baseline used by the existing threshold
+        // fixtures; actual pending claims are created only by the observers below.
+        _ = try competing.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 99
+        }
+        packetClock.arm()
+        fault.arm()
+        finishedB.enter()
+        DispatchQueue.global().async {
+            defer { finishedB.leave() }
+            boxB.set(ownerB.observe(tool: "fs_read", arguments: ["path": path.path], clientID: client, succeeded: true))
+        }
+        XCTAssertEqual(packetClock.reached.wait(timeout: .now() + 2), .success)
+        let claimed = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let claim100 = try XCTUnwrap(claimed.pending)
+        XCTAssertEqual(claimed.progressCount, 100)
+        XCTAssertEqual(claim100.progressCount, 100)
+        XCTAssertFalse(claim100.finalize)
+        XCTAssertEqual(claim100.packetID, packetID)
+        XCTAssertEqual(claim100.epoch, firstCommit.epoch)
+        XCTAssertGreaterThan(claim100.expiresAt, clock.now())
+        if crossLimit {
+            let read = try competing.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertTrue(read.ok)
+            XCTAssertFalse(read.isError)
+            XCTAssertEqual(try competing.store.runtimeContinuityProgress(scopeKey: key)?.progressCount, 101)
+        }
+        packetClock.release.signal()
+        XCTAssertEqual(finishedB.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(packetClock.didTimeOut)
+        XCTAssertEqual(fault.failureCount, 1)
+        XCTAssertNil(boxB.snapshot)
+        let failed = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let retryable = try XCTUnwrap(failed.pending)
+        XCTAssertEqual(retryable.packetID, claim100.packetID)
+        XCTAssertEqual(retryable.ownerID, claim100.ownerID)
+        XCTAssertEqual(retryable.epoch, claim100.epoch)
+        XCTAssertEqual(retryable.progressCount, 100)
+        XCTAssertFalse(retryable.finalize)
+        XCTAssertLessThanOrEqual(retryable.expiresAt, clock.now())
+        XCTAssertEqual(try competing.store.handoffGet(id: packetID), packet50)
+
+        secondPassClock.release.signal()
+        XCTAssertEqual(finishedA.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(secondPassClock.didTimeOut)
+        let observation = try XCTUnwrap(boxA.snapshot)
+        let after = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let saved = try XCTUnwrap(competing.store.handoffGet(id: packetID))
+        XCTAssertNil(after.pending)
+        XCTAssertEqual(after.epoch, firstCommit.epoch)
+        XCTAssertEqual(after.progressCount, crossLimit ? 101 : 100)
+        XCTAssertEqual(after.failureCount, 0, "Checkpoint persistence failure is not an extra model tool attempt")
+        XCTAssertEqual(after.latestPacketID, packetID)
+        XCTAssertEqual(try competing.store.handoffLegacyList(limit: 100).count, 1)
+        if crossLimit {
+            XCTAssertTrue(after.blocked, "The bounded second pass must service an already-due handoff even when adopting an expired checkpoint")
+            XCTAssertEqual(after.lastHandoffID, packetID)
+            XCTAssertTrue(saved.resumeReady)
+            XCTAssertTrue(observation.finalize)
+            XCTAssertEqual(after.lastHandoffCount, 101)
+        } else {
+            XCTAssertFalse(after.blocked)
+            XCTAssertFalse(saved.resumeReady)
+            XCTAssertFalse(observation.finalize)
+            XCTAssertEqual(after.lastCheckpointCount, 100)
+            let next = try competing.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertTrue(next.ok)
+            XCTAssertEqual(next.payload["handoff_id"] as? String, packetID)
+            XCTAssertEqual(try competing.store.runtimeContinuityProgress(scopeKey: key)?.progressCount, 101)
+            XCTAssertTrue(try competing.store.runtimeContinuityProgress(scopeKey: key)?.blocked == true)
+        }
+    }
+}
+
+extension ContinuityTests {
+    func testRuntimeContinuityLimitCrossedWhileSecondAdoptedCheckpointBuildsCommitsExactHandoff() throws {
+        try assertFinalReviewSecondCheckpointBuild(crossLimit: true)
+    }
+
+    func testRuntimeContinuitySecondAdoptedCheckpointBelowLimitPreservesOpenPacket() throws {
+        try assertFinalReviewSecondCheckpointBuild(crossLimit: false)
+    }
+
+    private func assertFinalReviewSecondCheckpointBuild(crossLimit: Bool) throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = MCPServer.defaultClientID(deploymentID: "second-checkpoint-build-deployment",
+            role: .primary, desktopProviderID: nil)
+        try bindProjectContext(app, clientID: client)
+        _ = try app.config.update(["allowed_roots": [tempHome.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 101))
+        let competing = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { competing.shutdown() }
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let path = tempHome.appendingPathComponent("second-checkpoint-build-owned.txt")
+        try "Owned current-project evidence\n".write(to: path, atomically: true, encoding: .utf8)
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 49
+            progress.startedAt = clock.now()
+        }
+
+        // A's injected clock is used only by Automation. Its second now() is
+        // the accountProgress:false pass, after checkpoint50 is already committed.
+        let secondPassClock = FinalReviewSecondObservationClock(clock.now())
+        let secondBuildClock = FinalReviewPacketBuildClock(clock.now())
+        let serviceA = ContextContinuityService(paths: app.paths, store: app.store,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: secondBuildClock)
+        let ownerA = ContinuityAutomation(store: app.store, sessions: app.sessions,
+            continuity: serviceA, diagnostics: app.diagnostics, clock: secondPassClock,
+            projectContexts: app.projectContexts, configStore: app.config)
+        let fault = FinalReviewCheckpointFailureOnce()
+        let faultStore = try SQLiteStore(path: app.paths.storeSQLite, clock: clock,
+            postMigrationCommitObserver: nil, beforeMutationCommitObserver: { kind in
+                if kind == .handoff, fault.shouldFail() {
+                    throw StoreError.execFailed("injected checkpoint100 commit failure")
+                }
+            })
+        defer { faultStore.close() }
+        let packetClock = FinalReviewPacketBuildClock(clock.now())
+        let serviceB = ContextContinuityService(paths: app.paths, store: faultStore,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: packetClock)
+        let ownerB = ContinuityAutomation(store: faultStore, sessions: app.sessions,
+            continuity: serviceB, diagnostics: app.diagnostics, clock: clock,
+            projectContexts: app.projectContexts, configStore: app.config)
+        let boxA = FinalReviewContinuityObservationBox()
+        let boxB = FinalReviewContinuityObservationBox()
+        let finishedA = DispatchGroup()
+        let finishedB = DispatchGroup()
+        defer {
+            packetClock.release.signal()
+            secondBuildClock.release.signal()
+            secondPassClock.release.signal()
+            XCTAssertEqual(finishedB.wait(timeout: .now() + 6), .success)
+            XCTAssertEqual(finishedA.wait(timeout: .now() + 6), .success)
+        }
+        finishedA.enter()
+        DispatchQueue.global().async {
+            defer { finishedA.leave() }
+            boxA.set(ownerA.observe(tool: "fs_read", arguments: ["path": path.path], clientID: client, succeeded: true))
+        }
+        XCTAssertEqual(secondPassClock.reached.wait(timeout: .now() + 2), .success)
+        let firstCommit = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(firstCommit.progressCount, 50)
+        XCTAssertEqual(firstCommit.lastCheckpointCount, 50)
+        XCTAssertNil(firstCommit.pending)
+        let packetID = try XCTUnwrap(firstCommit.latestPacketID)
+        let packet50 = try XCTUnwrap(competing.store.handoffGet(id: packetID))
+        XCTAssertFalse(packet50.resumeReady)
+
+        // Seed the same valid earlier-call baseline used by the existing threshold
+        // fixtures; actual pending claims are created only by the observers below.
+        _ = try competing.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 99
+        }
+        packetClock.arm()
+        fault.arm()
+        finishedB.enter()
+        DispatchQueue.global().async {
+            defer { finishedB.leave() }
+            boxB.set(ownerB.observe(tool: "fs_read", arguments: ["path": path.path], clientID: client, succeeded: true))
+        }
+        XCTAssertEqual(packetClock.reached.wait(timeout: .now() + 2), .success)
+        let claimed = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let claim100 = try XCTUnwrap(claimed.pending)
+        XCTAssertEqual(claimed.progressCount, 100)
+        XCTAssertEqual(claim100.progressCount, 100)
+        XCTAssertFalse(claim100.finalize)
+        XCTAssertEqual(claim100.packetID, packetID)
+        XCTAssertEqual(claim100.epoch, firstCommit.epoch)
+        XCTAssertGreaterThan(claim100.expiresAt, clock.now())
+        packetClock.release.signal()
+        XCTAssertEqual(finishedB.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(packetClock.didTimeOut)
+        XCTAssertEqual(fault.failureCount, 1)
+        XCTAssertNil(boxB.snapshot)
+        let failed = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let retryable = try XCTUnwrap(failed.pending)
+        XCTAssertEqual(retryable.packetID, claim100.packetID)
+        XCTAssertEqual(retryable.ownerID, claim100.ownerID)
+        XCTAssertEqual(retryable.epoch, claim100.epoch)
+        XCTAssertEqual(retryable.progressCount, 100)
+        XCTAssertFalse(retryable.finalize)
+        XCTAssertLessThanOrEqual(retryable.expiresAt, clock.now())
+        XCTAssertEqual(try competing.store.handoffGet(id: packetID), packet50)
+
+        // Let A's bounded follow-up adopt the expired checkpoint while still
+        // BELOW the limit. The second packet-build gate is after this claim's
+        // SQLite commit and before its packet mutation, so C can use the normal
+        // tool router while A builds without holding a database lock.
+        secondBuildClock.arm()
+        secondPassClock.release.signal()
+        XCTAssertEqual(secondBuildClock.reached.wait(timeout: .now() + 2), .success)
+        let adopted = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let adoptedClaim = try XCTUnwrap(adopted.pending)
+        XCTAssertEqual(adopted.progressCount, 100)
+        XCTAssertEqual(adopted.failureCount, 0)
+        XCTAssertFalse(adopted.blocked)
+        XCTAssertEqual(adopted.lastCheckpointCount, 50)
+        XCTAssertEqual(adoptedClaim.scopeKey, key)
+        XCTAssertEqual(adoptedClaim.packetID, packetID)
+        XCTAssertEqual(adoptedClaim.epoch, firstCommit.epoch)
+        XCTAssertNotEqual(adoptedClaim.ownerID, retryable.ownerID)
+        XCTAssertEqual(adoptedClaim.progressCount, 100)
+        XCTAssertEqual(adoptedClaim.failureCount, 0)
+        XCTAssertFalse(adoptedClaim.finalize)
+        XCTAssertEqual(adoptedClaim.claimedAt, retryable.claimedAt)
+        XCTAssertGreaterThan(adoptedClaim.expiresAt, clock.now())
+        XCTAssertEqual(try competing.store.handoffGet(id: packetID), packet50,
+            "No adopted packet has committed while the second build gate is held")
+        if crossLimit {
+            let read = try competing.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertTrue(read.ok)
+            XCTAssertFalse(read.isError)
+            XCTAssertNil(read.payload["handoff_id"], "The active second claim still owns packet persistence")
+            let crossed = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+            XCTAssertEqual(crossed.progressCount, 101)
+            XCTAssertEqual(crossed.failureCount, 0)
+            XCTAssertEqual(crossed.pending, adoptedClaim,
+                "The competing actual call must not steal a live claim or rewrite its snapshot")
+            XCTAssertFalse(crossed.blocked)
+        }
+        secondBuildClock.release.signal()
+        XCTAssertEqual(finishedA.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(secondBuildClock.didTimeOut)
+        XCTAssertFalse(secondPassClock.didTimeOut)
+        let observation = try XCTUnwrap(boxA.snapshot)
+        let after = try XCTUnwrap(competing.store.runtimeContinuityProgress(scopeKey: key))
+        let saved = try XCTUnwrap(competing.store.handoffGet(id: packetID))
+        XCTAssertNil(after.pending)
+        XCTAssertEqual(after.epoch, firstCommit.epoch)
+        XCTAssertEqual(after.progressCount, crossLimit ? 101 : 100)
+        XCTAssertEqual(after.failureCount, 0, "Checkpoint persistence failure is not an extra model tool attempt")
+        XCTAssertEqual(after.latestPacketID, packetID)
+        XCTAssertEqual(try competing.store.runtimeContinuityPacketScopeKey(packetID: packetID), key)
+        XCTAssertEqual(saved.cwd, packet50.cwd)
+        XCTAssertEqual(saved.clientID, packet50.clientID)
+        XCTAssertEqual(try competing.store.handoffLegacyList(limit: 100).count, 1)
+        if crossLimit {
+            XCTAssertTrue(after.blocked, "The exact second checkpoint commit must service the limit crossed during its build without a 102nd call")
+            XCTAssertEqual(after.lastHandoffID, packetID)
+            XCTAssertTrue(saved.resumeReady)
+            XCTAssertTrue(observation.finalize)
+            XCTAssertEqual(after.lastHandoffCount, 101)
+        } else {
+            XCTAssertFalse(after.blocked)
+            XCTAssertFalse(saved.resumeReady)
+            XCTAssertFalse(observation.finalize)
+            XCTAssertEqual(after.lastCheckpointCount, 100)
+            let next = try competing.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+            XCTAssertTrue(next.ok)
+            XCTAssertEqual(next.payload["handoff_id"] as? String, packetID)
+            XCTAssertEqual(try competing.store.runtimeContinuityProgress(scopeKey: key)?.progressCount, 101)
+            XCTAssertTrue(try competing.store.runtimeContinuityProgress(scopeKey: key)?.blocked == true)
+        }
+    }
+}
+
+extension ContinuityTests {
+    func testRuntimeContinuityAtomicPromotionPreservesAuthoredTaskAndCustomSeed() throws {
+        try assertRuntimeAtomicPromotionPacket(customSeed: true)
+    }
+
+    func testRuntimeContinuityAtomicPromotionRegeneratesDefaultSeedAndPublishesActualOutcome() throws {
+        try assertRuntimeAtomicPromotionPacket(customSeed: false)
+    }
+
+    func testRuntimeContinuityAtomicPromotionProjectionFailureStillReturnsCommittedHandoff() throws {
+        try assertRuntimeAtomicPromotionPacket(customSeed: false, projectionFails: true)
+    }
+
+    private func assertRuntimeAtomicPromotionPacket(customSeed: Bool, projectionFails: Bool = false) throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("atomic-packet-owner")
+        try bindProjectContext(app, clientID: client)
+        _ = try app.config.update(["allowed_roots": [tempHome.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 51))
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let path = tempHome.appendingPathComponent("atomic-packet-evidence.txt")
+        try "Native project evidence\n".write(to: path, atomically: true, encoding: .utf8)
+        var arguments: [String: Any] = [
+            "goal": "Preserve the authored task", "status": "exploration", "cwd": tempHome.path,
+            "project_slug": "Authored project", "next_actions": ["Run the exact native check"],
+            "blockers": ["Wait for the owned result"], "key_files": [path.path],
+            "decisions": ["Keep native evidence"], "narrative": "Authored narrative",
+        ]
+        if customSeed { arguments["resume_seed"] = "Authored successor seed" }
+        let saved = try app.tools.call(name: "session_checkpoint", arguments: arguments, clientID: client)
+        XCTAssertTrue(saved.ok)
+        let authoredID = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        let authored = try XCTUnwrap(app.store.handoffLegacyGet(id: authoredID))
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 49
+            progress.startedAt = clock.now()
+        }
+        let packetClock = FinalReviewPacketBuildClock(clock.now())
+        let service = ContextContinuityService(paths: app.paths, store: app.store,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: packetClock)
+        let owner = ContinuityAutomation(store: app.store, sessions: app.sessions,
+            continuity: service, diagnostics: app.diagnostics, clock: clock,
+            projectContexts: app.projectContexts, configStore: app.config)
+        let box = FinalReviewContinuityObservationBox()
+        let finished = DispatchGroup()
+        packetClock.arm()
+        finished.enter()
+        DispatchQueue.global().async {
+            defer { finished.leave() }
+            box.set(owner.observe(tool: "fs_read", arguments: ["path": path.path], clientID: client, succeeded: true))
+        }
+        defer {
+            packetClock.release.signal()
+            XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        }
+        XCTAssertEqual(packetClock.reached.wait(timeout: .now() + 2), .success)
+        let held = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        let claim = try XCTUnwrap(held.pending)
+        XCTAssertEqual(claim.progressCount, 50)
+        XCTAssertFalse(claim.finalize)
+        XCTAssertNil(held.rolloverRequested)
+        if projectionFails {
+            try FileManager.default.createDirectory(
+                at: app.paths.memoryHandoffsDir.appendingPathComponent("\(claim.packetID).json"),
+                withIntermediateDirectories: false)
+        }
+        let read = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+        XCTAssertTrue(read.ok)
+        let due = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(due.progressCount, 51)
+        XCTAssertEqual(due.pending, claim)
+        XCTAssertEqual(due.rolloverRequested, true)
+        packetClock.release.signal()
+        XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(packetClock.didTimeOut)
+        let observation = try XCTUnwrap(box.snapshot)
+        let packet = observation.packet
+        XCTAssertTrue(observation.finalize)
+        XCTAssertEqual(observation.reason, "auto_handoff progress=51 failed_tools=0")
+        XCTAssertEqual(packet.id, claim.packetID)
+        XCTAssertEqual(packet.goal, authored.goal)
+        XCTAssertEqual(packet.nextActions, authored.nextActions)
+        XCTAssertEqual(packet.blockers, authored.blockers)
+        XCTAssertEqual(packet.keyFiles, authored.keyFiles)
+        XCTAssertEqual(packet.decisions, authored.decisions)
+        XCTAssertEqual(packet.projectSlug, authored.projectSlug)
+        XCTAssertEqual(packet.cwd, authored.cwd)
+        XCTAssertEqual(packet.status, "handoff_ready")
+        XCTAssertTrue(packet.narrative.hasPrefix(authored.narrative))
+        XCTAssertTrue(packet.narrative.contains("Runtime continuity: auto_handoff progress=51 failed_tools=0"))
+        XCTAssertFalse(packet.narrative.contains("Runtime continuity: auto_checkpoint"))
+        XCTAssertEqual(packet.resumeSeedIsCustom, customSeed)
+        XCTAssertEqual(packet.resumeSeed, customSeed ? authored.resumeSeed : packet.defaultResumeSeed())
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), packet)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: authoredID), authored)
+        if projectionFails {
+            let entry = try XCTUnwrap(app.diagnostics.recent(limit: 100).last {
+                $0.event == "continuity_projection_write_failed" && $0.fields["handoff_id"] == packet.id
+            })
+            XCTAssertNotNil(entry.fields["error"])
+        } else {
+            let projectionData = try Data(contentsOf: app.paths.memoryHandoffsDir.appendingPathComponent("\(packet.id).json"))
+            let projectionObject = try JSONSupport.object(from: projectionData)
+            let projected = try XCTUnwrap(HandoffPacket.fromDictionary(projectionObject))
+            XCTAssertEqual(projected, packet, "Readable projection must use the actual finalized committed packet")
+        }
+        for event in ["auto_handoff", "auto_handoff_persist"] {
+            let entry = try XCTUnwrap(app.diagnostics.recent(limit: 100).last { $0.event == event && $0.fields["handoff_id"] == packet.id })
+            XCTAssertEqual(entry.fields["operation"], "handoff")
+            XCTAssertEqual(entry.fields["finalize"], "true")
+            XCTAssertEqual(entry.fields["resume_ready"], "true")
+            XCTAssertEqual(entry.fields["reason"], observation.reason)
+        }
+        let committed = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertTrue(committed.blocked)
+        XCTAssertNil(committed.pending)
+        XCTAssertNil(committed.rolloverRequested)
+        XCTAssertEqual(committed.lastHandoffCount, 51)
+        let resumed = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": packet.id,
+            "rollover_nonce": ContextContinuityService.interactiveRolloverNonce(handoffID: packet.id),
+        ], clientID: client)
+        XCTAssertTrue(resumed.ok)
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, true)
+        let successor = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertNotEqual(successor.epoch, committed.epoch)
+        XCTAssertNil(successor.rolloverRequested)
+        XCTAssertEqual(successor.progressCount, 0)
+        let next = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+        XCTAssertTrue(next.ok)
+        XCTAssertNil(next.payload["handoff_id"])
+        XCTAssertFalse(try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key)).blocked)
+    }
+
+    func testRuntimeContinuityAtomicPromotionRollbackRetainsFailedAttemptRequestAcrossReopen() throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("atomic-rollback-owner")
+        try bindProjectContext(app, clientID: client)
+        _ = try app.config.update(["allowed_roots": [tempHome.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 51))
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let packetID = UUID().uuidString.lowercased()
+        let baseline = try app.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 50
+            progress.startedAt = clock.now()
+            progress.pending = RuntimeContinuityProgressClaim(scopeKey: key, epoch: progress.epoch,
+                packetID: packetID, ownerID: UUID().uuidString, finalize: false, progressCount: 50, failureCount: 0,
+                claimedAt: clock.now(), expiresAt: clock.now().addingTimeInterval(30))
+        }
+        let claim = try XCTUnwrap(baseline.pending)
+        let failedRead = try app.tools.call(name: "fs_read", arguments: [
+            "path": tempHome.appendingPathComponent("missing-owned-file.txt").path,
+        ], clientID: client)
+        XCTAssertFalse(failedRead.ok)
+        let requested = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(requested.progressCount, 50)
+        XCTAssertEqual(requested.failureCount, 1)
+        XCTAssertEqual(requested.pending, claim)
+        XCTAssertEqual(requested.rolloverRequested, true)
+        let fault = FinalReviewCheckpointFailureOnce()
+        let faultStore = try SQLiteStore(path: app.paths.storeSQLite, clock: clock,
+            postMigrationCommitObserver: nil, beforeMutationCommitObserver: { kind in
+                if kind == .handoff, fault.shouldFail() { throw StoreError.execFailed("injected atomic promotion failure") }
+            })
+        defer { faultStore.close() }
+        let service = ContextContinuityService(paths: app.paths, store: faultStore,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: clock)
+        let inferred: [String: Any] = ["goal": "Recover the exact requested task", "cwd": tempHome.path,
+            "next_actions": ["Continue the preserved task"]]
+        fault.arm()
+        XCTAssertThrowsError(try service.autoPersistRuntime(clientID: client, reason: "checkpoint50",
+            inferred: inferred, attemptID: UUID(), claim: claim, priorPacketID: nil, cancellation: nil))
+        XCTAssertEqual(fault.failureCount, 1)
+        XCTAssertNil(try app.store.handoffLegacyGet(id: packetID))
+        let retained = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        XCTAssertEqual(try encoder.encode(retained), try encoder.encode(requested),
+            "Packet/progress rollback must retain exact claim, sticky request and accounted attempts")
+        faultStore.close()
+        clock.date = clock.date.addingTimeInterval(31)
+        let reopened = try SQLiteStore(path: app.paths.storeSQLite, clock: clock)
+        defer { reopened.close() }
+        let recoveredState = try XCTUnwrap(reopened.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(recoveredState.pending, claim)
+        XCTAssertEqual(recoveredState.rolloverRequested, true)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(recoveredState.pending).expiresAt, clock.now())
+        let recovery = ContextContinuityService(paths: app.paths, store: reopened,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: clock)
+        let receipt = try recovery.autoPersistRuntime(clientID: client, reason: "checkpoint50",
+            inferred: inferred, attemptID: UUID(), claim: claim, priorPacketID: nil, cancellation: nil)
+        XCTAssertEqual(receipt.packet.id, packetID)
+        XCTAssertTrue(receipt.finalize)
+        XCTAssertEqual(receipt.progressCount, 50)
+        XCTAssertEqual(receipt.failureCount, 1)
+        XCTAssertEqual(receipt.reason, "auto_handoff progress=50 failed_tools=1")
+        XCTAssertEqual(receipt.packet.goal, inferred["goal"] as? String)
+        XCTAssertEqual(receipt.packet.status, "handoff_ready")
+        let after = try XCTUnwrap(reopened.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(after.epoch, baseline.epoch)
+        XCTAssertEqual(after.progressCount, 50)
+        XCTAssertEqual(after.failureCount, 1)
+        XCTAssertEqual(after.lastHandoffFailureCount, 1)
+        XCTAssertTrue(after.blocked)
+        XCTAssertNil(after.pending)
+        XCTAssertNil(after.rolloverRequested)
+        XCTAssertEqual(try reopened.handoffLegacyList(limit: 100).filter { $0.id == packetID }.count, 1)
+        XCTAssertThrowsError(try reopened.handoffUpsertCompletingRuntimeProgress(
+            HandoffPacket(id: packetID, resumeReady: false), claim: claim))
+    }
+
+    func testRuntimeContinuityLiveClaimRecordsElapsedRolloverRequestBeforePacketCommit() throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("atomic-elapsed-owner")
+        try bindProjectContext(app, clientID: client)
+        _ = try app.config.update(["allowed_roots": [tempHome.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 10_000))
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let path = tempHome.appendingPathComponent("elapsed-owned-file.txt")
+        try "Owned evidence\n".write(to: path, atomically: true, encoding: .utf8)
+        let initial = try app.store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 50
+            progress.startedAt = clock.now().addingTimeInterval(-ContinuityAutomation.handoffIntervalSec + 10)
+            progress.pending = RuntimeContinuityProgressClaim(scopeKey: key, epoch: progress.epoch,
+                packetID: UUID().uuidString.lowercased(), ownerID: UUID().uuidString, finalize: false,
+                progressCount: 50, failureCount: 0, claimedAt: clock.now(), expiresAt: clock.now().addingTimeInterval(30))
+        }
+        let claim = try XCTUnwrap(initial.pending)
+        clock.date = clock.date.addingTimeInterval(11)
+        let read = try app.tools.call(name: "fs_read", arguments: ["path": path.path], clientID: client)
+        XCTAssertTrue(read.ok)
+        let requested = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(requested.progressCount, 51)
+        XCTAssertEqual(requested.pending, claim)
+        XCTAssertGreaterThan(claim.expiresAt, clock.now(), "This elapsed request must coexist with the original live lease")
+        XCTAssertEqual(requested.rolloverRequested, true)
+        let receipt = try app.continuity.autoPersistRuntime(clientID: client, reason: "checkpoint50",
+            inferred: ["goal": "Resume elapsed task", "cwd": tempHome.path, "next_actions": ["Continue"]],
+            attemptID: UUID(), claim: claim, priorPacketID: nil, cancellation: nil)
+        XCTAssertTrue(receipt.finalize)
+        XCTAssertEqual(receipt.packet.id, claim.packetID)
+        XCTAssertEqual(receipt.progressCount, 51)
+        XCTAssertTrue(try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: key)).blocked)
+    }
+
+    func testRuntimeContinuityHistoricalProgressJSONWithoutRequestBitRemainsReadable() throws {
+        let path = tempHome.appendingPathComponent("historical-runtime-progress.sqlite")
+        let key = JSONSupport.sha256Hex("historical-runtime-request-field")
+        let store = try SQLiteStore(path: path)
+        let initial = try store.updateRuntimeContinuityProgress(scopeKey: key) { progress in progress.progressCount = 7 }
+        var object = try JSONSupport.object(from: JSONEncoder().encode(initial))
+        object.removeValue(forKey: "rolloverRequested")
+        let historicalJSON = try JSONSupport.string(from: object)
+        store.close()
+        try withSQLiteFixture(at: path) { database in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, "UPDATE runtime_continuity_progress SET state_json=? WHERE scope_key=?", -1,
+                &statement, nil) == SQLITE_OK, let statement else { throw SQLiteFixtureError.failure("prepare historical state") }
+            defer { sqlite3_finalize(statement) }
+            bindSQLiteFixture(statement, index: 1, value: historicalJSON)
+            bindSQLiteFixture(statement, index: 2, value: key)
+            guard sqlite3_step(statement) == SQLITE_DONE else { throw SQLiteFixtureError.failure("persist historical state") }
+        }
+        let reopened = try SQLiteStore(path: path)
+        defer { reopened.close() }
+        let historical = try XCTUnwrap(reopened.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(historical.epoch, initial.epoch)
+        XCTAssertEqual(historical.progressCount, 7)
+        XCTAssertNil(historical.rolloverRequested)
+        XCTAssertNil(historical.pending)
+        XCTAssertEqual(try sqliteFixtureInt(at: path, sql: "SELECT version FROM schema_version;"), 9)
+    }
+
+    func testRuntimeContinuityAtomicRequestPreservesPreparationAndEpochFences() throws {
+        let store = try SQLiteStore(path: tempHome.appendingPathComponent("atomic-request-fences.sqlite"))
+        defer { store.close() }
+        let key = JSONSupport.sha256Hex("atomic-request-fences")
+        let seeded = try store.updateRuntimeContinuityProgress(scopeKey: key) { progress in
+            progress.progressCount = 51
+            progress.rolloverRequested = true
+            progress.pending = RuntimeContinuityProgressClaim(scopeKey: key, epoch: progress.epoch,
+                packetID: UUID().uuidString.lowercased(), ownerID: UUID().uuidString,
+                finalize: false, progressCount: 50, failureCount: 0,
+                claimedAt: Date(), expiresAt: Date().addingTimeInterval(30))
+        }
+        let claim = try XCTUnwrap(seeded.pending)
+        let packet = HandoffPacket(id: claim.packetID, resumeReady: false, goal: "Exact intent", cwd: tempHome.path)
+        XCTAssertThrowsError(try store.handoffUpsertCompletingRuntimeProgress(packet, claim: claim),
+            "A requested promotion cannot silently commit an unprepared checkpoint")
+        XCTAssertThrowsError(try store.handoffUpsertCompletingRuntimeProgress(packet, claim: claim, preparePacket: { value, _, _, _ in
+            var changed = value
+            changed.id = UUID().uuidString.lowercased()
+            changed.resumeReady = true
+            return changed
+        }), "Packet preparation cannot replace the exact claim identity")
+        let foreignEpoch = RuntimeContinuityProgressClaim(scopeKey: key, epoch: UUID().uuidString.lowercased(),
+            packetID: claim.packetID, ownerID: claim.ownerID, finalize: false, progressCount: 50, failureCount: 0,
+            claimedAt: claim.claimedAt, expiresAt: claim.expiresAt)
+        XCTAssertThrowsError(try store.handoffUpsertCompletingRuntimeProgress(packet, claim: foreignEpoch))
+        let retained = try XCTUnwrap(store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(retained.pending, claim)
+        XCTAssertEqual(retained.epoch, seeded.epoch)
+        XCTAssertEqual(retained.rolloverRequested, true)
+        XCTAssertFalse(retained.blocked)
+        XCTAssertNil(try store.handoffLegacyGet(id: packet.id))
+    }
+}
+
+extension ContinuityTests {
+    func testRuntimeContinuityStatusReflectsPersistedThresholdBeforeNextEligibleCall() throws {
+        let primary = try ForgeApp.bootstrap(home: tempHome)
+        defer { primary.shutdown() }
+        let client = MCPServer.defaultClientID(
+            deploymentID: "status-refresh-owned-deployment",
+            role: .primary,
+            desktopProviderID: nil
+        )
+        try bindProjectContext(primary, clientID: client)
+        _ = try primary.config.update(["allowed_roots": [tempHome.path]])
+        let fallback = try ForgeApp.bootstrap(home: tempHome)
+        defer { fallback.shutdown() }
+        let file = tempHome.appendingPathComponent("status-refresh-owned-input.txt")
+        try Data("Owned metadata refresh fixture\n".utf8).write(to: file)
+        let seeded = try fallback.tools.call(
+            name: "fs_read", arguments: ["path": file.path], clientID: client
+        )
+        XCTAssertTrue(seeded.ok, "\(seeded.payload)")
+        let context = try fallback.projectContexts.invocationContext(for: client)
+        let key = fallback.continuityAutomation.runtimeScopeKey(context)
+        let baseline = try XCTUnwrap(fallback.store.runtimeContinuityProgress(scopeKey: key))
+        XCTAssertEqual(baseline.progressCount, 1)
+        XCTAssertEqual(baseline.failureCount, 0)
+        XCTAssertFalse(baseline.blocked)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let baselineBytes = try encoder.encode(baseline)
+
+        func assertPolicy(_ result: ToolResult, limit: Int, file: StaticString = #filePath, line: UInt = #line) throws {
+            XCTAssertTrue(result.ok, "\(result.payload)", file: file, line: line)
+            let current = try XCTUnwrap(result.payload["auto_continuity"] as? [String: Any], file: file, line: line)
+            let continuity = try XCTUnwrap(result.payload["continuity"] as? [String: Any], file: file, line: line)
+            let legacy = try XCTUnwrap(continuity["auto"] as? [String: Any], file: file, line: line)
+            for policy in [current, legacy] {
+                XCTAssertEqual(policy["handoff_every_tools"] as? Int, limit, file: file, line: line)
+                XCTAssertEqual(policy["checkpoint_every_tools"] as? Int, min(50, limit), file: file, line: line)
+            }
+            XCTAssertEqual(current["progress_count"] as? Int, 1, file: file, line: line)
+            XCTAssertEqual(current["failed_tool_count"] as? Int, 0, file: file, line: line)
+            XCTAssertEqual(current["tool_call_count"] as? Int, 1, file: file, line: line)
+            XCTAssertEqual(current["blocked"] as? Bool, false, file: file, line: line)
+            XCTAssertEqual(current["continuity_epoch"] as? String, baseline.epoch, file: file, line: line)
+            XCTAssertEqual(current["project_id"] as? String, context.projectID.description, file: file, line: line)
+            XCTAssertEqual(current["project_generation"] as? UInt64, context.projectGeneration.rawValue, file: file, line: line)
+            let after = try XCTUnwrap(fallback.store.runtimeContinuityProgress(scopeKey: key), file: file, line: line)
+            XCTAssertEqual(try encoder.encode(after), baselineBytes, file: file, line: line)
+        }
+
+        let originalStatus = try fallback.tools.call(name: "forge_status", arguments: [:], clientID: client)
+        try assertPolicy(originalStatus, limit: 200)
+
+        _ = try primary.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3))
+        XCTAssertEqual(fallback.config.model.sessions.continuityRolloverToolCalls, 200)
+        let savedThree = try Data(contentsOf: primary.paths.configJSON)
+        // No eligible tool is called between the durable save and this status query.
+        let refreshedStatus = try fallback.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+        try assertPolicy(refreshedStatus, limit: 3)
+        XCTAssertEqual(fallback.config.model.sessions.continuityRolloverToolCalls, 3)
+        XCTAssertEqual(try Data(contentsOf: primary.paths.configJSON), savedThree)
+        XCTAssertEqual(try fallback.continuity.get(id: nil, preferResumeReady: true)["found"] as? Bool, false)
+
+        // A status refresh must reapply an unsaved local patch without persisting it.
+        _ = try fallback.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 7), save: false)
+        _ = try primary.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 5))
+        let savedFive = try Data(contentsOf: primary.paths.configJSON)
+        let stagedStatus = try fallback.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+        try assertPolicy(stagedStatus, limit: 7)
+        XCTAssertEqual(fallback.config.model.sessions.continuityRolloverToolCalls, 7)
+        XCTAssertEqual(ConfigStore(paths: primary.paths).model.sessions.continuityRolloverToolCalls, 5)
+        XCTAssertEqual(try Data(contentsOf: primary.paths.configJSON), savedFive)
+    }
+}
+
+extension ContinuityTests {
+    func testRuntimeContinuityStatusKeepsCachedRecoveryReadableWhenStoredBudgetIsMalformed() throws {
+        try assertRuntimeContinuityCachedStatusRecovery(malformedBudget: true)
+    }
+
+    func testRuntimeContinuityStatusKeepsCachedRecoveryReadableWhenConfigurationFileIsMissing() throws {
+        try assertRuntimeContinuityCachedStatusRecovery(malformedBudget: false)
+    }
+
+    private func assertRuntimeContinuityCachedStatusRecovery(malformedBudget: Bool) throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID(malformedBudget ? "cached-status-malformed-budget" : "cached-status-missing-file")
+        try bindProjectContext(app, clientID: client)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let key = app.continuityAutomation.runtimeScopeKey(context)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        func assertReadableStatus(_ response: ToolResult, file: StaticString = #filePath, line: UInt = #line) {
+            XCTAssertTrue(response.ok, "\(response.payload)", file: file, line: line)
+            XCTAssertFalse(response.isError, file: file, line: line)
+            let automation = response.payload["auto_continuity"] as? [String: Any]
+            let continuity = response.payload["continuity"] as? [String: Any]
+            let legacy = continuity?["auto"] as? [String: Any]
+            for policy in [automation, legacy] {
+                XCTAssertEqual(policy?["handoff_every_tools"] as? Int, 200, file: file, line: line)
+                XCTAssertEqual(policy?["checkpoint_every_tools"] as? Int, 50, file: file, line: line)
+            }
+            XCTAssertEqual(automation?["progress_count"] as? Int, 0, file: file, line: line)
+            XCTAssertEqual(automation?["failed_tool_count"] as? Int, 0, file: file, line: line)
+            XCTAssertEqual(automation?["tool_call_count"] as? Int, 0, file: file, line: line)
+            XCTAssertEqual(automation?["blocked"] as? Bool, false, file: file, line: line)
+            XCTAssertEqual(automation?["project_id"] as? String, context.projectID.description, file: file, line: line)
+            XCTAssertEqual(automation?["project_generation"] as? UInt64, context.projectGeneration.rawValue, file: file, line: line)
+            let attached = response.payload["project_context"] as? [String: Any]
+            XCTAssertEqual(attached?["attached"] as? Bool, true, file: file, line: line)
+            XCTAssertEqual(attached?["project_id"] as? String, context.projectID.description, file: file, line: line)
+            XCTAssertEqual(attached?["project_generation"] as? UInt64, context.projectGeneration.rawValue, file: file, line: line)
+            XCTAssertNotNil(response.payload["development_policy"], file: file, line: line)
+        }
+
+        let before = try app.tools.call(name: "forge_status", arguments: [:], clientID: client)
+        assertReadableStatus(before)
+        XCTAssertNil(before.payload["configuration_refresh"])
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+        let cachedModelBytes = try encoder.encode(app.config.model)
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: key))
+        let originalBytes = try Data(contentsOf: app.paths.configJSON)
+        var malformedBytes: Data?
+        if malformedBudget {
+            var object = try JSONSupport.object(from: originalBytes)
+            object["budget_policy"] = ["schema_version": 999]
+            let damaged = try JSONSupport.data(from: object)
+            XCTAssertNotEqual(damaged, originalBytes)
+            try damaged.write(to: app.paths.configJSON, options: .atomic)
+            malformedBytes = damaged
+        } else {
+            try FileManager.default.removeItem(at: app.paths.configJSON)
+        }
+
+        // Cancellation/deadline controls must stay authoritative even when refresh would fail.
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        cancelled.cancel()
+        XCTAssertThrowsError(try app.tools.call(
+            name: "get_forge_status", arguments: [:], clientID: client, cancellation: cancelled
+        )) { error in
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        let expired = try app.tools.call(
+            name: "get_forge_status", arguments: [:], clientID: client,
+            cancellation: ToolCallCancellation(timeoutSeconds: 0)
+        )
+        XCTAssertFalse(expired.ok)
+        XCTAssertEqual(expired.payload["code"] as? String, "deadline_exceeded")
+
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+        if !malformedBudget {
+            // Reestablish the missing-file boundary after the drained cancellation controls.
+            if FileManager.default.fileExists(atPath: app.paths.configJSON.path) {
+                try FileManager.default.removeItem(at: app.paths.configJSON)
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        }
+        // No eligible work or settings mutation occurs after the damage.
+        let recovered = try app.tools.call(name: "get_forge_status", arguments: [:], clientID: client)
+        XCTAssertTrue(app.audit.flushAttempts(timeout: 5))
+        assertReadableStatus(recovered)
+        let refresh = try XCTUnwrap(recovered.payload["configuration_refresh"] as? [String: Any])
+        XCTAssertEqual(refresh["state"] as? String, "failed")
+        XCTAssertEqual(refresh["using_cached_settings"] as? Bool, true)
+        let refreshError = try XCTUnwrap(refresh["error"] as? String)
+        XCTAssertFalse(refreshError.isEmpty)
+        XCTAssertLessThanOrEqual(refreshError.count, 1_024)
+        XCTAssertLessThanOrEqual(refreshError.utf8.count, 1_024)
+        XCTAssertEqual(try encoder.encode(app.config.model), cachedModelBytes)
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: key))
+        let afterContext = try app.projectContexts.invocationContext(for: client)
+        XCTAssertEqual(afterContext.projectID, context.projectID)
+        XCTAssertEqual(afterContext.projectGeneration, context.projectGeneration)
+        XCTAssertEqual(afterContext.clientID, context.clientID)
+        if let malformedBytes {
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), malformedBytes)
+        } else {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
+        }
     }
 }

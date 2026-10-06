@@ -47,11 +47,19 @@ public actor StjornarvaldObservationClient: PolicyObservationSubmitting {
     deinit { drainTask?.cancel() }
 
     public func submit(_ observation: DevelopmentObservation) {
+        _ = submitRetained(observation)
+    }
+
+    /// Internal acceptance boundary: true means the owner-only outbox retained
+    /// this exact observation, independently of manager availability.
+    func submitRetained(_ observation: DevelopmentObservation) -> Bool {
         do {
             try persist(observation)
             startDrainIfNeeded()
+            return true
         } catch {
             diagnostics("stjornarvald client observation could not be retained: \(error.localizedDescription)")
+            return false
         }
     }
 

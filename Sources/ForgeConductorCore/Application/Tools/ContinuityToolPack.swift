@@ -80,6 +80,13 @@ public struct ContinuityToolPack: ToolPackHandling {
         try cancellation?.checkCancellation()
         switch name {
         case "session_checkpoint":
+            if let context {
+                return ToolResult(ok: true, payload: try app.continuity.persistRuntimeModelPacket(
+                    arguments: arguments, clientID: clientID, context: context,
+                    scopeKey: app.continuityAutomation.runtimeScopeKey(context), finalize: false,
+                    cancellation: cancellation
+                ))
+            }
             let payload = try app.continuity.checkpoint(
                 arguments: arguments,
                 clientID: clientID,
@@ -88,6 +95,13 @@ public struct ContinuityToolPack: ToolPackHandling {
             )
             return ToolResult(ok: true, payload: payload)
         case "session_handoff":
+            if let context {
+                return ToolResult(ok: true, payload: try app.continuity.persistRuntimeModelPacket(
+                    arguments: arguments, clientID: clientID, context: context,
+                    scopeKey: app.continuityAutomation.runtimeScopeKey(context), finalize: true,
+                    cancellation: cancellation
+                ))
+            }
             let payload = try app.continuity.handoff(
                 arguments: arguments,
                 clientID: clientID,
@@ -99,9 +113,11 @@ public struct ContinuityToolPack: ToolPackHandling {
             let id = ToolArgHelpers.string(arguments, "handoff_id")
                 ?? ToolArgHelpers.string(arguments, "id")
             let preferResume = ToolArgHelpers.bool(arguments, "resume_ready") ?? false
+            let readScope = try app.continuityAutomation.packetReadScope(context: context, cancellation: cancellation)
             var payload = try app.continuity.get(
                 id: id,
                 preferResumeReady: preferResume,
+                readScope: readScope,
                 cancellation: cancellation
             )
             try cancellation?.checkCancellation()
@@ -113,21 +129,26 @@ public struct ContinuityToolPack: ToolPackHandling {
                     packet: packet,
                     cancellation: cancellation
                 )
-                try app.continuityAutomation.clearBlock(
+                let budgetCleared = try app.continuityAutomation.clearBlockReportingResult(
                     clientID: clientID,
+                    packet: packet,
                     cancellation: cancellation
                 )
                 payload["workspace_adopted"] = packet.cwd as Any
-                payload["auto_continuity"] = try app.continuityAutomation.snapshot(
+                let runtimeState = try app.continuityAutomation.snapshot(
                     for: clientID,
                     cancellation: cancellation
                 )
-                payload["context_budget_cleared"] = true
+                payload["auto_continuity"] = runtimeState
+                payload["context_budget_cleared"] = budgetCleared
+            } else {
+                payload["context_budget_cleared"] = false
             }
             return ToolResult(ok: true, payload: payload)
         case "context_list":
             let limit = ToolArgHelpers.int(arguments, "limit") ?? 10
-            let payload = try app.continuity.list(limit: limit, cancellation: cancellation)
+            let readScope = try app.continuityAutomation.packetReadScope(context: context, cancellation: cancellation)
+            let payload = try app.continuity.list(limit: limit, readScope: readScope, cancellation: cancellation)
             try cancellation?.checkCancellation()
             return ToolResult(ok: true, payload: payload)
         default:

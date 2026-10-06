@@ -49,6 +49,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             FilesystemToolPack(),
             GitToolPack(),
             RuntimeJobSynchronousToolPack(subsystem: app.runtimeJobs),
+            XcodeCLISynchronousToolPack(subsystem: app.runtimeJobs),
             DocsToolPack(),
             SearchToolPack(),
         ]
@@ -396,12 +397,12 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             authorizationDenial = (code, message)
         }
 
-        // Continuity tools never count toward identical-call loops. Every other call
-        // participates, including authorization denials, so policy failures cannot
-        // evade the context-budget circuit breaker indefinitely.
+        // Forge-owned runs and native sessions have their own capacity evaluators.
+        // Only ordinary chat calls enter the deployment-scoped continuity budget.
+        let usesInteractiveContinuity = context?.runID == nil && context?.providerSessionID == nil
         let isContinuity = ContinuityToolPack().toolNames.contains(name)
             || ContinuityLifecycleToolPack().toolNames.contains(name)
-        let bypassesContinuityBlock = isContinuity
+        let bypassesContinuityBlock = !usesInteractiveContinuity || isContinuity
             || ContinuityAutomation.resumeTools.contains(name)
         var continuityBlocked = false
         if !bypassesContinuityBlock {
@@ -466,11 +467,29 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 cancellation: cancellation
             )
         }
-        let loopCount = isContinuity
+        let pendingRuntimePoll: Bool
+        do {
+            if usesInteractiveContinuity && !isContinuity && authorizationDenial == nil {
+                pendingRuntimePoll = try isPendingRuntimePoll(
+                    tool: name, arguments: routedArguments, context: context,
+                    cancellation: cancellation
+                )
+            } else {
+                pendingRuntimePoll = false
+            }
+        } catch is CancellationError {
+            recordCancellation(tool: name, arguments: routedArguments, clientID: clientID,
+                start: start, cancellation: cancellation)
+            throw CancellationError()
+        } catch is ToolCallDeadlineExceeded {
+            return deadlineFailure(tool: name, arguments: routedArguments, clientID: clientID,
+                start: start, cancellation: cancellation)
+        }
+        let loopCount = !usesInteractiveContinuity || isContinuity
             ? 0
             : recordIdenticalCall(tool: name, arguments: routedArguments, clientID: clientID)
 
-        if !isContinuity, loopCount > Self.budgetIdenticalCalls {
+        if usesInteractiveContinuity, !isContinuity, !pendingRuntimePoll, loopCount > Self.budgetIdenticalCalls {
             // Hard stop runs before either denial return or dispatch. The repeated
             // tool therefore cannot execute, and continuation is never advertised
             // unless its resume-ready handoff was durably stored.
@@ -544,6 +563,13 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                         cancellation: cancellation
                     )
                 }
+            }
+            if usesInteractiveContinuity, !isContinuity,
+               !cancellation.isCancelled, !cancellation.isDeadlineExceeded {
+                result = applyRuntimeContinuity(
+                    result, tool: name, arguments: routedArguments, clientID: clientID,
+                    succeeded: false, cancellation: cancellation, trustedContext: context
+                )
             }
             return recordAndReturn(
                 result,
@@ -646,16 +672,23 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             )
         } catch {
             var fail = ToolResult.failure(code: "tool_exception", message: "\(error)", retryable: true)
-            if !isContinuity, loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
+            if usesInteractiveContinuity, !isContinuity,
+               loopCount == Self.maxIdenticalConsecutiveCalls + 1
+                || (pendingRuntimePoll && loopCount > Self.budgetIdenticalCalls) {
                 do {
-                    fail = try softBudgetResult(
-                        fail,
-                        tool: name,
-                        loopCount: loopCount,
-                        clientID: clientID,
-                        authorizationDenialCode: nil,
-                        cancellation: cancellation
-                    )
+                    if pendingRuntimePoll && loopCount > Self.budgetIdenticalCalls {
+                        fail = try hardLoopResult(tool: name, loopCount: loopCount,
+                            clientID: clientID, authorizationDenialCode: nil, cancellation: cancellation)
+                    } else {
+                        fail = try softBudgetResult(
+                            fail,
+                            tool: name,
+                            loopCount: loopCount,
+                            clientID: clientID,
+                            authorizationDenialCode: nil,
+                            cancellation: cancellation
+                        )
+                    }
                 } catch is CancellationError {
                     recordCancellation(
                         tool: name,
@@ -685,6 +718,13 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 "failure_stage": "tool_execution",
                 "client_id": clientID.rawValue,
             ], category: .tools)
+            if usesInteractiveContinuity, !isContinuity,
+               !cancellation.isCancelled, !cancellation.isDeadlineExceeded {
+                fail = applyRuntimeContinuity(
+                    fail, tool: name, arguments: routedArguments, clientID: clientID,
+                    succeeded: false, cancellation: cancellation, trustedContext: context
+                )
+            }
             return recordAndReturn(
                 fail,
                 tool: name,
@@ -700,9 +740,29 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         }
 
         var finalResult = result
+        if pendingRuntimePoll && result.ok {
+            // A successful read of a live owner's state is waiting, and breaks
+            // any preceding consecutive-call fingerprint.
+            clearIdenticalCalls(clientID: clientID)
+        } else if pendingRuntimePoll && loopCount > Self.budgetIdenticalCalls {
+            // Qualification never exempts a failing dispatch, including a race
+            // where ownership changes between the lookup and actual tool call.
+            do {
+                finalResult = try hardLoopResult(tool: name, loopCount: loopCount,
+                    clientID: clientID, authorizationDenialCode: nil, cancellation: cancellation)
+            } catch is CancellationError {
+                recordCancellation(tool: name, arguments: routedArguments, clientID: clientID,
+                    start: start, cancellation: cancellation)
+                throw CancellationError()
+            } catch is ToolCallDeadlineExceeded {
+                return deadlineFailure(tool: name, arguments: routedArguments, clientID: clientID,
+                    start: start, cancellation: cancellation)
+            }
+        }
         // The soft budget is based on repeated attempts, not execution success.
         // Keep the original outcome while attaching its durable resume handoff.
-        if !isContinuity, loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
+        if usesInteractiveContinuity, !isContinuity, (!pendingRuntimePoll || !result.ok),
+           loopCount == Self.maxIdenticalConsecutiveCalls + 1 {
             finalResult = (try? softBudgetResult(
                 result,
                 tool: name,
@@ -712,7 +772,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 cancellation: cancellation
             )) ?? result
         }
-        if !isContinuity,
+        if usesInteractiveContinuity, !isContinuity,
            !cancellation.isCancelled,
            !cancellation.isDeadlineExceeded {
             finalResult = applyRuntimeContinuity(
@@ -721,7 +781,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 arguments: routedArguments,
                 clientID: clientID,
                 succeeded: result.ok,
-                cancellation: cancellation
+                cancellation: cancellation,
+                trustedContext: context
             )
         }
 
@@ -761,7 +822,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         let denialReason = authorizationDenialCode.map { " authorization_denial=\($0)" } ?? ""
         let packet: HandoffPacket
         do {
-            packet = try app.continuity.budgetAutoCheckpoint(
+            packet = try app.continuityAutomation.budgetAutoCheckpoint(
                 clientID: clientID,
                 reason: "soft_budget identical \(tool) count=\(loopCount)\(denialReason)",
                 cancellation: cancellation
@@ -792,12 +853,12 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     ) throws -> ToolResult {
         let denialReason = authorizationDenialCode.map { " authorization_denial=\($0)" } ?? ""
         do {
-            let packet = try app.continuity.budgetAutoCheckpoint(
+            let packet = try app.continuityAutomation.budgetAutoCheckpoint(
                 clientID: clientID,
                 reason: "identical_call_loop tool=\(tool) count=\(loopCount)\(denialReason)",
+                blockProgress: true,
                 cancellation: cancellation
             )
-            app.continuityAutomation.markBlocked(clientID: clientID, packet: packet)
             var payload: [String: Any] = [
                 "ok": false,
                 "code": "identical_call_loop",
@@ -986,6 +1047,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "continuity.checkpoint", "continuity.prepare_handoff",
         "continuity.acknowledge_handoff", "continuity.resume", "continuity.request_rollover",
         "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+        "xcode.run", "xcode.debug",
         "job.cancel",
     ]
 
@@ -1009,6 +1071,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "runtime.capabilities", "process.run", "shell.run", "bash.run",
         "python.run", "powershell.run", "job.status", "job.read_output",
         "job.cancel", "job.list",
+        "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
     ]
 
     private static let projectMemoryMutatingTools: Set<String> = [
@@ -1023,15 +1086,24 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         arguments: [String: Any],
         clientID: ClientID,
         succeeded: Bool,
-        cancellation: ToolCallCancellation?
+        cancellation: ToolCallCancellation?,
+        trustedContext: ToolInvocationContext?
     ) -> ToolResult {
         guard let observation = app.continuityAutomation.observe(
             tool: tool,
             arguments: arguments,
             clientID: clientID,
             succeeded: succeeded,
-            cancellation: cancellation
+            cancellation: cancellation,
+            trustedContext: trustedContext
         ) else {
+            if let receipt = try? app.continuityAutomation.runtimeContinuityFailureReceipt(
+                for: clientID, cancellation: cancellation
+            ) {
+                var payload = result.payload
+                payload["continuity_attention"] = receipt
+                return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
+            }
             return result
         }
         var payload = result.payload
@@ -1045,7 +1117,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 : observation.packet.resumeSeed
             payload["continuity_note"] =
                 "Context budget: Forge auto-saved handoff \(observation.packet.id). " +
-                "Further project tools are blocked on this client until context_get in a new chat."
+                "Forge will create the successor chat and acknowledge this exact handoff through " +
+                "get_forge_status(resume=true). Further project tools are blocked until that acknowledgement."
         }
         return ToolResult(ok: result.ok, payload: payload, isError: result.isError)
     }
@@ -1586,6 +1659,50 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             }
         }
         return .failure(code: "unknown_tool", message: "Unknown tool '\(name)'", retryable: false)
+    }
+
+    private func isPendingRuntimePoll(
+        tool: String,
+        arguments: [String: Any],
+        context: ToolInvocationContext?,
+        cancellation: ToolCallCancellation
+    ) throws -> Bool {
+        guard tool == "job.status",
+              let context,
+              let jobText = ToolArgHelpers.string(arguments, "job_id"),
+              let jobID = UUID(uuidString: jobText) else { return false }
+        let service = app.runtimeJobs.service
+        do {
+            try cancellation.checkCancellation()
+            let waiting = try RuntimeJobSynchronousToolPack.wait(
+                timeoutSeconds: RuntimeJobSynchronousToolPack.controlTimeoutSeconds,
+                cancellation: cancellation,
+                committedResultWins: false
+            ) {
+                // Native validation owns the job/project/generation match.
+                // Output streams are published only at terminal completion,
+                // so output reads never qualify as successful waiting polls.
+                let owner = try await service.status(jobID: jobID, context: context)
+                return !owner.state.isTerminal
+            }
+            try cancellation.checkCancellation()
+            return waiting
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            throw error
+        } catch {
+            // Missing, foreign, stale, or unreadable owners retain the ordinary
+            // guard; dispatch remains responsible for its original error.
+            try cancellation.checkCancellation()
+            return false
+        }
+    }
+
+    private func clearIdenticalCalls(clientID: ClientID) {
+        loopLock.lock()
+        defer { loopLock.unlock() }
+        lastCallFingerprint.removeValue(forKey: clientID.rawValue)
     }
 
     /// Returns the consecutive count for this fingerprint (1 = first).

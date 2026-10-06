@@ -42,13 +42,13 @@ public final class TelemetryRoutes: @unchecked Sendable {
             http.respondJSON(connection, status: 200, object: app.telemetry.healthDictionary())
         case "/api/live", "/api/frame":
             // Preferred name for “current live frame” (not a multi-second product poll).
-            var obj = app.telemetry.currentFrame().asDictionary()
+            var obj = try app.telemetry.snapshotTyped(force: false).asDictionary()
             obj["stream"] = "realtime"
             obj["sample_hz"] = app.telemetry.realtimeEngine.measuredSampleHz
             http.respondJSON(connection, status: 200, object: obj)
         case "/api/snapshot":
             // Compatibility alias for current live frame.
-            var obj = app.telemetry.currentFrame().asDictionary()
+            var obj = try app.telemetry.snapshotTyped(force: false).asDictionary()
             obj["stream"] = "realtime"
             obj["sample_hz"] = app.telemetry.realtimeEngine.measuredSampleHz
             http.respondJSON(connection, status: 200, object: obj)

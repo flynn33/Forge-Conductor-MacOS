@@ -550,6 +550,9 @@ public final class StjornarvaldObservationRepository: @unchecked Sendable {
               (observation.details?.nativeTarget?.shippingRuntimePaths.count ?? 0) <= 10_000,
               observation.details?.nativeTarget?.shippingRuntimePaths
                 .allSatisfy({ $0.utf8.count <= 4_096 }) ?? true,
+              observation.details?.nativeTarget.map({
+                  NativeTargetDeclaredRole.valid($0.declaredPathRoles, paths: $0.shippingRuntimePaths)
+              }) ?? true,
               try encode(observation).count <= maximumObservationBytes else {
             throw StjornarvaldObservationError.invalidObservation("observation exceeds bounds or is malformed")
         }

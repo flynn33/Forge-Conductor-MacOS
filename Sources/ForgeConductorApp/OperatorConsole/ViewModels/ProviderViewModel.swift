@@ -18,6 +18,7 @@ final class ProviderViewModel: ObservableObject {
 
     @Published var endpoint = "http://127.0.0.1:1234"
     @Published var modelKey = ""
+    @Published var maximumOutputTokens = ProviderConfigurationContract.defaultMaximumOutputTokens
     @Published var token = ""
     @Published var credentialAction: ProviderCredentialAction = .keep
     @Published private(set) var configuration: ProviderConfigurationSnapshot?
@@ -47,6 +48,7 @@ final class ProviderViewModel: ObservableObject {
     var hasUnsavedChanges: Bool {
         guard let configuration else { return false }
         return endpoint != configuration.endpoint || modelKey != (configuration.modelKey ?? "")
+            || maximumOutputTokens != configuration.maximumOutputTokens
             || (configuration.endpointMode != .local && credentialAction != .keep)
     }
 
@@ -426,6 +428,7 @@ final class ProviderViewModel: ObservableObject {
         configuration = value
         endpoint = value.endpoint
         modelKey = value.modelKey ?? ""
+        maximumOutputTokens = value.maximumOutputTokens
         token = ""
         credentialAction = .keep
     }
@@ -438,7 +441,8 @@ final class ProviderViewModel: ObservableObject {
             endpoint: endpoint,
             modelKey: modelKey.isEmpty ? nil : modelKey,
             credentialAction: local ? .keep : credentialAction,
-            token: local || credentialAction != .replace ? nil : token
+            token: local || credentialAction != .replace ? nil : token,
+            maximumOutputTokens: maximumOutputTokens
         )
         token = ""
         isSaving = true

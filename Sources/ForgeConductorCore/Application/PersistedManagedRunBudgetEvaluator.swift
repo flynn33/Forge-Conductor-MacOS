@@ -5,11 +5,13 @@ import Foundation
 public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvaluating {
     public static let maximumCachedSessions = 128
     public typealias PolicyResolver = @Sendable (BudgetPolicyScope) throws -> BudgetPolicySelection
+    public typealias ToolCallThresholdResolver = @Sendable () throws -> Int
 
     private let repository: ProjectControlPlaneRepository
     private let clock: any Clock
     private let policyOverride: ContextBudgetPolicy?
     private let policyResolver: PolicyResolver?
+    private let toolCallThresholdResolver: ToolCallThresholdResolver?
     private var supervisors: [String: ContextBudgetSupervisor] = [:]
     private var cacheOrder: [String] = []
 
@@ -17,12 +19,14 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         repository: ProjectControlPlaneRepository,
         clock: any Clock = SystemClock(),
         policyOverride: ContextBudgetPolicy? = nil,
-        policyResolver: PolicyResolver? = nil
+        policyResolver: PolicyResolver? = nil,
+        toolCallThresholdResolver: ToolCallThresholdResolver? = nil
     ) {
         self.repository = repository
         self.clock = clock
         self.policyOverride = policyOverride
         self.policyResolver = policyResolver
+        self.toolCallThresholdResolver = toolCallThresholdResolver
     }
 
     public func evaluateBeforeProviderTurn(
@@ -62,6 +66,10 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         guard accounting.inputBytes >= 0, accounting.toolSchemaBytes >= 0 else {
             throw ContextBudgetError.invalidObservation("negative request accounting")
         }
+        if let retained = accounting.previouslyRetainedInputBytes,
+           !(0...accounting.inputBytes).contains(retained) {
+            throw ContextBudgetError.invalidObservation("retained request bytes exceed the full request")
+        }
         let supervisor = try await supervisor(run: run, sessionID: sessionID, capabilities: capabilities,
             providerPreflight: accounting.providerPreflight, requiresProviderPreflight: true)
         let snapshot = await supervisor.snapshot()
@@ -72,7 +80,9 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
             // retain another copy of the same request.
             measurement = .current
         } else {
-            let inputBytes = accounting.inputAlreadyRetained && latest != nil ? 0 : accounting.inputBytes
+            let retainedBytes = latest == nil ? 0
+                : (accounting.previouslyRetainedInputBytes ?? (accounting.inputAlreadyRetained ? accounting.inputBytes : 0))
+            let inputBytes = accounting.inputBytes - retainedBytes
             let schemaBytes = latest?.accounting?.toolSchemaSHA256 == accounting.toolSchemaSHA256
                 ? 0 : accounting.toolSchemaBytes
             let added = inputBytes.addingReportingOverflow(schemaBytes)
@@ -273,18 +283,69 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         return receipt.observation.action
     }
 
+    public func evaluateToolCallCount(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities,
+        providerCallID: String,
+        toolName: String
+    ) async throws -> ContextBudgetAction {
+        let threshold = try toolCallThresholdResolver?()
+            ?? AppConfig.SessionsConfig.defaultContinuityRolloverToolCalls
+        guard AppConfig.SessionsConfig.continuityRolloverToolCallRange.contains(threshold) else {
+            throw ContextBudgetError.invalidPolicy
+        }
+        let progress = try await repository.completedEligibleToolInvocationCount(
+            run: run, sessionID: sessionID, limit: threshold,
+            throughProviderCallID: providerCallID, toolName: toolName
+        )
+        // Completed journal replay must reconstruct every retained result before
+        // a new or already committed boundary can hand the work to continuity.
+        guard progress.isRetainedTail else { return .normal }
+        let identity = ContextBudgetIdentity(runID: run.runID, projectID: run.projectID,
+            projectGeneration: run.projectGeneration, sessionID: sessionID)
+        if let existing = try await repository.contextBudgetActionRequest(identity: identity),
+           existing.isPending,
+           existing.requestedAction.severity >= ContextBudgetAction.rollover.severity {
+            return existing.requestedAction
+        }
+        guard progress.count == threshold else { return .normal }
+        return try await requestBoundaryRollover(
+            run: run, sessionID: sessionID, capabilities: capabilities,
+            triggerPoint: .afterToolResult,
+            reason: "Automatic rollover at saved tool-call threshold (count=\(progress.count), threshold=\(threshold))"
+        )
+    }
+
     public func requestSessionBoundaryRollover(
         run: AutonomousRunRecord,
         sessionID: String,
         capabilities: ProviderCapabilities
+    ) async throws -> ContextBudgetAction {
+        try await requestBoundaryRollover(
+            run: run, sessionID: sessionID, capabilities: capabilities,
+            triggerPoint: .managerRecovery,
+            reason: "Automatic rollover at bounded provider tool-round boundary"
+        )
+    }
+
+    private func requestBoundaryRollover(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities,
+        triggerPoint: ContextBudgetTriggerPoint,
+        reason: String
     ) async throws -> ContextBudgetAction {
         let supervisor = try await supervisor(
             run: run,
             sessionID: sessionID,
             capabilities: capabilities
         )
+        let identity = ContextBudgetIdentity(runID: run.runID, projectID: run.projectID,
+            projectGeneration: run.projectGeneration, sessionID: sessionID)
         let snapshot = await supervisor.snapshot()
-        if let existing = snapshot.latestActionRequest,
+        let latestRequest = try await repository.contextBudgetActionRequest(identity: identity)
+        if let existing = latestRequest,
            existing.isPending,
            existing.requestedAction.severity >= ContextBudgetAction.rollover.severity {
             return existing.requestedAction
@@ -313,7 +374,7 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
             confidence: source.confidence,
             estimatorVersion: source.estimatorVersion,
             action: action,
-            triggerPoint: .managerRecovery,
+            triggerPoint: triggerPoint,
             thresholds: source.thresholds,
             actionEpoch: epoch,
             createdAt: timestamp,
@@ -326,8 +387,8 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         state.observationCount += 1
         state.revision += 1
         state.updatedAt = timestamp
-        let requestID = snapshot.latestActionRequest?.requestID ?? UUID()
-        let operationID = snapshot.latestActionRequest?.continuityOperationID ?? UUID()
+        let requestID = latestRequest?.requestID ?? UUID()
+        let operationID = latestRequest?.continuityOperationID ?? UUID()
         let receipt = try await repository.persistContextBudget(
             ContextBudgetPersistenceCommit(
                 observation: observation,
@@ -339,13 +400,16 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
                     observationID: observationID,
                     requestedAction: action,
                     actionEpoch: epoch,
-                    reason: "Automatic rollover at bounded provider tool-round boundary"
+                    reason: reason
                 )
             )
         )
         guard receipt.actionRequest?.requestedAction == action else {
             throw ContextBudgetError.invalidActionRequest
         }
+        let key = Self.key(identity)
+        supervisors.removeValue(forKey: key)
+        cacheOrder.removeAll { $0 == key }
         return action
     }
 
@@ -436,8 +500,20 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         let selectedCapacity = context?.mode == .manual
             ? min(context!.maxContextTokens, loadedCapacity) : loadedCapacity
         let capacity = min(selectedCapacity, inheritance?.effectiveContextTokens ?? selectedCapacity)
+        let requestedOutputTokens = capabilities.requestedMaximumOutputTokens
+        if let requestedOutputTokens {
+            guard (1...ManagedModelProviderContract.maximumContextTokens).contains(requestedOutputTokens),
+                  requestedOutputTokens <= capacity,
+                  requestedOutputTokens <= (inheritance?.maximumOutputTokens ?? capacity) else {
+                throw ContextBudgetError.insufficientUsableCapacity
+            }
+        }
         if let providerPreflight {
             guard providerPreflight.modelKey == capabilities.modelKey else {
+                throw ContextBudgetError.configurationMismatch
+            }
+            guard requestedOutputTokens == nil
+                    || requestedOutputTokens == providerPreflight.limits.maximumOutputTokens else {
                 throw ContextBudgetError.configurationMismatch
             }
             guard providerPreflight.limits.maximumOutputTokens <= capacity,
@@ -450,7 +526,7 @@ public actor PersistedManagedRunBudgetEvaluator: ManagedRunToolResultBudgetEvalu
         let reserves = ContextBudgetReserves(
             outputTokens: max(context?.responseReserveTokens ?? min(4_096, max(128, capacity / 16)),
                               floors?.outputTokens ?? 0, inheritance?.maximumOutputTokens ?? 0,
-                              providerPreflight?.limits.maximumOutputTokens ?? 0),
+                              providerPreflight?.limits.maximumOutputTokens ?? 0, requestedOutputTokens ?? 0),
             // Native managed requests include their schemas in retained input.
             // Preserve the legacy reserve only for legacy configurations.
             schemaTokens: max(selection == nil ? min(4_096, max(64, capacity / 32)) : 0,

@@ -1102,6 +1102,7 @@ final class AppBootstrapOperation {
             autoRestart: config.manager.autoRestart, watchdogIntervalSec: config.manager.watchdogIntervalSec,
             openBrowserOnStart: config.manager.openBrowserOnStart,
             sessionIdleTTLSec: config.sessions.idleTTLSec,
+            continuityRolloverToolCalls: config.sessions.continuityRolloverToolCalls,
             shellEnabled: shell.enabled, shellUserDisabled: shell.userDisabled,
             shellPolicyVersion: shell.policyVersion, shellPolicyOrigin: shell.policyOrigin,
             shellMigrationState: shell.migration.state, shellMigrationReceiptValid: shell.migration.receiptValid,
@@ -1155,6 +1156,7 @@ public final class AppModel: ObservableObject {
     @Published public var setRefresh: Int = 8
     @Published public var setWatchdog: Int = 3
     @Published public var setIdleTTL: Int = 14_400
+    @Published public var setContinuityRolloverToolCalls: Int = AppConfig.SessionsConfig.defaultContinuityRolloverToolCalls
     @Published public var setShellEnabled: Bool = true
     @Published public var setShellTimeout: Int = 30
     @Published public var setAutoRestart: Bool = true
@@ -2042,7 +2044,8 @@ public final class AppModel: ObservableObject {
         ManagerSettingsPatch(
             dashboardHost: setHost, dashboardPort: setPort, dashboardRefreshSec: setRefresh,
             autoRestart: setAutoRestart, watchdogIntervalSec: setWatchdog,
-            sessionIdleTTLSec: setIdleTTL, shellEnabled: setShellEnabled,
+            sessionIdleTTLSec: setIdleTTL, continuityRolloverToolCalls: setContinuityRolloverToolCalls,
+            shellEnabled: setShellEnabled,
             shellTimeoutSec: setShellTimeout, allowedRoots: setAllowedRoots
         )
     }
@@ -2693,6 +2696,7 @@ public final class AppModel: ObservableObject {
         setRefresh = settings.dashboardRefreshSec
         setWatchdog = settings.watchdogIntervalSec
         setIdleTTL = settings.sessionIdleTTLSec
+        setContinuityRolloverToolCalls = settings.continuityRolloverToolCalls
         setShellEnabled = settings.shellEnabled
         setShellTimeout = settings.shellTimeoutSec
         setAutoRestart = settings.autoRestart

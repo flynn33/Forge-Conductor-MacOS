@@ -10,6 +10,548 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+**Owner publication/installation checkpoint — 0.18.0 (28).** The owner requests
+publication of the current source/docs and wiki synchronization, then will handle
+installation. Further product repair waits for the owner's installation report.
+The actual managed policy mission remains **unverified**: its latest attempt
+stopped before model activation on an invalid harness mission. No installed or
+all-feature acceptance is claimed. [Checkpoint and limits](docs/LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
+
+Managed policy feedback and source replay now pass **93 affected source cases**
+(two disjoint selections: 65 + 28, zero failures/skips) on `5af17b77…`, including
+the original notice-bearing replay failure. Prior baseline, compiler and
+61-pass/one-failure receipts remain NONPASS. Fresh Debug13 reached native build
+success but retained a cleanup NONPASS; a separate incremental confirmation
+passed unforced. Both targeted native XCTest regressions, post-test five-role Debug
+identity and settings now pass. The actual managed notice/correction mission
+remains unverified. [Evidence and limits](docs/LMSTUDIO-RUNTIME-REPAIR.md#managed-policy-feedback-and-source-replay--source-checkpoint).
+
+The separate **Forge-owned saved-count rollover mission passed** on retained
+`e3762543…`/v11b inputs: five accepted provider turns, four successful reads,
+automatic rollover at count 3, same-handoff V2 acknowledgement and predecessor
+seal, one successor marker read and completed feedback. Native validation reached
+completed revision 16; after a 10.072-second stable window, ordinary APIs restored
+count 200 and output limit 4,096, then Manager exited zero with full EOF and no
+forced cleanup. Earlier NONPASS receipts remain unchanged. This does not qualify
+ordinary GUI rollover, policy comprehension, crash, installed or all-feature
+acceptance. [Evidence and limits](docs/LMSTUDIO-RUNTIME-REPAIR.md#forge-owned-saved-count-rollover-mission--pass).
+
+The third **typed Simulator fixture passed** on retained `80f542fa…` inputs:
+two actual iOS tests, zero failures/skips, 20 native-zero jobs and 40 complete
+producer/page EOF streams. Cleanup removed its owned device and preserved all
+32 original devices. The actual LM Studio build/one-XCTest/xcresult chain also
+reconciles positively with production completion validation; its original
+whole-message-parser receipt stays **NONPASS**, with later provider/policy checks
+unperformed. [Exact scopes and evidence](docs/LMSTUDIO-RUNTIME-REPAIR.md#typed-simulator-and-managed-xcode-workflows--scoped-evidence).
+
+Four newer policy/diagnostics/Debug-signing corrections now pass the same **six
+source controls** on `e3762543…`: zero failures/skips, native command exit zero,
+full EOF and unforced cleanup. The four affected source classes also report
+**115 passed, four explicitly skipped, zero failures** (119 started). Earlier
+failed attempts and fixture corrections remain recorded.
+Fresh `e3762543…` native evidence now includes a passing Release build,
+a separate passing **incremental Debug confirmation**, four settings queries and
+30 five-role signature controls. The first Debug capture stays **NONPASS** after
+owned-helper SIGINT cleanup; the confirmation is not a fresh-compilation claim.
+Debug CLI `get-task-allow` is true; all five Release roles remain false with
+existing distribution signing. Native Core **6/6 controls** and two separate signed-candidate controls passed;
+the area's four historical skips remain. Scoped actual-model signed-CLI LLDB/
+production completion independently reconciles positively; original LLDB probe receipts remain **NONPASS**. After-provider/target-after evidence is absent;
+remote quiescence and broader feature acceptance are not claimed.
+Retained v10 runtime passes qualify their earlier inputs. GUI rollover, broader debugging, crash, installed and all-feature gates stay
+open. Count/output controls and detector coverage are retained; [the repair
+record](docs/LMSTUDIO-RUNTIME-REPAIR.md#applied-policy-diagnostics-and-debug-signing-corrections--source-and-native-scopes)
+records the change and its limits.
+
+Later attempts on `80f542fa…` remain **NONPASS**: the CLI-Manager GUI again
+saved/reloaded count 3 but did not complete Provider, relaunch, restoration or
+ordinary Quit checks; the second 8,192-token run missed the assigned successor
+marker and retained an ambiguous `lmstudio_conflict` turn; actual-model
+`xcode.debug` reached LLDB, where macOS denied attachment to the signed CLI.
+The [latest repair evidence](docs/LMSTUDIO-RUNTIME-REPAIR.md#latest-gui-second-8192-token-and-model-lldb-attempts--nonpass)
+keeps these partial observations and open gates separate from prior passes.
+
+The first current **8,192-token actual-model attempt remains NONPASS**. It
+reached the saved-three-call trigger, same-handoff acknowledgement and predecessor
+seal, one successor marker read and its completed feedback. The protected-process
+count guard then rejected the paused-stability check; cleanup sent one owned
+SIGTERM. Stability, ordinary shutdown, restoration and final inventory/coherence
+gates did not complete. Later ten-process parity does not requalify that run or
+identify the initiating cause.
+
+The current ordinary GUI attempt also remains **NONPASS**. Root's retained CUA
+summary records default 200, stepper 4→3, Save 3 and unsaved 7→Reload 3; API/disk
+captures agree. Provider output Save/Refresh, restart persistence, restoration and
+ordinary Quit remain unverified after SkyComputerUseService failures. Three crash
+reports name that service/SIGTRAP; its triggering mechanism and any Forge
+accessibility role are unknown. The summary is not raw AX export. Prior source,
+native and negative receipts retain their scopes; exact evidence is in the repair
+record. Neither partial result qualifies ordinary GUI rollover, actual-model
+Xcode/LLDB, Simulator XCTest, crash recovery or the installed product.
+
+The current **private native Stjornarvald v10 replay passed** in 10.182 seconds
+on the same `80f542fa…` inputs. It detected the declared production Python fixture,
+presented its notice over MCP and recorded correction after membership removal;
+resource-only JavaScript stayed advisory, alias roles raised the native finding,
+and an unavailable graph preserved history. Manager and both MCP processes
+returned zero with full captured EOF and unforced cleanup; 439 inputs, five
+candidate binaries, ten protected identities and registration remained unchanged.
+Automatic coverage is still **one of 15 indexed rules**, with 14 guidance-only
+rules. This private detector/correction/transport fixture establishes no model
+comprehension, policy GUI, installed or full-policy compliance; historical job
+page EOF receives no native producer-EOF credit. Exact evidence is in the repair
+record.
+
+### LM Studio runtime repair — in progress
+
+Current source identity: `0.18.0 (28)`. Adds a saved rollover tool-call setting
+(default 200; range 1–10,000) for ordinary MCP chats and managed runs, plus five
+native Xcode CLI tools. Repairs durable
+continuity tracking, same-scope policy notices and on-demand MCP telemetry.
+
+The current `80f542fa…` checkpoint now has both source and signed native
+validation. Full source v14 executed **2,310 cases: 2,297 passed, 13 explicitly
+skipped, zero failed**; both Swift products built. Canonical native v10 Debug
+and Release builds returned zero with full EOF and unforced cleanup. The Debug
+selection passed **49 Core plus two app-hosted cases**, with no failures/skips;
+all four build/test captures retained the same 439 inputs. Both configurations'
+five roles passed all **30 signature/metadata/entitlement controls**, and all
+four effective-settings queries passed. These results close current source,
+selected native test, build and platform-identity scopes. Fixture/loopback and
+view-model controls do not qualify actual-model Xcode/LLDB, a larger-output
+LM Studio mission, onscreen GUI/ordinary rollover, Simulator XCTest, crash or
+installed acceptance. Those gates remain open; the 13 source skips receive no
+pass credit. Earlier checkpoints and all negative receipts retain their scopes.
+Exact current receipts and binary identities are in the repair record.
+
+A subsequent settings/compatibility checkpoint at source `80f542fa…` passed all
+**14 focused cases**, native zero, no failures/skips, full **7,073-byte** EOF.
+It covers output defaults/omission/persistence and CAS, malformed/authenticated
+loopback updates, view-model Save/Reload and unsaved-action gating, immutable
+REST-fixture 8,192-token probe/root/continuation bodies and accepted-receipt replay,
+and budget headroom/inherited-ceiling checks. The six ordinary source classes
+then selected **168 cases**: **166 passed**, **two explicitly skipped**, none
+failed; native zero, full **52,355-byte** EOF. Both retained all 439 inputs and
+finished unforced with no owned survivor. The two opt-in skips are the live
+LM Studio fresh-root/continuation and disposable real-Keychain tests; neither
+receives pass credit. This adds deterministic source settings/HTTP/view-model
+coverage to the earlier pending checkpoint below. It does not qualify an actual
+onscreen GUI, larger-output LM Studio run, refreshed full suite/native candidate,
+Xcode/Simulator workflow or installed product. The empty-response cause and full
+mission remain open; exact methods, receipts and scope are in the repair record.
+
+A later source slice adds a saved **Maximum output tokens** field to the Provider
+form: default **4,096**, range **1–65,536**, including reasoning and the answer.
+Legacy configurations without this field use 4,096; explicit saved limits are
+preserved. An omitted update preserves the saved value. The existing revision check and busy guard remain in place. This field is
+an immutable requested transport limit, not a measured model/service ceiling.
+The source repair carries it through capabilities so ordinary budget hooks retain
+the same output reserve after provider/tool observations and evaluator restart.
+Two REST-fixture regressions passed after their baseline failures; the broader
+selection passed **33 REST cases plus one configuration-boundary case**, with zero
+failures/skips, native zero, complete **11,351-byte** EOF, stable 439 inputs and
+unforced cleanup. These are source checks at `31dcfd8b…`. Settings API/CAS/busy and
+UI parity checks, a refreshed full suite/native candidate, and actual LM Studio
+use of a larger output allowance remain pending. The v13/v9 results below predate
+this slice; they qualify their retained `c1805d1a…` inputs. The empty-continuation
+cause and full mission remain unresolved. Exact receipts are in the repair record.
+
+The latest full source v13 run returned zero in **715.678 seconds**: **2,297**
+actual cases executed, **2,284 passed**, **13 explicitly skipped** and none failed.
+Exact case identities/statuses, class and bundle counts matched the retained
+2,286-case v12 baseline plus 11 added QoS, provider-metadata and catalog cases.
+The complete **688,301-byte** output reached EOF, all 439 inputs remained stable
+and cleanup was unforced with no owned process remaining. Both v13 Swift product
+builds also returned zero with full EOF and unforced cleanup. This is source
+compilation/test evidence; the 13 skips receive no pass credit.
+
+Canonical native v9 Debug compilation passed in **54.946 seconds**, native
+zero with one build-success marker and complete **512,938-byte** EOF. Its selected
+native XCTest capture passed **37 of 37** cases, with no skips/failures, native
+zero and complete **718,240-byte** EOF. Both retained all 439 inputs unchanged
+and finished without forced cleanup or owned survivors. All five Debug roles
+passed strict signature, metadata and entitlement controls, and both Debug
+effective-settings queries passed. These results are scoped to source
+`c1805d1a…`; fixture-driven XCTests do not qualify actual Apple CLI workflows.
+
+One owned actual-model saved-count diagnostic with threshold 3 reached the same handoff acknowledgement
+and predecessor seal, then measured the first observed accepted empty successor
+`automatic_continuation`. The completed response had provider transport EOF,
+one reasoning item, **4,095 reasoning/output tokens**, and zero text/tool calls
+under the unchanged **4,096-token** output setting and **262,144-token** context.
+The receipt has `diagnostic_complete: true`, `qualified: false`, and
+`failure: null`: the full mission marker/feedback proof was not reached. Manager
+shutdown returned zero with both streams at full EOF; settings were restored to
+200 and all 439 source inputs, ten protected processes and registration were preserved.
+The cause remains unknown; no remote-provider quiescence or zero-extra-generation
+claim is made. Current actual-model typed Xcode/LLDB, simulator XCTest, ordinary
+GUI rollover, crash recovery and installed/artifact acceptance remain open.
+Exact receipts are in the repair record.
+
+Earlier canonical native v8 Release compilation passed in **151.458 seconds**, native
+zero with one build-success marker, full **538,533-byte** EOF, stable 439 inputs
+and unforced cleanup. Debug xcodebuild also returned zero with one build-success
+marker and full **512,934-byte** EOF in **57.345 seconds**, but its capture remains
+**NONPASS**: cleanup sent SIGINT to tracked PID 52101. Its first ancestry and
+executable path are unknown; this does not establish a Forge leak or hang.
+At that v8 checkpoint, native37 and refreshed identity/settings had not run.
+The later v9 observations above retain the v8 NONPASS receipt; they establish no
+cause for its tracked process and add no process exemption or product repair.
+Current model workflow, simulator XCTest, ordinary GUI/crash and installed
+acceptance remain separate. Earlier checkpoints below retain their own source
+and artifact scope.
+
+The refreshed full v10 source run returned zero in 708.278 seconds: 2,264
+actual cases selected, 2,251 passed, 13 explicitly skipped and none failed.
+All 32 added repair cases passed; complete 678,541-byte EOF, all 439 stable
+inputs and unforced cleanup were independently reconciled. Receipt:
+`613906ead4407edafc1d17ca9389214acc54bc22499c36850629823485ea6623`.
+Fresh canonical native v6 Debug and Release builds returned zero in 57.907
+and 152.060 seconds, with full output and all 439 inputs unchanged. All five
+roles passed strict signature, metadata and effective-settings checks in each
+configuration. The focused native Core selection executed 32 cases: all passed,
+none skipped or failed, with full EOF and unforced cleanup. The hosted bootstrap cancellation case and five Rune reorder cases also passed.
+The native rollover UI case passed text edits and increment/decrement actions
+at both range boundaries. The current signed Stjornarvald control also passed deliberate violation,
+ordinary MCP notice delivery, correction and unavailable-graph history checks.
+Automatic detection covers one of 15 indexed Raven rules; the other 14 remain
+guidance. The current signed candidate’s `xcode.debug` control passed breakpoint,
+main backtrace, continuation and target-zero-exit checks for the unchanged signed
+owned C fixture. An actual LM Studio model also built for testing, ran one exact
+XCTest, read its passing xcresult and reached a completed managed run. That run’s
+receipt remains NONPASS because build-for-testing changed two test-host binary
+hashes. Six separate read-only post-build signature, metadata and entitlement
+controls passed against the current products. This preserves the original
+nonpass and does not establish native producer pipe EOF for that historical run.
+These scoped results do not qualify the installed app or shipment.
+
+The subsequent producer-output source repair passed all 16 selected controls
+without failures or skips. Managed saved-count source testing reproduced four
+invocations and no pending request at limit 3, then passed the same control after
+repair. The corrected 14-case selection passed without failures/skips, including
+three ordinary file-reopen recovery cases, both source-history replay controls,
+successor-session isolation and corrupted-result rejection. The earlier 13-case
+selection remains NONPASS at its active-session fixture. These changes postdate
+the retained v10/v6 checkpoints. Normal v11 remains NONPASS: 2,286 actual
+cases selected, 2,270 passed, 13 explicitly skipped and three migration cases
+failed on four stale runtime-version assertions. The corrected lineage selection
+passed all four cases. Final full v12 returned zero: 2,286 actual cases selected,
+2,273 passed, 13 explicitly skipped and none failed, with all 439 inputs unchanged,
+full output and unforced cleanup. Earlier failed receipts remain retained.
+
+Subsequent canonical native v7 Debug/Release builds and five-role signing/settings
+checks passed against those inputs. All 26 selected native cases passed without
+skips, but the retained log reports a priority inversion in the synchronous
+Runtime/Xcode bridge. The actual saved-3 model attempt requested and fulfilled
+rollover after three completed predecessor reads, acknowledged the same handoff
+and sealed the predecessor. Its overall receipt remains NONPASS because the
+successor marker read/feedback did not occur before the deadline; canonical
+handoff/replay qualification was not reached. The empty normalized responses do
+not establish a provider termination cause.
+
+The bridge now snapshots the caller's effective task priority before starting
+its detached worker. Both baseline priority controls failed; all eight repaired
+priority/deadline/cancellation/committed-receipt controls passed. Normal Runtime
+validation passed 122 of 123 cases with one explicit absent-PowerShell skip;
+all 41 Xcode cases passed. Complete output, stable 439 inputs and unforced cleanup
+were verified. Full v12 and native v7 predate these two changed source/test inputs.
+Fresh native priority validation and current model/artifact acceptance remain
+open; exact receipts are in the repair record.
+
+The later provider terminal-metadata source checkpoint passed seven focused
+controls and all 31 contract-fixture cases without failures/skips. Accepted
+receipts now retain bounded optional response metadata; successful provider
+transport completion remains separate from native producer EOF and artifact
+paging. The cause of the earlier empty continuation remains unknown.
+
+A retained-app policy catalog shutdown control then reproduced three database
+descriptors remaining open after completed shutdown and a still-readable catalog.
+After the explicit owner close, both focused closure/reopen cases and all 11
+catalog cases passed without failures/skips. The initial path-observer failure,
+the Darwin.stat compiler failure and the valid two-assertion baseline failure
+remain retained. These are source checks with full output, stable 439 inputs and
+unforced cleanup. Full source/CLI/app v13 subsequently passed; canonical v8
+Release compilation passed and Debug remains NONPASS at forced cleanup.
+Native37, identity/settings and runtime qualification remain pending. Current-source actual provider continuation, typed Xcode
+build/test, ordinary GUI rollover, crash recovery and installed acceptance
+remain open.
+
+A separate direct owned iOS 26.5/iPhone 17 Pro startup completed bootstatus at
+17 seconds; AddressBook migration logged success. All 13 native commands
+returned zero with complete output, unforced cleanup and all 32 original devices
+preserved. Its diagnostic receipt remains NONPASS because the stall/sampling
+window was not reached. No XCTest ran; the earlier stall cause and simulator
+XCTest qualification remain open. Exact scopes and receipts are in the repair record.
+
+Retained source v9 returned terminal one with 2,247 passes, 13 explicit skips and one
+failed bootstrap cancellation case. All 29 new repair cases passed. The focused
+failure was `diagnosticHomeMismatch` before cancellation. A bounded repeat
+captured equal paths with different directory flags. Bootstrap now normalizes
+that hint locally while retaining different-home and file-authority rejection.
+All 16 affected source cases and 30 repeated cancellation/retry flows passed,
+with complete output and no forced cleanup. CLI/app v10 compilation passed;
+full v10 and the scoped native v6 checks passed. After the previously observed SecurityAgent process disappeared, one
+unchanged signed C LLDB control passed all breakpoint/backtrace/continue/zero-exit
+checks in 0.714 seconds without forced cleanup or authorization changes. Current
+typed debugger control passed for the signed C fixture. Ordinary candidate
+rollover Settings Save, Reload and same-home GUI relaunch preserved 3, then saved
+200; disk/API readback and all owned native exits matched. A subsequent exact
+forced-reader reproducer failed two incomplete-output assertions, without a
+reader timeout or live child. The subsequent source repair passed 16 controls
+without failures/skips, preserving the failed receipt. Current native/model
+producer proof, simulator XCTest, automatic successor and complete artifact
+acceptance remain open.
+The Responses transport now reserves lifecycle capacity within a private finite
+5,120-event SSE budget, while preserving the public decoder's 4,096-event default
+and initializer contract. The valid 4,104-frame regression and exact 5,120/5,121
+boundary controls passed; byte, text, argument, output-token, timeout and exact
+acknowledgement protections remain. The original native v3 provider failure is
+retained; its raw stream validity is unknown. Full source v8 selected 2,232 cases:
+2,219 passed, 13 explicitly skipped and none failed, with all 439 inputs unchanged.
+Refreshed canonical native v5 Debug/Release builds and five-role identity checks
+passed. The signed Debug CLI executed exactly five SSE controls, all passed,
+without skips/failures and with native/serve exits zero and lossless EOF.
+Ordinary GUI rollover, SIGKILL recovery and shipment remain separate gates.
+The isolated native v5 Manager attempt completed its initial provider turn and
+reached automatic provider-usage rollover, then failed the probe's handoff-digest
+comparison before any SIGKILL. Native Foundation verified a probe encoding
+defect; Forge's canonical digest matches the retained packet. The corrected
+v6 probe verified its digest but missed the accepted receipt within its
+60-second window. A later 600-second observation durably accepted and acknowledged
+one successor and sealed the predecessor, but missed the crash-test boundary.
+The automatic continuation remained an intent without tool execution. These
+crash-test attempts remain non-passes; no SIGKILL was sent. The
+same-home ordinary restart subsequently completed the exact automatic turn,
+but its one model-selected read returned `not_found` for
+`/home/project/successor-only.txt`. The exact-one-marker check failed; replay
+did not execute, and the controller paused before tool-error feedback.
+The later separate ordinary resume recovered the original feedback turn and
+one successful absolute-path read of the exact owned marker; independent
+reconciliation preserved the failed read and H/ACK/seal. Its relative-only
+diagnostic remains a non-pass and stopped before settled replay. Final
+comprehension, SIGKILL and ordinary GUI acceptance remain unverified. A separate
+12.636-second two-launch paused replay passed with both Manager exits zero,
+complete streams, unchanged handoff/ACK/seal, two tool results and a 10-second
+stable interval. It preserves the earlier non-passes.
+One actual model-driven native Rune XCTest passed; the model consumed four
+complete test/result streams and reported the actual one-pass xcresult counts.
+The managed run nevertheless timed out: the unperformed project build and
+unrecognized typed Xcode test evidence left completion obligations unsatisfied.
+Typed Xcode completion now binds persisted intent to the actual run-owned native
+job, command fingerprint and complete output. It rejects command collisions,
+stale summaries, same-timestamp ambiguity, failed/truncated jobs and invalid
+xcresult counts. Build and test obligations remain separate; no requirement was
+bypassed. Two descriptor regressions failed before repair and passed afterward.
+The affected Xcode/Queue source run passed all 78 cases without skips/failures,
+with terminal zero, complete EOF and all 439 inputs unchanged. Current signed
+native and actual-model completion checks remain pending.
+Managed continuity now persists the actual tool outcome, leaves failed ordered
+actions open, and excludes failed invocations from handoff completed work.
+Three negative cases failed before repair while three success/compatibility
+controls passed. After repair, all 14 added cases and all 33 affected source
+cases passed without skips. Successful/legacy behavior, bounded metadata,
+broker replay, and queued native submission semantics remain available.
+These four updated inputs postdate the full v8/native v5 checkpoint; refreshed
+native validation remains pending.
+Manager settings reads now refresh saved rollover limits before returning both
+typed and HTTP settings. The existing bounded configuration refresh preserves
+unsaved patches and cached recovery diagnostics. Two stale-read cases failed
+before repair; all three focused controls passed afterward. The broader
+Manager/continuity selection passed 288 of 290 cases, with two explicit skips
+and zero failures; native validation remains pending.
+An actual LM Studio model separately completed and consumed a typed native
+Xcode version job: five provider turns, four tool calls, exact complete stdout/
+stderr, native/Manager exits zero and no forced cleanup. The version-only proof
+adds no XCTest, simulator, debugger or ordinary GUI rollover acceptance. The early
+Simulator migration sample timed out without a stack, before cleanup; readiness
+again timed out at 300 seconds.
+Exact owned cleanup preserved all 32 baseline devices; no simulator XCTest ran.
+Scoped packet reads preserve project/root/generation boundaries and sole-active
+read recovery. Successor receipt admission and consumption preserve deployment
+ownership, exact handoff identity, and legacy compatibility. Retained canonical
+Debug/Release v2 builds and five-role strict identity checks passed against all
+439 frozen inputs; their executed boundaries are recorded below.
+Pending rollover requests are sticky while a checkpoint is prepared and are
+consumed with the actual packet/counts in one transaction, without rewriting
+the active preparation claim. Projection-file failure no longer conceals the
+committed SQL handoff. Reusing an acknowledged handoff ID with changed content
+is refused; a fresh handoff ID remains supported.
+Xcode receipt ceilings include the complete durable wrapper before admission,
+preserving native failure exit 65 and same-intent replay. `job.list` keeps
+complete rows within the result byte budget and supplies optional paired
+`next_cursor.before_created_at`/`before_job_id` fields. Equal-timestamp rows
+remain traversable; legacy timestamp-only cursors stay exclusive. Existing
+byte-paged output and base64 recovery are preserved.
+The completed full Swift v3 source checkpoint selected 2,181 Core cases:
+2,168 passed, 13 explicitly skipped, zero failed; filesystem qualification
+passed 30 cases without skips. Later paired-cursor/byte-offset/base64 playbook
+guidance passed all 14 catalog cases after a fresh scratch rebuild and strict
+deep XCTest verification. The original stale resource-seal failure remains
+recorded; no trust alias, test assertion or signing-policy change was required.
+Both Swift products built before the subsequent status/storage changes.
+Saved rollover limits now appear immediately in both status views without
+resetting counters or saving pending edits. Missing or malformed configuration
+keeps cached recovery readable and adds failure-only `configuration_refresh`
+with `state: failed`, `using_cached_settings: true` and bounded error information;
+healthy responses omit it. Audit mirrors and Queue initialization now create storage
+without recreating default configuration, preserving cached shell opt-out,
+durable SQLite/JSONL, cancellation/deadline and snapshot behavior. Directory
+layout/0700 permissions and full bootstrap defaults remain unchanged.
+Six focused and 300 affected source cases passed without skips/failures. Full
+Swift v4 then returned terminal zero: 2,187 Core cases selected, 2,174 passed,
+13 explicitly skipped, zero failed; filesystem qualification passed 30 cases
+without skips. All 439 frozen product/test/graph inputs remained unchanged.
+At the v7 test freeze after this dated checkpoint, only the live test fixture
+changed; production and the other 438 frozen inputs stayed unchanged. The built-in
+gate correction passed the ownership control. Live v3–v5 each failed one case
+without skips;
+v5 retained a serialized-estimate rollover before any provider turn because the
+26,450-token initial input plus reserve exceeded the old 10,240-token cutoff.
+The opt-in fixture now uses 27,648/28,672-token cutoffs, bounded stage/numeric
+diagnostics and added initial-normal checks, preserving original usage/ACK/crash/
+recovery/marker/GUI/MCP assertions. Live v6 then failed one actual case without
+skips in 670.805 seconds. Its initial estimate was normal; the completed initial
+provider turn produced actual `provider_exact` / `after_provider_turn` rollover,
+used 10,093 tokens and output 511 tokens. Successor bootstrap's sole attempt was
+`blocked_failure`; the run was `failed_recoverable` with
+`lmstudio_response_truncated`, without ACK/crash/recovery proof. The underlying
+incomplete reason is unknown; the code does not prove output-cap exhaustion.
+All 14 original process identities/MCP registration were preserved, with no
+owned survivors. The v7 fixture's opt-in output cap is 4096; the legacy default
+remains 512, with strict failure diagnostics/assertions and
+a complete bounded-observation guard. The normal class then compiled and returned
+terminal zero: five selected cases, three passes, two disabled live skips, zero
+failures in 0.323 seconds. Separately, live v7 passed one actual case without
+skips/failures in 487.293 seconds, terminal zero. The isolated owned Manager/API
+fixture exercised exact V2 ACK, an injected in-process post-commit error at
+`providerBootstrapResponse`, one active successor after recovery, predecessor sealing,
+automatic continuation and one marker `fs_read`, then stable paused replay
+without an extra effect. The three phases ran in one SwiftPM XCTest process;
+the SIGKILL matrix was not executed. All 14 original identities/MCP registration
+were preserved, with no owned survivors. Prior failures and their unknown
+cancellation/v6 incomplete attribution remain retained. Ordinary LM Studio GUI
+rollover, compiled native v2 runtime, LLDB and simulator XCTest are separate
+gates; the v7 checkpoint contains no product/lifecycle patch.
+After v7, four actual semantic-classifier regressions failed with 39 assertions
+and no skips. A narrow JSON failure-field repair then passed the same four cases
+without skips/failures in 0.020 seconds, terminal zero. It preserves plaintext
+fallback, typed status/retry delay, the 64 KiB boundary and incomplete-response
+rejection without ACK/trust changes. Normal affected classes then selected 52
+cases: 51 actual passes, one explicit live skip, zero failures, terminal zero.
+Native v2 and live v7 predate this repair. The absent v6 bootstrap body prevents
+attributing that failure to the classifier defect or output exhaustion.
+Later full Swift v5 failed: 2,191 Core cases selected, 2,177 passed, 13 explicitly
+skipped and one failed; filesystem qualification passed all 30 cases. The sole
+failure used a shell PID log as a descendant-count witness. A controlled test
+passed with three kernel child identities and two shell entries; the original
+failing interleaving remains unrecovered. The fixture-only correction keeps the
+limit-two threshold, state/error and every shell-PID cleanup assertion, adding
+exact-identity cleanup and close-on-error. The normal Runtime class selected 113
+cases: 112 passed, one PowerShell skip, zero failures.
+On October 6, full v6 returned terminal zero: 2,192 Core cases selected,
+2,179 passed, 13 explicitly skipped and none failed, plus 30 filesystem passes
+without skips/failures. All 439 frozen inputs remained unchanged during the run:
+five full-v4 paths changed, 434 unchanged. Skips remain unqualified capabilities.
+Canonical native v3 Debug/Release builds passed in 60.309/153.358 seconds, with
+439 inputs unchanged and all five roles' strict signature/metadata/settings
+checks passed, including 15 native identity controls per configuration. Release
+recorded one owned post-build SIGINT. Four classifier XCTests passed through the
+signed v3 Debug CLI without skips/failures; native/serve exits were zero and
+output was lossless. Typed readback verified exactly four passed cases, no extras,
+skips or failures, with both result jobs and serve exit zero. Those builds
+precede the later Runtime/Queue test fixtures and Rune reorder repair. Ordinary
+GUI rollover, SIGKILL, Compute, LLDB, simulator XCTest and owner-signing acceptance
+remain open.
+The current 439-input native Compute v3 diagnostic executed one test but failed
+two startup activation assertions in 4.135 seconds, with no skips, native exit
+65, serve exit zero and complete streams. No cover variant ran. Preserved the
+failed preflight and corrected the root's wrong-path SecurityAgent absence
+claim; its actual `.bundle` process was foreground. Authorization outcome and
+activation cause remain unknown; no production predicate was weakened.
+After full v6, corrected the mixed-format Queue test's actor ownership with
+`@MainActor` after five native AppKit warnings. The focused case and normal 38-case
+Queue class passed without skips/failures; fresh isolated native execution passed
+one case in 0.321 seconds, with native/serve exits zero. Three older-late Rune
+reorder controls first failed four assertions. Per-command UUID ownership now
+prevents older success/cancellation/error from replacing newer order, while current
+request rollback remains available. Five focused and 15 normal Rune cases passed
+without skips/failures. Refreshed canonical native v4 Debug/Release builds then
+passed in 60.369906/158.787937 seconds with lossless EOF, native exits zero and all
+439 inputs unchanged. Debug required no cleanup signals; Release recorded two
+exact owned post-build SIGINT signals, with no owned survivors. All five roles'
+strict identity/metadata/settings controls passed in both configurations; the
+independent retained-evidence audit passed all 579 checks. Typed Queue build,
+summary and inventory readback confirmed exactly one actual Passed case, zero
+failures/skips, three native result-job exits zero and serve exit zero, preserving
+configuration bytes. Native Rune v4 used the wrong test bundle and executed zero
+tests despite two `Executed 0 tests` lines, `TEST SUCCEEDED` and helper success
+flags; it remains a non-pass. Corrected native Rune v5 used the existing
+ForgeConductorAppTests scheme/bundle and executed exactly five cases: five passed,
+zero skips/failures, in 0.246 (0.248) seconds. Native and serve exits were zero;
+581,183 stdout / 590 stderr bytes were reconstructed losslessly with EOF.
+Full Swift v7 returned terminal zero in 706.244 seconds: 2,197 Core cases
+selected, 2,184 passed, 13 explicitly skipped and none failed, plus all 30
+filesystem cases passed. Exact reconciliation verified 2,227 actual selected
+cases, 2,214 passes, the 13 skips and complete raw EOF; all 439 inputs remained
+unchanged. Skips remain unqualified capabilities. SIGKILL recovery remains
+pending; the first candidate attempt failed preparation before any Manager
+launch. No installed, full-runtime or shipment acceptance is claimed.
+The later direct simulator startup control also timed out at 300 seconds while
+reporting the same migration wait, outside Forge with inherited unlimited
+CPU/file-size limits. No XCTest ran; exact owned cleanup preserved all 32
+baseline devices. This shows Forge launch/limits are not necessary for that
+wait, without establishing its cause.
+The subsequent owned iOS 26.5 namespace diagnostic also timed out at 300 seconds,
+exit -15, before XCTest. Actual 60/120/240-second namespace snapshots and complete
+exact-PID log queries retained AddressBook migration duration updates and wrapper
+events. A simulator AddressBook TCC allow record establishes no host debugger
+authorization, and two reported pending XPC transactions establish no cause.
+Truncated query attempts and a timed-out sample remain non-passes. Exact owned
+shutdown/delete exited zero and all 32 baseline device bytes were unchanged.
+Canonical Debug/Release v1 builds and all
+five roles' strict signature/metadata checks passed before these status/storage
+fixes, with matching preserved binary/metadata identities. Retained v2 builds
+and five-role strict identity checks passed in both configurations. Both compiled
+CLI/native Xcode version jobs completed with lossless output and clean serve
+exits. The exact Rune coverage/unknown-state app-hosted test and v2
+Debug/Release candidate identity/version-drift test each passed one actual case
+without skips or failures; these are scoped native proofs.
+The earlier October 5 source checkpoint passed 19 focused tests without skips, then
+505 affected cases were selected: 499 passed, six explicitly skipped, zero
+failed. A subsequent adapter protocol checkpoint selected 34 cases: 33 passed,
+one live-provider case was skipped, zero failed. Bounded per-instance bootstrap
+ownership rejects concurrent same-session intent replacement; post-await scope,
+handoff/digest and cancellation fences prevent late ACK resurrection. Cold
+interruption/restart retry passed. Ledger, schema and public fields remain
+unchanged; the V2 cancellation contracts retain their controls. Foreground GUI
+rollover, live GUI overlap, GUI threshold and debugger acceptance remain open.
+The earlier complete Swift checkpoint selected 2,135 Core cases, seven
+explicit skips and zero failures, plus 30 filesystem qualification cases with
+zero failures/skips. These source snapshots do not establish full qualification.
+Optional declared-path roles now distinguish resource-only JS/MJS uncertainty:
+the 0.45 advisory finding remains a violation with unchanged identity and
+immutable prior history. It grants no exemption or correction. Python and
+source/copy/synchronized or legacy script membership retain conservative
+positive findings; invalid or incomplete evidence cannot establish compliance.
+Native policy v4 remains unqualified after its second-project fixture reused
+the first client's durable scope; its Manager/serve both exited zero. Native v5
+then passed with separate deployment clients: Python 0.99 violation/notice and 0.98 correction,
+resource-only JS 0.45 still-violation/history, source-alias 0.99 and genuine
+removal corrections. Manager and both serve processes exited zero. Model-notice
+v6 completed one authentic retained notice interpretation in 26.944 seconds,
+preserving 0.45 review, compliance unproven, advisory/non-blocking and no
+verified correction; the earlier v5 timeout remains retained. The actual
+retained-v9 new→old→new fixture passed with three clean CLI exits and a preserved
+synthetic seal across a same-ID edit; this is not a real acknowledgement, v8
+recovery or installed-build proof. Simulator v3 and alternate iOS 26.5 v4
+build/boot commands succeeded, but both 300-second boot-readiness controls
+timed out before XCTest; exact owned cleanup preserved all 32 baseline devices
+and serve exited zero. Ordinary GUI rollover, general model behavior, LLDB, Compute
+and simulator XCTest remain unqualified.
+[The repair record](docs/LMSTUDIO-RUNTIME-REPAIR.md) separates original native
+reproducers, attempted tests and remaining candidate/live acceptance. Earlier
+UI receipts retain their 0.17.0 (27) input identities.
+
 <!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
 ### Compute PCB refinement — verified native scope
 

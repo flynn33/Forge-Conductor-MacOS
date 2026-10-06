@@ -8,6 +8,32 @@ import ForgeNativeSessionHostPlugin
 #endif
 @testable import ForgeConductorCore
 
+private actor ProviderOutputSettingsService: ProviderConfigurationServicing {
+    private let storage: LMStudioConfigurationService
+    private(set) var updates: [ProviderConfigurationUpdate] = []
+    private(set) var modelRequests = 0
+
+    init(storageDirectory: URL) {
+        storage = LMStudioConfigurationService(storageDirectory: storageDirectory)
+    }
+
+    func read() async throws -> ProviderConfigurationSnapshot { try await storage.read() }
+
+    func update(_ request: ProviderConfigurationUpdate) async throws -> ProviderConfigurationSnapshot {
+        guard updates.count < 16 else { throw ProviderConfigurationError.busy }
+        updates.append(request)
+        return try await storage.update(request)
+    }
+
+    func models() async throws -> ProviderModelInventory {
+        guard modelRequests < 8 else { throw ProviderConfigurationError.busy }
+        modelRequests += 1
+        let configuration = try await storage.read()
+        return ProviderModelInventory(revision: configuration.revision,
+            models: [ProviderAvailableModel(key: "fixture/tool-model", loaded: true, toolUseCapable: true)])
+    }
+}
+
 private actor ProviderBusyService: ProviderConfigurationServicing {
     var entered = false
     var updates = 0
@@ -588,9 +614,126 @@ final class ProviderConfigurationAppTests: XCTestCase {
         XCTAssertEqual(credentials.mainThreadObservations, [false, false])
     }
 
-    private func request(_ revision: String = "0") -> ProviderConfigurationUpdate {
+    private func request(_ revision: String = "0", maximumOutputTokens: Int? = nil) -> ProviderConfigurationUpdate {
         ProviderConfigurationUpdate(expectedRevision: revision, endpoint: "http://127.0.0.1:1234",
-            modelKey: "fixture/tool-model", credentialAction: .keep)
+            modelKey: "fixture/tool-model", credentialAction: .keep, maximumOutputTokens: maximumOutputTokens)
+    }
+
+    @MainActor
+    func testOutputLimitEditsGateUnsavedActionsAndSaveReloadThroughManagerClient() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        defer { app.shutdown() }
+        let port = Int.random(in: 29000...39000)
+        try app.config.update(["dashboard": ["port": port]], save: true)
+        let service = ProviderOutputSettingsService(storageDirectory: directory)
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: ForgeNativeSessionHostPlugin.manifest,
+            configurationFactory: { _ in service }, factory: { _ in throw ContinuityRunError.hostCapabilityUnavailable })
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        _ = try manager.startService()
+        defer { _ = try? manager.stopService() }
+        let client = OperatorManagerClientRouter(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1", port: port, credentials: ManagerControlCredentialStore(paths: app.paths)))
+        let viewModel = ProviderViewModel(client: client)
+        XCTAssertEqual(viewModel.maximumOutputTokens, 4_096)
+        viewModel.load()
+        for _ in 0..<200 {
+            if viewModel.configuration != nil && !viewModel.isBusy { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertNotNil(viewModel.configuration)
+        XCTAssertFalse(viewModel.isBusy)
+        XCTAssertEqual(viewModel.maximumOutputTokens, 4_096)
+        viewModel.maximumOutputTokens = 8_192
+        XCTAssertTrue(viewModel.hasUnsavedChanges)
+        let beforeModels = await service.modelRequests
+        viewModel.refreshModels()
+        viewModel.connectAndCheck()
+        XCTAssertFalse(viewModel.isFetchingModels)
+        XCTAssertFalse(viewModel.isProbing)
+        XCTAssertNil(viewModel.preparation)
+        XCTAssertTrue(viewModel.noticeMessage?.contains("Save or discard") == true)
+        let gatedModels = await service.modelRequests
+        XCTAssertEqual(gatedModels, beforeModels)
+        viewModel.save()
+        for _ in 0..<200 {
+            if !viewModel.isSaving && viewModel.configuration?.maximumOutputTokens == 8_192 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertFalse(viewModel.isSaving)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.configuration?.maximumOutputTokens, 8_192)
+        XCTAssertFalse(viewModel.hasUnsavedChanges)
+        let updates = await service.updates
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertEqual(updates.first?.maximumOutputTokens, 8_192)
+        let reloaded = ProviderViewModel(client: client)
+        reloaded.load()
+        for _ in 0..<200 {
+            if reloaded.configuration != nil && !reloaded.isBusy { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertFalse(reloaded.isBusy)
+        XCTAssertEqual(reloaded.maximumOutputTokens, 8_192)
+        XCTAssertFalse(reloaded.hasUnsavedChanges)
+        reloaded.refreshModels()
+        for _ in 0..<200 {
+            if !reloaded.isFetchingModels { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        let afterModels = await service.modelRequests
+        XCTAssertEqual(afterModels, beforeModels + 1)
+        XCTAssertEqual(reloaded.availableModels.map(\.key), ["fixture/tool-model"])
+    }
+
+    func testOutputLimitRouteAuthenticatesValidNumbersAndRejectsMalformedOrOutOfRangeUpdates() async throws {
+        let app = try ForgeApp.bootstrap(home: directory)
+        defer { app.shutdown() }
+        let port = Int.random(in: 29000...39000)
+        try app.config.update(["dashboard": ["port": port]], save: true)
+        let service = ProviderOutputSettingsService(storageDirectory: directory)
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: ForgeNativeSessionHostPlugin.manifest,
+            configurationFactory: { _ in service }, factory: { _ in throw ContinuityRunError.hostCapabilityUnavailable })
+        let manager = ManagerNode(app: app, hostAdapterRegistry: registry)
+        _ = try manager.startService()
+        defer { _ = try? manager.stopService() }
+        let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)/api/manager/provider/configuration"))
+        var mutation = URLRequest(url: url)
+        mutation.httpMethod = "PUT"
+        mutation.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        mutation.httpBody = try JSONEncoder().encode(request(maximumOutputTokens: 65_536))
+        let (_, unauthorized) = try await URLSession.shared.data(for: mutation)
+        XCTAssertEqual((unauthorized as? HTTPURLResponse)?.statusCode, 401)
+        let client = OperatorManagerClientRouter(client: OperatorManagerHTTPClient(
+            host: "127.0.0.1", port: port, credentials: ManagerControlCredentialStore(paths: app.paths)))
+        let saved = try await client.updateProviderConfiguration(request(maximumOutputTokens: 65_536))
+        XCTAssertEqual(saved.maximumOutputTokens, 65_536)
+        let kept = try await client.updateProviderConfiguration(request(saved.revision))
+        XCTAssertEqual(kept.maximumOutputTokens, 65_536)
+        mutation.setValue("Bearer " + (try ManagerControlCredentialStore(paths: app.paths).bearerToken()),
+            forHTTPHeaderField: "Authorization")
+        mutation.httpBody = try JSONSerialization.data(withJSONObject: [
+            "expectedRevision": kept.revision, "endpoint": kept.endpoint,
+            "modelKey": "fixture/tool-model", "credentialAction": "keep", "maximumOutputTokens": NSNull()
+        ])
+        let (nullData, nullResponse) = try await URLSession.shared.data(for: mutation)
+        XCTAssertEqual((nullResponse as? HTTPURLResponse)?.statusCode, 200)
+        let retained = try JSONDecoder().decode(ProviderConfigurationSnapshot.self, from: nullData)
+        XCTAssertEqual(retained.maximumOutputTokens, 65_536)
+        let path = directory.appendingPathComponent(LMStudioProviderConfiguration.fileName)
+        let before = try Data(contentsOf: path)
+        for invalid in [true, false, 1.5, 0, 65_537, "8192"] as [Any] {
+            mutation.httpBody = try JSONSerialization.data(withJSONObject: [
+                "expectedRevision": retained.revision, "endpoint": retained.endpoint,
+                "modelKey": "fixture/tool-model", "credentialAction": "keep", "maximumOutputTokens": invalid
+            ])
+            let (_, response) = try await URLSession.shared.data(for: mutation)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 400)
+            let reread = try await client.providerConfiguration()
+            XCTAssertEqual(reread, retained)
+            XCTAssertEqual(try Data(contentsOf: path), before)
+        }
     }
 
     func testClientRouterPreservesPreparationWithoutRunResumption() async throws {
@@ -2127,6 +2270,18 @@ final class ProviderConfigurationAppTests: XCTestCase {
             ManagerNode.continuityPresentation(run: run(), continuity: nil).state,
             .monitoring
         )
+        for continuity in [nil, operation(type: .checkpoint, state: .completed),
+                           operation(type: .rollover, state: .queued)] {
+            let paused = ManagerNode.continuityPresentation(
+                run: run(.paused, errorSummary: "A selected XCTest failed."),
+                continuity: continuity
+            )
+            XCTAssertEqual(paused.state, .blocked)
+            XCTAssertEqual(paused.recoveryAction, .reviewRun)
+            XCTAssertTrue(paused.detail.contains("paused"))
+            XCTAssertTrue(paused.detail.contains("XCTest failed"))
+            XCTAssertTrue(paused.nextAction.contains("resume"))
+        }
         XCTAssertEqual(
             ManagerNode.continuityPresentation(
                 run: run(mode: .externalMCPCompatibility),

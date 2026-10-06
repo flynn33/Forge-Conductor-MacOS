@@ -10,14 +10,17 @@ public struct ManagedBudgetInputAccounting: Sendable, Equatable {
     public let toolSchemaSHA256: String
     public let pendingInputID: String
     public let inputAlreadyRetained: Bool
+    public let previouslyRetainedInputBytes: Int?
     public let providerPreflight: ProviderRequestPreflight?
 
     public init(inputBytes: Int, toolSchemaBytes: Int, toolSchemaSHA256: String,
                 pendingInputID: String, inputAlreadyRetained: Bool,
-                providerPreflight: ProviderRequestPreflight? = nil) {
+                providerPreflight: ProviderRequestPreflight? = nil,
+                previouslyRetainedInputBytes: Int? = nil) {
         self.inputBytes = inputBytes; self.toolSchemaBytes = toolSchemaBytes
         self.toolSchemaSHA256 = toolSchemaSHA256; self.pendingInputID = pendingInputID
         self.inputAlreadyRetained = inputAlreadyRetained
+        self.previouslyRetainedInputBytes = previouslyRetainedInputBytes
         self.providerPreflight = providerPreflight
     }
 }
@@ -56,6 +59,14 @@ public protocol ManagedRunBudgetEvaluating: Sendable {
         capabilities: ProviderCapabilities
     ) async throws -> ContextBudgetAction
 
+    func evaluateToolCallCount(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities,
+        providerCallID: String,
+        toolName: String
+    ) async throws -> ContextBudgetAction
+
     func requestSessionBoundaryRollover(
         run: AutonomousRunRecord,
         sessionID: String,
@@ -75,6 +86,14 @@ public extension ManagedRunBudgetEvaluating {
         return try await evaluateBeforeProviderTurn(run: run, sessionID: sessionID,
                                                    capabilities: capabilities, serializedInputBytes: sum.partialValue)
     }
+
+    func evaluateToolCallCount(
+        run: AutonomousRunRecord,
+        sessionID: String,
+        capabilities: ProviderCapabilities,
+        providerCallID: String,
+        toolName: String
+    ) async throws -> ContextBudgetAction { .normal }
 
     func requestSessionBoundaryRollover(
         run: AutonomousRunRecord,
@@ -144,6 +163,17 @@ public struct UnavailableManagedRunContinuityExecutor: ManagedRunContinuityExecu
             code: "continuity_worker_unavailable",
             summary: "The managed continuity worker is not available"
         )
+    }
+}
+
+enum ManagedToolInvocationOutcome: String, Sendable {
+    case succeeded
+    case failed
+
+    static let metadataKey = "managed_last_tool_outcome"
+
+    init(result: ToolResult) {
+        self = result.ok && !result.isError ? .succeeded : .failed
     }
 }
 
@@ -396,6 +426,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         var work = run.specification.work
         var previousResponseID = work.metadata["provider_response_id"]
         var continuationInput: Data?
+        var continuationRetainedInputBytes: Int?
         var strongestAction = ContextBudgetAction.normal
         if sourceCarryover != nil {
             guard let sourceBudget = budget as? any ManagedRunToolResultBudgetEvaluating else {
@@ -427,8 +458,8 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 )
                 : nil
             let policyDeliveryID: String?
-            let policyText: String?
-            if automatic == nil, continuationInput == nil,
+            var policyText: String?
+            if automatic == nil,
                let generation = Int(exactly: run.projectGeneration.rawValue) {
                 let deliveryID = "managed:\(sideEffect.idempotencyKey):\(round)"
                 let snapshot = await policyContext.context(
@@ -448,12 +479,45 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 policyDeliveryID = nil
                 policyText = nil
             }
-            let input = try automatic?.input ?? requestInput(
+            let baseInput = try automatic?.input ?? requestInput(
+                run: run, previousResponseID: previousResponseID,
+                continuationInput: continuationInput, policyContext: nil)
+            var input = try automatic?.input ?? requestInput(
                 run: run,
                 previousResponseID: previousResponseID,
                 continuationInput: continuationInput,
                 policyContext: policyText
             )
+            let ordinaryTurnID = Self.stableUUID("turn:\(sideEffect.idempotencyKey):round:\(round)")
+            let retainedTurn = automatic == nil ? try await repository.providerTurn(ordinaryTurnID) : nil
+            if policyText != nil, continuationInput != nil,
+               input == baseInput || retainedTurn?.intent.inputSHA256 == JSONSupport.sha256Hex(baseInput) {
+                // A bounded or previously frozen output-only request keeps its exact identity.
+                input = baseInput
+                policyText = nil
+                if let policyDeliveryID { await policyContext.deferred(deliveryID: policyDeliveryID) }
+            }
+            if policyText != nil, continuationInput != nil, retainedTurn == nil,
+               let optionalPreflight = provider as? any ManagedModelProviderRequestPreflighting,
+               let previousResponseID {
+                do {
+                    _ = try await sourceToolOutputPreflight(provider: optionalPreflight, input: input,
+                        tools: tools, run: run, sideEffect: sideEffect, round: round - 1,
+                        previousResponseID: previousResponseID, modelKey: modelKey)
+                } catch let failure as any ManagedProviderFailure
+                  where failure.managedProviderFailureCode == "lmstudio_limit_exceeded" {
+                    // Optional notice text must not make a valid output request exceed the transport cap.
+                    input = baseInput
+                    policyText = nil
+                    if let policyDeliveryID { await policyContext.deferred(deliveryID: policyDeliveryID) }
+                } catch let error as ManagedModelProviderContractError where observedProvider == nil {
+                    guard case .unsupportedCapability("request preflight") = error else { throw error }
+                    // Legacy ordinary transports may dispatch without the optional serializer refinement.
+                    input = baseInput
+                    policyText = nil
+                    if let policyDeliveryID { await policyContext.deferred(deliveryID: policyDeliveryID) }
+                }
+            }
             let sourceDispatch: SourceDerivedDispatch?
             if let observedProvider {
                 sourceDispatch = try await prepareSourceDerivedDispatch(sideEffect: sideEffect, run: run,
@@ -478,13 +542,15 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                     toolSchemaSHA256: toolSchemaSHA256,
                     pendingInputID: JSONSupport.sha256Hex("\(previousResponseID ?? "root"):\(JSONSupport.sha256Hex(input)):\(toolSchemaSHA256)"),
                     inputAlreadyRetained: continuationInput != nil,
-                    providerPreflight: sourceDispatch?.preflight
+                    providerPreflight: sourceDispatch?.preflight,
+                    previouslyRetainedInputBytes: policyText == nil ? nil : continuationRetainedInputBytes
                 )
             )
             }
             strongestAction = Self.stronger(strongestAction, beforeAction)
             if sourceActivation != nil,
                strongestAction == .checkpoint || strongestAction == .rollover || strongestAction == .emergency {
+                if let policyDeliveryID, policyText != nil { await policyContext.deferred(deliveryID: policyDeliveryID) }
                 return Self.sourceBudgetDeferral
             }
             // A successor is not accepted until this exact turn is durably reserved.
@@ -492,6 +558,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             // create an endless chain of fresh sessions without consuming the handoff.
             if automatic == nil,
                strongestAction == .rollover || strongestAction == .emergency {
+                if let policyDeliveryID, policyText != nil { await policyContext.deferred(deliveryID: policyDeliveryID) }
                 work.metadata["provider_response_id"] = previousResponseID
                 return .rolloverRequired(work)
             }
@@ -568,14 +635,15 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 }
                 throw error
             }
-            if let policyDeliveryID, policyText != nil {
-                await policyContext.presented(deliveryID: policyDeliveryID)
-            }
             guard turn.completed,
                   turn.providerID == expectedProviderID,
                   turn.modelKey == modelKey,
                   turn.previousResponseID == previousResponseID else {
+                if let policyDeliveryID, policyText != nil { await policyContext.deferred(deliveryID: policyDeliveryID) }
                 throw ManagedModelProviderContractError.incompleteTerminalResponse
+            }
+            if let policyDeliveryID, policyText != nil {
+                await policyContext.presented(deliveryID: policyDeliveryID)
             }
 
             let historicalBudgetReplay: Bool
@@ -695,21 +763,29 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 work.metadata["managed_last_tool_name"] = call.name
                 work.metadata["managed_last_tool_call_id"] = call.callID
                 work.metadata["managed_last_tool_output"] = boundedOutput
+                let toolOutcome = ManagedToolInvocationOutcome(result: result)
+                work.metadata[ManagedToolInvocationOutcome.metadataKey] = toolOutcome.rawValue
                 if let context = work.metadata["managed_instruction_context"],
                    Self.advanceOrderedToolProgress(
                         callName: call.name,
                         arguments: arguments,
                         instructionContext: context,
+                        outcome: toolOutcome,
                         work: &work
                    ) {
                     // The manager-owned cursor supplied the exact next action.
                 } else {
-                    work.nextAction = Self.boundedUTF8(
+                    let nextAction: String
+                    if toolOutcome == .failed {
+                        nextAction = """
+                        Tool \(call.name) (call \(call.callID)) failed with result \(boundedOutput). Keep the requested action open. Review this feedback and correct or reconcile the cause before continuing; do not count this failed attempt as completed work.
                         """
+                    } else {
+                        nextAction = """
                         The predecessor successfully completed tool \(call.name) (call \(call.callID)) with result \(boundedOutput). Continue with the next instruction after that completed effect. Do not repeat that tool call or replay earlier package actions.
-                        """,
-                        maximumBytes: 8 * 1_024
-                    )
+                        """
+                    }
+                    work.nextAction = Self.boundedUTF8(nextAction, maximumBytes: 8 * 1_024)
                 }
                 outputs.append([
                     "type": "function_call_output",
@@ -744,8 +820,21 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
                 )
                 }
                 strongestAction = Self.stronger(strongestAction, toolAction)
+                let toolCountAction: ContextBudgetAction
+                if historicalBudgetReplay { toolCountAction = .normal }
+                else {
+                    toolCountAction = try await budget.evaluateToolCallCount(
+                        run: run, sessionID: sessionID, capabilities: capabilities,
+                        providerCallID: call.callID, toolName: call.name
+                    )
+                }
+                strongestAction = Self.stronger(strongestAction, toolCountAction)
+                if toolCountAction == .rollover || toolCountAction == .emergency {
+                    return .rolloverRequired(work)
+                }
             }
             continuationInput = try Self.canonicalData(outputs)
+            continuationRetainedInputBytes = observedProvider == nil ? continuationInput?.count : prefix.serializedInputByteCount
             if strongestAction == .rollover || strongestAction == .emergency {
                 return .rolloverRequired(work)
             }
@@ -975,7 +1064,21 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             outputs.append(["type": "function_call_output", "call_id": call.callID,
                             "output": try JSONSupport.canonicalJSON(payload)])
         }
-        let firstChildInputSHA = JSONSupport.sha256Hex(try Self.canonicalData(outputs))
+        let firstChildInput = try Self.canonicalData(outputs)
+        var firstChildInputSHA = JSONSupport.sha256Hex(firstChildInput)
+        let firstChildKey = "\(sideEffect.idempotencyKey):round:\(round + 1)"
+        if let child = try await repository.providerTurn(Self.stableUUID("turn:\(firstChildKey)")),
+           child.intent.inputSHA256 != firstChildInputSHA,
+           let generation = Int(exactly: run.projectGeneration.rawValue) {
+            let snapshot = await policyContext.context(projectID: run.projectID.description,
+                projectGeneration: generation, runID: run.runID.description, sessionID: sessionID,
+                deliveryID: "managed:\(sideEffect.idempotencyKey):\(round + 1)",
+                maximumCount: Self.maximumPolicyNoticeCount, maximumBytes: Self.maximumPolicyContextBytes)
+            let text = StjornarvaldPolicyNoticeFormatter.managedContext(snapshot,
+                maximumBytes: Self.maximumPolicyContextBytes)
+            firstChildInputSHA = JSONSupport.sha256Hex(try requestInput(run: run,
+                previousResponseID: turn.responseID, continuationInput: firstChildInput, policyContext: text))
+        }
         var previous = turn.responseID
         var seen = Set([previous])
         guard round + 1 < maximumToolRounds else { throw NativeSourceConversationError.integrityFailure }
@@ -1037,7 +1140,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
     }
 
 
-    private func sourceToolOutputPreflight(provider: any ManagedModelProviderObservedDispatching,
+    private func sourceToolOutputPreflight(provider: any ManagedModelProviderRequestPreflighting,
         input: Data, tools: [Data], run: AutonomousRunRecord, sideEffect: RunSideEffectIntent,
         round: Int, previousResponseID: String, modelKey: String) async throws -> ProviderRequestPreflight {
         let key = "\(sideEffect.idempotencyKey):round:\(round + 1)"
@@ -1112,8 +1215,11 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             }
             guard actual == dispatch.preflight else { throw AutonomyError.intentConflict }
         }
+        let actualInput: Data?
+        if case .continuation(let request) = dispatch.request { actualInput = request.input }
+        else { actualInput = nil }
         let admission = try await repository.beginSourceDerivedProviderTurn(intent: dispatch.intent,
-            preflight: dispatch.preflight, capabilities: dispatch.capabilities, lease: lease)
+            preflight: dispatch.preflight, capabilities: dispatch.capabilities, lease: lease, actualInput: actualInput)
         switch admission {
         case .completed, .lookupOnly:
             guard let recovered = try await provider.lookupRecorded(idempotencyKey: dispatch.intent.idempotencyKey) else {
@@ -1347,7 +1453,16 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         continuationInput: Data?,
         policyContext: String?
     ) throws -> Data {
-        if let continuationInput { return continuationInput }
+        if let continuationInput {
+            guard let policyContext, !policyContext.isEmpty else { return continuationInput }
+            guard var values = try JSONSerialization.jsonObject(with: continuationInput) as? [[String: Any]] else {
+                throw ManagedModelProviderContractError.invalidValue("tool feedback input must contain objects")
+            }
+            guard values.count < ManagedModelProviderContract.maximumMessageCount else { return continuationInput }
+            values.append(["type": "message", "role": "user", "content": policyContext])
+            let candidate = try Self.canonicalData(values)
+            return candidate.count <= ManagedModelProviderContract.maximumContinuationInputBytes ? candidate : continuationInput
+        }
         if previousResponseID != nil,
            let nextAction = run.specification.work.nextAction,
            let instructionContext = run.specification.work.metadata[
@@ -1572,6 +1687,7 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
         callName: String,
         arguments: [String: Any],
         instructionContext: String,
+        outcome: ManagedToolInvocationOutcome = .succeeded,
         work: inout AutonomousRunWork
     ) -> Bool {
         let directives = orderedToolDirectives(in: instructionContext)
@@ -1581,10 +1697,19 @@ public actor ManagedProjectRunStepExecutor: ProjectRunStepExecuting {
             directives.count
         ))
         guard cursor < directives.count else {
+            guard outcome == .succeeded else { return false }
             work.nextAction = "All \(directives.count) ordered tool instructions are durably complete. Request completion without executing another project tool."
             return true
         }
         let expected = directives[cursor]
+        if outcome == .failed {
+            let feedback = work.metadata["managed_last_tool_output"] ?? "No error detail was retained"
+            work.nextAction = Self.boundedUTF8(
+                "The first open ordered package action is exactly: \(expected.instruction) The previous tool invocation failed with result \(feedback). Correct or reconcile the reported cause before continuing this still-open action; do not request completion.",
+                maximumBytes: 8 * 1_024
+            )
+            return true
+        }
         let argumentsJSON = (try? JSONSupport.canonicalJSON(arguments)) ?? ""
         if callName == expected.toolName,
            expected.requiredLiterals.allSatisfy({ argumentsJSON.contains($0) }) {

@@ -27,6 +27,7 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
     private let systemCollector: any SystemMetricsCollecting
     private let tieredCollector: SystemCollector?
     private let queue: DispatchQueue
+    private let queueKey = DispatchSpecificKey<UInt8>()
     private let lock = NSLock()
 
     private var timer: DispatchSourceTimer?
@@ -49,6 +50,7 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
         // The first public frame must be structurally complete even when the
         // continuous timer is intentionally idle (tests, CLI doctor, startup).
         self._latest = systemCollector.collectMetrics()
+        self.queue.setSpecific(key: queueKey, value: 1)
     }
 
     public var latestSystem: SystemMetrics {
@@ -71,6 +73,19 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
         return _running
     }
 
+    public func collectCurrentMetrics() -> SystemMetrics {
+        let collect = {
+            let metrics = self.tieredCollector?.collectMetrics(tier: .full)
+                ?? self.systemCollector.collectMetrics()
+            self.lock.lock()
+            self._latest = metrics
+            self.lock.unlock()
+            return metrics
+        }
+        if DispatchQueue.getSpecific(key: queueKey) == 1 { return collect() }
+        return queue.sync(execute: collect)
+    }
+
     public func start(targetHz: Double = RealtimeMetricsEngine.defaultTargetHz) {
         stop()
         let hz = min(max(targetHz, 5), 60)
@@ -84,7 +99,11 @@ public final class RealtimeMetricsEngine: RealtimeMetricsStreaming, @unchecked S
         lock.unlock()
 
         // Warm full sample so heavy fields are not empty on first paint.
-        sampleOnce(forceFull: true)
+        if DispatchQueue.getSpecific(key: queueKey) == 1 {
+            sampleOnce(forceFull: true)
+        } else {
+            queue.sync { sampleOnce(forceFull: true) }
+        }
 
         let t = DispatchSource.makeTimerSource(queue: queue)
         t.schedule(

@@ -86,6 +86,519 @@ final class RuntimeExecutionJobTests: XCTestCase {
         }
     }
 
+
+    func testForcedReaderCloseWithOwnedInheritedWriterCannotReportCompleteOutput() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-pipe-baseline-\(UUID().uuidString)")
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        let artifacts = root.appendingPathComponent("artifacts", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: artifacts, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let spool = try RuntimeOutputSpool(jobID: UUID(), projectID: ProjectID(), generation: .initial,
+            artifactRoot: artifacts, maximumInlineBytes: 256, maximumArtifactBytes: 1_024)
+        let ready = project.appendingPathComponent("ready")
+        let release = project.appendingPathComponent("release")
+        let launcher = try RuntimeLaunchGate.install(serviceRoot: artifacts)
+        let script = "printf 'owned-prefix'; printf 'owned-stderr' >&2; printf ready > \"$1\"; i=0; while [ ! -f \"$2\" ]; do i=$((i+1)); [ $i -lt 300 ] || exit 70; /bin/sleep 0.01; done; exit 0"
+        let process = try RuntimeActiveProcess(plan: RuntimeProcessPlan(
+            executable: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", script, "owned-inherited-writer", ready.path, release.path],
+            workingDirectory: project, environment: ["PATH": "/usr/bin:/bin"], writableRoots: [project]
+        ), spool: spool, launcher: launcher)
+        defer { process.forceCloseReaders(); spool.discard() }
+        var fixtureError: Error?
+        do {
+            try process.releaseForExecution()
+            let started = await Self.waitForFile(ready)
+            XCTAssertTrue(started, "The actual owned child must reach its writer-holding barrier")
+            process.forceCloseReaders()
+            let closedWhileWriterRetained = await process.waitForReaders(maximumMilliseconds: 250)
+            XCTAssertTrue(closedWhileWriterRetained, "Force close must stop the reader owner while the child retains its write descriptors")
+            try Data().write(to: release)
+        } catch {
+            fixtureError = error
+            process.abortBeforeExecution()
+            try? Data().write(to: release)
+        }
+        let exit = await process.waitForExit(maximumMilliseconds: 4_000)
+        XCTAssertEqual(exit?.exitCode, 0, "The bounded actual child must exit zero and be reaped")
+        if exit == nil {
+            _ = try? await process.terminateAndWait(graceMilliseconds: 100, forcedGraceMilliseconds: 1_000)
+        } else {
+            try await process.closeDescendants(graceMilliseconds: 100, forcedGraceMilliseconds: 1_000)
+        }
+        let drained = await process.waitForReaders(maximumMilliseconds: 1_000)
+        XCTAssertTrue(drained)
+        let outputs = try spool.finalize()
+        XCTAssertEqual(outputs.count, 2)
+        for output in outputs {
+            XCTAssertTrue(output.artifactTruncated, "Forced reader closure cannot certify complete producer output: \(output.stream)")
+        }
+        if let fixtureError { throw fixtureError }
+    }
+
+    func testPipeReaderEOFWaitsForOwnedChildRetainingTheWriter() async throws {
+        try await Self.withOwnedPipeWriter { root, spool, reader, release, child, ownedRead in
+            reader.start()
+            XCTAssertFalse(reader.finished, "The child still owns its pipe writer behind the release barrier")
+            try Data().write(to: release)
+            let status = try await Self.reapPipeWriter(child)
+            XCTAssertEqual(status, 0, "The actual writer must reach a successful native terminal status")
+            let closed = await Self.waitForPipeReader(reader)
+            XCTAssertTrue(closed)
+            reader.close()
+            let stdout = try XCTUnwrap(try spool.finalize().first { $0.stream == .stdout })
+            XCTAssertEqual(stdout.inlineText, "late-output")
+            XCTAssertEqual(stdout.byteCount, 11)
+            XCTAssertEqual(stdout.producerEndReason, .eof)
+            XCTAssertNil(stdout.producerReadErrno)
+            XCTAssertFalse(stdout.artifactTruncated)
+        }
+    }
+
+    func testForcedPipeCloseStopsItsOwnerBeforeLateChildWriteAndDescriptorReuse() async throws {
+        try await Self.withOwnedPipeWriter { root, spool, reader, release, child, ownedRead in
+            reader.start()
+            reader.close()
+            let closed = await Self.waitForPipeReader(reader)
+            XCTAssertTrue(closed, "An idle writer cannot retain a forced reader indefinitely")
+            let reused = Darwin.open("/dev/null", O_RDONLY | O_CLOEXEC)
+            guard reused >= 0 else { throw RuntimeJobError.storageFailure("could not open reuse control") }
+            defer { Darwin.close(reused) }
+            let exactReuse = reused == ownedRead ? reused : Darwin.fcntl(reused, F_DUPFD_CLOEXEC, ownedRead)
+            guard exactReuse >= 0 else { throw RuntimeJobError.storageFailure("could not allocate exact descriptor reuse control") }
+            defer { if exactReuse != reused { Darwin.close(exactReuse) } }
+            XCTAssertEqual(exactReuse, ownedRead, "This control must actually reuse the released reader descriptor")
+            reader.close()
+            XCTAssertGreaterThanOrEqual(Darwin.fcntl(exactReuse, F_GETFD), 0,
+                "Repeated close cannot close a descriptor allocated after the reader owner finished")
+            try Data().write(to: release)
+            let status = try await Self.reapPipeWriter(child)
+            XCTAssertNotEqual(status, 0, "The late writer must observe the closed actual pipe")
+            let stdout = try XCTUnwrap(try spool.finalize().first { $0.stream == .stdout })
+            XCTAssertEqual(stdout.byteCount, 0)
+            XCTAssertEqual(stdout.producerEndReason, .forcedClose)
+            XCTAssertNil(stdout.producerReadErrno)
+            XCTAssertTrue(stdout.artifactTruncated)
+        }
+    }
+
+    func testPipeReaderPersistsActualReadErrorInsteadOfEOF() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-pipe-error-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let spool = try RuntimeOutputSpool(jobID: UUID(), projectID: ProjectID(), generation: .initial,
+            artifactRoot: root, maximumInlineBytes: 256, maximumArtifactBytes: 1_024)
+        defer { spool.discard() }
+        var descriptors = [Int32](repeating: -1, count: 2)
+        guard Darwin.pipe(&descriptors) == 0 else { throw RuntimeJobError.spawnFailed(errno) }
+        defer { Darwin.close(descriptors[0]) }
+        // Reading the still-open write end produces a real EBADF; no injected reader result.
+        let reader = RuntimePipeReader(descriptor: descriptors[1], stream: .stdout, spool: spool)
+        reader.start()
+        let closed = await Self.waitForPipeReader(reader)
+        XCTAssertTrue(closed)
+        reader.close()
+        let stdout = try XCTUnwrap(try spool.finalize().first { $0.stream == .stdout })
+        XCTAssertEqual(stdout.producerEndReason, .readError)
+        XCTAssertEqual(stdout.producerReadErrno, EBADF)
+        XCTAssertTrue(stdout.artifactTruncated)
+        XCTAssertEqual(stdout.byteCount, 0)
+    }
+
+
+    func testPipeCloseBeforeStartCannotBecomeEOFForAnAlreadyClosedWriter() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-pipe-close-first-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let spool = try RuntimeOutputSpool(jobID: UUID(), projectID: ProjectID(), generation: .initial,
+            artifactRoot: root, maximumInlineBytes: 256, maximumArtifactBytes: 1_024)
+        defer { spool.discard() }
+        var descriptors = [Int32](repeating: -1, count: 2)
+        guard Darwin.pipe(&descriptors) == 0 else { throw RuntimeJobError.spawnFailed(errno) }
+        Darwin.close(descriptors[1])
+        let reader = RuntimePipeReader(descriptor: descriptors[0], stream: .stdout, spool: spool)
+        reader.close()
+        reader.start()
+        let closed = await Self.waitForPipeReader(reader)
+        XCTAssertTrue(closed)
+        let stdout = try XCTUnwrap(try spool.finalize().first { $0.stream == .stdout })
+        XCTAssertEqual(stdout.producerEndReason, .forcedClose)
+        XCTAssertNil(stdout.producerReadErrno)
+        XCTAssertTrue(stdout.artifactTruncated)
+        XCTAssertEqual(stdout.byteCount, 0)
+    }
+
+    func testLegacyOutputDecodesWithoutManufacturingProducerEOF() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-pipe-legacy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let spool = try RuntimeOutputSpool(jobID: UUID(), projectID: ProjectID(), generation: .initial,
+            artifactRoot: root, maximumInlineBytes: 256, maximumArtifactBytes: 1_024)
+        defer { spool.discard() }
+        spool.append(Data("legacy".utf8), stream: .stdout)
+        let stdout = try XCTUnwrap(try spool.finalize().first { $0.stream == .stdout })
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(stdout)) as? [String: Any])
+        legacy.removeValue(forKey: "producerEndReason")
+        legacy.removeValue(forKey: "producerReadErrno")
+        let decoded = try JSONDecoder().decode(RuntimeJobOutputMetadata.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertNil(decoded.producerEndReason)
+        XCTAssertNil(decoded.producerReadErrno)
+        XCTAssertEqual(decoded.inlineText, "legacy")
+        XCTAssertEqual(decoded.sha256, stdout.sha256)
+        legacy["producerEndReason"] = NSNull(); legacy["producerReadErrno"] = NSNull()
+        let explicitNull = try JSONDecoder().decode(RuntimeJobOutputMetadata.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertNil(explicitNull.producerEndReason)
+        XCTAssertNil(explicitNull.producerReadErrno)
+        legacy["producerEndReason"] = "not_a_producer_end"
+        XCTAssertThrowsError(try JSONDecoder().decode(RuntimeJobOutputMetadata.self,
+            from: JSONSerialization.data(withJSONObject: legacy)))
+    }
+
+
+    func testVersion5OutputRowsMigrateWithoutInventingProducerEOF() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-output-v5-\(UUID().uuidString)")
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("control.sqlite")
+        let control = try ProjectControlPlaneRepository(databaseURL: databaseURL)
+        let projectID = ProjectID()
+        _ = try await control.registerProjectUnchecked(projectID: projectID, displayName: "Owned V5 Output", canonicalRoot: project)
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: "owned-output-v5")
+        let scope = ToolAuthorizationScope(canonicalRoots: [project], allowedTools: ["job.read_output"], networkAllowed: false, maximumInlineOutputBytes: 256)
+        _ = try await control.bind(owner: owner, projectID: projectID, generation: .initial, authorizationScope: scope)
+        let context = try await control.invocationContext(for: owner)
+        await control.close()
+        let jobID = UUID()
+        let artifactRoot = root.appendingPathComponent("artifacts")
+        try FileManager.default.createDirectory(at: artifactRoot, withIntermediateDirectories: true)
+        let spool = try RuntimeOutputSpool(jobID: jobID, projectID: projectID, generation: .initial,
+            artifactRoot: artifactRoot, maximumInlineBytes: 8, maximumArtifactBytes: 256)
+        defer { spool.discard() }
+        spool.append(Data("legacy stdout bytes\n".utf8), stream: .stdout)
+        let originals = try spool.finalize()
+        let database = try Self.openSQLiteFixture(at: databaseURL)
+        do {
+            // Verbatim inspected v5 runtime schema; the co-resident control plane
+            // already owns execution_jobs, so add its v5 process-identity columns.
+            let schema = """
+            CREATE TABLE IF NOT EXISTS runtime_job_schema_version (
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                version INTEGER NOT NULL CHECK(version>=1),
+                applied_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS execution_jobs (
+                job_id TEXT PRIMARY KEY,
+                run_id TEXT REFERENCES autonomous_runs(run_id) ON DELETE SET NULL,
+                project_id TEXT NOT NULL REFERENCES control_projects(project_id) ON DELETE CASCADE,
+                project_generation INTEGER NOT NULL CHECK(project_generation>=1),
+                runtime_kind TEXT NOT NULL CHECK(runtime_kind IN ('process','shell','bash','python','powershell')),
+                execution_profile TEXT NOT NULL CHECK(execution_profile IN (
+                    'direct_process','zsh_no_profile','bash_no_profile','legacy_bash_login',
+                    'python_isolated','powershell_no_profile')),
+                replay_class TEXT NOT NULL CHECK(replay_class IN ('read_only','idempotent','reconciled','non_replayable')),
+                idempotency_key TEXT,
+                state TEXT NOT NULL CHECK(state IN (
+                    'queued','running','cancelling','completed','failed','timed_out','cancelled','quarantined_stale')),
+                canonical_cwd TEXT NOT NULL,
+                command_summary TEXT NOT NULL,
+                timeout_seconds INTEGER NOT NULL CHECK(timeout_seconds>0),
+                exit_code INTEGER,
+                stdout_inline TEXT,
+                stderr_inline TEXT,
+                output_artifact_id TEXT,
+                output_bytes INTEGER NOT NULL DEFAULT 0 CHECK(output_bytes>=0),
+                process_identifier INTEGER,
+                process_group_identifier INTEGER,
+                process_start_seconds INTEGER CHECK(process_start_seconds>0),
+                process_start_microseconds INTEGER CHECK(
+                    process_start_microseconds>=0 AND process_start_microseconds<1000000
+                ),
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                completed_at TEXT,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_jobs_project_state
+                ON execution_jobs(project_id,project_generation,state);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_project_idempotency
+                ON execution_jobs(project_id,project_generation,idempotency_key)
+                WHERE idempotency_key IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS runtime_job_details (
+                job_id TEXT PRIMARY KEY REFERENCES execution_jobs(job_id) ON DELETE CASCADE,
+                request_artifact_relative_path TEXT,
+                error_code TEXT,
+                error_summary TEXT,
+                termination_phase TEXT NOT NULL DEFAULT 'idle' CHECK(termination_phase IN (
+                    'idle','term_pending','term_sent','kill_pending','kill_sent','confirmed','unconfirmed'
+                )),
+                termination_probe_deadline TEXT,
+                termination_error_summary TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS runtime_job_output_streams (
+                job_id TEXT NOT NULL REFERENCES execution_jobs(job_id) ON DELETE CASCADE,
+                stream TEXT NOT NULL CHECK(stream IN ('stdout','stderr')),
+                inline_text TEXT NOT NULL,
+                artifact_relative_path TEXT,
+                artifact_device_identifier INTEGER CHECK(artifact_device_identifier>=0),
+                artifact_file_identifier INTEGER CHECK(artifact_file_identifier>=0),
+                byte_count INTEGER NOT NULL CHECK(byte_count>=0),
+                retained_byte_count INTEGER NOT NULL CHECK(retained_byte_count>=0),
+                sha256 TEXT NOT NULL,
+                inline_truncated INTEGER NOT NULL CHECK(inline_truncated IN (0,1)),
+                artifact_truncated INTEGER NOT NULL CHECK(artifact_truncated IN (0,1)),
+                artifact_evicted_at TEXT,
+                PRIMARY KEY(job_id,stream)
+            );
+            CREATE TABLE IF NOT EXISTS runtime_job_idempotency_receipts (
+                job_id TEXT PRIMARY KEY,
+                run_id TEXT REFERENCES autonomous_runs(run_id) ON DELETE SET NULL,
+                project_id TEXT NOT NULL REFERENCES control_projects(project_id) ON DELETE CASCADE,
+                project_generation INTEGER NOT NULL CHECK(project_generation>=1),
+                runtime_kind TEXT NOT NULL CHECK(runtime_kind IN ('process','shell','bash','python','powershell')),
+                execution_profile TEXT NOT NULL CHECK(execution_profile IN (
+                    'direct_process','zsh_no_profile','bash_no_profile','legacy_bash_login',
+                    'python_isolated','powershell_no_profile')),
+                replay_class TEXT NOT NULL CHECK(replay_class IN (
+                    'read_only','idempotent','reconciled','non_replayable')),
+                idempotency_key TEXT NOT NULL,
+                state TEXT NOT NULL CHECK(state IN (
+                    'completed','failed','timed_out','cancelled','quarantined_stale')),
+                canonical_cwd TEXT NOT NULL,
+                command_summary TEXT NOT NULL,
+                timeout_seconds INTEGER NOT NULL CHECK(timeout_seconds>0),
+                exit_code INTEGER,
+                output_bytes INTEGER NOT NULL CHECK(output_bytes>=0),
+                error_code TEXT,
+                error_summary TEXT,
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                completed_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                compacted_at TEXT NOT NULL,
+                UNIQUE(project_id,project_generation,idempotency_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_runtime_job_receipts_project_completed
+                ON runtime_job_idempotency_receipts(project_id,project_generation,completed_at DESC);
+            """
+            try Self.executeSQLiteFixture(schema, database: database)
+            try Self.executeSQLiteFixture("""
+                ALTER TABLE execution_jobs ADD COLUMN process_start_seconds INTEGER CHECK(process_start_seconds>0);
+                ALTER TABLE execution_jobs ADD COLUMN process_start_microseconds INTEGER CHECK(process_start_microseconds>=0 AND process_start_microseconds<1000000);
+                INSERT INTO runtime_job_schema_version(singleton,version,applied_at) VALUES(1,5,'2026-10-06T00:00:00Z');
+                """, database: database)
+            func text(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "''") + "'" }
+            func optionalText(_ value: String?) -> String { value.map(text) ?? "NULL" }
+            func optionalInteger(_ value: UInt64?) -> String { value.map(String.init) ?? "NULL" }
+            let job = jobID.uuidString.lowercased()
+            try Self.executeSQLiteFixture("""
+                INSERT INTO execution_jobs(job_id,project_id,project_generation,runtime_kind,execution_profile,replay_class,state,canonical_cwd,command_summary,timeout_seconds,exit_code,output_bytes,created_at,completed_at,updated_at)
+                VALUES('\(job)','\(projectID.description)',1,'process','direct_process','read_only','completed',\(text(project.path)),'owned pre-v6 output fixture',5,0,20,'2026-10-06T00:00:00Z','2026-10-06T00:00:01Z','2026-10-06T00:00:01Z');
+                """, database: database)
+            for output in originals {
+                try Self.executeSQLiteFixture("""
+                    INSERT INTO runtime_job_output_streams(job_id,stream,inline_text,artifact_relative_path,artifact_device_identifier,artifact_file_identifier,byte_count,retained_byte_count,sha256,inline_truncated,artifact_truncated)
+                    VALUES('\(job)',\(text(output.stream.rawValue)),\(text(output.inlineText)),\(optionalText(output.artifactRelativePath)),\(optionalInteger(output.artifactDeviceIdentifier)),\(optionalInteger(output.artifactFileIdentifier)),\(output.byteCount),\(output.retainedByteCount),\(text(output.sha256)),\(output.inlineTruncated ? 1 : 0),\(output.artifactTruncated ? 1 : 0));
+                    """, database: database)
+            }
+        } catch { sqlite3_close(database); throw error }
+        sqlite3_close(database)
+        XCTAssertEqual(try Self.sqliteCount(databaseURL: databaseURL,
+            sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"), 5)
+        XCTAssertEqual(try Self.sqliteCount(databaseURL: databaseURL,
+            sql: "SELECT COUNT(*) FROM runtime_job_output_streams"), 2)
+        let repository = try RuntimeJobRepository(databaseURL: databaseURL)
+        for original in originals {
+            let output = try await repository.output(jobID: jobID, stream: original.stream, context: context)
+            XCTAssertEqual(output, original, "Migration must preserve bytes, hash, artifact identity, and unknown producer end")
+            XCTAssertNil(output.producerEndReason)
+            XCTAssertNil(output.producerReadErrno)
+        }
+        let record = try await repository.job(jobID, context: context)
+        XCTAssertEqual(record.state, .completed)
+        XCTAssertEqual(record.exitCode, 0)
+        await repository.close()
+        let manifest = try JSONDecoder().decode(VerifiedMigrationBackupManifest.self,
+            from: Data(contentsOf: VerifiedMigrationBackup.activeManifestURL(for: databaseURL)))
+        XCTAssertEqual(manifest.state, .completed)
+        XCTAssertEqual(manifest.sourceVersion, 5)
+        XCTAssertEqual(manifest.targetVersion, 6)
+        let backup = root.appendingPathComponent("control.pre-migration-v5.sqlite3")
+        let backupBytes = try Data(contentsOf: backup)
+        XCTAssertEqual(manifest.backupSHA256, JSONSupport.sha256Hex(backupBytes))
+        XCTAssertEqual(try Self.sqliteCount(databaseURL: backup,
+            sql: "SELECT version FROM runtime_job_schema_version WHERE singleton=1"), 5)
+        let reopened = try RuntimeJobRepository(databaseURL: databaseURL)
+        for original in originals {
+            let output = try await reopened.output(jobID: jobID, stream: original.stream, context: context)
+            XCTAssertEqual(output, original)
+        }
+        await reopened.close()
+        XCTAssertEqual(try Data(contentsOf: backup), backupBytes, "Reopen cannot create a replacement migration backup")
+        XCTAssertEqual(try Self.sqliteCount(databaseURL: databaseURL,
+            sql: "SELECT COUNT(*) FROM forge_migration_receipts WHERE migration_id='\(manifest.migrationID)'"), 1)
+    }
+
+
+    func testProducerLossAndErrnoCannotBypassDurableOutputValidation() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        do {
+            let invalid: [(RuntimeOutputProducerEndReason?, Int32?, Bool)] = [
+                (.readError, EBADF, false), (.forcedClose, nil, false),
+                (.readError, nil, true), (.eof, EBADF, false),
+                (.forcedClose, EBADF, true), (nil, EBADF, false),
+            ]
+            for (reason, readErrno, truncated) in invalid {
+                let jobID = UUID()
+                _ = try await fixture.runtimeRepository.createJob(jobID: jobID,
+                    request: fixture.request(kind: .bash, profile: .bashNoProfile, script: "exit 0", timeout: 5),
+                    commandSummary: "owned unlaunched producer validation", timeoutSeconds: 5, requestArtifactRelativePath: nil)
+                let artifactRoot = fixture.root.appendingPathComponent("validation-artifacts")
+                try FileManager.default.createDirectory(at: artifactRoot, withIntermediateDirectories: true)
+                let spool = try RuntimeOutputSpool(jobID: jobID, projectID: fixture.context.projectID, generation: .initial,
+                    artifactRoot: artifactRoot, maximumInlineBytes: 256, maximumArtifactBytes: 1_024)
+                spool.append(Data("owned".utf8), stream: .stdout)
+                let original = try XCTUnwrap(try spool.finalize().first { $0.stream == .stdout })
+                var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+                object["producerEndReason"] = reason?.rawValue as Any? ?? NSNull()
+                object["producerReadErrno"] = readErrno as Any? ?? NSNull()
+                object["artifactTruncated"] = truncated
+                let rejected = try JSONDecoder().decode(RuntimeJobOutputMetadata.self,
+                    from: JSONSerialization.data(withJSONObject: object))
+                do {
+                    _ = try await fixture.runtimeRepository.complete(jobID: jobID, terminalState: .failed,
+                        exitCode: 1, outputs: [rejected], artifactID: nil, expectedContext: fixture.context)
+                    XCTFail("Invalid producer metadata reached durable output: \(reason?.rawValue ?? "unknown")")
+                } catch let error as RuntimeJobError {
+                    XCTAssertEqual(error.code, "invalid_request")
+                }
+                let queued = try await fixture.runtimeRepository.job(jobID, context: fixture.context)
+                XCTAssertEqual(queued.state, .queued, "The failed write must roll its job transition back")
+                _ = try await fixture.runtimeRepository.complete(jobID: jobID, terminalState: .failed,
+                    exitCode: 1, outputs: [original], artifactID: nil, expectedContext: fixture.context)
+                let databaseURL = await fixture.runtimeRepository.databaseURL
+                let database = try Self.openSQLiteFixture(at: databaseURL)
+                do {
+                    let value = reason.map { "'" + $0.rawValue + "'" } ?? "NULL"
+                    let number = readErrno.map(String.init) ?? "NULL"
+                    try Self.executeSQLiteFixture("UPDATE runtime_job_output_streams SET producer_end_reason=\(value),producer_read_errno=\(number),artifact_truncated=\(truncated ? 1 : 0) WHERE job_id='\(jobID.uuidString.lowercased())' AND stream='stdout'", database: database)
+                    XCTAssertEqual(sqlite3_changes(database), 1)
+                } catch { sqlite3_close(database); throw error }
+                sqlite3_close(database)
+                do {
+                    _ = try await fixture.runtimeRepository.output(jobID: jobID, stream: .stdout, context: fixture.context)
+                    XCTFail("Invalid durable producer metadata was decoded")
+                } catch let error as RuntimeJobError { XCTAssertEqual(error.code, "runtime_storage_failure") }
+                spool.discard()
+            }
+        } catch { await fixture.close(); throw error }
+        await fixture.close()
+    }
+
+    private static func waitForPipeReader(_ reader: RuntimePipeReader) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while !reader.finished && clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return reader.finished
+    }
+
+    private static func reapPipeWriter(_ child: Int32) async throws -> Int32 {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(3))
+        while clock.now < deadline {
+            var status: Int32 = 0
+            let result = Darwin.waitpid(child, &status, WNOHANG)
+            if result == child { return status }
+            if result < 0, errno != EINTR { throw RuntimeJobError.storageFailure("owned pipe writer could not be reaped") }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        throw RuntimeJobError.storageFailure("owned pipe writer exceeded its bounded deadline")
+    }
+
+    private static func withOwnedPipeWriter(
+        body: (URL, RuntimeOutputSpool, RuntimePipeReader, URL, Int32, Int32) async throws -> Void
+    ) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-pipe-child-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let artifactRoot = root.appendingPathComponent("artifacts")
+        try FileManager.default.createDirectory(at: artifactRoot, withIntermediateDirectories: true)
+        let spool = try RuntimeOutputSpool(jobID: UUID(), projectID: ProjectID(), generation: .initial,
+            artifactRoot: artifactRoot, maximumInlineBytes: 256, maximumArtifactBytes: 1_024)
+        defer { spool.discard() }
+        let release = root.appendingPathComponent("release")
+        var descriptors = [Int32](repeating: -1, count: 2)
+        guard Darwin.pipe(&descriptors) == 0 else { throw RuntimeJobError.spawnFailed(errno) }
+        let ownedRead = Darwin.fcntl(descriptors[0], F_DUPFD_CLOEXEC, 128)
+        guard ownedRead >= 0 else {
+            descriptors.forEach { Darwin.close($0) }
+            throw RuntimeJobError.storageFailure("could not allocate owned reader descriptor")
+        }
+        Darwin.close(descriptors[0]); descriptors[0] = ownedRead
+        var transferredRead = false
+        defer {
+            if !transferredRead { Darwin.close(descriptors[0]) }
+            if descriptors[1] >= 0 { Darwin.close(descriptors[1]) }
+        }
+        var actions: posix_spawn_file_actions_t?
+        guard posix_spawn_file_actions_init(&actions) == 0 else { throw RuntimeJobError.storageFailure("pipe writer actions failed") }
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        var attributes: posix_spawnattr_t?
+        guard posix_spawnattr_init(&attributes) == 0 else { throw RuntimeJobError.storageFailure("pipe writer attributes failed") }
+        defer { posix_spawnattr_destroy(&attributes) }
+        guard posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)) == 0 else {
+            throw RuntimeJobError.storageFailure("pipe writer descriptor isolation failed")
+        }
+        guard posix_spawn_file_actions_adddup2(&actions, descriptors[1], STDOUT_FILENO) == 0,
+              posix_spawn_file_actions_addclose(&actions, descriptors[0]) == 0,
+              posix_spawn_file_actions_addclose(&actions, descriptors[1]) == 0,
+              posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0) == 0,
+              posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0) == 0 else {
+            throw RuntimeJobError.storageFailure("pipe writer file actions failed")
+        }
+        let script = "i=0; while [ ! -f \"$1\" ]; do i=$((i+1)); [ $i -lt 200 ] || exit 70; /bin/sleep 0.01; done; printf late-output"
+        var arguments = ["/bin/sh", "-c", script, "owned-pipe-writer", release.path].map { strdup($0) } + [nil]
+        var environment = [strdup("PATH=/usr/bin:/bin"), nil]
+        defer {
+            for pointer in arguments { free(pointer) }
+            for pointer in environment { free(pointer) }
+        }
+        var child: Int32 = 0
+        let spawned = arguments.withUnsafeMutableBufferPointer { argv in
+            environment.withUnsafeMutableBufferPointer { envp in
+                posix_spawn(&child, "/bin/sh", &actions, &attributes, argv.baseAddress!, envp.baseAddress!)
+            }
+        }
+        guard spawned == 0 else { throw RuntimeJobError.spawnFailed(spawned) }
+        Darwin.close(descriptors[1]); descriptors[1] = -1
+        let reader = RuntimePipeReader(descriptor: descriptors[0], stream: .stdout, spool: spool)
+        transferredRead = true
+        do { try await body(root, spool, reader, release, child, ownedRead) }
+        catch {
+            reader.close()
+            var pendingStatus: Int32 = 0
+            if Darwin.waitpid(child, &pendingStatus, WNOHANG) == 0 {
+                _ = Darwin.kill(child, SIGKILL)
+                _ = try? await reapPipeWriter(child)
+            }
+            _ = await waitForPipeReader(reader)
+            throw error
+        }
+        reader.close()
+        _ = await waitForPipeReader(reader)
+    }
+
     func testConcurrentStdoutAndStderrDrainWithoutDeadlockAndSpillWithinBudget() async throws {
         let fixture = try await Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -126,6 +639,10 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertTrue(stderr.inlineTruncated)
         XCTAssertTrue(stdout.artifactTruncated)
         XCTAssertTrue(stderr.artifactTruncated)
+        XCTAssertEqual(stdout.producerEndReason, .eof)
+        XCTAssertEqual(stderr.producerEndReason, .eof)
+        XCTAssertNil(stdout.producerReadErrno)
+        XCTAssertNil(stderr.producerReadErrno)
         XCTAssertLessThanOrEqual(
             stdout.retainedByteCount + stderr.retainedByteCount,
             UInt64(fixture.limits.maximumArtifactBytesPerJob)
@@ -362,38 +879,255 @@ final class RuntimeExecutionJobTests: XCTestCase {
             forcedTerminationGraceMilliseconds: 500,
             maximumDescendantProcessesPerJob: 2
         )
-        let fixture = try await Fixture.make(limits: limits)
+        let observer = BeforeTerminationDescendantWitness()
+        let fixture = try await Fixture.make(
+            limits: limits,
+            recoveredProcessController: observer
+        )
         defer { try? FileManager.default.removeItem(at: fixture.root) }
-        let pidFile = fixture.projectRoot.appendingPathComponent("fork-tree.pids")
-        let script = """
-        : > fork-tree.pids
-        i=0
-        while [ "$i" -lt 8 ]; do
-          sleep 30 &
-          echo $! >> fork-tree.pids
-          i=$((i + 1))
-        done
-        wait
-        """
-        let jobID = try await fixture.service.submit(
-            fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 20)
-        )
-        let record = try await fixture.service.waitForTerminal(
-            jobID: jobID,
-            context: fixture.context,
-            maximumWait: .seconds(8)
-        )
-        XCTAssertEqual(record.state, .failed)
-        XCTAssertEqual(record.errorCode, "runtime_descendant_limit_exceeded")
-        let pids = try String(contentsOf: pidFile, encoding: .utf8)
-            .split(whereSeparator: \.isNewline)
-            .compactMap { Int32($0) }
-        XCTAssertGreaterThan(pids.count, limits.maximumDescendantProcessesPerJob)
-        for pid in pids {
-            let descendantGone = await Self.waitUntilProcessIsGone(pid)
-            XCTAssertTrue(descendantGone, "descendant \(pid) survived")
+        do {
+            let pidFile = fixture.projectRoot.appendingPathComponent("fork-tree.pids")
+            await observer.setPIDFile(pidFile)
+            let script = """
+            : > fork-tree.pids
+            i=0
+            while [ "$i" -lt 8 ]; do
+              sleep 30 &
+              echo $! >> fork-tree.pids
+              i=$((i + 1))
+            done
+            wait
+            """
+            let jobID = try await fixture.service.submit(
+                fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 20)
+            )
+            let record = try await fixture.service.waitForTerminal(
+                jobID: jobID,
+                context: fixture.context,
+                maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(record.state, .failed)
+            XCTAssertEqual(record.errorCode, "runtime_descendant_limit_exceeded")
+            let state = await observer.captured()
+            XCTAssertNil(state.failure)
+            XCTAssertEqual(state.delegatedTermination, .signaled)
+            let capture = try XCTUnwrap(state.capture)
+            let observedPIDs = Set(capture.children.map(\.processIdentifier))
+            XCTAssertGreaterThan(observedPIDs.count, limits.maximumDescendantProcessesPerJob)
+            let pids = try String(contentsOf: pidFile, encoding: .utf8)
+                .split(whereSeparator: \.isNewline)
+                .compactMap { Int32($0) }
+            for pid in pids {
+                let descendantGone = await Self.waitUntilProcessIsGone(pid)
+                XCTAssertTrue(descendantGone, "descendant \(pid) survived")
+            }
+            for identity in capture.children {
+                let exactIdentityGone = await Self.waitUntil {
+                    if let current = RuntimeProcessIdentityReader.observedIdentity(
+                        processIdentifier: identity.processIdentifier
+                    ) {
+                        return current.startIdentity != identity.startIdentity
+                    }
+                    return Darwin.kill(identity.processIdentifier, 0) != 0 && errno == ESRCH
+                }
+                XCTAssertTrue(
+                    exactIdentityGone,
+                    "captured exact descendant \(identity.processIdentifier) survived"
+                )
+            }
+            await fixture.close()
+        } catch {
+            await fixture.close()
+            throw error
         }
-        await fixture.close()
+    }
+
+    func testDescendantBudgetTerminationCanPrecedeShellPIDRecording() async throws {
+        let limits = RuntimeJobLimits(
+            maximumConcurrentJobs: 1,
+            maximumCPUHeavyJobs: 1,
+            maximumQueuedJobs: 2,
+            maximumInlineOutputBytes: 512,
+            maximumArtifactBytesPerJob: 4 * 1_024,
+            maximumScriptBytes: 8 * 1_024,
+            maximumArguments: 32,
+            maximumArgumentBytes: 4 * 1_024,
+            maximumTimeoutSeconds: 30,
+            terminationGraceMilliseconds: 50,
+            forcedTerminationGraceMilliseconds: 500,
+            maximumDescendantProcessesPerJob: 2
+        )
+        let observer = BeforeTerminationDescendantWitness()
+        let fixture = try await Fixture.make(
+            limits: limits,
+            recoveredProcessController: observer
+        )
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        do {
+            let pidFile = fixture.projectRoot.appendingPathComponent("fork-tree.pids")
+            await observer.setPIDFile(pidFile)
+            let script = """
+            : > fork-tree.pids
+            i=0
+            while [ "$i" -lt 2 ]; do
+              sleep 30 &
+              echo $! >> fork-tree.pids
+              i=$((i + 1))
+            done
+            sleep 30 &
+            unrecorded_pid=$!
+            SECONDS=0
+            while [ "$SECONDS" -lt 2 ]; do :; done
+            echo "$unrecorded_pid" >> fork-tree.pids
+            wait
+            """
+            let jobID = try await fixture.service.submit(
+                fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 20)
+            )
+            let record = try await fixture.service.waitForTerminal(
+                jobID: jobID,
+                context: fixture.context,
+                maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(record.state, .failed)
+            XCTAssertEqual(record.errorCode, "runtime_descendant_limit_exceeded")
+            let state = await observer.captured()
+            XCTAssertNil(state.failure)
+            XCTAssertEqual(state.delegatedTermination, .signaled)
+            let capture = try XCTUnwrap(state.capture)
+            // Shell PID recording can lag the owned kernel child count.
+            XCTAssertEqual(Set(capture.shellPIDs).count, 2)
+            let observedPIDs = Set(capture.children.map(\.processIdentifier))
+            XCTAssertEqual(observedPIDs.count, 3)
+            XCTAssertGreaterThan(observedPIDs.count, limits.maximumDescendantProcessesPerJob)
+            XCTAssertTrue(Set(capture.shellPIDs).isSubset(of: observedPIDs))
+
+            // Retain the original shell-PID cleanup contract.
+            let originalPIDs = try String(contentsOf: pidFile, encoding: .utf8)
+                .split(whereSeparator: \.isNewline)
+                .compactMap { Int32($0) }
+            for pid in originalPIDs {
+                let gone = await Self.waitUntilProcessIsGone(pid)
+                XCTAssertTrue(gone, "shell-listed descendant \(pid) survived")
+            }
+            // Also cover the child that had not been written to the shell file.
+            for identity in capture.children {
+                let exactIdentityGone = await Self.waitUntil {
+                    if let current = RuntimeProcessIdentityReader.observedIdentity(
+                        processIdentifier: identity.processIdentifier
+                    ) {
+                        return current.startIdentity != identity.startIdentity
+                    }
+                    return Darwin.kill(identity.processIdentifier, 0) != 0 && errno == ESRCH
+                }
+                XCTAssertTrue(
+                    exactIdentityGone,
+                    "captured exact descendant \(identity.processIdentifier) survived"
+                )
+            }
+            await fixture.close()
+        } catch {
+            await fixture.close()
+            throw error
+        }
+    }
+
+    private actor BeforeTerminationDescendantWitness: RuntimeRecoveredProcessControlling {
+        struct Capture: Sendable {
+            let root: RuntimeObservedProcessIdentity
+            let children: [RuntimeObservedProcessIdentity]
+            let shellPIDs: [Int32]
+        }
+
+        struct State: Sendable {
+            let capture: Capture?
+            let failure: String?
+            let delegatedTermination: RuntimeRecoveredProcessSignalResult?
+        }
+
+        private let delegate = DarwinRuntimeRecoveredProcessController()
+        private let reader = DarwinRuntimeProcessTreeReader()
+        private var pidFile: URL?
+        private var attemptedFirstTermination = false
+        private var capture: Capture?
+        private var failure: String?
+        private var delegatedTermination: RuntimeRecoveredProcessSignalResult?
+
+        func setPIDFile(_ url: URL) { pidFile = url }
+
+        func captured() -> State {
+            State(
+                capture: capture,
+                failure: failure,
+                delegatedTermination: delegatedTermination
+            )
+        }
+
+        func signalProcessGroup(
+            _ signal: Int32,
+            expectedIdentity: RuntimePersistedProcessIdentity
+        ) async -> RuntimeRecoveredProcessSignalResult {
+            let capturesThisCall = signal == SIGTERM && !attemptedFirstTermination
+            if capturesThisCall {
+                attemptedFirstTermination = true
+                do {
+                    capture = try captureBeforeSignal(expectedIdentity)
+                } catch {
+                    failure = String(decoding: Array(error.localizedDescription.utf8.prefix(1_024)), as: UTF8.self)
+                }
+            }
+            // Capture failures must never prevent real cleanup or alter signaling.
+            let result = await delegate.signalProcessGroup(signal, expectedIdentity: expectedIdentity)
+            if capturesThisCall { delegatedTermination = result }
+            return result
+        }
+
+        private func captureBeforeSignal(
+            _ expected: RuntimePersistedProcessIdentity
+        ) throws -> Capture {
+            guard let pidFile,
+                  let before = reader.identity(processIdentifier: expected.processIdentifier),
+                  before.processIdentifier == expected.processIdentifier,
+                  before.processGroupIdentifier == expected.processGroupIdentifier,
+                  before.startIdentity == expected.startIdentity else {
+                throw RuntimeJobError.invalidRequest("owned root identity unavailable before signal")
+            }
+            let listed = reader.children(of: before.processIdentifier, maximumCount: 16)
+            guard listed.complete,
+                  Set(listed.processIdentifiers).count == listed.processIdentifiers.count else {
+                throw RuntimeJobError.invalidRequest("bounded direct-child snapshot incomplete")
+            }
+            var children: [RuntimeObservedProcessIdentity] = []
+            for pid in listed.processIdentifiers {
+                guard let child = reader.identity(processIdentifier: pid),
+                      child.parentProcessIdentifier == before.processIdentifier,
+                      child.processGroupIdentifier == before.processGroupIdentifier else {
+                    throw RuntimeJobError.invalidRequest("direct child identity unavailable before signal")
+                }
+                children.append(child)
+            }
+            let file = try FileHandle(forReadingFrom: pidFile)
+            defer { try? file.close() }
+            let data = try file.read(upToCount: 8_193) ?? Data()
+            guard data.count <= 8_192,
+                  let text = String(data: data, encoding: .utf8) else {
+                throw RuntimeJobError.invalidRequest("bounded shell PID file unavailable")
+            }
+            let lines = text.split(whereSeparator: \.isNewline)
+            guard lines.count <= 16 else {
+                throw RuntimeJobError.invalidRequest("bounded shell PID entry count exceeded")
+            }
+            let shellPIDs = try lines.map { line -> Int32 in
+                guard let pid = Int32(line), pid > 1 else {
+                    throw RuntimeJobError.invalidRequest("invalid owned shell PID entry")
+                }
+                return pid
+            }
+            guard reader.identity(processIdentifier: before.processIdentifier) == before else {
+                throw RuntimeJobError.invalidRequest("owned root changed during bounded snapshot")
+            }
+            return Capture(root: before, children: children, shellPIDs: shellPIDs)
+        }
     }
 
     func testLiveTerminationFailurePersistsAndReaperEventuallyCompletes() async throws {
@@ -1211,6 +1945,10 @@ final class RuntimeExecutionJobTests: XCTestCase {
         )
         XCTAssertTrue(columns.contains("process_start_seconds"))
         XCTAssertTrue(columns.contains("process_start_microseconds"))
+        let outputColumns = try Self.sqliteColumnNames(databaseURL: databaseURL, table: "runtime_job_output_streams")
+        XCTAssertTrue(outputColumns.contains("producer_end_reason"))
+        XCTAssertTrue(outputColumns.contains("producer_read_errno"))
+
         XCTAssertEqual(
             try Self.sqliteCount(
                 databaseURL: databaseURL,
@@ -4431,6 +5169,65 @@ final class RuntimeExecutionJobTests: XCTestCase {
         await fixture.close()
     }
 
+    func testSynchronousRuntimeBridgePreservesUserInitiatedTransportPriority() async throws {
+        let finished = expectation(description: "user-initiated transport bridge completed")
+        let observation = RuntimeBlockingResult<(TaskPriority, TaskPriority, Bool, Bool)>()
+        DispatchQueue.global(qos: .userInitiated).async(qos: .userInitiated, flags: .enforceQoS) {
+            do {
+                let callerPriority = Task.currentPriority
+                let callerHasTask = withUnsafeCurrentTask { $0 != nil }
+                let worker: (TaskPriority, Bool) = try RuntimeJobSynchronousToolPack.wait(
+                    timeoutSeconds: 1,
+                    cancellation: nil,
+                    committedResultWins: false
+                ) {
+                    (Task.currentPriority, pthread_main_np() != 0)
+                }
+                observation.store(.success((callerPriority, worker.0, callerHasTask, worker.1)))
+            } catch {
+                observation.store(.failure(error))
+            }
+            finished.fulfill()
+        }
+        await fulfillment(of: [finished], timeout: 20)
+        let observed = try XCTUnwrap(observation.take()).get()
+        XCTAssertEqual(observed.0, .userInitiated)
+        XCTAssertFalse(observed.2, "The transport control must run outside a Swift task")
+        XCTAssertEqual(observed.1, observed.0, "The signalling task must preserve the waiting transport's priority")
+        XCTAssertFalse(observed.3, "The detached operation must remain off the main thread")
+    }
+
+    func testSynchronousRuntimeBridgePreservesHighPriorityTaskCaller() async throws {
+        let finished = expectation(description: "high-priority task bridge completed")
+        let observation = RuntimeBlockingResult<(TaskPriority, TaskPriority, Bool, Bool)>()
+        let caller = Task.detached(priority: .high) {
+            do {
+                let callerPriority = Task.currentPriority
+                let callerHasTask = withUnsafeCurrentTask { $0 != nil }
+                let worker: (TaskPriority, Bool) = try RuntimeJobSynchronousToolPack.wait(
+                    timeoutSeconds: 1,
+                    cancellation: nil,
+                    committedResultWins: false
+                ) {
+                    (Task.currentPriority, pthread_main_np() != 0)
+                }
+                observation.store(.success((callerPriority, worker.0, callerHasTask, worker.1)))
+            } catch {
+                observation.store(.failure(error))
+            }
+            finished.fulfill()
+        }
+        defer { caller.cancel() }
+        // Observe completion without awaiting caller.value, which would itself
+        // introduce a task-priority escalation dependency.
+        await fulfillment(of: [finished], timeout: 20)
+        let observed = try XCTUnwrap(observation.take()).get()
+        XCTAssertEqual(observed.0, .high)
+        XCTAssertTrue(observed.2, "This control must execute inside its explicit high-priority task")
+        XCTAssertEqual(observed.1, observed.0, "The signalling task must preserve the waiting task's priority")
+        XCTAssertFalse(observed.3, "The detached operation must remain off the main thread")
+    }
+
     func testSynchronousRuntimeBridgePreservesDeadlineWhenCancelledTaskStops() throws {
         let cancellation = ToolCallCancellation(timeoutSeconds: 0.05)
         do {
@@ -5907,6 +6704,748 @@ final class RuntimeExecutionJobTests: XCTestCase {
         }
 
         func signals() -> [Int32] { observedSignals }
+    }
+
+    func testRawRuntimeIdempotencyRejectsForeignRunAndPreservesSameRunAndLegacyOwner() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        do {
+            let firstRun = try await fixture.autonomousRunContext(mission: "Own raw idempotency receipt")
+            let secondRun = try await fixture.autonomousRunContext(mission: "Reject foreign raw idempotency receipt")
+            XCTAssertEqual(firstRun.context.projectID, secondRun.context.projectID)
+            XCTAssertEqual(firstRun.context.projectGeneration, secondRun.context.projectGeneration)
+            XCTAssertNotEqual(firstRun.runID, secondRun.runID)
+            XCTAssertNil(fixture.context.runID)
+            let arguments: [String: Any] = [
+                "executable": "/usr/bin/printf", "arguments": ["raw-receipt"],
+                "cwd": fixture.projectRoot.path, "timeout_sec": 5,
+                "replay_class": RuntimeReplayClass.readOnly.rawValue,
+                "idempotency_key": "raw-run-owner-receipt",
+            ]
+            let pack = RuntimeJobToolPack(service: fixture.service)
+            let submittedOptional = try await pack.handle(name: "process.run", arguments: arguments, context: firstRun.context)
+            let submitted = try XCTUnwrap(submittedOptional)
+            XCTAssertTrue(submitted.ok, "\(submitted.payload)")
+            let firstID = try XCTUnwrap((submitted.payload["job_id"] as? String).flatMap(UUID.init(uuidString:)))
+            let terminal = try await fixture.service.waitForTerminal(jobID: firstID, context: firstRun.context, maximumWait: .seconds(8))
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+
+            let sameRunOptional = try await pack.handle(name: "process.run", arguments: arguments, context: firstRun.context)
+            let sameRun = try XCTUnwrap(sameRunOptional)
+            XCTAssertTrue(sameRun.ok, "\(sameRun.payload)")
+            XCTAssertEqual(sameRun.payload["job_id"] as? String, firstID.uuidString.lowercased())
+
+            let ownerOptional = try await pack.handle(name: "process.run", arguments: arguments, context: fixture.context)
+            let owner = try XCTUnwrap(ownerOptional)
+            XCTAssertTrue(owner.ok, "\(owner.payload)")
+            XCTAssertEqual(owner.payload["job_id"] as? String, firstID.uuidString.lowercased())
+
+            let foreignReceipt = RuntimeBlockingResult<ToolResult>()
+            let foreignPack = RuntimeJobToolPack(service: fixture.service, durableResultObserver: { value in
+                foreignReceipt.store(.success(value))
+            })
+            let foreignOptional = try await foreignPack.handle(name: "process.run", arguments: arguments, context: secondRun.context)
+            let foreign = try XCTUnwrap(foreignOptional)
+            XCTAssertFalse(foreign.ok, "A foreign run must not receive a successful raw submission: \(foreign.payload)")
+            XCTAssertEqual(foreign.payload["code"] as? String, "runtime_job_scope_mismatch")
+            XCTAssertNil(foreignReceipt.take(), "A foreign job must not become the committed success receipt")
+            do {
+                _ = try await fixture.service.status(jobID: firstID, context: secondRun.context)
+                XCTFail("The repository must still reject the foreign run's status read")
+            } catch let error as RuntimeJobError {
+                XCTAssertEqual(error, .jobScopeMismatch(firstID))
+            }
+            let unchanged = try await fixture.runtimeRepository.job(firstID)
+            XCTAssertEqual(unchanged, terminal)
+            let foreignRows = try await fixture.service.list(context: secondRun.context)
+            let projectRows = try await fixture.service.list(context: fixture.context)
+            XCTAssertTrue(foreignRows.isEmpty)
+            XCTAssertEqual(projectRows.count, 1)
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testRawRuntimeAdmissionRaceRejectsForeignCommittedReceiptBeforePublication() async throws {
+        let fixture = try await Fixture.make()
+        let admissionClock = RawRuntimeAdmissionClock()
+        defer {
+            admissionClock.release()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let raceDatabaseURL = await fixture.runtimeRepository.databaseURL
+        let raceRepository = try RuntimeJobRepository(databaseURL: raceDatabaseURL, clock: admissionClock)
+        let raceService = try ExecutionJobService(
+            repository: raceRepository,
+            contextValidator: ProjectControlPlaneRuntimeJobContextValidator(repository: fixture.controlRepository),
+            artifactRoot: fixture.root.appendingPathComponent("race-artifacts"), limits: fixture.limits
+        )
+        try await raceService.start()
+        do {
+            let firstRun = try await fixture.autonomousRunContext(mission: "Win raw receipt admission")
+            let secondRun = try await fixture.autonomousRunContext(mission: "Reject raw receipt admission race")
+            XCTAssertEqual(firstRun.context.projectID, secondRun.context.projectID)
+            XCTAssertEqual(firstRun.context.projectGeneration, secondRun.context.projectGeneration)
+            XCTAssertNotEqual(firstRun.runID, secondRun.runID)
+            let key = "raw-raced-owner-receipt"
+            let emptyLookup = try await fixture.runtimeRepository.existingJob(
+                projectID: fixture.projectID, generation: fixture.context.projectGeneration, idempotencyKey: key
+            )
+            XCTAssertNil(emptyLookup)
+            let arguments: [String: Any] = [
+                "executable": "/usr/bin/printf", "arguments": ["must-not-run"],
+                "cwd": fixture.projectRoot.path, "timeout_sec": 5,
+                "replay_class": RuntimeReplayClass.readOnly.rawValue, "idempotency_key": key,
+            ]
+            let committedReceipt = RuntimeBlockingResult<ToolResult>()
+            let pack = RuntimeJobToolPack(service: raceService, durableResultObserver: { value in
+                committedReceipt.store(.success(value))
+            })
+            let serializedArguments = try SerializedToolArguments(arguments)
+            let losingContext = secondRun.context
+            admissionClock.arm()
+            let admission = Task {
+                try await pack.handle(name: "process.run", arguments: try serializedArguments.decoded(), context: losingContext)
+            }
+            let deadline = ProcessInfo.processInfo.systemUptime + 4
+            while !admissionClock.didPause(), ProcessInfo.processInfo.systemUptime < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            guard admissionClock.didPause() else {
+                admissionClock.release()
+                admission.cancel()
+                _ = try? await admission.value
+                XCTFail("The losing admission did not reach the existing createJob clock seam")
+                throw RuntimeJobError.storageFailure("runtime receipt race setup failed")
+            }
+            // createJob's existing injected clock is called after the service's
+            // empty lookup and before BEGIN. The independent repository commits
+            // a legitimate Run A row before the losing transaction can inspect it.
+            let winnerRequest = RuntimeJobRequest(
+                kind: .process, profile: .directProcess, context: firstRun.context,
+                executable: URL(fileURLWithPath: "/usr/bin/printf"), arguments: ["winner"],
+                canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(5),
+                replayClass: .readOnly, idempotencyKey: key
+            )
+            let winnerID = try await fixture.service.submit(winnerRequest)
+            let winner = try await fixture.service.waitForTerminal(
+                jobID: winnerID, context: firstRun.context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(winner.state, .completed)
+            XCTAssertEqual(winner.exitCode, 0)
+            XCTAssertEqual(winner.runID, firstRun.runID)
+            admissionClock.release()
+            let losingOptional = try await admission.value
+            XCTAssertFalse(admissionClock.didTimeOut(), "The winner must commit while admission is paused")
+            let losing = try XCTUnwrap(losingOptional)
+            XCTAssertFalse(losing.ok, "A foreign COMMIT row must not publish success: \(losing.payload)")
+            XCTAssertEqual(losing.payload["code"] as? String, "runtime_job_scope_mismatch")
+            XCTAssertNil(committedReceipt.take(), "The real pack observer must not expose the foreign COMMIT row")
+            let preservedWinner = try await fixture.runtimeRepository.job(winner.jobID)
+            XCTAssertEqual(preservedWinner, winner)
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertEqual(rows.map(\.jobID), [winner.jobID])
+
+            for allowedContext in [firstRun.context, fixture.context] {
+                let retryOptional = try await pack.handle(name: "process.run", arguments: arguments, context: allowedContext)
+                let retry = try XCTUnwrap(retryOptional)
+                XCTAssertTrue(retry.ok, "Same-run and legacy nil-run owners retain reuse: \(retry.payload)")
+                XCTAssertEqual(retry.payload["job_id"] as? String, winner.jobID.uuidString.lowercased())
+            }
+        } catch {
+            admissionClock.release()
+            _ = await raceService.shutdown()
+            await raceRepository.close()
+            await fixture.close()
+            throw error
+        }
+        let stopped = await raceService.shutdown()
+        XCTAssertTrue(stopped.completed)
+        await raceRepository.close()
+        await fixture.close()
+    }
+
+    private final class RawRuntimeAdmissionClock: ForgeConductorCore.Clock, @unchecked Sendable {
+        private let lock = NSLock()
+        private let released = DispatchSemaphore(value: 0)
+        private var armed = false
+        private var paused = false
+        private var timedOut = false
+
+        func arm() { lock.withLock { armed = true } }
+        func didPause() -> Bool { lock.withLock { paused } }
+        func didTimeOut() -> Bool { lock.withLock { timedOut } }
+        func release() { released.signal() }
+        func now() -> Date {
+            let shouldPause = lock.withLock {
+                guard armed else { return false }
+                armed = false
+                paused = true
+                return true
+            }
+            if shouldPause, released.wait(timeout: .now() + 10) == .timedOut {
+                lock.withLock { timedOut = true }
+            }
+            return Date()
+        }
+    }
+
+
+    func testRuntimeRepositoryExistingReceiptUsesExactRunOwnershipAndLegacyOwnerAccess() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        do {
+            let firstRun = try await fixture.autonomousRunContext(mission: "Own repository idempotency receipt")
+            let secondRun = try await fixture.autonomousRunContext(mission: "Reject foreign repository idempotency receipt")
+            func request(_ context: ToolInvocationContext, key: String) -> RuntimeJobRequest {
+                RuntimeJobRequest(
+                    kind: .process, profile: .directProcess, context: context,
+                    executable: URL(fileURLWithPath: "/usr/bin/printf"), arguments: ["repository-fixture"],
+                    canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(5),
+                    replayClass: .readOnly, idempotencyKey: key
+                )
+            }
+            let key = "repository-owned-receipt"
+            let ownerRow = try await fixture.runtimeRepository.createJob(
+                jobID: UUID(), request: request(firstRun.context, key: key),
+                commandSummary: "repository-owner-fixture", timeoutSeconds: 5, requestArtifactRelativePath: nil
+            )
+            let foreignObserver = RuntimeBlockingResult<RuntimeJobRecord>()
+            do {
+                _ = try await fixture.runtimeRepository.createJob(
+                    jobID: UUID(), request: request(secondRun.context, key: key),
+                    commandSummary: "repository-foreign-fixture", timeoutSeconds: 5, requestArtifactRelativePath: nil,
+                    commitObserver: { record in foreignObserver.store(.success(record)) }
+                )
+                XCTFail("A differing nonnil run must not receive the existing COMMIT row")
+            } catch let error as RuntimeJobError {
+                XCTAssertEqual(error, .jobScopeMismatch(ownerRow.jobID))
+            }
+            XCTAssertNil(foreignObserver.take(), "The foreign row must be rejected before the COMMIT observer")
+            for allowedContext in [firstRun.context, fixture.context] {
+                let allowedObserver = RuntimeBlockingResult<RuntimeJobRecord>()
+                let repeated = try await fixture.runtimeRepository.createJob(
+                    jobID: UUID(), request: request(allowedContext, key: key),
+                    commandSummary: "repository-repeat-fixture", timeoutSeconds: 5, requestArtifactRelativePath: nil,
+                    commitObserver: { record in allowedObserver.store(.success(record)) }
+                )
+                XCTAssertEqual(repeated, ownerRow)
+                XCTAssertEqual(try XCTUnwrap(allowedObserver.take()).get(), ownerRow)
+            }
+            let legacyKey = "repository-legacy-owned-receipt"
+            let legacyRow = try await fixture.runtimeRepository.createJob(
+                jobID: UUID(), request: request(fixture.context, key: legacyKey),
+                commandSummary: "repository-legacy-owner-fixture", timeoutSeconds: 5, requestArtifactRelativePath: nil
+            )
+            XCTAssertNil(legacyRow.runID)
+            let runOwnedObserver = RuntimeBlockingResult<RuntimeJobRecord>()
+            do {
+                _ = try await fixture.runtimeRepository.createJob(
+                    jobID: UUID(), request: request(firstRun.context, key: legacyKey),
+                    commandSummary: "repository-run-into-legacy-fixture", timeoutSeconds: 5, requestArtifactRelativePath: nil,
+                    commitObserver: { record in runOwnedObserver.store(.success(record)) }
+                )
+                XCTFail("A run-owned caller must not gain the nil-run project owner's row")
+            } catch let error as RuntimeJobError {
+                XCTAssertEqual(error, .jobScopeMismatch(legacyRow.jobID))
+            }
+            XCTAssertNil(runOwnedObserver.take())
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertEqual(Set(rows.map(\.jobID)), Set([ownerRow.jobID, legacyRow.jobID]))
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+
+    func testMCPOutputPagingRoundTripsSplitUnicodeAndInvalidBytesWithoutChangingLegacyFields() async throws {
+        let fixture = try ProductionFixture.make(clientName: "runtime-mcp-lossless-byte-pages")
+        defer { fixture.close() }
+        let context = try fixture.bindProject()
+        let server = MCPServer(app: fixture.app, clientID: fixture.clientID, role: .primary)
+        _ = try XCTUnwrap(server.handle([
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": ["protocolVersion": "2025-11-25", "capabilities": [:],
+                       "clientInfo": ["name": "runtime-output-fixture", "version": "1"]],
+        ]))
+        var requestID = 2
+        func call(_ name: String, arguments: [String: Any]) throws -> [String: Any] {
+            defer { requestID += 1 }
+            let response = try XCTUnwrap(server.handle([
+                "jsonrpc": "2.0", "id": requestID, "method": "tools/call",
+                "params": ["name": name, "arguments": arguments],
+            ]))
+            XCTAssertNil(response["error"], "\(response)")
+            let result = try XCTUnwrap(response["result"] as? [String: Any])
+            XCTAssertEqual(result["isError"] as? Bool, false, "\(result)")
+            let payload = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+            let content = try XCTUnwrap(result["content"] as? [[String: Any]])
+            let text = try XCTUnwrap(content.first?["text"] as? String)
+            let duplicated = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+            XCTAssertEqual(try JSONSupport.canonicalJSON(duplicated), try JSONSupport.canonicalJSON(payload))
+            XCTAssertEqual(payload["ok"] as? Bool, true, "\(payload)")
+            return payload
+        }
+        let cases: [(name: String, format: String, expected: Data, limit: Int)] = [
+            ("split-unicode", "A🦅Z", Data("A🦅Z".utf8), 2),
+            ("whole-unicode", "A🦅Z", Data("A🦅Z".utf8), 5),
+            ("ascii", "ASCII", Data("ASCII".utf8), 2),
+            ("invalid-native-bytes", "\\377\\376A", Data([0xff, 0xfe, 0x41]), 2),
+            ("empty", "", Data(), 2),
+        ]
+        for item in cases {
+            let submission = try call("process.run", arguments: [
+                "executable": "/usr/bin/printf", "arguments": [item.format],
+                "cwd": fixture.projectRoot.path, "timeout_sec": 5,
+                "replay_class": RuntimeReplayClass.readOnly.rawValue,
+            ])
+            let jobText = try XCTUnwrap(submission["job_id"] as? String)
+            let jobID = try XCTUnwrap(UUID(uuidString: jobText))
+            let terminal = try await fixture.app.runtimeJobs.service.waitForTerminal(
+                jobID: jobID, context: context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(terminal.state, .completed, item.name)
+            XCTAssertEqual(terminal.exitCode, 0, item.name)
+            var offset: UInt64 = 0
+            var reconstructed = Data()
+            var reachedEOF = false
+            for _ in 0..<32 {
+                let page = try call("job.read_output", arguments: [
+                    "job_id": jobText, "stream": "stdout", "offset": offset, "limit": item.limit,
+                ])
+                let legacyText = try XCTUnwrap(page["data"] as? String)
+                let returnedOffset = try XCTUnwrap((page["offset"] as? NSNumber)?.uint64Value)
+                let next = try XCTUnwrap((page["next_offset"] as? NSNumber)?.uint64Value)
+                let retained = try XCTUnwrap((page["retained_bytes"] as? NSNumber)?.uint64Value)
+                let observed = try XCTUnwrap((page["observed_bytes"] as? NSNumber)?.uint64Value)
+                let eof = try XCTUnwrap(page["eof"] as? Bool)
+                let expectedNext = min(offset + UInt64(item.limit), UInt64(item.expected.count))
+                XCTAssertEqual(returnedOffset, offset, item.name)
+                XCTAssertEqual(next, expectedNext, item.name)
+                XCTAssertEqual(retained, UInt64(item.expected.count), item.name)
+                XCTAssertEqual(observed, retained, item.name)
+                XCTAssertEqual(page["artifact_truncated"] as? Bool, false, item.name)
+                XCTAssertEqual(page["sha256"] as? String, JSONSupport.sha256Hex(item.expected), item.name)
+                XCTAssertEqual(eof, next == retained, item.name)
+                guard next >= offset, next <= UInt64(item.expected.count) else {
+                    XCTFail("Nonmonotonic or out-of-range byte page: \(page)")
+                    throw RuntimeJobError.invalidRequest("invalid fixture page offsets")
+                }
+                let expectedPage = Data(item.expected[Int(offset)..<Int(next)])
+                XCTAssertEqual(legacyText, String(decoding: expectedPage, as: UTF8.self),
+                               "The existing data field retains its legacy decoding: \(item.name)")
+                if String(data: expectedPage, encoding: .utf8) != nil {
+                    XCTAssertNil(page["data_base64"], "Valid UTF8 pages preserve their existing output shape: \(item.name)")
+                    reconstructed.append(contentsOf: legacyText.utf8)
+                } else {
+                    let lossless = page["data_base64"] as? String
+                    XCTAssertNotNil(lossless, "An invalid UTF8 byte page needs a lossless additive representation: \(item.name)")
+                    if let lossless, let bytes = Data(base64Encoded: lossless) {
+                        XCTAssertEqual(bytes, expectedPage, item.name)
+                        XCTAssertLessThanOrEqual(bytes.count, item.limit, item.name)
+                        reconstructed.append(bytes)
+                    } else {
+                        // Preserve a complete baseline failure receipt even when
+                        // the old transport has no lossless field.
+                        reconstructed.append(contentsOf: legacyText.utf8)
+                    }
+                }
+                if eof { reachedEOF = true; break }
+                guard next > offset else {
+                    XCTFail("Nonterminal page made no progress: \(page)")
+                    throw RuntimeJobError.invalidRequest("fixture page made no progress")
+                }
+                offset = next
+            }
+            XCTAssertTrue(reachedEOF, "The bounded byte reader must reach terminal EOF: \(item.name)")
+            XCTAssertEqual(reconstructed, item.expected, "Transport must preserve the retained raw bytes: \(item.name)")
+        }
+    }
+
+    func testManagedRuntimeOutputPagingPreservesBytesWithinCompleteDurableResultBudget() async throws {
+        let fixture = try ProductionFixture.make(clientName: "runtime-managed-byte-budget")
+        defer { fixture.close() }
+        let projectContext = try fixture.bindProject()
+        let repository = fixture.app.projectContexts.repository
+        let service = fixture.app.runtimeJobs.service
+        let expected = Data(repeating: 0xff, count: 16 * 1_024)
+        let format = String(repeating: "\\377", count: expected.count)
+        // One argument exactly meets the existing 65536-byte native argument
+        // bound. The child writes 16384 actual invalid UTF8 bytes, not text.
+        XCTAssertEqual(format.utf8.count, 65_536)
+        for budget in [4_096, 65_536] {
+            let sessionID = "runtime-byte-budget-\(budget)"
+            let rootResponseID = "\(sessionID)-root"
+            let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+                projectID: projectContext.projectID,
+                projectGeneration: projectContext.projectGeneration,
+                mission: "Read native byte pages within the intact managed result budget",
+                providerID: "runtime-budget-fixture", modelKey: "runtime-budget-fixture",
+                specification: AutonomousRunSpecification(
+                    allowedTools: RuntimeJobToolPack.names,
+                    completionGates: ["lossless-bounded-output"]
+                ),
+                authorizationScope: ToolAuthorizationScope(
+                    canonicalRoots: projectContext.authorizationScope.canonicalRoots,
+                    writableRoots: projectContext.authorizationScope.writableRoots,
+                    allowedTools: Set(RuntimeJobToolPack.names), networkAllowed: false,
+                    maximumInlineOutputBytes: budget
+                )
+            ))
+            let lease = try await repository.acquireRunLease(
+                runID: run.runID, ownerID: sessionID,
+                policy: RunLeasePolicy(duration: 120, renewalInterval: 10, maximumDuration: 300)
+            )
+            try await repository.reserveProviderSession(ProviderSessionIntent(
+                sessionID: sessionID, runID: run.runID,
+                projectID: run.projectID, projectGeneration: run.projectGeneration,
+                providerID: "runtime-budget-fixture", adapterID: "runtime-budget-fixture",
+                modelKey: "runtime-budget-fixture", providerResponseID: rootResponseID,
+                idempotencyKey: "\(sessionID)-session"
+            ), lease: lease)
+            let turn = ProviderTurnIntent(
+                runID: run.runID, sessionID: sessionID,
+                projectID: run.projectID, projectGeneration: run.projectGeneration,
+                kind: .normalContinuation, idempotencyKey: "\(sessionID)-turn",
+                previousResponseID: rootResponseID,
+                inputSHA256: String(repeating: "d", count: 64)
+            )
+            _ = try await repository.persistProviderTurnIntent(turn, lease: lease)
+            let context = try await repository.invocationContext(
+                for: ProjectBindingOwner(kind: .providerSession, id: sessionID),
+                clientID: ClientID(sessionID)
+            )
+            XCTAssertEqual(context.authorizationScope.maximumInlineOutputBytes, budget)
+            XCTAssertEqual(context.runID, run.runID)
+            let jobID = try await service.submit(RuntimeJobRequest(
+                kind: .process, profile: .directProcess, context: context,
+                executable: URL(fileURLWithPath: "/usr/bin/printf"), arguments: [format],
+                canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(5),
+                maximumInlineOutputBytes: budget, replayClass: .readOnly
+            ))
+            let terminal = try await service.waitForTerminal(
+                jobID: jobID, context: context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            let direct = try await service.readOutput(
+                jobID: jobID, stream: .stdout, offset: 0, limit: expected.count, context: context
+            )
+            XCTAssertEqual(direct.data, expected)
+            XCTAssertFalse(direct.artifactTruncated)
+            let broker = try ToolInvocationBroker(
+                repository: repository, executor: fixture.app.tools,
+                classifier: ProductionToolReplayCatalog.classifier(
+                    productionToolNames: fixture.app.tools.toolNames
+                )
+            )
+            var offset: UInt64 = 0
+            var reconstructed = Data()
+            var reachedEOF = false
+            var usedShortPage = false
+            for pageIndex in 0..<32 {
+                let callID = "\(sessionID)-page-\(pageIndex)"
+                let call = BrokeredToolCall(
+                    providerCallID: callID, toolName: "job.read_output",
+                    arguments: ["job_id": jobID.uuidString.lowercased(), "stream": "stdout",
+                                "offset": offset, "limit": 16 * 1_024]
+                )
+                let result: ToolResult
+                do {
+                    result = try await broker.invoke(
+                        call, turnID: turn.turnID, context: context, lease: lease
+                    )
+                } catch {
+                    let rejected = try await repository.toolInvocation(
+                        sessionID: sessionID, providerCallID: callID
+                    )
+                    XCTAssertEqual(rejected?.state, .completed,
+                                   "Managed byte page must fit its complete durable result: \(error)")
+                    XCTAssertNil(rejected?.lastErrorCode)
+                    XCTFail("Actual managed broker rejected the byte page at budget \(budget): \(error)")
+                    break
+                }
+                XCTAssertTrue(result.ok)
+                XCTAssertFalse(result.isError)
+                let encoded = try JSONSupport.canonicalJSON([
+                    "ok": result.ok, "is_error": result.isError, "payload": result.payload,
+                ])
+                XCTAssertLessThanOrEqual(encoded.utf8.count, min(budget, 65_536))
+                let storedValue = try await repository.toolInvocation(
+                    sessionID: sessionID, providerCallID: callID
+                )
+                let stored = try XCTUnwrap(storedValue)
+                XCTAssertEqual(stored.state, .completed)
+                XCTAssertEqual(stored.resultSummary, encoded)
+                XCTAssertEqual(stored.resultSHA256, JSONSupport.sha256Hex(encoded))
+                XCTAssertNil(stored.lastErrorCode)
+                let page = result.payload
+                let returnedOffset = try XCTUnwrap((page["offset"] as? NSNumber)?.uint64Value)
+                let next = try XCTUnwrap((page["next_offset"] as? NSNumber)?.uint64Value)
+                let retained = try XCTUnwrap((page["retained_bytes"] as? NSNumber)?.uint64Value)
+                let observed = try XCTUnwrap((page["observed_bytes"] as? NSNumber)?.uint64Value)
+                let eof = try XCTUnwrap(page["eof"] as? Bool)
+                XCTAssertEqual(returnedOffset, offset)
+                XCTAssertEqual(retained, UInt64(expected.count))
+                XCTAssertEqual(observed, retained)
+                XCTAssertEqual(page["artifact_truncated"] as? Bool, false)
+                XCTAssertEqual(page["sha256"] as? String, JSONSupport.sha256Hex(expected))
+                XCTAssertGreaterThan(next, offset)
+                XCTAssertLessThanOrEqual(next, min(offset + 16 * 1_024, retained))
+                XCTAssertEqual(eof, next == retained)
+                guard next > offset, next <= retained else {
+                    XCTFail("Returned byte offsets must advance within the retained artifact")
+                    break
+                }
+                let expectedPage = Data(expected[Int(offset)..<Int(next)])
+                let legacy = try XCTUnwrap(page["data"] as? String)
+                XCTAssertEqual(legacy, String(decoding: expectedPage, as: UTF8.self))
+                let lossless = page["data_base64"] as? String
+                XCTAssertNotNil(lossless, "Invalid UTF8 page must retain a lossless representation")
+                if let lossless, let bytes = Data(base64Encoded: lossless) {
+                    XCTAssertEqual(bytes, expectedPage)
+                    reconstructed.append(bytes)
+                } else {
+                    // Retain the complete old-path failure receipt, including
+                    // its wrong reconstructed byte count, before proceeding.
+                    reconstructed.append(contentsOf: legacy.utf8)
+                }
+                usedShortPage = usedShortPage || next - offset < 16 * 1_024
+                if eof { reachedEOF = true; break }
+                offset = next
+            }
+            XCTAssertTrue(reachedEOF, "The bounded managed reader must reach EOF at budget \(budget)")
+            XCTAssertTrue(usedShortPage, "Expanded invalid-byte representations require shorter pages")
+            XCTAssertEqual(reconstructed, expected)
+            _ = try await repository.releaseRunLease(lease)
+        }
+    }
+
+    func testManagedRuntimeJobListPreservesCompleteRowsWithinTheDurableResultBudget() async throws {
+        let fixture = try ProductionFixture.make(clientName: "runtime-managed-job-list-budget")
+        defer { fixture.close() }
+        let projectContext = try fixture.bindProject()
+        let repository = fixture.app.projectContexts.repository
+        let service = fixture.app.runtimeJobs.service
+        let budget = 4_096
+        let sessionID = "runtime-job-list-budget"
+        let rootResponseID = "\(sessionID)-root"
+        let run = try await repository.createAutonomousRun(AutonomousRunRequest(
+            projectID: projectContext.projectID, projectGeneration: projectContext.projectGeneration,
+            mission: "Read native job rows within the intact managed result budget",
+            providerID: "runtime-list-budget-fixture", modelKey: "runtime-list-budget-fixture",
+            specification: AutonomousRunSpecification(allowedTools: RuntimeJobToolPack.names, completionGates: ["bounded-job-list"]),
+            authorizationScope: ToolAuthorizationScope(
+                canonicalRoots: projectContext.authorizationScope.canonicalRoots,
+                writableRoots: projectContext.authorizationScope.writableRoots,
+                allowedTools: Set(RuntimeJobToolPack.names), networkAllowed: false,
+                maximumInlineOutputBytes: budget
+            )
+        ))
+        let lease = try await repository.acquireRunLease(
+            runID: run.runID, ownerID: sessionID,
+            policy: RunLeasePolicy(duration: 120, renewalInterval: 10, maximumDuration: 300)
+        )
+        try await repository.reserveProviderSession(ProviderSessionIntent(
+            sessionID: sessionID, runID: run.runID, projectID: run.projectID,
+            projectGeneration: run.projectGeneration, providerID: "runtime-list-budget-fixture",
+            adapterID: "runtime-list-budget-fixture", modelKey: "runtime-list-budget-fixture",
+            providerResponseID: rootResponseID, idempotencyKey: "\(sessionID)-session"
+        ), lease: lease)
+        let turn = ProviderTurnIntent(
+            runID: run.runID, sessionID: sessionID, projectID: run.projectID,
+            projectGeneration: run.projectGeneration, kind: .normalContinuation,
+            idempotencyKey: "\(sessionID)-turn", previousResponseID: rootResponseID,
+            inputSHA256: String(repeating: "f", count: 64)
+        )
+        _ = try await repository.persistProviderTurnIntent(turn, lease: lease)
+        let context = try await repository.invocationContext(
+            for: ProjectBindingOwner(kind: .providerSession, id: sessionID), clientID: ClientID(sessionID)
+        )
+        XCTAssertEqual(context.runID, run.runID)
+        XCTAssertEqual(context.authorizationScope.maximumInlineOutputBytes, budget)
+        XCTAssertGreaterThan(projectContext.authorizationScope.maximumInlineOutputBytes, budget)
+        var admittedIDs = Set<String>()
+        for _ in 0..<6 {
+            let jobID = try await service.submit(RuntimeJobRequest(
+                kind: .process, profile: .directProcess, context: context,
+                executable: URL(fileURLWithPath: "/usr/bin/true"), arguments: [],
+                canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(5),
+                maximumInlineOutputBytes: budget, replayClass: .readOnly
+            ))
+            let terminal = try await service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(8))
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            XCTAssertEqual(terminal.outputBytes, 0)
+            admittedIDs.insert(jobID.uuidString.lowercased())
+        }
+        XCTAssertEqual(admittedIDs.count, 6)
+        let full = try fixture.app.tools.call(
+            name: "job.list", arguments: ["states": ["completed"], "limit": 20], context: projectContext
+        )
+        XCTAssertTrue(full.ok)
+        XCTAssertFalse(full.isError)
+        let fullRows = try XCTUnwrap(full.payload["jobs"] as? [[String: Any]])
+        let fullBytes = try JSONSupport.canonicalJSON(["ok": full.ok, "is_error": full.isError, "payload": full.payload]).utf8.count
+        XCTAssertEqual(fullRows.count, 6)
+        XCTAssertEqual(full.payload["count"] as? Int, fullRows.count)
+        XCTAssertEqual(full.payload["has_more"] as? Bool, false)
+        XCTAssertGreaterThan(fullBytes, budget, "The six-row fixture must exercise result expansion, not input admission")
+        XCTAssertLessThanOrEqual(fullBytes, projectContext.authorizationScope.maximumInlineOutputBytes)
+        let completeByID = try Dictionary(uniqueKeysWithValues: fullRows.map { row in
+            (try XCTUnwrap(row["job_id"] as? String), try JSONSupport.canonicalJSON(row))
+        })
+        XCTAssertEqual(Set(completeByID.keys), admittedIDs)
+        let requiredFields: Set<String> = [
+            "job_id", "run_id", "project_id", "project_generation", "runtime_kind", "execution_profile",
+            "replay_class", "state", "cwd", "command_summary", "timeout_seconds", "exit_code",
+            "output_artifact_id", "output_bytes", "process_identifier", "process_group_identifier",
+            "error_code", "error_summary", "created_at", "started_at", "completed_at", "updated_at"
+        ]
+        for row in fullRows {
+            XCTAssertTrue(requiredFields.isSubset(of: Set(row.keys)))
+            var oneRowPayload = full.payload
+            oneRowPayload["jobs"] = [row]
+            oneRowPayload["count"] = 1
+            oneRowPayload["has_more"] = true
+            let oneRowBytes = try JSONSupport.canonicalJSON(["ok": true, "is_error": false, "payload": oneRowPayload]).utf8.count
+            XCTAssertLessThanOrEqual(oneRowBytes, budget, "Each complete native record must fit individually")
+        }
+        let broker = try ToolInvocationBroker(
+            repository: repository, executor: fixture.app.tools,
+            classifier: ProductionToolReplayCatalog.classifier(productionToolNames: fixture.app.tools.toolNames)
+        )
+        // Both the existing default of 20 and allowed maximum of 100 must remain useful
+        // at a valid smaller managed inline budget without dropping row fields.
+        let requests: [[String: Any]] = [["states": ["completed"]], ["states": ["completed"], "limit": 100]]
+        for (index, arguments) in requests.enumerated() {
+            XCTAssertLessThan(try JSONSupport.canonicalJSON(arguments).utf8.count, budget)
+            let call = BrokeredToolCall(providerCallID: "\(sessionID)-list-\(index)", toolName: "job.list", arguments: arguments)
+            do {
+                let result = try await broker.invoke(call, turnID: turn.turnID, context: context, lease: lease)
+                XCTAssertTrue(result.ok)
+                XCTAssertFalse(result.isError)
+                let encoded = try JSONSupport.canonicalJSON(["ok": result.ok, "is_error": result.isError, "payload": result.payload])
+                XCTAssertLessThanOrEqual(encoded.utf8.count, budget)
+                let storedValue = try await repository.toolInvocation(sessionID: sessionID, providerCallID: call.providerCallID)
+                let stored = try XCTUnwrap(storedValue)
+                XCTAssertEqual(stored.state, .completed)
+                XCTAssertEqual(stored.resultSummary, encoded)
+                XCTAssertEqual(stored.resultSHA256, JSONSupport.sha256Hex(encoded))
+                XCTAssertNil(stored.lastErrorCode)
+                let rows = try XCTUnwrap(result.payload["jobs"] as? [[String: Any]])
+                XCTAssertFalse(rows.isEmpty, "An individually fitting full record must remain readable")
+                XCTAssertLessThanOrEqual(rows.count, fullRows.count)
+                XCTAssertEqual(result.payload["count"] as? Int, rows.count)
+                XCTAssertEqual(result.payload["has_more"] as? Bool, rows.count < fullRows.count)
+                var returnedIDs = Set<String>()
+                for row in rows {
+                    let id = try XCTUnwrap(row["job_id"] as? String)
+                    XCTAssertTrue(returnedIDs.insert(id).inserted)
+                    XCTAssertTrue(requiredFields.isSubset(of: Set(row.keys)))
+                    XCTAssertEqual(try JSONSupport.canonicalJSON(row), completeByID[id], "Budgeting must preserve the complete existing row contract")
+                }
+            } catch {
+                let stored = try await repository.toolInvocation(sessionID: sessionID, providerCallID: call.providerCallID)
+                XCTAssertEqual(stored?.state, .completed, "Valid job.list request left an ambiguous result: \(error)")
+                XCTAssertNil(stored?.lastErrorCode)
+                XCTFail("Actual managed job.list rejected six native terminal rows at budget \(budget), default/maximum request \(index), full bytes \(fullBytes): \(error)")
+            }
+            let unchanged = try await service.list(context: context, limit: 20)
+            XCTAssertEqual(Set(unchanged.map { $0.jobID.uuidString.lowercased() }), admittedIDs)
+            XCTAssertTrue(unchanged.allSatisfy { $0.state == .completed && $0.exitCode == 0 })
+        }
+        var cursor: [String: Any] = [:]
+        var pagedIDs = Set<String>()
+        var reachedEnd = false
+        for page in 0..<7 {
+            var arguments: [String: Any] = ["states": ["completed"], "limit": 100]
+            arguments.merge(cursor) { _, new in new }
+            let result = try await broker.invoke(BrokeredToolCall(
+                providerCallID: "\(sessionID)-page-\(page)", toolName: "job.list", arguments: arguments
+            ), turnID: turn.turnID, context: context, lease: lease)
+            XCTAssertTrue(result.ok)
+            let encoded = try JSONSupport.canonicalJSON(["ok": result.ok, "is_error": result.isError, "payload": result.payload])
+            XCTAssertLessThanOrEqual(encoded.utf8.count, budget)
+            let rows = try XCTUnwrap(result.payload["jobs"] as? [[String: Any]])
+            for row in rows {
+                let id = try XCTUnwrap(row["job_id"] as? String)
+                XCTAssertTrue(pagedIDs.insert(id).inserted, "Cursor pages must not repeat a job")
+                XCTAssertEqual(try JSONSupport.canonicalJSON(row), completeByID[id])
+            }
+            if result.payload["has_more"] as? Bool == false {
+                reachedEnd = true
+                XCTAssertNil(result.payload["next_cursor"])
+                break
+            }
+            XCTAssertFalse(rows.isEmpty)
+            cursor = try XCTUnwrap(result.payload["next_cursor"] as? [String: Any])
+            XCTAssertEqual(Set(cursor.keys), ["before_created_at", "before_job_id"])
+            XCTAssertEqual(cursor["before_created_at"] as? String, rows.last?["created_at"] as? String)
+            XCTAssertEqual(cursor["before_job_id"] as? String, rows.last?["job_id"] as? String)
+        }
+        XCTAssertTrue(reachedEnd, "Six complete jobs must be traversable within seven bounded pages")
+        XCTAssertEqual(pagedIDs, admittedIDs)
+        _ = try await repository.releaseRunLease(lease)
+    }
+
+    func testRuntimeJobListCursorPreservesTimestampTiesAndLegacyExclusiveTimeFilter() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let repository = try RuntimeJobRepository(databaseURL: databaseURL,
+            clock: FixedClock(Date(timeIntervalSince1970: 1_800_000_000)))
+        do {
+            let request = RuntimeJobRequest(kind: .process, profile: .directProcess,
+                context: fixture.context, executable: URL(fileURLWithPath: "/usr/bin/true"),
+                arguments: [], canonicalWorkingDirectory: fixture.projectRoot,
+                timeout: .seconds(5), replayClass: .readOnly)
+            var all = Set<UUID>()
+            for _ in 0..<6 {
+                let id = UUID()
+                _ = try await repository.createJob(jobID: id, request: request,
+                    commandSummary: "Owned unlaunched cursor fixture", timeoutSeconds: 5,
+                    requestArtifactRelativePath: nil)
+                all.insert(id)
+            }
+            let first = try await repository.list(context: fixture.context, limit: 2)
+            XCTAssertEqual(first.count, 2)
+            let timestamp = try XCTUnwrap(first.last?.createdAt)
+            XCTAssertTrue(first.allSatisfy { $0.createdAt == timestamp })
+            let legacy = try await repository.list(context: fixture.context, limit: 100,
+                beforeCreatedAt: timestamp)
+            XCTAssertTrue(legacy.isEmpty, "Existing timestamp-only cursors retain their exclusive semantics")
+            var cursor: UUID?
+            var seen = Set<UUID>()
+            for _ in 0..<4 {
+                let page = try await repository.list(context: fixture.context, limit: 2,
+                    beforeCreatedAt: cursor == nil ? nil : timestamp, beforeJobID: cursor)
+                for row in page {
+                    XCTAssertEqual(row.createdAt, timestamp)
+                    XCTAssertTrue(seen.insert(row.jobID).inserted)
+                }
+                if page.isEmpty { break }
+                cursor = page.last?.jobID
+            }
+            XCTAssertEqual(seen, all, "The UUID tie-breaker must retain every equal-timestamp row")
+            do {
+                _ = try await repository.list(context: fixture.context, beforeJobID: UUID())
+                XCTFail("An unpaired cursor must be rejected at its repository boundary")
+            } catch let error as RuntimeJobError {
+                guard case .invalidRequest = error else { throw error }
+            }
+            await repository.close()
+            await fixture.close()
+        } catch {
+            await repository.close()
+            await fixture.close()
+            throw error
+        }
     }
 
     private actor TerminalPersistenceGate: RuntimeJobTerminalPersistenceHook {

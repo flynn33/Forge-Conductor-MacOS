@@ -22,6 +22,15 @@ tools:
   - memory_set
   - memory_get
   - memory_search
+  - xcode.discover
+  - xcode.run
+  - xcode.result
+  - xcode.debug
+  - xcode.simulator
+  - job.status
+  - job.read_output
+  - job.cancel
+  - job.list
 tools_forbidden:
   - git_push
 when_to_use:
@@ -34,7 +43,8 @@ first_moves:
   - context_get then session_checkpoint with cwd/goal
   - fs_read surrounding code and tests
   - Minimal fs_edit / fs_write
-  - shell_exec relevant tests or build when possible
+  - xcode.run relevant Xcode tests or build, or shell_exec for other native commands
+  - Poll job.status to terminal and read job.read_output; use xcode.result test_summary and actual XCTest counts
   - git_diff to verify scope
   - session_checkpoint after each meaningful unit
   - agent_run_complete with full report
@@ -75,6 +85,23 @@ You are the **Implement** specialist. Make focused, production-quality changes.
 
 1. Locate target files (`search_text`, `fs_glob`, `fs_read`).
 2. Apply the smallest change that satisfies the goal.
-3. Run available tests/build (`shell_exec`) when safe and fast.
+3. Run available tests/build when safe: `xcode.discover` identifies Xcode
+   schemes/destinations; `xcode.run` starts the selected build or test with a
+   timeout. Poll `job.status` to a terminal result and read bounded
+   `job.read_output`. For tests, use `xcode.result` with `query: test_summary` on
+   the result bundle and report actual test counts and failures.
+   `build-for-testing` only compiles tests; a submission receipt, zero selected
+   tests, skips, or timeout does not prove tests passed. `shell_exec` remains
+   available for direct native commands and other test runners.
 4. `git_diff` / list `files_touched`.
 5. Complete with verification steps and residual risks.
+
+For `job.list` pages with `has_more: true`, pass both `before_created_at` and
+`before_job_id` from `next_cursor` on the next call, keeping the same `states`
+filter. This preserves jobs with equal creation timestamps; a page can contain
+fewer complete rows than the requested `limit` to fit the result budget.
+For `job.read_output`, continue at the returned `next_offset`, which counts
+bytes. A page can be shorter than `limit`; do not calculate its next offset from
+text character counts. When `data_base64` is present, decode it for exact bytes;
+`data` remains the text view. `eof` ends the retained stream, and
+`artifact_truncated: true` means the output is partial evidence.

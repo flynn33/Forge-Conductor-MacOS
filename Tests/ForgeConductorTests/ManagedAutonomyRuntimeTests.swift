@@ -3,6 +3,218 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ManagedAutonomyRuntimeTests: XCTestCase {
+    /// Uses ordinary production runtime composition with saved settings. The
+    /// provider is a deterministic source fixture; no native/model claim follows.
+    func testSavedToolCountFencesFourthCallAfterTwoSuccessesAndTerminalFailure() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown() }
+        let root = home.appendingPathComponent("saved-count-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for name in ["first.txt", "second.txt", "fourth.txt"] {
+            try Data(name.utf8).write(to: root.appendingPathComponent(name))
+        }
+        _ = try app.config.update(["allowed_roots": [root.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3))
+        XCTAssertEqual(ConfigStore(paths: app.paths).model.sessions.continuityRolloverToolCalls, 3)
+        let provider = ManagedSavedCountFixtureProvider(root: root)
+        let registry = HostAdapterRegistry()
+        registry.register(manifest: HostPluginManifest(identifier: "saved-count-adapter", version: "1",
+            minimumContractVersion: 2, hostType: "source-fixture",
+            capabilities: HostCapabilities(create: false, bootstrap: false, usageReporting: true,
+                resume: false, idempotency: true, queryByIdempotencyKey: true),
+            configurationKeys: [], privacyRequirements: [], migrationVersion: 1),
+            managedProviderFactory: { _ in provider }, factory: { _ in ManagedRuntimeUnavailableAdapter() })
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(projectID: ProjectID(),
+            displayName: "Saved Count Fixture", canonicalRoot: root)
+        let runtime = try ManagedAutonomyRuntime(app: app, registry: registry, maximumConcurrentRuns: 1,
+            continuityFactory: { _ in UnavailableManagedRunContinuityExecutor() })
+        do {
+            _ = try await runtime.start()
+            let created = try await runtime.createRun(AutonomousRunRequest(projectID: project.projectID,
+                projectGeneration: project.generation, mission: "Read exactly the four fixture paths in provider order",
+                providerID: "saved-count-provider", adapterID: "saved-count-adapter", modelKey: "saved-count-model",
+                specification: AutonomousRunSpecification(allowedTools: ["fs_read"], completionGates: ["tests"]),
+                authorizationScope: ToolAuthorizationScope(canonicalRoots: [root], allowedTools: ["fs_read"],
+                    networkAllowed: false, maximumInlineOutputBytes: 65_536)))
+            let deadline = ContinuousClock.now + .seconds(5)
+            var reached = false
+            while ContinuousClock.now < deadline {
+                let tools = try await app.projectContexts.repository.toolInvocations(runID: created.runID, limit: 8)
+                let pending = try await app.projectContexts.repository.pendingContextBudgetActionRequest(runID: created.runID)
+                let retained = try await app.projectContexts.repository.autonomousRun(created.runID)
+                let countBoundaryDurable = pending?.reason.hasPrefix("Automatic rollover at saved tool-call threshold") == true
+                    && retained?.specification.work.metadata["managed_last_tool_call_id"] == "saved-missing"
+                    && retained?.specification.work.metadata["managed_last_tool_outcome"] == "failed"
+                if tools.count >= 4 || countBoundaryDurable {
+                    reached = true; break
+                }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            XCTAssertTrue(reached, "The source fixture must expose either the count action or baseline fourth call")
+            await runtime.shutdown()
+            let tools = try await app.projectContexts.repository.toolInvocations(runID: created.runID, limit: 8)
+            XCTAssertEqual(tools.count, 3, "Saved count 3 must fence the uninvoked fourth eligible call")
+            XCTAssertEqual(Set(tools.map(\.providerCallID)), Set(["saved-first", "saved-second", "saved-missing"]))
+            XCTAssertTrue(tools.allSatisfy { $0.state == .completed })
+            let failed = try XCTUnwrap(tools.first { $0.providerCallID == "saved-missing" })
+            let failedPayload = try JSONSerialization.jsonObject(with: Data(try XCTUnwrap(failed.resultSummary).utf8)) as? [String: Any]
+            XCTAssertEqual(failedPayload?["ok"] as? Bool, false)
+            XCTAssertEqual(failedPayload?["is_error"] as? Bool, true)
+            let pending = try await app.projectContexts.repository.pendingContextBudgetActionRequest(runID: created.runID)
+            let request = try XCTUnwrap(pending, "A saved tool-count trigger must be durably pending before any host dispatch")
+            XCTAssertEqual(request.requestedAction, .rollover)
+            XCTAssertEqual(request.reason, "Automatic rollover at saved tool-call threshold (count=3, threshold=3)")
+            let observation = try await app.projectContexts.repository.contextBudgetObservation(observationID: request.observationID)
+            XCTAssertEqual(observation?.triggerPoint, .afterToolResult)
+            XCTAssertEqual(observation?.capacity, 262_144)
+            let retained = try await app.projectContexts.repository.autonomousRun(created.runID)
+            XCTAssertEqual(retained?.specification.work.metadata["managed_last_tool_outcome"], "failed")
+            XCTAssertNil(retained?.specification.work.metadata["operator_continuity_action"])
+            XCTAssertEqual(app.config.model.sessions.continuityRolloverToolCalls, 3)
+            let snapshot = await provider.snapshot()
+            XCTAssertEqual(snapshot.rootCalls, 1)
+            XCTAssertEqual(snapshot.continuationCalls, 0, "The fourth effect or a predecessor provider feedback round must stay fenced")
+        } catch {
+            await runtime.shutdown()
+            throw error
+        }
+    }
+
+
+    func testSavedToolCountReplayAfterPendingRequestBeforeCoordinatorWorkKeepsFailedTail() async throws {
+        try await savedCountBeforeCoordinatorRecovery(raiseLimit: false, interruptBeforeRequest: false)
+    }
+
+    func testSavedToolCountReplayAfterPendingRequestRemainsStickyWhenLimitRaised() async throws {
+        try await savedCountBeforeCoordinatorRecovery(raiseLimit: true, interruptBeforeRequest: false)
+    }
+
+    func testSavedToolCountReplayAfterThirdResultBeforeRequestCommitsOneFailedTailBoundary() async throws {
+        try await savedCountBeforeCoordinatorRecovery(raiseLimit: false, interruptBeforeRequest: true)
+    }
+
+    private func savedCountBeforeCoordinatorRecovery(raiseLimit: Bool, interruptBeforeRequest: Bool) async throws {
+        var app = try ForgeApp.bootstrap(home: home)
+        defer { _ = app.shutdown() }
+        let root = home.appendingPathComponent("saved-count-recovery-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for name in ["first.txt", "second.txt", "fourth.txt"] {
+            try Data(name.utf8).write(to: root.appendingPathComponent(name))
+        }
+        _ = try app.config.update(["allowed_roots": [root.path]])
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3))
+        let provider = ManagedSavedCountFixtureProvider(root: root)
+        let project = try await app.projectContexts.repository.registerProjectUnchecked(projectID: ProjectID(),
+            displayName: "Saved Count Recovery", canonicalRoot: root)
+        var run = try await app.projectContexts.repository.createAutonomousRun(.init(projectID: project.projectID,
+            projectGeneration: project.generation, mission: "Read four approved fixture paths in provider order",
+            providerID: "saved-count-provider", adapterID: "saved-count-adapter", modelKey: "saved-count-model",
+            specification: .init(allowedTools: ["fs_read"], completionGates: ["tests"]),
+            authorizationScope: .init(canonicalRoots: [root], allowedTools: ["fs_read"],
+                networkAllowed: false, maximumInlineOutputBytes: 65_536)))
+        var lease = try await app.projectContexts.repository.acquireRunLease(runID: run.runID,
+            ownerID: "saved-count-before-coordinator-first")
+        for state in [AutonomousRunState.validating, .ready, .starting, .running] {
+            run = try await app.projectContexts.repository.transitionAutonomousRun(runID: run.runID, lease: lease,
+                transition: .init(expectedState: run.state, expectedRevision: run.revision, nextState: state,
+                    eventType: "saved_count_fixture_advance", eventSummary: "Advance owned source fixture"))
+        }
+        let cut = interruptBeforeRequest ? SavedCountBeforeRequestCut() : nil
+        let first = try savedCountRecoveryStepper(app: app, provider: provider, cut: cut)
+        let prepared = try await first.prepareNextStep(for: run)
+        let intent = try XCTUnwrap(prepared)
+        run = try await app.projectContexts.repository.persistRunSideEffectIntent(runID: run.runID,
+            lease: lease, expectedRevision: run.revision, intent: intent)
+        let context = try await app.projectContexts.repository.invocationContext(
+            for: .init(kind: .autonomousRun, id: run.runID.description))
+        if interruptBeforeRequest {
+            do {
+                _ = try await first.execute(intent, run: run, context: context, lease: lease)
+                XCTFail("Expected the source fixture cut after third committed result before count request")
+            } catch { XCTAssertEqual(error as? SavedCountBeforeRequestCutError, .afterThirdResult) }
+        } else {
+            let firstOutcome = try await first.execute(intent, run: run, context: context, lease: lease)
+            guard case .rolloverRequired(let work) = firstOutcome else {
+                return XCTFail("Expected a source count rollover after the failed third result")
+            }
+            XCTAssertEqual(work.metadata["managed_last_tool_call_id"], "saved-missing")
+            XCTAssertEqual(work.metadata["managed_last_tool_outcome"], "failed")
+        }
+        let retainedValue = try await app.projectContexts.repository.autonomousRun(run.runID)
+        let retained = try XCTUnwrap(retainedValue)
+        XCTAssertEqual(retained.state, .running)
+        XCTAssertEqual(retained.specification.work.pendingIntent, intent)
+        XCTAssertNil(retained.specification.work.metadata["managed_last_tool_call_id"],
+            "Do not apply the coordinator outcome: this is the actual durable work lag boundary")
+        let firstTools = try await app.projectContexts.repository.toolInvocations(runID: run.runID, limit: 8)
+        XCTAssertEqual(firstTools.count, 3)
+        XCTAssertEqual(Set(firstTools.map(\.providerCallID)), Set(["saved-first", "saved-second", "saved-missing"]))
+        let originalRequest = try await app.projectContexts.repository.pendingContextBudgetActionRequest(runID: run.runID)
+        if interruptBeforeRequest { XCTAssertNil(originalRequest) } else { XCTAssertNotNil(originalRequest) }
+        let firstProvider = await provider.snapshot()
+        XCTAssertEqual(firstProvider.rootCalls, 1)
+        XCTAssertEqual(firstProvider.continuationCalls, 0)
+        if raiseLimit { _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 10_000)) }
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+        XCTAssertTrue(app.shutdown().completed)
+        // Reopen the actual owned app/control-plane files; the deterministic
+        // provider retains its public idempotency receipts but makes no new POST.
+        app = try ForgeApp.bootstrap(home: home)
+        XCTAssertEqual(app.config.model.sessions.continuityRolloverToolCalls, raiseLimit ? 10_000 : 3)
+        lease = try await app.projectContexts.repository.acquireRunLease(runID: run.runID,
+            ownerID: "saved-count-before-coordinator-restarted")
+        let currentValue = try await app.projectContexts.repository.autonomousRun(run.runID)
+        let current = try XCTUnwrap(currentValue)
+        XCTAssertEqual(current.specification.work.pendingIntent, intent)
+        let replayContext = try await app.projectContexts.repository.invocationContext(
+            for: .init(kind: .providerSession, id: try XCTUnwrap(current.activeSessionID)))
+        let restarted = try savedCountRecoveryStepper(app: app, provider: provider)
+        let replay = try await restarted.execute(intent, run: current, context: replayContext, lease: lease)
+        guard case .rolloverRequired(let recoveredWork) = replay else {
+            return XCTFail("Reopened cached step must catch up to the failed retained tail before rollover")
+        }
+        XCTAssertEqual(recoveredWork.metadata["managed_last_tool_call_id"], "saved-missing")
+        XCTAssertEqual(recoveredWork.metadata["managed_last_tool_outcome"], "failed")
+        XCTAssertTrue(try XCTUnwrap(recoveredWork.nextAction).contains("Keep the requested action open"))
+        let afterTools = try await app.projectContexts.repository.toolInvocations(runID: run.runID, limit: 8)
+        XCTAssertEqual(afterTools, firstTools, "Replayed results must retain exactly the original three journal rows")
+        let requestValue = try await app.projectContexts.repository.pendingContextBudgetActionRequest(runID: run.runID)
+        let request = try XCTUnwrap(requestValue)
+        XCTAssertEqual(request.reason, "Automatic rollover at saved tool-call threshold (count=3, threshold=3)")
+        if let originalRequest {
+            XCTAssertEqual(request.requestID, originalRequest.requestID)
+            XCTAssertEqual(request.continuityOperationID, originalRequest.continuityOperationID)
+            XCTAssertEqual(request.observationID, originalRequest.observationID)
+            XCTAssertEqual(request, originalRequest)
+        }
+        let afterProvider = await provider.snapshot()
+        XCTAssertEqual(afterProvider.rootCalls, firstProvider.rootCalls)
+        XCTAssertEqual(afterProvider.continuationCalls, firstProvider.continuationCalls)
+        let unchangedValue = try await app.projectContexts.repository.autonomousRun(run.runID)
+        let unchanged = try XCTUnwrap(unchangedValue)
+        XCTAssertEqual(unchanged.specification.work.pendingIntent, intent)
+        XCTAssertNil(unchanged.specification.work.metadata["managed_last_tool_call_id"])
+        _ = try await app.projectContexts.repository.releaseRunLease(lease)
+    }
+
+    private func savedCountRecoveryStepper(app: ForgeApp, provider: ManagedSavedCountFixtureProvider,
+        cut: SavedCountBeforeRequestCut? = nil) throws -> ManagedProjectRunStepExecutor {
+        let broker = try ToolInvocationBroker(repository: app.projectContexts.repository, executor: app.tools,
+            classifier: ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames))
+        let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+        let budget = PersistedManagedRunBudgetEvaluator(repository: app.projectContexts.repository,
+            policyResolver: { scope in try app.config.budgetPolicySelection(scope: scope) },
+            toolCallThresholdResolver: {
+                try app.config.refreshIfChanged()
+                if let cut { try cut.check() }
+                return app.config.model.sessions.continuityRolloverToolCalls
+            })
+        return try ManagedProjectRunStepExecutor(repository: app.projectContexts.repository,
+            providerResolver: { _ in provider },
+            toolDefinitionResolver: { try catalog.providerToolDefinitions(allowedToolNames: $0) },
+            broker: broker, budget: budget)
+    }
+
     private var home: URL!
 
     override func setUpWithError() throws {
@@ -2478,4 +2690,69 @@ private struct ManagedRuntimeUnavailableAdapter: SessionHostAdapter, Sendable {
     }
 
     func cancel(operationID: String) async {}
+}
+
+/// Four eligible calls in one completed provider response; the third file is
+/// absent so the real fs_read pack returns an error result. Its durable attempt
+/// must count without becoming successful instruction work.
+private actor ManagedSavedCountFixtureProvider: ManagedModelProvider {
+    nonisolated let providerID = "saved-count-provider"
+    private let root: URL
+    private var receipts: [String: ProviderTurn] = [:]
+    private var rootCalls = 0
+    private var continuationCalls = 0
+    init(root: URL) { self.root = root }
+    func probe() async throws -> ProviderCapabilities {
+        try ProviderCapabilities(providerID: providerID, providerVersion: "source-fixture-1",
+            modelKey: "saved-count-model", providerInstanceID: "saved-count-instance",
+            contextLength: 262_144, maximumContextLength: 262_144, statefulResponses: true,
+            streaming: true, customTools: true, mcp: false, structuredOutput: false,
+            usageReporting: true, idempotencyLookup: true, capabilityFingerprintSHA256: String(repeating: "a", count: 64))
+    }
+    func createRoot(_ request: ProviderRootRequest) async throws -> ProviderTurn {
+        if let existing = receipts[request.idempotencyKey] { return existing }
+        rootCalls += 1
+        let files = ["first.txt", "second.txt", "missing.txt", "fourth.txt"]
+        let ids = ["saved-first", "saved-second", "saved-missing", "saved-fourth"]
+        let calls = try zip(ids, files).map { id, file in
+            try ProviderToolCall(callID: id, name: "fs_read", argumentsJSON:
+                JSONSerialization.data(withJSONObject: ["path": root.appendingPathComponent(file).path], options: [.sortedKeys]))
+        }
+        let turn = try ProviderTurn(requestID: "saved-count-root-request", responseID: "saved-count-root-response",
+            providerID: providerID, providerVersion: "source-fixture-1", modelKey: "saved-count-model",
+            providerInstanceID: "saved-count-instance", messages: [], toolCalls: calls,
+            usage: ProviderUsage(capacity: 262_144, inputTokens: 1_000, outputTokens: 64, source: .providerExact, confidence: 1),
+            completed: true, finishReason: .toolCalls)
+        receipts[request.idempotencyKey] = turn; return turn
+    }
+    func continueSession(_ request: ProviderContinuationRequest) async throws -> ProviderTurn {
+        if let existing = receipts[request.idempotencyKey] { return existing }
+        guard receipts.count < 32 else { throw AutonomyError.invalidRequest("bounded source fixture turn limit") }
+        continuationCalls += 1
+        let turn = try ProviderTurn(requestID: "saved-count-feedback-request-\(continuationCalls)",
+            responseID: "saved-count-feedback-response-\(continuationCalls)", previousResponseID: request.previousResponseID,
+            providerID: providerID, providerVersion: "source-fixture-1", modelKey: "saved-count-model",
+            providerInstanceID: "saved-count-instance", messages: ["Fixture provider yielded without completion"], toolCalls: [],
+            usage: ProviderUsage(capacity: 262_144, inputTokens: 1_200, outputTokens: 16, source: .providerExact, confidence: 1),
+            completed: true, finishReason: .stop)
+        receipts[request.idempotencyKey] = turn; return turn
+    }
+    func lookup(idempotencyKey: String) async throws -> ProviderTurn? { receipts[idempotencyKey] }
+    func cancel(requestID: String) async {}
+    func snapshot() -> (rootCalls: Int, continuationCalls: Int) { (rootCalls, continuationCalls) }
+}
+
+private enum SavedCountBeforeRequestCutError: Error, Equatable {
+    case afterThirdResult
+}
+
+private final class SavedCountBeforeRequestCut: @unchecked Sendable {
+    private let lock = NSLock()
+    private var checks = 0
+    func check() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        checks += 1
+        if checks == 3 { throw SavedCountBeforeRequestCutError.afterThirdResult }
+    }
 }

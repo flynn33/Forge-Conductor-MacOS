@@ -35,12 +35,95 @@ public struct ContinuityObservation: Sendable {
     public var reason: String
 }
 
+struct RuntimeContinuityProgress: Codable, Sendable {
+    var epoch = UUID().uuidString.lowercased()
+    var progressCount = 0
+    var failureCount = 0
+    var lastCheckpointCount = 0
+    var lastHandoffCount = 0
+    var lastCheckpointFailureCount = 0
+    var lastHandoffFailureCount = 0
+    var startedAt: Date?
+    var lastCheckpointAt: Date?
+    var lastHandoffAt: Date?
+    var lastTools: [String] = []
+    var lastPaths: [String] = []
+    var blocked = false
+    var lastHandoffID: String?
+    var lastResumeSeed: String?
+    var latestPacketID: String?
+    var latestRuntimeCheckpointID: String?
+    var capacityFailure: String?
+    var pending: RuntimeContinuityProgressClaim?
+    var rolloverRequested: Bool?
+
+    static func utf8Prefix(_ value: String, maximumBytes: Int) -> String {
+        var output = ""
+        output.reserveCapacity(maximumBytes)
+        var bytes = 0
+        for scalar in value.unicodeScalars {
+            let text = String(scalar)
+            let count = text.utf8.count
+            guard bytes + count <= maximumBytes else { break }
+            output.append(text)
+            bytes += count
+        }
+        return output
+    }
+
+    static func resumeSeed(for packet: HandoffPacket) -> String {
+        utf8Prefix(packet.resumeSeed.isEmpty ? packet.defaultResumeSeed() : packet.resumeSeed, maximumBytes: 16_384)
+    }
+
+    func validated() throws -> Self {
+        let counters = [progressCount, failureCount, lastCheckpointCount, lastHandoffCount,
+                        lastCheckpointFailureCount, lastHandoffFailureCount]
+        guard UUID(uuidString: epoch) != nil, counters.allSatisfy({ (0...1_000_000).contains($0) }),
+              lastCheckpointCount <= progressCount, lastHandoffCount <= progressCount,
+              lastCheckpointFailureCount <= failureCount, lastHandoffFailureCount <= failureCount,
+              lastTools.count <= 12, lastPaths.count <= 16,
+              lastTools.allSatisfy({ $0.utf8.count <= 256 }),
+              lastPaths.allSatisfy({ $0.utf8.count <= 4_096 }),
+              [lastHandoffID, latestPacketID, latestRuntimeCheckpointID].compactMap({ $0 }).allSatisfy({ UUID(uuidString: $0) != nil }),
+              capacityFailure.map({ $0.utf8.count <= 1_024 }) ?? true,
+              lastResumeSeed.map({ $0.utf8.count <= 16_384 }) ?? true else {
+            throw StoreError.execFailed("runtime continuity progress is invalid")
+        }
+        if let pending {
+            guard pending.scopeKey.utf8.count == 64, pending.epoch == epoch,
+                  UUID(uuidString: pending.packetID) != nil, UUID(uuidString: pending.ownerID) != nil,
+                  (0...progressCount).contains(pending.progressCount),
+                  (0...failureCount).contains(pending.failureCount),
+                  pending.claimedAt.timeIntervalSinceReferenceDate.isFinite,
+                  pending.expiresAt.timeIntervalSinceReferenceDate.isFinite else {
+                throw StoreError.execFailed("runtime continuity claim is invalid")
+            }
+        }
+        return self
+    }
+}
+
+struct RuntimeContinuityProgressClaim: Codable, Sendable, Equatable {
+    let scopeKey: String
+    let epoch: String
+    let packetID: String
+    var ownerID: String
+    let finalize: Bool
+    let progressCount: Int
+    let failureCount: Int
+    let claimedAt: Date
+    var expiresAt: Date
+}
+
 /// Server-side continuity: checkpoint and handoff without a model tool call.
 public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Sendable {
     public static let checkpointEveryTools = 50
     public static let handoffEveryTools = 200
     public static let checkpointIntervalSec: TimeInterval = 1_800
     public static let handoffIntervalSec: TimeInterval = 7_200
+    public static let checkpointEveryFailedTools = 50
+    public static let handoffEveryFailedTools = 200
+    static let progressClaimLeaseSec: TimeInterval = 30
     static let maxTrackedClients = 128
     static let maxImplicitRootsPerClient = 16
 
@@ -49,6 +132,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     private let continuity: ContextContinuityService
     private let diagnostics: DiagnosticLog
     private let clock: any Clock
+    private let projectContexts: ProjectContextService?
+    private let configStore: ConfigStore?
     private let lock = NSLock()
 
     private struct ClientState {
@@ -72,13 +157,17 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         sessions: AgentSessionService,
         continuity: ContextContinuityService,
         diagnostics: DiagnosticLog,
-        clock: any Clock
+        clock: any Clock,
+        projectContexts: ProjectContextService? = nil,
+        configStore: ConfigStore? = nil
     ) {
         self.store = store
         self.sessions = sessions
         self.continuity = continuity
         self.diagnostics = diagnostics
         self.clock = clock
+        self.projectContexts = projectContexts
+        self.configStore = configStore
     }
 
     public func additionalRoots(for clientID: ClientID) -> [URL] {
@@ -89,11 +178,20 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         for clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> [URL] {
+        let context = try runtimeContext(for: clientID, cancellation: cancellation)
+        let key = context.map { runtimeScopeKey($0) } ?? clientID.rawValue
         let implicit = try withStateLock(cancellation: cancellation) {
-            state[clientID.rawValue]?.implicitRoots ?? []
+            state[key]?.implicitRoots ?? []
         }
 
         var roots = implicit
+        if let context {
+            roots.append(contentsOf: context.authorizationScope.canonicalRoots)
+            if let progress = try store.runtimeContinuityProgress(scopeKey: key, cancellation: cancellation) {
+                roots.append(contentsOf: progress.lastPaths.map { ToolArgHelpers.resolvePath($0).deletingLastPathComponent() })
+            }
+            return uniqued(roots)
+        }
         if let binding = try sessions.binding(for: clientID, cancellation: cancellation),
            let cwd = binding.cwd,
            !cwd.isEmpty {
@@ -167,13 +265,15 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             )
         }
         guard !urls.isEmpty else { return }
+        let context = try runtimeContext(for: clientID, cancellation: cancellation)
+        let key = context.map { runtimeScopeKey($0) } ?? clientID.rawValue
         try withStateLock(cancellation: cancellation) {
-            var current = state[clientID.rawValue] ?? ClientState()
+            var current = state[key] ?? ClientState()
             current.implicitRoots = Array(
                 uniqued(current.implicitRoots + urls).suffix(Self.maxImplicitRootsPerClient)
             )
-            makeRoomForClientIfNeeded(clientID.rawValue)
-            state[clientID.rawValue] = current
+            makeRoomForClientIfNeeded(key)
+            state[key] = current
         }
     }
 
@@ -186,6 +286,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         packet: HandoffPacket,
         cancellation: ToolCallCancellation?
     ) throws {
+        if let context = try runtimeContext(for: clientID, cancellation: cancellation),
+           !packetMatchesProject(packet, context: context) { return }
         var paths: [String] = packet.keyFiles
         if let cwd = packet.cwd { paths.insert(cwd, at: 0) }
         try adopt(clientID: clientID, paths: paths, cancellation: cancellation)
@@ -197,7 +299,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         arguments: [String: Any],
         clientID: ClientID,
         succeeded: Bool,
-        cancellation: ToolCallCancellation? = nil
+        cancellation: ToolCallCancellation? = nil,
+        trustedContext: ToolInvocationContext? = nil
     ) -> ContinuityObservation? {
         let attemptID = UUID()
         var stage = "progress_observation"
@@ -205,6 +308,22 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         var persistenceAttempted = false
         do {
             try cancellation?.checkCancellation()
+            if let trustedContext {
+                guard trustedContext.clientID == clientID, let projectContexts else {
+                    throw ProjectContextError.projectScopeMismatch
+                }
+                try projectContexts.validate(trustedContext, cancellation: cancellation)
+                // Manager-owned runs and provider sessions have their own durable
+                // capacity evaluators and lifecycle. They must not become ordinary
+                // external-chat epochs through a same-client MCP lookup.
+                if trustedContext.runID != nil || trustedContext.providerSessionID != nil {
+                    return nil
+                }
+            }
+            if Self.progressTools.contains(tool) {
+                try configStore?.refreshIfChanged()
+                try cancellation?.checkCancellation()
+            }
             let observedPath = ToolArgHelpers.string(arguments, "path")
                 ?? ToolArgHelpers.string(arguments, "cwd")
             if let observedPath {
@@ -214,9 +333,20 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                     cancellation: cancellation
                 )
             }
+            if Self.progressTools.contains(tool),
+               let context = try runtimeContext(for: clientID, cancellation: cancellation) {
+                stage = "durable_progress"
+                return try observeDurable(
+                    tool: tool, observedPath: observedPath, clientID: clientID,
+                    context: context, succeeded: succeeded, attemptID: attemptID,
+                    cancellation: cancellation
+                )
+            }
             guard succeeded, Self.progressTools.contains(tool) else { return nil }
 
             let now = clock.now()
+            let handoffThreshold = handoffToolThreshold
+            let checkpointThreshold = min(Self.checkpointEveryTools, handoffThreshold)
             let update = try withStateLock(cancellation: cancellation) { () -> (
                 current: ClientState,
                 progress: Int,
@@ -224,6 +354,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                 handoffDue: Bool
             ) in
                 var current = state[clientID.rawValue] ?? ClientState()
+                if current.lastCheckpointAt == nil { current.lastCheckpointAt = now }
+                if current.lastHandoffAt == nil { current.lastHandoffAt = now }
                 current.progressCount += 1
                 current.lastTools.append(tool)
                 if current.lastTools.count > 12 {
@@ -240,11 +372,11 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                 let sinceHandoff = progress - current.lastHandoffCount
                 let forcePersist = Self.forcePersistTools.contains(tool)
                 let checkpointDue = forcePersist
-                    || sinceCheckpoint >= Self.checkpointEveryTools
+                    || sinceCheckpoint >= checkpointThreshold
                     || current.lastCheckpointAt.map({
                         now.timeIntervalSince($0) >= Self.checkpointIntervalSec
                     }) == true
-                let handoffDue = sinceHandoff >= Self.handoffEveryTools
+                let handoffDue = sinceHandoff >= handoffThreshold
                     || current.lastHandoffAt.map({
                         now.timeIntervalSince($0) >= Self.handoffIntervalSec
                     }) == true
@@ -340,7 +472,12 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         _ clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> Bool {
-        try withStateLock(cancellation: cancellation) {
+        if let context = try runtimeContext(for: clientID, cancellation: cancellation) {
+            return try store.runtimeContinuityProgress(
+                scopeKey: runtimeScopeKey(context), cancellation: cancellation
+            )?.blocked == true
+        }
+        return try withStateLock(cancellation: cancellation) {
             state[clientID.rawValue]?.blocked == true
         }
     }
@@ -353,13 +490,29 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         _ clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> (handoffID: String?, resumeSeed: String?) {
-        try withStateLock(cancellation: cancellation) {
+        if let context = try runtimeContext(for: clientID, cancellation: cancellation) {
+            let progress = try store.runtimeContinuityProgress(scopeKey: runtimeScopeKey(context), cancellation: cancellation)
+            return (progress?.lastHandoffID, progress?.lastResumeSeed)
+        }
+        return try withStateLock(cancellation: cancellation) {
             let current = state[clientID.rawValue]
             return (current?.lastHandoffID, current?.lastResumeSeed)
         }
     }
 
     public func markBlocked(clientID: ClientID, packet: HandoffPacket) {
+        if let context = try? runtimeContext(for: clientID, cancellation: nil) {
+            _ = try? store.updateRuntimeContinuityProgress(scopeKey: runtimeScopeKey(context)) { progress in
+                progress.blocked = true
+                progress.lastHandoffID = packet.id
+                progress.lastResumeSeed = RuntimeContinuityProgress.resumeSeed(for: packet)
+            }
+            return
+        }
+        markLocalBlocked(clientID: clientID, packet: packet)
+    }
+
+    private func markLocalBlocked(clientID: ClientID, packet: HandoffPacket) {
         try? withStateLock(cancellation: nil) {
             var current = state[clientID.rawValue] ?? ClientState()
             current.blocked = true
@@ -372,14 +525,111 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         }
     }
 
+    func budgetAutoCheckpoint(
+        clientID: ClientID,
+        reason: String,
+        blockProgress: Bool = false,
+        cancellation: ToolCallCancellation?
+    ) throws -> HandoffPacket {
+        guard let context = try runtimeContext(for: clientID, cancellation: cancellation) else {
+            let packet = try continuity.budgetAutoCheckpoint(
+                clientID: clientID, reason: reason, cancellation: cancellation
+            )
+            if blockProgress { markLocalBlocked(clientID: clientID, packet: packet) }
+            return packet
+        }
+        let key = runtimeScopeKey(context)
+        do {
+            return try continuity.budgetRuntimeCheckpoint(
+                clientID: clientID, reason: reason, context: context, scopeKey: key,
+                blockProgress: blockProgress, cancellation: cancellation
+            )
+        } catch let StoreError.execFailed(message) where message == SQLiteStore.runtimeContinuityPacketCapacityMessage {
+            _ = try? store.updateRuntimeContinuityProgress(scopeKey: key) { $0.capacityFailure = message }
+            throw StoreError.execFailed(message)
+        }
+    }
+
     public func clearBlock(clientID: ClientID) {
         try? clearBlock(clientID: clientID, cancellation: nil)
     }
 
-    public func clearBlock(
+    func recordInteractiveResumeAcknowledgement(
+        packet: HandoffPacket,
+        rolloverNonce: String,
         clientID: ClientID,
         cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
+        guard let packetScope = try store.runtimeContinuityPacketScopeKey(
+            packetID: packet.id, cancellation: cancellation
+        ) else {
+            return try continuity.recordInteractiveResumeAcknowledgement(
+                handoffID: packet.id, rolloverNonce: rolloverNonce,
+                clientID: clientID, cancellation: cancellation
+            )
+        }
+        guard let projectContexts,
+              let context = try runtimeContext(for: clientID, cancellation: cancellation),
+              context.runID == nil, context.providerSessionID == nil,
+              runtimeScopeKey(context) == packetScope else {
+            throw ProjectContextError.projectScopeMismatch
+        }
+        // Hold the native binding/generation fence through this bounded receipt
+        // write. Clearing the current epoch remains a separate exact-ID operation.
+        let receiptData = try projectContexts.commitIfCurrent(
+            context: context, resultKind: "interactive_resume_acknowledgement",
+            cancellation: cancellation
+        ) { control in
+            guard try self.store.runtimeContinuityPacketScopeKey(
+                packetID: packet.id, cancellation: control
+            ) == packetScope,
+                  let persisted = try self.store.handoffLegacyGet(id: packet.id, cancellation: control),
+                  persisted.resumeReady, persisted.clientID == clientID.rawValue,
+                  self.packetMatchesProject(persisted, context: context) else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            return try JSONSupport.data(from: self.continuity.recordInteractiveResumeAcknowledgement(
+                handoffID: persisted.id, rolloverNonce: rolloverNonce,
+                clientID: clientID, cancellation: control
+            ))
+        }
+        return try JSONSupport.object(from: receiptData)
+    }
+
+    public func clearBlock(
+        clientID: ClientID,
+        packet: HandoffPacket? = nil,
+        cancellation: ToolCallCancellation?
     ) throws {
+        _ = try clearBlockReportingResult(clientID: clientID, packet: packet, cancellation: cancellation)
+    }
+
+    func clearBlockReportingResult(
+        clientID: ClientID,
+        packet: HandoffPacket? = nil,
+        cancellation: ToolCallCancellation?
+    ) throws -> Bool {
+        if let context = try runtimeContext(for: clientID, cancellation: cancellation) {
+            var cleared = false
+            _ = try store.updateRuntimeContinuityProgress(scopeKey: runtimeScopeKey(context), cancellation: cancellation) { progress in
+                if let packet {
+                    guard packetMatchesProject(packet, context: context),
+                          packet.resumeReady, progress.lastHandoffID == packet.id else { return }
+                }
+                // This is Forge's logical continuity epoch. Shared stdio exposes no
+                // authenticated identity for the external host's individual chat.
+                var successor = RuntimeContinuityProgress()
+                successor.latestPacketID = packet?.id
+                progress = successor
+                cleared = true
+            }
+            return cleared
+        }
+        if let packet, try store.runtimeContinuityPacketScopeKey(packetID: packet.id, cancellation: cancellation) != nil {
+            // Read-only recovery before explicit project binding cannot release
+            // another deployment's durable continuity epoch.
+            return false
+        }
         try withStateLock(cancellation: cancellation) {
             if var current = state[clientID.rawValue] {
                 current.blocked = false
@@ -389,6 +639,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
                 state[clientID.rawValue] = current
             }
         }
+        return true
     }
 
     public func snapshot(for clientID: ClientID) -> [String: Any] {
@@ -399,13 +650,40 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         for clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> [String: Any] {
+        if let context = try runtimeContext(for: clientID, cancellation: cancellation) {
+            let key = runtimeScopeKey(context)
+            let progress = try store.runtimeContinuityProgress(scopeKey: key, cancellation: cancellation)
+            let roots = try withStateLock(cancellation: cancellation) { state[key]?.implicitRoots ?? [] }
+            let attention = try runtimeContinuityFailureReceipt(for: clientID, cancellation: cancellation)
+            return [
+                "enabled": true,
+                "checkpoint_every_tools": min(Self.checkpointEveryTools, handoffToolThreshold),
+                "handoff_every_tools": handoffToolThreshold,
+                "progress_count": progress?.progressCount ?? 0,
+                "failed_tool_count": progress?.failureCount ?? 0,
+                "tool_call_count": (progress?.progressCount ?? 0) + (progress?.failureCount ?? 0),
+                "checkpoint_every_failed_tools": min(Self.checkpointEveryFailedTools, handoffToolThreshold),
+                "handoff_every_failed_tools": handoffToolThreshold,
+                "blocked": progress?.blocked ?? false,
+                "handoff_id": progress?.lastHandoffID as Any,
+                "implicit_roots": roots.map(\.path),
+                "project_id": context.projectID.description,
+                "project_generation": context.projectGeneration.rawValue,
+                "continuity_epoch": progress?.epoch as Any,
+                "session_identity_source": "forge_logical_epoch",
+                "external_context_usage": "unavailable",
+                "continuity_attention_required": attention != nil,
+                "continuity_error": attention?["message"] as Any,
+                "continuity_attention": attention as Any,
+            ]
+        }
         let current = try withStateLock(cancellation: cancellation) {
             state[clientID.rawValue]
         }
         return [
             "enabled": true,
-            "checkpoint_every_tools": Self.checkpointEveryTools,
-            "handoff_every_tools": Self.handoffEveryTools,
+            "checkpoint_every_tools": min(Self.checkpointEveryTools, handoffToolThreshold),
+            "handoff_every_tools": handoffToolThreshold,
             "progress_count": current?.progressCount ?? 0,
             "blocked": current?.blocked ?? false,
             "handoff_id": current?.lastHandoffID as Any,
@@ -416,6 +694,199 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     var trackedClientCount: Int {
         lock.lock(); defer { lock.unlock() }
         return state.count
+    }
+
+    private func runtimeContext(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolInvocationContext? {
+        guard let projectContexts else { return nil }
+        do {
+            return try projectContexts.invocationContext(for: clientID, cancellation: cancellation)
+        } catch ProjectContextError.projectContextRequired {
+            return nil
+        } catch ProjectContextError.invalidIdentifier("binding owner") {
+            // An invalid owner cannot have a durable binding. Bootstrap still
+            // owns reporting a committed initialization with pending attachment.
+            return nil
+        }
+    }
+
+    func runtimeScopeKey(_ context: ToolInvocationContext) -> String {
+        // Only native-validated identity participates. Tool arguments cannot select
+        // a project generation, deployment client, or provider session.
+        JSONSupport.sha256Hex("runtime-continuity-v1:\(context.projectID.description):\(context.projectGeneration.rawValue):\(JSONSupport.sha256Hex(context.clientID.rawValue)):\(JSONSupport.sha256Hex(context.providerSessionID ?? "forge-logical-epoch"))")
+    }
+
+    func packetReadScope(
+        context: ToolInvocationContext?,
+        cancellation: ToolCallCancellation?
+    ) throws -> ContinuityPacketReadScope {
+        guard let context else {
+            if let projectContexts,
+               let selection = try projectContexts.soleActiveContinuityReadProject(cancellation: cancellation) {
+                return ContinuityPacketReadScope(
+                    runtimeScopeKeys: Set(selection.contexts.map(runtimeScopeKey)),
+                    canonicalRoots: [selection.project.canonicalRoot], legacyRequiresProjectRoot: false
+                )
+            }
+            // Ambiguous recovery retains the original NULL-owned legacy surface.
+            return ContinuityPacketReadScope(runtimeScopeKeys: [], canonicalRoots: nil)
+        }
+        guard let projectContexts else { throw ProjectContextError.projectScopeMismatch }
+        let current = try projectContexts.continuityReadContexts(for: context, cancellation: cancellation)
+        var keys = Set(current.map(runtimeScopeKey))
+        keys.insert(runtimeScopeKey(context))
+        return ContinuityPacketReadScope(runtimeScopeKeys: keys,
+            canonicalRoots: context.authorizationScope.canonicalRoots)
+    }
+
+    private var handoffToolThreshold: Int {
+        configStore?.model.sessions.continuityRolloverToolCalls ?? Self.handoffEveryTools
+    }
+
+    func runtimeContinuityFailureReceipt(
+        for clientID: ClientID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: Any]? {
+        guard let context = try runtimeContext(for: clientID, cancellation: cancellation) else { return nil }
+        let progress = try store.runtimeContinuityProgress(scopeKey: runtimeScopeKey(context), cancellation: cancellation)
+        let message: String
+        let resource: String
+        let limit: Int
+        if let failure = progress?.capacityFailure {
+            message = failure
+            resource = "runtime_continuity_packets"
+            limit = SQLiteStore.maximumRuntimeContinuityPackets
+        } else if progress == nil, try store.runtimeContinuityScopeCapacityReached(cancellation: cancellation) {
+            message = "Runtime continuity scope capacity reached. Existing evidence was retained."
+            resource = "runtime_continuity_scopes"
+            limit = SQLiteStore.maximumRuntimeContinuityScopes
+        } else { return nil }
+        return ["code": "continuity_capacity_reached", "message": message,
+                "attention_required": true, "resource": resource, "limit": limit,
+                "handoff_persisted": false, "retryable": false]
+    }
+
+    private func packetMatchesProject(_ packet: HandoffPacket, context: ToolInvocationContext) -> Bool {
+        guard let cwd = packet.cwd else { return false }
+        let path = ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
+        return context.authorizationScope.canonicalRoots.contains { root in
+            let canonical = root.resolvingSymlinksInPath().standardizedFileURL.path
+            return path == canonical || path.hasPrefix(canonical + "/")
+        }
+    }
+
+    private func observeDurable(
+        tool: String,
+        observedPath: String?,
+        clientID: ClientID,
+        context: ToolInvocationContext,
+        succeeded: Bool,
+        attemptID: UUID,
+        cancellation: ToolCallCancellation?,
+        accountProgress: Bool = true
+    ) throws -> ContinuityObservation? {
+        let now = clock.now()
+        let handoffThreshold = handoffToolThreshold
+        let checkpointThreshold = min(Self.checkpointEveryTools, handoffThreshold)
+        let key = runtimeScopeKey(context)
+        let ownerID = attemptID.uuidString
+        let progress = try store.updateRuntimeContinuityProgress(scopeKey: key, cancellation: cancellation) { current in
+            guard !current.blocked else { return }
+            if accountProgress {
+                if current.startedAt == nil { current.startedAt = now }
+                if succeeded {
+                    current.progressCount = min(current.progressCount + 1, 1_000_000)
+                } else {
+                    current.failureCount = min(current.failureCount + 1, 1_000_000)
+                }
+                current.lastTools = Array((current.lastTools + [tool]).suffix(12))
+                if let observedPath {
+                    current.lastPaths = Array((current.lastPaths + [RuntimeContinuityProgress.utf8Prefix(observedPath, maximumBytes: 4_096)]).suffix(16))
+                }
+            }
+            let sinceHandoff = current.progressCount - current.lastHandoffCount
+                + current.failureCount - current.lastHandoffFailureCount
+            let handoffDue = current.rolloverRequested == true || sinceHandoff >= handoffThreshold
+                || now.timeIntervalSince(current.lastHandoffAt ?? current.startedAt ?? now) >= Self.handoffIntervalSec
+            if handoffDue { current.rolloverRequested = true }
+            if var pending = current.pending {
+                if pending.expiresAt <= now {
+                    pending.ownerID = ownerID
+                    pending.expiresAt = now.addingTimeInterval(Self.progressClaimLeaseSec)
+                    current.pending = pending
+                }
+                return
+            }
+            let sinceCheckpoint = current.progressCount - current.lastCheckpointCount
+                + current.failureCount - current.lastCheckpointFailureCount
+            let checkpointDue = accountProgress && (Self.forcePersistTools.contains(tool)
+                || sinceCheckpoint >= checkpointThreshold
+                || now.timeIntervalSince(current.lastCheckpointAt ?? current.startedAt ?? now) >= Self.checkpointIntervalSec)
+            guard checkpointDue || handoffDue else { return }
+            current.pending = RuntimeContinuityProgressClaim(
+                scopeKey: key, epoch: current.epoch, packetID: current.latestRuntimeCheckpointID ?? UUID().uuidString.lowercased(),
+                ownerID: ownerID, finalize: handoffDue, progressCount: current.progressCount,
+                failureCount: current.failureCount, claimedAt: now,
+                expiresAt: now.addingTimeInterval(Self.progressClaimLeaseSec)
+            )
+        }
+        guard let claim = progress.pending, claim.ownerID == ownerID else { return nil }
+        var inferred = try inferredArguments(
+            clientID: clientID, lastTools: progress.lastTools, lastPaths: progress.lastPaths,
+            context: context,
+            cancellation: cancellation
+        )
+        // The trusted selected project owns the packet root. Another client's
+        // global legacy packet cannot become this project's task or identity.
+        if let root = context.authorizationScope.canonicalRoots.first { inferred["cwd"] = root.path }
+        let reason = "auto_\(claim.finalize ? "handoff" : "checkpoint") progress=\(claim.progressCount) failed_tools=\(claim.failureCount)"
+        let committed: RuntimeContinuityCommit
+        do {
+            committed = try continuity.autoPersistRuntime(
+                clientID: clientID, reason: reason, inferred: inferred, attemptID: attemptID,
+                claim: claim, priorPacketID: progress.latestPacketID, cancellation: cancellation
+            )
+        } catch {
+            // A failed transaction retains its exact packet intent. Make this
+            // observer's claim immediately retryable without stealing a newer claim.
+            _ = try? store.updateRuntimeContinuityProgress(scopeKey: key) { current in
+                if current.pending == claim {
+                    current.pending?.expiresAt = now
+                    if case let StoreError.execFailed(message) = error,
+                       message == SQLiteStore.runtimeContinuityPacketCapacityMessage {
+                        current.capacityFailure = message
+                    }
+                }
+            }
+            throw error
+        }
+        let packet = committed.packet
+        diagnostics.info(committed.finalize ? "auto_handoff" : "auto_checkpoint", [
+            "handoff_id": packet.id, "client_id": clientID.rawValue,
+            "project_id": context.projectID.description,
+            "project_generation": "\(context.projectGeneration.rawValue)",
+            "continuity_epoch": claim.epoch, "progress": "\(committed.progressCount)",
+            "failed_tools": "\(committed.failureCount)", "reason": committed.reason,
+            "attempt_id": attemptID.uuidString,
+            "operation": committed.finalize ? "handoff" : "checkpoint",
+            "finalize": committed.finalize ? "true" : "false",
+            "resume_ready": packet.resumeReady ? "true" : "false",
+            "source": packet.source.rawValue, "save_outcome": "committed",
+            "successor_request_state": committed.finalize
+                ? "deferred_to_interactive_successor" : "not_applicable_checkpoint",
+        ], category: .general)
+        let observation = ContinuityObservation(packet: packet, finalize: committed.finalize, reason: committed.reason)
+        if accountProgress, !committed.finalize,
+           let promoted = try observeDurable(
+            tool: tool, observedPath: observedPath, clientID: clientID, context: context,
+            succeeded: succeeded, attemptID: attemptID, cancellation: cancellation,
+            accountProgress: false
+           ) {
+            return promoted
+        }
+        return observation
     }
 
     private func withStateLock<Value>(
@@ -445,10 +916,16 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         clientID: ClientID,
         lastTools: [String],
         lastPaths: [String],
+        context: ToolInvocationContext? = nil,
         cancellation: ToolCallCancellation?
     ) throws -> [String: Any] {
         var args: [String: Any] = [:]
-        if let binding = try sessions.binding(for: clientID, cancellation: cancellation) {
+        if let binding = try sessions.binding(for: clientID, cancellation: cancellation),
+           context.map({ selected in
+               binding.cwd.map { cwd in
+                   packetMatchesProject(HandoffPacket(cwd: cwd), context: selected)
+               } ?? false
+           }) ?? true {
             if !binding.goal.isEmpty { args["goal"] = binding.goal }
             if let cwd = binding.cwd, !cwd.isEmpty { args["cwd"] = cwd }
         }
@@ -518,5 +995,8 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         "agent_run_start", "agent_run_complete",
         "search_text",
         "pdf_write", "pdf_from_file",
+        "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+        "job.status", "job.read_output", "job.list", "job.cancel",
+        "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
     ]
 }

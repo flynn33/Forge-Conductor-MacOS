@@ -419,6 +419,9 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
         if let endpointMode = request.endpointMode { next.endpointMode = endpointMode }
         next.baseURL = endpoint
         next.modelKey = request.modelKey
+        if let maximumOutputTokens = request.maximumOutputTokens {
+            next.maximumOutputTokens = maximumOutputTokens
+        }
         next.revision = UUID().uuidString.lowercased()
         if next.endpointMode == .local,
            request.credentialAction == .replace || request.token != nil {
@@ -641,7 +644,9 @@ public actor LMStudioConfigurationService: ProviderConfigurationServicing {
             endpointMode: configuration?.endpointMode ?? .local,
             modelKey: configuration?.modelKey,
             credentialConfigured: configuration?.keychainTokenReference != nil,
-            saved: configuration != nil, credentialCleanupPending: cleanupPending)
+            saved: configuration != nil, credentialCleanupPending: cleanupPending,
+            maximumOutputTokens: configuration?.maximumOutputTokens
+                ?? ProviderConfigurationContract.defaultMaximumOutputTokens)
     }
 
     private func recoverCredentials(_ configuration: LMStudioProviderConfiguration?) -> Bool {

@@ -171,7 +171,25 @@ public final class StjornarvaldPolicySourceCatalog:
         )
     }
 
-    deinit { if let database { sqlite3_close(database) } }
+    deinit { _ = close() }
+
+    @discardableResult
+    public func close() -> Bool {
+        lock.lock()
+        let result: Int32
+        if let database {
+            result = sqlite3_close(database)
+            if result == SQLITE_OK { self.database = nil }
+        } else {
+            result = SQLITE_OK
+        }
+        lock.unlock()
+        guard result == SQLITE_OK else {
+            diagnostics("Stjornarvald policy source catalog close was deferred: SQLite code \(result)")
+            return false
+        }
+        return true
+    }
 
     public func add(selectedURL: URL, requestID: UUID) async throws -> DevelopmentPolicySource {
         try addSync(selectedURL: selectedURL, requestID: requestID)

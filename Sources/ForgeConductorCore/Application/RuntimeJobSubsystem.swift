@@ -235,7 +235,7 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
     ) throws -> Value {
         let semaphore = DispatchSemaphore(value: 0)
         let result = RuntimeBlockingResult<Value>()
-        let task = Task.detached {
+        let task = Task.detached(priority: Task.currentPriority) {
             do {
                 result.store(.success(try await operation()))
             } catch {

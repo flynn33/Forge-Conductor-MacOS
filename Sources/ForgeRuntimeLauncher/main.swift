@@ -77,7 +77,7 @@ private func applyResourceLimits() -> Bool {
     let fileBytes = environmentLimit(
         ResourceLimitEnvironment.fileBytes,
         default: ResourceLimitEnvironment.defaultFileBytes,
-        maximum: 16 * 1_024 * 1_024 * 1_024
+        maximum: 32 * 1_024 * 1_024 * 1_024
     ),
     let coreBytes = environmentLimit(
         ResourceLimitEnvironment.coreBytes,

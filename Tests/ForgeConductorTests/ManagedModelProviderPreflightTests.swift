@@ -26,6 +26,9 @@ private final class PreflightCapabilityClock: @unchecked Sendable {
 
 private actor PreflightGUIChatDriver: LMStudioGUIChatDriving {
     private var requests: [LMStudioGUIChatRequest] = []
+    private let clientID: String
+
+    init(clientID: String = "lmstudio-gui-fixture") { self.clientID = clientID }
 
     func submitSuccessor(_ request: LMStudioGUIChatRequest) async throws
         -> LMStudioGUIChatReceipt {
@@ -33,7 +36,7 @@ private actor PreflightGUIChatDriver: LMStudioGUIChatDriving {
         return LMStudioGUIChatReceipt(
             visibleChatTitle: "Forge rollover \(request.handoffID.prefix(8))",
             mcpTool: "get_forge_status",
-            clientID: "lmstudio-gui-fixture",
+            clientID: clientID,
             acknowledgedAt: "2026-09-28T12:00:00Z"
         )
     }
@@ -217,6 +220,99 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
             tools: root().tools)
     }
 
+    func testConfigured8192OutputLimitReachesProbeRootAndContinuationWireBodies() async throws {
+        let f = try fixture(); defer { f.close() }
+        var configuration = f.configuration
+        configuration.maximumOutputTokens = 8_192
+        let provider = try f.provider(configuration: configuration)
+        let capabilities = try await provider.probe()
+        XCTAssertEqual(capabilities.contextLength, 32_768)
+        XCTAssertEqual(capabilities.requestedMaximumOutputTokens, 8_192)
+        let rootRequest = try root()
+        let rootPreflight = try await provider.preflightRoot(rootRequest)
+        let rootTurn = try await provider.createRoot(rootRequest, observedCapabilities: capabilities)
+        let continuationRequest = try continuation(previous: rootTurn.responseID)
+        let continuationPreflight = try await provider.preflightContinuation(continuationRequest)
+        let continued = try await provider.continueSession(continuationRequest, observedCapabilities: capabilities)
+        XCTAssertEqual(continued.responseID, "resp_preflight_continuation")
+        XCTAssertEqual(rootPreflight.limits.maximumOutputTokens, 8_192)
+        XCTAssertEqual(continuationPreflight.limits.maximumOutputTokens, 8_192)
+        let posts = f.capture.snapshot.filter { $0.method == "POST" && $0.path == "/v1/responses" }
+        XCTAssertEqual(posts.count, 3, "Exactly one contract probe, root and continuation were sent")
+        for post in posts {
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: post.body) as? [String: Any])
+            XCTAssertEqual(body["max_output_tokens"] as? Int, 8_192)
+        }
+        let rootBody = try XCTUnwrap(posts.first { $0.requestID == rootRequest.operationID.uuidString.lowercased() })
+        let continuationPosts = try posts.filter {
+            let body = try XCTUnwrap(JSONSerialization.jsonObject(with: $0.body) as? [String: Any])
+            return body["previous_response_id"] as? String == rootTurn.responseID
+        }
+        XCTAssertEqual(continuationPosts.count, 1)
+        let continuedBody = try XCTUnwrap(continuationPosts.first)
+        XCTAssertNil(continuedBody.requestID, "The existing continuation transport intentionally omits the root request-ID header")
+        XCTAssertEqual(JSONSupport.sha256Hex(rootBody.body), rootPreflight.bodySHA256)
+        XCTAssertEqual(JSONSupport.sha256Hex(continuedBody.body), continuationPreflight.bodySHA256)
+        XCTAssertEqual(rootBody.body.count, rootPreflight.bodyByteCount)
+        XCTAssertEqual(continuedBody.body.count, continuationPreflight.bodyByteCount)
+    }
+
+    func testAcceptedOutputLimitReceiptReplaysOriginalCapabilitiesAfterConfigurationChangeWithoutPost() async throws {
+        let f = try fixture(); defer { f.close() }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("forge-output-limit-receipt-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var originalConfiguration = f.configuration
+        originalConfiguration.maximumOutputTokens = 8_192
+        let original = try LMStudioManagedModelProvider(storageDirectory: directory,
+            transport: LMStudioManagedSessionTransport(configuration: originalConfiguration,
+                sessionConfiguration: f.session, authorization: f.authorization))
+        let originalCapabilities = try await original.probe()
+        let request = try root()
+        let originalPreflight = try await original.preflightRoot(request)
+        let turn = try await original.createRoot(request, observedCapabilities: originalCapabilities)
+        let ledgerURL = directory.appendingPathComponent("managed-provider-receipts.json")
+        let ledgerBefore = try OwnerOnlyAtomicFile.read(from: ledgerURL, maximumBytes: 64 * 1_024)
+        let ledger = try XCTUnwrap(JSONSerialization.jsonObject(with: ledgerBefore) as? [String: Any])
+        let record = try XCTUnwrap((ledger["records"] as? [[String: Any]])?.first)
+        XCTAssertEqual(record["status"] as? String, "accepted")
+        let recordedCapabilities = try JSONDecoder().decode(ProviderCapabilities.self,
+            from: JSONSerialization.data(withJSONObject: XCTUnwrap(record["capabilities"] as? [String: Any])))
+        XCTAssertEqual(recordedCapabilities, originalCapabilities)
+        XCTAssertEqual(recordedCapabilities.requestedMaximumOutputTokens, 8_192)
+        XCTAssertNotNil(record["terminal_metadata"])
+        var changedConfiguration = originalConfiguration
+        changedConfiguration.maximumOutputTokens = 16_384
+        let reopened = try LMStudioManagedModelProvider(storageDirectory: directory,
+            transport: LMStudioManagedSessionTransport(configuration: changedConfiguration,
+                sessionConfiguration: f.session, authorization: f.authorization))
+        let changedCapabilities = try await reopened.probe()
+        let changedPreflight = try await reopened.preflightRoot(request)
+        XCTAssertEqual(changedCapabilities.requestedMaximumOutputTokens, 16_384)
+        XCTAssertEqual(changedCapabilities.capabilityFingerprintSHA256, originalCapabilities.capabilityFingerprintSHA256,
+            "The negotiated service capability fingerprint keeps its existing contract")
+        XCTAssertNotEqual(changedPreflight.configurationFingerprintSHA256, originalPreflight.configurationFingerprintSHA256)
+        XCTAssertNotEqual(changedPreflight.bodySHA256, originalPreflight.bodySHA256)
+        let stillOriginal = try await original.preflightRoot(request)
+        XCTAssertEqual(stillOriginal, originalPreflight, "The existing provider retains its immutable configuration")
+        let requestsBeforeReplay = f.capture.snapshot
+        let replayed = try await reopened.createRoot(request)
+        let lookedUp = try await reopened.lookupRecorded(idempotencyKey: request.idempotencyKey)
+        XCTAssertEqual(replayed, turn)
+        XCTAssertEqual(lookedUp, turn)
+        XCTAssertEqual(f.capture.snapshot.count, requestsBeforeReplay.count,
+            "Accepted replay performs no additional HTTP request, including no Responses POST")
+        XCTAssertEqual(try OwnerOnlyAtomicFile.read(from: ledgerURL, maximumBytes: 64 * 1_024), ledgerBefore,
+            "Replay retains the original capability value, terminal metadata and request fingerprint bytes")
+        let newRequest = try root(input: "A new intent after the output limit change")
+        _ = try await reopened.createRoot(newRequest, observedCapabilities: changedCapabilities)
+        let freshBody = try XCTUnwrap(f.capture.snapshot.first {
+            $0.method == "POST" && $0.requestID == newRequest.operationID.uuidString.lowercased()
+        })
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: freshBody.body) as? [String: Any])
+        XCTAssertEqual(body["max_output_tokens"] as? Int, 16_384)
+    }
+
     func testLocalPreflightMatchesActualRootAndContinuationBodies() async throws {
         let f = try fixture(); defer { f.close() }
         let request = try root()
@@ -342,6 +438,7 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
             LMStudioInteractiveSessionTransport.rolloverNonce(operationID: operationID)
         )
         XCTAssertEqual(request.acknowledgementURL.deletingLastPathComponent(), acknowledgements)
+        XCTAssertNil(request.expectedClientID)
         let acknowledgement = try XCTUnwrap(
             JSONSerialization.jsonObject(with: try XCTUnwrap(response.chunks.first))
                 as? [String: Any]
@@ -350,6 +447,95 @@ final class ManagedModelProviderPreflightTests: XCTestCase {
         XCTAssertEqual(acknowledgement["successor_session_id"] as? String, "successor-fixture")
         XCTAssertEqual(acknowledgement["mcp_tool"] as? String, "get_forge_status")
         XCTAssertFalse(f.capture.snapshot.contains { $0.path == "/api/v1/chat" })
+    }
+
+    func testInteractiveSuccessorRejectsForeignDeploymentReceiptFromAlternateDriver() async throws {
+        let owner = "lm-studio:" + String(repeating: "a", count: 64)
+        let driver = PreflightGUIChatDriver(clientID: "lm-studio:" + String(repeating: "b", count: 64))
+        let transport = LMStudioInteractiveSessionTransport(
+            guiDriver: driver, acknowledgementDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("forge-foreign-ack-\(UUID().uuidString)", isDirectory: true)
+        )
+        let operationID = UUID().uuidString.lowercased()
+        do {
+            _ = try await transport.bootstrap(NativeBootstrapRequest(
+                operationID: operationID, projectID: UUID().uuidString.lowercased(),
+                successorSessionID: "successor-fixture", providerSessionID: "provider-fixture",
+                handoffID: operationID, handoffSHA256: String(repeating: "a", count: 64),
+                canonicalHandoff: Data("{}".utf8), predecessorSessionID: owner,
+                deadline: ContinuousClock.now.advanced(by: .seconds(2))
+            ))
+            XCTFail("An alternate GUI driver must not publish a foreign deployment acknowledgement")
+        } catch let error as NativeHostPluginError {
+            guard case .malformedResponse(let message) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(message, "LM Studio GUI successor acknowledgement client identity differs")
+        }
+        let requests = await driver.snapshot
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.expectedClientID, owner)
+    }
+
+    func testInteractiveSuccessorPropagatesScopedDeploymentOwnerToAlternateDriver() async throws {
+        let owner = "lm-studio:" + String(repeating: "c", count: 64)
+        let driver = PreflightGUIChatDriver(clientID: owner)
+        let transport = LMStudioInteractiveSessionTransport(
+            guiDriver: driver, acknowledgementDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("forge-scoped-ack-\(UUID().uuidString)", isDirectory: true)
+        )
+        let operationID = UUID().uuidString.lowercased()
+        let response = try await transport.bootstrap(NativeBootstrapRequest(
+            operationID: operationID, projectID: UUID().uuidString.lowercased(),
+            successorSessionID: "successor-fixture", providerSessionID: "provider-fixture",
+            handoffID: operationID, handoffSHA256: String(repeating: "a", count: 64),
+            canonicalHandoff: Data("{}".utf8), predecessorSessionID: owner,
+            deadline: ContinuousClock.now.advanced(by: .seconds(2))
+        ))
+        let requests = await driver.snapshot
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.expectedClientID, owner)
+        let acknowledgement = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: try XCTUnwrap(response.chunks.first)
+        ) as? [String: Any])
+        XCTAssertEqual(acknowledgement["handoff_id"] as? String, operationID)
+        XCTAssertEqual(acknowledgement["successor_session_id"] as? String, "successor-fixture")
+        XCTAssertEqual(acknowledgement["mcp_client_id"] as? String, owner)
+    }
+
+    func testInteractiveSuccessorPreservesUnscopedAndLegacyRequestInitializers() async throws {
+        let predecessors: [String?] = [
+            nil, "lmstudio-predecessor", "lm-studio:" + String(repeating: "A", count: 64),
+            "lm-studio:" + String(repeating: "a", count: 63),
+        ]
+        for predecessor in predecessors {
+            let driver = PreflightGUIChatDriver()
+            let transport = LMStudioInteractiveSessionTransport(
+                guiDriver: driver, acknowledgementDirectory: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("forge-legacy-ack-\(UUID().uuidString)", isDirectory: true)
+            )
+            let operationID = UUID().uuidString.lowercased()
+            let response = try await transport.bootstrap(NativeBootstrapRequest(
+                operationID: operationID, projectID: UUID().uuidString.lowercased(),
+                successorSessionID: "successor-fixture", providerSessionID: "provider-fixture",
+                handoffID: operationID, handoffSHA256: String(repeating: "a", count: 64),
+                canonicalHandoff: Data("{}".utf8), predecessorSessionID: predecessor,
+                deadline: ContinuousClock.now.advanced(by: .seconds(2))
+            ))
+            let requests = await driver.snapshot
+            XCTAssertEqual(requests.count, 1)
+            XCTAssertNil(requests.first?.expectedClientID)
+            let acknowledgement = try XCTUnwrap(JSONSerialization.jsonObject(
+                with: try XCTUnwrap(response.chunks.first)
+            ) as? [String: Any])
+            XCTAssertEqual(acknowledgement["mcp_client_id"] as? String, "lmstudio-gui-fixture")
+        }
+        let oldGUIRequest = LMStudioGUIChatRequest(
+            operationID: "legacy-operation", handoffID: "legacy-handoff",
+            rolloverNonce: "legacy-nonce", prompt: "get_forge_status", acknowledgementURL: URL(fileURLWithPath: "/fixture/ack.json"),
+            deadline: ContinuousClock.now.advanced(by: .seconds(2))
+        )
+        XCTAssertNil(oldGUIRequest.expectedClientID)
     }
 
     func testExpiredObservationRejectsRootAndContinuationWithoutHiddenProbe() async throws {
