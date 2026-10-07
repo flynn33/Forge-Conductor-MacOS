@@ -1,14 +1,22 @@
 # Version and qualification status
 
-Current source **0.18.0, build 28** is undergoing continuity, native Xcode CLI
-and Stjornarvald validation. [The repair record](LMSTUDIO-RUNTIME-REPAIR.md)
-contains current findings and remaining gates. The UI receipts below retain
-the preceding 0.17.0 (27) sources and do not qualify the new repair.
+Current source **0.22.0, build 32** adds binary web fetching/paging and aligns
+current authority documents. All 41 distinct affected source cases and 17
+signed-native cases passed; installed/all-feature gates remain open. Exact scopes
+are recorded in
+[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md).
+The preceding [0.21.0 inventory](RUNTIME-INVENTORY.md),
+[0.20.0 Qwen follow-up](QWEN-FOLLOWUP.md) and
+[0.19.0 project/web feature](PROJECT-WEB-QWEN.md) records retain their exact
+tested inputs. The repair and UI receipts below retain their older source,
+candidate and installation scopes; they do not qualify this new slice.
+
+## Preceding 0.18.0 (28) repair receipts
 
 **Published owner checkpoint — 0.18.0 (28).** The source and wiki were
 published under the owner identity and both local checkouts were synchronized.
-The owner will build, notarize and install this version; further product repair
-waits for the installation report. The actual managed policy mission remains
+The recorded follow-up at that checkpoint was the owner's build, notarization,
+installation and installation report. The actual managed policy mission remains
 **unverified** after a harness preparation failure before model activation.
 Installed and all-feature acceptance remain open. [Published references and limits](LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
 
@@ -56,7 +64,7 @@ The later CLI-Manager GUI, second 8,192-token mission and actual-model LLDB
 attempts remain **NONPASS**; partial count Save/Reload and debugger dispatch do
 not close their remaining gates. See [the latest repair evidence](LMSTUDIO-RUNTIME-REPAIR.md#latest-gui-second-8192-token-and-model-lldb-attempts--nonpass).
 
-The first current **8,192-token actual-model attempt remains NONPASS**. It
+The preceding checkpoint's first **8,192-token actual-model attempt remains NONPASS**. It
 reached the saved-three-call trigger, same-handoff acknowledgement and predecessor
 seal, one successor marker read and its completed feedback. The protected-process
 count guard then rejected the paused-stability check; cleanup sent one owned
@@ -64,7 +72,7 @@ SIGTERM. Stability, ordinary shutdown, restoration and final inventory/coherence
 gates did not complete. Later ten-process parity does not requalify that run or
 identify the initiating cause.
 
-The current ordinary GUI attempt also remains **NONPASS**. Root's retained CUA
+The preceding ordinary GUI attempt also remains **NONPASS**. Root's retained CUA
 summary records default 200, stepper 4→3, Save 3 and unsaved 7→Reload 3; API/disk
 captures agree. Provider output Save/Refresh, restart persistence, restoration and
 ordinary Quit remain unverified after SkyComputerUseService failures. Three crash
@@ -74,7 +82,7 @@ native and negative receipts retain their scopes; exact evidence is in the repai
 record. Neither partial result qualifies ordinary GUI rollover, actual-model
 Xcode/LLDB, Simulator XCTest, crash recovery or the installed product.
 
-The current **private native Stjornarvald v10 replay passed** in 10.182 seconds
+The preceding **private native Stjornarvald v10 replay passed** in 10.182 seconds
 on the same `80f542fa…` inputs. It detected the declared production Python fixture,
 presented its notice over MCP and recorded correction after membership removal;
 resource-only JavaScript stayed advisory, alias roles raised the native finding,
@@ -87,20 +95,20 @@ comprehension, policy GUI, installed or full-policy compliance; historical job
 page EOF receives no native producer-EOF credit. Exact evidence is in the repair
 record.
 
-The current `80f542fa…` checkpoint now has both source and signed native
+The preceding `80f542fa…` checkpoint has both source and signed native
 validation. Full source v14 executed **2,310 cases: 2,297 passed, 13 explicitly
 skipped, zero failed**; both Swift products built. Canonical native v10 Debug
 and Release builds returned zero with full EOF and unforced cleanup. The Debug
 selection passed **49 Core plus two app-hosted cases**, with no failures/skips;
 all four build/test captures retained the same 439 inputs. Both configurations'
 five roles passed all **30 signature/metadata/entitlement controls**, and all
-four effective-settings queries passed. These results close current source,
-selected native test, build and platform-identity scopes. Fixture/loopback and
+four effective-settings queries passed. These results close that checkpoint's
+source, selected native test, build and platform-identity scopes. Fixture/loopback and
 view-model controls do not qualify actual-model Xcode/LLDB, a larger-output
 LM Studio mission, onscreen GUI/ordinary rollover, Simulator XCTest, crash or
 installed acceptance. Those gates remain open; the 13 source skips receive no
 pass credit. Earlier checkpoints and all negative receipts retain their scopes.
-Exact current receipts and binary identities are in the repair record.
+Exact receipts and binary identities for that checkpoint are in the repair record.
 
 A subsequent settings/compatibility checkpoint at source `80f542fa…` passed all
 **14 focused cases**, native zero, no failures/skips, full **7,073-byte** EOF.
@@ -355,7 +363,7 @@ and one successful absolute-path read of the exact owned marker. Independent
 reconciliation preserved the earlier failed read and H/ACK/seal. Its additional
 relative-path assertion failed; settled replay and final comprehension remain
 unverified, and both original diagnostics remain non-passes.
-The current native Compute v3 diagnostic executed one test and failed two
+The preceding native Compute v3 diagnostic executed one test and failed two
 activation assertions in 4.135 seconds, with no skips, native exit 65 and serve
 exit zero. Complete output and the startup attachment retain inactive/keyless
 state with SecurityAgent PID 55952 foreground; cover variants did not execute.
@@ -485,7 +493,7 @@ exit zero. The exact app-hosted Rune coverage/unknown-state case passed once
 without skips or failures; typed xcresult inspection reported Passed and one
 actual test. A separate current Debug/Release identity/version-drift fixture
 case passed once without skips or failures. These are scoped runtime receipts.
-Current native policy v5 qualified real detection, delivered notices, separate
+The preceding native policy v5 qualified real detection, delivered notices, separate
 project scopes, resource-review classification and immutable correction
 history, with Manager and both MCP helper exits zero. Its separate model notice
 v5 interpretation returned a timeout without a completed response. The bounded
@@ -632,7 +640,7 @@ App Store Connect upload or distribution was performed.
 
 ## Preceding Graphite/Compute source and ordinary candidate — 0.17.0 (27)
 
-Current production qualification is **116 distinct tests /140 successful
+Preceding 0.17.0 production qualification is **116 distinct tests /140 successful
 executions**, zero failures/skips: Compute 29, regression 68 and proper canonical
 Provider 33 (24 Provider repeats counted once), plus fresh Core 8/H0(1)/G1(1).
 CLI/App SwiftPM compilation and the canonical ordinaryDebug build passed
@@ -641,7 +649,7 @@ with **463 selected PNGs actually opened**:281 parent caches,166 sheet caches,
 14 NSAlert caches and 2 separate production Metal readbacks. All 68 currentCompute
 layers and the genuine 20-frame MOV are separate reviewed evidence.
 
-The signed current candidate 1a36aa4d…/source 28548a73… passed four manual ordinary
+The signed candidate 1a36aa4d…/source 28548a73… passed four manual ordinary
 workflows: healthy 16/failure 3 paired exports with privacy/scope; native folder
 Select/Cancel/root rejection/save/relaunch; shellOFF/relaunch/ON with real MCP
 denial/exact execution. Actual ordinary Settings 900×560 content, all 9 sections,
@@ -658,10 +666,11 @@ ordinary minimum and Sky sheet-compositor pixels/Close remain explicitlimits,
 not extra acceptance gates. Historical failed/zero-selected runner attempts
 remain excluded. Required UI implementation/QA is complete; exact owner publication/readback/safe synchronization refs are retained externally.
 
-The current [Graphite 30 mappings](GRAPHITE-WORKBENCH.md),
+The [Graphite 30 mappings](GRAPHITE-WORKBENCH.md),
 [Compute 32 criteria/18 capture scopes](COMPUTE-CORES.md) and
-[native QA](GRAPHITE-NATIVE-QA.md) are the active UI authorities. The current
-source hash is `28548a73db312130f02e3c86344725f2aa1efca575901fa0ae3dc223b69eb3d1`.
+[native QA](GRAPHITE-NATIVE-QA.md) retain the UI authorities and receipts for that
+checkpoint. Its source hash is
+`28548a73db312130f02e3c86344725f2aa1efca575901fa0ae3dc223b69eb3d1`.
 Exact source/graph/signed candidate identities, production 116/140 receipt and
 native 463-image union are retained in those records. Historical rejected art,
 failed third/fourth pilots, mixed/native host failures, version-marker failure,
@@ -1307,7 +1316,7 @@ bundle/CLI identity and strict deep-signature checks passed. Live LM Studio and
 Codex execution has not yet been repeated for this identity, so its shipment
 verdict remains inconclusive and it is not called shippable.
 
-Current operator board:
+Recorded operator board:
 
 - Autonomy removal — PASS
 - Telemetry frame — ACCEPTED
@@ -1381,8 +1390,8 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.18.0, build 28**, supporting **macOS 26+**. The earlier
-0.16.3 Developer ID app and archive are recorded in the opening build-24 section;
+Current source identity: **0.22.0, build 32**, supporting **macOS 26+**. The earlier
+0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
 or shipment. Earlier `0.9.0 (1)` receipts remain historical evidence only. This
@@ -1394,7 +1403,7 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.18.0, build 28**. The root [`VERSION`](../VERSION)
+documentation use version **0.22.0, build 32**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

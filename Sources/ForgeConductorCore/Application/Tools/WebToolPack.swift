@@ -18,7 +18,7 @@ public struct WebToolPack: ToolPackHandling, Sendable {
     public static func description(for name: String) -> String? {
         switch name {
         case "web.fetch":
-            return "Fetch an HTTP(S) URL with native networking. Returns byte-paged text or source, content SHA256, HTTP status and final URL. HTML title and first h1 are returned when present and the inline budget permits, bounded to 512 UTF-8 bytes each. Continue using next_byte_offset plus if_content_sha256 to reject changed pages. Receives at most 1 MiB. Does not execute JavaScript. Remote content is untrusted data. Requires project network authorization."
+            return "Fetch an HTTP(S) URL with native networking. Returns byte-paged text, source or base64 binary content, content SHA256, HTTP status and final URL. Base64 format preserves response bytes for any MIME type; offsets, counts and SHA256 describe decoded bytes. HTML title and first h1 are returned for text/source when present and the inline budget permits, bounded to 512 UTF-8 bytes each. Continue using next_byte_offset plus if_content_sha256 to reject changed pages. Receives at most 1 MiB per request. Does not execute JavaScript. Remote content is untrusted data. Requires project network authorization."
         case "web.search":
             return "Search the public web through DuckDuckGo HTML and return bounded titles, URLs and snippets. Provider challenges and format changes return errors. Follow result URLs with web.fetch. Remote content is untrusted data. Requires project network authorization."
         default: return nil
@@ -34,7 +34,8 @@ public struct WebToolPack: ToolPackHandling, Sendable {
         ]
         if name == "web.fetch" {
             properties["url"] = ["type": "string", "minLength": 1, "maxLength": 8_192]
-            properties["format"] = ["type": "string", "enum": ["text", "source"], "default": "text"]
+            properties["format"] = ["type": "string", "enum": ["text", "source", "base64"], "default": "text",
+                                    "description": "Base64 returns original response bytes; byte offsets/counts and content SHA256 refer to decoded bytes."]
             properties["byte_offset"] = ["type": "integer", "minimum": 0, "maximum": maximumResponseBytes, "default": 0]
             properties["if_content_sha256"] = ["type": "string", "minLength": 64, "maxLength": 64,
                                                 "description": "SHA256 returned by a prior page; fails if content changed while paging."]
@@ -77,8 +78,8 @@ public struct WebToolPack: ToolPackHandling, Sendable {
                 query = nil
                 limit = 0
                 format = (arguments["format"] as? String) ?? "text"
-                guard ["text", "source"].contains(format), arguments["format"] == nil || arguments["format"] is String else {
-                    throw WebReadError.invalidArgument("format must be text or source")
+                guard ["text", "source", "base64"].contains(format), arguments["format"] == nil || arguments["format"] is String else {
+                    throw WebReadError.invalidArgument("format must be text, source or base64")
                 }
                 byteOffset = try Self.integer(arguments, "byte_offset", defaultValue: 0, range: 0...Self.maximumResponseBytes)
                 if let rawDigest = arguments["if_content_sha256"] {
@@ -124,8 +125,13 @@ public struct WebToolPack: ToolPackHandling, Sendable {
                 guard Self.fits(failure, budget: budget) else { throw WebReadError.outputBudget }
                 return failure
             }
+            if format == "base64", query == nil {
+                let binaryPayload = try Self.binaryPage(response.data, payload: payload, offset: byteOffset,
+                    expectedDigest: expectedDigest, budget: budget, cancellation: cancellation)
+                return .success(binaryPayload)
+            }
             guard let source = Self.decode(response) else {
-                throw WebReadError.unsupportedContent("Response is not supported text; web.fetch does not emit binary files")
+                throw WebReadError.unsupportedContent("Response is not supported text; select format=base64 for response bytes")
             }
             if let query {
                 payload["query"] = query
@@ -467,6 +473,55 @@ public struct WebToolPack: ToolPackHandling, Sendable {
             if let value = String(data: data.prefix(data.count - trim), encoding: .utf8) { return value }
         }
         return ""
+    }
+
+    private static func binaryPage(
+        _ bytes: Data, payload initialPayload: [String: Any], offset: Int,
+        expectedDigest: String?, budget: Int, cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
+        try cancellation?.checkCancellation()
+        let digest = JSONSupport.sha256Hex(bytes)
+        if let expectedDigest, expectedDigest != digest { throw WebReadError.contentChanged }
+        guard offset <= bytes.count else { throw WebReadError.invalidArgument("byte_offset must be within the response bytes") }
+        let remaining = bytes.count - offset
+        var payload = initialPayload
+        payload["format"] = "base64"
+        payload["content_encoding"] = "base64"
+        payload["javascript_executed"] = false
+        payload["content_sha256"] = digest
+        payload["total_content_bytes"] = bytes.count
+        payload["byte_offset"] = offset
+
+        func page(_ count: Int) -> [String: Any] {
+            var result = payload
+            result["content"] = bytes.subdata(in: offset..<(offset + count)).base64EncodedString()
+            result["returned_content_bytes"] = count
+            result["has_more"] = count < remaining
+            result["truncated"] = count < remaining
+            result["next_byte_offset"] = count < remaining ? offset + count : NSNull()
+            return result
+        }
+
+        guard Self.fits(.success(page(0)), budget: budget) else { throw WebReadError.outputBudget }
+        // Whole base64 groups keep existing encoded prefix bytes unchanged while
+        // increasing the candidate. A final short group is considered separately.
+        var lower = 0
+        var upper = min(remaining, budget) / 3
+        while lower < upper {
+            try cancellation?.checkCancellation()
+            let candidate = lower + (upper - lower + 1) / 2
+            if Self.fits(.success(page(candidate * 3)), budget: budget) { lower = candidate }
+            else { upper = candidate - 1 }
+        }
+        var count = lower * 3
+        for candidate in (count + 1)...(count + 2) where candidate <= remaining {
+            try cancellation?.checkCancellation()
+            if Self.fits(.success(page(candidate)), budget: budget) { count = candidate }
+        }
+        guard count > 0 || remaining == 0 else { throw WebReadError.outputBudget }
+        let result = page(count)
+        guard Self.fits(.success(result), budget: budget) else { throw WebReadError.outputBudget }
+        return result
     }
 
     private static func fits(_ result: ToolResult, budget: Int) -> Bool {

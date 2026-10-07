@@ -1,15 +1,29 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 binary web fetching and Qwen file workflows
+
+Current source identity is **0.22.0 (32)**, starting from synchronized owner-signed
+`3b2b0caa4eab1eaab7d73a1c20d48863d745edbc`. This milestone addresses the
+native-reproduced binary HTTP gap and stale current-version markers.
+[The current record](docs/BINARY-WEB-AND-QWEN-FILES.md) preserves exact scopes.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Binary HTTP paging | Signed 0.21.0 rejected binary content/default and base64 format. Additive 0.22.0 preserves raw bytes with decoded-byte cursors and whole-body SHA. All sixteen source web cases, nine deadline cases and fourteen catalog cases passed. CLI/app and canonical Debug build and strict signing passed. The same 38,144-byte HTTP body reconstructed exactly in 41 signed-native pages; changed-digest guard, old default error, credential/cookie exclusion, normal zero exit and both EOFs passed. | All sixteen native web tests passed. Actual Qwen used the real base64 descriptor and two correct continued pages, then stopped normally. Its original one-byte prose arithmetic error is retained; a separate read-only correction finished normally without tool/native replay. Installation remains separate. |
+| Current-version alignment | Existing 0.21.0 regression reproduced eight failed assertions. Expected current identity and current documentation markers corrected with every assertion retained; twelve marketing and sixteen build settings updated. All four changed Swift inputs remain in their intended canonical targets; graph changes are version settings only. | Focused source and signed-native version regressions each passed once with every assertion retained. Historical receipts retain tested identities. |
+| Qwen file examples | Signed 0.21.0 PNG/WAV author and consumer loops completed normally; native pixel/PCM validation and full base64 copy/hash passed. Minimal DOCX ZIP/XML/native text import passed in r3; its consumer guard failure remains NONPASS. Separate read-only r4 completed pending reads and final model stop using the same artifact/job without replay. Protected source/candidate/installed/registration inputs unchanged. | Photographic generation, vision, STT/TTS/music, Word rendering and other rich-format families remain open. |
+| Original active chat feedback | Existing Qwen GUI chat identified no current blocked web task or specific failing URL/JS/login/form/download flow. Normal UI completion; empty composer and installed 0.18.0 inputs preserved. | This feedback does not qualify newer candidate tools or prove complete web access. |
+
 ## October 7 optional runtime inventory and native web investigation
 
-Current source identity is **0.21.0 (31)**, starting from synchronized owner-signed
+This checkpoint's source identity is **0.21.0 (31)**, starting from synchronized owner-signed
 `52152bd56213372793d98d6e2800ac4c638eba15`. This milestone addresses Qwen's
 capability-discovery feedback while preserving existing execution admission.
 
 | Milestone | Actual evidence | Remaining gate |
 | --- | --- | --- |
 | Optional runtime inventory | Fixed filesystem-only snapshot implemented; existing gates, limits and old Codable records preserved. All twelve source and signed-native regressions passed. Normal selection: 201 selected, 198 passed, three fixture skips, zero failures; live-provider readiness subsequently passed separately. CLI/app and canonical ordinary Debug builds and strict signing passed. Actual Qwen consumed the cached inventory and finished normally; source/candidate/protected inputs unchanged. Correct target memberships verified, graph version-only; [contract and evidence](docs/RUNTIME-INVENTORY.md). | Two current-version native identity fixtures remain unprepared. No optional workflow/import or installed acceptance claim. |
-| JavaScript renderer | External native fixture executed page JavaScript. Refusing-proxy localhost bypass disproved universal interception. Fourth fixture completed nineteen bounded native cases with normal exit/EOF, including infinite-script deadline/cancel and TLS. All views released; two stores remained alive during cleanup observation, then helpers exited. New observed WebKit PIDs were absent after exit, with attribution limits. Earlier failed receipts remain. | Production rendering/IPC and deployment support remain unqualified. Permission/file-picker denial callbacks were unreached; broader OS-prompt, heap and network bounds unknown. No authenticated-browser claim. |
+| JavaScript renderer | External native fixture executed page JavaScript. Refusing-proxy localhost bypass disproved universal interception. Fourth fixture completed nineteen bounded native cases with normal exit/EOF, including infinite-script deadline/cancel and TLS. Later external macOS 27 controls exercised visible-window file-picker denial, Lockdown API restrictions and four inline geolocation denials. Owned-child audit-token/signature admission primitive passed separately. All original failures and lifetime/attribution limitations remain. | Production rendering/IPC, minimal-environment startup and macOS 26 support remain unqualified. Broader OS-prompt, whole heap/DOM/network bounds and mapped-Core identity remain unknown. No authenticated-browser claim. |
 
 ## October 7 Qwen feedback follow-up
 

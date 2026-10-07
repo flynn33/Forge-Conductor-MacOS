@@ -1,7 +1,12 @@
 # Forge Conductor for macOS
 
-Current source is **0.21.0 (31)**. The bounded optional-tool inventory passed all
-twelve source and signed-native regressions. The affected source selection
+Current source is **0.22.0 (32)**. Binary HTTP paging and current-version
+alignment passed 41 distinct affected source cases and 17 signed-native cases.
+The exact HTTP body reconstructed in 41 native pages; Qwen consumed two actual
+base64 pages and finished normally. [Evidence and limits](docs/BINARY-WEB-AND-QWEN-FILES.md).
+
+The preceding **0.21.0 (31)** bounded optional-tool inventory passed all twelve
+source and signed-native regressions. The affected source selection
 passed 198 cases with three fixture skips; live-provider readiness then passed
 separately. Qwen consumed the real inventory and reported scoped presence and
 unverified workflows. [Current evidence and limits](docs/RUNTIME-INVENTORY.md).
@@ -523,8 +528,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.18.0** |
-| **Build** | **28** |
+| **Version** | **0.22.0** |
+| **Build** | **32** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -641,8 +646,10 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The root version authorities, compiled protocol constants, all Xcode build
-configurations, and current repository documentation use `0.18.0 (28)`.
+The current root version authorities, compiled protocol constants and Xcode
+build settings use `0.22.0 (32)`; the current document markers are checked by
+the version-alignment regression. Historical qualification receipts retain
+their tested identities.
 The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)
 publication/readback/synchronization refs are retained externally. Installed-app
 references are dated qualification snapshots; the later publication readback

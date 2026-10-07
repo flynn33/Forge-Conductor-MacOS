@@ -6,8 +6,8 @@ import Security
 public enum ForgeFilesystemProtocolConstants {
     public static let version = 5
     public static let requestDigestCanonicalizationVersion = 1
-    public static let productVersion = "0.21.0"
-    public static let productBuildVersion = "31"
+    public static let productVersion = "0.22.0"
+    public static let productBuildVersion = "32"
     public static let serviceName = "com.forge-conductor.filesystem-daemon"
     public static let daemonPlistName = "com.forge-conductor.filesystem-daemon.plist"
     public static let daemonExecutableName = "forge-filesystem-daemon"

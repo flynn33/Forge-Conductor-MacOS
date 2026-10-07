@@ -10,6 +10,18 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.22.0 (32)` binary web fetching
+
+- Added optional `format: "base64"` to `web.fetch`, preserving original response
+  bytes for any MIME type. Paged offsets, counts and SHA256 refer to decoded
+  bytes; text remains the default and existing network, size and deadline
+  bounds remain in force.
+- Corrected stale current-version document markers and the version regression
+  expectations, retaining every existing assertion and historical receipt.
+- Qwen authored and inspected bounded PNG, WAV and DOCX examples through the
+  signed 0.21.0 candidate. Exact scopes, retained failures and binary-web
+  qualification are recorded in [the current record](docs/BINARY-WEB-AND-QWEN-FILES.md).
+
 ### 0.21.0 (31) runtime capability inventory
 
 - Added a bounded, service-startup filesystem inventory for optional executables

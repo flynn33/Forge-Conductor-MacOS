@@ -17,6 +17,11 @@ final class WebToolPackTests: XCTestCase {
                 XCTAssertEqual(try replay.replayClass(for: name), .readOnly)
                 XCTAssertTrue(definition.description.contains("untrusted data"))
                 XCTAssertTrue(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.contains(name))
+                if name == "web.fetch" {
+                    let format = try XCTUnwrap(properties["format"] as? [String: Any])
+                    XCTAssertEqual(format["enum"] as? [String], ["text", "source", "base64"])
+                    XCTAssertEqual(format["default"] as? String, "text")
+                }
             }
         }
     }
@@ -217,6 +222,142 @@ final class WebToolPackTests: XCTestCase {
                 XCTAssertEqual(invalid.payload["code"] as? String, "web_invalid_argument")
             }
             XCTAssertNil(WebResponseProtocol.latestRequest)
+        }
+    }
+
+    func testBase64WebPagingPreservesAllBytesAndRejectsChangedContent() throws {
+        try withApp { app in
+            let bytes = Data((0..<(256 * 149)).map { UInt8($0 % 256) })
+            let session = session(body: bytes, contentType: "application/octet-stream")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session)
+            let context = context(app: app, maximum: 4_096)
+            let url = fixtureURL()
+            let digest = JSONSupport.sha256Hex(bytes)
+            var offset = 0
+            var reconstructed = Data()
+            var finished = false
+            var requests = 0
+            for _ in 0..<70 {
+                requests += 1
+                let page = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64",
+                    "byte_offset": offset, "if_content_sha256": digest, "maximum_bytes": 8_192], context: context,
+                    clientID: context.clientID, app: app, cancellation: nil))
+                XCTAssertTrue(page.ok, "\(page.payload)")
+                XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: page).count, 4_096)
+                XCTAssertEqual(page.payload["format"] as? String, "base64")
+                XCTAssertEqual(page.payload["content_encoding"] as? String, "base64")
+                XCTAssertEqual(page.payload["content_sha256"] as? String, digest)
+                XCTAssertEqual(page.payload["total_content_bytes"] as? Int, bytes.count)
+                XCTAssertEqual(page.payload["javascript_executed"] as? Bool, false)
+                let piece = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(page.payload["content"] as? String)))
+                XCTAssertFalse(piece.isEmpty)
+                XCTAssertEqual(page.payload["returned_content_bytes"] as? Int, piece.count)
+                reconstructed.append(piece)
+                guard let next = page.payload["next_byte_offset"] as? Int else {
+                    XCTAssertEqual(page.payload["has_more"] as? Bool, false)
+                    finished = true
+                    break
+                }
+                XCTAssertEqual(next, offset + piece.count)
+                XCTAssertGreaterThan(next, offset)
+                offset = next
+            }
+            XCTAssertTrue(finished)
+            XCTAssertGreaterThan(requests, 1)
+            XCTAssertEqual(reconstructed, bytes)
+            WebResponseProtocol.configure(body: Data([0, 255, 1]), contentType: "application/octet-stream")
+            let changed = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64",
+                "if_content_sha256": digest], context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertEqual(changed.payload["code"] as? String, "web_content_changed")
+        }
+    }
+
+    func testBase64WebFormatKeepsRawTextBytesAndArbitraryByteOffsets() throws {
+        try withApp { app in
+            let bytes = Data("😀\n<title>Raw &amp; unchanged</title>".utf8)
+            let session = session(body: bytes)
+            defer { session.invalidateAndCancel() }
+            let context = context(app: app)
+            let page = try XCTUnwrap(WebToolPack(session: session).handle(name: "web.fetch",
+                arguments: ["url": fixtureURL(), "format": "base64", "byte_offset": 1], context: context,
+                clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(page.ok, "\(page.payload)")
+            XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(page.payload["content"] as? String)), bytes.dropFirst())
+            XCTAssertEqual(page.payload["content_sha256"] as? String, JSONSupport.sha256Hex(bytes))
+            XCTAssertEqual(page.payload["returned_content_bytes"] as? Int, bytes.count - 1)
+            XCTAssertNil(page.payload["title"])
+            XCTAssertNil(page.payload["heading"])
+        }
+    }
+
+    func testBase64WebEmptyResponseEndOffsetAndSmallBudgets() throws {
+        try withApp { app in
+            let session = session(body: Data(), contentType: "image/png")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session)
+            let context = context(app: app)
+            let url = fixtureURL()
+            let empty = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64"],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(empty.ok, "\(empty.payload)")
+            XCTAssertEqual(empty.payload["content"] as? String, "")
+            XCTAssertEqual(empty.payload["returned_content_bytes"] as? Int, 0)
+            XCTAssertEqual(empty.payload["has_more"] as? Bool, false)
+            WebResponseProtocol.configure(body: Data([0, 255]), contentType: "image/png")
+            let end = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64", "byte_offset": 2],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(end.ok)
+            XCTAssertEqual(end.payload["content"] as? String, "")
+            let invalid = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64", "byte_offset": 3],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertEqual(invalid.payload["code"] as? String, "web_invalid_argument")
+            let small = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64", "maximum_bytes": 128],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertEqual(small.payload["code"] as? String, "web_output_budget_too_small")
+        }
+    }
+
+    func testBase64WebRetainsReceiveAndHTTPFailureBounds() throws {
+        try withApp { app in
+            let session = session(body: Data(repeating: 255, count: WebToolPack.maximumResponseBytes + 1), contentType: "image/png")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session)
+            let context = context(app: app)
+            let oversized = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": fixtureURL(), "format": "base64"],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertEqual(oversized.payload["code"] as? String, "web_response_too_large")
+            WebResponseProtocol.configure(body: Data([0, 255]), contentType: "image/png", status: 503)
+            let failure = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": fixtureURL(), "format": "base64"],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertEqual(failure.payload["code"] as? String, "web_http_error")
+            XCTAssertNil(failure.payload["content"])
+        }
+    }
+
+    func testBase64WebBudgetNeverReturnsEmptyContinuation() throws {
+        try withApp { app in
+            let bytes = Data(repeating: 255, count: 257)
+            let session = session(body: bytes, contentType: "application/octet-stream")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session)
+            let url = fixtureURL()
+            for budget in [512, 1_100, 1_300, 1_500, 1_600, 1_700, 1_800, 1_900, 2_000, 2_200, 4_096] {
+                let context = context(app: app, maximum: budget)
+                let page = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "base64"],
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                if !page.ok {
+                    XCTAssertEqual(page.payload["code"] as? String, "web_output_budget_too_small")
+                    continue
+                }
+                XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: page).count, budget)
+                let piece = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(page.payload["content"] as? String)))
+                XCTAssertFalse(piece.isEmpty)
+                XCTAssertEqual(piece, bytes.prefix(piece.count))
+                if page.payload["has_more"] as? Bool == true {
+                    XCTAssertEqual(page.payload["next_byte_offset"] as? Int, piece.count)
+                }
+            }
         }
     }
 

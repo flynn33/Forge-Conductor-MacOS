@@ -189,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.21.0**, build **31** (current source; candidate qualification is separate from installation).
+Version **0.22.0**, build **32** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -420,7 +420,7 @@ boundary, the marker can also be absent. See
 [the inventory contract](docs/RUNTIME-INVENTORY.md).
 
 After attaching the project, the model can use `web.search` to find public pages
-and `web.fetch` to read HTTP(S) text. Ordinary LM Studio MCP project bindings
+and `web.fetch` to read HTTP(S) text or original response bytes. Ordinary LM Studio MCP project bindings
 receive network access; explicitly scoped and run-bound grants retain their
 network policy. Check `project_context.network_allowed` in `get_forge_status`.
 Web responses are external data. These tools do not execute JavaScript or use
@@ -430,7 +430,7 @@ challenges return errors.
 | Tool | Arguments and continuation |
 | --- | --- |
 | `web.search` | `query`; optional `limit` from 1–10 (default 5). Returns titles, URLs and snippets through DuckDuckGo HTML. Read selected URLs with `web.fetch`. |
-| `web.fetch` | `url`; optional `format: "text"` (default) or `"source"`. HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
+| `web.fetch` | `url`; optional `format: "text"` (default), `"source"` or `"base64"`. Base64 preserves the original response bytes for any MIME type; offsets, counts and SHA256 refer to decoded bytes. Text/source HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
 | `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
 | `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
@@ -439,7 +439,9 @@ challenges return errors.
 Web tools accept integer `timeout_sec` from 1–30 (default 20), and
 `maximum_bytes` from 1–65,536 (default 16,384) for the encoded inline response;
 the project budget can reduce that allowance. Each fetch receives at most 1 MiB
-and follows at most five redirects. Binary file reads request 16 KiB by default,
+and follows at most five redirects. Each continued web page fetches the URL
+again; `if_content_sha256` detects a changed body. Decode each base64 page
+separately and append its bytes, then use the returned byte cursor. Binary file reads request 16 KiB by default,
 up to 32 KiB raw bytes per page; the returned page can be smaller to fit the
 encoded MCP and project budgets. Always use the returned cursor rather than
 advancing by the requested size. Binary transport lets tools preserve exact file

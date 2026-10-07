@@ -1,11 +1,19 @@
-# Context and agent continuity (v0.18.0)
+# Context and agent continuity (v0.22.0)
 
-The current native hosted rollover-control test passed numeric edits and public
+<a id="context-and-agent-continuity-v0180"></a>
+
+Current source documentation targets 0.22.0 (32). Binary web fetching/paging
+and current-authority alignment have scoped verification in
+[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). The continuity
+contract remains in force; the preceding repair receipts below retain their
+tested 0.18.0 identity and do not qualify this new slice.
+
+The preceding native hosted rollover-control test passed numeric edits and public
 accessibility stepper actions, including the 1 and 10,000 boundaries and default
 200. This verifies the rendered control and staged settings binding; ordinary
 current Manager save and LM Studio GUI rollover remain separate acceptance.
 
-Current 0.18.0 (28) repair: the rollover threshold is saved in
+Preceding 0.18.0 (28) repair: the rollover threshold is saved in
 `sessions.continuity_rollover_tool_calls`, defaults to 200, and is adjustable
 from 1 to 10,000 in Manager → Settings. Durable project/generation/client
 progress includes runtime and Xcode jobs and survives MCP helper restart.
@@ -76,8 +84,9 @@ Two stale-read cases failed before repair. All three focused controls passed
 afterward, followed by 288 passes/two explicit skips/zero failures in the 290-case
 Manager/continuity selection. This remains source evidence.
 
-This describes the current source identity. The owner-installed 0.16.4 startup
-failure and corrected Xcode project are recorded in the qualification status.
+These repair receipts retain their recorded source scopes. The historical
+owner-installed 0.16.4 startup failure and corrected Xcode project are recorded
+in the qualification status.
 
 ## Current workflow
 
@@ -188,7 +197,7 @@ exact-handoff acknowledgement, predecessor sealing, project isolation, and the
 reduced Continuity UI. The later protocol fixtures verify bootstrap ownership,
 late-cancellation fencing and cold restart retry. Ordinary LM Studio GUI rollover,
 live threshold acceptance and actual GUI overlap remain unverified; these
-fixtures do not establish live GUI behavior. The scoped current signed build,
+fixtures do not establish live GUI behavior. The scoped preceding signed build,
 identity, native Xcode and policy checks are recorded in the repair record;
 current signed session-host acceptance and the complete owner-host flow remain
 required.

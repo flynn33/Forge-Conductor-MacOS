@@ -1,18 +1,24 @@
 # Optional runtime inventory and native web investigation
 
-Current source is **0.21.0 (31)**, beginning from safely synchronized,
-owner-signed `52152bd56213372793d98d6e2800ac4c638eba15`. The working installation
-remains **0.18.0 (28)**. The preceding [Qwen follow-up](QWEN-FOLLOWUP.md)
-retains its own tested source, candidate and model receipts.
+Current source is **0.22.0 (32)**. Scoped binary web fetching/paging and current-authority
+alignment checks are recorded in
+[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). The preceding
+0.21.0 inventory slice began from safely synchronized, owner-signed
+`52152bd56213372793d98d6e2800ac4c638eba15`. The working installation remains
+**0.18.0 (28)**. The preceding inventory and [Qwen follow-up](QWEN-FOLLOWUP.md)
+receipts retain their own tested source, candidate and model identities.
 
 ## Capability contract
 
 The supplied capability audit describes the old installed tool set. It is
 feedback, not dispatch authority. Its unavailable-PowerShell claim was disproved
 after the reversible startup-cache repair; its text-only writer limitation was
-addressed by the preceding base64 transport. Rich-format authoring still requires
-its own executable workflow evidence. An executable or package file existing
-does not prove that workflow works.
+addressed by the preceding base64 transport. Separate signed 0.21.0 examples
+exercised a synthetic PNG, PCM WAV and minimal DOCX package/text import using
+existing job and binary file tools. Their exact author/native/model scopes are
+retained in [the file evidence record](BINARY-WEB-AND-QWEN-FILES.md); they do not
+qualify photographic generation, speech/music, full Office rendering or arbitrary
+formats. An executable or package file existing does not prove a workflow works.
 
 `RuntimeCapabilityDiscoverer` adds a fixed filesystem snapshot to the cached
 `RuntimeCapabilities` value. It introduces no child probes, imports, hooks,
@@ -52,6 +58,9 @@ not been qualified.
 
 ## Verification
 
+This section records the preceding **0.21.0 (31)** inventory inputs. Its passes
+and exact artifacts are preserved; they do not qualify the new 0.22.0 scope.
+
 | Check | Actual result |
 | --- | --- |
 | Focused inventory regressions | Twelve selected, twelve passed, zero skips/failures. The first run's oversized-path fixture failed; it used a path beyond this Mac's native 1,023-byte bound. The corrected fixture retains the omission assertion and the failed receipt. |
@@ -80,7 +89,7 @@ unchanged. The model's rich-format paragraph is not evidence that no rich-format
 workflow is possible; filesystem rows establish neither general ability nor
 general inability.
 
-Final candidate helper SHA-256 is
+The preceding 0.21.0 candidate helper SHA-256 is
 `fbebd0f0bc7a273f803d61599bc81194ca76936dc39a93e810d0b974d1870335`;
 Core SHA-256 is
 `59e69f7a57d8549f07fa6a6f7cdec8b88b66b695439c1be0439ebceeb2c216f0`.
@@ -92,8 +101,8 @@ Root command logs/terminal receipts use `inventory-affected-source-tests`,
 Repository hygiene and whitespace checks passed. No installation or LM Studio
 registration change was performed.
 
-The two remaining normal-run skips require prepared same-version and Debug/Release
-native-bundle identity fixtures for this new version. Earlier 0.20.0 peer results
+The two remaining 0.21.0 normal-run skips require prepared same-version and Debug/Release
+native-bundle identity fixtures for that version. Earlier 0.20.0 peer results
 retain their actual inputs. Installed acceptance, general optional workflows,
 package imports and hostile-mount timing remain unverified.
 
@@ -131,16 +140,49 @@ observation, then their helpers exited normally. Newly observed WebKit PIDs were
 absent after helper exit; global process listings do not establish every ownership
 edge or a general leak proof.
 
-Permission and file-picker attempts never reached their denial callbacks and
-remain inconclusive. Public geolocation denial is macOS 27+, while the product
-targets 26. Extraction bounds do not cap the complete DOM, JavaScript heap,
-decoded bodies or all network traffic. Signed IPC and product integration remain
-under investigation. No production JavaScript tool or authenticated session is
-claimed.
+The original permission and file-picker attempts did not reach denial callbacks
+and remain inconclusive. Later external controls separately qualify narrower
+behavior on macOS 27.0.1 / WebKit 22625.1.29.11.28:
+
+- Six safe visibility/file-picker controls exited zero with full EOF and
+  view/store release. Two trusted clicks in owned native windows reached the
+  public file-picker delegate, completed with `nil` and produced DOM cancellation;
+  automatic chooser calls returned `NotAllowedError`. No media/location request
+  was invoked. Installed helper/Core and MCP registration plus fixture artifacts
+  were unchanged; this harness did not capture all 436 production inputs.
+- Four fresh ordinary/Lockdown owned-window geolocation controls each reached
+  one public inline `deny` callback and one JavaScript `PERMISSION_DENIED` error.
+  Read-only location/camera/microphone status stayed `notDetermined`; no OS
+  authorization request was invoked. Native exit/EOF, weak view/store release,
+  owned-window closure and prior-frontmost-PID restoration passed. All 436 source
+  inputs and protected identities matched. The retained detached negative had
+  `GEO_PENDING` and callback count zero; the positives changed visibility and the
+  bounded observation window, so no sole cause is claimed.
+- Six Lockdown controls formed three ordinary/Lockdown pairs. Promise/timer and
+  local ES-module pages retained the expected asynchronous markers. Public
+  per-page preference readback confirmed the mode; Notification, service worker,
+  WebAssembly and WebRTC APIs changed from present to absent. Media APIs were
+  absent in both modes, which does not establish a Lockdown cause. No permission
+  function was invoked. Native exit/EOF and weak view/store release passed, with
+  all 436 source inputs and protected identities unchanged. No global/device
+  Lockdown setting changed.
+
+The public geolocation denial callback requires macOS 27; these controls do not
+qualify supported macOS 26 renderer admission, every permission route or universal
+prompt suppression. Extraction bounds do not cap the complete DOM, JavaScript
+heap, decoded bodies or all network traffic. Signed IPC, production renderer
+integration and full authenticated-web workflows remain open. Native renderer
+preparation v2 is uncompiled design work. No production JavaScript tool or
+authenticated session is claimed.
 
 Evidence is retained outside the repository under
 `/Users/flynn/Projects/Forge-Conductor-Evidence/2026-10-07-project-web-qwen`:
 `native-webkit-proxy-020`, retained failed render attempts,
-`native-webkit-render-020-r4`, and
-`proxy-contract-sdk27-audit`. The broader requested capability families,
+`native-webkit-render-020-r4`, `proxy-contract-sdk27-audit`,
+`native-webkit-permission-controls-020-r2`,
+`native-webkit-geolocation-deny-021` (retained detached negative),
+`native-webkit-geolocation-deny-021-r2`, and `native-webkit-lockdown-021`.
+The three later control directories retain `qualification.md`; the earlier
+renderer and negative receipts preserve their own observation and lifecycle
+bounds. The broader requested capability families,
 installed acceptance and ordinary external-chat continuity remain open.

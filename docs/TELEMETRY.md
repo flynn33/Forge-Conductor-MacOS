@@ -1,12 +1,18 @@
 # Telemetry architecture (real-time native)
 
-Current `0.18.0` repair starts MCP serve processes with on-demand metrics,
+Current source documentation is `0.22.0`, build `32`. Binary web fetching/paging
+and current-authority alignment have scoped verification in
+[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). The telemetry
+operating contracts below remain in force; preceding receipts keep their tested
+source identities.
+
+The preceding `0.18.0` repair starts MCP serve processes with on-demand metrics,
 while the GUI retains its bounded continuous stream. Fresh one-shot collection
 runs on the telemetry worker and does not start a timer or enqueue GUI delivery.
-Current tests and candidate measurements are recorded in
+Its tests and candidate measurements are recorded in
 [the repair record](LMSTUDIO-RUNTIME-REPAIR.md); preceding UI/telemetry receipts
 retain their source identities.
-The current native Compute v3 ordering diagnostic failed its unchanged
+The preceding native Compute v3 ordering diagnostic failed its unchanged
 active/key/exposed startup predicate before any cover variant. Its one actual
 test, two assertions, native exit 65, complete streams and corrected foreground
 SecurityAgent identity remain in the repair record. Neither cover quiescence
@@ -67,8 +73,8 @@ activity drives illustrative regions without measured-core claims. Source
 registry/time/quality and stale/zero/missing semantics remain independent.
 Trace travel is simulated, bounded and quiescent when hidden/paused.
 
-Current Compute 29, regression 68, proper canonical Provider 33 and fresh
-Core 8/H0/G1 checks passed: 116 distinct production tests in 140 successful
+The preceding 0.17.0 Compute 29, regression 68, proper canonical Provider 33 and
+fresh Core 8/H0/G1 checks passed: 116 distinct production tests in 140 successful
 executions. The separate 21-method/22-invocation native view matrix passed with
 463 reviewed PNGs. All 68 Compute layers, the verified 20-frame MOV, strict
 signed candidate/library packaging and four scoped ordinary workflows passed.
@@ -189,15 +195,15 @@ not introduce another telemetry or render loop. The wizard opens on explicit
 request and never covers the app at launch. Its optional view control appears
 only after enablement in Workbench Settings. Navigation visibility and telemetry
 updates are also available in Settings; existing Navigation and Telemetry menus
-retain their shortcuts. The current native matrix and scoped ordinary Settings
+retain their shortcuts. The preceding native matrix and scoped ordinary Settings
 workflow verified opt-in controls, draft preservation, persistence and
 restoration; their exact evidence boundaries remain in the phase record.
 
 ## Qualification boundary
 
 The earlier qualifications below retain their original source/runtime scopes.
-They do not replace the current production counts and four manual ordinary
-workflows recorded above.
+They remain separate from the preceding 0.17.0 production counts and four
+manual ordinary workflows recorded above; neither set qualifies this new slice.
 
 Telemetry contract and stream tests qualify only this subsystem. The retained
 Apple Development installed-app qualifier passed bounded shell app/manager
@@ -219,6 +225,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.18.0`
+`0.22.0`
 
-Build: `28`
+Build: `32`
