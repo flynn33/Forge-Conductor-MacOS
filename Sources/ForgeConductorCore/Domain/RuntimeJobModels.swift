@@ -326,6 +326,42 @@ public struct RuntimeExecutableCapability: Codable, Sendable, Equatable {
     }
 }
 
+public enum RuntimeInventoryPresence: String, Codable, Sendable {
+    case present
+    case notFoundInSearchScope = "not_found_in_search_scope"
+    case unknown
+}
+
+public enum RuntimePythonAssetSearchScope: String, Codable, Sendable {
+    case selectedPythonFramework = "selected_python_framework"
+    case unsupportedLayout = "unsupported_layout"
+    case parentRuntimeUnavailable = "parent_runtime_unavailable"
+}
+
+/// Filesystem observations only; neither executable nor package rows prove a workflow.
+public struct RuntimeExecutableInventoryEntry: Codable, Sendable, Equatable {
+    public let id: String
+    public let presence: RuntimeInventoryPresence
+    public let executablePath: String?
+    public let executable: Bool?
+}
+
+public struct RuntimePythonPackageAsset: Codable, Sendable, Equatable {
+    public let id: String
+    public let moduleName: String
+    public let presence: RuntimeInventoryPresence
+    public let assetPath: String?
+}
+
+public struct RuntimeCapabilityInventory: Codable, Sendable, Equatable {
+    public let capturedAt: String
+    public let executableSearchComplete: Bool
+    public let pythonAssetSearchScope: RuntimePythonAssetSearchScope
+    public let parentRuntimeStatus: RuntimeExecutableProbeState
+    public let executables: [RuntimeExecutableInventoryEntry]
+    public let pythonPackageAssets: [RuntimePythonPackageAsset]
+}
+
 public struct RuntimeCapabilities: Codable, Sendable, Equatable {
     public let directProcess: RuntimeExecutableCapability
     public let zsh: RuntimeExecutableCapability
@@ -339,8 +375,63 @@ public struct RuntimeCapabilities: Codable, Sendable, Equatable {
     public let maximumArtifactBytesPerProject: Int
     public let maximumArtifactBytesGlobal: Int
     public let maximumRetainedArtifactJobsPerProject: Int
+    public let inventory: RuntimeCapabilityInventory?
 
     public var shellAvailable: Bool { zsh.available && bash.available }
+
+    public init(
+        directProcess: RuntimeExecutableCapability,
+        zsh: RuntimeExecutableCapability,
+        bash: RuntimeExecutableCapability,
+        python: RuntimeExecutableCapability,
+        powershell: RuntimeExecutableCapability,
+        maximumConcurrentJobs: Int,
+        maximumCPUHeavyJobs: Int,
+        maximumInlineOutputBytes: Int,
+        maximumArtifactBytesPerJob: Int,
+        maximumArtifactBytesPerProject: Int,
+        maximumArtifactBytesGlobal: Int,
+        maximumRetainedArtifactJobsPerProject: Int,
+        inventory: RuntimeCapabilityInventory? = nil
+    ) {
+        self.directProcess = directProcess
+        self.zsh = zsh
+        self.bash = bash
+        self.python = python
+        self.powershell = powershell
+        self.maximumConcurrentJobs = maximumConcurrentJobs
+        self.maximumCPUHeavyJobs = maximumCPUHeavyJobs
+        self.maximumInlineOutputBytes = maximumInlineOutputBytes
+        self.maximumArtifactBytesPerJob = maximumArtifactBytesPerJob
+        self.maximumArtifactBytesPerProject = maximumArtifactBytesPerProject
+        self.maximumArtifactBytesGlobal = maximumArtifactBytesGlobal
+        self.maximumRetainedArtifactJobsPerProject = maximumRetainedArtifactJobsPerProject
+        self.inventory = inventory
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case directProcess, zsh, bash, python, powershell
+        case maximumConcurrentJobs, maximumCPUHeavyJobs, maximumInlineOutputBytes
+        case maximumArtifactBytesPerJob, maximumArtifactBytesPerProject
+        case maximumArtifactBytesGlobal, maximumRetainedArtifactJobsPerProject, inventory
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        directProcess = try container.decode(RuntimeExecutableCapability.self, forKey: .directProcess)
+        zsh = try container.decode(RuntimeExecutableCapability.self, forKey: .zsh)
+        bash = try container.decode(RuntimeExecutableCapability.self, forKey: .bash)
+        python = try container.decode(RuntimeExecutableCapability.self, forKey: .python)
+        powershell = try container.decode(RuntimeExecutableCapability.self, forKey: .powershell)
+        maximumConcurrentJobs = try container.decode(Int.self, forKey: .maximumConcurrentJobs)
+        maximumCPUHeavyJobs = try container.decode(Int.self, forKey: .maximumCPUHeavyJobs)
+        maximumInlineOutputBytes = try container.decode(Int.self, forKey: .maximumInlineOutputBytes)
+        maximumArtifactBytesPerJob = try container.decode(Int.self, forKey: .maximumArtifactBytesPerJob)
+        maximumArtifactBytesPerProject = try container.decode(Int.self, forKey: .maximumArtifactBytesPerProject)
+        maximumArtifactBytesGlobal = try container.decode(Int.self, forKey: .maximumArtifactBytesGlobal)
+        maximumRetainedArtifactJobsPerProject = try container.decode(Int.self, forKey: .maximumRetainedArtifactJobsPerProject)
+        inventory = try container.decodeIfPresent(RuntimeCapabilityInventory.self, forKey: .inventory)
+    }
 }
 
 public struct RuntimeJobLimits: Sendable, Equatable {

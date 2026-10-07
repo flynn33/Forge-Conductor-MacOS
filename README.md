@@ -1,6 +1,12 @@
 # Forge Conductor for macOS
 
-Current source is **0.20.0 (30)**. The follow-up work adds enforced memory expiry,
+Current source is **0.21.0 (31)**. The bounded optional-tool inventory passed all
+twelve source and signed-native regressions. The affected source selection
+passed 198 cases with three fixture skips; live-provider readiness then passed
+separately. Qwen consumed the real inventory and reported scoped presence and
+unverified workflows. [Current evidence and limits](docs/RUNTIME-INVENTORY.md).
+
+The published **0.20.0 (30)** follow-up adds enforced memory expiry,
 running-job output snapshots and bounded HTML title/heading metadata suggested
 by Qwen. The final affected source run passed 224 cases with two fixture skips;
 signed native Core passed all 36 selected cases and Projects app-hosted tests

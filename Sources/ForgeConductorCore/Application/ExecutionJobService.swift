@@ -131,6 +131,32 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
     private static let probeMaximumOutputBytes = 1_024
     private static let pythonProbePrefix = "forge-runtime-python:"
     private static let powershellProbePrefix = "forge-runtime-powershell:Core:"
+    static let maximumInventorySearchPathBytes = 16 * 1_024
+    static let maximumInventoryPathComponents = 32
+    static let maximumInventoryFilePathBytes = Int(PATH_MAX) - 1
+    static let inventoryExecutableIDs = [
+        "git", "gh", "brew", "node", "npm", "sqlite3", "docker", "podman",
+        "dot", "mmdc", "sips", "afconvert", "ffmpeg",
+    ]
+    private static let inventoryFallbackDirectories = [
+        "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin",
+    ]
+    private static let inventoryPackages = [
+        (id: "sqlite3", module: "sqlite3", sitePackage: false),
+        (id: "pip", module: "pip", sitePackage: true),
+        (id: "Pillow", module: "PIL", sitePackage: true),
+        (id: "python-docx", module: "docx", sitePackage: true),
+        (id: "openpyxl", module: "openpyxl", sitePackage: true),
+        (id: "python-pptx", module: "pptx", sitePackage: true),
+        (id: "numpy", module: "numpy", sitePackage: true),
+        (id: "matplotlib", module: "matplotlib", sitePackage: true),
+    ]
+
+    enum InventoryFileObservation: Sendable {
+        case file(path: String, executable: Bool)
+        case missing
+        case unknown
+    }
 
     private let configuredPython: URL?
     private let configuredPowerShell: URL?
@@ -178,8 +204,154 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
             maximumArtifactBytesPerProject: limits.maximumArtifactBytesPerProject,
             maximumArtifactBytesGlobal: limits.maximumArtifactBytesGlobal,
             maximumRetainedArtifactJobsPerProject:
-                limits.maximumRetainedArtifactJobsPerProject
+                limits.maximumRetainedArtifactJobsPerProject,
+            inventory: Self.inventorySnapshot(
+                python: python,
+                searchPath: ProcessInfo.processInfo.environment["PATH"],
+                capturedAt: ISO8601DateFormatter().string(from: Date())
+            )
         )
+    }
+
+    /// Fixed filesystem observations add no child processes or refresh tasks.
+    static func inventorySnapshot(
+        python: RuntimeExecutableCapability,
+        searchPath: String?,
+        capturedAt: String,
+        fallbackDirectories: [String] = inventoryFallbackDirectories,
+        observe: @Sendable (String) -> InventoryFileObservation = inspectInventoryFile
+    ) -> RuntimeCapabilityInventory {
+        let search = inventoryDirectories(searchPath: searchPath, fallbackDirectories: fallbackDirectories)
+        var searchComplete = search.complete
+        let executables = inventoryExecutableIDs.map { name in
+            var nonExecutable: String?
+            var uncertain = !search.complete
+            for directory in search.directories {
+                let candidate = directory.hasSuffix("/") ? directory + name : directory + "/" + name
+                guard candidate.utf8.count <= maximumInventoryFilePathBytes else {
+                    uncertain = true
+                    searchComplete = false
+                    continue
+                }
+                switch observe(candidate) {
+                case let .file(path, executable):
+                    guard validInventoryPath(path) else { uncertain = true; searchComplete = false; continue }
+                    if executable {
+                        return RuntimeExecutableInventoryEntry(
+                            id: name, presence: .present, executablePath: path, executable: true
+                        )
+                    }
+                    if nonExecutable == nil { nonExecutable = path }
+                case .missing: break
+                case .unknown: uncertain = true; searchComplete = false
+                }
+            }
+            if let nonExecutable {
+                return RuntimeExecutableInventoryEntry(
+                    id: name, presence: .present, executablePath: nonExecutable, executable: false
+                )
+            }
+            return RuntimeExecutableInventoryEntry(
+                id: name, presence: uncertain ? .unknown : .notFoundInSearchScope,
+                executablePath: nil, executable: nil
+            )
+        }
+        let library = python.available && python.probeState == .available
+            ? python.executablePath.flatMap(pythonFrameworkLibrary) : nil
+        let scope: RuntimePythonAssetSearchScope = !python.available || python.probeState != .available
+            ? .parentRuntimeUnavailable : (library == nil ? .unsupportedLayout : .selectedPythonFramework)
+        let packages = inventoryPackages.map { package in
+            var presence: RuntimeInventoryPresence = .unknown
+            var assetPath: String?
+            if let library {
+                let candidate = library + (package.sitePackage ? "/site-packages" : "")
+                    + "/" + package.module + "/__init__.py"
+                if candidate.utf8.count <= maximumInventoryFilePathBytes {
+                    switch observe(candidate) {
+                    case let .file(path, _):
+                        if validInventoryPath(path) { presence = .present; assetPath = path }
+                    case .missing: presence = .notFoundInSearchScope
+                    case .unknown: break
+                    }
+                }
+            }
+            return RuntimePythonPackageAsset(
+                id: package.id, moduleName: package.module, presence: presence, assetPath: assetPath
+            )
+        }
+        return RuntimeCapabilityInventory(
+            capturedAt: capturedAt, executableSearchComplete: searchComplete,
+            pythonAssetSearchScope: scope, parentRuntimeStatus: python.probeState,
+            executables: executables, pythonPackageAssets: packages
+        )
+    }
+
+    private static func inventoryDirectories(
+        searchPath: String?, fallbackDirectories: [String]
+    ) -> (directories: [String], complete: Bool) {
+        var complete = true
+        var components: [Substring] = []
+        if let searchPath {
+            let prefix = Array(searchPath.utf8.prefix(maximumInventorySearchPathBytes))
+            let bounded: String
+            if searchPath.utf8.count > maximumInventorySearchPathBytes {
+                complete = false
+                // Keep only whole components; a colon is also a UTF-8 boundary.
+                bounded = prefix.lastIndex(of: 58).map {
+                    String(decoding: prefix[..<$0], as: UTF8.self)
+                } ?? ""
+            } else { bounded = searchPath }
+            let parsed = bounded.split(separator: ":", omittingEmptySubsequences: false)
+            if parsed.count > maximumInventoryPathComponents { complete = false }
+            components = Array(parsed.prefix(maximumInventoryPathComponents))
+        }
+        if fallbackDirectories.count > inventoryFallbackDirectories.count { complete = false }
+        var directories: [String] = []
+        var seen: Set<String> = []
+        for component in components.map(String.init) + Array(fallbackDirectories.prefix(inventoryFallbackDirectories.count)) {
+            guard validInventoryPath(component) else { complete = false; continue }
+            let normalized = URL(fileURLWithPath: component).standardizedFileURL.path
+            guard validInventoryPath(normalized) else { complete = false; continue }
+            if seen.insert(normalized).inserted { directories.append(normalized) }
+        }
+        return (directories, complete)
+    }
+
+    private static func validInventoryPath(_ path: String) -> Bool {
+        path.hasPrefix("/") && !path.contains("\0") && path.utf8.count <= maximumInventoryFilePathBytes
+    }
+
+    private static func inspectInventoryFile(_ path: String) -> InventoryFileObservation {
+        guard validInventoryPath(path) else { return .unknown }
+        var entry = stat()
+        guard Darwin.lstat(path, &entry) == 0 else {
+            return errno == ENOENT || errno == ENOTDIR ? .missing : .unknown
+        }
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard Darwin.realpath(path, &buffer) != nil,
+              let canonical = buffer.withUnsafeBufferPointer({ String(validatingCString: $0.baseAddress!) }),
+              validInventoryPath(canonical) else {
+            return .unknown
+        }
+        var target = stat()
+        guard Darwin.lstat(canonical, &target) == 0,
+              target.st_mode & S_IFMT == S_IFREG else { return .unknown }
+        return .file(path: canonical, executable: FileManager.default.isExecutableFile(atPath: canonical))
+    }
+
+    private static func pythonFrameworkLibrary(_ executable: String) -> String? {
+        guard validInventoryPath(executable) else { return nil }
+        let canonical = RuntimePathCanonicalizer.canonicalExistingURL(URL(fileURLWithPath: executable)).path
+        guard validInventoryPath(canonical) else { return nil }
+        let components = canonical.split(separator: "/").map(String.init)
+        let suffix = ["Resources", "Python.app", "Contents", "MacOS", "Python"]
+        guard components.count >= 8, Array(components.suffix(5)) == suffix else { return nil }
+        let framework = Array(components.dropLast(5))
+        guard Array(framework.suffix(3).prefix(2)) == ["Python3.framework", "Versions"] else { return nil }
+        let version = framework.last!.split(separator: ".", omittingEmptySubsequences: false)
+        guard version.count == 2, version[0] == "3", !version[1].isEmpty,
+              version[1].utf8.count <= 3, version[1].utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
+        return "/" + framework.joined(separator: "/") + "/lib/python" + version.joined(separator: ".")
     }
 
     private static func pythonCapability(

@@ -1,6 +1,8 @@
 # Documentation guide
 
-Current source is **0.20.0 (30)**. Current Qwen feedback work is recorded in
+Current source is **0.21.0 (31)**. The bounded optional-tool inventory and ongoing
+native JavaScript prototype are recorded in [runtime inventory](RUNTIME-INVENTORY.md).
+The preceding Qwen feedback work is recorded in
 [the expiry/output/metadata follow-up](QWEN-FOLLOWUP.md). Project-linked GitHub metadata and the new
 web/file tool contracts are described in the [user guide](../USER-GUIDE.md) and
 [October 7 implementation record](PROJECT-WEB-QWEN.md). Qualification details

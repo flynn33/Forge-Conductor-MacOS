@@ -4559,6 +4559,318 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertFalse(rejectedMutableRuntime.powershell.available)
     }
 
+    func testRuntimeInventoryFindsFixedExecutablesWithoutLaunchingThem() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let first = root.appendingPathComponent("first")
+        let fallback = root.appendingPathComponent("fallback")
+        try FileManager.default.createDirectory(at: first, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: fallback, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let blocked = first.appendingPathComponent("gh")
+        let target = fallback.appendingPathComponent("gh")
+        try Data("never execute this fixture".utf8).write(to: blocked)
+        try Data("never execute this fixture".utf8).write(to: target)
+        XCTAssertEqual(Darwin.chmod(blocked.path, S_IRUSR | S_IWUSR), 0)
+        XCTAssertEqual(Darwin.chmod(target.path, S_IRWXU), 0)
+        let link = first.appendingPathComponent("brew")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        let launches = RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue]
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: first.path, capturedAt: "fixture",
+            fallbackDirectories: [fallback.path]
+        )
+        XCTAssertEqual(inventory.executables.map(\.id), RuntimeCapabilityDiscoverer.inventoryExecutableIDs)
+        XCTAssertEqual(inventory.executables.count, 13)
+        XCTAssertEqual(inventory.pythonPackageAssets.count, 8)
+        let gh = try XCTUnwrap(inventory.executables.first { $0.id == "gh" })
+        XCTAssertEqual(gh.presence, .present)
+        XCTAssertEqual(gh.executable, true)
+        XCTAssertEqual(gh.executablePath, RuntimePathCanonicalizer.canonicalExistingURL(target).path)
+        XCTAssertEqual(inventory.executables.first { $0.id == "brew" }?.executablePath, gh.executablePath)
+        XCTAssertEqual(inventory.executables.first { $0.id == "docker" }?.presence, .notFoundInSearchScope)
+        XCTAssertTrue(inventory.executableSearchComplete)
+        XCTAssertEqual(RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue], launches)
+    }
+
+    func testRuntimeInventoryDistinguishesNonExecutableAndUnresolvableFiles() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let gh = root.appendingPathComponent("gh")
+        try Data("not executable".utf8).write(to: gh)
+        XCTAssertEqual(Darwin.chmod(gh.path, S_IRUSR | S_IWUSR), 0)
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("brew"), withDestinationURL: root.appendingPathComponent("missing")
+        )
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("docker"), withIntermediateDirectories: true)
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: root.path, capturedAt: "fixture", fallbackDirectories: []
+        )
+        XCTAssertEqual(inventory.executables.first { $0.id == "gh" }?.presence, .present)
+        XCTAssertEqual(inventory.executables.first { $0.id == "gh" }?.executable, false)
+        XCTAssertEqual(inventory.executables.first { $0.id == "brew" }?.presence, .unknown)
+        XCTAssertEqual(inventory.executables.first { $0.id == "docker" }?.presence, .unknown)
+        XCTAssertEqual(inventory.executables.first { $0.id == "ffmpeg" }?.presence, .notFoundInSearchScope)
+        XCTAssertFalse(inventory.executableSearchComplete)
+    }
+
+    func testRuntimeInventorySearchBoundsReportUnknownForUnsearchedPaths() {
+        let paths = [
+            ":relative:/contains\0nul:/" + String(repeating: "x", count: Int(PATH_MAX)),
+            (0...RuntimeCapabilityDiscoverer.maximumInventoryPathComponents).map { "/fixture/\($0)" }.joined(separator: ":"),
+            "/first:" + String(repeating: "x", count: RuntimeCapabilityDiscoverer.maximumInventorySearchPathBytes),
+        ]
+        for path in paths {
+            let recorder = InventoryObservationRecorder()
+            let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+                python: Self.inventoryPython(), searchPath: path, capturedAt: "fixture",
+                fallbackDirectories: ["/fallback"], observe: { candidate in recorder.record(candidate); return .missing }
+            )
+            XCTAssertFalse(inventory.executableSearchComplete)
+            XCTAssertTrue(inventory.executables.allSatisfy { $0.presence == .unknown })
+            XCTAssertLessThanOrEqual(recorder.paths.count, 13 * 33)
+            XCTAssertTrue(recorder.paths.allSatisfy {
+                $0.hasPrefix("/") && !$0.contains("\0") && $0.utf8.count < Int(PATH_MAX)
+            })
+            XCTAssertFalse(recorder.paths.contains { $0.hasPrefix("/fixture/32/") })
+        }
+        let partialButFound = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: "relative", capturedAt: "fixture",
+            fallbackDirectories: ["/fallback"], observe: { candidate in .file(path: candidate, executable: true) }
+        )
+        XCTAssertFalse(partialButFound.executableSearchComplete)
+        XCTAssertTrue(partialButFound.executables.allSatisfy { $0.presence == .present })
+    }
+
+    func testRuntimeInventoryDeduplicatesSearchAndCapsFallbackInputs() {
+        let recorder = InventoryObservationRecorder()
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: "/fixture:/fixture/../fixture:/fixture", capturedAt: "fixture",
+            fallbackDirectories: ["/fixture", "/second", "/third", "/fourth", "/fifth", "/sixth", "/omitted"],
+            observe: { candidate in recorder.record(candidate); return .missing }
+        )
+        XCTAssertFalse(inventory.executableSearchComplete)
+        XCTAssertEqual(recorder.paths.count, 13 * 6)
+        XCTAssertFalse(recorder.paths.contains { $0.hasPrefix("/omitted/") })
+        XCTAssertTrue(inventory.executables.allSatisfy { $0.presence == .unknown })
+    }
+
+    func testRuntimeInventoryPythonAssetsAreOnlyFilesystemEvidence() throws {
+        let interpreter = "/fixture/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        let recorder = InventoryObservationRecorder()
+        let launches = RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue]
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(path: interpreter, state: .available), searchPath: nil, capturedAt: "fixture",
+            fallbackDirectories: [], observe: { candidate in
+                recorder.record(candidate)
+                return candidate.hasSuffix("/sqlite3/__init__.py") || candidate.hasSuffix("/PIL/__init__.py")
+                    ? .file(path: candidate, executable: false) : .missing
+            }
+        )
+        XCTAssertEqual(inventory.pythonAssetSearchScope, .selectedPythonFramework)
+        XCTAssertEqual(inventory.parentRuntimeStatus, .available)
+        XCTAssertEqual(inventory.pythonPackageAssets.map(\.id), ["sqlite3", "pip", "Pillow", "python-docx", "openpyxl", "python-pptx", "numpy", "matplotlib"])
+        XCTAssertEqual(inventory.pythonPackageAssets.first { $0.id == "Pillow" }?.presence, .present)
+        XCTAssertEqual(inventory.pythonPackageAssets.first { $0.id == "pip" }?.presence, .notFoundInSearchScope)
+        XCTAssertEqual(recorder.paths.count, 8)
+        XCTAssertTrue(recorder.paths.contains("/fixture/Python3.framework/Versions/3.9/lib/python3.9/sqlite3/__init__.py"))
+        XCTAssertTrue(recorder.paths.contains("/fixture/Python3.framework/Versions/3.9/lib/python3.9/site-packages/PIL/__init__.py"))
+        let result = try RuntimeJobToolPack.capabilitiesResult(Self.inventoryCapabilities(inventory), budget: 65_536)
+        let payload = try XCTUnwrap(result.payload["inventory"] as? [String: Any])
+        let assets = try XCTUnwrap(payload["python_package_assets"] as? [[String: Any]])
+        XCTAssertTrue(assets.allSatisfy { $0["import_verified"] as? Bool == false })
+        XCTAssertTrue(assets.allSatisfy { $0["evidence"] as? String == "filesystem_package_asset" })
+        XCTAssertEqual(RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue], launches)
+    }
+
+    func testRuntimeInventoryUnknownPythonLayoutAndParentFailuresAreNotMissingPackages() {
+        let interpreter = "/fixture/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        for python in [
+            Self.inventoryPython(path: "/usr/bin/python3", state: .available),
+            Self.inventoryPython(path: nil, state: .available),
+            Self.inventoryPython(path: interpreter, state: .probeFailed),
+            Self.inventoryPython(),
+        ] {
+            let recorder = InventoryObservationRecorder()
+            let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+                python: python, searchPath: nil, capturedAt: "fixture", fallbackDirectories: [],
+                observe: { candidate in recorder.record(candidate); return .missing }
+            )
+            XCTAssertTrue(inventory.pythonPackageAssets.allSatisfy { $0.presence == .unknown && $0.assetPath == nil })
+            XCTAssertEqual(inventory.parentRuntimeStatus, python.probeState)
+            XCTAssertEqual(inventory.pythonAssetSearchScope, python.available ? .unsupportedLayout : .parentRuntimeUnavailable)
+            XCTAssertTrue(recorder.paths.isEmpty)
+        }
+    }
+
+    func testRuntimeInventoryCanonicalizesPythonFrameworkCurrentBeforeFindingAssets() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let versions = root.appendingPathComponent("Python3.framework/Versions")
+        let version = versions.appendingPathComponent("3.12")
+        let interpreter = version.appendingPathComponent("Resources/Python.app/Contents/MacOS/Python")
+        let asset = version.appendingPathComponent("lib/python3.12/site-packages/pip/__init__.py")
+        try FileManager.default.createDirectory(at: interpreter.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: asset.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("must not be launched".utf8).write(to: interpreter)
+        try Data("must not be imported".utf8).write(to: asset)
+        try FileManager.default.createSymbolicLink(at: versions.appendingPathComponent("Current"), withDestinationURL: version)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let current = versions.appendingPathComponent("Current/Resources/Python.app/Contents/MacOS/Python")
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(path: current.path, state: .available), searchPath: nil,
+            capturedAt: "fixture", fallbackDirectories: []
+        )
+        XCTAssertEqual(inventory.pythonAssetSearchScope, .selectedPythonFramework)
+        XCTAssertEqual(inventory.pythonPackageAssets.first { $0.id == "pip" }?.presence, .present)
+        XCTAssertEqual(inventory.pythonPackageAssets.first { $0.id == "pip" }?.assetPath,
+                       RuntimePathCanonicalizer.canonicalExistingURL(asset).path)
+        XCTAssertEqual(inventory.pythonPackageAssets.first { $0.id == "numpy" }?.presence, .notFoundInSearchScope)
+    }
+
+    func testRuntimeInventoryRejectsInvalidCanonicalPathsAndReportsInspectionErrors() {
+        for canonical in ["relative", "/contains\0nul", "/" + String(repeating: "x", count: Int(PATH_MAX))] {
+            let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+                python: Self.inventoryPython(), searchPath: "/fixture", capturedAt: "fixture",
+                fallbackDirectories: [], observe: { _ in .file(path: canonical, executable: true) }
+            )
+            XCTAssertFalse(inventory.executableSearchComplete)
+            XCTAssertTrue(inventory.executables.allSatisfy { $0.presence == .unknown && $0.executablePath == nil })
+        }
+        let unreadable = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: "/fixture", capturedAt: "fixture",
+            fallbackDirectories: [], observe: { _ in .unknown }
+        )
+        XCTAssertFalse(unreadable.executableSearchComplete)
+        XCTAssertTrue(unreadable.executables.allSatisfy { $0.presence == .unknown })
+    }
+
+    func testRuntimeInventoryCodableRetainsLegacyCapabilitiesAndProbeFallback() throws {
+        let legacy = Self.inventoryCapabilities(nil)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? [String: Any])
+        XCTAssertNil(json["inventory"])
+        for key in ["directProcess", "zsh", "bash", "python", "powershell"] {
+            var runtime = try XCTUnwrap(json[key] as? [String: Any])
+            runtime.removeValue(forKey: "probeState")
+            json[key] = runtime
+        }
+        let decoded = try JSONDecoder().decode(RuntimeCapabilities.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(decoded, legacy)
+        XCTAssertNil(decoded.inventory)
+        XCTAssertTrue(decoded.shellAvailable)
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: nil, capturedAt: "2026-10-07T00:00:00Z", fallbackDirectories: []
+        )
+        let current = Self.inventoryCapabilities(inventory)
+        XCTAssertEqual(try JSONDecoder().decode(RuntimeCapabilities.self, from: JSONEncoder().encode(current)), current)
+        XCTAssertEqual(decoded.directProcess, current.directProcess)
+        XCTAssertEqual(decoded.python, current.python)
+    }
+
+    func testRuntimeInventoryFitsDuplicatedResultAndStrictHTTPIdentifierExample() throws {
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: "/fixture", capturedAt: "fixture", fallbackDirectories: [],
+            observe: { candidate in .file(path: candidate, executable: true) }
+        )
+        let result = try RuntimeJobToolPack.capabilitiesResult(Self.inventoryCapabilities(inventory), budget: 65_536)
+        XCTAssertEqual(result.payload["inventory_status"] as? String, "included")
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: nil, result: result).count, 65_536)
+        // HTTP admission caps raw UTF-8 IDs at 256 bytes. Control bytes require
+        // six-byte JSON escapes; unbounded legacy stdio IDs are a separate scope.
+        let id = String(repeating: "\u{01}", count: 256)
+        XCTAssertNotNil(MCPRequestAdmission.Identifier(id, strict: true))
+        XCTAssertNil(MCPRequestAdmission.Identifier(id + "x", strict: true))
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: id, result: result).count, 65_536)
+        let inventoryPayload = try XCTUnwrap(result.payload["inventory"] as? [String: Any])
+        let rows = try XCTUnwrap(inventoryPayload["executables"] as? [[String: Any]])
+        XCTAssertTrue(rows.allSatisfy { $0["probe_state"] as? String == "not_run" && $0["workflow_verified"] as? Bool == false })
+    }
+
+    func testRuntimeInventoryBudgetOmissionPreservesUsableLegacyCore() throws {
+        let inventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: "/fixture", capturedAt: "fixture", fallbackDirectories: [],
+            observe: { candidate in .file(path: candidate, executable: true) }
+        )
+        let capabilities = Self.inventoryCapabilities(inventory)
+        var core = try RuntimeJobToolPack.capabilitiesResult(Self.inventoryCapabilities(nil), budget: 65_536).payload
+        core.removeValue(forKey: "inventory_status")
+        let coreBytes = try MCPToolResponse.data(id: nil, result: .success(core)).count
+        let result = try RuntimeJobToolPack.capabilitiesResult(capabilities, budget: coreBytes + 128)
+        XCTAssertEqual(result.payload["inventory_status"] as? String, "omitted_inline_budget")
+        XCTAssertNil(result.payload["inventory"])
+        var retained = result.payload
+        retained.removeValue(forKey: "inventory_status")
+        XCTAssertEqual(try JSONSupport.canonicalJSON(retained), try JSONSupport.canonicalJSON(core))
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: nil, result: result).count, coreBytes + 128)
+        let exactLegacy = try RuntimeJobToolPack.capabilitiesResult(capabilities, budget: coreBytes)
+        XCTAssertEqual(try JSONSupport.canonicalJSON(exactLegacy.payload), try JSONSupport.canonicalJSON(core))
+        XCTAssertThrowsError(try RuntimeJobToolPack.capabilitiesResult(capabilities, budget: coreBytes - 1)) {
+            XCTAssertTrue($0.localizedDescription.contains("core metadata exceeds"))
+        }
+        let escapedComponent = "/" + String(repeating: "\"", count: 200)
+        let escapedPath = String(repeating: escapedComponent,
+            count: RuntimeCapabilityDiscoverer.maximumInventoryFilePathBytes / escapedComponent.utf8.count)
+        XCTAssertLessThanOrEqual(escapedPath.utf8.count, RuntimeCapabilityDiscoverer.maximumInventoryFilePathBytes)
+        let oversizedInventory = RuntimeCapabilityDiscoverer.inventorySnapshot(
+            python: Self.inventoryPython(), searchPath: "/fixture", capturedAt: "fixture", fallbackDirectories: [],
+            observe: { _ in .file(path: escapedPath, executable: true) }
+        )
+        let omitted = try RuntimeJobToolPack.capabilitiesResult(Self.inventoryCapabilities(oversizedInventory), budget: 65_536)
+        XCTAssertEqual(omitted.payload["inventory_status"] as? String, "omitted_inline_budget")
+        XCTAssertNil(omitted.payload["inventory"])
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: nil, result: omitted).count, 65_536)
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "\u{01}", count: 256), result: omitted).count, 65_536)
+    }
+
+    func testRuntimeInventoryCachedReadsLeaveShellRequirementsAndShutdownUnchanged() async throws {
+        let limits = RuntimeJobLimits(maximumConcurrentJobs: 2, maximumCPUHeavyJobs: 1,
+            maximumInlineOutputBytes: 65_536, maximumArtifactBytesPerJob: 131_072)
+        let fixture = try await Fixture.make(limits: limits)
+        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        let initial = await fixture.service.capabilities()
+        let launches = RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue]
+        let pack = RuntimeJobToolPack(service: fixture.service)
+        let firstResponse = try await pack.handle(name: "runtime.capabilities", arguments: [:], context: fixture.context)
+        let secondResponse = try await pack.handle(name: "runtime.capabilities", arguments: [:], context: fixture.context)
+        let first = try XCTUnwrap(firstResponse)
+        let second = try XCTUnwrap(secondResponse)
+        XCTAssertTrue(first.ok)
+        XCTAssertEqual(try JSONSupport.canonicalJSON(first.payload), try JSONSupport.canonicalJSON(second.payload))
+        let repeated = await fixture.service.capabilities()
+        XCTAssertEqual(repeated, initial)
+        XCTAssertNotNil(initial.inventory)
+        XCTAssertEqual(RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue], launches)
+        let requirements = RuntimeRequirementResolver.resolve(
+            input: RuntimeRequirementInput(selectedTools: ["shell_exec"]), capabilities: initial
+        )
+        XCTAssertFalse(requirements.contains { $0.blocksTask })
+        XCTAssertEqual(requirements.first { $0.runtime == .python }?.requirement, .notNeeded)
+        let report = await fixture.service.shutdown()
+        XCTAssertTrue(report.completed)
+        XCTAssertEqual(RuntimeDiagnostics.shared.snapshot().counters[RuntimeCounter.processLaunches.rawValue], launches)
+    }
+
+    private final class InventoryObservationRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [String] = []
+        func record(_ path: String) { lock.lock(); defer { lock.unlock() }; values.append(path) }
+        var paths: [String] { lock.lock(); defer { lock.unlock() }; return values }
+    }
+
+    private static func inventoryPython(
+        path: String? = nil, state: RuntimeExecutableProbeState = .unknown
+    ) -> RuntimeExecutableCapability {
+        RuntimeExecutableCapability(available: state == .available, executablePath: path, required: false, probeState: state)
+    }
+
+    private static func inventoryCapabilities(_ inventory: RuntimeCapabilityInventory?) -> RuntimeCapabilities {
+        let available = RuntimeExecutableCapability(available: true, executablePath: "/bin/bash", required: true)
+        return RuntimeCapabilities(directProcess: available, zsh: available, bash: available,
+            python: inventoryPython(), powershell: inventoryPython(), maximumConcurrentJobs: 2,
+            maximumCPUHeavyJobs: 1, maximumInlineOutputBytes: 65_536, maximumArtifactBytesPerJob: 131_072,
+            maximumArtifactBytesPerProject: 262_144, maximumArtifactBytesGlobal: 524_288,
+            maximumRetainedArtifactJobsPerProject: 8, inventory: inventory)
+    }
+
     func testOptionalRuntimeDiscoveryRejectsUnrelatedImmutableExecutables() {
         let capabilities = RuntimeCapabilityDiscoverer(
             configuredPython: URL(fileURLWithPath: "/usr/bin/true"),

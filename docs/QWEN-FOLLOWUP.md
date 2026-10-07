@@ -1,9 +1,11 @@
 # Qwen feedback: expiry, running output and page metadata
 
-Current source is **0.20.0 (30)**. This local-first change starts from synchronized
+This checkpoint's source is **0.20.0 (30)**. This local-first change starts from synchronized
 owner-signed `a14a63de92d26cfd16fd196601033570e682ba7a`. The working installation is
 still **0.18.0 (28)**. The [preceding feature checkpoint](PROJECT-WEB-QWEN.md)
 retains its own tested inputs, model exchange and PowerShell host repair.
+The subsequent [runtime inventory work](RUNTIME-INVENTORY.md) has its own
+identity and qualification record; these receipts retain their original inputs.
 
 ## Observed starting behavior — E0
 

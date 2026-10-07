@@ -10,6 +10,17 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### 0.21.0 (31) runtime capability inventory
+
+- Added a bounded, service-startup filesystem inventory for optional executables
+  and selected Python framework package assets to `runtime.capabilities`.
+- Inventory distinguishes observed presence, missing entries within the searched
+  locations and unknown results. Workflow and import verification remain explicit.
+- Preserved existing execution gates and job limits; the inventory is omitted
+  when it cannot fit the inline result allowance. Source/native regressions and
+  actual Qwen consumption passed; qualification boundaries are recorded in
+  [the inventory record](docs/RUNTIME-INVENTORY.md).
+
 ### 0.20.0 (30) Qwen feedback follow-up
 
 - Added optional bounded HTML page title and first-heading fields to `web.fetch`,

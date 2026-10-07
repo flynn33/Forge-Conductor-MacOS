@@ -189,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.20.0**, build **30** (current source; candidate qualification is separate from installation).
+Version **0.21.0**, build **31** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -404,6 +404,20 @@ making development changes. Then give the model the task in LM Studio as usual.
 Forge Conductor does not start this work through a Managed Run.
 
 ### Web and file tools
+
+`runtime.capabilities` retains the execution gates and enforced job limits. When
+the inline result budget permits, `inventory` adds thirteen optional-executable
+observations and eight selected-Python package-asset observations. Read
+`presence`, `executable`, the search scopes and `captured_at` together.
+`not_found_in_search_scope` only describes those locations; unsupported layouts
+and inaccessible paths are `unknown`. Executable rows have `probe_state: "not_run"`
+and `workflow_verified: false`; package rows have `import_verified: false`.
+Use an authorized bounded job to verify a required workflow. The snapshot is
+cached for the service lifetime; restarting the runtime service refreshes it.
+`inventory_status: "omitted_inline_budget"` preserves the established core result
+when the inventory would exceed the result allowance; at the exact legacy core
+boundary, the marker can also be absent. See
+[the inventory contract](docs/RUNTIME-INVENTORY.md).
 
 After attaching the project, the model can use `web.search` to find public pages
 and `web.fetch` to read HTTP(S) text. Ordinary LM Studio MCP project bindings

@@ -1,8 +1,19 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 optional runtime inventory and native web investigation
+
+Current source identity is **0.21.0 (31)**, starting from synchronized owner-signed
+`52152bd56213372793d98d6e2800ac4c638eba15`. This milestone addresses Qwen's
+capability-discovery feedback while preserving existing execution admission.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Optional runtime inventory | Fixed filesystem-only snapshot implemented; existing gates, limits and old Codable records preserved. All twelve source and signed-native regressions passed. Normal selection: 201 selected, 198 passed, three fixture skips, zero failures; live-provider readiness subsequently passed separately. CLI/app and canonical ordinary Debug builds and strict signing passed. Actual Qwen consumed the cached inventory and finished normally; source/candidate/protected inputs unchanged. Correct target memberships verified, graph version-only; [contract and evidence](docs/RUNTIME-INVENTORY.md). | Two current-version native identity fixtures remain unprepared. No optional workflow/import or installed acceptance claim. |
+| JavaScript renderer | External native fixture executed page JavaScript. Refusing-proxy localhost bypass disproved universal interception. Fourth fixture completed nineteen bounded native cases with normal exit/EOF, including infinite-script deadline/cancel and TLS. All views released; two stores remained alive during cleanup observation, then helpers exited. New observed WebKit PIDs were absent after exit, with attribution limits. Earlier failed receipts remain. | Production rendering/IPC and deployment support remain unqualified. Permission/file-picker denial callbacks were unreached; broader OS-prompt, heap and network bounds unknown. No authenticated-browser claim. |
+
 ## October 7 Qwen feedback follow-up
 
-Current source identity is **0.20.0 (30)**. Work continues from safely synchronized
+This checkpoint's source identity is **0.20.0 (30)**. Work continues from safely synchronized
 owner-signed `a14a63de92d26cfd16fd196601033570e682ba7a` on the native-reproduced
 expiry and running-output gaps and Qwen's page-title request.
 [The follow-up record](docs/QWEN-FOLLOWUP.md) retains before/after evidence.

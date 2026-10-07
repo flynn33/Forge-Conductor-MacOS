@@ -58,7 +58,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
 
     public static func description(for name: String) -> String? {
         [
-            "runtime.capabilities": "Report direct process and external runtime availability plus enforced job limits.",
+            "runtime.capabilities": "Report direct process and external runtime availability plus enforced job limits. Includes a bounded, service-startup filesystem inventory of optional executables and selected Python framework package assets when the inline result budget permits. Presence is limited to the reported search scope; probe_state=not_run, workflow_verified=false and import_verified=false do not establish working accounts, daemons, installs or imports. Unsupported package layouts are unknown. Restart the runtime service to refresh the cached inventory.",
             "process.run": "Start a durable direct executable/argument-vector job without shell parsing.",
             "shell.run": "Start a durable staged zsh job with startup files disabled.",
             "bash.run": "Start a durable staged Bash job with profile and rc files disabled.",
@@ -141,9 +141,11 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             try Self.requireAuthorization(name, context: context)
             switch name {
             case "runtime.capabilities":
-                let payload = Self.capabilitiesPayload(await service.capabilities())
+                let capabilities = await service.capabilities()
                 try Task.checkCancellation()
-                return .success(payload)
+                return try Self.capabilitiesResult(
+                    capabilities, budget: context.authorizationScope.maximumInlineOutputBytes
+                )
             case "process.run", "shell.run", "bash.run", "python.run", "powershell.run":
                 let request = try Self.request(
                     name: name,
@@ -519,6 +521,58 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             throw RuntimeJobError.invalidRequest("\(key) is required")
         }
         return value
+    }
+
+    static func capabilitiesResult(_ capabilities: RuntimeCapabilities, budget: Int) throws -> ToolResult {
+        let boundedBudget = min(ToolInvocationBroker.maximumDurableResultBytes, budget)
+        let core = capabilitiesPayload(capabilities)
+        func fits(_ payload: [String: Any]) throws -> Bool {
+            // Correlation IDs are transport metadata. Stdio accepts unbounded
+            // IDs within its request envelope; this bounds the duplicated result.
+            try MCPToolResponse.data(id: nil, result: .success(payload)).count <= boundedBudget
+        }
+        var payload = core
+        if let inventory = capabilities.inventory {
+            payload["inventory"] = inventoryPayload(inventory)
+            payload["inventory_status"] = "included"
+            if try fits(payload) { return .success(payload) }
+            payload = core
+            payload["inventory_status"] = "omitted_inline_budget"
+        } else {
+            payload["inventory_status"] = "unavailable"
+        }
+        if try fits(payload) { return .success(payload) }
+        // Preserve a legacy result that fits at the exact old metadata boundary.
+        if try fits(core) { return .success(core) }
+        throw RuntimeJobError.invalidRequest("runtime capability core metadata exceeds the inline result budget")
+    }
+
+    private static func inventoryPayload(_ inventory: RuntimeCapabilityInventory) -> [String: Any] {
+        [
+            "version": 1,
+            "captured_at": inventory.capturedAt,
+            "refresh_policy": "service_restart",
+            "executable_search_scope": "bounded_absolute_path_and_standard_locations",
+            "executable_search_complete": inventory.executableSearchComplete,
+            "python_asset_search_scope": inventory.pythonAssetSearchScope.rawValue,
+            "parent_runtime_status": inventory.parentRuntimeStatus.rawValue,
+            "executables": inventory.executables.map { entry -> [String: Any] in
+                [
+                    "id": entry.id, "presence": entry.presence.rawValue,
+                    "executable_path": entry.executablePath as Any? ?? NSNull(),
+                    "executable": entry.executable as Any? ?? NSNull(),
+                    "probe_state": "not_run", "workflow_verified": false,
+                ]
+            },
+            "python_package_assets": inventory.pythonPackageAssets.map { entry -> [String: Any] in
+                [
+                    "id": entry.id, "module_name": entry.moduleName,
+                    "presence": entry.presence.rawValue,
+                    "asset_path": entry.assetPath as Any? ?? NSNull(),
+                    "evidence": "filesystem_package_asset", "import_verified": false,
+                ]
+            },
+        ]
     }
 
     private static func capabilitiesPayload(_ capabilities: RuntimeCapabilities) -> [String: Any] {
