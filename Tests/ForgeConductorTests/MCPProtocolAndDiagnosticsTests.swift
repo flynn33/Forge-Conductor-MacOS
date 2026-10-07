@@ -339,6 +339,59 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertNil(stopError)
     }
 
+    func testRendererBudgetLookupHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0.1)
+    }
+
+    func testAlreadyExpiredRendererResponseHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0)
+    }
+
+    private func checkRendererDeadlineDuringProjectContention(timeoutSeconds: TimeInterval) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("forge-render-budget-deadline-\(UUID().uuidString)", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: home)
+        defer { app.shutdown(); try? FileManager.default.removeItem(at: root) }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let client = ClientID("render-budget-deadline")
+        let initialized = try app.tools.call(name: "project_memory.initialize",
+            arguments: ["project_path": project.path], clientID: client)
+        XCTAssertTrue(initialized.ok, "\(initialized.payload)")
+        let context = try app.projectContexts.invocationContext(for: client)
+        let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+        await app.projectContexts.repository.configureOperationObservers(beforeCommit: {
+            entered.signal()
+            _ = release.wait(timeout: .now() + 2)
+        })
+        let writer = Task.detached {
+            try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: "owned-contention"),
+                projectID: context.projectID, generation: context.projectGeneration,
+                authorizationScope: context.authorizationScope)
+        }
+        XCTAssertEqual(entered.wait(timeout: .now() + 2), .success,
+            "The fixture must hold actual project-operation admission before the request")
+        let server = MCPServer(app: app, clientID: client)
+        let control = ToolCallCancellation(timeoutSeconds: timeoutSeconds)
+        let start = Date()
+        let response = try XCTUnwrap(server.handle([
+            "jsonrpc": "2.0", "id": "contended-render", "method": "tools/call",
+            "params": ["name": "web.render", "arguments": ["url": "https://example.com/"]]
+        ], cancellation: control))
+        let elapsed = Date().timeIntervalSince(start)
+        for _ in 0..<4 { release.signal() }
+        _ = try await writer.value
+        await app.projectContexts.repository.configureOperationObservers()
+        XCTAssertLessThan(elapsed, 1, "The budget lookup must not replace the caller's deadline with its own wait")
+        XCTAssertEqual(response["id"] as? String, "contended-render")
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["code"] as? String, "deadline_exceeded")
+        XCTAssertEqual(result["isError"] as? Bool, true)
+    }
+
     func testWireDefaultRequestDeadlineBoundsToolCallsWithoutOverride() throws {
         let fixture = try MCPWireFixture(
             maximumConcurrentRequests: 1,

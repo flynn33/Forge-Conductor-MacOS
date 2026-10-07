@@ -30,7 +30,8 @@ let package = Package(
             resources: [
                 .copy("Resources/Agents"),
                 .copy("Resources/TelemetryStatic"),
-            ]
+            ],
+            linkerSettings: [.linkedLibrary("bsm")]
         ),
         .executableTarget(
             name: "ForgeConductorCLI",

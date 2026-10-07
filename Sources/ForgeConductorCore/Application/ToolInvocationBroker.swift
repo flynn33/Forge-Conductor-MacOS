@@ -120,6 +120,7 @@ public enum ProductionToolReplayCatalog {
         "search_text": .readOnly,
         "web.fetch": .readOnly,
         "web.search": .readOnly,
+        "web.render": .readOnly,
 
         "memory_set": .idempotent,
         "memory_get": .readOnly,

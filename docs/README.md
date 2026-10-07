@@ -1,9 +1,15 @@
 # Documentation guide
 
-Current source is **0.22.0 (32)**. Binary web paging, current-version alignment
+Current source is **0.23.0 (33)**. Native JavaScript snapshots, ownership and
+deadline corrections are recorded in [native web rendering](NATIVE-WEB-RENDERING.md).
+Debug passed 130 compiled tests and 35 actual MCP cases; Qwen consumed the live
+JavaScript result and finished normally. Release compilation, signing and the
+same 35-case MCP matrix passed. Installed acceptance remains open.
+
+The preceding **0.22.0 (32)** binary web paging, current-version alignment
 and scoped Qwen file workflows are recorded in
 [binary web and Qwen files](BINARY-WEB-AND-QWEN-FILES.md). The preceding optional
-inventory and ongoing native JavaScript prototype retain their own
+inventory and native JavaScript investigation retain their own
 [runtime inventory record](RUNTIME-INVENTORY.md).
 The preceding Qwen feedback work is recorded in
 [the expiry/output/metadata follow-up](QWEN-FOLLOWUP.md). Project-linked GitHub metadata and the new
@@ -45,6 +51,7 @@ qualification is not promoted by this UI phase.
 | [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow current setup guidance or open contextual offline help |
 | [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
+| [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Import, order, query, and delete project instruction packages |

@@ -642,6 +642,7 @@ private enum ProductionToolDefinitionSource {
             ?? RuntimeJobToolPack.description(for: name)
             ?? XcodeCLIToolPack.description(for: name)
             ?? WebToolPack.description(for: name)
+            ?? WebRenderToolPack.description(for: name)
             ?? baseDescriptions[name]
     }
 
@@ -652,6 +653,7 @@ private enum ProductionToolDefinitionSource {
             ?? RuntimeJobToolPack.schema(for: name)
             ?? XcodeCLIToolPack.schema(for: name)
             ?? WebToolPack.schema(for: name)
+            ?? WebRenderToolPack.schema(for: name)
             ?? baseSchema(for: name)
     }
 

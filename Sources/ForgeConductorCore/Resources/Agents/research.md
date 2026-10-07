@@ -13,6 +13,7 @@ tools:
   - shell_exec
   - web.search
   - web.fetch
+  - web.render
 tools_forbidden:
   - fs_write
   - fs_edit

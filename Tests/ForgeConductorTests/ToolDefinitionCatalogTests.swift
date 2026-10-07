@@ -5,6 +5,38 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ToolDefinitionCatalogTests: XCTestCase {
+    func testRendererAddsExactPublicSchemaAndPreservesResearchGrantsAndContextAdmission() throws {
+        try withProductionApp("renderer-catalog") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let replay = try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "web.render"))
+            let schema = try definition.inputSchemaObject()
+            XCTAssertEqual(schema["required"] as? [String], ["url"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["url", "timeout_sec", "maximum_bytes", "deadline_ms"])
+            XCTAssertEqual((properties["timeout_sec"] as? [String: Any])?["maximum"] as? Int, 30)
+            XCTAssertEqual((properties["maximum_bytes"] as? [String: Any])?["maximum"] as? Int, 65_536)
+            XCTAssertEqual(try replay.replayClass(for: "web.render"), .readOnly)
+            XCTAssertTrue(definition.description.contains("macOS 27+"))
+            XCTAssertTrue(definition.description.contains("untrusted data"))
+            XCTAssertTrue(definition.description.contains("at most five unique follow-up URLs"))
+            XCTAssertTrue(definition.description.contains("Across a request"))
+            XCTAssertTrue(definition.description.contains("including finite cookie/state redirects"))
+            let researchGrants: Set<String> = ["fs_read", "fs_list", "fs_glob", "search_text", "git_log",
+                "git_status", "shell_exec", "web.search", "web.fetch", "web.render"]
+            XCTAssertEqual(Set(try XCTUnwrap(app.catalog.get("research")).tools), researchGrants)
+            XCTAssertEqual(Set(try XCTUnwrap(AgentCatalog.builtinDefaults().first { $0.id == "research" }).tools), researchGrants)
+            for name in ["web.fetch", "web.search", "web.render", "shell_exec"] {
+                XCTAssertTrue(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.contains(name))
+                XCTAssertTrue(app.tools.toolNames.contains(name))
+            }
+            let missing = try app.tools.call(name: "web.render", arguments: ["url": "https://example.com/"],
+                clientID: ClientID("renderer-unattached"))
+            XCTAssertEqual(missing.payload["code"] as? String, "project_context_required")
+        }
+    }
+
     private static let jobControlTools: Set<String> = [
         "job.status", "job.read_output", "job.cancel", "job.list",
     ]

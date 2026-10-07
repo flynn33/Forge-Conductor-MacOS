@@ -37,6 +37,7 @@ public enum ForgeProcessEntry {
         case gui
         case serve
         case providerHook
+        case webRenderChild
         case managerRun(openBrowser: Bool)
         case managerOther // start/stop/restart/status — delegated if needed
     }
@@ -52,6 +53,8 @@ public enum ForgeProcessEntry {
             // Argument validation happens in the bounded hook command. Classify
             // even malformed invocations as headless so they can never start UI.
             return .providerHook
+        case "--internal-web-render-v1":
+            return .webRenderChild
         case "manager":
             let sub = args.dropFirst().first ?? "run"
             if sub == "run" || sub.hasPrefix("-") {
@@ -173,6 +176,9 @@ public enum ForgeProcessEntry {
             runServe(home: homeOverride(from: arguments), arguments: arguments)
         case .providerHook:
             runProviderHook(arguments: arguments)
+        case .webRenderChild:
+            _ = WebRenderChildEntry.runIfRequested(arguments: arguments, expectedRole: .app)
+            exit(2)
         case .managerRun(let open):
             runManager(home: homeOverride(from: arguments), openBrowser: open)
         case .managerOther:

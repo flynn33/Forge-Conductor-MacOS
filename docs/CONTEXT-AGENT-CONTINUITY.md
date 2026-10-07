@@ -1,10 +1,13 @@
-# Context and agent continuity (v0.22.0)
+# Context and agent continuity (v0.23.0)
+
+<a id="context-and-agent-continuity-v0220"></a>
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.22.0 (32). Binary web fetching/paging
-and current-authority alignment have scoped verification in
-[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). The continuity
+Current source documentation targets 0.23.0 (33). `web.render` is an ordinary
+eligible progress tool and appears in the research agent and default grant
+catalogs. Its [renderer record](NATIVE-WEB-RENDERING.md) separates snapshot
+checks from continuity acceptance. The continuity
 contract remains in force; the preceding repair receipts below retain their
 tested 0.18.0 identity and do not qualify this new slice.
 

@@ -53,6 +53,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
             DocsToolPack(),
             SearchToolPack(),
             WebToolPack(),
+            WebRenderToolPack(renderer: app.webRenderer),
         ]
     }
 
@@ -1060,7 +1061,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "instruction_catalog", "instruction_read",
         "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir",
         "fs_delete", "fs_delete_recovery", "fs_move", "search_text",
-        "web.fetch", "web.search",
+        "web.fetch", "web.search", "web.render",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "shell_exec", "pdf_write", "pdf_from_file",
         "project_memory.remember", "project_memory.remember_batch",

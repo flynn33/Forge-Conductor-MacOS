@@ -1108,7 +1108,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir",
         "fs_delete", "fs_delete_recovery", "fs_move",
         "search_text", "instruction_catalog", "instruction_read", "shell_exec",
-        "web.fetch", "web.search",
+        "web.fetch", "web.search", "web.render",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
         "pdf_write", "pdf_from_file",
         "runtime.capabilities", "process.run", "shell.run", "bash.run", "python.run",

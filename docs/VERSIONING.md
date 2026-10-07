@@ -11,10 +11,11 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.22.0 (32)**. Additive binary web fetching/paging advances
+Current identity is **0.23.0 (33)**. Additive native JavaScript snapshots advance
 the feature-release component; current authority documents advance with it.
-Scoped source/native/model verification is recorded in
-[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). The preceding
+Scoped verification is recorded in [native web rendering](NATIVE-WEB-RENDERING.md).
+The preceding 0.22.0 binary-web receipts remain in
+[their record](BINARY-WEB-AND-QWEN-FILES.md). The preceding
 **0.21.0 (31)** optional-tool inventory retains its tested identity in
 [the inventory record](RUNTIME-INVENTORY.md). The preceding **0.20.0 (30)** expiry,
 running-output and page-metadata receipts remain in [their follow-up](QWEN-FOLLOWUP.md). The published **0.19.0 (29)** project
@@ -61,13 +62,13 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.22.0`, build `32`. Backward-compatible binary
-web fetching/paging advances the feature-release component and resets the patch
+The current product version is `0.23.0`, build `33`. Backward-compatible native
+JavaScript rendering advances the feature-release component and resets the patch
 component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
 marketing-version settings, all 16 build-number settings and the current
-authority-document markers agree. The focused version regression passed in source
-and signed-native execution, with every assertion retained. The preceding 0.21.0
-inventory receipts keep their own scope.
+authority-document markers agree. The actual current-version regression passed
+in source and in the compiled selection with every existing assertion retained. The preceding 0.22.0 binary-web
+and 0.21.0 inventory receipts keep their own scope.
 
 The preceding 0.17.0 exact-reference source audit passed 15/15 checks over 434 inputs.
 That preceding 0.17.0 434-input ordinary Debug build passed strict signing/

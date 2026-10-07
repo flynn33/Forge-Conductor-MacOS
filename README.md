@@ -1,7 +1,15 @@
 # Forge Conductor for macOS
 
-Current source is **0.22.0 (32)**. Binary HTTP paging and current-version
-alignment passed 41 distinct affected source cases and 17 signed-native cases.
+Current source is **0.23.0 (33)**. Native JavaScript snapshots and request-deadline
+corrections passed 130 compiled tests and 35 signed Debug MCP cases. Qwen selected
+`web.render`, consumed its live JavaScript result and stopped normally. Release
+compilation, strict signing and the same 35-case MCP matrix passed. Signed Debug
+and Release app executables each passed ten core cases. Installed acceptance
+and broader browser workflows remain open.
+[Renderer contract and evidence](docs/NATIVE-WEB-RENDERING.md).
+
+The preceding **0.22.0 (32)** binary HTTP paging and current-version alignment
+passed 41 distinct affected source cases and 17 signed-native cases.
 The exact HTTP body reconstructed in 41 native pages; Qwen consumed two actual
 base64 pages and finished normally. [Evidence and limits](docs/BINARY-WEB-AND-QWEN-FILES.md).
 
@@ -528,8 +536,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.22.0** |
-| **Build** | **32** |
+| **Version** | **0.23.0** |
+| **Build** | **33** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -647,7 +655,7 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The current root version authorities, compiled protocol constants and Xcode
-build settings use `0.22.0 (32)`; the current document markers are checked by
+build settings use `0.23.0 (33)`; the current document markers are checked by
 the version-alignment regression. Historical qualification receipts retain
 their tested identities.
 The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)

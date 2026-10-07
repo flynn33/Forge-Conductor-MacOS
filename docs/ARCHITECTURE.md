@@ -1,11 +1,12 @@
 # Forge Conductor architecture
 
-Version: `0.22.0`; build: `32`.
+Version: `0.23.0`; build: `33`.
 
-The current slice adds binary web fetching/paging and aligns current authority
-documents with the source identity. Its scoped checks are recorded in
-[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). Earlier
-0.18.0, 0.20.0 and 0.21.0 receipts retain their tested identities and scopes.
+The current slice adds `ForgeApp`-owned JavaScript rendering through a bounded
+fixed-mode signed native child and preserves request deadlines through MCP
+response-context lookups. Its ownership, protocol and verification scopes are
+recorded in [native web rendering](NATIVE-WEB-RENDERING.md). Earlier receipts
+retain their tested identities and scopes.
 
 Forge Conductor is a native macOS control plane and MCP server for work carried
 out in externally owned model conversations. The current LM Studio workflow

@@ -21,6 +21,418 @@ public struct ProcessResult: Sendable {
     public var terminationSignal: Int32? = nil
 }
 
+enum OwnedCurrentSelfMode: Sendable {
+    case webRenderV1
+
+    var argument: String { "--internal-web-render-v1" }
+}
+
+enum OwnedStreamEnd: Sendable, Equatable {
+    case eof
+    case readError(Int32)
+    case forcedClose
+}
+
+struct OwnedCapturedStream: Sendable {
+    let data: Data
+    let end: OwnedStreamEnd
+    let truncated: Bool
+}
+
+enum OwnedAdmissionDisposition: Sendable {
+    case notAttempted
+    case admitted
+    case roleRejected
+    case auditTokenUnavailable
+    case childInvalid
+    case exactIdentityMismatch
+    case ownedChildExited
+}
+
+struct OwnedDuplexResult: Sendable {
+    let exitCode: Int32?
+    let terminationSignal: Int32?
+    let stdout: OwnedCapturedStream
+    let stderr: OwnedCapturedStream
+    let stdinBytesWritten: Int
+    let stdinClosed: Bool
+    let admission: OwnedAdmissionDisposition
+    let timedOut: Bool
+    let cancelled: Bool
+    let termRequested: Bool
+    let killRequested: Bool
+    let terminationConfirmed: Bool
+}
+
+struct OwnedNativeTerminationUnconfirmed: Error, Sendable, LocalizedError {
+    let processIdentifier: Int32
+    let signalError: Int32?
+    let waitError: Int32?
+    let killRequested: Bool
+
+    var errorDescription: String? {
+        "owned native child \(processIdentifier) termination was not confirmed"
+    }
+}
+
+/// One waitpid owner. Signal and reap share this lock so a watchdog cannot
+/// signal a PID after this owner has reaped it. Security calls hold no lock.
+private final class OwnedNativeChild: @unchecked Sendable {
+    struct Status {
+        var exitCode: Int32?
+        var signal: Int32?
+        var waitError: Int32?
+        var termAt: UInt64?
+        var killRequested = false
+        var signalError: Int32?
+        var timedOut = false
+        var cancelled = false
+    }
+    let pid: Int32
+    private let lock = NSLock()
+    private var status = Status()
+
+    init(pid: Int32) {
+        self.pid = pid
+        RuntimeDiagnostics.shared.increment(.processLaunches)
+        RuntimeDiagnostics.shared.adjust(.childProcesses, by: 1)
+    }
+
+    func snapshot() -> Status {
+        lock.lock(); defer { lock.unlock() }
+        return status
+    }
+
+    @discardableResult
+    func pollTerminal() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if status.exitCode != nil { return true }
+        // A failed wait cannot grant permission to signal a potentially reused PID.
+        if status.waitError != nil { return false }
+        var raw: Int32 = 0
+        let result = Darwin.waitpid(pid, &raw, WNOHANG)
+        if result == pid {
+            let signal = raw & 0x7f
+            status.signal = signal == 0 ? nil : signal
+            status.exitCode = signal == 0 ? (raw >> 8) & 0xff : signal
+            RuntimeDiagnostics.shared.adjust(.childProcesses, by: -1)
+            RuntimeDiagnostics.shared.increment(.processExits)
+            return true
+        }
+        if result < 0, errno != EINTR { status.waitError = errno }
+        return false
+    }
+
+    func requestTermination(now: UInt64, timedOut: Bool, cancelled: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        guard status.exitCode == nil, status.waitError == nil else { return }
+        status.timedOut = status.timedOut || timedOut
+        status.cancelled = status.cancelled || cancelled
+        guard !status.killRequested else { return }
+        if status.termAt == nil {
+            status.termAt = now
+            signalLocked(SIGTERM)
+        } else if now - status.termAt! >= 500_000_000, !status.killRequested {
+            status.killRequested = true
+            signalLocked(SIGKILL)
+        }
+    }
+
+    func forceTerminationAtDeadline(cancelled: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        guard status.exitCode == nil, status.waitError == nil, !status.killRequested else { return }
+        status.timedOut = true
+        status.cancelled = status.cancelled || cancelled
+        status.killRequested = true
+        signalLocked(SIGKILL)
+    }
+
+    func writeAdmitted(_ descriptor: Int32, data: Data, offset: Int,
+                       cancellation: ToolCallCancellation, stopWorkAt: UInt64) -> Int? {
+        lock.lock(); defer { lock.unlock() }
+        guard status.exitCode == nil, status.waitError == nil, status.termAt == nil, !status.killRequested,
+              !cancellation.isCancelled, !cancellation.isDeadlineExceeded,
+              DispatchTime.now().uptimeNanoseconds < stopWorkAt else { return nil }
+        // This descriptor is nonblocking; holding the ownership lock for this
+        // single finite write prevents the watchdog starting cleanup mid-write.
+        return data.withUnsafeBytes { bytes in
+            Darwin.write(descriptor, bytes.baseAddress!.advanced(by: offset),
+                         min(4_096, bytes.count - offset))
+        }
+    }
+
+    private func signalLocked(_ signal: Int32) {
+        if Darwin.kill(-pid, signal) != 0, errno != ESRCH { status.signalError = errno }
+        if Darwin.kill(pid, signal) != 0, errno != ESRCH, status.signalError == nil {
+            status.signalError = errno
+        }
+    }
+}
+
+final class OwnedPipeCapture {
+    private(set) var data = Data()
+    private(set) var end: OwnedStreamEnd?
+    private(set) var truncated = false
+    private let limit: Int
+    private var buffer = [UInt8](repeating: 0, count: 8_192)
+
+    init(limit: Int) { self.limit = limit }
+
+    @discardableResult
+    func drain(_ descriptor: Int32) -> Bool {
+        guard end == nil else { return false }
+        var consumed = false
+        for _ in 0..<4 {
+            let count = buffer.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress, $0.count) }
+            if count > 0 {
+                consumed = true
+                let retained = min(count, max(0, limit - data.count))
+                data.append(contentsOf: buffer.prefix(retained))
+                truncated = truncated || retained < count
+            } else if count == 0 {
+                end = .eof
+                break
+            } else if errno == EINTR {
+                continue
+            } else if errno == EAGAIN || errno == EWOULDBLOCK {
+                break
+            } else {
+                end = .readError(errno)
+                break
+            }
+        }
+        return consumed
+    }
+
+    func finish() -> OwnedCapturedStream {
+        OwnedCapturedStream(data: data, end: end ?? .forcedClose, truncated: truncated)
+    }
+}
+
+private final class OwnedNativeWatchdog: @unchecked Sendable {
+    private let source: DispatchSourceTimer
+
+    init(child: OwnedNativeChild, cancellation: ToolCallCancellation, stopWorkAt: UInt64, end: UInt64) {
+        source = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        source.schedule(deadline: .now(), repeating: .milliseconds(25))
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            let now = DispatchTime.now().uptimeNanoseconds
+            let cancelled = cancellation.isCancelled
+            let timedOut = now >= stopWorkAt || cancellation.isDeadlineExceeded
+            if now >= end {
+                child.forceTerminationAtDeadline(cancelled: cancelled)
+                self.source.cancel()
+                return
+            }
+            if cancelled || timedOut {
+                child.requestTermination(now: now, timedOut: timedOut, cancelled: cancelled)
+            }
+        }
+        source.resume()
+    }
+
+    func cancel() { source.cancel() }
+    deinit { source.cancel() }
+}
+
+extension ProcessRunner {
+    /// Internal fixed native mode: no caller-selected executable, arguments,
+    /// environment, or admission predicate. Payload starts only after admission.
+    func runOwnedCurrentSelf(
+        mode: OwnedCurrentSelfMode,
+        standardInput: Data,
+        deadlineUptimeNanoseconds suppliedDeadline: UInt64,
+        cancellation: ToolCallCancellation
+    ) throws -> OwnedDuplexResult {
+        guard !Thread.isMainThread else {
+            throw NSError(domain: "ProcessRunner", code: 20,
+                          userInfo: [NSLocalizedDescriptionKey: "owned native mode requires a worker thread"])
+        }
+        guard standardInput.count <= 16_388 else {
+            throw NSError(domain: "ProcessRunner", code: 21,
+                          userInfo: [NSLocalizedDescriptionKey: "owned native input exceeds its frame limit"])
+        }
+        try cancellation.checkCancellation()
+        ownedModeLock.lock()
+        guard !ownedModeReserved, ownedModeChild == nil else {
+            ownedModeLock.unlock()
+            throw NSError(domain: "ProcessRunner", code: 22,
+                          userInfo: [NSLocalizedDescriptionKey: "owned native mode is busy or unresolved"])
+        }
+        ownedModeReserved = true
+        ownedModeLock.unlock()
+        defer {
+            ownedModeLock.lock()
+            ownedModeReserved = false
+            if ownedModeChild?.snapshot().exitCode != nil { ownedModeChild = nil }
+            ownedModeLock.unlock()
+        }
+
+        let entered = DispatchTime.now().uptimeNanoseconds
+        var end = min(suppliedDeadline, entered + 30_000_000_000)
+        if let remaining = cancellation.remainingTimeInterval {
+            end = min(end, entered + UInt64(max(0, min(30, remaining)) * 1_000_000_000))
+        }
+        guard end > entered, end - entered > 2_500_000_000 else {
+            throw ToolCallDeadlineExceeded()
+        }
+        let stopWorkAt = end - 1_500_000_000
+        let identity = try OwnedCurrentSelfAdmission.current()
+        try cancellation.checkCancellation()
+        guard DispatchTime.now().uptimeNanoseconds < stopWorkAt else {
+            throw ToolCallDeadlineExceeded()
+        }
+
+        let input = Pipe(), output = Pipe(), errors = Pipe()
+        let inputRead = input.fileHandleForReading, inputWrite = input.fileHandleForWriting
+        let outputRead = output.fileHandleForReading, outputWrite = output.fileHandleForWriting
+        let errorRead = errors.fileHandleForReading, errorWrite = errors.fileHandleForWriting
+        let handles = [inputRead, inputWrite, outputRead, outputWrite, errorRead, errorWrite]
+        defer { for handle in handles { try? handle.close() } }
+        for handle in [inputWrite, outputRead, errorRead] {
+            let flags = fcntl(handle.fileDescriptor, F_GETFL)
+            guard flags >= 0, fcntl(handle.fileDescriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+                throw Self.posixError(errno, operation: "configure owned nonblocking pipe")
+            }
+        }
+        guard fcntl(inputWrite.fileDescriptor, F_SETNOSIGPIPE, 1) == 0 else {
+            throw Self.posixError(errno, operation: "suppress owned pipe SIGPIPE")
+        }
+        try cancellation.checkCancellation()
+        let beforeSpawn = DispatchTime.now().uptimeNanoseconds
+        guard end > beforeSpawn, end - beforeSpawn > 2_500_000_000 else {
+            throw ToolCallDeadlineExceeded()
+        }
+        let pid = try Self.spawn(executable: identity.executable, arguments: [mode.argument],
+            currentDirectory: nil, environment: [:], inheritEnvironment: false,
+            stdoutDescriptors: [outputRead.fileDescriptor, outputWrite.fileDescriptor],
+            stderrDescriptors: [errorRead.fileDescriptor, errorWrite.fileDescriptor],
+            stdinDescriptors: [inputRead.fileDescriptor, inputWrite.fileDescriptor])
+        let child = OwnedNativeChild(pid: pid)
+        RuntimeDiagnostics.shared.adjust(.processReaders, by: 2)
+        defer { RuntimeDiagnostics.shared.adjust(.processReaders, by: -2) }
+        ownedModeLock.lock(); ownedModeChild = child; ownedModeLock.unlock()
+        try? inputRead.close(); try? outputWrite.close(); try? errorWrite.close()
+        let watchdog = OwnedNativeWatchdog(child: child, cancellation: cancellation,
+                                           stopWorkAt: stopWorkAt, end: end)
+        defer { watchdog.cancel() }
+
+        var admission: OwnedAdmissionDisposition = .notAttempted
+        if !child.pollTerminal() {
+            do {
+                try OwnedCurrentSelfAdmission.validateOwnedChild(pid: pid, matching: identity)
+                if child.pollTerminal() { admission = .ownedChildExited }
+                else { admission = .admitted }
+            } catch let error as OwnedCurrentSelfAdmissionError {
+                switch error {
+                case .roleRejected, .roleMismatch: admission = .roleRejected
+                case .auditTokenUnavailable, .auditTokenMismatch: admission = .auditTokenUnavailable
+                case .exactIdentityMismatch: admission = .exactIdentityMismatch
+                default: admission = .childInvalid
+                }
+            } catch { admission = .childInvalid }
+        } else { admission = .ownedChildExited }
+
+        let out = OwnedPipeCapture(limit: 32_772), err = OwnedPipeCapture(limit: 16_384)
+        var inputBytes = 0
+        var inputClosed = false
+        var inputCloseAttempted = false
+        func closeInput() {
+            guard !inputCloseAttempted else { return }
+            inputCloseAttempted = true
+            do { try inputWrite.close(); inputClosed = true }
+            catch { inputClosed = false }
+        }
+        let admitted: Bool
+        if case .admitted = admission { admitted = true } else { admitted = false }
+        if !admitted {
+            closeInput()
+            child.requestTermination(now: DispatchTime.now().uptimeNanoseconds,
+                                     timedOut: false, cancelled: false)
+        }
+        var writeFailed = false
+        while true {
+            let now = DispatchTime.now().uptimeNanoseconds
+            let terminal = child.pollTerminal()
+            let cancelled = cancellation.isCancelled
+            let timedOut = now >= stopWorkAt || cancellation.isDeadlineExceeded
+            if !terminal, (cancelled || timedOut || !admitted || writeFailed) {
+                closeInput()
+                child.requestTermination(now: now, timedOut: timedOut, cancelled: cancelled)
+            }
+            if terminal { closeInput() }
+            let consumedOut = out.drain(outputRead.fileDescriptor)
+            let consumedErr = err.drain(errorRead.fileDescriptor)
+            if !inputCloseAttempted, !cancelled, !timedOut {
+                if inputBytes == standardInput.count { closeInput() }
+                else {
+                    let count = child.writeAdmitted(inputWrite.fileDescriptor, data: standardInput,
+                        offset: inputBytes, cancellation: cancellation, stopWorkAt: stopWorkAt)
+                    if let count {
+                        if count > 0 { inputBytes += count }
+                        else if count == 0 || (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+                            writeFailed = true; closeInput()
+                        }
+                    } else {
+                        closeInput()
+                    }
+                }
+            }
+            if terminal, out.end != nil, err.end != nil { break }
+            if now >= end {
+                closeInput()
+                child.forceTerminationAtDeadline(cancelled: cancelled)
+                break
+            }
+            if consumedOut || consumedErr { continue }
+            var descriptors = [
+                pollfd(fd: out.end == nil ? outputRead.fileDescriptor : -1, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: err.end == nil ? errorRead.fileDescriptor : -1, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: inputCloseAttempted ? -1 : inputWrite.fileDescriptor, events: Int16(POLLOUT), revents: 0)
+            ]
+            _ = Darwin.poll(&descriptors, nfds_t(descriptors.count),
+                            Int32(min(25, max(1, (end - now) / 1_000_000))))
+        }
+        let confirmed = child.pollTerminal()
+        let status = child.snapshot()
+        guard confirmed else {
+            throw OwnedNativeTerminationUnconfirmed(processIdentifier: pid,
+                signalError: status.signalError, waitError: status.waitError,
+                killRequested: status.killRequested)
+        }
+        return OwnedDuplexResult(exitCode: status.exitCode, terminationSignal: status.signal,
+            stdout: out.finish(), stderr: err.finish(), stdinBytesWritten: inputBytes,
+            stdinClosed: inputClosed, admission: admission, timedOut: status.timedOut,
+            cancelled: status.cancelled, termRequested: status.termAt != nil,
+            killRequested: status.killRequested, terminationConfirmed: confirmed)
+    }
+
+    /// One bounded recovery of this runner's retained owner; never starts a child.
+    func shutdownOwnedCurrentSelf(deadlineUptimeNanoseconds: UInt64) -> Bool {
+        ownedModeLock.lock()
+        guard !ownedModeReserved else { ownedModeLock.unlock(); return false }
+        let child = ownedModeChild
+        ownedModeReserved = true
+        ownedModeLock.unlock()
+        defer {
+            ownedModeLock.lock()
+            if child?.snapshot().exitCode != nil { ownedModeChild = nil }
+            ownedModeReserved = false
+            ownedModeLock.unlock()
+        }
+        guard let child else { return true }
+        let end = min(deadlineUptimeNanoseconds, DispatchTime.now().uptimeNanoseconds + 1_500_000_000)
+        while !child.pollTerminal() {
+            let now = DispatchTime.now().uptimeNanoseconds
+            if now >= end { return false }
+            child.requestTermination(now: now, timedOut: true, cancelled: true)
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return true
+    }
+}
+
 /// Failures that are specific to subprocess lifecycle management.
 public enum ProcessRunnerError: Error, Equatable, Sendable, LocalizedError {
     /// TERM and KILL were requested, but process termination was not observed before
@@ -47,6 +459,9 @@ public final class ProcessRunner: @unchecked Sendable {
     private let forcedTerminationGraceSec: TimeInterval
     private let maximumRetainedOutputBytes: Int
     private let inheritEnvironment: Bool
+    private let ownedModeLock = NSLock()
+    private var ownedModeReserved = false
+    private var ownedModeChild: OwnedNativeChild?
 
     public init(inheritEnvironment: Bool = true) {
         self.inheritEnvironment = inheritEnvironment
@@ -400,7 +815,8 @@ public final class ProcessRunner: @unchecked Sendable {
         environment suppliedEnvironment: [String: String]?,
         inheritEnvironment: Bool,
         stdoutDescriptors: [Int32],
-        stderrDescriptors: [Int32]
+        stderrDescriptors: [Int32],
+        stdinDescriptors: [Int32]? = nil
     ) throws -> Int32 {
         var actions: posix_spawn_file_actions_t?
         var attributes: posix_spawnattr_t?
@@ -420,19 +836,21 @@ public final class ProcessRunner: @unchecked Sendable {
         guard result == 0 else { throw posixError(result, operation: "configure stdout") }
         result = posix_spawn_file_actions_adddup2(&actions, stderrDescriptors[1], STDERR_FILENO)
         guard result == 0 else { throw posixError(result, operation: "configure stderr") }
-        for descriptor in Set(stdoutDescriptors + stderrDescriptors).sorted()
+        if let stdinDescriptors {
+            result = posix_spawn_file_actions_adddup2(&actions, stdinDescriptors[0], STDIN_FILENO)
+            guard result == 0 else { throw posixError(result, operation: "configure owned stdin") }
+        }
+        for descriptor in Set(stdoutDescriptors + stderrDescriptors + (stdinDescriptors ?? [])).sorted()
         where descriptor != STDIN_FILENO && descriptor != STDOUT_FILENO && descriptor != STDERR_FILENO {
             result = posix_spawn_file_actions_addclose(&actions, descriptor)
             guard result == 0 else { throw posixError(result, operation: "close inherited pipe") }
         }
-        result = posix_spawn_file_actions_addopen(
-            &actions,
-            STDIN_FILENO,
-            "/dev/null",
-            O_RDONLY,
-            0
-        )
-        guard result == 0 else { throw posixError(result, operation: "configure stdin") }
+        if stdinDescriptors == nil {
+            result = posix_spawn_file_actions_addopen(
+                &actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0
+            )
+            guard result == 0 else { throw posixError(result, operation: "configure stdin") }
+        }
         if let currentDirectory {
             result = currentDirectory.withCString {
                 posix_spawn_file_actions_addchdir(&actions, $0)

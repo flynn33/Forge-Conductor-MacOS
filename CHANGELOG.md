@@ -10,6 +10,26 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.23.0 (33)` native JavaScript web snapshots
+
+- Added project-authorized `web.render` for native JavaScript DOM snapshots on
+  macOS 27+, using a fresh nonpersistent Lockdown store and one owned fixed-mode
+  signed child. Existing text/source/base64 fetch and search remain available.
+- Bounded extraction, final encoded successful MCP responses and process/pipe
+  ownership have explicit limits and error dispositions. Whole network bytes,
+  DOM size and JavaScript heap are reported as unenforced.
+- Propagated request deadlines through budget, policy-notice and deadline-error
+  response lookups after two actual contention regressions reproduced delayed
+  failures. Every response route requires its existing request token.
+- Redirect admission now denies repeated provisional URLs before follow, while
+  preserving ordinary documents, reloads, frames and hash navigation. Finite
+  same-URI cookie/state redirects are an explicit compatibility restriction.
+- Debug passed 130 compiled tests and 35 actual MCP cases; Qwen consumed the live
+  JavaScript snapshot and finished normally. Release compilation, signing and
+  the same 35-case MCP matrix passed; signed Debug/Release app executables each
+  passed ten core cases. [Evidence](docs/NATIVE-WEB-RENDERING.md). Installed
+  acceptance and broader browser workflows remain open.
+
 ### `0.22.0 (32)` binary web fetching
 
 - Added optional `format: "base64"` to `web.fetch`, preserving original response

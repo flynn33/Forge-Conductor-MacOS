@@ -1,10 +1,14 @@
 # Version and qualification status
 
-Current source **0.22.0, build 32** adds binary web fetching/paging and aligns
-current authority documents. All 41 distinct affected source cases and 17
-signed-native cases passed; installed/all-feature gates remain open. Exact scopes
-are recorded in
-[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md).
+Current source **0.23.0, build 33** adds native JavaScript snapshots and MCP
+response deadline propagation. Debug passed 130 compiled cases and 35 actual
+MCP cases; the signed app executable passed ten core cases. Qwen consumed the
+real renderer result and stopped normally with observed Low in both requests.
+Release compilation/signing and the same 35-case MCP matrix passed; its app
+executable also passed ten core cases. Installed acceptance remains open in
+[the renderer record](NATIVE-WEB-RENDERING.md). The preceding
+0.22.0 binary-web checkpoint passed 41 distinct affected source cases and 17
+signed-native cases in [its record](BINARY-WEB-AND-QWEN-FILES.md).
 The preceding [0.21.0 inventory](RUNTIME-INVENTORY.md),
 [0.20.0 Qwen follow-up](QWEN-FOLLOWUP.md) and
 [0.19.0 project/web feature](PROJECT-WEB-QWEN.md) records retain their exact
@@ -1390,7 +1394,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.22.0, build 32**, supporting **macOS 26+**. The earlier
+Current source identity: **0.23.0, build 33**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1403,7 +1407,7 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.22.0, build 32**. The root [`VERSION`](../VERSION)
+documentation use version **0.23.0, build 33**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

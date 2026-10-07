@@ -135,3 +135,7 @@ heap/DOM/network byte limits and authenticated browsing remain unqualified.
 The renderer investigation retains detailed failures and scope in
 [runtime inventory](RUNTIME-INVENTORY.md). Installation, shipment and all-feature
 acceptance remain separate owner gates.
+
+Later **0.23.0 (33)** adds a separate native JavaScript snapshot tool. Its
+[renderer record](NATIVE-WEB-RENDERING.md) retains the new contract and runtime
+proof; the 0.22.0 receipts below keep their original binary-HTTP scope.

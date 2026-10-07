@@ -1,8 +1,8 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation is `0.22.0`, build `32`. Binary web fetching/paging
-and current-authority alignment have scoped verification in
-[the binary web and Qwen file record](BINARY-WEB-AND-QWEN-FILES.md). The telemetry
+Current source documentation is `0.23.0`, build `33`. Native renderer process
+launch, exit, child and pipe-reader counters use the existing diagnostics owner.
+The [renderer record](NATIVE-WEB-RENDERING.md) gives their verification limits. The telemetry
 operating contracts below remain in force; preceding receipts keep their tested
 source identities.
 
@@ -225,6 +225,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.22.0`
+`0.23.0`
 
-Build: `32`
+Build: `33`

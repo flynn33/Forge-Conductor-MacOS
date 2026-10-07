@@ -178,7 +178,7 @@ public struct AgentToolPack: ToolPackHandling {
             "query_tools": [
                 "instructions": ["instruction_catalog", "instruction_read"],
                 "project_files": ["fs_list", "fs_read", "fs_glob", "search_text"],
-                "web": ["web.search", "web.fetch"],
+                "web": ["web.search", "web.fetch", "web.render"],
                 "development_policy": ["fs_list", "fs_read", "fs_glob", "search_text"],
                 "continuity": [
                     "continuity.status", "continuity.get_pending_handoff",

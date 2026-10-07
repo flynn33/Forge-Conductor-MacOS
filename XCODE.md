@@ -1,6 +1,11 @@
 # Forge Conductor — Xcode
 
-Current source version **0.22.0**, build **32**.
+Current source version **0.23.0**, build **33**.
+
+The renderer adds five Core sources and four Core test files to the existing
+canonical project, and links Apple `libbsm` in Core Debug/Release and SwiftPM.
+The research resource includes `web.render`; no project regeneration or signing
+change was made. [Native renderer evidence](docs/NATIVE-WEB-RENDERING.md).
 
 **Published owner checkpoint — 0.18.0 (28).** The source and wiki were
 published under the owner identity and both local checkouts were synchronized.
@@ -601,7 +606,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.22.0 (32)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.23.0 (33)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

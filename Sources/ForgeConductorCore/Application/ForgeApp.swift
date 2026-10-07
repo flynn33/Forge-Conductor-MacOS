@@ -29,6 +29,7 @@ public final class ForgeApp: @unchecked Sendable {
     public let projectContexts: ProjectContextService
     public let continuityControl: ContinuityControlService
     public let runtimeJobs: RuntimeJobSubsystem
+    public let webRenderer: WebRendererService
     /// Read-side access to the ordered Development Policy sources selected in
     /// Rune Forge. The manager remains the mutation and indexing owner.
     public let developmentPolicySources: (any DevelopmentPolicySourceReading)?
@@ -91,6 +92,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.projectContexts = projectContexts
         self.continuityControl = continuityControl
         self.runtimeJobs = runtimeJobs
+        self.webRenderer = WebRendererService()
         self.developmentPolicySources = developmentPolicySources
         self.developmentPolicySourceCatalog = developmentPolicySources
         self.stjornarvaldObservations = stjornarvaldObservations
@@ -292,8 +294,16 @@ public final class ForgeApp: @unchecked Sendable {
         _ = stjornarvaldObservations.shutdown(timeoutSeconds: 3)
         let runtimeStopped = DispatchSemaphore(value: 0)
         let reportBox = RuntimeShutdownReportBox()
-        Task.detached(priority: .high) { [runtimeJobs] in
-            reportBox.store(await runtimeJobs.shutdown())
+        Task.detached(priority: .high) { [runtimeJobs, webRenderer] in
+            async let jobs = runtimeJobs.shutdown()
+            async let renderer = webRenderer.shutdown()
+            let report = await jobs
+            let rendererStopped = await renderer
+            reportBox.store(RuntimeJobShutdownReport(
+                completed: report.completed && rendererStopped,
+                unresolvedJobIDs: report.unresolvedJobIDs,
+                persistencePendingJobIDs: report.persistencePendingJobIDs
+            ))
             runtimeStopped.signal()
         }
         guard runtimeStopped.wait(timeout: .now() + 35) == .success,

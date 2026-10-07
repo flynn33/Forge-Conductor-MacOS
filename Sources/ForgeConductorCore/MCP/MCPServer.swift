@@ -257,7 +257,7 @@ public final class MCPServer: @unchecked Sendable {
             return errorResponse(id: id, code: -32800, message: "Cancelled")
         } catch is ToolCallDeadlineExceeded {
             if isNotification { return nil }
-            return deadlineExceededResponse(id: id, method: method)
+            return deadlineExceededResponse(id: id, method: method, cancellation: requestCancellation)
         } catch {
             if isNotification { return nil }
             return errorResponse(
@@ -354,21 +354,26 @@ public final class MCPServer: @unchecked Sendable {
                         return toolCallResponse(id: id, result: .failure(
                             code: "desktop_attachment_required",
                             message: "This desktop provider session must attach to its active Forge run before using tools. Request a fresh assignment context if attachment was rejected."
-                        ))
+                        ), cancellation: requestCancellation)
                     }
                 }
                 guard desktopProviderID != nil || MCPToolAccessPolicy.permits(name, role: role) else {
                     return toolCallResponse(id: id, result: .failure(
                         code: "tool_not_allowed", message: "This tool is not available through the CLU role."
-                    ))
+                    ), cancellation: requestCancellation)
                 }
                 if ContinuityControlToolName(rawValue: name) != nil,
                    let supplied = params["arguments"], !(supplied is [String: Any]) {
                     return toolCallResponse(id: id, result: try ContinuityControlToolResponse.failure(
                         .init(.invalidRequest, field: .arguments)
-                    ).toolResult())
+                    ).toolResult(), cancellation: requestCancellation)
                 }
                 let arguments = params["arguments"] as? [String: Any] ?? [:]
+                let rendererBudget: Int? = name == "web.render"
+                    ? WebRenderToolPack.responseBudget(arguments: arguments,
+                        scope: (try? app.projectContexts.invocationContext(
+                            for: clientID, cancellation: requestCancellation))?.authorizationScope)
+                    : nil
                 app.diagnostics.info("mcp_tools_call", [
                     "tool": name,
                     "client_id": clientID.rawValue,
@@ -381,20 +386,23 @@ public final class MCPServer: @unchecked Sendable {
                     let result = try nativeTaskSession.callSynchronously(name: name, arguments: arguments,
                         role: ContinuityControlCapabilities.Role(rawValue: role.rawValue) ?? .primary,
                         connected: connected, cancellation: requestCancellation)
-                    return toolCallResponse(id: id, result: result)
+                    return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget,
+                        cancellation: requestCancellation)
                 }
                 if let result = try ContinuityControlToolPack.sharedConnectionResult(
                     name: name, arguments: arguments, app: app,
                     role: ContinuityControlCapabilities.Role(rawValue: role.rawValue) ?? .primary,
                     connected: connected, cancellation: requestCancellation
-                ) { return toolCallResponse(id: id, result: result) }
+                ) { return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget,
+                    cancellation: requestCancellation) }
                 let result = try app.tools.call(
                     name: name,
                     arguments: arguments,
                     clientID: clientID,
                     cancellation: requestCancellation
                 )
-                return toolCallResponse(id: id, result: result)
+                return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget,
+                    cancellation: requestCancellation)
             case "resources/list":
                 return ok(id: id, result: ["resources": [] as [Any]])
             case "prompts/list":
@@ -408,7 +416,7 @@ public final class MCPServer: @unchecked Sendable {
             return errorResponse(id: id, code: -32800, message: "Cancelled")
         } catch is ToolCallDeadlineExceeded {
             if isNotification { return nil }
-            return deadlineExceededResponse(id: id, method: method)
+            return deadlineExceededResponse(id: id, method: method, cancellation: requestCancellation)
         } catch {
             if isNotification { return nil }
             return errorResponse(id: id, code: -32000, message: "\(error)")
@@ -488,7 +496,7 @@ public final class MCPServer: @unchecked Sendable {
         } catch is CancellationError {
             return errorResponse(id: id, code: -32800, message: "Cancelled")
         } catch is ToolCallDeadlineExceeded {
-            return deadlineExceededResponse(id: id, method: "tools/call")
+            return deadlineExceededResponse(id: id, method: "tools/call", cancellation: cancellation)
         } catch let error as DesktopProviderMCPAttachmentError {
             let code: String
             let message: String
@@ -600,7 +608,7 @@ public final class MCPServer: @unchecked Sendable {
                 return
             } catch is ToolCallDeadlineExceeded {
                 finishRequest(requestID, cancellation: cancellation)
-                try write(deadlineExceededResponse(id: id, method: "tools/call"), to: output)
+                try write(deadlineExceededResponse(id: id, method: "tools/call", cancellation: cancellation), to: output)
                 commitPolicyNoticePresentation(requestID: requestID)
                 return
             } catch {
@@ -694,7 +702,8 @@ public final class MCPServer: @unchecked Sendable {
         return try ToolRouter.requestedDeadlineMilliseconds(in: arguments)
     }
 
-    private func deadlineExceededResponse(id: Any?, method: String) -> [String: Any] {
+    private func deadlineExceededResponse(id: Any?, method: String,
+                                          cancellation: ToolCallCancellation) -> [String: Any] {
         guard method == "tools/call" else {
             return errorResponse(id: id, code: -32000, message: "deadline_exceeded")
         }
@@ -704,12 +713,21 @@ public final class MCPServer: @unchecked Sendable {
                 code: "deadline_exceeded",
                 message: "Tool call deadline exceeded",
                 retryable: true
-            )
+            ),
+            cancellation: cancellation
         )
     }
 
-    private func toolCallResponse(id: Any?, result: ToolResult) -> [String: Any] {
-        let context = try? app.projectContexts.invocationContext(for: clientID)
+    private func toolCallResponse(id: Any?, result: ToolResult, rendererBudget: Int? = nil,
+                                  cancellation: ToolCallCancellation) -> [String: Any] {
+        func response(notice: String? = nil) -> [String: Any] {
+            if let rendererBudget {
+                return WebRenderToolPack.finalMCPResponse(id: id, result: result,
+                    additiveNotice: notice, budget: rendererBudget)
+            }
+            return MCPToolResponse.object(id: id, result: result, additiveNotice: notice)
+        }
+        let context = try? app.projectContexts.invocationContext(for: clientID, cancellation: cancellation)
         let generation = context.flatMap { Int(exactly: $0.projectGeneration.rawValue) }
         guard let requestID = Self.requestKey(id),
               let presentation = policyNoticeProvider.presentation(
@@ -720,12 +738,12 @@ public final class MCPServer: @unchecked Sendable {
                 maximumCount: 8,
                 maximumBytes: StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes
               ) else {
-            return MCPToolResponse.object(id: id, result: result)
+            return response()
         }
         policyNoticeLock.lock()
         pendingPolicyNoticePresentations[requestID] = presentation
         policyNoticeLock.unlock()
-        return MCPToolResponse.object(id: id, result: result, additiveNotice: presentation.text)
+        return response(notice: presentation.text)
     }
 
     private func commitPolicyNoticePresentation(requestID: RequestKey) {

@@ -219,7 +219,7 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
         searchPath: String?,
         capturedAt: String,
         fallbackDirectories: [String] = inventoryFallbackDirectories,
-        observe: @Sendable (String) -> InventoryFileObservation = inspectInventoryFile
+        observe: @Sendable (String) -> InventoryFileObservation = { inspectInventoryFile($0) }
     ) -> RuntimeCapabilityInventory {
         let search = inventoryDirectories(searchPath: searchPath, fallbackDirectories: fallbackDirectories)
         var searchComplete = search.complete

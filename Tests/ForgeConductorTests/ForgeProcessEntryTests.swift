@@ -68,6 +68,14 @@ final class ForgeProcessEntryTests: XCTestCase {
         XCTAssertTrue(url!.path.contains("somewhere") || url!.path.hasPrefix("/"))
     }
 
+    func testRendererFixedModeAndMalformedCallsRemainHeadless() {
+        for arguments in [["/app", "--internal-web-render-v1"],
+                          ["/app", "--internal-web-render-v1", "--home", "/tmp/ignored"]] {
+            XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: arguments), .webRenderChild)
+        }
+        XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: ["/app", "--internal-web-render-v2"]), .gui)
+    }
+
     func testServeArgumentsConstant() {
         XCTAssertEqual(LMStudioMCPPluginInstaller.serveArguments, ["serve"])
     }

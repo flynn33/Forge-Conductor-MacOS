@@ -1,8 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 native JavaScript web snapshots
+
+Current source identity is **0.23.0 (33)**, starting from synchronized owner-signed
+`c391285b00fa4af03eb5210f42f67c3f57e0ffde`. The current implementation and retained
+failures are recorded in [native web rendering](docs/NATIVE-WEB-RENDERING.md).
+The corrected candidate gates below passed; installed and broader feature
+acceptance remain open.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Native JavaScript snapshots | One owned fixed-mode child with role/audit-token/CDHash admission and bounded pipes. Final affected source selection: 199 selected, 198 passed, one existing native-fixture skip. The actual current-version source case passed separately: 200 distinct selected, 199 passed, one skipped. Final descriptor and service reruns passed 15 and 16 cases. Canonical Debug and Release builds/signing passed. All 130 selected compiled cases passed without skips; warning correction retained every assertion and all 16 service cases passed again without warnings. Canonical memberships, native bsm linking and copied research resource verified. | macOS 26 rendering is explicitly unsupported; Intel, installed/all-model/site acceptance, universal prompt denial and whole network/DOM/heap bounds remain open. Two original test audit-drain QoS warnings remain disclosed; no live UI inversion was established. |
+| Redirect boundary | Original seven-request full matrix and action-only hypothesis remain NONPASS. Revised external fixture passed 11 baselines and all 11 policy cases. Final Debug and Release CLI matrices each passed all 35 actual MCP cases with exact post-shutdown origin totals, 39 responses consumed, normal zero exit and both EOFs. Signed Debug and Release app executables each passed ten core cases with 14 responses consumed and normal zero exit/EOF. | New provisional policy deliberately rejects finite same-URI cookie/state redirects; ordinary document return, reload, frame and hash cases passed. This is not a whole-network cap or universal HTTP redirect discriminator. |
+| MCP response deadlines | Two contention regressions reproduced near-two-second responses for 0.1-second/already-expired requests. First prelookup-only fix still failed; all response routes now require the caller token. Final 35 MCP/deadline cases passed, including both corrections again in the compiled 130-case selection. | Real additive-notice runtime was not exercised in these isolated probes; exact-ID/notice serialization has deterministic coverage. Existing notice targeting and committed-result semantics remain covered. |
+| Qwen consumer | Actual descriptor selected; one native render call returned JavaScript marker/title/fragment, Lockdown/readiness and explicit unenforced-resource limits. Qwen consumed those exact fields and stopped normally. Both real requests had observed Low templates; all five native responses consumed, parent zero exit/EOF and joined observer. Source, candidate and three installed/registration protections unchanged. | This is LM Studio API proof; original active GUI chat, installed new tools, other models and authenticated browser workflows remain distinct/open. |
+| Attached capability disposition | Read-only external table covers 54 requests/themes. Existing bounded Python-job PNG/WAV/minimal DOCX acceptance retains its exact scope. Source confirms old fs_list cutoff/no cursor; scoped backward-compatible paging plan and unexecuted native baseline driver prepared. | Other rich formats and first-class conveniences remain open. Historical attachment policy text has no dispatch authority. Continue native listing baseline and the next tested local slice after synchronization. |
+
 ## October 7 binary web fetching and Qwen file workflows
 
-Current source identity is **0.22.0 (32)**, starting from synchronized owner-signed
+This checkpoint's source identity is **0.22.0 (32)**, starting from synchronized owner-signed
 `3b2b0caa4eab1eaab7d73a1c20d48863d745edbc`. This milestone addresses the
 native-reproduced binary HTTP gap and stale current-version markers.
 [The current record](docs/BINARY-WEB-AND-QWEN-FILES.md) preserves exact scopes.
