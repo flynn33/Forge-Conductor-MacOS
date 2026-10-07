@@ -1,4 +1,6 @@
-# Context and agent continuity (v0.24.0)
+# Context and agent continuity (v0.25.0)
+
+<a id="context-and-agent-continuity-v0240"></a>
 
 <a id="context-and-agent-continuity-v0230"></a>
 
@@ -6,7 +8,22 @@
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.24.0 (34). Paged `fs_list` retains the
+Current source documentation targets 0.25.0 (35). Existing PDF tools retain their
+grant/deadline boundary. Complete supported tagged PDFs can now contribute logical
+text to instruction imports and policy-source indexing, with explicit converter
+provenance and unchanged durable ownership. Unsupported, incomplete, over-budget
+or whitespace-only semantic text retains the existing PDFKit path. The corrected
+101-method source selection and 102 compiled native tests do not qualify a handoff
+or model-session rollover. Qwen used both PDF tools and consumed their actual
+metadata in a separate LM Studio API exchange, then stopped normally; this is not
+active GUI or installed acceptance. Independent r6 semantic validation passed 82
+controls and all eight Debug, eight Release and two Qwen artifacts with the original
+scalar markers and 80 expectations intact. Native PNG review covered ten Release
+and two Qwen PNG pages. PDFKit compatibility, the test capture warning and publication
+remain open in
+[native PDF writing](NATIVE-PDF-WRITING.md).
+
+The preceding 0.24.0 (34) checkpoint: Paged `fs_list` retains the
 existing read-only tool name and grant boundary. Its cursor is part of each
 routed argument set, while project/client/generation validation remains required.
 The original paged arguments are validated before path normalization, and MCP

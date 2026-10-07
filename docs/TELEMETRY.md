@@ -1,6 +1,23 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation is `0.24.0`, build `34`. The per-call listing
+Current source documentation is `0.25.0`, build `35`. The PDF writer and shared
+semantic reader own per-call native resources without adding a recurring
+producer, timer or cache. The corrected owning-area source selection passed
+101 methods and the compiled native selection passed 102 tests on 450 unchanged
+inputs. Candidate and Qwen native processes exited normally with full EOF and no
+forced cleanup. This is not general leak, GUI responsiveness or quiescence
+qualification; synchronous native parsing is not preempted by the reader's quotas.
+The native compiler's XCTest self-capture warning is an E2 test-fixture risk, with
+no observed runtime race or production reachability. The independent r6 validator
+passed 82 controls and the Debug/Release/Qwen artifacts with normal exits and full
+EOF; its revised operand quota is separate from framework latency/heap bounds.
+Native PNG review covered ten Release and two Qwen PNG pages. PDFKit compatibility,
+the test capture warning and publication remain open in
+[native PDF writing](NATIVE-PDF-WRITING.md).
+
+## Preceding 0.24.0 listing resource evidence
+
+The per-call listing
 helper introduces no recurring timer, watcher, cursor cache or subprocess. Its
 source descriptor owner uses explicit idempotent close with a deinit fallback;
 the source and compiled Core regression observes exactly one successful close
@@ -242,6 +259,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.24.0`
+`0.25.0`
 
-Build: `34`
+Build: `35`

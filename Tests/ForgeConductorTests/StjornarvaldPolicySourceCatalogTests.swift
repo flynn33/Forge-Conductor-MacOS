@@ -5,6 +5,87 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class StjornarvaldPolicySourceCatalogTests: XCTestCase {
+    func testNativePDFPolicySegmentsPreserveMixedScriptLogicalOrderAfterReopen() async throws {
+        let fixture = try SourceFixture()
+        let catalog = try fixture.makeCatalog()
+        defer { _ = catalog.close() }
+        let sourceURL = fixture.root.appendingPathComponent("mixed-script-policy.pdf")
+        let paragraphs = [
+            "café Ελληνικά Русский 日本語 العربية",
+            "Latin العربية. 123 (45), source.",
+            "abcאבג 6789; MIXED-ID-025.",
+        ]
+        let metadata = try PDFWriter.write(
+            path: sourceURL, content: paragraphs.joined(separator: "\n"), title: ""
+        )
+        let byteCount = try XCTUnwrap(metadata["bytes_written"] as? Int)
+        XCTAssertGreaterThan(byteCount, 0)
+        XCTAssertLessThanOrEqual(byteCount, StjornarvaldNativePolicyExtractor.maximumInputBytes)
+        let pageCount = try XCTUnwrap(metadata["pages"] as? Int)
+        XCTAssertTrue((1...8).contains(pageCount))
+        let originalSHA256 = JSONSupport.sha256Hex(try Data(contentsOf: sourceURL))
+        let source = try await catalog.add(
+            selectedURL: sourceURL, requestID: stableUUID(prefix: 0x71, index: 1)
+        )
+        try catalog.scheduleOrThrow(sourceID: source.id)
+        var progress = try catalog.progress(sourceID: source.id)
+        for _ in 0..<20 where progress.pendingWorkCount > 0 {
+            progress = try await Task.detached(priority: .utility) {
+                try catalog.runNextBatch(
+                    sourceID: source.id, maximumWorkItems: 8, maximumBytes: 64 * 1_024
+                )
+            }.value
+        }
+        XCTAssertEqual(progress.pendingWorkCount, 0)
+        let revisionID = try XCTUnwrap(progress.revisionID)
+        let artifacts = try catalog.artifacts(revisionID: revisionID)
+        let artifact = try XCTUnwrap(artifacts.first { $0.relativePath == "." })
+        XCTAssertEqual(artifact.contentSHA256, originalSHA256)
+        let segments = try catalog.segments(artifactID: artifact.id)
+        XCTAssertFalse(segments.isEmpty)
+        XCTAssertLessThanOrEqual(segments.count, StjornarvaldNativePolicyExtractor.maximumSegments)
+        let text = segments.map(\.content).joined()
+        XCTAssertLessThanOrEqual(text.utf8.count, 128 * 1_024)
+        XCTAssertTrue(text.contains("[page 1]"))
+        for segment in segments {
+            XCTAssertLessThanOrEqual(segment.content.utf8.count,
+                StjornarvaldNativePolicyExtractor.maximumSegmentBytes)
+            XCTAssertEqual(segment.contentSHA256, JSONSupport.sha256Hex(Data(segment.content.utf8)))
+        }
+
+        func normalizedScalars(_ value: String) -> [UInt32] {
+            var result: [UInt32] = []
+            var pendingSpace = false
+            for scalar in value.unicodeScalars {
+                if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                    pendingSpace = !result.isEmpty
+                } else {
+                    if pendingSpace { result.append(0x20) }
+                    result.append(scalar.value)
+                    pendingSpace = false
+                }
+            }
+            return result
+        }
+        let extracted = normalizedScalars(text)
+        for paragraph in paragraphs {
+            let expected = normalizedScalars(paragraph)
+            let found = extracted.count >= expected.count
+                && (0...(extracted.count - expected.count)).contains { start in
+                    extracted[start..<(start + expected.count)].elementsEqual(expected)
+                }
+            XCTAssertTrue(found, "Persisted policy extraction changed scalar order: \(paragraph)")
+        }
+        XCTAssertEqual(Set(segments.map(\.extractionMethod)), ["cgpdf-actualtext"])
+        XCTAssertEqual(Set(segments.map(\.extractionVersion)), ["1"])
+
+        XCTAssertTrue(catalog.close())
+        let reopened = try fixture.makeCatalog()
+        defer { _ = reopened.close() }
+        XCTAssertEqual(try reopened.artifacts(revisionID: revisionID), artifacts)
+        XCTAssertEqual(try reopened.segments(artifactID: artifact.id), segments)
+    }
+
     func testExplicitCloseIsIdempotentRejectsFurtherWorkAndPreservesDurableSources() async throws {
         let fixture = try SourceFixture()
         let catalog = try fixture.makeCatalog()

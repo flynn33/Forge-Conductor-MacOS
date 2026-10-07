@@ -11,7 +11,22 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.24.0 (34)**. Additive `fs_list`
+Current identity is **0.25.0 (35)**. The native PDF text/layout correction and shared
+complete tagged-text reader advance the feature-release component. Tool names,
+schemas, defaults and durable formats remain; generated PDF bytes/layout and
+new converter provenance can change. The corrected owning-area source selection
+passed 101 methods and the compiled native selection passed 102 tests on 450
+unchanged inputs. The current marker regression and strict Debug/Release
+signing/build binding passed; Qwen's separate two-document API exchange passed.
+Independent r6 semantic validation passed 82 controls and all eight Debug, eight
+Release and two Qwen artifacts with original scalar markers and 80 expectations
+preserved. Its operand quota revision is external to the product. Native PNG
+review covered ten Release and two Qwen PNG pages. The PDFKit whole mixed-script
+order and Qwen wrapped-sentinel gates, a test capture warning and publication remain
+open in
+[native PDF writing](NATIVE-PDF-WRITING.md).
+
+The preceding identity is **0.24.0 (34)**. Additive `fs_list`
 continuation advances the feature-release component; current authority documents
 advance with it. Its final 173 source and matching compiled Core cases, current
 CLI/app builds, signed Debug/Release matrices and scoped Qwen continuation
@@ -70,7 +85,25 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.24.0`, build `34`. Backward-compatible directory
+The current product version is `0.25.0`, build `35`. `VERSION`, `BUILD_NUMBER`,
+compiled protocol constants, all twelve Xcode marketing-version settings,
+all sixteen build-number settings and current document markers must agree.
+The current-version source/document regression passed one method and the compiled
+native selection passed 102 tests, including that same marker check. Strict
+Debug/Release verification bound seven/five candidate identities to successful
+450-input builds. This documentation refresh still requires final review/publication;
+Independent r6 semantic artifact validation and Release/Qwen render review passed
+within their recorded scopes; original PDFKit compatibility failures and the test
+capture warning remain open.
+The corrected PDF owning-area
+source selection passed 101 methods, while earlier build/source receipts retain
+their exact pre-final inputs.
+Historical product, filesystem protocol, plugin and database schema identities
+are not globally replaced by this feature version.
+
+### Preceding 0.24.0 version agreement
+
+That checkpoint's product version is `0.24.0`, build `34`. Backward-compatible directory
 continuation advances the feature-release component and resets the patch
 component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
 marketing-version settings, all 16 build-number settings and the current

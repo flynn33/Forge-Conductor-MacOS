@@ -1,8 +1,30 @@
 # Forge Conductor architecture
 
-Version: `0.24.0`; build: `34`.
+Version: `0.25.0`; build: `35`.
 
-The current listing work adds opt-in, per-call `fs_list` continuation and a
+The PDF repair keeps the existing document tools and atomic destination write,
+using CoreText glyph/metric layout and a per-call CoreGraphics output consumer
+with a new 64 MiB retained-output cap. The shared `NativePDFTextReader` owns its
+native parser/scanner resources per invocation, admits a complete flat tagged-text
+subset and applies cumulative decode/operator/array quotas. It adds no cache,
+timer or service. Instruction imports and policy-source indexing retain existing
+PDFKit fallback and durable records; accepted logical text has new converter
+provenance. The corrected owning-area selection passed 101 source methods and the
+compiled native selection passed 102 tests on 450 unchanged inputs. Strict
+Debug/Release signing/build binding and separate Qwen PDF-tool consumption passed.
+Independent r6 validation passed 82 controls (fourteen admissions and sixty-eight
+whole-document fallbacks) and all eight Debug, eight Release and two Qwen artifacts.
+The original 80 expectations and scalar markers remain unchanged. The external
+operand ceiling increased from 4,096 to 32,768 with two new exact boundary controls;
+its counter population differs from the production reader. It does not qualify
+glyphs or PDF tagging conformance. Native PNG review covered ten Release and two Qwen
+PNG pages. PDFKit compatibility, the test capture warning and publication remain
+open. The scope, unresolved optional root-field ambiguity
+and retained PDFKit order failure are in [native PDF writing](NATIVE-PDF-WRITING.md).
+
+## Preceding 0.24.0 listing boundary
+
+The preceding listing work adds opt-in, per-call `fs_list` continuation and a
 paged-list-only final stdio budget check. The helper scans direct names with a
 bounded raw-byte selector, has an explicit per-call directory owner with
 idempotent close/deinit fallback, and revalidates observed directory metadata

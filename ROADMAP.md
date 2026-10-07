@@ -1,8 +1,27 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 native PDF text and measured wrapping
+
+Current source identity is **0.25.0 (35)**, starting from synchronized published
+source `8ecb186b591195e662cc84ba578b9f40be0db345` and wiki
+`ded02011e397b3f71c6be6bdee0db8a04706b142`. The integrated boundary is 450 inputs
+with three new Swift files and twelve additive canonical project entries.
+[PDF contract and evidence](docs/NATIVE-PDF-WRITING.md) retain the original
+failures and separate logical-text, glyph and geometry verification.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Original PDF defects | Signed 0.24 generated eight owned artifacts. Independent pure-PDFKit checks failed bullets, Unicode body/title and explicit UTF-8 source; wide text had two rectangles outside MediaBox. Native PNG review showed corrupted glyphs and clipping. Original source and mixed-order failures remain NONPASS. | Preserve the original artifacts/oracles; generation metadata alone is not text, glyph or geometry proof. |
+| Native text and layout | CoreText glyph layout and metric wrapping replace the manual writer. Nineteen writer cases passed in the corrected 101-method source and 102-test compiled selections. Signed Debug and Release each generated eight controls plus two source negatives, consuming fourteen LF-inclusive responses with normal exits/full EOF. Each unchanged control PDFKit validator passed seven of eight controls; each profile's ten pages had zero measured bounds outside MediaBox. Native PNG review covered five Debug, ten Release and two Qwen PNG pages. | The whole mixed-script PDFKit order gate remains OPEN. Broader fonts/scripts and arbitrary glyph correctness are not qualified. |
+| Complete logical text | Fourteen reader methods cover 53 bounded raw cases. Both durable instruction/policy regressions passed. The corrected source selection passed 101 methods and the compiled native selection passed 102 tests without failures/skips on 450 unchanged inputs. Independent r6 validation passed 82 controls (fourteen admissions, sixty-eight whole fallbacks) and all eight Debug, eight Release and two Qwen artifacts with original scalar markers/page targets. | This is a narrow complete tagged-text subset, not standards-complete tagging or glyph truth. Original PDFKit compatibility failures remain OPEN. |
+| Independent validator quota | The retained r5 Debug/Release owners each passed seven of eight artifacts; only the three-page fixture exceeded their 4,096 operand quota. R5 Qwen passed two of two. Fresh r6 raises the external quota to 32,768, retains all original 80 bytes/expectations and adds exact 32,768/32,769 controls; all 82 and current artifact owners passed. The actual three-page artifact used 7,545 independent operands. | This external validator correction does not change the candidate or prove exact production counter parity; production also charges structure/reverse arrays. R5 failures remain NONPASS. |
+| Reverse-field admission | Limits baseline failed one assertion; the first enumeration-only patch still failed the same case in a 101-method run (100 passes). A required typed Limits value when its name is present passed the same negative method, then the full corrected 101-method selection. Kids correctly declined throughout. | The observed unresolved optional root-field ambiguity remains explicit; arbitrary malformed PDFs and broader tagging are not qualified. |
+| Compatibility and ownership | Tool fields/defaults/source caps/engine metadata retained. New 64 MiB output cap, per-call resource ownership, whole-document fallback and existing durable records preserved. Three new files have twelve entries in existing targets; workspace unchanged. Earlier 35/84 passes and pre-final builds retain their own snapshots. Current CLI/app, canonical Debug/Release, marker regression and strict signing/build binding passed; seven Debug and five Release identities bind 450 inputs. | Refresh review and publication remain pending. A native compiler warning at PDFWriterTests.swift:85 is an E2 XCTest self-capture risk; its test-only correction remains open, without an observed runtime race or production reachability. |
+| Model and publication | Qwen used pdf_write and pdf_from_file in two API rounds with two observed Low templates, consumed both actual results and stopped normally. All six LF-inclusive native responses were consumed with normal zero exit/full EOF. Independent r6 validation passed both documents with original scalar markers. Its separate unchanged PDFKit validator passed conversion but failed the written whole sentinel after a layout line break. Signed 0.24 and every failed repair attempt remain immutable. | The Qwen PDFKit marker gate remains OPEN; owner publication/synchronization and the test capture warning remain pending. API candidate evidence does not qualify the active installed GUI, installation or shipment. |
+
 ## October 7 bounded filesystem listing continuation
 
-Current source identity is **0.24.0 (34)**, starting from synchronized owner-authored
+This checkpoint's source identity is **0.24.0 (34)**, starting from synchronized owner-authored
 `574aa99ccd5ba38966f79f4cce0f3c855ea4b7fc`; source and wiki were clean and matched
 remote before product edits. [Listing evidence](docs/FILESYSTEM-LIST-PAGING.md)
 records this slice. The candidate gates below passed; installed acceptance and

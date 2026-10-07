@@ -1,6 +1,20 @@
 # Documentation guide
 
-Current source is **0.24.0 (34)**. Opt-in directory continuation,
+Current source is **0.25.0 (35)**. Native PDF writing, measured wrapping and the
+shared complete tagged-text reader are recorded in
+[native PDF writing](NATIVE-PDF-WRITING.md). The corrected owning-area selection
+passed 101 source methods and the compiled native selection passed 102 tests on
+450 unchanged inputs. Strict Debug/Release signing/build binding, eight-control
+generation in both profiles and Qwen's separate two-document API exchange passed.
+Both control PDFKit validators retain one of eight whole-order failures; Qwen's
+written sentinel also fails its unchanged PDFKit oracle. Independent r6 semantic
+validation passed 82 controls and all eight Debug, eight Release and two Qwen
+artifacts, retaining the original scalar markers and 80 expectations. Two added
+boundary controls qualify its revised 32,768-item operand ceiling; the r5 quota
+failures remain NONPASS. Native PNG review covered ten Release and two Qwen PNG
+pages. PDFKit compatibility, a test capture warning and publication remain open.
+
+The preceding **0.24.0 (34)** checkpoint: Opt-in directory continuation,
 metadata fences, final stdio budgets and qualification limits are recorded in
 [filesystem list paging](FILESYSTEM-LIST-PAGING.md). Its 0.23.0 native baseline
 observed ignored limits and truncation without a cursor. The final affected

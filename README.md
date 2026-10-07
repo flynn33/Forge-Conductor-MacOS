@@ -1,6 +1,23 @@
 # Forge Conductor for macOS
 
-Current source is **0.24.0 (34)**. Opt-in `fs_list` pagination passed 173 affected
+Current source is **0.25.0 (35)**. The native PDF repair uses CoreText glyph layout
+and measured wrapping through the existing `pdf_write` and `pdf_from_file` tools.
+A bounded CoreGraphics reader preserves logical text for the supported complete
+tagged subset in instruction imports and policy-source indexing. The corrected
+owning-area selection passed all 101 source cases and the compiled native selection
+passed 102 tests on 450 unchanged inputs. Signed Debug and Release each generated
+eight control PDFs; Qwen used both PDF tools in a separate two-document API exchange
+and stopped normally. Both unchanged control PDFKit validators passed seven of
+eight controls; mixed-script order and Qwen's wrapped-sentinel gates remain open.
+Independent r6 semantic validation passed all 82 controls and the eight Debug,
+eight Release and two Qwen artifacts with their original scalar markers. The
+original 80 expectations remain unchanged; two new operand-boundary controls
+qualify the independent validator's revised 32,768-item ceiling. Native PNG review covered
+ten Release and two Qwen PNG pages. PDFKit compatibility, a test capture warning
+and publication remain open.
+[PDF contract, evidence and limits](docs/NATIVE-PDF-WRITING.md).
+
+The preceding **0.24.0 (34)** checkpoint: Opt-in `fs_list` pagination passed 173 affected
 source cases and the same 173 compiled native cases. Signed Debug and Release
 each passed 35 listing checks, including complete continuation of 1,001 names.
 Qwen read three actual pages using returned cursors and finished normally.
@@ -545,8 +562,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.24.0** |
-| **Build** | **34** |
+| **Version** | **0.25.0** |
+| **Build** | **35** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -664,7 +681,7 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The current root version authorities, compiled protocol constants and Xcode
-build settings use `0.24.0 (34)`; the current document markers are checked by
+build settings use `0.25.0 (35)`; the current document markers are checked by
 the version-alignment regression. Historical qualification receipts retain
 their tested identities.
 The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)

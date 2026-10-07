@@ -189,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.24.0**, build **34** (current source; candidate qualification is separate from installation).
+Version **0.25.0**, build **35** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -442,8 +442,30 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `fs_list` | Optional `path`. Path-only calls retain the legacy 1,000-entry cap. Supply `limit` (1–1,000; default 100), `cursor` or `maximum_bytes` to select paged mode. Paged arguments are validated before path normalization; count tokens must have an exact integral value. Continue using the returned `next_cursor` until `has_more` is false; `deadline_ms` alone retains legacy mode. Directory changes require restarting. [Contract and verified scopes](docs/FILESYSTEM-LIST-PAGING.md). |
 | `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
 | `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
+| `pdf_write` | `path`, `content`; optional `title`. A missing PDF extension is appended; the default title is the destination filename without its extension. Writes the supported text/Markdown subset through native layout. |
+| `pdf_from_file` | `source_path`; optional `dest_path`, `title`. Reads a bounded regular UTF-8 source. The default destination replaces the source extension with `.pdf`; the default title is the source filename without its extension. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
+
+The PDF tools retain their existing authorization, title/destination defaults,
+Markdown subset and 4 MiB content/source limits. Native layout now limits retained
+PDF output to 64 MiB before atomic writing. A successful response reports
+generation metadata; intended glyphs and layout require document review.
+For accepted complete tagged PDFs, instruction imports and policy-source indexing
+use logical ActualText with explicit converter provenance. Unsupported, incomplete,
+over-budget or whitespace-only semantic input retains the existing PDFKit path;
+previously stored records are not automatically reconverted.
+[PDF contract and current qualification](docs/NATIVE-PDF-WRITING.md) separate
+logical-text, rendered-glyph and geometry checks. Signed Debug and Release each
+generated eight control documents, and Qwen used both PDF tools in a separate
+two-document API exchange. Both control PDFKit validators still fail the whole
+mixed-script phrase order; Qwen's written whole sentinel fails across a layout
+newline. Independent r6 semantic validation passed all eight Debug, eight Release
+and two Qwen artifacts with the original scalar markers. Its 82 controls retain
+the original 80 expectations and add exact 32,768/32,769 operand boundaries. Native PNG
+review covered ten Release and two Qwen PNG pages. PDFKit compatibility and the
+test capture warning remain open. These results do not qualify the installed active chat, full
+Markdown or Office export.
 
 Web tools accept integer `timeout_sec` from 1–30 (default 20), and
 `maximum_bytes` from 1–65,536 (default 16,384) for the encoded inline response;

@@ -1,6 +1,54 @@
 # Version and qualification status
 
-Current source **0.24.0, build 34** adds opt-in `fs_list` continuation while
+Current source **0.25.0, build 35** repairs native PDF text/layout and adds a bounded
+complete tagged-text path to instruction imports and policy-source indexing.
+The corrected owning-area selection passed 101 source methods with no failures
+or skips on 450 unchanged inputs. This includes nineteen writer methods,
+fourteen reader methods with 53 finite raw cases, both durable consumers and
+existing queue/catalog/tool/PDF coverage. The earlier 35/84 source successes and
+CLI/app/ordinary Debug build predate final reverse-field/current-version changes.
+The first enumeration-only Limits patch remained NONPASS (101 methods, 100 passes,
+one failure); presence-aware validation then passed the original negative method
+and the corrected full selection. Kids correctly declined. All earlier pure-PDFKit,
+BOM/dangling-key, annotation/form and mixed-order failures remain preserved.
+Final CLI/app builds passed in 0.893/0.892 seconds and ordinary canonical Debug
+compilation in 5.261 seconds on 450 unchanged inputs. The marker regression passed
+one source method; the compiled native selection passed 102 tests without
+failures/skips in 44.409 seconds. Strict Debug signing/build binding passed for
+seven identities. Release compilation passed in 149.056 seconds and strict
+verification passed for five identities. Both candidates generated eight controls
+plus two source negatives, each consuming fourteen LF-inclusive responses with
+normal zero exit/full EOF.
+
+Both unchanged control PDFKit validators passed seven of eight controls but retain
+the whole mixed-script order NONPASS. Each profile's ten pages had zero measured
+bounds outside MediaBox; native PNG review covered five Debug, ten Release and two Qwen
+PNG pages. Qwen used
+both PDF tools in two API rounds with two observed Low templates and normal stop. Its separate
+PDFKit validator passed conversion but failed the written whole sentinel across
+a layout line break. Both compatibility gates remain OPEN. Independent r6 semantic
+validation passed all 82 controls (fourteen admissions, sixty-eight whole fallbacks)
+and all eight Debug, eight Release and two Qwen artifacts with original scalar
+markers/page targets. Its external operand ceiling increased from 4,096 to 32,768
+after the retained r5 Debug/Release three-page quota failures; r5 Qwen passed two
+of two. The original 80 PDF bytes/expectations remain unchanged, and two new exact
+boundary controls qualify the revised independent limit. Production also charges
+structure/reverse arrays, so identical numerical caps do not prove counter parity.
+Publication remains pending; all original PDFKit and r5 failures remain retained.
+
+The native compiler warning at `PDFWriterTests.swift:85` is an E2 XCTest
+self/mutable-fixture capture risk. No runtime race or production/UI reachability
+is established; all current tests remain frozen, and the narrow test-only
+correction remains open. API candidate evidence is separate from the active GUI
+and installed deployment.
+Accepted ActualText is not glyph proof, standards-complete tagging or arbitrary
+metadata truth; the native root's unresolved optional-field ambiguity is explicit.
+[Native PDF contract and evidence](NATIVE-PDF-WRITING.md) records exact receipts,
+limits, converter provenance and unchanged fallback/durable compatibility.
+
+## Preceding 0.24.0 (34) listing receipts
+
+The preceding source **0.24.0, build 34** adds opt-in `fs_list` continuation while
 preserving path-only listing. The unchanged signed 0.23.0 candidate reproduced
 three owned-file cases: path-only returned three, undeclared `limit: 1` still
 returned three, and 1,001 names returned 1,000 with truncation and no cursor.
@@ -1432,7 +1480,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.24.0, build 34**, supporting **macOS 26+**. The earlier
+Current source identity: **0.25.0, build 35**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1445,10 +1493,14 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.24.0, build 34**. The root [`VERSION`](../VERSION)
+documentation target version **0.25.0, build 35**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
-and Xcode build settings must match them. The consistency check runs locally and
-in CI. Filesystem protocol, provider-plugin, and database schema versions are
+and Xcode build settings must match them. The current marker regression passed
+one source method and was included in the 102-test compiled native pass. Strict
+Debug/Release verification bound their successful builds to the same 450 inputs.
+This documentation refresh still requires final review/publication. The
+consistency check runs locally and in CI. Filesystem protocol, provider-plugin,
+and database schema versions are
 separate compatibility contracts.
 
 The canonical native project is `ForgeConductor.xcworkspace`, using the

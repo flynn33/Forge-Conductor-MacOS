@@ -206,6 +206,14 @@ enum StjornarvaldNativePolicyExtractor {
                 segments: [], observation: "Encrypted PDF content remains accepted and metadata-only."
             )
         }
+        if let pages = try? NativePDFTextReader.pages(in: data),
+           pages.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            let text = pages.enumerated().compactMap { index, page in
+                page.isEmpty ? nil : "[page \(index + 1)]\n\(page)"
+            }.joined(separator: "\n\n")
+            return textResult(kind: .pdf, text: text, method: "cgpdf-actualtext",
+                              confidence: 0.98, metadata: values)
+        }
         let text = (0..<min(document.pageCount, 256)).compactMap { index in
             document.page(at: index)?.string.map { "[page \(index + 1)]\n\($0)" }
         }.joined(separator: "\n\n")

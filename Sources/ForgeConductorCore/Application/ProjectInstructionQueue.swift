@@ -2757,6 +2757,18 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
                     "The PDF is encrypted and cannot be converted without its password; original bytes were retained."
                 )
             }
+            if let pages = try NativePDFTextReader.pages(in: data),
+               pages.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                let text = pages.enumerated().compactMap { index, page in
+                    page.isEmpty ? nil : "[PDF page \(index + 1)]\n\(page)"
+                }.joined(separator: "\n\n")
+                return (
+                    text, "cgpdf-actualtext-v1",
+                    "Extracted complete page-mapped tagged text with CoreGraphics; the original PDF remains source-linked.",
+                    .unrepresentedVisualStructural,
+                    "The tagged PDF contained no usable instruction text. The original PDF was retained for visual review."
+                )
+            }
             let text = (0..<document.pageCount).compactMap { index in
                 document.page(at: index)?.string.map { "[PDF page \(index + 1)]\n\($0)" }
             }

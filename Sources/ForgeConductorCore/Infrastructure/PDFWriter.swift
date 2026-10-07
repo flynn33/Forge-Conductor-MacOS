@@ -1,235 +1,294 @@
 // PDFWriter.swift
-// What: Generates simple PDF documents using only native Swift/Foundation primitives.
-// How: It lays out wrapped text into pages and emits a valid object/xref/trailer graph
-// directly to Data before an atomic file write.
-// Why: Document tools remain dependency-free and available in restricted installations.
+// What: Generates native PDF documents from the document tools' bounded text sources.
+// How: CoreText lays out Unicode glyphs; CoreGraphics writes pages into a bounded
+// consumer before the existing atomic destination write.
+// Why: PDF text must remain readable and extractable, including native font fallback.
 
 import Foundation
+import CoreGraphics
+import CoreText
 
-/// Minimal multi-page PDF writer (Helvetica, markdown-ish headings) — stdlib only.
 public enum PDFWriter {
+    private static let maximumOutputBytes = 64 * 1_024 * 1_024
+
+    private enum WriterError: LocalizedError {
+        case contextUnavailable
+        case layoutUnavailable
+        case outputTooLarge(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .contextUnavailable: return "The native PDF context could not be created."
+            case .layoutUnavailable: return "The text could not be laid out within the PDF page."
+            case .outputTooLarge(let limit): return "PDF output is limited to \(limit) bytes."
+            }
+        }
+    }
+
+    private final class Output {
+        var data = Data()
+        var error: Error?
+        let cancellationCheck: (() throws -> Void)?
+        let maximumBytes: Int
+
+        init(maximumBytes: Int, cancellationCheck: (() throws -> Void)?) {
+            self.maximumBytes = maximumBytes
+            self.cancellationCheck = cancellationCheck
+        }
+
+        func check() throws {
+            if let error { throw error }
+            do { try cancellationCheck?() }
+            catch {
+                self.error = error
+                throw error
+            }
+        }
+
+        func append(_ bytes: UnsafeRawPointer, count: Int) -> Int {
+            do {
+                try check()
+                guard count <= maximumBytes - data.count else {
+                    throw WriterError.outputTooLarge(maximumBytes)
+                }
+                data.append(bytes.assumingMemoryBound(to: UInt8.self), count: count)
+                return count
+            } catch {
+                self.error = error
+                return 0
+            }
+        }
+    }
+
     public static func write(
         path: URL,
         content: String,
         title: String = "",
         cancellationCheck: (() throws -> Void)? = nil
     ) throws -> [String: Any] {
-        try cancellationCheck?()
-        let parent = path.deletingLastPathComponent()
+        try write(path: path, content: content, title: title,
+                  outputByteLimit: maximumOutputBytes, cancellationCheck: cancellationCheck)
+    }
 
-        let pageW = 612
-        let pageH = 792
-        let marginX = 50
-        let topY = pageH - 50
-        let bottomY = 50
-        let lineH = 14
-
-        let rows = try layoutLines(content, cancellationCheck: cancellationCheck)
-        var pages: [String] = []
-        var y = topY
-        var stream: [String] = []
-
-        func emit(_ yy: Int, _ size: Int, _ text: String) {
-            stream.append("BT")
-            stream.append("/F1 \(size) Tf")
-            stream.append("\(marginX) \(yy) Td")
-            stream.append("(\(escape(text))) Tj")
-            stream.append("ET")
+    // The internal lower limit exercises the real native consumer failure path.
+    static func write(
+        path: URL, content: String, title: String = "", outputByteLimit: Int,
+        cancellationCheck: (() throws -> Void)? = nil
+    ) throws -> [String: Any] {
+        let output = Output(maximumBytes: max(0, min(outputByteLimit, maximumOutputBytes)),
+                            cancellationCheck: cancellationCheck)
+        try output.check()
+        let retainedOutput = Unmanaged.passRetained(output)
+        var callbacks = CGDataConsumerCallbacks(
+            putBytes: { information, bytes, count in
+                guard let information else { return 0 }
+                return Unmanaged<Output>.fromOpaque(information).takeUnretainedValue()
+                    .append(bytes, count: count)
+            },
+            releaseConsumer: { information in
+                if let information { Unmanaged<Output>.fromOpaque(information).release() }
+            }
+        )
+        guard let consumer = CGDataConsumer(info: retainedOutput.toOpaque(), cbks: &callbacks) else {
+            retainedOutput.release()
+            throw WriterError.contextUnavailable
         }
-        func flush() {
-            let body = stream.isEmpty ? "BT /F1 11 Tf 50 750 Td ( ) Tj ET" : stream.joined(separator: "\n")
-            pages.append(body)
-            stream = []
-            y = topY
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            throw WriterError.contextUnavailable
+        }
+        var pageOpen = false
+        var closed = false
+        defer {
+            if !closed {
+                if pageOpen { context.endPDFPage() }
+                context.closePDF()
+            }
         }
 
+        let margin: CGFloat = 50
+        let width = Double(mediaBox.width - 2 * margin)
+        let top: CGFloat = mediaBox.height - 50
+        let bottom: CGFloat = 50
+        let sizes: [CGFloat] = [8, 9, 11, 12, 13, 16, 18]
+        let fonts = Dictionary(uniqueKeysWithValues: sizes.map {
+            ($0, CTFontCreateWithName("Helvetica" as CFString, $0, nil))
+        })
+        let black = CGColor(gray: 0, alpha: 1)
+        var pages = 0
+        var y = top
+        var pendingHeader = false
+
+        func beginPage() {
+            context.beginPDFPage(nil)
+            pageOpen = true
+            pages += 1
+        }
+
+        func lines(_ text: String, size: CGFloat, visit: (CTLine, String) throws -> Void) throws {
+            try output.check()
+            let attributes: [NSAttributedString.Key: Any] = [
+                NSAttributedString.Key(kCTFontAttributeName as String): fonts[size]!,
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): black,
+            ]
+            let value = NSAttributedString(string: text, attributes: attributes)
+            let options = [kCTTypesetterOptionAllowUnboundedLayout as String: false] as CFDictionary
+            guard let typesetter = CTTypesetterCreateWithAttributedStringAndOptions(
+                value as CFAttributedString, options
+            ) else { throw WriterError.layoutUnavailable }
+            if value.length == 0 {
+                try visit(CTTypesetterCreateLine(typesetter, CFRange(location: 0, length: 0)), "")
+                return
+            }
+            var start = 0
+            while start < value.length {
+                try output.check()
+                var count = CTTypesetterSuggestLineBreak(typesetter, start, width)
+                guard count > 0 && count <= value.length - start else { throw WriterError.layoutUnavailable }
+                var line = CTTypesetterCreateLine(typesetter, CFRange(location: start, length: count))
+                if CTLineGetTypographicBounds(line, nil, nil, nil) - CTLineGetTrailingWhitespaceWidth(line) > width + 0.25 {
+                    count = CTTypesetterSuggestClusterBreak(typesetter, start, width)
+                    guard count > 0 && count <= value.length - start else { throw WriterError.layoutUnavailable }
+                    line = CTTypesetterCreateLine(typesetter, CFRange(location: start, length: count))
+                }
+                guard CTLineGetTypographicBounds(line, nil, nil, nil) - CTLineGetTrailingWhitespaceWidth(line) <= width + 0.25
+                else { throw WriterError.layoutUnavailable }
+                // Wrapped spans concatenate; only the logical paragraph ends in a newline.
+                let logicalText = value.attributedSubstring(from: NSRange(location: start, length: count)).string
+                    + (start + count == value.length ? "\n" : "")
+                try visit(line, logicalText)
+                start += count
+            }
+        }
+
+        func draw(_ line: CTLine, logicalText: String, baseline: CGFloat) throws {
+            try output.check()
+            context.saveGState()
+            context.textMatrix = .identity
+            context.textPosition = CGPoint(x: margin, y: baseline)
+            if !logicalText.isEmpty {
+                CGPDFContextBeginTag(context, .span, [
+                    CGPDFTagProperty.actualText.rawValue as String: logicalText,
+                ] as CFDictionary)
+            }
+            CTLineDraw(line, context)
+            if !logicalText.isEmpty { CGPDFContextEndTag(context) }
+            context.restoreGState()
+            try output.check()
+        }
+
+        func nextPage(repeatingTitle: Bool = true) throws {
+            // A fully consumed blank page counts; an unused trailing page does not.
+            if !pageOpen { beginPage() }
+            context.endPDFPage()
+            pageOpen = false
+            try output.check()
+            y = top
+            pendingHeader = repeatingTitle
+        }
+
+        func titlePrefix(_ count: Int) -> String {
+            title.prefix(count).split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        }
+
+        func ensurePage() throws {
+            guard !pageOpen else { return }
+            beginPage()
+            if pendingHeader && !title.isEmpty {
+                var headerY = mediaBox.height - 36
+                try lines(titlePrefix(80), size: 8) { line, logicalText in
+                    guard headerY - 14 >= bottom else { throw WriterError.layoutUnavailable }
+                    try draw(line, logicalText: logicalText, baseline: headerY)
+                    headerY -= 14
+                }
+                y = min(y, top - 10, headerY - 2)
+            }
+            pendingHeader = false
+        }
+
+        func drawText(
+            _ text: String, size: CGFloat, extra: CGFloat = 0,
+            after: CGFloat = 0, minimumAdvance: CGFloat = 14
+        ) throws {
+            try lines(text, size: size) { line, logicalText in
+                try ensurePage()
+                var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+                _ = CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
+                let advance = max(minimumAdvance, ceil(ascent + descent + leading))
+                if y - advance - extra < bottom {
+                    try nextPage()
+                    try ensurePage()
+                }
+                guard y - advance - extra >= bottom else { throw WriterError.layoutUnavailable }
+                y -= extra
+                try draw(line, logicalText: logicalText, baseline: y)
+                y -= advance + after
+            }
+        }
+
+        func blank() throws {
+            y -= 7
+            if y < bottom { try nextPage(repeatingTitle: false) }
+        }
+
+        beginPage()
         if !title.isEmpty {
-            emit(y, 18, String(title.prefix(120)))
-            y -= 22
-            emit(y, 9, "Forge-Conductor docs export")
+            try drawText(titlePrefix(120), size: 18, minimumAdvance: 22)
             y -= 20
         }
 
-        for (style, text) in rows {
-            try cancellationCheck?()
-            if style == "blank" {
-                y -= lineH / 2
-                if y < bottomY { flush() }
-                continue
-            }
-            var size = 11
-            var extra = 0
-            switch style {
-            case "h1": size = 16; extra = 6
-            case "h2": size = 13; extra = 4
-            case "h3": size = 12; extra = 2
-            case "code": size = 9
-            default: break
-            }
-            if y - lineH - extra < bottomY {
-                flush()
-                if !title.isEmpty {
-                    emit(pageH - 36, 8, String(title.prefix(80)))
-                    y = topY - 10
+        var inCode = false
+        var cursor = content.startIndex
+        while true {
+            try output.check()
+            let newline = content[cursor...].firstIndex(of: "\n")
+            let end = newline ?? content.endIndex
+            let raw = String(content[cursor..<end]).replacingOccurrences(of: "\r", with: "")
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") {
+                inCode.toggle()
+                try blank()
+            } else if inCode {
+                try drawText(raw.replacingOccurrences(of: "\t", with: "    "), size: 9)
+            } else if trimmed.isEmpty {
+                try blank()
+            } else {
+                var text = trimmed
+                var size: CGFloat = 11, extra: CGFloat = 0, after: CGFloat = 0
+                if trimmed.hasPrefix("### ") {
+                    text = String(trimmed.dropFirst(4)); size = 12; extra = 2
+                } else if trimmed.hasPrefix("## ") {
+                    text = String(trimmed.dropFirst(3)); size = 13; extra = 4
+                } else if trimmed.hasPrefix("# ") {
+                    text = String(trimmed.dropFirst(2)).uppercased(); size = 16; extra = 6; after = 4
+                } else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
+                    text = "• " + String(trimmed.dropFirst(2))
                 }
+                text = text.replacingOccurrences(of: "*", with: "")
+                    .replacingOccurrences(of: "_", with: "")
+                    .replacingOccurrences(of: "`", with: "")
+                text = text.split(separator: " ").joined(separator: " ")
+                try drawText(text, size: size, extra: extra, after: after)
             }
-            y -= extra
-            emit(y, size, text)
-            y -= lineH + (style == "h1" ? 4 : 0)
-        }
-        if !stream.isEmpty || pages.isEmpty { flush() }
-
-        // Build PDF objects
-        var objects: [Data] = []
-        func add(_ s: String) -> Int {
-            objects.append(Data(s.utf8))
-            return objects.count
-        }
-        func addData(_ d: Data) -> Int {
-            objects.append(d)
-            return objects.count
+            guard let newline else { break }
+            cursor = content.index(after: newline)
         }
 
-        _ = add("<< /Type /Catalog /Pages 2 0 R >>")
-        objects.append(Data()) // placeholder pages obj index 1
-        let fontID = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-
-        var pageIDs: [Int] = []
-        for streamBody in pages {
-            try cancellationCheck?()
-            let raw = Data(streamBody.utf8)
-            var content = Data()
-            content.append(contentsOf: "<< /Length \(raw.count) >>\nstream\n".utf8)
-            content.append(raw)
-            content.append(contentsOf: "\nendstream".utf8)
-            let contentID = addData(content)
-            let pageID = add(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 \(pageW) \(pageH)] "
-                    + "/Contents \(contentID) 0 R /Resources << /Font << /F1 \(fontID) 0 R >> >> >>"
-            )
-            pageIDs.append(pageID)
-        }
-        let kids = pageIDs.map { "\($0) 0 R" }.joined(separator: " ")
-        objects[1] = Data("<< /Type /Pages /Kids [ \(kids) ] /Count \(pageIDs.count) >>".utf8)
-
-        var buf = Data("%PDF-1.4\n".utf8)
-        buf.append(contentsOf: [0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A])
-        var offsets: [Int] = [0]
-        for (i, obj) in objects.enumerated() {
-            try cancellationCheck?()
-            offsets.append(buf.count)
-            buf.append(contentsOf: "\(i + 1) 0 obj\n".utf8)
-            buf.append(obj)
-            buf.append(contentsOf: "\nendobj\n".utf8)
-        }
-        let xref = buf.count
-        buf.append(contentsOf: "xref\n0 \(objects.count + 1)\n".utf8)
-        buf.append(contentsOf: "0000000000 65535 f \n".utf8)
-        for off in offsets.dropFirst() {
-            buf.append(contentsOf: String(format: "%010d 00000 n \n", off).utf8)
-        }
-        buf.append(contentsOf: """
-        trailer
-        << /Size \(objects.count + 1) /Root 1 0 R >>
-        startxref
-        \(xref)
-        %%EOF
-
-        """.utf8)
-
-        try cancellationCheck?()
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        try buf.write(to: path, options: .atomic)
+        try output.check()
+        if pageOpen { context.endPDFPage() }
+        pageOpen = false
+        context.closePDF()
+        closed = true
+        try output.check()
+        try FileManager.default.createDirectory(at: path.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try output.data.write(to: path, options: .atomic)
         return [
             "ok": true,
             "path": path.path,
-            "bytes_written": buf.count,
-            "pages": pageIDs.count,
+            "bytes_written": output.data.count,
+            "pages": pages,
             "engine": "swift-pdf-writer",
             "title": title,
         ]
-    }
-
-    private static func escape(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "(", with: "\\(")
-            .replacingOccurrences(of: ")", with: "\\)")
-            .replacingOccurrences(of: "\r", with: "")
-    }
-
-    private static func layoutLines(
-        _ content: String,
-        cancellationCheck: (() throws -> Void)?
-    ) throws -> [(String, String)] {
-        var rows: [(String, String)] = []
-        var inCode = false
-        for raw in content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
-            try cancellationCheck?()
-            let line = raw
-            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
-                inCode.toggle()
-                rows.append(("blank", ""))
-                continue
-            }
-            if inCode {
-                var t = line.replacingOccurrences(of: "\t", with: "    ")
-                while t.count > 92 {
-                    rows.append(("code", String(t.prefix(92))))
-                    t = String(t.dropFirst(92))
-                }
-                rows.append(("code", t))
-                continue
-            }
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty {
-                rows.append(("blank", ""))
-                continue
-            }
-            var style = "normal"
-            var text = trimmed
-            if trimmed.hasPrefix("### ") { style = "h3"; text = String(trimmed.dropFirst(4)) }
-            else if trimmed.hasPrefix("## ") { style = "h2"; text = String(trimmed.dropFirst(3)) }
-            else if trimmed.hasPrefix("# ") { style = "h1"; text = String(trimmed.dropFirst(2)).uppercased() }
-            else if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
-                style = "bullet"
-                text = "• " + String(trimmed.dropFirst(2))
-            }
-            text = text.replacingOccurrences(of: "*", with: "")
-                .replacingOccurrences(of: "_", with: "")
-                .replacingOccurrences(of: "`", with: "")
-            let width = (style == "h1" || style == "h2" || style == "h3") ? 88 : 92
-            for part in try wrap(text, width: width, cancellationCheck: cancellationCheck) {
-                rows.append((style, part))
-            }
-        }
-        if rows.isEmpty { rows.append(("normal", "(empty document)")) }
-        return rows
-    }
-
-    private static func wrap(
-        _ text: String,
-        width: Int,
-        cancellationCheck: (() throws -> Void)?
-    ) throws -> [String] {
-        let words = text.split(separator: " ").map(String.init)
-        guard !words.isEmpty else { return [""] }
-        var lines: [String] = []
-        var cur: [String] = []
-        var n = 0
-        for w in words {
-            try cancellationCheck?()
-            let add = w.count + (cur.isEmpty ? 0 : 1)
-            if n + add > width, !cur.isEmpty {
-                lines.append(cur.joined(separator: " "))
-                cur = [w]
-                n = w.count
-            } else {
-                cur.append(w)
-                n += add
-            }
-        }
-        if !cur.isEmpty { lines.append(cur.joined(separator: " ")) }
-        return lines
     }
 }

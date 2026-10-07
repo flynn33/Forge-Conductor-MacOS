@@ -1,6 +1,39 @@
 # Forge Conductor — Xcode
 
-Current source version **0.24.0**, build **34**.
+Current source version **0.25.0**, build **35**.
+
+The PDF repair adds `NativePDFTextReader.swift` to the existing Core target and
+`PDFWriterTests.swift` / `NativePDFTextReaderTests.swift` to the existing test
+target: twelve additive PBX entries, three new Swift files and 450 source inputs.
+The workspace is unchanged. The corrected owning-area source selection passed
+101 methods without failures/skips, including fourteen reader methods with 53
+raw cases and both durable consumers. Earlier 35-method focused and 84-method
+owning-area passes and pre-final-input compilation keep their original scope.
+The final CLI/app builds passed in 0.893/0.892 seconds; ordinary canonical Debug
+compilation passed in 5.261 seconds with all 450 inputs unchanged. The current
+marker regression passed one source method; the native selection, including that
+method, passed 102 tests without failures/skips in 44.409 seconds. Strict Debug
+signing and build-input binding passed for seven candidate identities. Release
+compilation passed in 149.056 seconds and strict verification passed for five
+identities. Both candidates generated eight controls and passed two source
+negatives, each consuming fourteen LF-inclusive responses with normal zero exit
+and full EOF. Both unchanged control PDFKit validators retain the same one of
+eight mixed-order failure. Independent r6 semantic validation passed 82 controls
+and all eight Debug, eight Release and two Qwen artifacts. It preserves the original
+80 expectations and adds exact 32,768/32,769 operand controls; the revised ceiling
+is an external validator change, with no candidate/source change. Native PNG
+review covered ten Release and two Qwen PNG pages. PDFKit compatibility, the test
+capture warning and publication remain open.
+
+The native compile log retains a warning at `PDFWriterTests.swift:85`: the detached
+closure captures XCTest `self`, including mutable fixture state. This is an E2
+test capture risk, not an observed runtime race or a production/UI reachability
+finding. The awaited worker and all current assertions remain unchanged. A narrow
+test-only correction to capture an immutable root URL and use stateless fixture
+helpers remains open; concurrency checking has not been relaxed.
+[PDF contract and gate status](docs/NATIVE-PDF-WRITING.md).
+
+## Preceding 0.24.0 listing graph and qualification
 
 The listing slice registers one Core source, `FilesystemListingPage.swift`, and
 one Core test file, `FilesystemListingTests.swift`, in the existing canonical
@@ -632,7 +665,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.24.0 (34)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.25.0 (35)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

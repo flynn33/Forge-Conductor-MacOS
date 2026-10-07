@@ -1118,6 +1118,87 @@ final class ProjectInstructionQueueTests: XCTestCase {
         XCTAssertTrue(pdfPage.content.contains("PDF instruction"))
     }
 
+    func testNativePDFInstructionReadPreservesMixedScriptLogicalOrder() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = fixture.external.appendingPathComponent("mixed-script-instructions.pdf")
+        let paragraphs = [
+            "café Ελληνικά Русский 日本語 العربية",
+            "Latin العربية. 123 (45), source.",
+            "abcאבג 6789; MIXED-ID-025.",
+        ]
+        let metadata = try PDFWriter.write(
+            path: source, content: paragraphs.joined(separator: "\n"), title: ""
+        )
+        let byteCount = try XCTUnwrap(metadata["bytes_written"] as? Int)
+        XCTAssertGreaterThan(byteCount, 0)
+        XCTAssertLessThanOrEqual(byteCount, 1_048_576)
+        let pageCount = try XCTUnwrap(metadata["pages"] as? Int)
+        XCTAssertTrue((1...8).contains(pageCount))
+        let originalSHA256 = JSONSupport.sha256Hex(try Data(contentsOf: source))
+
+        let instructionStore = fixture.store
+        let projectID = fixture.projectID
+        let imported = try await Task.detached(priority: .utility) {
+            try instructionStore.importPackage(
+                sourceURL: source, projectID: projectID, generation: .initial
+            )
+        }.value
+        let package = try XCTUnwrap(imported.packages.first)
+        XCTAssertEqual(package.documentCount, 1)
+        XCTAssertEqual(package.unresolvedDocumentCount, 0)
+        let catalog = try fixture.store.catalogPage(
+            contentSHA256: package.contentSHA256, projectID: fixture.projectID,
+            generation: .initial, runID: nil, cursor: 0, limit: 1
+        )
+        let document = try XCTUnwrap(catalog.documents.first)
+        XCTAssertEqual(document["status"], "converted_instruction")
+        XCTAssertEqual(document["original_sha256"], originalSHA256)
+        let documentID = try XCTUnwrap(document["id"])
+        let page = try fixture.store.readDocument(
+            contentSHA256: package.contentSHA256, documentID: documentID,
+            projectID: fixture.projectID, generation: .initial, runID: nil,
+            byteOffset: 0, maximumBytes: 4_096
+        )
+        XCTAssertNil(page.nextByteOffset)
+        XCTAssertEqual(page.totalBytes, page.content.utf8.count)
+        XCTAssertEqual(page.sha256, JSONSupport.sha256Hex(Data(page.content.utf8)))
+        XCTAssertTrue(page.content.contains("[PDF page 1]"))
+
+        func normalizedScalars(_ text: String) -> [UInt32] {
+            var result: [UInt32] = []
+            var pendingSpace = false
+            for scalar in text.unicodeScalars {
+                if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                    pendingSpace = !result.isEmpty
+                } else {
+                    if pendingSpace { result.append(0x20) }
+                    result.append(scalar.value)
+                    pendingSpace = false
+                }
+            }
+            return result
+        }
+        let delivered = normalizedScalars(page.content)
+        for paragraph in paragraphs {
+            let expected = normalizedScalars(paragraph)
+            let found = delivered.count >= expected.count
+                && (0...(delivered.count - expected.count)).contains { start in
+                    delivered[start..<(start + expected.count)].elementsEqual(expected)
+                }
+            XCTAssertTrue(found, "instruction_read changed scalar order: \(paragraph)")
+        }
+        XCTAssertEqual(document["converter"], "cgpdf-actualtext-v1")
+
+        let reopened = try ProjectInstructionQueueStore(paths: fixture.paths, clock: fixture.clock)
+        let durablePage = try reopened.readDocument(
+            contentSHA256: package.contentSHA256, documentID: documentID,
+            projectID: fixture.projectID, generation: .initial, runID: nil,
+            byteOffset: 0, maximumBytes: 4_096
+        )
+        XCTAssertEqual(durablePage, page)
+    }
+
     func testMalformedPDFIsRetainedWithActionableUnresolvedStatus() throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }

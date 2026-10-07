@@ -688,7 +688,7 @@ private enum ProductionToolDefinitionSource {
         "git_log": "git log --oneline.",
         "git_add": "git add path or -A.",
         "git_commit": "git commit -m message.",
-        "pdf_write": "Write a PDF from markdown-ish text (stdlib, no pandoc).",
+        "pdf_write": "Write a PDF from markdown-ish text using native Unicode layout (no external converter).",
         "pdf_from_file": "Convert a local markdown/text file to PDF.",
         "search_text": "Recursive text search (grep), with optional context_lines and include/exclude filename globs.",
         "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",

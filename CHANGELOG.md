@@ -10,6 +10,33 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.25.0 (35)` native PDF text and layout
+
+- Native CoreText glyph layout and metric wrapping replace the manual Helvetica
+  stream writer behind `pdf_write` and `pdf_from_file`. Existing names, schemas,
+  defaults, Markdown subset, 4 MiB content/source limits and
+  `engine: "swift-pdf-writer"` remain. PDF bytes and page breaks change; a new
+  64 MiB retained-output cap precedes the existing atomic destination write.
+- Complete supported tagged PDFs use native logical text in instruction imports
+  and policy-source indexing. Incomplete, unsupported or over-budget input falls
+  back as a whole to the existing PDFKit path. Empty or whitespace-only semantic
+  text also retains that fallback; stored records are not automatically reconverted.
+- The corrected owning-area selection passed 101 source cases and the compiled
+  native selection passed 102 tests without failures/skips. Signed Debug and Release
+  each generated eight control PDFs; Qwen used both tools, consumed their metadata
+  and stopped normally in a separate two-document API exchange. Both unchanged
+  control PDFKit validators passed seven of eight controls, retaining whole
+  mixed-script order NONPASS; Qwen's written whole sentinel also remains NONPASS.
+  Each profile's ten pages had no measured bounds outside MediaBox; native review
+  covered five Debug, ten Release and two Qwen PNG pages. Independent r6 semantic
+  validation passed 82 controls (the unchanged original 80 plus exact 32,768/32,769
+  operand boundaries) and all eight Debug, eight Release and two Qwen artifacts.
+  Its operand ceiling changed from 4,096 to 32,768 after the retained r5 Debug/
+  Release three-page quota failures; no original expected outcome was changed.
+  Earlier failures remain NONPASS. PDFKit compatibility, test capture warning
+  and publication gates remain open in
+  [the PDF record](docs/NATIVE-PDF-WRITING.md).
+
 ### `0.24.0 (34)` bounded directory continuation
 
 - Added opt-in `fs_list` pagination with project/client/generation/path-bound
