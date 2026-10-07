@@ -22,8 +22,8 @@ Product versions do not by themselves claim shipment.
   back as a whole to the existing PDFKit path. Empty or whitespace-only semantic
   text also retains that fallback; stored records are not automatically reconverted.
 - The corrected owning-area selection passed 101 source cases and the compiled
-  native selection passed 102 tests without failures/skips. Signed Debug and Release
-  each generated eight control PDFs; Qwen used both tools, consumed their metadata
+  native selection passed 102 tests without failures/skips on the original PDF
+  product snapshot. Signed Debug and Release each generated eight control PDFs; Qwen used both tools, consumed their metadata
   and stopped normally in a separate two-document API exchange. Both unchanged
   control PDFKit validators passed seven of eight controls, retaining whole
   mixed-script order NONPASS; Qwen's written whole sentinel also remains NONPASS.
@@ -33,9 +33,16 @@ Product versions do not by themselves claim shipment.
   operand boundaries) and all eight Debug, eight Release and two Qwen artifacts.
   Its operand ceiling changed from 4,096 to 32,768 after the retained r5 Debug/
   Release three-page quota failures; no original expected outcome was changed.
-  Earlier failures remain NONPASS. PDFKit compatibility, test capture warning
-  and publication gates remain open in
-  [the PDF record](docs/NATIVE-PDF-WRITING.md).
+  Earlier failures remain NONPASS. Both PDFKit compatibility gates remain open
+  in [the PDF record](docs/NATIVE-PDF-WRITING.md). The PDF source/wiki checkpoint
+  was published and synchronized.
+- A later test-only repair captures an immutable fixture URL and uses stateless
+  helpers for detached work. The focused UTF-8 regression freshly compiled without
+  the original warning, and all 19 writer methods passed with zero failures/skips.
+  All 96 existing assertion lines remain, with one new fixture unwrap. The other
+  449 source/configuration/graph inputs and product 0.25.0 (35) remain unchanged;
+  the earlier candidate receipts keep their original test hash. This test/document
+  update awaits its own publication.
 
 ### `0.24.0 (34)` bounded directory continuation
 

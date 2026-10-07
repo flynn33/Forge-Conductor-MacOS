@@ -2,9 +2,9 @@
 
 Current source **0.25.0, build 35** repairs native PDF text/layout and adds a bounded
 complete tagged-text path to instruction imports and policy-source indexing.
-The corrected owning-area selection passed 101 source methods with no failures
-or skips on 450 unchanged inputs. This includes nineteen writer methods,
-fourteen reader methods with 53 finite raw cases, both durable consumers and
+On the original PDF product snapshot, the corrected owning-area selection passed
+101 source methods with no failures or skips on 450 unchanged inputs. This
+includes nineteen writer methods, fourteen reader methods with 53 finite raw cases, both durable consumers and
 existing queue/catalog/tool/PDF coverage. The earlier 35/84 source successes and
 CLI/app/ordinary Debug build predate final reverse-field/current-version changes.
 The first enumeration-only Limits patch remained NONPASS (101 methods, 100 passes,
@@ -34,13 +34,24 @@ after the retained r5 Debug/Release three-page quota failures; r5 Qwen passed tw
 of two. The original 80 PDF bytes/expectations remain unchanged, and two new exact
 boundary controls qualify the revised independent limit. Production also charges
 structure/reverse arrays, so identical numerical caps do not prove counter parity.
-Publication remains pending; all original PDFKit and r5 failures remain retained.
+The PDF source/wiki checkpoint was published and synchronized; all original
+PDFKit and r5 failures remain retained.
 
-The native compiler warning at `PDFWriterTests.swift:85` is an E2 XCTest
-self/mutable-fixture capture risk. No runtime race or production/UI reachability
-is established; all current tests remain frozen, and the narrow test-only
-correction remains open. API candidate evidence is separate from the active GUI
-and installed deployment.
+The original native compiler warning at `PDFWriterTests.swift:85` remains
+historical E2 XCTest self/mutable-fixture evidence. A later test-only correction
+captures an immutable root URL and uses stateless helpers. Its freshly compiled
+UTF-8 regression passed one native test in 5.978 seconds with no compiler
+warning/error; the normal writer selection passed all 19 methods in 3.074 seconds,
+zero failures/skips, normal terminal zero/full EOF/unforced. The focused case is
+included in the 19, not an additional method. All 19 identifiers and 96 existing
+assertion lines remain, with one new fixture unwrap. Only PDFWriterTests.swift
+changes within the 450-input map; the other 449 source/configuration/graph inputs
+and product 0.25.0 (35) remain unchanged. Twelve prior Debug/Release binary
+identities and three protected inputs remain unchanged; original 101/102 and
+artifact receipts keep their original test hash. No runtime race, production/UI
+reachability or new product-candidate qualification is claimed. This later
+test/documentation publication is pending. API candidate evidence is separate
+from the active GUI and installed deployment.
 Accepted ActualText is not glyph proof, standards-complete tagging or arbitrary
 metadata truth; the native root's unresolved optional-field ambiguity is explicit.
 [Native PDF contract and evidence](NATIVE-PDF-WRITING.md) records exact receipts,

@@ -463,9 +463,10 @@ mixed-script phrase order; Qwen's written whole sentinel fails across a layout
 newline. Independent r6 semantic validation passed all eight Debug, eight Release
 and two Qwen artifacts with the original scalar markers. Its 82 controls retain
 the original 80 expectations and add exact 32,768/32,769 operand boundaries. Native PNG
-review covered ten Release and two Qwen PNG pages. PDFKit compatibility and the
-test capture warning remain open. These results do not qualify the installed active chat, full
-Markdown or Office export.
+review covered ten Release and two Qwen PNG pages. PDFKit compatibility remains
+open. A later test-only fixture capture correction passed the focused native
+regression and all 19 writer methods; the PDF tool contract is unchanged. These
+results do not qualify the installed active chat, full Markdown or Office export.
 
 Web tools accept integer `timeout_sec` from 1–30 (default 20), and
 `maximum_bytes` from 1–65,536 (default 16,384) for the encoded inline response;

@@ -33,13 +33,13 @@ final class PDFWriterTests: XCTestCase {
         let (document, metadata) = try writeAndOpen(
             "ascii.pdf", content: content, title: "ASCII native PDF"
         )
-        let text = try extractedText(document)
+        let text = try Self.extractedText(document)
         for fragment in [
             "ASCII CONTROL", "Section", "Detail", "strong emphasis inline",
             "Literal parentheses (left right) and backslash \\ marker.",
             "let_value = (left)\\right", "ASCII-SENTINEL-025", "ASCII native PDF",
         ] {
-            assertContainsScalars(text, fragment: fragment)
+            Self.assertContainsScalars(text, fragment: fragment)
         }
         XCTAssertEqual(metadata["engine"] as? String, "swift-pdf-writer")
         XCTAssertEqual(metadata["title"] as? String, "ASCII native PDF")
@@ -51,10 +51,10 @@ final class PDFWriterTests: XCTestCase {
             content: "- first item\n* second item\nBULLET-SENTINEL-025",
             title: "Bullet control"
         )
-        let text = try extractedText(document)
-        assertContainsScalars(text, fragment: "• first item")
-        assertContainsScalars(text, fragment: "• second item")
-        assertContainsScalars(text, fragment: "BULLET-SENTINEL-025")
+        let text = try Self.extractedText(document)
+        Self.assertContainsScalars(text, fragment: "• first item")
+        Self.assertContainsScalars(text, fragment: "• second item")
+        Self.assertContainsScalars(text, fragment: "BULLET-SENTINEL-025")
     }
 
     func testUnicodeBodyExtractsExactScalars() throws {
@@ -64,9 +64,9 @@ final class PDFWriterTests: XCTestCase {
             content: fragments.joined(separator: "\n") + "\nUNICODE-BODY-SENTINEL-025",
             title: "Unicode body control"
         )
-        let text = try extractedText(document)
+        let text = try Self.extractedText(document)
         for fragment in fragments + ["UNICODE-BODY-SENTINEL-025"] {
-            assertContainsScalars(text, fragment: fragment)
+            Self.assertContainsScalars(text, fragment: fragment)
         }
     }
 
@@ -75,15 +75,16 @@ final class PDFWriterTests: XCTestCase {
         let (document, metadata) = try writeAndOpen(
             "unicode-title.pdf", content: "UNICODE-TITLE-SENTINEL-025", title: title
         )
-        let text = try extractedText(document)
-        assertContainsScalars(text, fragment: title)
-        assertContainsScalars(text, fragment: "UNICODE-TITLE-SENTINEL-025")
+        let text = try Self.extractedText(document)
+        Self.assertContainsScalars(text, fragment: title)
+        Self.assertContainsScalars(text, fragment: "UNICODE-TITLE-SENTINEL-025")
         XCTAssertEqual(metadata["title"] as? String, title)
     }
 
     func testUTF8SourceExplicitDestinationPreservesUnicode() async throws {
-        try await Task.detached(priority: .utility) { [self] in
-            try withToolApp { app, client, project in
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
                 let source = project.appendingPathComponent("utf8-source.md")
                 let destination = project.appendingPathComponent("explicit-output.pdf")
                 let marker = "café Ελληνικά Русский 日本語 العربية"
@@ -99,15 +100,15 @@ final class PDFWriterTests: XCTestCase {
                 )
                 XCTAssertTrue(result.ok, "\(result.payload)")
                 XCTAssertEqual(result.payload["source_path"] as? String, source.path)
-                let document = try openPDF(destination, metadata: result.payload)
-                let visualText = try extractedText(document)
+                let document = try Self.openPDF(destination, metadata: result.payload)
+                let visualText = try Self.extractedText(document)
                 for fragment in ["UTF8 SOURCE", "UTF8-SOURCE-SENTINEL-025", "Explicit UTF8 source"] {
-                    assertContainsScalars(visualText, fragment: fragment)
+                    Self.assertContainsScalars(visualText, fragment: fragment)
                 }
                 let pages = try XCTUnwrap(try NativePDFTextReader.pages(in: Data(contentsOf: destination)))
                 let text = pages.joined()
                 for fragment in ["UTF8 SOURCE", marker, "UTF8-SOURCE-SENTINEL-025", "Explicit UTF8 source"] {
-                    assertContainsScalars(text, fragment: fragment)
+                    Self.assertContainsScalars(text, fragment: fragment)
                 }
             }
         }.value
@@ -128,11 +129,11 @@ final class PDFWriterTests: XCTestCase {
         }.value
         XCTAssertGreaterThan(pages.count, 1)
         XCTAssertLessThanOrEqual(pages.count, 8)
-        XCTAssertEqual(whitespaceNormalizedScalars(pages.joined()), whitespaceNormalizedScalars(content))
+        XCTAssertEqual(Self.whitespaceNormalizedScalars(pages.joined()), Self.whitespaceNormalizedScalars(content))
     }
 
     func testDefaultToolTitlesAndDestinationsRemainAvailable() throws {
-        try withToolApp { app, client, project in
+        try Self.withToolApp(root: temporaryRoot) { app, client, project in
             let extensionless = project.appendingPathComponent("default-write")
             let written = try app.tools.call(
                 name: "pdf_write",
@@ -141,12 +142,12 @@ final class PDFWriterTests: XCTestCase {
             )
             XCTAssertTrue(written.ok, "\(written.payload)")
             XCTAssertEqual(written.payload["title"] as? String, "default-write")
-            let writtenDocument = try openPDF(
+            let writtenDocument = try Self.openPDF(
                 extensionless.appendingPathExtension("pdf"), metadata: written.payload
             )
-            let writtenText = try extractedText(writtenDocument)
-            assertContainsScalars(writtenText, fragment: "default-write")
-            assertContainsScalars(writtenText, fragment: "DEFAULT-WRITE-SENTINEL-025")
+            let writtenText = try Self.extractedText(writtenDocument)
+            Self.assertContainsScalars(writtenText, fragment: "default-write")
+            Self.assertContainsScalars(writtenText, fragment: "DEFAULT-WRITE-SENTINEL-025")
 
             let source = project.appendingPathComponent("default-source.md")
             try Data("DEFAULT-SOURCE-SENTINEL-025\n".utf8).write(to: source)
@@ -156,12 +157,12 @@ final class PDFWriterTests: XCTestCase {
             XCTAssertTrue(converted.ok, "\(converted.payload)")
             XCTAssertEqual(converted.payload["source_path"] as? String, source.path)
             XCTAssertEqual(converted.payload["title"] as? String, "default-source")
-            let convertedDocument = try openPDF(
+            let convertedDocument = try Self.openPDF(
                 project.appendingPathComponent("default-source.pdf"), metadata: converted.payload
             )
-            let convertedText = try extractedText(convertedDocument)
-            assertContainsScalars(convertedText, fragment: "default-source")
-            assertContainsScalars(convertedText, fragment: "DEFAULT-SOURCE-SENTINEL-025")
+            let convertedText = try Self.extractedText(convertedDocument)
+            Self.assertContainsScalars(convertedText, fragment: "default-source")
+            Self.assertContainsScalars(convertedText, fragment: "DEFAULT-SOURCE-SENTINEL-025")
         }
     }
 
@@ -173,11 +174,11 @@ final class PDFWriterTests: XCTestCase {
         XCTAssertGreaterThan(document.pageCount, 1)
         let first = try XCTUnwrap(document.page(at: 0)?.string)
         let last = try XCTUnwrap(document.page(at: document.pageCount - 1)?.string)
-        assertContainsScalars(first, fragment: "Paragraph 000 MULTIPAGE-SENTINEL-025")
-        assertContainsScalars(last, fragment: "Paragraph 129 MULTIPAGE-SENTINEL-025")
-        let text = try extractedText(document)
+        Self.assertContainsScalars(first, fragment: "Paragraph 000 MULTIPAGE-SENTINEL-025")
+        Self.assertContainsScalars(last, fragment: "Paragraph 129 MULTIPAGE-SENTINEL-025")
+        let text = try Self.extractedText(document)
         for index in 0..<130 {
-            assertContainsScalars(text, fragment: String(format: "Paragraph %03d MULTIPAGE-SENTINEL-025", index))
+            Self.assertContainsScalars(text, fragment: String(format: "Paragraph %03d MULTIPAGE-SENTINEL-025", index))
         }
     }
 
@@ -213,7 +214,7 @@ final class PDFWriterTests: XCTestCase {
         )
         XCTAssertEqual(document.pageCount, 1)
         XCTAssertEqual(metadata["pages"] as? Int, 1)
-        assertContainsScalars(try extractedText(document), fragment: marker)
+        Self.assertContainsScalars(try Self.extractedText(document), fragment: marker)
     }
 
     func testMultilineContinuationTitlePreservesBodyAndPageGeometry() throws {
@@ -248,9 +249,9 @@ final class PDFWriterTests: XCTestCase {
             text += pageText + "\n"
             try assertTitleStressPageGeometry(page, pageIndex: pageIndex)
         }
-        assertContainsScalars(text, fragment: "X")
+        Self.assertContainsScalars(text, fragment: "X")
         for paragraph in paragraphs {
-            assertContainsScalars(text, fragment: paragraph)
+            Self.assertContainsScalars(text, fragment: paragraph)
         }
     }
 
@@ -261,13 +262,13 @@ final class PDFWriterTests: XCTestCase {
             "wide-text.pdf", content: "GEOMETRY-SENTINEL-025\n\(wide)\n\(unbroken)",
             title: "Wide text geometry"
         )
-        let text = try extractedText(document)
-        assertContainsScalars(text, fragment: "GEOMETRY-SENTINEL-025")
+        let text = try Self.extractedText(document)
+        Self.assertContainsScalars(text, fragment: "GEOMETRY-SENTINEL-025")
         let compact = String(String.UnicodeScalarView(text.unicodeScalars.filter {
             !CharacterSet.whitespacesAndNewlines.contains($0)
         }))
-        assertContainsScalars(compact, fragment: wide)
-        assertContainsScalars(compact, fragment: unbroken)
+        Self.assertContainsScalars(compact, fragment: wide)
+        Self.assertContainsScalars(compact, fragment: unbroken)
 
         for pageIndex in 0..<document.pageCount {
             let page = try XCTUnwrap(document.page(at: pageIndex))
@@ -325,7 +326,7 @@ final class PDFWriterTests: XCTestCase {
     }
 
     func testDocumentToolSourceByteLimitsRejectBeforeOutput() throws {
-        try withToolApp { app, client, project in
+        try Self.withToolApp(root: temporaryRoot) { app, client, project in
             let tooLarge = String(repeating: "x", count: 4 * 1_024 * 1_024 + 1)
             let inlineDestination = project.appendingPathComponent("inline-too-large.pdf")
             let inline = try app.tools.call(
@@ -383,7 +384,7 @@ final class PDFWriterTests: XCTestCase {
     ) throws -> (PDFDocument, [String: Any]) {
         let destination = temporaryRoot.appendingPathComponent(filename)
         let metadata = try PDFWriter.write(path: destination, content: content, title: title)
-        return (try openPDF(destination, metadata: metadata), metadata)
+        return (try Self.openPDF(destination, metadata: metadata), metadata)
     }
 
     private func assertTitleStressPageGeometry(_ page: PDFPage, pageIndex: Int) throws {
@@ -408,7 +409,7 @@ final class PDFWriterTests: XCTestCase {
         }
     }
 
-    private func openPDF(_ url: URL, metadata: [String: Any]) throws -> PDFDocument {
+    private static func openPDF(_ url: URL, metadata: [String: Any]) throws -> PDFDocument {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let size = try XCTUnwrap(attributes[.size] as? NSNumber).intValue
         XCTAssertGreaterThan(size, 100)
@@ -429,7 +430,7 @@ final class PDFWriterTests: XCTestCase {
         return try XCTUnwrap((1...8).contains(document.pageCount) ? document : nil)
     }
 
-    private func extractedText(_ document: PDFDocument) throws -> String {
+    private static func extractedText(_ document: PDFDocument) throws -> String {
         guard document.pageCount <= 8 else {
             XCTFail("Fixture exceeded the page inspection bound")
             return ""
@@ -447,12 +448,12 @@ final class PDFWriterTests: XCTestCase {
         return text
     }
 
-    private func assertContainsScalars(
+    private static func assertContainsScalars(
         _ text: String, fragment: String, file: StaticString = #filePath, line: UInt = #line
     ) {
         // PDFKit may insert layout whitespace. Keep every non-whitespace scalar exact.
-        let haystack = whitespaceNormalizedScalars(text)
-        let needle = whitespaceNormalizedScalars(fragment)
+        let haystack = Self.whitespaceNormalizedScalars(text)
+        let needle = Self.whitespaceNormalizedScalars(fragment)
         let found = !needle.isEmpty && haystack.count >= needle.count
             && (0...(haystack.count - needle.count)).contains { start in
                 haystack[start..<(start + needle.count)].elementsEqual(needle)
@@ -460,7 +461,7 @@ final class PDFWriterTests: XCTestCase {
         XCTAssertTrue(found, "Missing scalar-exact fragment: \(fragment)", file: file, line: line)
     }
 
-    private func whitespaceNormalizedScalars(_ text: String) -> [UInt32] {
+    private static func whitespaceNormalizedScalars(_ text: String) -> [UInt32] {
         var result: [UInt32] = []
         var pendingSpace = false
         for scalar in text.unicodeScalars {
@@ -475,9 +476,11 @@ final class PDFWriterTests: XCTestCase {
         return result
     }
 
-    private func withToolApp(_ operation: (ForgeApp, ClientID, URL) throws -> Void) throws {
-        let home = temporaryRoot.appendingPathComponent("home", isDirectory: true)
-        let project = temporaryRoot.appendingPathComponent("project", isDirectory: true)
+    private static func withToolApp(
+        root: URL, _ operation: (ForgeApp, ClientID, URL) throws -> Void
+    ) throws {
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let project = root.appendingPathComponent("project", isDirectory: true)
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         let app = try ForgeApp.bootstrap(home: home)
         defer { app.shutdown() }

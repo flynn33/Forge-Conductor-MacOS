@@ -5,16 +5,20 @@ and measured wrapping through the existing `pdf_write` and `pdf_from_file` tools
 A bounded CoreGraphics reader preserves logical text for the supported complete
 tagged subset in instruction imports and policy-source indexing. The corrected
 owning-area selection passed all 101 source cases and the compiled native selection
-passed 102 tests on 450 unchanged inputs. Signed Debug and Release each generated
-eight control PDFs; Qwen used both PDF tools in a separate two-document API exchange
+passed 102 tests on the original 450-input PDF product snapshot. Signed Debug
+and Release each generated eight control PDFs; Qwen used both PDF tools in a separate two-document API exchange
 and stopped normally. Both unchanged control PDFKit validators passed seven of
 eight controls; mixed-script order and Qwen's wrapped-sentinel gates remain open.
 Independent r6 semantic validation passed all 82 controls and the eight Debug,
 eight Release and two Qwen artifacts with their original scalar markers. The
 original 80 expectations remain unchanged; two new operand-boundary controls
 qualify the independent validator's revised 32,768-item ceiling. Native PNG review covered
-ten Release and two Qwen PNG pages. PDFKit compatibility, a test capture warning
-and publication remain open.
+ten Release and two Qwen PNG pages. PDFKit compatibility remains open. The PDF
+source/wiki checkpoint was published and synchronized. A later test-only correction
+captures an immutable fixture URL; its freshly compiled UTF-8 regression and all
+19 writer methods passed without the original capture warning. All 96 existing
+assertion lines remain. Product/configuration/graph and version 0.25.0 (35) are
+unchanged; the new test/documentation publication is pending.
 [PDF contract, evidence and limits](docs/NATIVE-PDF-WRITING.md).
 
 The preceding **0.24.0 (34)** checkpoint: Opt-in `fs_list` pagination passed 173 affected

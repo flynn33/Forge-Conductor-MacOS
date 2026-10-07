@@ -5,14 +5,18 @@ tools now use native CoreText glyph layout and measured wrapping with CoreGraphi
 output. A shared bounded reader supplies logical text for a complete supported
 tagged subset in instruction imports and policy-source indexing. The corrected
 owning-area source selection passed 101 methods and the compiled native selection
-passed 102 tests on 450 unchanged inputs. Signed Debug and Release generation and
-Qwen's separate two-document API exchange passed. The unchanged PDFKit validators
+passed 102 tests on the original 450-input PDF product snapshot. Signed Debug/
+Release generation and Qwen's separate two-document API exchange passed. The unchanged PDFKit validators
 retain whole mixed-script order and wrapped-sentinel failures. Independent r6
 semantic validation passed 82 controls and all eight Debug, eight Release and two
 Qwen artifacts with original scalar markers/page targets. The original 80
 expectations remain unchanged; two exact operand-boundary controls qualify the
 external validator's revised limit. Native PNG review covered ten Release and two Qwen
-PNG pages. PDFKit compatibility, a test capture warning and publication remain open.
+PNG pages. PDFKit compatibility remains open. The PDF source/wiki checkpoint was
+published and synchronized. A later test-only fixture capture correction passed
+the freshly compiled UTF-8 regression and all 19 writer methods without the
+original warning; product identity remains 0.25.0 (35). This later test/documentation
+publication is pending.
 
 The signed 0.24 baseline and every unsuccessful repair attempt retain their own
 inputs. Generation metadata, logical text, PDFKit extraction, geometry and visible
@@ -178,8 +182,9 @@ Receipts are retained externally under
 | R6 Debug semantic artifacts | `native-pdf-debug-semantic-r6-025`: all eight passed with original scalar markers/page targets, normal zero exits/full EOF and no forced cleanup. Outer zero, 0.343 seconds; log `97c69d6da8faae766b4c8621c3c8919f32e994d8f2b918ba73028f6d80adb191`. The three-page artifact admits 133 spans and 7,545 cumulative independent operands. |
 | R6 Release semantic artifacts | `native-pdf-release-semantic-r6-025`: all eight passed with original scalar markers/page targets, normal zero exits/full EOF and no forced cleanup. Outer zero, 0.341 seconds; log `712da4e2f848508007c8f49c193460465800e0774f2c96fd8a8bf325cfc9fede`. |
 | R6 Qwen semantic artifacts | `native-pdf-qwen-semantic-r6-025`: both passed with original scalar markers/page targets, normal zero exits/full EOF and no forced cleanup. Outer zero, 0.341 seconds; log `0b989029494ae09790d75edf5e16dbd75f007f64eb733fe5d68b17e0f8fb85d8`. This separate logical-text proof does not reclassify the unchanged Qwen PDFKit NONPASS. |
-| Native test warning | E2 source risk: the native compiler warns at `PDFWriterTests.swift:85` that its detached closure sends XCTest `self`, including mutable fixture state, into concurrent work. The method awaits `.value`; no runtime race or production/UI reachability is observed. Current tests and assertions remain frozen. A narrow test-only value-capture/stateless-helper correction remains open; no checking or protection was lowered. |
-| Publication, installation and shipment | Current owner publication/readback/synchronization pending. Installation and shipment remain separate. |
+| Original native test warning | Historical E2 source evidence: the original native compiler warned at `PDFWriterTests.swift:85` that detached work captured XCTest `self`, including mutable fixture state. The method awaited `.value`; no runtime race or production/UI reachability was observed. The original 102-test receipt and warning log remain immutable; the later test-only correction has separate receipts below. |
+| PDF product publication | `native-pdf-publication-and-synchronization-025.json` records owner source `812f4ead367fc95f39b666fd1a814606b837b853` and wiki `07a4fb8f0a12b68c22650cc4121fa84fae1dce50`, clean and zero divergence. The 26 published source paths and all 450 tested inputs match; 45 remote wiki files match, with 34 pages and 284 checked local links/zero errors. Product candidate receipts retain this original test snapshot. |
+| Later test/documentation publication, installation and shipment | The test-only immutable capture change and this documentation closeout await their own owner publication/readback/synchronization. Installation and shipment remain separate. |
 
 R6 is a fresh independent validator revision, not a product-source change. Its
 cumulative generic-operand/TJ-member ceiling increased from 4,096 to 32,768 after
@@ -200,6 +205,38 @@ Each named source/build terminal receipt above records no deadline hit, output-c
 hit or forced cleanup. Source success does not supply signed-candidate or installed
 proof. Earlier preparations with planned 448 inputs retain their original hashes;
 fresh final preparations must bind the actual 450-input candidate map and identity.
+
+## Later test-only immutable fixture capture
+
+The original warning concerns a test closure, not the production writer or reader.
+The correction unwraps the root URL before detached work, captures that value and
+uses static helpers whose state is passed as arguments or owned locally. Awaited
+completion and deferred app shutdown remain. All 19 method identifiers and 96
+existing XCTest assertion/unwrap/fail lines remain, with one new boundary unwrap.
+No concurrency checking, scalar, geometry, cancellation, source/output-limit,
+default or durable-provenance oracle was relaxed.
+
+Only `Tests/ForgeConductorTests/PDFWriterTests.swift` changes among the original
+450 source/configuration/graph inputs: from
+`d24d5d25e5451b5333a1a2f757d92e2149748dbb780da159d0651c2774137a90` to
+`55d34730f0a1acfc4f077572d1544d5c764853f43fdd507cd5912712f55e0033`.
+The other 449 inputs and all four existing PDFWriterTests PBX membership entries
+remain unchanged. Product/configuration/graph and identity remain 0.25.0 (35);
+this test-only correction does not create or distribute a new product candidate.
+
+| Gate | Actual result and scope |
+| --- | --- |
+| Freshly compiled warning site | `native-pdf-immutable-capture-focused-025`: the exact UTF-8 source regression passed one native test, zero failures/skips, terminal zero, 5.978 seconds, full 58,724-byte EOF and unforced cleanup. Log `8a282286a6753594779f640a14521a041a218fd2faad1d3f85b370bb97cb8efa` shows PDFWriterTests.swift freshly compiled at lines 108–114; no compiler warning/error lines remain in the current native logs. New 450-input snapshot unchanged during the command. |
+| Normal writer selection | `native-pdf-immutable-capture-writer-tests-025`: all 19 writer methods passed, zero failures/skips, terminal zero, 3.074 seconds, full 20,932-byte EOF and unforced cleanup. Log `796b00b2f191caf597d90f494fd62d8d688c45e41b58c268f3145db41663ba90`; new 450-input snapshot unchanged. The focused case is included in these 19, not a twentieth method. |
+| Static parity and preserved artifacts | `native-pdf-immutable-capture-qualification-025.json` records all 19 identifiers/96 existing assertion lines and the single boundary unwrap, with 449 other inputs unchanged. `native-pdf-immutable-capture-artifact-preservation-025.json` verifies all twelve prior Debug/Release binary identities and three protected inputs unchanged. |
+
+The original 101-source/102-native and signed Debug/Release, PDFKit, r5/r6 and Qwen
+receipts keep their original input map and test hash. The later 19-method run does
+not rerun all 102 tests or supply new candidate signing/build-binding qualification.
+No runtime race or general concurrency acceptance is claimed. Both unchanged
+PDFKit compatibility gates remain OPEN; this test-only change does not alter
+generation, glyph, logical-text, layout or installed behavior. Its source/document
+publication is pending separately from the completed PDF product checkpoint.
 
 The PDF record closes neither the attachment's other rich-format requests nor the
 broader completion target. Earlier PNG/WAV/minimal-DOCX examples were Qwen-authored

@@ -13,14 +13,17 @@ grant/deadline boundary. Complete supported tagged PDFs can now contribute logic
 text to instruction imports and policy-source indexing, with explicit converter
 provenance and unchanged durable ownership. Unsupported, incomplete, over-budget
 or whitespace-only semantic text retains the existing PDFKit path. The corrected
-101-method source selection and 102 compiled native tests do not qualify a handoff
-or model-session rollover. Qwen used both PDF tools and consumed their actual
-metadata in a separate LM Studio API exchange, then stopped normally; this is not
+101-method source selection and 102 compiled native tests on the original PDF
+product snapshot do not qualify a handoff or model-session rollover. Qwen used
+both PDF tools and consumed their actual metadata in a separate LM Studio API exchange, then stopped normally; this is not
 active GUI or installed acceptance. Independent r6 semantic validation passed 82
 controls and all eight Debug, eight Release and two Qwen artifacts with the original
 scalar markers and 80 expectations intact. Native PNG review covered ten Release
-and two Qwen PNG pages. PDFKit compatibility, the test capture warning and publication
-remain open in
+and two Qwen PNG pages. PDFKit compatibility remains open. The PDF source/wiki
+checkpoint was published and synchronized. A later test-only fixture capture
+correction passed the freshly compiled UTF-8 regression and all 19 writer methods
+without the original warning; it changes neither product nor continuity behavior.
+This test/documentation publication is pending in
 [native PDF writing](NATIVE-PDF-WRITING.md).
 
 The preceding 0.24.0 (34) checkpoint: Paged `fs_list` retains the

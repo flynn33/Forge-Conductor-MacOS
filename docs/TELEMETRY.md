@@ -3,16 +3,20 @@
 Current source documentation is `0.25.0`, build `35`. The PDF writer and shared
 semantic reader own per-call native resources without adding a recurring
 producer, timer or cache. The corrected owning-area source selection passed
-101 methods and the compiled native selection passed 102 tests on 450 unchanged
-inputs. Candidate and Qwen native processes exited normally with full EOF and no
-forced cleanup. This is not general leak, GUI responsiveness or quiescence
-qualification; synchronous native parsing is not preempted by the reader's quotas.
-The native compiler's XCTest self-capture warning is an E2 test-fixture risk, with
-no observed runtime race or production reachability. The independent r6 validator
-passed 82 controls and the Debug/Release/Qwen artifacts with normal exits and full
-EOF; its revised operand quota is separate from framework latency/heap bounds.
-Native PNG review covered ten Release and two Qwen PNG pages. PDFKit compatibility,
-the test capture warning and publication remain open in
+101 methods and the compiled native selection passed 102 tests on the original
+450-input PDF product snapshot. Candidate and Qwen native processes exited
+normally with full EOF and no forced cleanup. This is not general leak, GUI
+responsiveness or quiescence qualification; synchronous native parsing is not preempted by the reader's quotas.
+The original native compiler's XCTest self-capture warning remains historical E2
+test-fixture evidence. A later immutable fixture capture correction freshly
+compiled without the warning; its focused native regression and all 19 writer
+methods passed. No runtime race or production reachability was observed, and no
+production resource boundary or concurrency check changed. The independent r6
+validator passed 82 controls and the Debug/Release/Qwen artifacts with normal
+exits and full EOF; its revised operand quota is separate from framework latency/heap bounds.
+Native PNG review covered ten Release and two Qwen PNG pages. PDFKit compatibility
+remains open. The PDF source/wiki checkpoint was published and synchronized; this
+later test/documentation publication is pending in
 [native PDF writing](NATIVE-PDF-WRITING.md).
 
 ## Preceding 0.24.0 listing resource evidence

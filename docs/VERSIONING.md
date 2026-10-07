@@ -15,15 +15,18 @@ Current identity is **0.25.0 (35)**. The native PDF text/layout correction and s
 complete tagged-text reader advance the feature-release component. Tool names,
 schemas, defaults and durable formats remain; generated PDF bytes/layout and
 new converter provenance can change. The corrected owning-area source selection
-passed 101 methods and the compiled native selection passed 102 tests on 450
-unchanged inputs. The current marker regression and strict Debug/Release
-signing/build binding passed; Qwen's separate two-document API exchange passed.
+passed 101 methods and the compiled native selection passed 102 tests on the
+original 450-input PDF product snapshot. Its marker regression and strict
+Debug/Release signing/build binding passed; Qwen's separate two-document API
+exchange passed.
 Independent r6 semantic validation passed 82 controls and all eight Debug, eight
 Release and two Qwen artifacts with original scalar markers and 80 expectations
 preserved. Its operand quota revision is external to the product. Native PNG
 review covered ten Release and two Qwen PNG pages. The PDFKit whole mixed-script
-order and Qwen wrapped-sentinel gates, a test capture warning and publication remain
-open in
+order and Qwen wrapped-sentinel gates remain open. The PDF source/wiki checkpoint
+was published and synchronized. A later test-only immutable fixture capture
+correction passed the freshly compiled UTF-8 regression and all 19 writer methods
+without the original warning; this test/documentation publication is pending in
 [native PDF writing](NATIVE-PDF-WRITING.md).
 
 The preceding identity is **0.24.0 (34)**. Additive `fs_list`
@@ -88,13 +91,20 @@ focused version test, and CI reject drift between them.
 The current product version is `0.25.0`, build `35`. `VERSION`, `BUILD_NUMBER`,
 compiled protocol constants, all twelve Xcode marketing-version settings,
 all sixteen build-number settings and current document markers must agree.
-The current-version source/document regression passed one method and the compiled
-native selection passed 102 tests, including that same marker check. Strict
-Debug/Release verification bound seven/five candidate identities to successful
-450-input builds. This documentation refresh still requires final review/publication;
-Independent r6 semantic artifact validation and Release/Qwen render review passed
-within their recorded scopes; original PDFKit compatibility failures and the test
-capture warning remain open.
+At the PDF product checkpoint, the current-version source/document regression
+passed one method and the compiled native selection passed 102 tests, including
+that same marker check. Strict Debug/Release verification bound seven/five
+candidate identities to successful
+450-input builds on the original PDF snapshot. That PDF source/wiki checkpoint
+was published and synchronized. The later fixture-only correction changes one
+test hash within the same 450-entry map; the other 449 inputs, product/configuration
+and graph remain unchanged. Its focused native regression and all 19 writer
+methods passed without the original warning. No distributed candidate or product
+contract changed, so identity remains 0.25.0 (35); this does not alter the general
+version policy or the build-number requirement for distributed candidates. This
+test/documentation publication remains pending. Independent r6 semantic artifact
+validation and Release/Qwen render review retain their original scopes; both
+PDFKit compatibility failures remain open.
 The corrected PDF owning-area
 source selection passed 101 methods, while earlier build/source receipts retain
 their exact pre-final inputs.

@@ -5,9 +5,9 @@ Current source version **0.25.0**, build **35**.
 The PDF repair adds `NativePDFTextReader.swift` to the existing Core target and
 `PDFWriterTests.swift` / `NativePDFTextReaderTests.swift` to the existing test
 target: twelve additive PBX entries, three new Swift files and 450 source inputs.
-The workspace is unchanged. The corrected owning-area source selection passed
-101 methods without failures/skips, including fourteen reader methods with 53
-raw cases and both durable consumers. Earlier 35-method focused and 84-method
+The workspace is unchanged. On the original PDF product snapshot, the corrected
+owning-area source selection passed 101 methods without failures/skips, including
+fourteen reader methods with 53 raw cases and both durable consumers. Earlier 35-method focused and 84-method
 owning-area passes and pre-final-input compilation keep their original scope.
 The final CLI/app builds passed in 0.893/0.892 seconds; ordinary canonical Debug
 compilation passed in 5.261 seconds with all 450 inputs unchanged. The current
@@ -22,15 +22,22 @@ eight mixed-order failure. Independent r6 semantic validation passed 82 controls
 and all eight Debug, eight Release and two Qwen artifacts. It preserves the original
 80 expectations and adds exact 32,768/32,769 operand controls; the revised ceiling
 is an external validator change, with no candidate/source change. Native PNG
-review covered ten Release and two Qwen PNG pages. PDFKit compatibility, the test
-capture warning and publication remain open.
+review covered ten Release and two Qwen PNG pages. PDFKit compatibility remains
+open; the PDF source/wiki checkpoint was published and synchronized.
 
-The native compile log retains a warning at `PDFWriterTests.swift:85`: the detached
-closure captures XCTest `self`, including mutable fixture state. This is an E2
-test capture risk, not an observed runtime race or a production/UI reachability
-finding. The awaited worker and all current assertions remain unchanged. A narrow
-test-only correction to capture an immutable root URL and use stateless fixture
-helpers remains open; concurrency checking has not been relaxed.
+The original native compile log retains the E2 warning at
+`PDFWriterTests.swift:85`: detached work captured XCTest `self` and mutable fixture
+state. A later test-only correction snapshots the root URL before detached work
+and uses stateless helpers. The exact UTF-8 regression freshly compiled without
+compiler warnings/errors and passed one native test in 5.978 seconds; the normal
+writer selection then passed all 19 methods in 3.074 seconds, zero failures/skips.
+The focused case is included in the 19. All 96 existing assertion lines remain,
+with one added fixture unwrap; awaited completion and deferred shutdown remain.
+Only this test hash changes among 450 inputs; the other 449 inputs, existing four
+PDFWriterTests membership entries, workspace, product/configuration and 0.25.0 (35)
+identity are unchanged. Original 102-test and signed-candidate receipts keep their
+old map; no runtime race or new product-candidate qualification is claimed.
+Concurrency checking was not relaxed. This test/documentation publication is pending.
 [PDF contract and gate status](docs/NATIVE-PDF-WRITING.md).
 
 ## Preceding 0.24.0 listing graph and qualification

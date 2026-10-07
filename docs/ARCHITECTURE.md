@@ -10,17 +10,21 @@ subset and applies cumulative decode/operator/array quotas. It adds no cache,
 timer or service. Instruction imports and policy-source indexing retain existing
 PDFKit fallback and durable records; accepted logical text has new converter
 provenance. The corrected owning-area selection passed 101 source methods and the
-compiled native selection passed 102 tests on 450 unchanged inputs. Strict
-Debug/Release signing/build binding and separate Qwen PDF-tool consumption passed.
+compiled native selection passed 102 tests on the original 450-input PDF snapshot.
+Strict Debug/Release signing/build binding and separate Qwen PDF-tool consumption passed.
 Independent r6 validation passed 82 controls (fourteen admissions and sixty-eight
 whole-document fallbacks) and all eight Debug, eight Release and two Qwen artifacts.
 The original 80 expectations and scalar markers remain unchanged. The external
 operand ceiling increased from 4,096 to 32,768 with two new exact boundary controls;
 its counter population differs from the production reader. It does not qualify
 glyphs or PDF tagging conformance. Native PNG review covered ten Release and two Qwen
-PNG pages. PDFKit compatibility, the test capture warning and publication remain
-open. The scope, unresolved optional root-field ambiguity
-and retained PDFKit order failure are in [native PDF writing](NATIVE-PDF-WRITING.md).
+PNG pages. PDFKit compatibility remains open. The PDF source/wiki checkpoint was
+published and synchronized. A later test-only immutable fixture capture correction
+passed the freshly compiled UTF-8 regression and all 19 writer methods without the
+original warning. It changes no production ownership, resource boundary, graph or
+product identity; original candidate receipts retain their original test hash. This
+test/documentation publication is pending. The scope, unresolved optional
+root-field ambiguity and retained PDFKit order failure are in [native PDF writing](NATIVE-PDF-WRITING.md).
 
 ## Preceding 0.24.0 listing boundary
 
