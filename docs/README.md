@@ -1,7 +1,20 @@
 # Documentation guide
 
-Current source is **0.23.0 (33)**. Native JavaScript snapshots, ownership and
-deadline corrections are recorded in [native web rendering](NATIVE-WEB-RENDERING.md).
+Current source is **0.24.0 (34)**. Opt-in directory continuation,
+metadata fences, final stdio budgets and qualification limits are recorded in
+[filesystem list paging](FILESYSTEM-LIST-PAGING.md). Its 0.23.0 native baseline
+observed ignored limits and truncation without a cursor. The final affected
+selection passed 173 source cases and the same 173 compiled Core cases;
+Debug/Release builds and signatures passed. Each profile passed 35 listing
+cases, 35 CLI renderer cases and ten app renderer cases. Qwen consumed three
+real pages, using the previous returned cursor on each continuation, and stopped
+normally. New renderer measurements include LF; the original 0.23.0 JSON-only
+receipts retain their own scope. Initial
+compiler, raw-input, wrong-error and 34/35-case failed attempts remain NONPASS;
+installed and notice-bearing runtime gates remain open.
+
+The preceding **0.23.0 (33)** native JavaScript snapshots, ownership and deadline
+corrections are recorded in [native web rendering](NATIVE-WEB-RENDERING.md).
 Debug passed 130 compiled tests and 35 actual MCP cases; Qwen consumed the live
 JavaScript result and finished normally. Release compilation, signing and the
 same 35-case MCP matrix passed. Installed acceptance remains open.
@@ -51,6 +64,7 @@ qualification is not promoted by this UI phase.
 | [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow current setup guidance or open contextual offline help |
 | [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
+| [Filesystem list paging](FILESYSTEM-LIST-PAGING.md) | Opt-in directory continuation, metadata/authorization fences, LF-inclusive frame budgets and current qualification status |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

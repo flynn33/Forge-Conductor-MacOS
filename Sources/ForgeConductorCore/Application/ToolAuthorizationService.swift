@@ -241,6 +241,16 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             )
         }
 
+        if tool == "fs_list", FilesystemListingPage.usesPagedMode(arguments: arguments) {
+            do {
+                _ = try FilesystemListingPage.Arguments(arguments)
+            } catch let failure as FilesystemListingPage.Failure {
+                let result = failure.result
+                return .denied(code: result.payload["code"] as? String ?? "listing_invalid_argument",
+                               message: result.payload["message"] as? String ?? "Invalid listing arguments")
+            }
+        }
+
         let base = try defaultBase(
             binding: binding,
             context: context,

@@ -347,7 +347,93 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0)
     }
 
-    private func checkRendererDeadlineDuringProjectContention(timeoutSeconds: TimeInterval) async throws {
+    func testPagedListingBudgetLookupHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0.1, toolName: "fs_list")
+    }
+
+    func testPagedListingRejectsFractionalWireNumbersNearIntegerRoundingBoundaries() throws {
+        for field in ["limit", "maximum_bytes"] {
+            for framing in ["ndjson", "content-length", "eof"] {
+                for token in ["1.00000000000000001", "999.99999999999999999",
+                              "1.0000000000000000000000000000000000000000001"] {
+                    let pipe = Pipe()
+                    let body = Data(("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"fs_list\",\"arguments\":{\""
+                                     + field + "\":" + token + "}}}").utf8)
+                    let packet = framing == "content-length" ? Data("Content-Length: \(body.count)\r\n\r\n".utf8) + body
+                        : framing == "ndjson" ? body + Data([10]) : body
+                    try pipe.fileHandleForWriting.write(contentsOf: packet)
+                    try pipe.fileHandleForWriting.close()
+                    defer { try? pipe.fileHandleForReading.close() }
+                    let reader = MCPStreamReader(handle: pipe.fileHandleForReading)
+                    defer { reader.close() }
+                    let message = try XCTUnwrap(reader.readMessage())
+                    let parameters = try XCTUnwrap(message["params"] as? [String: Any])
+                    let arguments = try XCTUnwrap(parameters["arguments"] as? [String: Any])
+                    XCTAssertEqual(message["id"] as? Int, 1)
+                    XCTAssertThrowsError(try FilesystemListingPage.Arguments(arguments), "\(field)/\(framing)/\(token)")
+                }
+            }
+        }
+    }
+
+    func testPagedListingWireRejectionKeepsServerAliveAndCorrelationIntact() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        fixture.start()
+        var stopped = false
+        defer { if !stopped { _ = fixture.stop() } }
+        for field in ["limit", "maximum_bytes"] {
+            let id = "invalid-list-\(field)"
+            try fixture.sendRaw(Data(("{\"jsonrpc\":\"2.0\",\"id\":\"" + id + "\",\"method\":\"tools/call\",\"params\":{\"name\":\"fs_list\",\"arguments\":{\""
+                                     + field + "\":1.0000000000000000000000000000000000000000001}}}\n").utf8))
+            let rejected = try fixture.responses.read(timeout: 3)
+            XCTAssertEqual(rejected["id"] as? String, id)
+            let result = try XCTUnwrap(rejected["result"] as? [String: Any])
+            let payload = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+            XCTAssertEqual(payload["code"] as? String, "listing_invalid_argument", field)
+            XCTAssertEqual(result["isError"] as? Bool, true)
+            XCTAssertNil(payload["entries"])
+            try fixture.send(["jsonrpc": "2.0", "id": "after-" + id, "method": "ping"])
+            let ping = try fixture.responses.read(timeout: 3)
+            XCTAssertEqual(ping["id"] as? String, "after-" + id)
+            XCTAssertNotNil(ping["result"])
+        }
+        let error = fixture.stop()
+        stopped = true
+        XCTAssertNil(error)
+    }
+
+    func testPagedListingRawIntegerCanonicalizationPreservesExactNotationAndLegacyMode() throws {
+        for token in ["1.0", "1e2", "100"] {
+            let pipe = Pipe()
+            try pipe.fileHandleForWriting.write(contentsOf: Data(("{\"method\":\"tools/call\",\"params\":{\"name\":\"fs_list\",\"arguments\":{\"limit\":" + token + "}}}\n").utf8))
+            try pipe.fileHandleForWriting.close()
+            defer { try? pipe.fileHandleForReading.close() }
+            let reader = MCPStreamReader(handle: pipe.fileHandleForReading)
+            defer { reader.close() }
+            let message = try XCTUnwrap(reader.readMessage())
+            let parameters = try XCTUnwrap(message["params"] as? [String: Any])
+            let arguments = try XCTUnwrap(parameters["arguments"] as? [String: Any])
+            XCTAssertEqual(try FilesystemListingPage.Arguments(arguments).limit, token == "1.0" ? 1 : 100)
+        }
+        let pipe = Pipe()
+        try pipe.fileHandleForWriting.write(contentsOf: Data("{\"method\":\"tools/call\",\"params\":{\"name\":\"fs_list\",\"arguments\":{\"path\":3}}}\n".utf8))
+        try pipe.fileHandleForWriting.close()
+        defer { try? pipe.fileHandleForReading.close() }
+        let reader = MCPStreamReader(handle: pipe.fileHandleForReading)
+        defer { reader.close() }
+        let message = try XCTUnwrap(reader.readMessage())
+        let parameters = try XCTUnwrap(message["params"] as? [String: Any])
+        let arguments = try XCTUnwrap(parameters["arguments"] as? [String: Any])
+        XCTAssertEqual(arguments["path"] as? Int, 3)
+        XCTAssertNil(arguments["limit"])
+    }
+
+    func testAlreadyExpiredPagedListingResponseHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0, toolName: "fs_list")
+    }
+
+    private func checkRendererDeadlineDuringProjectContention(timeoutSeconds: TimeInterval,
+                                                            toolName: String = "web.render") async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("forge-render-budget-deadline-\(UUID().uuidString)", isDirectory: true)
         let home = root.appendingPathComponent("home", isDirectory: true)
@@ -376,9 +462,12 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         let server = MCPServer(app: app, clientID: client)
         let control = ToolCallCancellation(timeoutSeconds: timeoutSeconds)
         let start = Date()
+        let arguments: [String: Any] = toolName == "fs_list"
+            ? ["path": project.path, "limit": 1]
+            : ["url": "https://example.com/"]
         let response = try XCTUnwrap(server.handle([
             "jsonrpc": "2.0", "id": "contended-render", "method": "tools/call",
-            "params": ["name": "web.render", "arguments": ["url": "https://example.com/"]]
+            "params": ["name": toolName, "arguments": arguments]
         ], cancellation: control))
         let elapsed = Date().timeIntervalSince(start)
         for _ in 0..<4 { release.signal() }
@@ -1960,6 +2049,10 @@ private final class MCPWireFixture {
 
     func send(_ message: [String: Any]) throws {
         try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode(message))
+    }
+
+    func sendRaw(_ data: Data) throws {
+        try input.fileHandleForWriting.write(contentsOf: data)
     }
 
     func stop() -> Error? {

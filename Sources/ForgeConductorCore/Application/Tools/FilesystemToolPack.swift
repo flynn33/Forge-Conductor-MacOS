@@ -171,7 +171,12 @@ public struct FilesystemToolPack: ToolPackHandling {
         case "fs_read": return try fsRead(arguments, context: context, cancellation: cancellation)
         case "fs_write": return try fsWrite(arguments, cancellation: cancellation)
         case "fs_edit": return try fsEdit(arguments, cancellation: cancellation)
-        case "fs_list": return try fsList(arguments, cancellation: cancellation)
+        case "fs_list":
+            if FilesystemListingPage.usesPagedMode(arguments: arguments) {
+                return try FilesystemListingPage.list(arguments: arguments, context: context,
+                    clientID: clientID, app: app, cancellation: cancellation)
+            }
+            return try fsList(arguments, cancellation: cancellation)
         case "fs_glob":
             return try fsGlob(
                 arguments,

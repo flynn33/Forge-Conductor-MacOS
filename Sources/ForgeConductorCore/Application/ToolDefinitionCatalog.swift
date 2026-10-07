@@ -676,7 +676,7 @@ private enum ProductionToolDefinitionSource {
         "fs_read": "Read a file. Default encoding=utf8 preserves the 1-based line window: offset + length/limit, with total_lines, start_line, end_line, has_more and next_offset. encoding=base64 reads a bounded exact-byte page using byte_offset and maximum_bytes; continue at next_byte_offset. Do not repeat an offset after content was returned.",
         "fs_write": "Write a file. Default encoding=utf8 writes text; encoding=base64 accepts strict base64 for up to 2 MiB of decoded bytes.",
         "fs_edit": "Replace occurrences of old with new in a file.",
-        "fs_list": "List directory entries.",
+        "fs_list": "List direct directory entries. Path-only calls retain the legacy 1000-entry cap. Supplying limit, cursor or maximum_bytes selects bounded pagination ordered by raw filename bytes; continue with next_cursor until has_more=false. Cursors bind the client, project generation, canonical path and observed directory metadata. Changed directories require restarting. Each page scans at most 100000 direct entries within 15 seconds and the request deadline. Successful paged stdio responses fit the encoded inline budget including the terminating LF, request ID and required notice. An impossible envelope returns listing_output_budget. This is a metadata-fenced scan, not an atomic directory snapshot; unsupported filename encoding returns an explicit error.",
         "fs_glob": "Find files by name pattern under a path.",
         "fs_mkdir": "Create a directory.",
         "fs_delete": "Delete a file or directory.",
@@ -843,11 +843,25 @@ private enum ProductionToolDefinitionSource {
                 ] as [String: Any],
                 "required": ["path"],
             ]
-        case "fs_list", "fs_delete", "fs_mkdir":
+        case "fs_list":
+            return [
+                "type": "object",
+                "properties": [
+                    "path": ["type": "string"] as [String: Any],
+                    "limit": ["type": "integer", "minimum": 1, "maximum": 1_000, "default": 100,
+                        "description": "Select paged listing with at most this many direct entries."] as [String: Any],
+                    "cursor": ["type": "string", "minLength": 1, "maxLength": 8_192,
+                        "description": "Opaque next_cursor from the preceding page for the same client, project generation and path."] as [String: Any],
+                    "maximum_bytes": ["type": "integer", "minimum": 1, "maximum": 65_536, "default": 16_384,
+                        "description": "Select paged listing; maximum successful stdio response bytes, including LF and limited by project authorization."] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
+            ]
+        case "fs_delete", "fs_mkdir":
             return [
                 "type": "object",
                 "properties": ["path": ["type": "string"] as [String: Any]] as [String: Any],
-                "required": name == "fs_list" ? [] as [String] : ["path"],
+                "required": ["path"],
             ]
         case "fs_glob":
             return [

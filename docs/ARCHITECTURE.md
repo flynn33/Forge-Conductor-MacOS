@@ -1,9 +1,27 @@
 # Forge Conductor architecture
 
-Version: `0.23.0`; build: `33`.
+Version: `0.24.0`; build: `34`.
 
-The current slice adds `ForgeApp`-owned JavaScript rendering through a bounded
-fixed-mode signed native child and preserves request deadlines through MCP
+The current listing work adds opt-in, per-call `fs_list` continuation and a
+paged-list-only final stdio budget check. The helper scans direct names with a
+bounded raw-byte selector, has an explicit per-call directory owner with
+idempotent close/deinit fallback, and revalidates observed directory metadata
+and project context before delivery.
+It adds no persistent cursor index, watcher, cache or child process. Existing
+path-only listing, owner read access and tool grants remain separate preserved
+surfaces. Original paged arguments are checked before path normalization, and
+the MCP reader checks original paged count tokens across its three framing
+branches. Final checks passed 173 source cases and the same 173 compiled Core
+cases. The close regression observes one successful `closedir` on four paths;
+it is not a whole-process leak qualification. Signed Debug/Release listing and
+renderer matrices passed, and Qwen consumed actual continuation pages. The
+retained failed attempts, runtime scope limits and open installed/notice gates are in
+[filesystem list paging](FILESYSTEM-LIST-PAGING.md).
+
+## Preceding 0.23.0 renderer boundary
+
+The preceding 0.23.0 slice adds `ForgeApp`-owned JavaScript rendering through a
+bounded fixed-mode signed native child and preserves request deadlines through MCP
 response-context lookups. Its ownership, protocol and verification scopes are
 recorded in [native web rendering](NATIVE-WEB-RENDERING.md). Earlier receipts
 retain their tested identities and scopes.

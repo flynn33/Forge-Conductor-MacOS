@@ -10,6 +10,22 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.24.0 (34)` bounded directory continuation
+
+- Added opt-in `fs_list` pagination with project/client/generation/path-bound
+  continuation and raw filename byte ordering. Path-only calls preserve the
+  legacy response. Signed Debug and Release each passed 35 listing checks;
+  Qwen consumed three real one-entry pages and stopped normally.
+- Corrected `web.render` final stdio sizing to include its terminating LF after
+  an exact-boundary regression reproduced a one-byte overflow. All 17 affected
+  renderer service source cases passed. Debug and Release each passed 35 CLI
+  and ten app-executable MCP cases with LF-inclusive measurements.
+- Strict paged-list input checks preserve the original path type and JSON
+  integer tokens before normalization can coerce or round them. All 173 affected
+  source cases and the same 173 compiled native cases passed without skips.
+- [Listing contract and evidence](docs/FILESYSTEM-LIST-PAGING.md) records the
+  baseline, bounds, directory fences and remaining checks.
+
 ### `0.23.0 (33)` native JavaScript web snapshots
 
 - Added project-authorized `web.render` for native JavaScript DOM snapshots on

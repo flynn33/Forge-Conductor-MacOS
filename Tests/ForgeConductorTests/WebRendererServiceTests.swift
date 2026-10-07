@@ -297,6 +297,30 @@ final class WebRendererServiceTests: XCTestCase {
         XCTAssertEqual(blocks.last?["text"] as? String, notice)
     }
 
+    func testFinalMCPBudgetIncludesTerminatingLineFeedAtExactJSONBoundary() throws {
+        let context = makeContext()
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let reply = makeReply(request, text: String(repeating: "x", count: 1_024))
+        let original = try WebRenderToolPack.snapshotResult(reply, requestedURL: request.url,
+            context: context, budget: 16_384, cancellation: nil)
+        let identifier = "exact-boundary-\"-\\-😀"
+        let notice = "Required notice retained at the exact encoding boundary"
+        let budget = try MCPToolResponse.data(id: identifier, result: original, additiveNotice: notice).count
+        let response = WebRenderToolPack.finalMCPResponse(id: identifier, result: original,
+            additiveNotice: notice, budget: budget)
+        XCTAssertLessThanOrEqual(try MCPStdioTransport.encode(response).count, budget)
+        XCTAssertEqual(response["id"] as? String, identifier)
+        let result = try XCTUnwrap(response["result"] as? [String: Any])
+        XCTAssertEqual(result["isError"] as? Bool, false)
+        XCTAssertEqual((result["content"] as? [[String: Any]])?.last?["text"] as? String, notice)
+        let payload = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+        let content = try XCTUnwrap(payload["content"] as? String)
+        XCTAssertFalse(content.isEmpty)
+        XCTAssertTrue(Data(reply.text.utf8).starts(with: Data(content.utf8)))
+        XCTAssertEqual(payload["content_sha256"] as? String, JSONSupport.sha256Hex(Data(content.utf8)))
+        XCTAssertEqual(payload["returned_content_bytes"] as? Int, content.utf8.count)
+    }
+
     func testImpossibleMCPEnvelopeReturnsExplicitBudgetFailureWithoutChangingIDOrNotice() throws {
         let identifier = String(repeating: "escaped\"😀", count: 300)
         let notice = "Required notice"

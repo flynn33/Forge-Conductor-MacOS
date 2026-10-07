@@ -5,6 +5,30 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class ToolDefinitionCatalogTests: XCTestCase {
+    func testPagedListingSchemaIsAdditiveAndPreservesNeighboringPathContracts() throws {
+        try withProductionApp("paged-listing-catalog") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let replay = try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "fs_list"))
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "limit", "cursor", "maximum_bytes", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], [])
+            XCTAssertEqual((properties["limit"] as? [String: Any])?["maximum"] as? Int, 1_000)
+            XCTAssertEqual((properties["limit"] as? [String: Any])?["default"] as? Int, 100)
+            XCTAssertEqual((properties["cursor"] as? [String: Any])?["maxLength"] as? Int, 8_192)
+            XCTAssertEqual((properties["maximum_bytes"] as? [String: Any])?["maximum"] as? Int, 65_536)
+            XCTAssertEqual(try replay.replayClass(for: "fs_list"), .readOnly)
+            XCTAssertTrue(definition.description.contains("Path-only calls retain"))
+            XCTAssertTrue(definition.description.contains("not an atomic directory snapshot"))
+            for name in ["fs_delete", "fs_mkdir"] {
+                let neighboring = try XCTUnwrap(catalog.definition(named: name)).inputSchemaObject()
+                XCTAssertEqual(neighboring["required"] as? [String], ["path"])
+                XCTAssertEqual(Set(try XCTUnwrap(neighboring["properties"] as? [String: Any]).keys), ["path", "deadline_ms"])
+            }
+        }
+    }
+
     func testRendererAddsExactPublicSchemaAndPreservesResearchGrantsAndContextAdmission() throws {
         try withProductionApp("renderer-catalog") { app in
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)

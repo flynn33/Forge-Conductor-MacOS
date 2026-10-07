@@ -1,8 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 bounded filesystem listing continuation
+
+Current source identity is **0.24.0 (34)**, starting from synchronized owner-authored
+`574aa99ccd5ba38966f79f4cce0f3c855ea4b7fc`; source and wiki were clean and matched
+remote before product edits. [Listing evidence](docs/FILESYSTEM-LIST-PAGING.md)
+records this slice. The candidate gates below passed; installed acceptance and
+the remaining capability work stay open.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Directory continuation | Signed .23 baseline reproduced the 1,000-name cutoff without continuation. New opt-in paging preserves path-only responses, orders raw filename bytes and fences client/project/generation/path/directory metadata. All 173 affected source cases and the same 173 compiled native cases passed without skips. Signed Debug and Release each passed 35 listing checks, 52 correlated responses across two normally exited parents, the exact 1,001-name union in eight pages and budget-shrunk continuation without gaps. | Metadata fences are not an atomic snapshot or a first-open vnode identity guarantee. Privileged metadata restoration, hostile mounts and installed acceptance were not exercised. Actual additive-policy-notice runtime was not exercised; deterministic final-envelope tests cover the notice and ID. |
+| Original input boundaries | Actual tests reproduced numeric path coercion and near-integer JSON rounding. Paged validation now checks original path types and original count tokens; invalid maximum_bytes receives its own argument error. Literal native inputs reject both near-integer counts, and the same stream answers a subsequent ping. Original failed receipts remain NONPASS. | Other tools' numeric parsing is unchanged and is not qualified by these cases. Legacy path-only behavior remains covered. |
+| Complete-wire renderer sizing | Exact source regression reproduced 3,730 wire bytes against a 3,729-byte budget. Minimal final-fit correction includes LF; all 17 service cases passed. Signed Debug and Release each passed 35 CLI and ten app-executable MCP cases, consuming 39 and 14 responses respectively with LF-inclusive accounting, normal zero exits, full EOF and closed fixtures. Earlier .23 JSON-only receipts remain preserved. | This qualifies the candidate stdio route; HTTP/native-task framing, whole DOM/network/heap bounds, other Macs and installed/browser workflows remain separate. |
+| Qwen consumer | Qwen used the advertised listing descriptor for three real pages, passing the prior returned cursor on each continuation. It reported alpha.txt, middle.txt and zulu.txt once each, then stopped normally. Four nonce-scoped model requests each had observed Low templates; seven native responses were consumed with normal zero exit/full EOF. | Supported LM Studio API evidence; active GUI chat, installed new tools, other models and Release-model repetition were not exercised. |
+| Canonical build and ownership | CLI/app compilation and canonical Debug/Release builds passed on the same 447 source inputs. Both ordinary candidates passed strict signing; seven Debug and five Release identities retained. New helper/test membership and all twelve changed Swift inputs were checked in existing targets, workspace unchanged. Five preceding candidates and three installed/registration protections remained unchanged. | Five native-test audit-drain QoS warnings are retained; no ordinary GUI inversion was established. No installation, packaging, notarization or shipment was performed. |
+
 ## October 7 native JavaScript web snapshots
 
-Current source identity is **0.23.0 (33)**, starting from synchronized owner-signed
+This checkpoint’s source identity is **0.23.0 (33)**, starting from synchronized owner-signed
 `c391285b00fa4af03eb5210f42f67c3f57e0ffde`. The current implementation and retained
 failures are recorded in [native web rendering](docs/NATIVE-WEB-RENDERING.md).
 The corrected candidate gates below passed; installed and broader feature

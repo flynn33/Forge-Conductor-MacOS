@@ -1,10 +1,29 @@
 # Native JavaScript web snapshots
 
-Current source identity is **0.23.0 (33)**, based on synchronized owner-signed
+This checkpoint's source identity is **0.23.0 (33)**, based on synchronized owner-signed
 `c391285b00fa4af03eb5210f42f67c3f57e0ffde`. Debug native and Qwen acceptance
 passed; Release compilation, signing and the same runtime matrix passed.
 The installed application and LM Studio registration remain
 separate from these candidates.
+
+## 0.24.0 complete-wire follow-up
+
+After this checkpoint, an exact boundary test reproduced 3,730 stdio bytes
+against a 3,729-byte budget. The 0.23.0 final-fit code and recorded protocol
+measurements counted the JSON before the terminating LF. Those original
+receipts remain unchanged. In **0.24.0 (34)**, final fit uses the actual stdio
+encoder, including LF, the real ID, both payload copies and any required notice.
+All seventeen renderer service cases passed, including the original boundary.
+
+New signed Debug and Release CLI matrices each passed all 35 cases with 39
+correlated responses; both signed app executables passed ten core cases with
+14 responses. Measurements include LF. All four parents exited zero with both
+EOFs, no forced cleanup, unconsumed replies or response tails. Source, candidate
+and installed/registration identities stayed unchanged. The CLI origin totals
+matched exactly after fixture shutdown. Actual additive-policy-notice runtime
+was not exercised; its exact final-frame behavior has deterministic coverage.
+[The listing and wire-budget record](FILESYSTEM-LIST-PAGING.md) retains the
+failure, corrected receipts and remaining qualification boundaries.
 
 ## Tool contract
 
@@ -24,7 +43,7 @@ This is not a promise that every page operation finished.
 
 Extraction visits at most 4,096 nodes and returns at most 8,192 UTF-8 text bytes
 and 512 title bytes. Successful stdio responses fit the final encoded allowance,
-including the actual JSON-RPC ID, duplicated text/structured payload and required
+including the terminating LF, actual JSON-RPC ID, duplicated text/structured payload and required
 policy notice. Content reduction updates its digest and count. An impossible
 envelope produces an explicit error; even that correlated error cannot fit an
 allowance smaller than the ID/envelope itself. Other tools' output contracts

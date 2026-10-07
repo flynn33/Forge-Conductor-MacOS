@@ -1,6 +1,23 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation is `0.23.0`, build `33`. Native renderer process
+Current source documentation is `0.24.0`, build `34`. The per-call listing
+helper introduces no recurring timer, watcher, cursor cache or subprocess. Its
+source descriptor owner uses explicit idempotent close with a deinit fallback;
+the source and compiled Core regression observes exactly one successful close
+on success, cancellation, quota and stale-context paths. This is not broad leak
+qualification. Final checks passed 173 source and the same 173 compiled Core
+cases; the interim failed selections remain NONPASS. The helper's bounded
+scan/output work and actual native/model checks are recorded in
+[filesystem list paging](FILESYSTEM-LIST-PAGING.md); no new telemetry or
+quiescence pass is implied.
+
+Five Thread Performance Checker QoS warnings occurred in the compiled test host
+at `DiagnosticLog` flush/shutdown drain lines 64/75, in three existing Core tests
+and two existing router-deadline tests. All those cases passed. Ordinary GUI
+reachability and a product priority-inversion defect are not established by
+those warnings; they remain separate from the new listing/renderer MCP passes.
+
+Preceding 0.23.0 native renderer process
 launch, exit, child and pipe-reader counters use the existing diagnostics owner.
 The [renderer record](NATIVE-WEB-RENDERING.md) gives their verification limits. The telemetry
 operating contracts below remain in force; preceding receipts keep their tested
@@ -225,6 +242,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.23.0`
+`0.24.0`
 
-Build: `33`
+Build: `34`

@@ -1,6 +1,44 @@
 # Version and qualification status
 
-Current source **0.23.0, build 33** adds native JavaScript snapshots and MCP
+Current source **0.24.0, build 34** adds opt-in `fs_list` continuation while
+preserving path-only listing. The unchanged signed 0.23.0 candidate reproduced
+three owned-file cases: path-only returned three, undeclared `limit: 1` still
+returned three, and 1,001 names returned 1,000 with truncation and no cursor.
+All seven native responses were consumed, with normal zero exit/both EOFs and
+unchanged 445 source, seven candidate and three protected inputs. This is
+baseline evidence of the missing capability, not qualification of the new paging.
+Two source input baselines also failed: one raw fractional token survived
+integer rounding, and one numeric path returned the owned sentinel after path
+normalization. The corrected interim source selection executed 34 tests with
+four failures (one unexpected), terminal 1; all four selected MCP checks and the
+routed numeric-path check passed. That selection, a later 35-case alias failure,
+the initial compiler failures and the fractional-maximum-bytes wrong-error
+baseline remain NONPASS. The final frozen 447-input selection passed 173 source
+tests and the same 173 compiled Core tests, zero failures/skips, with final
+CLI/app builds and signed Debug/Release builds passing.
+
+Debug and Release listing each passed 35 cases/52 responses across two normally
+exiting native parents, including exact recovery of 1,001 names in eight pages
+and LF-inclusive escaped-name budgets. Each profile also passed renderer CLI
+35 cases/39 responses and app ten cases/14 responses. Qwen used the Debug
+candidate for the initial one-entry page and two continuations using the previous
+returned cursor, then stopped normally after four model requests; the scoped
+observer saw Low in 4/4 events.
+All frozen source/artifact/protected guards passed. Required policy notices
+were covered by source final-frame tests but absent from the native matrices.
+Five compiled test-host QoS warnings at diagnostic drains are separate evidence,
+not an established ordinary GUI warning defect. Installed, notice-bearing runtime
+and broad filesystem gates remain open in [the listing record](FILESYSTEM-LIST-PAGING.md).
+
+The separate renderer LF boundary regression failed 3,730 > 3,729 bytes. Its
+minimal final-fit correction passed all 17 source `WebRendererServiceTests`,
+terminal zero without timeout/truncation/forced cleanup. New Debug/Release
+renderer MCP matrices measure actual LF-inclusive bytes. Published 0.23.0
+JSON-only receipts remain unchanged and are not reclassified.
+
+## Preceding 0.23.0 (33) native renderer receipts
+
+Published preceding source **0.23.0, build 33** adds native JavaScript snapshots and MCP
 response deadline propagation. Debug passed 130 compiled cases and 35 actual
 MCP cases; the signed app executable passed ten core cases. Qwen consumed the
 real renderer result and stopped normally with observed Low in both requests.
@@ -1394,7 +1432,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.23.0, build 33**, supporting **macOS 26+**. The earlier
+Current source identity: **0.24.0, build 34**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1407,7 +1445,7 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation use version **0.23.0, build 33**. The root [`VERSION`](../VERSION)
+documentation use version **0.24.0, build 34**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings must match them. The consistency check runs locally and
 in CI. Filesystem protocol, provider-plugin, and database schema versions are

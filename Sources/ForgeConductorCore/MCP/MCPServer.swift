@@ -374,6 +374,11 @@ public final class MCPServer: @unchecked Sendable {
                         scope: (try? app.projectContexts.invocationContext(
                             for: clientID, cancellation: requestCancellation))?.authorizationScope)
                     : nil
+                let listingBudget: Int? = name == "fs_list" && FilesystemListingPage.usesPagedMode(arguments: arguments)
+                    ? FilesystemListingPage.responseBudget(arguments: arguments,
+                        scope: (try? app.projectContexts.invocationContext(
+                            for: clientID, cancellation: requestCancellation))?.authorizationScope)
+                    : nil
                 app.diagnostics.info("mcp_tools_call", [
                     "tool": name,
                     "client_id": clientID.rawValue,
@@ -386,14 +391,14 @@ public final class MCPServer: @unchecked Sendable {
                     let result = try nativeTaskSession.callSynchronously(name: name, arguments: arguments,
                         role: ContinuityControlCapabilities.Role(rawValue: role.rawValue) ?? .primary,
                         connected: connected, cancellation: requestCancellation)
-                    return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget,
+                    return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget, listingBudget: listingBudget,
                         cancellation: requestCancellation)
                 }
                 if let result = try ContinuityControlToolPack.sharedConnectionResult(
                     name: name, arguments: arguments, app: app,
                     role: ContinuityControlCapabilities.Role(rawValue: role.rawValue) ?? .primary,
                     connected: connected, cancellation: requestCancellation
-                ) { return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget,
+                ) { return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget, listingBudget: listingBudget,
                     cancellation: requestCancellation) }
                 let result = try app.tools.call(
                     name: name,
@@ -401,7 +406,7 @@ public final class MCPServer: @unchecked Sendable {
                     clientID: clientID,
                     cancellation: requestCancellation
                 )
-                return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget,
+                return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget, listingBudget: listingBudget,
                     cancellation: requestCancellation)
             case "resources/list":
                 return ok(id: id, result: ["resources": [] as [Any]])
@@ -718,12 +723,16 @@ public final class MCPServer: @unchecked Sendable {
         )
     }
 
-    private func toolCallResponse(id: Any?, result: ToolResult, rendererBudget: Int? = nil,
+    private func toolCallResponse(id: Any?, result: ToolResult, rendererBudget: Int? = nil, listingBudget: Int? = nil,
                                   cancellation: ToolCallCancellation) -> [String: Any] {
         func response(notice: String? = nil) -> [String: Any] {
             if let rendererBudget {
                 return WebRenderToolPack.finalMCPResponse(id: id, result: result,
                     additiveNotice: notice, budget: rendererBudget)
+            }
+            if let listingBudget {
+                return FilesystemListingPage.finalMCPResponse(id: id, result: result,
+                    additiveNotice: notice, budget: listingBudget)
             }
             return MCPToolResponse.object(id: id, result: result, additiveNotice: notice)
         }
@@ -974,7 +983,7 @@ public final class MCPStreamReader {
                     let bodyEnd = buffer.index(bodyStart, offsetBy: length)
                     let body = buffer.subdata(in: bodyStart..<bodyEnd)
                     buffer.removeSubrange(buffer.startIndex..<bodyEnd)
-                    return try JSONSupport.object(from: body)
+                    return try decodeMessage(body)
                 }
             }
         }
@@ -986,14 +995,39 @@ public final class MCPStreamReader {
             if line.isEmpty || line == Data([0x0D]) { return try extractMessage(forceLine: forceLine) }
             let trimmed = line.drop(while: { $0 == 0x0D })
             if trimmed.isEmpty { return try extractMessage(forceLine: forceLine) }
-            return try JSONSupport.object(from: Data(trimmed))
+            return try decodeMessage(Data(trimmed))
         }
         if forceLine, !buffer.isEmpty {
             let body = buffer
             buffer.removeAll()
-            return try JSONSupport.object(from: body)
+            return try decodeMessage(body)
         }
         return nil
+    }
+
+    private func decodeMessage(_ data: Data) throws -> [String: Any] {
+        var message = try JSONSupport.object(from: data)
+        guard message["method"] as? String == "tools/call",
+              var parameters = message["params"] as? [String: Any],
+              parameters["name"] as? String == "fs_list",
+              var arguments = parameters["arguments"] as? [String: Any],
+              FilesystemListingPage.usesPagedMode(arguments: arguments) else { return message }
+        do {
+            let checked = try JSONSupport.validatingIntegerFields(in: data, maximumBytes: maximumMessageBytes) { path in
+                path == ["params", "arguments", "limit"] || path == ["params", "arguments", "maximum_bytes"]
+                    ? .required : nil
+            }
+            return try JSONSupport.object(from: checked)
+        } catch {
+            // Preserve correlation and the live stream. An explicit invalid
+            // argument reaches the ordinary listing rejection before path I/O.
+            let field = (error as? ManagerSettingsValidationError)?.field == "params.arguments.maximum_bytes"
+                ? "maximum_bytes" : "limit"
+            arguments[field] = NSNull()
+            parameters["arguments"] = arguments
+            message["params"] = parameters
+            return message
+        }
     }
 }
 

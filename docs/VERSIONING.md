@@ -11,9 +11,17 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.23.0 (33)**. Additive native JavaScript snapshots advance
-the feature-release component; current authority documents advance with it.
-Scoped verification is recorded in [native web rendering](NATIVE-WEB-RENDERING.md).
+Current identity is **0.24.0 (34)**. Additive `fs_list`
+continuation advances the feature-release component; current authority documents
+advance with it. Its final 173 source and matching compiled Core cases, current
+CLI/app builds, signed Debug/Release matrices and scoped Qwen continuation
+passed. Interim failures and open installed/notice-bearing gates remain in
+[filesystem list paging](FILESYSTEM-LIST-PAGING.md).
+The preceding **0.23.0 (33)** native JavaScript snapshot receipts retain their
+published identity in [native web rendering](NATIVE-WEB-RENDERING.md), including
+an immutable source link. The later renderer LF correction has separate source
+proof and later 0.24.0 LF-aware native qualification in the listing record;
+original 0.23.0 JSON-only receipts keep their measurement scope.
 The preceding 0.22.0 binary-web receipts remain in
 [their record](BINARY-WEB-AND-QWEN-FILES.md). The preceding
 **0.21.0 (31)** optional-tool inventory retains its tested identity in
@@ -62,13 +70,18 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.23.0`, build `33`. Backward-compatible native
-JavaScript rendering advances the feature-release component and resets the patch
+The current product version is `0.24.0`, build `34`. Backward-compatible directory
+continuation advances the feature-release component and resets the patch
 component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
 marketing-version settings, all 16 build-number settings and the current
-authority-document markers agree. The actual current-version regression passed
-in source and in the compiled selection with every existing assertion retained. The preceding 0.22.0 binary-web
-and 0.21.0 inventory receipts keep their own scope.
+authority-document markers agree. The current-version regression passed in
+the final source selection and matching compiled native selection. An earlier
+corrected Swift CLI build passed before the raw-token and pre-normalization
+boundary corrections. Current corrected-input CLI/app and signed Debug/Release
+builds passed separately. The preceding 0.23.0
+actual version regression passed in source and in its compiled selection with
+every assertion retained; its renderer, 0.22.0 binary-web and 0.21.0 inventory
+receipts keep their own tested scopes.
 
 The preceding 0.17.0 exact-reference source audit passed 15/15 checks over 434 inputs.
 That preceding 0.17.0 434-input ordinary Debug build passed strict signing/

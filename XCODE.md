@@ -1,6 +1,32 @@
 # Forge Conductor — Xcode
 
-Current source version **0.23.0**, build **33**.
+Current source version **0.24.0**, build **34**.
+
+The listing slice registers one Core source, `FilesystemListingPage.swift`, and
+one Core test file, `FilesystemListingTests.swift`, in the existing canonical
+project. No project regeneration, signing change or storage migration was added.
+The initial focused source attempt stopped at two test compiler errors before
+any cases executed. A later interim selection executed 34 source tests with four
+failures (one unexpected), terminal 1; its four MCP boundary checks and numeric
+path check passed, but the selection remains NONPASS. The earlier corrected
+Swift CLI build passed before the raw-token/pre-normalization changes.
+The final corrected-input selection passed 173 source tests and the same 173
+compiled native Core tests, zero failures/skips. Current Swift CLI/app builds
+passed, and ordinary canonical Debug/Release builds passed in 24.011/147.188
+seconds with strict deep signatures. Signed Debug/Release listing each passed
+35 cases/52 responses, renderer CLI each 35/39 and app each 10/14; native parents
+exited zero with both EOFs and unforced cleanup. Qwen consumed three Debug
+candidate pages and stopped normally after four model requests.
+[Listing contract and gate status](docs/FILESYSTEM-LIST-PAGING.md).
+
+The renderer LF boundary correction passed all 17 source
+`WebRendererServiceTests` and the later LF-aware Debug/Release MCP matrices.
+The original 0.23.0 JSON-only receipts are not relabeled as LF coverage. Five
+native test-host QoS warnings at existing diagnostic drain boundaries remain
+recorded separately; they do not establish an ordinary GUI warning defect.
+Installed, notice-bearing runtime and broad filesystem qualification remain open.
+
+## Preceding 0.23.0 renderer graph
 
 The renderer adds five Core sources and four Core test files to the existing
 canonical project, and links Apple `libbsm` in Core Debug/Release and SwiftPM.
@@ -606,7 +632,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.23.0 (33)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.24.0 (34)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

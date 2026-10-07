@@ -189,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.23.0**, build **33** (current source; candidate qualification is separate from installation).
+Version **0.24.0**, build **34** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -439,6 +439,7 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `web.search` | `query`; optional `limit` from 1–10 (default 5). Returns titles, URLs and snippets through DuckDuckGo HTML. Read selected URLs with `web.fetch`. |
 | `web.fetch` | `url`; optional `format: "text"` (default), `"source"` or `"base64"`. Base64 preserves the original response bytes for any MIME type; offsets, counts and SHA256 refer to decoded bytes. Text/source HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
 | `web.render` | `url`; optional `timeout_sec` and `maximum_bytes`. Returns a finite native JavaScript DOM snapshot with title, text, returned-content SHA256/count, URLs, project identity, readiness and truncation. There is no continuation cursor. Requires macOS 27+ and project network/tool authorization. |
+| `fs_list` | Optional `path`. Path-only calls retain the legacy 1,000-entry cap. Supply `limit` (1–1,000; default 100), `cursor` or `maximum_bytes` to select paged mode. Paged arguments are validated before path normalization; count tokens must have an exact integral value. Continue using the returned `next_cursor` until `has_more` is false; `deadline_ms` alone retains legacy mode. Directory changes require restarting. [Contract and verified scopes](docs/FILESYSTEM-LIST-PAGING.md). |
 | `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
 | `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
@@ -447,8 +448,11 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 Web tools accept integer `timeout_sec` from 1–30 (default 20), and
 `maximum_bytes` from 1–65,536 (default 16,384) for the encoded inline response;
 the project budget can reduce that allowance. Successful `web.render` stdio
-responses include the actual request ID and required policy notice in that
-allowance. An impossible envelope returns an explicit budget error. Renderer
+responses include the actual request ID, required policy notice and terminating
+line feed in that allowance. The post-publication LF boundary correction has
+[source and new Debug/Release native coverage](docs/FILESYSTEM-LIST-PAGING.md#renderer-line-feed-boundary-after-023-publication);
+the original 0.23.0 JSON-only receipts retain their own measurement scope.
+An impossible envelope returns an explicit budget error. Renderer
 extraction visits at most 4,096 nodes and returns at most 8,192 UTF-8 text bytes;
 whole network bytes, DOM size and JavaScript heap are not capped.
 Each HTTP fetch receives at most 1 MiB
@@ -459,6 +463,26 @@ up to 32 KiB raw bytes per page; the returned page can be smaller to fit the
 encoded MCP and project budgets. Always use the returned cursor rather than
 advancing by the requested size. Binary transport lets tools preserve exact file
 bytes; format-specific authoring and image understanding have separate capabilities.
+
+Paged listing uses raw filename-byte order, not locale
+order. Its cursor is bound to the same client, project generation and canonical
+path and grants no new access. Keep it unchanged when requesting the next page.
+A page can return fewer than `limit` entries to fit the output budget; use the returned
+cursor, rather than counting names. A complete successful paged stdio response
+includes its actual ID, required notice and line feed within `maximum_bytes`
+(default 16 KiB, maximum 64 KiB), reduced by the project allowance. An impossible
+envelope returns an explicit error and advances no cursor. Each page processes
+at most 100,000 direct names within a 15-second scan bound and the request deadline;
+metadata fences are not an atomic snapshot or a guarantee of filesystem syscall
+latency. Calls on the main thread fail with `listing_worker_required` before
+scanning. The final source and compiled Core checks passed the same 173 cases.
+Signed Debug and Release each recovered all 1,001 owned names in eight pages,
+and Qwen consumed three real one-entry pages, using the previous returned cursor
+on each of two continuations, then stopped normally. These are candidate/API
+checks; installed and active GUI-chat qualification remain separate. Source
+tests cover required notices in final
+frames, but no policy notice was present in the native listing/renderer runs.
+The linked record retains all failed attempts and exact limits.
 
 When inspecting jobs, `job.list` may return fewer complete rows to fit the
 response byte budget. If `has_more` is true, pass the returned `next_cursor`'s

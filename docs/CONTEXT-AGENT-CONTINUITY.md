@@ -1,10 +1,25 @@
-# Context and agent continuity (v0.23.0)
+# Context and agent continuity (v0.24.0)
+
+<a id="context-and-agent-continuity-v0230"></a>
 
 <a id="context-and-agent-continuity-v0220"></a>
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.23.0 (33). `web.render` is an ordinary
+Current source documentation targets 0.24.0 (34). Paged `fs_list` retains the
+existing read-only tool name and grant boundary. Its cursor is part of each
+routed argument set, while project/client/generation validation remains required.
+The original paged arguments are validated before path normalization, and MCP
+count checks preserve raw-token exactness and correlated rejection/server
+liveness. The final 173 source and matching compiled Core cases passed after
+the retained 34/35-case failed selections. Signed Debug/Release listing checks
+passed, and actual Qwen API consumption used three one-entry pages, using the
+previous returned cursor on each of two continuations before normal stop.
+Scope and lifecycle evidence is bounded in
+[the listing record](FILESYSTEM-LIST-PAGING.md); a cursor or page response does
+not prove a continuity handoff or an external model-session rollover.
+
+The preceding 0.23.0 `web.render` is an ordinary
 eligible progress tool and appears in the research agent and default grant
 catalogs. Its [renderer record](NATIVE-WEB-RENDERING.md) separates snapshot
 checks from continuity acceptance. The continuity
