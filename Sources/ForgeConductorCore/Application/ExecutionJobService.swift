@@ -1219,7 +1219,42 @@ public actor ExecutionJobService: ExecutionJobServicing {
         guard (1...(64 * 1_024)).contains(limit) else {
             throw RuntimeJobError.invalidRequest("output read limit must be between 1 and 65536 bytes")
         }
-        let metadata = try await repository.output(jobID: jobID, stream: stream, context: context)
+        var record = try await repository.job(jobID, context: context)
+        if !record.state.isTerminal,
+           let item = active[jobID]?.item ?? pending[jobID] {
+            guard item.spool.jobID == jobID,
+                  item.jobContext.projectID == record.projectID,
+                  item.jobContext.projectGeneration == record.projectGeneration,
+                  item.jobContext.runID == record.runID else {
+                throw RuntimeJobError.jobScopeMismatch(jobID)
+            }
+            try await contextValidator.validateJob(jobID: jobID, context: item.jobContext)
+            try Task.checkCancellation()
+            // Validation can suspend. Read only an owner still present on this
+            // actor; finalization may already have transferred it to persistence.
+            if let owned = active[jobID]?.item ?? pending[jobID],
+               owned.spool === item.spool,
+               let snapshot = try owned.spool.snapshot(
+                   stream: stream, offset: offset, limit: limit, jobState: record.state
+               ) {
+                try Task.checkCancellation()
+                return snapshot
+            }
+            record = try await repository.job(jobID, context: context)
+        }
+        let metadata: RuntimeJobOutputMetadata
+        do {
+            metadata = try await repository.output(jobID: jobID, stream: stream, context: context)
+        } catch let error as RuntimeJobError {
+            guard case .outputUnavailable = error else { throw error }
+            record = try await repository.job(jobID, context: context)
+            if !record.state.isTerminal {
+                throw RuntimeJobError.outputPending(jobID, stream)
+            }
+            // A terminal commit may have completed during the failed lookup.
+            // Retry it once; genuinely absent terminal output stays unavailable.
+            metadata = try await repository.output(jobID: jobID, stream: stream, context: context)
+        }
         if metadata.artifactEvicted {
             throw RuntimeJobError.artifactEvicted(jobID, stream)
         }
@@ -1258,7 +1293,8 @@ public actor ExecutionJobService: ExecutionJobServicing {
             artifactTruncated: metadata.artifactTruncated,
             sha256: metadata.sha256,
             producerEndReason: metadata.producerEndReason,
-            producerReadErrno: metadata.producerReadErrno
+            producerReadErrno: metadata.producerReadErrno,
+            jobState: record.state
         )
     }
 

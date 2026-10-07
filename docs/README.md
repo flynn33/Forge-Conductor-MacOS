@@ -1,6 +1,7 @@
 # Documentation guide
 
-Current source is **0.19.0 (29)**. Project-linked GitHub metadata and the new
+Current source is **0.20.0 (30)**. Current Qwen feedback work is recorded in
+[the expiry/output/metadata follow-up](QWEN-FOLLOWUP.md). Project-linked GitHub metadata and the new
 web/file tool contracts are described in the [user guide](../USER-GUIDE.md) and
 [October 7 implementation record](PROJECT-WEB-QWEN.md). Qualification details
 in the earlier checkpoints below retain their original source and scope.

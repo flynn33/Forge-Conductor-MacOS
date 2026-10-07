@@ -25,6 +25,43 @@ The October 7 implementation and qualification boundary are recorded in
 [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md).
 The historical test receipt below retains its original source and scope.
 
+## Expiry and query continuation
+
+The 0.20.0 follow-up filters expired records from normal `project_memory.get`,
+`search` and `list_recent` calls. `include_expired: true` preserves explicit
+historical inspection. Each query evaluates expiry against its current clock
+before applying page limits; no recurring cleanup task or deletion is added.
+Export and durable status counts include expired records.
+
+New writes, batch writes and default strict imports accept at most 35 UTF-8 bytes for
+`expires_at`: a valid RFC 3339 calendar date with an explicit zone, seconds 00–59
+and optionally up to nine fractional digits. They normalize to UTC while
+retaining fractional precision and removing trailing fractional zeros. Existing invalid timestamps are
+preserved, visible and non-expiring. Export preserves that legacy value.
+Deduplication does not renew an existing record's expiry.
+
+The import-only versioned compatibility option is
+`expiry_policy: "preserve_legacy_v1"`. It retains malformed string expiry
+verbatim, including empty or embedded-NUL values, while normalizing valid
+timestamps. The default `"strict"` continues to reject malformed imports and
+new remember writes. Both preview and commit retain schema/checksum/project,
+type, transaction and cancellation checks; preserved expiry bytes count toward
+the existing 1 MiB batch limit. Invalid expiry remains non-expiring metadata.
+No mode accepts numeric/boolean expiry values or authorizes foreign-project
+imports without the existing explicit merge policy.
+
+New opaque v2 cursors bind the exact project query and `include_expired` mode
+to ordered record coordinates. Recent pages use timestamp/ID; search pages also
+use rank. Expiration of earlier rows between requests does not shift the
+continuation past later live records. Legacy v1 offset cursors remain readable
+with their prior offset semantics. The byte budget includes continuation and
+query metadata; a single oversized row returns `payload_too_large` rather than
+an empty page that cannot advance.
+
+The [Qwen follow-up](QWEN-FOLLOWUP.md) records seventeen source/native expiry
+cases, the full 49-case memory class, actual model query consumption and native
+legacy recovery. Installed qualification retains its separate gate.
+
 ## Historical project memory isolation — SLICE-05 verification
 
 **Status:** behavior verified working — no source repair required. Project-isolated durable memory works: a record belongs to its selected project, is invisible to other projects (lookup, search, and no default-project fallback), and remains readable after the isolated repository is reopened. The one uncovered exclusion case (cross-project lookup + fallback) gained a focused regression.

@@ -4,6 +4,7 @@
 // Why: Existing hosts retain compatibility while autonomous sessions gain scoped memory.
 
 import Foundation
+import CoreFoundation
 
 public struct ProjectMemoryToolPack: ToolPackHandling {
     public static let names = [
@@ -71,14 +72,14 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
                 "Create or open a durable project-scoped memory store within an authorized bootstrap root.",
             "project_memory.remember": "Store one redacted, deduplicated project memory record.",
             "project_memory.remember_batch": "Store a bounded batch transactionally.",
-            "project_memory.search": "Search one project with deterministic bounded pagination.",
-            "project_memory.get": "Fetch project memory records by stable ID.",
+            "project_memory.search": "Search one project with deterministic bounded pagination. Expired records are omitted unless include_expired=true.",
+            "project_memory.get": "Fetch project memory records by stable ID. Expired records are omitted unless include_expired=true.",
             "project_memory.update": "Update a record with optimistic version checking.",
             "project_memory.forget": "Tombstone a record in one project.",
-            "project_memory.list_recent": "List recent project records with bounded pagination.",
+            "project_memory.list_recent": "List recent project records with bounded pagination. Expired records are omitted unless include_expired=true.",
             "project_memory.link": "Create an idempotent typed link between records.",
             "project_memory.export": "Create a checksummed project memory export artifact.",
-            "project_memory.import": "Preview or transactionally import a checksummed export.",
+            "project_memory.import": "Preview or transactionally import a checksummed export. Expiry timestamps are strict by default; explicit expiry_policy=preserve_legacy_v1 preserves malformed legacy expiry strings as non-expiring metadata while normalizing valid timestamps.",
             "project_memory.status": "Report project memory health, sizes, capabilities, and limits.",
         ]
         return descriptions[name]
@@ -115,11 +116,13 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
                 "query": string, "kinds": ["type": "array", "items": string], "tags": ["type": "array", "items": string],
                 "session_id": string, "limit": ["type": "integer"], "cursor": string,
                 "include_body": ["type": "boolean"], "maximum_response_bytes": ["type": "integer"],
+                "include_expired": ["type": "boolean", "default": false],
                 "deadline_ms": ["type": "integer"],
             ]) { _, new in new }, required: ["project_id", "query"])
         case "project_memory.get":
             return object(projectProperty.merging([
                 "id": string, "ids": ["type": "array", "items": string], "include_body": ["type": "boolean"],
+                "include_expired": ["type": "boolean", "default": false],
                 "deadline_ms": ["type": "integer"],
             ]) { _, new in new }, required: ["project_id"])
         case "project_memory.update":
@@ -133,6 +136,7 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
             return object(projectProperty.merging([
                 "kinds": ["type": "array", "items": string], "session_id": string, "limit": ["type": "integer"],
                 "cursor": string, "include_body": ["type": "boolean"], "maximum_response_bytes": ["type": "integer"],
+                "include_expired": ["type": "boolean", "default": false],
                 "deadline_ms": ["type": "integer"],
             ]) { _, new in new }, required: ["project_id"])
         case "project_memory.link":
@@ -142,6 +146,8 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
         case "project_memory.import":
             return object(projectProperty.merging([
                 "artifact": string, "preview": ["type": "boolean"], "merge_policy": string,
+                "expiry_policy": ["type": "string", "enum": ProjectMemoryImportExpiryPolicy.allCases.map(\.rawValue),
+                                  "default": ProjectMemoryImportExpiryPolicy.strict.rawValue],
                 "deadline_ms": ["type": "integer"],
             ]) { _, new in new }, required: ["project_id", "artifact"])
         default:
@@ -155,7 +161,10 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
             "kind": string, "title": string, "summary": string, "body": string,
             "tags": ["type": "array", "items": string], "importance": ["type": "number"],
             "confidence": ["type": "number"], "source_kind": string, "source_reference": string,
-            "session_id": string, "expires_at": string, "related_ids": ["type": "array", "items": string],
+            "session_id": string,
+            "expires_at": ["type": "string", "maxLength": ProjectMemoryExpiry.maximumBytes,
+                           "description": "RFC 3339 calendar timestamp with explicit timezone, seconds 00–59 (leap seconds are unsupported), optionally 1–9 fractional digits. Records expire at this instant; retained rows remain inspectable with include_expired=true."],
+            "related_ids": ["type": "array", "items": string],
             "idempotency_key": string, "deadline_ms": ["type": "integer"],
         ]
     }
@@ -194,6 +203,7 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
             sessionID: string(arguments, "session_id"), limit: integer(arguments, "limit") ?? service.limits.defaultPageCount,
             cursor: string(arguments, "cursor"), includeBody: boolean(arguments, "include_body") ?? false,
             maximumResponseBytes: integer(arguments, "maximum_response_bytes") ?? service.limits.defaultResponseBytes,
+            includeExpired: try includeExpired(arguments),
             cancellation: control
         )
     }
@@ -207,7 +217,8 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
         if let id = string(arguments, "id") { ids.insert(id, at: 0) }
         return try service.get(
             projectID: projectID(arguments), ids: Array(Set(ids)).sorted(),
-            includeBody: boolean(arguments, "include_body") ?? false, cancellation: control
+            includeBody: boolean(arguments, "include_body") ?? false,
+            includeExpired: try includeExpired(arguments), cancellation: control
         )
     }
 
@@ -245,6 +256,7 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
             limit: integer(arguments, "limit") ?? service.limits.defaultPageCount, cursor: string(arguments, "cursor"),
             includeBody: boolean(arguments, "include_body") ?? false,
             maximumResponseBytes: integer(arguments, "maximum_response_bytes") ?? service.limits.defaultResponseBytes,
+            includeExpired: try includeExpired(arguments),
             cancellation: control
         )
     }
@@ -270,9 +282,19 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
         control: ToolCallCancellation
     ) throws -> [String: Any] {
         guard let artifact = string(arguments, "artifact") else { throw ProjectMemoryError.invalidRequest("artifact is required") }
+        let expiryPolicy: ProjectMemoryImportExpiryPolicy
+        if let raw = arguments["expiry_policy"] {
+            guard let value = raw as? String, let policy = ProjectMemoryImportExpiryPolicy(rawValue: value) else {
+                throw ProjectMemoryError.invalidRequest("expiry_policy must be strict or preserve_legacy_v1")
+            }
+            expiryPolicy = policy
+        } else {
+            expiryPolicy = .strict
+        }
         return try service.importRecords(
             projectID: projectID(arguments), artifactPath: artifact,
             preview: boolean(arguments, "preview") ?? true, mergePolicy: string(arguments, "merge_policy"),
+            expiryPolicy: expiryPolicy,
             cancellation: control
         )
     }
@@ -282,15 +304,27 @@ public struct ProjectMemoryToolPack: ToolPackHandling {
               let summary = string(arguments, "summary") else {
             throw ProjectMemoryError.invalidRequest("kind, title, and summary are required")
         }
+        if let expiry = arguments["expires_at"], !(expiry is String) {
+            throw ProjectMemoryError.invalidRequest("expires_at must be a timestamp string")
+        }
         return ProjectMemoryWrite(
             kind: kind, title: title, summary: summary, body: string(arguments, "body"),
             tags: strings(arguments["tags"]), importance: number(arguments, "importance") ?? 0.5,
             confidence: number(arguments, "confidence") ?? 1,
             sourceKind: string(arguments, "source_kind") ?? "external_integration",
             sourceReference: string(arguments, "source_reference"), sessionID: string(arguments, "session_id"),
-            expiresAt: string(arguments, "expires_at"), relatedIDs: strings(arguments["related_ids"]),
+            expiresAt: arguments["expires_at"] as? String, relatedIDs: strings(arguments["related_ids"]),
             idempotencyKey: string(arguments, "idempotency_key")
         )
+    }
+
+    private func includeExpired(_ arguments: [String: Any]) throws -> Bool {
+        guard let value = arguments["include_expired"] else { return false }
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) == CFBooleanGetTypeID() else {
+            throw ProjectMemoryError.invalidRequest("include_expired must be a boolean")
+        }
+        return number.boolValue
     }
 
     private func projectID(_ arguments: [String: Any]) throws -> String {

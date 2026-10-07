@@ -11,9 +11,11 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.19.0 (29)**. Project GitHub linkage and native model web/file
-tools advance the feature-release component. Current validation is recorded in
-[the feature record](PROJECT-WEB-QWEN.md). The preceding **0.18.0 (28)** Xcode CLI
+Current identity is **0.20.0 (30)**. Enforced expiry, running output and HTML page
+metadata advance the feature-release component. Current validation is recorded
+in [the follow-up record](QWEN-FOLLOWUP.md). The published **0.19.0 (29)** project
+GitHub and web/file receipts stay in [their feature record](PROJECT-WEB-QWEN.md).
+The preceding **0.18.0 (28)** Xcode CLI
 and continuity-setting receipts remain in [the repair record](LMSTUDIO-RUNTIME-REPAIR.md).
 
 Preceding identity was **0.17.0 (27)**. The Graphite/Compute UI implementation and
@@ -55,8 +57,8 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.19.0`, build `29`. The backward-compatible
-project repository and web/file tools advance the feature-release component and reset the
+The current product version is `0.20.0`, build `30`. The backward-compatible
+expiry inspection, running output and page metadata advance the feature-release component and reset the
 patch component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
 marketing-version settings and all 16 build-number settings align.
 

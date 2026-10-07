@@ -2,9 +2,20 @@
 
 The October 7 owner request authorizes project-linked GitHub entry, web access
 through Forge, and collaboration with Qwen on real failures and additions.
-Current source is **0.19.0 (29)**, based on synchronized
+This checkpoint's source is **0.19.0 (29)**, based on synchronized
 `37f0a800d6c5f6ad870decbb8d62025128166e91`. The installed app is **0.18.0 (28)**.
 Candidate and installed/runtime qualification remain separate.
+
+The 43 intended source/document paths were published as owner-authored,
+GitHub-signed commit `a14a63de92d26cfd16fd196601033570e682ba7a`. Remote blobs
+matched the intended hashes; local `main` was safely synchronized with zero
+divergence and a clean tree. Installed GUI/CLI and LM Studio MCP registration
+SHA256 identities matched the pre-work baseline. Later changes have their own
+[follow-up record](QWEN-FOLLOWUP.md); these receipts keep their tested identity.
+The matching wiki was published on its canonical `master` as
+`0cbb6742c6948a001e5b3cb0395d4a03e80ddcee`; local/tracking/remote refs matched,
+divergence was zero and the tree clean. Its whitespace and 207 internal
+link/anchor checks passed. No source graph changed during wiki publication.
 
 ## Observed baseline
 
@@ -67,14 +78,20 @@ its test source memberships; existing project/file/search/UI-test memberships re
 | Signed file/search/Git transport | 6/6 cases passed, including an 8,217-byte arbitrary-byte roundtrip and complete 3 MiB reconstruction over 135 bounded pages with matching SHA256. Default text errors, numeric base64 rejection, context/filter exclusions and dash-prefixed Git path filtering passed. `native-file-search-git/summary.json` records clean native shutdown and identities. |
 | Actual Qwen web use | `qwen-native-web/summary.json`: `qwen/qwen3.8-27b` emitted both canonical tool calls through LM Studio's supported API, consumed successful signed-candidate responses, and finished with `stop`. It reported “Example Domain” and Apple's URLSession documentation URL. Candidate CLI SHA256 is `68fc5436647df0dd244188103d9462eb39b4c8217e057b10ce2da1d061c64c18`; source/binary unchanged and native shutdown clean. This API-owned model exchange is separate from the active desktop chat. |
 
-The native Projects click-through remains **unverified**. CUA first read the exact
+At this 0.19.0 checkpoint, native Projects click-through remained **unverified**. CUA first read the exact
 0.19.0 candidate's Dashboard, then twice returned `Sky Computer Use native pipe
 closed before response`. The candidate remained alive and its owned process was
 stopped with SIGTERM. The new ordinary-bootstrap UI test compiled, but Xcode
 exited 65 because its runner timed out enabling automation mode; **zero UI tests
 executed** (`projects-ui-tests.xcresult`). Save/relaunch/invalid/clear native
-screenshots and ordinary GUI shutdown therefore have no pass credit. The test
+screenshots and ordinary GUI shutdown therefore had no pass credit. The test
 and protections remain intact.
+
+The later signed 0.20.0 candidate passed six ordinary Projects flows through
+public Accessibility, including exact repository Open in Safari and reviewed
+native screenshots. Both launches ended through ordinary Quit with exit zero.
+That acceptance is recorded in [the Qwen follow-up](QWEN-FOLLOWUP.md); it does
+not change the failed 0.19.0 runner receipt or claim installed deployment.
 
 The installed PowerShell repair is **E0 observed runtime proof**. Only the corrupt
 startup-cache file was archived and moved to a recoverable same-directory backup;

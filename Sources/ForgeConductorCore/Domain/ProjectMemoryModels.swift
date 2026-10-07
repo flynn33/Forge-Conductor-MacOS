@@ -62,6 +62,7 @@ public struct ProjectMemoryLimits: Sendable, Equatable {
     public let maximumSummaryBytes = 4 * 1024
     public let maximumBodyBytes = 256 * 1024
     public let maximumSourceReferenceBytes = 2 * 1024
+    public let maximumExpiryBytes = ProjectMemoryExpiry.maximumBytes
     public let maximumTagCount = 32
     public let maximumTagBytes = 128
     public let maximumBatchCount = 50
@@ -79,6 +80,7 @@ public struct ProjectMemoryLimits: Sendable, Equatable {
             "summary_bytes": maximumSummaryBytes,
             "body_bytes": maximumBodyBytes,
             "source_reference_bytes": maximumSourceReferenceBytes,
+            "expiry_bytes": maximumExpiryBytes,
             "tag_count": maximumTagCount,
             "tag_bytes": maximumTagBytes,
             "batch_count": maximumBatchCount,
@@ -88,6 +90,105 @@ public struct ProjectMemoryLimits: Sendable, Equatable {
             "open_projects": maximumOpenProjects,
         ]
     }
+}
+
+public enum ProjectMemoryImportExpiryPolicy: String, CaseIterable, Sendable {
+    case strict
+    case preserveLegacyV1 = "preserve_legacy_v1"
+}
+
+/// Expiry timestamps use bounded RFC 3339 calendar dates with an explicit zone.
+/// Explicit legacy import preserves malformed values as non-expiring metadata.
+enum ProjectMemoryExpiry {
+    static let maximumBytes = 35
+
+    static func normalized(_ raw: String?) throws -> String? {
+        guard let raw else { return nil }
+        guard raw.utf8.count <= maximumBytes else {
+            throw ProjectMemoryError.payloadTooLarge("expires_at exceeds \(maximumBytes) bytes")
+        }
+        guard let parsed = parse(raw) else {
+            throw ProjectMemoryError.invalidRequest(
+                "expires_at must be a calendar timestamp with an explicit timezone, seconds 00–59 and up to 9 fractional digits"
+            )
+        }
+        return parsed.canonical
+    }
+
+    static func epoch(_ raw: String) -> Double? { parse(raw)?.epoch }
+
+    static func normalizedForImport(_ raw: String?, policy: ProjectMemoryImportExpiryPolicy) throws -> String? {
+        guard policy == .preserveLegacyV1, let raw else { return try normalized(raw) }
+        return parse(raw)?.canonical ?? raw
+    }
+
+    private static func parse(_ raw: String) -> (epoch: Double, canonical: String)? {
+        guard (20...maximumBytes).contains(raw.utf8.count) else { return nil }
+        let bytes = Array(raw.utf8)
+        guard bytes[4] == 45, bytes[7] == 45, bytes[10] == 84 || bytes[10] == 116,
+              bytes[13] == 58, bytes[16] == 58 else { return nil }
+        func digits(_ start: Int, _ length: Int) -> Int? {
+            guard start + length <= bytes.count else { return nil }
+            var value = 0
+            for byte in bytes[start..<(start + length)] {
+                guard (48...57).contains(byte) else { return nil }
+                value = value * 10 + Int(byte - 48)
+            }
+            return value
+        }
+        guard let year = digits(0, 4), (1...9999).contains(year),
+              let month = digits(5, 2), (1...12).contains(month),
+              let day = digits(8, 2), (1...31).contains(day),
+              let hour = digits(11, 2), (0...23).contains(hour),
+              let minute = digits(14, 2), (0...59).contains(minute),
+              let second = digits(17, 2), (0...59).contains(second) else { return nil }
+        let leapYear = year.isMultiple(of: 400) || (year.isMultiple(of: 4) && !year.isMultiple(of: 100))
+        let monthDays = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        guard day <= monthDays[month - 1] else { return nil }
+        var zoneStart = 19
+        var fraction = ""
+        if bytes[zoneStart] == 46 {
+            zoneStart += 1
+            let start = zoneStart
+            while zoneStart < bytes.count, (48...57).contains(bytes[zoneStart]) { zoneStart += 1 }
+            guard (1...9).contains(zoneStart - start) else { return nil }
+            fraction = String(decoding: bytes[start..<zoneStart], as: UTF8.self)
+        }
+        guard zoneStart < bytes.count else { return nil }
+        let zoneSeconds: Int
+        if (bytes[zoneStart] == 90 || bytes[zoneStart] == 122), bytes.count == zoneStart + 1 {
+            zoneSeconds = 0
+        } else {
+            guard bytes.count == zoneStart + 6,
+                  bytes[zoneStart] == 43 || bytes[zoneStart] == 45,
+                  bytes[zoneStart + 3] == 58,
+                  let zoneHour = digits(zoneStart + 1, 2), (0...23).contains(zoneHour),
+                  let zoneMinute = digits(zoneStart + 4, 2), (0...59).contains(zoneMinute) else { return nil }
+            zoneSeconds = (zoneHour * 3600 + zoneMinute * 60) * (bytes[zoneStart] == 45 ? -1 : 1)
+        }
+        guard let zone = TimeZone(secondsFromGMT: zoneSeconds) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let components = DateComponents(year: year, month: month, day: day,
+                                        hour: hour, minute: minute, second: second)
+        guard let wholeDate = calendar.date(from: components) else { return nil }
+        let check = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: wholeDate)
+        guard check.year == year, check.month == month, check.day == day,
+              check.hour == hour, check.minute == minute, check.second == second else { return nil }
+        let subsecond = fraction.isEmpty ? 0 : Double("0." + fraction) ?? 0
+        while fraction.last == "0" { fraction.removeLast() }
+        let wholeUTC = ISO8601.string(from: wholeDate)
+        guard wholeUTC.utf8.count == 20, wholeUTC.hasSuffix("Z"),
+              !wholeUTC.hasPrefix("0000") else { return nil }
+        let canonical = fraction.isEmpty ? wholeUTC : String(wholeUTC.dropLast()) + "." + fraction + "Z"
+        return (wholeDate.addingTimeInterval(subsecond).timeIntervalSince1970, canonical)
+    }
+}
+
+public struct ProjectMemoryPagePosition: Sendable {
+    let id: String
+    let updatedAt: String
+    let rank: Double?
 }
 
 public struct ProjectMemoryDescriptor: Sendable, Equatable {

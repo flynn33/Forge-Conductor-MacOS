@@ -64,13 +64,20 @@ struct OperatorHeader: View {
 struct OperatorErrorBanner: View {
     let message: String
     let retry: (() -> Void)?
+    let title: String
+
+    init(message: String, retry: (() -> Void)?, title: String = "Manager state unavailable") {
+        self.message = message
+        self.retry = retry
+        self.title = title
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(GraphitePalette.warning)
             VStack(alignment: .leading, spacing: 6) {
-                Text("Manager state unavailable").font(.headline)
+                Text(title).font(.headline)
                 Text(message)
                     .font(.system(size: 13))
                     .foregroundStyle(GraphitePalette.textSecondary)
@@ -87,7 +94,7 @@ struct OperatorErrorBanner: View {
         .background(GraphitePanelSurface())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("operator-unavailable")
-        .accessibilityLabel("Manager state unavailable. \(message)")
+        .accessibilityLabel("\(title). \(message)")
     }
 }
 

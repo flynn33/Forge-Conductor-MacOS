@@ -468,15 +468,29 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     public func get(
         id: String,
         includeTombstone: Bool = false,
+        includeExpired: Bool = false,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ProjectMemoryRecord? {
+        try get(id: id, includeTombstone: includeTombstone, includeExpired: includeExpired,
+                visibleAt: clock.now(), cancellation: cancellation)
+    }
+
+    private func get(
+        id: String,
+        includeTombstone: Bool,
+        includeExpired: Bool,
+        visibleAt: Date,
+        cancellation: ToolCallCancellation?
+    ) throws -> ProjectMemoryRecord? {
         let tombstone = includeTombstone ? "" : " AND is_tombstone=0"
+        let expiry = includeExpired ? "" : " AND COALESCE(forge_memory_expiry_epoch(expires_at)>?,1)"
         return try withStatement(
-            Self.recordSelect + " WHERE id=? AND project_id=?\(tombstone) LIMIT 1",
+            Self.recordSelect + " WHERE id=? AND project_id=?\(tombstone)\(expiry) LIMIT 1",
             cancellation: cancellation
         ) { statement in
             bind(statement, 1, id)
             bind(statement, 2, projectID)
+            if !includeExpired { sqlite3_bind_double(statement, 3, visibleAt.timeIntervalSince1970) }
             guard try stepRow(statement) else { return nil }
             return record(statement)
         }
@@ -486,12 +500,15 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         ids: [String],
         includeBody: Bool,
         maximumCount: Int,
+        includeExpired: Bool = false,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [ProjectMemoryRecord] {
+        let visibleAt = clock.now()
         var output: [ProjectMemoryRecord] = []
         for id in ids.prefix(maximumCount) {
             try cancellation?.checkCancellation()
-            if let item = try get(id: id, cancellation: cancellation) {
+            if let item = try get(id: id, includeTombstone: false, includeExpired: includeExpired,
+                                  visibleAt: visibleAt, cancellation: cancellation) {
                 var value = item
                 if !includeBody { value.body = nil }
                 output.append(value)
@@ -635,19 +652,30 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         sessionID: String?,
         limit: Int,
         offset: Int,
+        includeExpired: Bool = false,
+        after: ProjectMemoryPagePosition? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [ProjectMemoryRecord] {
+        let visibleAt = clock.now()
         var sql = Self.recordSelect + " WHERE project_id=? AND is_tombstone=0"
+        if !includeExpired { sql += " AND COALESCE(forge_memory_expiry_epoch(expires_at)>?,1)" }
         if !kinds.isEmpty {
             sql += " AND kind IN (\(Array(repeating: "?", count: kinds.count).joined(separator: ",")))"
         }
         if sessionID != nil { sql += " AND session_id=?" }
+        if after != nil { sql += " AND (updated_at<? OR (updated_at=? AND id>?))" }
         sql += " ORDER BY updated_at DESC,id ASC LIMIT ? OFFSET ?"
         return try withStatement(sql, cancellation: cancellation) { statement in
             var index: Int32 = 1
             bind(statement, index, projectID); index += 1
+            if !includeExpired { sqlite3_bind_double(statement, index, visibleAt.timeIntervalSince1970); index += 1 }
             for kind in kinds { bind(statement, index, kind); index += 1 }
             if let sessionID { bind(statement, index, sessionID); index += 1 }
+            if let after {
+                bind(statement, index, after.updatedAt); index += 1
+                bind(statement, index, after.updatedAt); index += 1
+                bind(statement, index, after.id); index += 1
+            }
             sqlite3_bind_int(statement, index, Int32(limit)); index += 1
             sqlite3_bind_int(statement, index, Int32(offset))
             var output: [ProjectMemoryRecord] = []
@@ -663,8 +691,11 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         sessionID: String?,
         limit: Int,
         offset: Int,
+        includeExpired: Bool = false,
+        after: ProjectMemoryPagePosition? = nil,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [(ProjectMemoryRecord, Double)] {
+        let visibleAt = clock.now()
         let escaped = Self.escapeLike(query)
         let pattern = "%\(escaped)%"
         var sql = """
@@ -678,12 +709,17 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
         WHERE project_id=? AND is_tombstone=0
           AND (id=? OR title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')
         """
+        if !includeExpired { sql += " AND COALESCE(forge_memory_expiry_epoch(expires_at)>?,1)" }
         if !kinds.isEmpty {
             sql += " AND kind IN (\(Array(repeating: "?", count: kinds.count).joined(separator: ",")))"
         }
         if sessionID != nil { sql += " AND session_id=?" }
         for _ in tags {
             sql += " AND EXISTS(SELECT 1 FROM memory_record_tags rt JOIN memory_tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id AND t.name=?)"
+        }
+        if after != nil {
+            sql = "WITH ranked AS (\(sql)) SELECT * FROM ranked WHERE "
+                + "(rank_score<? OR (rank_score=? AND updated_at<?) OR (rank_score=? AND updated_at=? AND id>?))"
         }
         sql += " ORDER BY rank_score DESC,updated_at DESC,id ASC LIMIT ? OFFSET ?"
         return try withStatement(sql, cancellation: cancellation) { statement in
@@ -698,9 +734,21 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             bind(statement, index, pattern); index += 1
             bind(statement, index, pattern); index += 1
             bind(statement, index, pattern); index += 1
+            if !includeExpired { sqlite3_bind_double(statement, index, visibleAt.timeIntervalSince1970); index += 1 }
             for kind in kinds { bind(statement, index, kind); index += 1 }
             if let sessionID { bind(statement, index, sessionID); index += 1 }
             for tag in tags { bind(statement, index, tag); index += 1 }
+            if let after {
+                guard let rank = after.rank, rank.isFinite else {
+                    throw ProjectMemoryError.invalidRequest("search cursor requires a finite rank")
+                }
+                sqlite3_bind_double(statement, index, rank); index += 1
+                sqlite3_bind_double(statement, index, rank); index += 1
+                bind(statement, index, after.updatedAt); index += 1
+                sqlite3_bind_double(statement, index, rank); index += 1
+                bind(statement, index, after.updatedAt); index += 1
+                bind(statement, index, after.id); index += 1
+            }
             sqlite3_bind_int(statement, index, Int32(limit)); index += 1
             sqlite3_bind_int(statement, index, Int32(offset))
             var output: [(ProjectMemoryRecord, Double)] = []
@@ -929,6 +977,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
     ) throws -> [[String: Any]] {
         let records = try recent(
             kinds: [], sessionID: nil, limit: 10_000, offset: 0,
+            includeExpired: true,
             cancellation: cancellation
         )
         try cancellation?.checkCancellation()
@@ -4465,6 +4514,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 )
             }
             try execUnlocked("PRAGMA busy_timeout=3000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
+            try registerExpiryFunctionUnlocked(handle)
             try withSQLiteControlUnlocked(cancellation: cancellation) {
                 try migrateUnlocked(
                     migrationManifest: migrationManifest,
@@ -4486,6 +4536,36 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
                 throw corruptDatabaseRecoveryError()
             }
             throw error
+        }
+    }
+
+    private func registerExpiryFunctionUnlocked(_ handle: OpaquePointer) throws {
+        // SQLite owns this noncapturing callback until the connection closes.
+        // Every invocation parses at most 35 bytes; query cancellation retains
+        // the existing bounded progress handler between SQLite operations.
+        let result = sqlite3_create_function_v2(
+            handle, "forge_memory_expiry_epoch", 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+            nil, { context, count, values in
+                guard let context else { return }
+                guard count == 1, let value = values?[0],
+                      sqlite3_value_type(value) == SQLITE_TEXT else {
+                    sqlite3_result_null(context)
+                    return
+                }
+                let bytes = Int(sqlite3_value_bytes(value))
+                guard (20...ProjectMemoryExpiry.maximumBytes).contains(bytes),
+                      let pointer = sqlite3_value_text(value),
+                      let text = String(bytes: UnsafeBufferPointer(start: pointer, count: bytes), encoding: .utf8),
+                      let expiry = ProjectMemoryExpiry.epoch(text) else {
+                    // Preserve invalid legacy metadata as non-expiring.
+                    sqlite3_result_null(context)
+                    return
+                }
+                sqlite3_result_double(context, expiry)
+            }, nil, nil, nil
+        )
+        guard result == SQLITE_OK else {
+            throw StoreError.execFailed(String(cString: sqlite3_errmsg(handle)))
         }
     }
 
@@ -4967,7 +5047,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             bind(statement, 12, timestamp)
             bind(statement, 13, timestamp)
             bind(statement, 14, timestamp)
-            bind(statement, 15, write.expiresAt)
+            bindExpiry(statement, 15, write.expiresAt)
             bind(statement, 16, hash)
             sqlite3_bind_int(statement, 17, 2)
             bind(statement, 18, write.idempotencyKey)
@@ -5031,7 +5111,7 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
             confidence: sqlite3_column_double(statement, 8), sourceKind: text(statement, 9) ?? "",
             sourceReference: text(statement, 10), sessionID: text(statement, 11),
             createdAt: text(statement, 12) ?? "", updatedAt: text(statement, 13) ?? "",
-            lastAccessedAt: text(statement, 14) ?? "", expiresAt: text(statement, 15),
+            lastAccessedAt: text(statement, 14) ?? "", expiresAt: expiryText(statement, 15),
             contentHash: text(statement, 16) ?? "", isTombstone: sqlite3_column_int(statement, 17) != 0,
             schemaVersion: Int(sqlite3_column_int(statement, 18))
         )
@@ -5447,6 +5527,19 @@ public final class ProjectMemoryRepository: @unchecked Sendable {
 
     private func text(_ statement: OpaquePointer, _ index: Int32) -> String? {
         sqlite3_column_text(statement, index).map { String(cString: $0) }
+    }
+
+    private func bindExpiry(_ statement: OpaquePointer, _ index: Int32, _ value: String?) {
+        guard let value else { sqlite3_bind_null(statement, index); return }
+        _ = value.withCString {
+            sqlite3_bind_text(statement, index, $0, Int32(value.utf8.count), Self.transient)
+        }
+    }
+
+    private func expiryText(_ statement: OpaquePointer, _ index: Int32) -> String? {
+        guard let pointer = sqlite3_column_text(statement, index) else { return nil }
+        let bytes = Int(sqlite3_column_bytes(statement, index))
+        return String(bytes: UnsafeBufferPointer(start: pointer, count: bytes), encoding: .utf8)
     }
 
     private static func contentHash(kind: String, title: String, summary: String, body: String?, tags: [String]) -> String {

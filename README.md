@@ -1,12 +1,21 @@
 # Forge Conductor for macOS
 
-Current source is **0.19.0 (29)**. Projects now supports a saved GitHub repository
+Current source is **0.20.0 (30)**. The follow-up work adds enforced memory expiry,
+running-job output snapshots and bounded HTML title/heading metadata suggested
+by Qwen. The final affected source run passed 224 cases with two fixture skips;
+signed native Core passed all 36 selected cases and Projects app-hosted tests
+passed two. The skipped same-version native-peer case subsequently passed with
+real signed candidates. The Projects editor passed six ordinary native GUI checks,
+including persistence, validation, Clear and Open on GitHub. Native/model checks
+and legacy recovery are recorded in [the follow-up record](docs/QWEN-FOLLOWUP.md).
+
+The published **0.19.0 (29)** checkpoint supports a saved GitHub repository
 location linked to the stable project identity. Native web fetch/search, binary
 file transport, search context/filename filters and per-file Git diffs passed
 signed-candidate MCP checks. Qwen consumed both web tools through LM Studio's
 supported API. Its active desktop chat also verified the repaired host PowerShell
-cache through installed Forge. Projects has two passing app-hosted tests; native
-UI automation could not initialize, so its click-through gate remains open.
+cache through installed Forge. The initial XCTest UI runner could not initialize;
+the later 0.20.0 public Accessibility check passed the ordinary Projects controls.
 The installed 0.18.0 (28) application remains separate from this candidate. See [the current work and
 verification record](docs/PROJECT-WEB-QWEN.md).
 

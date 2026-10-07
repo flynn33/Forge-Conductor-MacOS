@@ -10,6 +10,21 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### 0.20.0 (30) Qwen feedback follow-up
+
+- Added optional bounded HTML page title and first-heading fields to `web.fetch`,
+  with body-only paging retained when the inline budget cannot fit metadata.
+- Enforced valid memory expiry in normal get/search/recent reads, with explicit
+  expired-record inspection, retained exports and expiry-safe page continuation.
+- Added an explicit versioned import mode for malformed legacy expiry metadata,
+  preserving old export recovery under the existing authorization and bounds.
+- Added bounded output snapshots for queued/running/cancelling jobs, with
+  provisional hashes and producer completion distinct from the current page end.
+- Projects validation errors use a project-request heading rather than implying
+  that the Manager is unavailable.
+- Source and signed-native before/after checks passed; actual Qwen and Projects
+  UI qualification boundaries are tracked in [the follow-up record](docs/QWEN-FOLLOWUP.md).
+
 ### 0.19.0 (29) project repository and model tools
 
 - Added project-linked GitHub repository entry in Projects, including normalization,

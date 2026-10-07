@@ -1179,19 +1179,27 @@ final class RuntimeOutputSpool: @unchecked Sendable {
                 let url = directory.appendingPathComponent(filename)
                 let descriptor = Darwin.open(
                     url.path,
-                    O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
                     S_IRUSR | S_IWUSR
                 )
                 guard descriptor >= 0 else {
                     throw RuntimeJobError.storageFailure("could not create runtime output artifact")
                 }
                 let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+                let identity: ArtifactIdentity
+                do {
+                    identity = try Self.identity(descriptor: descriptor, expectedBytes: 0)
+                } catch {
+                    try? handle.close()
+                    throw error
+                }
                 initialized[stream] = StreamState(
                     inlineLimit: inlineLimit,
                     artifactLimit: artifactLimit,
                     artifactRelativePath: relativePath,
                     artifactURL: url,
-                    handle: handle
+                    handle: handle,
+                    artifactIdentity: identity
                 )
             }
         } catch {
@@ -1243,6 +1251,90 @@ final class RuntimeOutputSpool: @unchecked Sendable {
         state.producerReadErrno = reason == .readError ? readErrno : nil
         if reason != .eof { state.artifactTruncated = true }
         states[stream] = state
+    }
+
+    /// Reads a fixed bound while holding the producer lock. Neither the writer's
+    /// file offset nor its incremental digest is changed by a snapshot.
+    func snapshot(
+        stream: RuntimeOutputStream, offset: UInt64, limit: Int, jobState: RuntimeJobState
+    ) throws -> RuntimeOutputSlice? {
+        lock.lock()
+        defer { lock.unlock() }
+        try Task.checkCancellation()
+        guard !finalized else { return nil }
+        guard let state = states[stream], let handle = state.handle,
+              let expectedIdentity = state.artifactIdentity else {
+            throw RuntimeJobError.outputUnavailable(jobID, stream)
+        }
+        guard state.writeError == nil else {
+            throw RuntimeJobError.storageFailure("runtime artifact write failed before snapshot")
+        }
+        let descriptor = handle.fileDescriptor
+        let identity = try Self.identity(descriptor: descriptor, expectedBytes: state.retainedBytes)
+        var initial = stat()
+        var pathIdentity = stat()
+        guard identity == expectedIdentity,
+              Darwin.fstat(descriptor, &initial) == 0,
+              Darwin.lstat(state.artifactURL.path, &pathIdentity) == 0,
+              pathIdentity.st_mode & S_IFMT == S_IFREG,
+              pathIdentity.st_dev == initial.st_dev,
+              pathIdentity.st_ino == initial.st_ino else {
+            throw RuntimeJobError.storageFailure("runtime snapshot artifact identity changed")
+        }
+        let start = min(offset, state.retainedBytes)
+        let advanced = start.addingReportingOverflow(UInt64(limit))
+        let end = min(state.retainedBytes, advanced.overflow ? UInt64.max : advanced.partialValue)
+        var slice = Data()
+        slice.reserveCapacity(Int(end - start))
+        var hasher = SHA256()
+        var fileOffset: UInt64 = 0
+        var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+        while fileOffset < state.retainedBytes {
+            try Task.checkCancellation()
+            let requested = min(buffer.count, Int(state.retainedBytes - fileOffset))
+            let count = buffer.withUnsafeMutableBytes {
+                Darwin.pread(descriptor, $0.baseAddress, requested, off_t(fileOffset))
+            }
+            if count < 0, errno == EINTR { continue }
+            guard count > 0 else {
+                throw RuntimeJobError.storageFailure("runtime snapshot artifact changed during read")
+            }
+            let bytes = Data(buffer.prefix(count))
+            hasher.update(data: bytes)
+            let chunkEnd = fileOffset + UInt64(count)
+            let lower = max(fileOffset, start)
+            let upper = min(chunkEnd, end)
+            if lower < upper {
+                slice.append(bytes[Int(lower - fileOffset)..<Int(upper - fileOffset)])
+            }
+            fileOffset = chunkEnd
+        }
+        let snapshotHasher = state.hasher
+        let expectedDigest = snapshotHasher.finalize()
+        let digest = hasher.finalize()
+        var final = stat()
+        var finalPath = stat()
+        guard digest == expectedDigest,
+              Darwin.fstat(descriptor, &final) == 0,
+              Darwin.lstat(state.artifactURL.path, &finalPath) == 0,
+              finalPath.st_mode & S_IFMT == S_IFREG,
+              finalPath.st_dev == initial.st_dev, finalPath.st_ino == initial.st_ino,
+              final.st_dev == initial.st_dev, final.st_ino == initial.st_ino,
+              final.st_size == initial.st_size,
+              final.st_mtimespec.tv_sec == initial.st_mtimespec.tv_sec,
+              final.st_mtimespec.tv_nsec == initial.st_mtimespec.tv_nsec,
+              final.st_ctimespec.tv_sec == initial.st_ctimespec.tv_sec,
+              final.st_ctimespec.tv_nsec == initial.st_ctimespec.tv_nsec else {
+            throw RuntimeJobError.storageFailure("runtime snapshot artifact verification failed")
+        }
+        return RuntimeOutputSlice(
+            jobID: jobID, stream: stream, offset: offset, data: slice, nextOffset: end,
+            totalRetainedBytes: state.retainedBytes, totalObservedBytes: state.observedBytes,
+            eof: end >= state.retainedBytes, artifactTruncated: state.artifactTruncated,
+            sha256: digest.map { String(format: "%02x", $0) }.joined(),
+            producerEndReason: state.producerEndReason, producerReadErrno: state.producerReadErrno,
+            isSnapshot: true, jobState: jobState
+        )
     }
 
     func finalize() throws -> [RuntimeJobOutputMetadata] {

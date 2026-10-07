@@ -1,8 +1,22 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 Qwen feedback follow-up
+
+Current source identity is **0.20.0 (30)**. Work continues from safely synchronized
+owner-signed `a14a63de92d26cfd16fd196601033570e682ba7a` on the native-reproduced
+expiry and running-output gaps and Qwen's page-title request.
+[The follow-up record](docs/QWEN-FOLLOWUP.md) retains before/after evidence.
+
+| Milestone | Current evidence | Remaining gate |
+| --- | --- | --- |
+| Memory expiration | Seventeen regressions and the full 49-case memory class passed; all seventeen signed-native cases passed. Final-candidate Qwen reads confirm normal versus explicit expired visibility. The untouched signed 0.19.0 schema-3 export recovered four inserted records into a fresh project through explicit versioned legacy import, with malformed/NUL expiry preserved, strict rejection with unchanged memory-domain rows, separate-project/path guards and durable reopen. Three owned native sessions exited zero with full EOF. | Installed/all-feature acceptance remains open. Per-ID expired/missing explanation is a recorded Qwen usability proposal. |
+| Running job-output reads | Eight new regressions and the full 131-case runtime class passed; eight signed-native cases passed. All five production MCP cases passed. Final-candidate Qwen consumed both provisional running streams and exact final continuation, correctly distinguishing producer EOF and terminal exit zero. | Installed/all-feature acceptance remains open; no push-streaming or interactive PTY claim. Additional page-EOF annotation is a recorded Qwen usability proposal. |
+| Web page metadata | All eleven web cases passed in source and signed native, including small budgets, adversarial HTML and continued text/source pages. Qwen consumed title/heading availability and both real web tools through LM Studio API, finishing normally. | Installed build remains 0.18.0 (28); JavaScript/authenticated browser access remains open. |
+| Projects native controls | The final signed 0.20.0 candidate passed six public Accessibility GUI flows and all five native window captures were reviewed: registration, exact Open URL in Safari, normalized SSH Save, ordinary Quit/relaunch persistence, invalid-host rejection with the correct heading, and Clear. Two app-hosted editor tests also passed. | Installed deployment remains separate. The earlier zero-executed XCTest UI runner remains a retained nonpass; the ordinary controls have independent runtime proof. |
+
 ## October 7 project repository and Qwen collaboration
 
-Current source identity is **0.19.0 (29)**; installed 0.18.0 (28) is preserved.
+Published checkpoint identity is **0.19.0 (29)**; installed 0.18.0 (28) is preserved.
 The owner requested project-linked GitHub entry, model web access, and work with
 the active Qwen chat on its reported failures and requested functionality.
 [The feature record](docs/PROJECT-WEB-QWEN.md) distinguishes implemented changes,
@@ -10,9 +24,9 @@ executed checks, host repairs and still-open additions.
 
 | Milestone | Current evidence | Remaining gate |
 | --- | --- | --- |
-| Projects GitHub linkage | Stable-project metadata, generation-fenced update, native editor and model projection implemented. Four registry tests and the authenticated route passed in signed native Core; two app-hosted tests passed. | Native UI runner timed out enabling automation mode: zero UI cases executed. Click-through/screenshots remain open; source publication pending. |
-| Web and file tools for LM Studio | 402 affected source cases passed (two documented skips; live-provider skip subsequently executed and passed), affected final edits rerun. Signed native Core passed 24 cases across two exact selections, app-hosted passed two. Production signed MCP passed five web and six file/search/Git cases; actual Qwen consumed both web tools and finished normally. | Installed build remains 0.18.0 (28). Candidate source publication pending; browser JavaScript/authenticated sessions and broad wishlist are separate open additions. |
-| Qwen reported runtime failures | Cache A/B reproduced PowerShell exit 134; archived reversible cache repair passed three direct probes. Active Qwen installed-Forge PowerShell job `91dcf79a…` completed exit zero with version 7.6.6 and full untruncated streams. Native reproducers also demonstrate unenforced memory expiry and unavailable running-job output. | CLU/task/context require supported host identity; ordinary GUI rollover and all-feature acceptance remain open. Expiry and running-output repairs are the next independent work. |
+| Projects GitHub linkage | Stable-project metadata, generation-fenced update, native editor and model projection implemented. Four registry tests and the authenticated route passed in signed native Core; two app-hosted tests passed. Published owner-signed as `a14a63de…`; local/remote main matched, clean. Later 0.20.0 ordinary native GUI verification passed six flows with reviewed captures; see follow-up above. | The initial UI runner timed out enabling automation mode with zero cases; retained as nonpass. Installed deployment remains separate from candidate UI acceptance. |
+| Web and file tools for LM Studio | 402 affected source cases passed (two documented skips; live-provider skip subsequently executed and passed), affected final edits rerun. Signed native Core passed 24 cases across two exact selections, app-hosted passed two. Production signed MCP passed five web and six file/search/Git cases; actual Qwen consumed both web tools and finished normally. Published in `a14a63de…`. | Installed build remains 0.18.0 (28). Browser JavaScript/authenticated sessions and broad wishlist are separate open additions. |
+| Qwen reported runtime failures | Cache A/B reproduced PowerShell exit 134; archived reversible cache repair passed three direct probes. Active Qwen installed-Forge PowerShell job `91dcf79a…` completed exit zero with version 7.6.6 and full untruncated streams. The subsequent 0.20.0 candidate repairs the separately reproduced expiry and running-output gaps; see follow-up rows above. | CLU/task/context require supported host identity; ordinary GUI rollover and all-feature acceptance remain open. |
 
 
 **Published owner checkpoint — 0.18.0 (28).** The source and wiki were

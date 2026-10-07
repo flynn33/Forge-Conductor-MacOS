@@ -65,7 +65,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             "python.run": "Start a durable isolated Python job when the configured interpreter is available.",
             "powershell.run": "Start a durable noninteractive PowerShell job when pwsh is available.",
             "job.status": "Read durable status for one project-generation-bound runtime job.",
-            "job.read_output": "Read a bounded stdout/stderr byte page. Continue at next_offset; pages may be shorter than limit to fit the result budget. data is legacy text; optional data_base64 preserves exact bytes when the page is not valid UTF-8. eof ends retained byte pages only. Complete native output also requires producer_end_reason=eof, producer_read_errno=null, and artifact_truncated=false for both streams. Missing/null producer reason is legacy unknown; read_error or forced_close is incomplete.",
+            "job.read_output": "Read a bounded stdout/stderr byte page, including an owned queued/running/cancelling snapshot. Continue at next_offset; pages may be shorter than limit to fit the result budget. For is_snapshot=true, retained_bytes, observed_bytes and sha256 describe the current snapshot; sha256_is_provisional=true and more bytes may arrive, so poll again at next_offset even when eof=true. job_state is the observed durable state. data is legacy text; optional data_base64 preserves exact bytes when the page is not valid UTF-8. eof ends retained byte pages only; producer_eof reports producer EOF separately. Complete native output requires a terminal job, is_snapshot=false, producer_end_reason=eof, producer_read_errno=null, and artifact_truncated=false for both streams. Missing/null producer reason is legacy unknown; read_error or forced_close is incomplete.",
             "job.cancel": "Cancel a runtime job and terminate its process group with bounded escalation.",
             "job.list": "List complete runtime job rows within the current project generation and inline result budget. Pass both fields from next_cursor to read the next page, including jobs with the same creation timestamp.",
         ][name]
@@ -220,7 +220,9 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as RuntimeJobError {
-            return .failure(code: error.code, message: error.localizedDescription, retryable: false)
+            let retryable: Bool
+            if case .outputPending = error { retryable = true } else { retryable = false }
+            return .failure(code: error.code, message: error.localizedDescription, retryable: retryable)
         } catch let error as ProjectContextError {
             return .failure(
                 code: error.code,
@@ -258,6 +260,10 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                 "sha256": slice.sha256,
                 "producer_end_reason": slice.producerEndReason?.rawValue as Any? ?? NSNull(),
                 "producer_read_errno": slice.producerReadErrno as Any? ?? NSNull(),
+                "is_snapshot": slice.isSnapshot,
+                "sha256_is_provisional": slice.isSnapshot,
+                "job_state": slice.jobState?.rawValue as Any? ?? NSNull(),
+                "producer_eof": slice.producerEndReason == .eof,
             ]
             if String(data: bytes, encoding: .utf8) == nil {
                 payload["data_base64"] = bytes.base64EncodedString()

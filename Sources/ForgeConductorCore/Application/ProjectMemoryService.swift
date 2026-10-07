@@ -2260,7 +2260,7 @@ public final class ProjectMemoryService: @unchecked Sendable {
             "project_id": descriptor.id,
             "schema_version": ProjectMemoryRepository.schemaVersion,
             "capability_version": Self.capabilityVersion,
-            "capabilities": ["lexical_search", "transactions", "redaction", "exports", repository.supportsFTS5 ? "fts5" : "bounded_sql_fallback"],
+            "capabilities": ["lexical_search", "transactions", "redaction", "exports", "expiry_visibility", "expired_record_inspection", repository.supportsFTS5 ? "fts5" : "bounded_sql_fallback"],
             "limits": limits.asDictionary(),
             "migration_status": "current",
             "project": descriptor.asDictionary(),
@@ -2308,25 +2308,46 @@ public final class ProjectMemoryService: @unchecked Sendable {
         writes: [ProjectMemoryWrite],
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
+        let validated = try validatedBatch(writes, expiryPolicy: .strict, cancellation: cancellation)
+        return try commitValidatedBatch(projectID: projectID, writes: validated, cancellation: cancellation)
+    }
+
+    private func validatedBatch(
+        _ writes: [ProjectMemoryWrite],
+        expiryPolicy: ProjectMemoryImportExpiryPolicy,
+        allowEmpty: Bool = false,
+        cancellation: ToolCallCancellation?
+    ) throws -> [ProjectMemoryWrite] {
         try cancellation?.checkCancellation()
-        guard !writes.isEmpty, writes.count <= limits.maximumBatchCount else {
+        guard (allowEmpty || !writes.isEmpty), writes.count <= limits.maximumBatchCount else {
             throw ProjectMemoryError.payloadTooLarge("batch count exceeds \(limits.maximumBatchCount)")
         }
         var validated: [ProjectMemoryWrite] = []
         validated.reserveCapacity(writes.count)
         for write in writes {
             try cancellation?.checkCancellation()
-            validated.append(try validate(write))
+            validated.append(try validate(write, expiryPolicy: expiryPolicy))
         }
         let encodedBytes = validated.reduce(0) { total, item in
             total + item.title.utf8.count + item.summary.utf8.count + (item.body?.utf8.count ?? 0)
+                + (expiryPolicy == .preserveLegacyV1 ? (item.expiresAt?.utf8.count ?? 0) : 0)
         }
         guard encodedBytes <= limits.maximumBatchBytes else {
             throw ProjectMemoryError.payloadTooLarge("batch bytes exceed \(limits.maximumBatchBytes)")
         }
         try cancellation?.checkCancellation()
+        return validated
+    }
+
+    private func commitValidatedBatch(
+        projectID: String,
+        writes: [ProjectMemoryWrite],
+        importExpiryPolicy: ProjectMemoryImportExpiryPolicy? = nil,
+        cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
+        try cancellation?.checkCancellation()
         let resultPayload: ([(ProjectMemoryRecord, String)]) -> [String: Any] = { results in
-            [
+            var payload: [String: Any] = [
                 "ok": true,
                 "project_id": projectID,
                 "count": results.count,
@@ -2334,12 +2355,14 @@ public final class ProjectMemoryService: @unchecked Sendable {
                 "schema_version": ProjectMemoryRepository.schemaVersion,
                 "capability_version": Self.capabilityVersion,
             ]
+            if let importExpiryPolicy { payload["expiry_policy"] = importExpiryPolicy.rawValue }
+            return payload
         }
         let results = try repository(
             projectID: projectID,
             cancellation: cancellation
         ).rememberBatch(
-            validated,
+            writes,
             cancellation: cancellation,
             commitReceipt: { ToolResult.success(resultPayload($0)) }
         )
@@ -2350,6 +2373,7 @@ public final class ProjectMemoryService: @unchecked Sendable {
         projectID: String,
         ids: [String],
         includeBody: Bool,
+        includeExpired: Bool = false,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
         try cancellation?.checkCancellation()
@@ -2360,6 +2384,7 @@ public final class ProjectMemoryService: @unchecked Sendable {
             ids: ids,
             includeBody: includeBody,
             maximumCount: limits.maximumPageCount,
+            includeExpired: includeExpired,
             cancellation: cancellation
         )
         return envelope(projectID: projectID, records: records.map { $0.asDictionary(includeBody: includeBody) })
@@ -2455,24 +2480,31 @@ public final class ProjectMemoryService: @unchecked Sendable {
     public func listRecent(
         projectID: String, kinds: [String], sessionID: String?, limit: Int, cursor: String?, includeBody: Bool,
         maximumResponseBytes: Int,
+        includeExpired: Bool = false,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
         try cancellation?.checkCancellation()
         let page = min(max(limit, 1), limits.maximumPageCount)
-        let offset = try decodeCursor(cursor)
+        let scope = try cursorScope(projectID: projectID, query: nil, kinds: kinds, tags: [],
+                                    sessionID: sessionID, includeExpired: includeExpired)
+        let continuation = try decodeCursor(cursor, scope: scope, requiresRank: false)
         let records = try repository(projectID: projectID, cancellation: cancellation).recent(
             kinds: kinds,
             sessionID: sessionID,
             limit: page + 1,
-            offset: offset,
+            offset: continuation.offset,
+            includeExpired: includeExpired,
+            after: continuation.after,
             cancellation: cancellation
         )
-        return boundedPage(projectID: projectID, records: records.map { $0.asDictionary(includeBody: includeBody) }, offset: offset, requestedPage: page, maximumBytes: maximumResponseBytes)
+        return try boundedPage(projectID: projectID, records: records.map { $0.asDictionary(includeBody: includeBody) },
+                               scope: scope, requestedPage: page, maximumBytes: maximumResponseBytes)
     }
 
     public func search(
         projectID: String, query: String, kinds: [String], tags: [String], sessionID: String?,
         limit: Int, cursor: String?, includeBody: Bool, maximumResponseBytes: Int,
+        includeExpired: Bool = false,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
         try cancellation?.checkCancellation()
@@ -2480,16 +2512,19 @@ public final class ProjectMemoryService: @unchecked Sendable {
         guard !normalized.isEmpty else { throw ProjectMemoryError.invalidRequest("query is required") }
         try requireBytes(normalized, maximum: limits.maximumQueryBytes, field: "query")
         let page = min(max(limit, 1), limits.maximumPageCount)
-        let offset = try decodeCursor(cursor)
+        let normalizedTags = try normalizeTags(tags)
+        let scope = try cursorScope(projectID: projectID, query: normalized, kinds: kinds, tags: normalizedTags,
+                                    sessionID: sessionID, includeExpired: includeExpired)
+        let continuation = try decodeCursor(cursor, scope: scope, requiresRank: true)
         let matches = try repository(projectID: projectID, cancellation: cancellation).search(
-            query: normalized, kinds: kinds, tags: try normalizeTags(tags), sessionID: sessionID,
-            limit: page + 1, offset: offset, cancellation: cancellation
+            query: normalized, kinds: kinds, tags: normalizedTags, sessionID: sessionID,
+            limit: page + 1, offset: continuation.offset, includeExpired: includeExpired,
+            after: continuation.after, cancellation: cancellation
         )
         let records = matches.map { $0.0.asDictionary(includeBody: includeBody, score: $0.1) }
-        var output = boundedPage(projectID: projectID, records: records, offset: offset, requestedPage: page, maximumBytes: maximumResponseBytes)
-        output["query"] = normalized
-        output["ranking"] = ["exact_id", "exact_title", "lexical_title", "summary", "body", "importance", "confidence"]
-        return output
+        return try boundedPage(projectID: projectID, records: records, scope: scope,
+            requestedPage: page, maximumBytes: maximumResponseBytes,
+            extra: ["query": normalized, "ranking": ["exact_id", "exact_title", "lexical_title", "summary", "body", "importance", "confidence"]])
     }
 
     public func status(
@@ -2502,6 +2537,10 @@ public final class ProjectMemoryService: @unchecked Sendable {
         )
         status["ok"] = true
         status["capability_version"] = Self.capabilityVersion
+        status["expiry_policy"] = [
+            "default_visibility": "unexpired", "include_expired_supported": true,
+            "legacy_invalid_timestamps": "visible_non_expiring", "expired_rows_deleted": false,
+        ]
         status["limits"] = limits.asDictionary()
         status["cache"] = ["open_repositories": openRepositoryCount, "maximum": limits.maximumOpenProjects]
         status["project"] = try identities.descriptor(
@@ -2567,6 +2606,7 @@ public final class ProjectMemoryService: @unchecked Sendable {
         artifactPath: String,
         preview: Bool,
         mergePolicy: String?,
+        expiryPolicy: ProjectMemoryImportExpiryPolicy = .strict,
         cancellation: ToolCallCancellation? = nil
     ) throws -> [String: Any] {
         try cancellation?.checkCancellation()
@@ -2613,11 +2653,13 @@ public final class ProjectMemoryService: @unchecked Sendable {
             try cancellation?.checkCancellation()
             writes.append(try writeFromExport(record))
         }
+        let validated = try validatedBatch(writes, expiryPolicy: expiryPolicy, allowEmpty: preview, cancellation: cancellation)
         if preview {
             try cancellation?.checkCancellation()
-            return ["ok": true, "preview": true, "project_id": projectID, "record_count": records.count, "importable_count": writes.count, "checksum": actualChecksum]
+            return ["ok": true, "preview": true, "project_id": projectID, "record_count": records.count,
+                    "importable_count": validated.count, "checksum": actualChecksum, "expiry_policy": expiryPolicy.rawValue]
         }
-        return try rememberBatch(projectID: projectID, writes: writes, cancellation: cancellation)
+        return try commitValidatedBatch(projectID: projectID, writes: validated, importExpiryPolicy: expiryPolicy, cancellation: cancellation)
     }
 
     public var openRepositoryCount: Int {
@@ -2705,7 +2747,10 @@ public final class ProjectMemoryService: @unchecked Sendable {
         }
     }
 
-    private func validate(_ write: ProjectMemoryWrite) throws -> ProjectMemoryWrite {
+    private func validate(
+        _ write: ProjectMemoryWrite,
+        expiryPolicy: ProjectMemoryImportExpiryPolicy = .strict
+    ) throws -> ProjectMemoryWrite {
         let kind = write.kind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !kind.isEmpty, kind.utf8.count <= 64,
               kind.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-.")).contains($0) }) else {
@@ -2722,12 +2767,16 @@ public final class ProjectMemoryService: @unchecked Sendable {
             throw ProjectMemoryError.invalidRequest("importance and confidence must be within 0...1")
         }
         let tags = try normalizeTags(write.tags)
+        if expiryPolicy == .preserveLegacyV1, let expiry = write.expiresAt {
+            try requireBytes(expiry, maximum: limits.maximumBatchBytes, field: "legacy expires_at")
+        }
+        let expiresAt = try ProjectMemoryExpiry.normalizedForImport(write.expiresAt, policy: expiryPolicy)
         return ProjectMemoryWrite(
             kind: kind, title: try redactor.redact(title) ?? title,
             summary: try redactor.redact(summary) ?? summary, body: try redactor.redact(write.body),
             tags: tags, importance: write.importance, confidence: write.confidence,
             sourceKind: write.sourceKind, sourceReference: try redactor.redact(write.sourceReference),
-            sessionID: write.sessionID, expiresAt: write.expiresAt,
+            sessionID: write.sessionID, expiresAt: expiresAt,
             relatedIDs: Array(write.relatedIDs.prefix(32)), idempotencyKey: write.idempotencyKey
         )
     }
@@ -2765,41 +2814,94 @@ public final class ProjectMemoryService: @unchecked Sendable {
     }
 
     private func boundedPage(
-        projectID: String, records: [[String: Any]], offset: Int, requestedPage: Int, maximumBytes: Int
-    ) -> [String: Any] {
+        projectID: String, records: [[String: Any]], scope: String, requestedPage: Int, maximumBytes: Int,
+        extra: [String: Any] = [:]
+    ) throws -> [String: Any] {
         let byteLimit = min(max(maximumBytes, 1024), limits.maximumResponseBytes)
         var accepted: [[String: Any]] = []
-        var used = 256
-        var truncated = records.count > requestedPage
-        for record in records.prefix(requestedPage) {
-            let size = (try? JSONSerialization.data(withJSONObject: record).count) ?? byteLimit
-            if used + size > byteLimit { truncated = true; break }
-            accepted.append(record); used += size
+        func payload(_ selected: [[String: Any]]) throws -> [String: Any] {
+            let truncated = records.count > selected.count
+            var output = extra
+            output.merge([
+                "ok": true, "project_id": projectID, "count": selected.count, "records": selected,
+                "next_cursor": truncated && !selected.isEmpty ? try encodeCursor(selected.last!, scope: scope) : NSNull(),
+                "truncated": truncated, "encoded_bytes": 0, "maximum_response_bytes": byteLimit,
+                "schema_version": ProjectMemoryRepository.schemaVersion, "capability_version": Self.capabilityVersion,
+            ]) { _, new in new }
+            // Count the new opaque continuation and query metadata as well as
+            // records. The size field converges after its digit width settles.
+            for _ in 0..<3 { output["encoded_bytes"] = try JSONSupport.data(from: output).count }
+            return output
         }
-        let nextOffset = offset + accepted.count
-        return [
-            "ok": true, "project_id": projectID, "count": accepted.count, "records": accepted,
-            "next_cursor": truncated && !accepted.isEmpty ? encodeCursor(nextOffset) : NSNull(),
-            "truncated": truncated, "encoded_bytes": used, "maximum_response_bytes": byteLimit,
-            "schema_version": ProjectMemoryRepository.schemaVersion, "capability_version": Self.capabilityVersion,
-        ]
+        var output = try payload([])
+        for record in records.prefix(requestedPage) {
+            let proposed = accepted + [record]
+            let candidate = try payload(proposed)
+            guard try JSONSupport.data(from: candidate).count <= byteLimit else { break }
+            accepted = proposed
+            output = candidate
+        }
+        guard records.isEmpty || !accepted.isEmpty else {
+            throw ProjectMemoryError.payloadTooLarge("one record and its continuation exceed maximum_response_bytes")
+        }
+        guard try JSONSupport.data(from: output).count <= byteLimit else {
+            throw ProjectMemoryError.payloadTooLarge("page metadata exceeds maximum_response_bytes")
+        }
+        return output
     }
 
-    private func encodeCursor(_ offset: Int) -> String { Data("v1:\(offset)".utf8).base64EncodedString() }
+    private func cursorScope(projectID: String, query: String?, kinds: [String], tags: [String],
+                             sessionID: String?, includeExpired: Bool) throws -> String {
+        JSONSupport.sha256Hex(try JSONSupport.canonicalJSON([
+            "project_id": projectID, "query": query as Any, "kinds": Array(Set(kinds)).sorted(),
+            "tags": tags.sorted(), "session_id": sessionID as Any, "include_expired": includeExpired,
+        ]))
+    }
 
-    private func decodeCursor(_ cursor: String?) throws -> Int {
-        guard let cursor, !cursor.isEmpty else { return 0 }
+    private func encodeCursor(_ record: [String: Any], scope: String) throws -> String {
+        guard let id = record["id"] as? String, let updatedAt = record["updated_at"] as? String else {
+            throw ProjectMemoryError.integrityFailure("record is missing continuation coordinates")
+        }
+        guard !id.isEmpty, id.utf8.count <= 512, !updatedAt.isEmpty, updatedAt.utf8.count <= 128 else {
+            throw ProjectMemoryError.payloadTooLarge("continuation coordinates exceed cursor limit")
+        }
+        var payload: [String: Any] = ["version": 2, "scope": scope, "id": id, "updated_at": updatedAt]
+        if let rank = record["score"] { payload["rank"] = rank }
+        let data = try JSONSupport.data(from: payload)
+        guard data.count <= 3072 else { throw ProjectMemoryError.payloadTooLarge("continuation coordinates exceed cursor limit") }
+        return data.base64EncodedString()
+    }
+
+    private func decodeCursor(_ cursor: String?, scope: String, requiresRank: Bool) throws -> (offset: Int, after: ProjectMemoryPagePosition?) {
+        guard let cursor, !cursor.isEmpty else { return (0, nil) }
+        guard cursor.utf8.count <= 4096 else { throw ProjectMemoryError.invalidRequest("invalid cursor") }
         guard let data = Data(base64Encoded: cursor), let text = String(data: data, encoding: .utf8),
-              text.hasPrefix("v1:"), let value = Int(text.dropFirst(3)), value >= 0 else {
+              data.count <= 3072 else {
             throw ProjectMemoryError.invalidRequest("invalid cursor")
         }
-        return value
+        if text.hasPrefix("v1:"), let value = Int(text.dropFirst(3)), (0...Int(Int32.max)).contains(value) {
+            return (value, nil)
+        }
+        guard let value = try? JSONSupport.object(from: data), value["version"] as? Int == 2,
+              value["scope"] as? String == scope,
+              let id = value["id"] as? String, !id.isEmpty, id.utf8.count <= 512,
+              let updatedAt = value["updated_at"] as? String, !updatedAt.isEmpty, updatedAt.utf8.count <= 128 else {
+            throw ProjectMemoryError.invalidRequest("cursor does not match this project query")
+        }
+        let rank = value["rank"] as? Double
+        guard requiresRank == (rank != nil), rank?.isFinite != false else {
+            throw ProjectMemoryError.invalidRequest("invalid cursor rank")
+        }
+        return (0, ProjectMemoryPagePosition(id: id, updatedAt: updatedAt, rank: rank))
     }
 
     private func writeFromExport(_ object: [String: Any]) throws -> ProjectMemoryWrite {
         guard let kind = object["kind"] as? String, let title = object["title"] as? String,
               let summary = object["summary"] as? String else {
             throw ProjectMemoryError.invalidRequest("export record is missing required fields")
+        }
+        if let expiry = object["expires_at"], !(expiry is NSNull), !(expiry is String) {
+            throw ProjectMemoryError.invalidRequest("expires_at must be a timestamp string")
         }
         return ProjectMemoryWrite(
             kind: kind, title: title, summary: summary, body: object["body"] as? String,

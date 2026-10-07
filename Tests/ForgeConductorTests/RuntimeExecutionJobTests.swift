@@ -87,6 +87,340 @@ final class RuntimeExecutionJobTests: XCTestCase {
     }
 
 
+    func testRunningOutputSpoolSnapshotsDoNotFinalizeOrChangeProducerHash() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let spool = try RuntimeOutputSpool(
+            jobID: UUID(), projectID: ProjectID(), generation: .initial, artifactRoot: root,
+            maximumInlineBytes: 8, maximumArtifactBytes: 32
+        )
+        defer { spool.discard(); try? FileManager.default.removeItem(at: root) }
+        let empty = try XCTUnwrap(spool.snapshot(stream: .stdout, offset: 0, limit: 2, jobState: .queued))
+        XCTAssertTrue(empty.isSnapshot)
+        XCTAssertEqual(empty.jobState, .queued)
+        XCTAssertEqual(empty.data, Data())
+        XCTAssertEqual(empty.sha256, JSONSupport.sha256Hex(Data()))
+        XCTAssertTrue(empty.eof)
+        XCTAssertNil(empty.producerEndReason)
+        let first = Data("A🦅Z".utf8)
+        spool.append(first, stream: .stdout)
+        let page = try XCTUnwrap(spool.snapshot(stream: .stdout, offset: 0, limit: 2, jobState: .running))
+        XCTAssertEqual(page.data, first.prefix(2))
+        XCTAssertEqual(page.nextOffset, 2)
+        XCTAssertEqual(page.sha256, JSONSupport.sha256Hex(first))
+        XCTAssertFalse(page.eof)
+        let initialEnd = try XCTUnwrap(spool.snapshot(stream: .stdout, offset: 2, limit: 20, jobState: .running))
+        XCTAssertTrue(initialEnd.eof)
+        let second = Data([0xff, 0xfe])
+        spool.append(second, stream: .stdout)
+        let afterPageEnd = try XCTUnwrap(spool.snapshot(
+            stream: .stdout, offset: initialEnd.nextOffset, limit: 20, jobState: .cancelling
+        ))
+        XCTAssertEqual(afterPageEnd.data, second)
+        XCTAssertEqual(afterPageEnd.jobState, .cancelling)
+        XCTAssertEqual(afterPageEnd.sha256, JSONSupport.sha256Hex(first + second))
+        XCTAssertEqual(afterPageEnd.totalObservedBytes, 8)
+        XCTAssertNil(afterPageEnd.producerEndReason)
+        spool.endProducer(stream: .stdout, reason: .eof)
+        spool.endProducer(stream: .stderr, reason: .eof)
+        let ended = try XCTUnwrap(spool.snapshot(stream: .stdout, offset: .max, limit: 2, jobState: .running))
+        XCTAssertTrue(ended.isSnapshot)
+        XCTAssertEqual(ended.producerEndReason, .eof)
+        XCTAssertTrue(ended.data.isEmpty)
+        XCTAssertEqual(ended.nextOffset, 8)
+        let terminal = try spool.finalize()
+        let stdout = try XCTUnwrap(terminal.first { $0.stream == .stdout })
+        XCTAssertEqual(stdout.sha256, JSONSupport.sha256Hex(first + second))
+        XCTAssertEqual(stdout.retainedByteCount, 8)
+        XCTAssertFalse(stdout.artifactTruncated)
+        XCTAssertNil(try spool.snapshot(stream: .stdout, offset: 0, limit: 2, jobState: .completed))
+    }
+
+    func testRunningOutputSnapshotCancellationLeavesOwnedSpoolReadable() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let spool = try RuntimeOutputSpool(
+            jobID: UUID(), projectID: ProjectID(), generation: .initial, artifactRoot: root,
+            maximumInlineBytes: 8, maximumArtifactBytes: 32
+        )
+        defer { spool.discard(); try? FileManager.default.removeItem(at: root) }
+        spool.append(Data("still-owned".utf8), stream: .stdout)
+        let read = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try spool.snapshot(stream: .stdout, offset: 0, limit: 20, jobState: .running)
+        }
+        do {
+            _ = try await read.value
+            XCTFail("A cancelled output read must throw cancellation")
+        } catch is CancellationError {}
+        let later = try XCTUnwrap(spool.snapshot(stream: .stdout, offset: 0, limit: 20, jobState: .running))
+        XCTAssertEqual(later.data, Data("still-owned".utf8))
+        XCTAssertEqual(later.sha256, JSONSupport.sha256Hex(Data("still-owned".utf8)))
+        XCTAssertTrue(later.isSnapshot)
+    }
+
+    func testRunningOutputAbsentOwnerIsRetryableOnlyBeforeTerminalPersistence() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        let jobID = UUID()
+        _ = try await fixture.runtimeRepository.createJob(
+            jobID: jobID, request: fixture.request(kind: .bash, profile: .bashNoProfile, script: "exit 0", timeout: 5),
+            commandSummary: "queued before owner wiring", timeoutSeconds: 5, requestArtifactRelativePath: nil
+        )
+        let pack = RuntimeJobToolPack(service: fixture.service)
+        let pending = try await pack.handle(name: "job.read_output", arguments: [
+            "job_id": jobID.uuidString, "stream": "stdout", "offset": 0, "limit": 100
+        ], context: fixture.context)
+        XCTAssertEqual(pending?.ok, false)
+        XCTAssertEqual(pending?.payload["code"] as? String, "runtime_output_unavailable")
+        XCTAssertEqual(pending?.payload["retryable"] as? Bool, true)
+        XCTAssertNil(pending?.payload["data"])
+        XCTAssertNil(pending?.payload["sha256"])
+        _ = try await fixture.runtimeRepository.complete(jobID: jobID, terminalState: .cancelled,
+            exitCode: nil, outputs: [], artifactID: nil, expectedContext: fixture.context)
+        let terminal = try await pack.handle(name: "job.read_output", arguments: [
+            "job_id": jobID.uuidString, "stream": "stdout", "offset": 0, "limit": 100
+        ], context: fixture.context)
+        XCTAssertEqual(terminal?.ok, false)
+        XCTAssertEqual(terminal?.payload["code"] as? String, "runtime_output_unavailable")
+        XCTAssertEqual(terminal?.payload["retryable"] as? Bool, false)
+    }
+
+    func testRunningOutputSpoolVerifiesIdentityDigestAndRetainedBounds() throws {
+        for substitution in ["symlink", "replacement", "mutation", "hardlink"] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let spool = try RuntimeOutputSpool(
+                jobID: UUID(), projectID: ProjectID(), generation: .initial, artifactRoot: root,
+                maximumInlineBytes: 4, maximumArtifactBytes: 16
+            )
+            defer { spool.discard(); try? FileManager.default.removeItem(at: root) }
+            spool.append(Data(repeating: 0x61, count: 20), stream: .stdout)
+            let before = try XCTUnwrap(spool.snapshot(stream: .stdout, offset: 0, limit: 3, jobState: .running))
+            XCTAssertEqual(before.totalRetainedBytes, 12)
+            XCTAssertEqual(before.totalObservedBytes, 20)
+            XCTAssertTrue(before.artifactTruncated)
+            XCTAssertEqual(before.data, Data(repeating: 0x61, count: 3))
+            let artifact = spool.canonicalDirectory.appendingPathComponent("stdout.log")
+            switch substitution {
+            case "symlink":
+                try FileManager.default.removeItem(at: artifact)
+                let target = root.appendingPathComponent("outside-output")
+                try Data(repeating: 0x61, count: 12).write(to: target)
+                try FileManager.default.createSymbolicLink(at: artifact, withDestinationURL: target)
+            case "replacement":
+                try FileManager.default.removeItem(at: artifact)
+                try Data(repeating: 0x61, count: 12).write(to: artifact)
+            case "hardlink":
+                try FileManager.default.linkItem(at: artifact, to: root.appendingPathComponent("extra-link"))
+            default:
+                let handle = try FileHandle(forWritingTo: artifact)
+                try handle.write(contentsOf: Data(repeating: 0x62, count: 12))
+                try handle.close()
+            }
+            XCTAssertThrowsError(try spool.snapshot(stream: .stdout, offset: 0, limit: 3, jobState: .running)) {
+                XCTAssertEqual(($0 as? RuntimeJobError)?.code, "runtime_storage_failure", substitution)
+            }
+        }
+    }
+
+    func testRunningOutputZeroBytesThenArrivalPagingAndTerminalTransition() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        let ready = fixture.projectRoot.appendingPathComponent("ready")
+        let firstRelease = fixture.projectRoot.appendingPathComponent("first-release")
+        let finish = fixture.projectRoot.appendingPathComponent("finish")
+        let waitFirst = "i=0; while [ ! -e '\(firstRelease.path)' ] && [ $i -lt 1000 ]; do /bin/sleep 0.01; i=$((i+1)); done"
+        let waitFinish = "i=0; while [ ! -e '\(finish.path)' ] && [ $i -lt 1000 ]; do /bin/sleep 0.01; i=$((i+1)); done"
+        let jobID = try await fixture.service.submit(fixture.request(
+            kind: .bash, profile: .bashNoProfile,
+            script: ": > '\(ready.path)'; \(waitFirst); printf 'A🦅Z'; printf 'first-error' >&2; \(waitFinish); printf '\\377\\376'",
+            timeout: 15
+        ))
+        let readyReached = await Self.waitForFile(ready)
+        XCTAssertTrue(readyReached)
+        let empty = try await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 2, context: fixture.context)
+        XCTAssertTrue(empty.isSnapshot)
+        XCTAssertEqual(empty.jobState, .running)
+        XCTAssertTrue(empty.data.isEmpty)
+        XCTAssertTrue(empty.eof)
+        XCTAssertNil(empty.producerEndReason)
+        try Data().write(to: firstRelease)
+        let arrived = await Self.waitUntil {
+            let page = try? await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 20, context: fixture.context)
+            return page?.totalRetainedBytes == 6
+        }
+        XCTAssertTrue(arrived)
+        let pack = RuntimeJobToolPack(service: fixture.service)
+        var reconstructed = Data()
+        for offset: UInt64 in [0, 2, 4] {
+            let result = try await pack.handle(name: "job.read_output", arguments: [
+                "job_id": jobID.uuidString, "stream": "stdout", "offset": offset, "limit": 2
+            ], context: fixture.context)
+            let page = try XCTUnwrap(result?.payload)
+            XCTAssertEqual(result?.ok, true)
+            XCTAssertEqual(page["is_snapshot"] as? Bool, true)
+            XCTAssertEqual(page["sha256_is_provisional"] as? Bool, true)
+            XCTAssertEqual(page["producer_eof"] as? Bool, false)
+            XCTAssertEqual(page["sha256"] as? String, JSONSupport.sha256Hex(Data("A🦅Z".utf8)))
+            let raw: Data
+            if let base64 = page["data_base64"] as? String {
+                raw = try XCTUnwrap(Data(base64Encoded: base64))
+            } else {
+                raw = Data((try XCTUnwrap(page["data"] as? String)).utf8)
+            }
+            reconstructed.append(raw)
+            XCTAssertEqual(page["eof"] as? Bool, offset == 4)
+        }
+        XCTAssertEqual(reconstructed, Data("A🦅Z".utf8))
+        let stderrArrived = await Self.waitUntil {
+            (try? await fixture.service.readOutput(jobID: jobID, stream: .stderr, offset: 0, limit: 20, context: fixture.context).data) == Data("first-error".utf8)
+        }
+        XCTAssertTrue(stderrArrived)
+        try Data().write(to: finish)
+        let terminal = try await fixture.service.waitForTerminal(jobID: jobID, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(terminal.state, .completed)
+        XCTAssertEqual(terminal.exitCode, 0)
+        let final = try await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 6, limit: 20, context: fixture.context)
+        XCTAssertFalse(final.isSnapshot)
+        XCTAssertEqual(final.jobState, .completed)
+        XCTAssertEqual(final.data, Data([0xff, 0xfe]))
+        XCTAssertEqual(final.sha256, JSONSupport.sha256Hex(Data("A🦅Z".utf8) + Data([0xff, 0xfe])))
+        XCTAssertEqual(final.producerEndReason, .eof)
+        XCTAssertFalse(final.artifactTruncated)
+    }
+
+    func testRunningOutputQueuedCancellationAndTimeoutPreserveFinalPages() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        let running = try await fixture.service.submit(fixture.request(
+            kind: .bash, profile: .bashNoProfile, script: "printf 'before-cancel'; /bin/sleep 20", timeout: 30
+        ))
+        let firstArrived = await Self.waitUntil {
+            (try? await fixture.service.readOutput(jobID: running, stream: .stdout, offset: 0, limit: 100, context: fixture.context).data) == Data("before-cancel".utf8)
+        }
+        XCTAssertTrue(firstArrived)
+        let second = try await fixture.service.submit(fixture.request(
+            kind: .bash, profile: .bashNoProfile, script: "/bin/sleep 20", timeout: 30
+        ))
+        let secondRunning = await fixture.waitForState(second, expected: .running)
+        XCTAssertTrue(secondRunning)
+        let queued = try await fixture.service.submit(fixture.request(
+            kind: .bash, profile: .bashNoProfile, script: "printf 'must-not-launch'", timeout: 5
+        ))
+        let queuedPage = try await fixture.service.readOutput(jobID: queued, stream: .stdout, offset: 0, limit: 100, context: fixture.context)
+        XCTAssertTrue(queuedPage.isSnapshot)
+        XCTAssertEqual(queuedPage.jobState, .queued)
+        XCTAssertTrue(queuedPage.data.isEmpty)
+        try await fixture.service.cancel(jobID: queued, context: fixture.context)
+        try await fixture.service.cancel(jobID: running, context: fixture.context)
+        try await fixture.service.cancel(jobID: second, context: fixture.context)
+        let cancelled = try await fixture.service.waitForTerminal(jobID: running, context: fixture.context, maximumWait: .seconds(8))
+        _ = try await fixture.service.waitForTerminal(jobID: second, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(cancelled.state, .cancelled)
+        let final = try await fixture.service.readOutput(jobID: running, stream: .stdout, offset: 0, limit: 100, context: fixture.context)
+        XCTAssertFalse(final.isSnapshot)
+        XCTAssertEqual(final.jobState, .cancelled)
+        XCTAssertEqual(final.data, Data("before-cancel".utf8))
+        let timed = try await fixture.service.submit(fixture.request(
+            kind: .bash, profile: .bashNoProfile, script: "printf 'before-timeout'; /bin/sleep 20", timeout: 1
+        ))
+        let timedArrived = await Self.waitUntil {
+            (try? await fixture.service.readOutput(jobID: timed, stream: .stdout, offset: 0, limit: 100, context: fixture.context).data) == Data("before-timeout".utf8)
+        }
+        XCTAssertTrue(timedArrived)
+        let timeout = try await fixture.service.waitForTerminal(jobID: timed, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(timeout.state, .timedOut)
+        let timeoutPage = try await fixture.service.readOutput(jobID: timed, stream: .stdout, offset: 0, limit: 100, context: fixture.context)
+        XCTAssertFalse(timeoutPage.isSnapshot)
+        XCTAssertEqual(timeoutPage.jobState, .timedOut)
+        XCTAssertEqual(timeoutPage.data, Data("before-timeout".utf8))
+    }
+
+    func testRunningOutputRejectsStaleCallerAndForeignJobBeforeSnapshot() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        let jobID = try await fixture.service.submit(fixture.request(
+            kind: .bash, profile: .bashNoProfile, script: "printf 'private-output'; /bin/sleep 2", timeout: 5
+        ))
+        let arrived = await Self.waitUntil {
+            (try? await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 100, context: fixture.context).data) == Data("private-output".utf8)
+        }
+        XCTAssertTrue(arrived)
+        let foreignRoot = fixture.root.appendingPathComponent("foreign-project")
+        try FileManager.default.createDirectory(at: foreignRoot, withIntermediateDirectories: true)
+        let foreignID = ProjectID()
+        _ = try await fixture.controlRepository.registerProjectUnchecked(projectID: foreignID, displayName: "Foreign", canonicalRoot: foreignRoot)
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: "foreign-output-client")
+        _ = try await fixture.controlRepository.bind(owner: owner, projectID: foreignID, generation: .initial, authorizationScope: ToolAuthorizationScope(canonicalRoots: [foreignRoot], writableRoots: [], allowedTools: ["job.read_output"], networkAllowed: false, maximumInlineOutputBytes: 1024))
+        let foreign = try await fixture.controlRepository.invocationContext(for: owner)
+        do {
+            _ = try await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 100, context: foreign)
+            XCTFail("A foreign project must not read an owned live spool")
+        } catch {
+            XCTAssertEqual((error as? RuntimeJobError)?.code, "runtime_job_scope_mismatch")
+        }
+        let otherRun = try await fixture.autonomousRunContext(mission: "Reject output outside this run")
+        do {
+            _ = try await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 100, context: otherRun.context)
+            XCTFail("A run context must not read a job from another run")
+        } catch {
+            XCTAssertEqual((error as? RuntimeJobError)?.code, "runtime_job_scope_mismatch")
+        }
+        let deniedOwner = ProjectBindingOwner(kind: .mcpClient, id: "denied-output-client")
+        _ = try await fixture.controlRepository.bind(owner: deniedOwner, projectID: fixture.projectID, generation: .initial,
+            authorizationScope: ToolAuthorizationScope(canonicalRoots: [fixture.projectRoot], writableRoots: [], allowedTools: ["job.status"], networkAllowed: false, maximumInlineOutputBytes: 1024))
+        let deniedContext = try await fixture.controlRepository.invocationContext(for: deniedOwner)
+        let denied = try await RuntimeJobToolPack(service: fixture.service).handle(name: "job.read_output",
+            arguments: ["job_id": jobID.uuidString, "stream": "stdout", "limit": 100], context: deniedContext)
+        XCTAssertEqual(denied?.ok, false)
+        XCTAssertEqual(denied?.payload["code"] as? String, "tool_not_authorized")
+        XCTAssertNil(denied?.payload["data"])
+        _ = try await fixture.controlRepository.beginReset(projectID: fixture.projectID, expectedGeneration: .initial)
+        _ = try await fixture.controlRepository.completeReset(projectID: fixture.projectID, expectedGeneration: .initial)
+        do {
+            _ = try await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 100, context: fixture.context)
+            XCTFail("A stale context must not read an owned live spool")
+        } catch {
+            XCTAssertEqual((error as? ProjectContextError)?.code, "stale_project_generation")
+        }
+    }
+
+    func testRunningOutputInvalidBytesFitCompleteDurableResultBudget() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        let finish = fixture.projectRoot.appendingPathComponent("finish-budget")
+        let script = "printf '\(String(repeating: "\\377", count: 4096))'; i=0; while [ ! -e '\(finish.path)' ] && [ $i -lt 1000 ]; do /bin/sleep 0.01; i=$((i+1)); done"
+        let jobID = try await fixture.service.submit(fixture.request(kind: .bash, profile: .bashNoProfile, script: script, timeout: 15))
+        let arrived = await Self.waitUntil {
+            (try? await fixture.service.readOutput(jobID: jobID, stream: .stdout, offset: 0, limit: 4096, context: fixture.context).totalRetainedBytes) == 4096
+        }
+        XCTAssertTrue(arrived)
+        let pack = RuntimeJobToolPack(service: fixture.service)
+        var offset: UInt64 = 0
+        var reconstructed = Data()
+        for _ in 0..<128 {
+            let handled = try await pack.handle(name: "job.read_output", arguments: ["job_id": jobID.uuidString, "stream": "stdout", "offset": offset, "limit": 4096], context: fixture.context)
+            let result = try XCTUnwrap(handled)
+            XCTAssertTrue(result.ok)
+            let encoded = try JSONSupport.canonicalJSON(["ok": result.ok, "is_error": result.isError, "payload": result.payload])
+            XCTAssertLessThanOrEqual(encoded.utf8.count, fixture.context.authorizationScope.maximumInlineOutputBytes)
+            let bytes = try XCTUnwrap((result.payload["data_base64"] as? String).flatMap { Data(base64Encoded: $0) })
+            let next = try XCTUnwrap((result.payload["next_offset"] as? NSNumber)?.uint64Value)
+            XCTAssertGreaterThan(next, offset)
+            XCTAssertEqual(next - offset, UInt64(bytes.count))
+            XCTAssertEqual(result.payload["is_snapshot"] as? Bool, true)
+            XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(Data(repeating: 0xff, count: 4096)))
+            reconstructed.append(bytes)
+            offset = next
+            if result.payload["eof"] as? Bool == true { break }
+        }
+        XCTAssertEqual(reconstructed, Data(repeating: 0xff, count: 4096))
+        try Data().write(to: finish)
+        let terminal = try await fixture.service.waitForTerminal(jobID: jobID, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(terminal.state, .completed)
+    }
+
     func testForcedReaderCloseWithOwnedInheritedWriterCannotReportCompleteOutput() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-pipe-baseline-\(UUID().uuidString)")
         let project = root.appendingPathComponent("project", isDirectory: true)

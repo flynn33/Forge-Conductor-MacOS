@@ -49,6 +49,648 @@ final class ProjectMemoryTests: XCTestCase {
         try? FileManager.default.removeItem(at: home.deletingLastPathComponent())
     }
 
+    func testExpiryTimestampValidationNormalizesZonesAndPreservesFractions() throws {
+        let examples = [
+            ("2026-10-07T05:00:00.123456789-05:00", "2026-10-07T10:00:00.123456789Z"),
+            ("2026-10-07T11:30:00.120000000+01:30", "2026-10-07T10:00:00.12Z"),
+            ("2026-10-07T10:00:00.000000000+00:00", "2026-10-07T10:00:00Z"),
+            ("2026-10-07T23:30:00-02:00", "2026-10-08T01:30:00Z"),
+            ("2026-10-07t10:00:00.125z", "2026-10-07T10:00:00.125Z"),
+            ("2024-02-29T00:00:00Z", "2024-02-29T00:00:00Z"),
+            ("2000-02-29T00:00:00Z", "2000-02-29T00:00:00Z"),
+        ]
+        for (input, expected) in examples {
+            XCTAssertEqual(try ProjectMemoryExpiry.normalized(input), expected, input)
+            XCTAssertEqual(ProjectMemoryExpiry.epoch(input), ProjectMemoryExpiry.epoch(expected), input)
+        }
+        XCTAssertNil(try ProjectMemoryExpiry.normalized(nil))
+        let wholeDate = try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z"))
+        let fractionClock = FixedClock(wholeDate.addingTimeInterval(0.123456789))
+        XCTAssertEqual(try XCTUnwrap(ProjectMemoryExpiry.epoch(examples[0].0)), fractionClock.now().timeIntervalSince1970)
+        for input in [
+            "", "not-a-date", "2026-10-07", "2026-10-07T10:00:00", "2026-02-29T00:00:00Z",
+            "1900-02-29T00:00:00Z", "1500-02-29T00:00:00Z", "2024-02-30T00:00:00Z",
+            "2026-04-31T00:00:00Z", "2026-13-01T00:00:00Z", "2026-00-01T00:00:00Z",
+            "2026-10-00T00:00:00Z", "2026-10-07T24:00:00Z", "2026-10-07T10:60:00Z",
+            "2026-10-07T10:00:60Z", "2026-10-07T10:00:00+24:00", "2026-10-07T10:00:00+01:60",
+            "2026-10-07T10:00:00.Z", "2026-10-07T10:00:00.1234567890Z", "2026-10-07T10:00:00Ztail",
+            " 2026-10-07T10:00:00Z", "2026-10-07T10:00:00Z\n", "２０２６-10-07T10:00:00Z",
+            "0000-01-01T00:00:00Z",
+        ] {
+            XCTAssertThrowsError(try ProjectMemoryExpiry.normalized(input), input)
+            XCTAssertNil(ProjectMemoryExpiry.epoch(input), input)
+        }
+        XCTAssertThrowsError(try ProjectMemoryExpiry.normalized(String(repeating: "x", count: 36))) { error in
+            XCTAssertEqual((error as? ProjectMemoryError)?.code, "payload_too_large")
+        }
+    }
+
+    func testExpiryVisibilityChangesAtInjectedClockWithoutDeletingRows() throws {
+        let base = try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z"))
+        let clock = FixedClock(base)
+        let memory = try expiryMemoryService(clock: clock)
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let otherID = try XCTUnwrap(memory.initializeUnchecked(path: projectB.path)["project_id"] as? String)
+        let write = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "fact", title: "expiry-boundary", summary: "injected clock precision",
+            expiresAt: "2026-10-07T05:00:00.0005-05:00"))
+        let id = try XCTUnwrap(write["record_id"] as? String)
+        let repository = try memory.repositoryForProject(projectID)
+        XCTAssertEqual(try repository.get(id: id)?.expiresAt, "2026-10-07T10:00:00.0005Z")
+
+        func assertVisibility(_ expected: Int) throws {
+            XCTAssertEqual(try memory.get(projectID: projectID, ids: [id], includeBody: true)["count"] as? Int, expected)
+            XCTAssertEqual(try memory.listRecent(projectID: projectID, kinds: [], sessionID: nil,
+                limit: 10, cursor: nil, includeBody: true, maximumResponseBytes: 4096)["count"] as? Int, expected)
+            XCTAssertEqual(try memory.search(projectID: projectID, query: "expiry-boundary", kinds: [], tags: [],
+                sessionID: nil, limit: 10, cursor: nil, includeBody: true, maximumResponseBytes: 4096)["count"] as? Int, expected)
+        }
+        clock.date = base.addingTimeInterval(0.0004)
+        try assertVisibility(1)
+        clock.date = base.addingTimeInterval(0.0005)
+        try assertVisibility(0)
+        clock.date = base.addingTimeInterval(0.0006)
+        try assertVisibility(0)
+        XCTAssertEqual(try memory.get(projectID: projectID, ids: [id], includeBody: true, includeExpired: true)["count"] as? Int, 1)
+        XCTAssertEqual(try memory.listRecent(projectID: projectID, kinds: [], sessionID: nil,
+            limit: 10, cursor: nil, includeBody: true, maximumResponseBytes: 4096, includeExpired: true)["count"] as? Int, 1)
+        XCTAssertEqual(try memory.search(projectID: projectID, query: "expiry-boundary", kinds: [], tags: [],
+            sessionID: nil, limit: 10, cursor: nil, includeBody: true, maximumResponseBytes: 4096, includeExpired: true)["count"] as? Int, 1)
+        XCTAssertEqual(try memory.get(projectID: otherID, ids: [id], includeBody: true, includeExpired: true)["count"] as? Int, 0)
+        XCTAssertEqual(try repository.status()["record_count"] as? Int, 1)
+        XCTAssertEqual(try repository.exportRecords().first?["id"] as? String, id)
+        XCTAssertTrue(try repository.quickCheck())
+    }
+
+    func testExpiryFilteringHappensBeforePageSelectionWithKindsTagsAndSession() throws {
+        let clock = FixedClock(try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z")))
+        let memory = try expiryMemoryService(clock: clock)
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        var active = Set<String>()
+        for index in 0..<12 {
+            let expired = index < 7
+            let result = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+                kind: "fact", title: "expiry-paging-\(index)", summary: "page selection fixture",
+                tags: ["selected"], importance: expired ? 1 : 0.5, sessionID: "selected-session",
+                expiresAt: expired ? "2000-01-01T00:00:00Z" : (index == 7 ? nil : "2099-01-01T00:00:00Z")))
+            if !expired { active.insert(try XCTUnwrap(result["record_id"] as? String)) }
+        }
+        _ = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "decision", title: "expiry-paging-other", summary: "excluded by kind", tags: ["selected"], sessionID: "selected-session"))
+        _ = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "fact", title: "expiry-paging-other-session", summary: "excluded by session", tags: ["selected"], sessionID: "other-session"))
+        for search in [false, true] {
+            var cursor: String?
+            var collected: [String] = []
+            for _ in 0..<4 {
+                let page = try search
+                    ? memory.search(projectID: projectID, query: "expiry-paging", kinds: ["fact"], tags: ["selected"],
+                        sessionID: "selected-session", limit: 2, cursor: cursor, includeBody: false, maximumResponseBytes: 4096)
+                    : memory.listRecent(projectID: projectID, kinds: ["fact"], sessionID: "selected-session",
+                        limit: 2, cursor: cursor, includeBody: false, maximumResponseBytes: 4096)
+                let rows = try XCTUnwrap(page["records"] as? [[String: Any]])
+                XCTAssertLessThanOrEqual(rows.count, 2)
+                collected.append(contentsOf: rows.compactMap { $0["id"] as? String })
+                cursor = page["next_cursor"] as? String
+                if cursor == nil { break }
+                XCTAssertEqual(rows.count, 2)
+            }
+            XCTAssertNil(cursor)
+            XCTAssertEqual(Set(collected), active)
+            XCTAssertEqual(collected.count, active.count)
+        }
+    }
+
+    func testExpiryPageCursorsDoNotSkipLiveRecordsWhenEarlierRowsExpire() throws {
+        let base = try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z"))
+        let clock = FixedClock(base)
+        let memory = try expiryMemoryService(clock: clock)
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let otherID = try XCTUnwrap(memory.initializeUnchecked(path: projectB.path)["project_id"] as? String)
+        var live = Set<String>()
+        for index in 0..<4 {
+            clock.date = base.addingTimeInterval(Double(index))
+            let result = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+                kind: "fact", title: "expiry-clock-page-\(index)", summary: "stable ordered fixture",
+                importance: index >= 2 ? 1 : 0.5, expiresAt: index >= 2 ? "2026-10-07T10:00:10Z" : nil))
+            if index < 2 { live.insert(try XCTUnwrap(result["record_id"] as? String)) }
+        }
+        for search in [false, true] {
+            func page(_ cursor: String?) throws -> [String: Any] {
+                try search
+                    ? memory.search(projectID: projectID, query: "expiry-clock-page", kinds: [], tags: [],
+                        sessionID: nil, limit: 2, cursor: cursor, includeBody: false, maximumResponseBytes: 4096)
+                    : memory.listRecent(projectID: projectID, kinds: [], sessionID: nil,
+                        limit: 2, cursor: cursor, includeBody: false, maximumResponseBytes: 4096)
+            }
+            clock.date = base.addingTimeInterval(3)
+            let first = try page(nil)
+            XCTAssertEqual(first["count"] as? Int, 2)
+            let cursor = try XCTUnwrap(first["next_cursor"] as? String)
+            XCTAssertEqual(try page(Data("v1:2".utf8).base64EncodedString())["count"] as? Int, 2)
+            XCTAssertThrowsError(try memory.listRecent(projectID: otherID, kinds: [], sessionID: nil,
+                limit: 2, cursor: cursor, includeBody: false, maximumResponseBytes: 4096))
+            clock.date = base.addingTimeInterval(11)
+            let second = try page(cursor)
+            let rows = try XCTUnwrap(second["records"] as? [[String: Any]])
+            XCTAssertEqual(Set(rows.compactMap { $0["id"] as? String }), live)
+            XCTAssertNil(second["next_cursor"] as? String)
+            XCTAssertThrowsError(try memory.search(projectID: projectID, query: "different query", kinds: [], tags: [],
+                sessionID: nil, limit: 2, cursor: cursor, includeBody: false, maximumResponseBytes: 4096))
+        }
+    }
+
+    func testExpiryPageByteBudgetIncludesScopedContinuationAndQueryMetadata() throws {
+        let memory = try expiryMemoryService()
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        for index in 0..<4 {
+            _ = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+                kind: "fact", title: "expiry-byte-page-\(index)", summary: String(repeating: "s", count: 200)))
+        }
+        let page = try memory.search(projectID: projectID, query: "expiry-byte-page", kinds: [], tags: [],
+            sessionID: nil, limit: 4, cursor: nil, includeBody: false, maximumResponseBytes: 2048)
+        let actualBytes = try JSONSupport.data(from: page).count
+        XCTAssertLessThanOrEqual(actualBytes, 2048)
+        XCTAssertEqual(page["encoded_bytes"] as? Int, actualBytes)
+        XCTAssertNotNil(page["next_cursor"] as? String)
+        for cursor in [Data("v1:-1".utf8).base64EncodedString(),
+                       Data("v1:2147483648".utf8).base64EncodedString(), String(repeating: "A", count: 4097)] {
+            XCTAssertThrowsError(try memory.listRecent(projectID: projectID, kinds: [], sessionID: nil,
+                limit: 1, cursor: cursor, includeBody: false, maximumResponseBytes: 4096))
+        }
+        let write = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "fact", title: "expiry-oversize-page", summary: String(repeating: "s", count: 2000)))
+        XCTAssertNotNil(write["record_id"])
+        XCTAssertThrowsError(try memory.search(projectID: projectID, query: "expiry-oversize-page", kinds: [], tags: [],
+            sessionID: nil, limit: 1, cursor: nil, includeBody: false, maximumResponseBytes: 1024)) { error in
+            XCTAssertEqual((error as? ProjectMemoryError)?.code, "payload_too_large")
+        }
+    }
+
+    func testExpiryToolArgumentsAreStrictAndBatchValidationIsAtomic() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let projectID = try initialize(app, project: projectA)
+        let base: [String: Any] = ["project_id": projectID, "kind": "fact", "title": "expiry-tool", "summary": "strict inputs"]
+        for invalid in ["not-a-date", "2026-02-30T00:00:00Z", 1, true, NSNull()] as [Any] {
+            var request = base
+            request["expires_at"] = invalid
+            let result = try app.tools.call(name: "project_memory.remember", arguments: request, clientID: ClientID("project-memory-test"))
+            XCTAssertFalse(result.ok, "\(invalid)")
+            XCTAssertEqual(result.payload["code"] as? String, "invalid_request")
+        }
+        var expired = base
+        expired["expires_at"] = "2000-01-01T00:00:00Z"
+        let write = try call(app, "project_memory.remember", expired)
+        let id = try XCTUnwrap(write["record_id"] as? String)
+        for name in ["project_memory.get", "project_memory.search", "project_memory.list_recent"] {
+            let properties = try XCTUnwrap(ProjectMemoryToolPack.schema(for: name)?["properties"] as? [String: Any])
+            XCTAssertEqual((properties["include_expired"] as? [String: Any])?["type"] as? String, "boolean")
+            var request: [String: Any] = ["project_id": projectID]
+            if name == "project_memory.get" { request["id"] = id }
+            if name == "project_memory.search" { request["query"] = "expiry-tool" }
+            XCTAssertEqual(try call(app, name, request)["count"] as? Int, 0)
+            request["include_expired"] = true
+            XCTAssertEqual(try call(app, name, request)["count"] as? Int, 1)
+            for invalid in ["true", 1, NSNull()] as [Any] {
+                request["include_expired"] = invalid
+                let result = try app.tools.call(name: name, arguments: request, clientID: ClientID("project-memory-test"))
+                XCTAssertFalse(result.ok)
+                XCTAssertEqual(result.payload["code"] as? String, "invalid_request")
+            }
+        }
+        let result = try app.tools.call(name: "project_memory.remember_batch", arguments: ["project_id": projectID,
+            "items": [["kind": "fact", "title": "batch valid", "summary": "must not commit"],
+                      ["kind": "fact", "title": "batch invalid", "summary": "must not commit", "expires_at": "invalid"]]],
+            clientID: ClientID("project-memory-test"))
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "invalid_request")
+        XCTAssertEqual(try app.projectMemory.status(projectID: projectID)["record_count"] as? Int, 1)
+    }
+
+    func testExpiryDeduplicationDoesNotReviveAnExpiredRecord() throws {
+        let clock = FixedClock(try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z")))
+        let memory = try expiryMemoryService(clock: clock)
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let original = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "fact", title: "expiry-dedupe", summary: "same retained content",
+            expiresAt: "2026-10-07T10:00:01Z", idempotencyKey: "expiry-key"))
+        let id = try XCTUnwrap(original["record_id"] as? String)
+        clock.date = clock.date.addingTimeInterval(2)
+        let byContent = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "fact", title: "expiry-dedupe", summary: "same retained content", expiresAt: "2099-01-01T00:00:00Z"))
+        let byKey = try memory.remember(projectID: projectID, write: ProjectMemoryWrite(
+            kind: "fact", title: "different content", summary: "idempotency still wins",
+            expiresAt: "2099-01-01T00:00:00Z", idempotencyKey: "expiry-key"))
+        for result in [byContent, byKey] {
+            XCTAssertEqual(result["record_id"] as? String, id)
+            XCTAssertEqual(result["disposition"] as? String, "deduplicated")
+        }
+        let repository = try memory.repositoryForProject(projectID)
+        XCTAssertNil(try repository.get(id: id))
+        XCTAssertEqual(try repository.get(id: id, includeExpired: true)?.expiresAt, "2026-10-07T10:00:01Z")
+        XCTAssertEqual(try repository.get(id: id, includeExpired: true)?.version, 1)
+    }
+
+    func testExpiryExportImportAndReopenPreserveExpiredRowsAndIsolation() throws {
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let clock = FixedClock(try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z")))
+        let memory = ProjectMemoryService(paths: paths, clock: clock)
+        defer { memory.closeAll() }
+        let sourceID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let destinationID = try XCTUnwrap(memory.initializeUnchecked(path: projectB.path)["project_id"] as? String)
+        var ids: [String] = []
+        for (index, expiry) in ["2000-01-01T01:00:00+01:00", "2099-01-01T00:00:00.125Z", nil].enumerated() {
+            let result = try memory.remember(projectID: sourceID, write: ProjectMemoryWrite(
+                kind: "fact", title: "expiry-recovery-\(index)", summary: "durable fixture \(index)", expiresAt: expiry))
+            ids.append(try XCTUnwrap(result["record_id"] as? String))
+        }
+        let export = try memory.export(projectID: sourceID)
+        let artifact = URL(fileURLWithPath: try XCTUnwrap(export["artifact"] as? String))
+        let exported = try JSONSupport.object(from: Data(contentsOf: artifact))
+        let rows = try XCTUnwrap(exported["records"] as? [[String: Any]])
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows.first { $0["id"] as? String == ids[0] }?["expires_at"] as? String, "2000-01-01T00:00:00Z")
+        let destinationRepository = try memory.repositoryForProject(destinationID)
+        let copied = destinationRepository.directory.appendingPathComponent("exports/import-expiry.json")
+        try FileManager.default.createDirectory(at: copied.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: artifact, to: copied)
+        XCTAssertThrowsError(try memory.importRecords(projectID: destinationID, artifactPath: copied.path, preview: false, mergePolicy: nil))
+        XCTAssertEqual(try memory.importRecords(projectID: destinationID, artifactPath: copied.path, preview: true, mergePolicy: "merge")["importable_count"] as? Int, 3)
+        XCTAssertEqual(try memory.importRecords(projectID: destinationID, artifactPath: copied.path, preview: false, mergePolicy: "merge")["count"] as? Int, 3)
+        XCTAssertEqual(try destinationRepository.recent(kinds: [], sessionID: nil, limit: 10, offset: 0).count, 2)
+        XCTAssertEqual(try destinationRepository.exportRecords().count, 3)
+        memory.closeAll()
+        let reopened = ProjectMemoryService(paths: paths, clock: clock)
+        defer { reopened.closeAll() }
+        XCTAssertEqual(try reopened.get(projectID: sourceID, ids: ids, includeBody: true)["count"] as? Int, 2)
+        XCTAssertEqual(try reopened.get(projectID: sourceID, ids: ids, includeBody: true, includeExpired: true)["count"] as? Int, 3)
+        XCTAssertEqual(try reopened.get(projectID: destinationID, ids: ids, includeBody: true, includeExpired: true)["count"] as? Int, 0)
+        XCTAssertTrue(try reopened.repositoryForProject(sourceID).quickCheck())
+    }
+
+    func testExpiryInvalidLegacyMetadataRemainsVisibleAndExportableAfterReopen() throws {
+        let projectID = UUID().uuidString.lowercased()
+        let directory = home.appendingPathComponent("legacy-expiry")
+        let clock = FixedClock(try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z")))
+        let repository = try ProjectMemoryRepository(projectID: projectID, directory: directory, clock: clock)
+        let legacy = ["not-a-date", "2026-02-30T00:00:00Z", String(repeating: "x", count: 4096)]
+        var ids: [String] = []
+        for (index, expiry) in legacy.enumerated() {
+            let (record, _) = try repository.remember(ProjectMemoryWrite(
+                kind: "fact", title: "legacy-expiry-\(index)", summary: "old metadata \(index)", expiresAt: expiry))
+            ids.append(record.id)
+        }
+        let (expired, _) = try repository.remember(ProjectMemoryWrite(
+            kind: "fact", title: "legacy-expiry-valid", summary: "old offset timestamp", expiresAt: "2000-01-01T01:00:00.0001+01:00"))
+        XCTAssertNil(try repository.get(id: expired.id))
+        XCTAssertEqual(try repository.recent(kinds: [], sessionID: nil, limit: 10, offset: 0).count, legacy.count)
+        XCTAssertEqual(try repository.search(query: "legacy-expiry", kinds: [], tags: [], sessionID: nil, limit: 10, offset: 0).count, legacy.count)
+        XCTAssertEqual(try repository.exportRecords().count, legacy.count + 1)
+        repository.close()
+        let reopened = try ProjectMemoryRepository(projectID: projectID, directory: directory, clock: clock)
+        defer { reopened.close() }
+        for (id, expiry) in zip(ids, legacy) { XCTAssertEqual(try reopened.get(id: id)?.expiresAt, expiry) }
+        XCTAssertNil(try reopened.get(id: expired.id))
+        XCTAssertNotNil(try reopened.get(id: expired.id, includeExpired: true))
+    }
+
+    func testExpiryImportPreviewAndCommitRejectMalformedTimestampsBeforeMutation() throws {
+        let memory = try expiryMemoryService()
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let exported = try memory.export(projectID: projectID)
+        let artifact = URL(fileURLWithPath: try XCTUnwrap(exported["artifact"] as? String))
+        var envelope = try JSONSupport.object(from: Data(contentsOf: artifact))
+        for invalid in ["not-a-date", 42, true] as [Any] {
+            let records: [[String: Any]] = [
+                ["kind": "fact", "title": "import valid", "summary": "batch must remain atomic", "expires_at": "2099-01-01T00:00:00Z"],
+                ["kind": "fact", "title": "import invalid", "summary": "batch must remain atomic", "expires_at": invalid],
+            ]
+            envelope["records"] = records
+            let data = try JSONSerialization.data(withJSONObject: records, options: [.sortedKeys])
+            envelope["checksum"] = JSONSupport.sha256Hex(try XCTUnwrap(String(data: data, encoding: .utf8)))
+            try JSONSupport.data(from: envelope).write(to: artifact, options: .atomic)
+            for preview in [true, false] {
+                XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                    preview: preview, mergePolicy: nil)) { error in
+                    XCTAssertEqual((error as? ProjectMemoryError)?.code, "invalid_request")
+                }
+            }
+            XCTAssertEqual(try memory.status(projectID: projectID)["record_count"] as? Int, 0)
+        }
+    }
+
+    func testExpiryLegacyImportPolicyRecoversSchemaThreeExportAndReopen() throws {
+        let clock = FixedClock(try XCTUnwrap(ISO8601.date(from: "2026-10-07T10:00:00Z")))
+        let memory = try expiryMemoryService(clock: clock)
+        defer { memory.closeAll() }
+        let sourceID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let destinationID = try XCTUnwrap(memory.initializeUnchecked(path: projectB.path)["project_id"] as? String)
+        let source = try memory.repositoryForProject(sourceID)
+        let legacy = ["not-a-date", "2026-02-30T00:00:00Z", String(repeating: "x", count: 4096),
+                      "2000-01-01T00:00:00Z\u{0}legacy-suffix", ""]
+        let expiries: [String?] = legacy.map(Optional.some) + ["2099-01-01t01:30:00.125000+01:30", "2000-01-01T00:00:00Z", nil]
+        var sourceIDs: [String] = []
+        for (index, expiry) in expiries.enumerated() {
+            let (record, _) = try source.remember(ProjectMemoryWrite(kind: "fact", title: "legacy-recovery-\(index)",
+                summary: "schema three legacy expiry \(index)", expiresAt: expiry))
+            sourceIDs.append(record.id)
+        }
+        let exported = try memory.export(projectID: sourceID)
+        let original = URL(fileURLWithPath: try XCTUnwrap(exported["artifact"] as? String))
+        let originalData = try Data(contentsOf: original)
+        let envelope = try JSONSupport.object(from: originalData)
+        XCTAssertEqual(envelope["schema_version"] as? Int, 3)
+        let sourceRows = try XCTUnwrap(envelope["records"] as? [[String: Any]])
+        for (index, expiry) in legacy.enumerated() {
+            XCTAssertEqual(sourceRows.first { $0["title"] as? String == "legacy-recovery-\(index)" }?["expires_at"] as? String, expiry)
+        }
+        let destination = try memory.repositoryForProject(destinationID)
+        let copied = destination.directory.appendingPathComponent("exports/legacy-schema-three.json")
+        try FileManager.default.createDirectory(at: copied.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try originalData.write(to: copied)
+        for preview in [true, false] {
+            XCTAssertThrowsError(try memory.importRecords(projectID: destinationID, artifactPath: copied.path,
+                preview: preview, mergePolicy: "merge"))
+        }
+        let preview = try memory.importRecords(projectID: destinationID, artifactPath: copied.path,
+            preview: true, mergePolicy: "merge", expiryPolicy: .preserveLegacyV1)
+        XCTAssertEqual(preview["importable_count"] as? Int, expiries.count)
+        XCTAssertEqual(preview["expiry_policy"] as? String, "preserve_legacy_v1")
+        XCTAssertEqual(try destination.status()["record_count"] as? Int, 0)
+        let committed = try memory.importRecords(projectID: destinationID, artifactPath: copied.path,
+            preview: false, mergePolicy: "merge", expiryPolicy: .preserveLegacyV1)
+        XCTAssertEqual(committed["count"] as? Int, expiries.count)
+        XCTAssertEqual(committed["expiry_policy"] as? String, "preserve_legacy_v1")
+        XCTAssertEqual(try Data(contentsOf: copied), originalData)
+        let rows = try destination.recent(kinds: [], sessionID: nil, limit: 20, offset: 0, includeExpired: true)
+        let destinationIDs = rows.map(\.id)
+        XCTAssertEqual(try destination.recent(kinds: [], sessionID: nil, limit: 20, offset: 0).count, expiries.count - 1)
+        for (index, expiry) in legacy.enumerated() {
+            XCTAssertEqual(rows.first { $0.title == "legacy-recovery-\(index)" }?.expiresAt, expiry)
+        }
+        XCTAssertEqual(rows.first { $0.title == "legacy-recovery-5" }?.expiresAt, "2099-01-01T00:00:00.125Z")
+        XCTAssertEqual(try memory.get(projectID: destinationID, ids: sourceIDs, includeBody: true, includeExpired: true)["count"] as? Int, 0)
+        let repeated = try memory.importRecords(projectID: destinationID, artifactPath: copied.path,
+            preview: false, mergePolicy: "merge", expiryPolicy: .preserveLegacyV1)
+        XCTAssertTrue(try XCTUnwrap(repeated["results"] as? [[String: Any]]).allSatisfy { $0["disposition"] as? String == "deduplicated" })
+        memory.closeAll()
+        let reopened = ProjectMemoryService(paths: AppPaths(home: home), clock: clock)
+        defer { reopened.closeAll() }
+        XCTAssertEqual(try reopened.get(projectID: destinationID, ids: destinationIDs, includeBody: true)["count"] as? Int, expiries.count - 1)
+        XCTAssertEqual(try reopened.get(projectID: destinationID, ids: destinationIDs, includeBody: true, includeExpired: true)["count"] as? Int, expiries.count)
+        let roundTrip = try reopened.export(projectID: destinationID)
+        let roundTripEnvelope = try JSONSupport.object(from: Data(contentsOf: URL(fileURLWithPath: try XCTUnwrap(roundTrip["artifact"] as? String))))
+        let roundTripRows = try XCTUnwrap(roundTripEnvelope["records"] as? [[String: Any]])
+        for (index, expiry) in legacy.enumerated() {
+            XCTAssertEqual(roundTripRows.first { $0["title"] as? String == "legacy-recovery-\(index)" }?["expires_at"] as? String, expiry)
+        }
+        XCTAssertEqual(try reopened.get(projectID: sourceID, ids: destinationIDs, includeBody: true, includeExpired: true)["count"] as? Int, 0)
+        XCTAssertTrue(try reopened.repositoryForProject(destinationID).quickCheck())
+    }
+
+    func testExpiryLegacyImportPolicyToolSchemaAndStrictArgumentParity() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let projectID = try initialize(app, project: projectA)
+        let records: [[String: Any]] = [
+            ["kind": "fact", "title": "tool legacy", "summary": "old invalid metadata", "expires_at": "not-a-date"],
+            ["kind": "fact", "title": "tool future", "summary": "canonicalized timestamp", "expires_at": "2099-01-01t01:30:00.125000+01:30"],
+        ]
+        let artifact = try expiryImportArtifact(memory: app.projectMemory, projectID: projectID, records: records)
+        let schema = try XCTUnwrap(ProjectMemoryToolPack.schema(for: "project_memory.import"))
+        let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+        let policySchema = try XCTUnwrap(properties["expiry_policy"] as? [String: Any])
+        XCTAssertEqual(policySchema["type"] as? String, "string")
+        XCTAssertEqual(policySchema["enum"] as? [String], ["strict", "preserve_legacy_v1"])
+        XCTAssertEqual(policySchema["default"] as? String, "strict")
+        for policy in [NSNull(), true, 1, "unknown", "preserve_legacy_v2", " preserve_legacy_v1 "] as [Any] {
+            let invalid = try app.tools.call(name: "project_memory.import", arguments: ["project_id": projectID,
+                "artifact": artifact.path, "expiry_policy": policy], clientID: ClientID("project-memory-test"))
+            XCTAssertFalse(invalid.ok)
+            XCTAssertEqual(invalid.payload["code"] as? String, "invalid_request")
+        }
+        for policy in [nil, "strict"] as [String?] {
+            var arguments: [String: Any] = ["project_id": projectID, "artifact": artifact.path, "preview": false]
+            if let policy { arguments["expiry_policy"] = policy }
+            let invalid = try app.tools.call(name: "project_memory.import", arguments: arguments, clientID: ClientID("project-memory-test"))
+            XCTAssertFalse(invalid.ok)
+            XCTAssertEqual(invalid.payload["code"] as? String, "invalid_request")
+        }
+        for preview in [true, false] {
+            let imported = try call(app, "project_memory.import", ["project_id": projectID, "artifact": artifact.path,
+                "preview": preview, "expiry_policy": "preserve_legacy_v1"])
+            XCTAssertEqual(imported["expiry_policy"] as? String, "preserve_legacy_v1")
+            XCTAssertEqual(imported[preview ? "importable_count" : "count"] as? Int, 2)
+            XCTAssertEqual(try call(app, "project_memory.status", ["project_id": projectID])["record_count"] as? Int, preview ? 0 : 2)
+        }
+        let repository = try app.projectMemory.repositoryForProject(projectID)
+        let rows = try repository.recent(kinds: [], sessionID: nil, limit: 10, offset: 0)
+        XCTAssertEqual(rows.first { $0.title == "tool legacy" }?.expiresAt, "not-a-date")
+        XCTAssertEqual(rows.first { $0.title == "tool future" }?.expiresAt, "2099-01-01T00:00:00.125Z")
+    }
+
+    func testExpiryLegacyImportPolicyRejectsTypeChecksumAndProjectScopeWithoutMutation() throws {
+        let memory = try expiryMemoryService()
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let otherID = try XCTUnwrap(memory.initializeUnchecked(path: projectB.path)["project_id"] as? String)
+        for expiry in [true, 42, ["unexpected": "object"], ["unexpected"]] as [Any] {
+            let artifact = try expiryImportArtifact(memory: memory, projectID: projectID, records: [
+                ["kind": "fact", "title": "typed valid", "summary": "atomic validation", "expires_at": "not-a-date"],
+                ["kind": "fact", "title": "typed invalid", "summary": "atomic validation", "expires_at": expiry],
+            ])
+            for preview in [true, false] {
+                XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                    preview: preview, mergePolicy: nil, expiryPolicy: .preserveLegacyV1)) { error in
+                    XCTAssertEqual((error as? ProjectMemoryError)?.code, "invalid_request")
+                }
+            }
+        }
+        let artifact = try expiryImportArtifact(memory: memory, projectID: projectID, records: [
+            ["kind": "fact", "title": "scoped legacy", "summary": "isolated checksummed fixture", "expires_at": "not-a-date"],
+        ])
+        let copy = try memory.repositoryForProject(otherID).directory.appendingPathComponent("exports/scoped-import.json")
+        try FileManager.default.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: artifact, to: copy)
+        for preview in [true, false] {
+            for scopedArtifact in [artifact, copy] {
+                XCTAssertThrowsError(try memory.importRecords(projectID: otherID, artifactPath: scopedArtifact.path,
+                    preview: preview, mergePolicy: nil, expiryPolicy: .preserveLegacyV1)) { error in
+                    XCTAssertEqual(error as? ProjectMemoryError, .projectScopeMismatch)
+                }
+            }
+        }
+        var envelope = try JSONSupport.object(from: Data(contentsOf: artifact))
+        envelope["checksum"] = String(repeating: "0", count: 64)
+        try JSONSupport.data(from: envelope).write(to: artifact, options: .atomic)
+        for preview in [true, false] {
+            XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                preview: preview, mergePolicy: nil, expiryPolicy: .preserveLegacyV1)) { error in
+                XCTAssertEqual((error as? ProjectMemoryError)?.code, "integrity_failure")
+            }
+        }
+        XCTAssertEqual(try memory.status(projectID: projectID)["record_count"] as? Int, 0)
+        XCTAssertEqual(try memory.status(projectID: otherID)["record_count"] as? Int, 0)
+    }
+
+    func testExpiryLegacyImportPolicyBoundsApplyToPreviewAndCommit() throws {
+        let memory = try expiryMemoryService()
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let batches: [[[String: Any]]] = [
+            [["kind": "fact", "title": "aggregate bytes", "summary": "expiry participates in batch bound",
+              "expires_at": String(repeating: "é", count: memory.limits.maximumBatchBytes / 2)]],
+            [["kind": "fact", "title": "individual bytes", "summary": "oversized legacy field",
+              "expires_at": String(repeating: "x", count: memory.limits.maximumBatchBytes + 1)]],
+            (0...memory.limits.maximumBatchCount).map { ["kind": "fact", "title": "legacy-count-\($0)",
+                "summary": "bounded count", "expires_at": "not-a-date"] },
+        ]
+        for records in batches {
+            let artifact = try expiryImportArtifact(memory: memory, projectID: projectID, records: records)
+            for preview in [true, false] {
+                XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                    preview: preview, mergePolicy: nil, expiryPolicy: .preserveLegacyV1)) { error in
+                    XCTAssertEqual((error as? ProjectMemoryError)?.code, "payload_too_large")
+                }
+            }
+        }
+        XCTAssertEqual(try memory.status(projectID: projectID)["record_count"] as? Int, 0)
+    }
+
+    func testExpiryLegacyImportPolicyHonorsCancellationAndCommittedReceipt() throws {
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        let committedCancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let memory = ProjectMemoryService(paths: paths, clock: SystemClock(), limits: .current,
+            afterIdentityMetadataWriteObserver: nil, didIdentityRegistryCommitObserver: nil,
+            didMutationCommitObserver: { committedCancellation.cancel() })
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        let artifact = try expiryImportArtifact(memory: memory, projectID: projectID, records: [
+            ["kind": "fact", "title": "cancel legacy import", "summary": "durable commit authorization", "expires_at": "not-a-date"],
+        ])
+        for preview in [true, false] {
+            let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+            cancelled.cancel()
+            XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                preview: preview, mergePolicy: nil, expiryPolicy: .preserveLegacyV1, cancellation: cancelled)) { error in
+                XCTAssertTrue(error is CancellationError)
+            }
+        }
+        let repository = try memory.repositoryForProject(projectID)
+        var locker: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(repository.databaseURL.path, &locker), SQLITE_OK)
+        let opened = try XCTUnwrap(locker)
+        defer { sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil); sqlite3_close(opened) }
+        XCTAssertEqual(sqlite3_exec(opened, "BEGIN IMMEDIATE;", nil, nil, nil), SQLITE_OK)
+        let deadline = ToolCallCancellation(timeoutSeconds: 0.1)
+        let started = Date()
+        XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+            preview: false, mergePolicy: nil, expiryPolicy: .preserveLegacyV1, cancellation: deadline)) { error in
+            XCTAssertTrue(error is ToolCallDeadlineExceeded, "\(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 1)
+        sqlite3_exec(opened, "ROLLBACK;", nil, nil, nil)
+        XCTAssertEqual(try repository.status()["record_count"] as? Int, 0)
+        let imported = try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+            preview: false, mergePolicy: nil, expiryPolicy: .preserveLegacyV1, cancellation: committedCancellation)
+        XCTAssertTrue(committedCancellation.isCancelled)
+        let receipt = try XCTUnwrap(committedCancellation.committedResult(as: ToolResult.self))
+        XCTAssertEqual(imported["expiry_policy"] as? String, "preserve_legacy_v1")
+        XCTAssertEqual(receipt.payload["expiry_policy"] as? String, imported["expiry_policy"] as? String)
+        XCTAssertEqual(receipt.payload["count"] as? Int, 1)
+        XCTAssertEqual(try repository.status()["record_count"] as? Int, 1)
+    }
+
+    func testExpiryLegacyImportPolicyDoesNotAuthorizeMalformedNewWritesOrEmptyCommits() throws {
+        let memory = try expiryMemoryService()
+        defer { memory.closeAll() }
+        let projectID = try XCTUnwrap(memory.initializeUnchecked(path: projectA.path)["project_id"] as? String)
+        for expiry in ["not-a-date", "2000-01-01T00:00:00Z\u{0}legacy"] {
+            let invalid = ProjectMemoryWrite(kind: "fact", title: "strict new write", summary: "explicit import policy cannot escape", expiresAt: expiry)
+            XCTAssertThrowsError(try memory.remember(projectID: projectID, write: invalid)) { error in
+                XCTAssertEqual((error as? ProjectMemoryError)?.code, "invalid_request")
+            }
+            XCTAssertThrowsError(try memory.rememberBatch(projectID: projectID, writes: [
+                ProjectMemoryWrite(kind: "fact", title: "valid batch", summary: "atomic strict writes"), invalid,
+            ])) { error in
+                XCTAssertEqual((error as? ProjectMemoryError)?.code, "invalid_request")
+            }
+        }
+        let artifact = try expiryImportArtifact(memory: memory, projectID: projectID, records: [])
+        for policy in ProjectMemoryImportExpiryPolicy.allCases {
+            XCTAssertEqual(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                preview: true, mergePolicy: nil, expiryPolicy: policy)["importable_count"] as? Int, 0)
+            XCTAssertThrowsError(try memory.importRecords(projectID: projectID, artifactPath: artifact.path,
+                preview: false, mergePolicy: nil, expiryPolicy: policy)) { error in
+                XCTAssertEqual((error as? ProjectMemoryError)?.code, "payload_too_large")
+            }
+        }
+        XCTAssertEqual(try memory.status(projectID: projectID)["record_count"] as? Int, 0)
+    }
+
+    private func expiryImportArtifact(memory: ProjectMemoryService, projectID: String, records: [[String: Any]]) throws -> URL {
+        let exported = try memory.export(projectID: projectID)
+        let artifact = URL(fileURLWithPath: try XCTUnwrap(exported["artifact"] as? String))
+        var envelope = try JSONSupport.object(from: Data(contentsOf: artifact))
+        envelope["records"] = records
+        let recordsData = try JSONSerialization.data(withJSONObject: records, options: [.sortedKeys])
+        envelope["checksum"] = JSONSupport.sha256Hex(try XCTUnwrap(String(data: recordsData, encoding: .utf8)))
+        try JSONSupport.data(from: envelope).write(to: artifact, options: .atomic)
+        return artifact
+    }
+
+    func testExpiryFilteringHonorsCancellationDuringSQLiteSelection() throws {
+        let cancellation = ToolCallCancellation(timeoutSeconds: 5)
+        let gate = ExpiryCancellationGate(cancellation: cancellation)
+        let repository = try ProjectMemoryRepository(
+            projectID: UUID().uuidString.lowercased(), directory: home.appendingPathComponent("expiry-cancel"),
+            enableFTS5: false, beforeMigrationCommitObserver: nil,
+            rowStepObserver: { gate.observe() })
+        defer { repository.close() }
+        _ = try repository.rememberBatch((0..<500).map { index in
+            ProjectMemoryWrite(kind: "fact", title: "expiry-cancel-\(index)", summary: "filtered fixture \(index)",
+                               expiresAt: "2000-01-01T00:00:00Z")
+        })
+        gate.arm()
+        XCTAssertThrowsError(try repository.recent(kinds: [], sessionID: nil, limit: 10, offset: 0,
+            cancellation: cancellation)) { error in
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        XCTAssertEqual(try repository.status()["record_count"] as? Int, 500)
+        XCTAssertEqual(try repository.recent(kinds: [], sessionID: nil, limit: 10, offset: 0).count, 0)
+    }
+
+    private final class ExpiryCancellationGate: @unchecked Sendable {
+        private let lock = NSLock()
+        private let cancellation: ToolCallCancellation
+        private var armed = false
+
+        init(cancellation: ToolCallCancellation) { self.cancellation = cancellation }
+        func arm() { lock.lock(); armed = true; lock.unlock() }
+        func observe() {
+            lock.lock()
+            let shouldCancel = armed
+            armed = false
+            lock.unlock()
+            if shouldCancel { cancellation.cancel() }
+        }
+    }
+
+    private func expiryMemoryService(clock: any Clock = SystemClock()) throws -> ProjectMemoryService {
+        let paths = AppPaths(home: home)
+        try paths.ensureLayout()
+        return ProjectMemoryService(paths: paths, clock: clock)
+    }
+
     func testGitHubRepositoryLocationNormalizesCloneURLsAndRejectsNonRepositoryInputs() throws {
         for location in [
             " https://github.com/Owner/Repository.git/ \n",

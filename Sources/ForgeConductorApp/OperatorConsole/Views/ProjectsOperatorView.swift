@@ -138,7 +138,7 @@ struct ProjectsOperatorView: View {
                         onRefresh: viewModel.load
                     )
                     if let error = viewModel.errorMessage {
-                        OperatorErrorBanner(message: error, retry: viewModel.load)
+                        OperatorErrorBanner(message: error, retry: viewModel.load, title: "Project request failed")
                     }
                     if let error = registrationPickerErrorMessage {
                         Text(error)

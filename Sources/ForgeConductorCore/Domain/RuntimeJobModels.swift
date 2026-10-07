@@ -252,6 +252,31 @@ public struct RuntimeOutputSlice: Sendable, Equatable {
     public let sha256: String
     public let producerEndReason: RuntimeOutputProducerEndReason?
     public let producerReadErrno: Int32?
+    public let isSnapshot: Bool
+    public let jobState: RuntimeJobState?
+
+    public init(
+        jobID: UUID, stream: RuntimeOutputStream, offset: UInt64, data: Data,
+        nextOffset: UInt64, totalRetainedBytes: UInt64, totalObservedBytes: UInt64,
+        eof: Bool, artifactTruncated: Bool, sha256: String,
+        producerEndReason: RuntimeOutputProducerEndReason?, producerReadErrno: Int32?,
+        isSnapshot: Bool = false, jobState: RuntimeJobState? = nil
+    ) {
+        self.jobID = jobID
+        self.stream = stream
+        self.offset = offset
+        self.data = data
+        self.nextOffset = nextOffset
+        self.totalRetainedBytes = totalRetainedBytes
+        self.totalObservedBytes = totalObservedBytes
+        self.eof = eof
+        self.artifactTruncated = artifactTruncated
+        self.sha256 = sha256
+        self.producerEndReason = producerEndReason
+        self.producerReadErrno = producerReadErrno
+        self.isSnapshot = isSnapshot
+        self.jobState = jobState
+    }
 }
 
 public enum RuntimeExecutableProbeState: String, Codable, Sendable, CaseIterable {
@@ -429,6 +454,7 @@ public enum RuntimeJobError: Error, LocalizedError, Equatable, Sendable {
     case jobScopeMismatch(UUID)
     case invalidTransition(from: RuntimeJobState, to: RuntimeJobState)
     case outputUnavailable(UUID, RuntimeOutputStream)
+    case outputPending(UUID, RuntimeOutputStream)
     case artifactEvicted(UUID, RuntimeOutputStream)
     case artifactQuotaExhausted(ProjectID)
     case spawnFailed(Int32)
@@ -446,7 +472,7 @@ public enum RuntimeJobError: Error, LocalizedError, Equatable, Sendable {
         case .jobNotFound: "runtime_job_not_found"
         case .jobScopeMismatch: "runtime_job_scope_mismatch"
         case .invalidTransition: "runtime_job_invalid_transition"
-        case .outputUnavailable: "runtime_output_unavailable"
+        case .outputUnavailable, .outputPending: "runtime_output_unavailable"
         case .artifactEvicted: "runtime_artifact_evicted"
         case .artifactQuotaExhausted: "runtime_artifact_quota_exhausted"
         case .spawnFailed: "runtime_spawn_failed"
@@ -467,6 +493,7 @@ public enum RuntimeJobError: Error, LocalizedError, Equatable, Sendable {
         case .jobScopeMismatch(let jobID): "Runtime job does not belong to this project generation: \(jobID.uuidString.lowercased())"
         case .invalidTransition(let from, let to): "Invalid runtime job transition: \(from.rawValue) to \(to.rawValue)"
         case .outputUnavailable(let jobID, let stream): "No \(stream.rawValue) output exists for job \(jobID.uuidString.lowercased())"
+        case .outputPending(let jobID, let stream): "The \(stream.rawValue) snapshot is not yet readable for nonterminal job \(jobID.uuidString.lowercased()); retry at the same offset"
         case .artifactEvicted(let jobID, let stream): "The retained \(stream.rawValue) artifact was evicted for job \(jobID.uuidString.lowercased())"
         case .artifactQuotaExhausted(let projectID): "Runtime artifact quota is exhausted for project \(projectID.description)"
         case .spawnFailed(let code): "Process spawn failed with errno \(code)"

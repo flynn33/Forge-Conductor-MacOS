@@ -34,9 +34,69 @@ final class WebToolPackTests: XCTestCase {
             XCTAssertEqual(result.payload["content"] as? String, "Native & bounded\nReadable 😀 content.")
             XCTAssertEqual(result.payload["content_trust"] as? String, "untrusted_external_data")
             XCTAssertEqual(result.payload["javascript_executed"] as? Bool, false)
+            XCTAssertEqual(result.payload["heading"] as? String, "Native & bounded")
+            XCTAssertNil(result.payload["title"])
             XCTAssertEqual(result.payload["has_more"] as? Bool, false)
             XCTAssertEqual(WebResponseProtocol.latestRequest?.httpMethod, "GET")
             XCTAssertNil(WebResponseProtocol.latestRequest?.value(forHTTPHeaderField: "Authorization"))
+        }
+    }
+
+    func testHTMLMetadataDecodesFirstRealHeadingAndPreservesSmallBudgetPaging() throws {
+        try withApp { app in
+            let heading = String(repeating: "😀", count: 200)
+            let html = "<script>let fake='<h1>Script</h1>'</script><!-- <h1>Comment</h1> --><title> Native &amp; Swift &#x1F600; </title><h1>\(heading)</h1><h1>Second</h1><p>Retained body</p>"
+            let session = session(body: Data(html.utf8))
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session)
+            let context = context(app: app)
+            let result = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": fixtureURL()],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(result.ok, "\(result.payload)")
+            XCTAssertEqual(result.payload["title"] as? String, "Native & Swift 😀")
+            XCTAssertEqual(result.payload["heading"] as? String, String(repeating: "😀", count: 128))
+            XCTAssertEqual(result.payload["heading_truncated"] as? Bool, true)
+            XCTAssertTrue((result.payload["content"] as? String)?.contains("Retained body") == true)
+
+            let small = self.context(app: app, maximum: 1_750)
+            let page = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": fixtureURL()],
+                context: small, clientID: small.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(page.ok, "\(page.payload)")
+            XCTAssertNil(page.payload["heading"], "Optional metadata must leave room for a readable body page")
+            XCTAssertFalse((page.payload["content"] as? String ?? "").isEmpty)
+            XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: page).count, 1_750)
+            XCTAssertEqual(page.payload["content_sha256"] as? String, result.payload["content_sha256"] as? String)
+            XCTAssertTrue(page.payload["has_more"] as? Bool == true)
+        }
+    }
+
+    func testHTMLMetadataIgnoresQuotedAttributesRawTextAndLookalikeTagNames() throws {
+        try withApp { app in
+            let fixtures: [(String, String?)] = [
+                ("<div data-copy=\"<h1>Fake</h1>\"><h1>Real</h1></div>", "Real"),
+                ("<title>literal <h1>Fake</h1></title><textarea><h1>Fake</h1></textarea><h1>Real</h1>", "Real"),
+                ("<h1-custom>Fake</h1-custom><h1:fake>Fake</h1:fake><H1 class='a>b'>Real</H1>", "Real"),
+                ("<div data-copy=\"<h1>Fake</h1>", nil),
+                ("<script><h1>Fake</h1>", nil),
+                ("<script>let value=\"<div attr='</script>'>\";<h1>Real</h1>", "Real"),
+                ("<textarea><!-- literal </textarea><h1>Real</h1>", "Real"),
+                ("<h1><span data-copy=\"<em>Fake</em>\">Real</span><br> &amp; bounded</h1>", "Real & bounded"),
+                ("<div data-copy=\"\u{0301}<h1>Fake</h1>\"><h1>\u{0301}Real</h1></div>", "\u{0301}Real"),
+                ("<div data-copy=<h1>Fake</h1>><h1>Real</h1>", "Real"),
+                ("1 < 2<h1>Real < 3 &amp; bounded</h1>", "Real < 3 & bounded"),
+            ]
+            for (html, expected) in fixtures {
+                let session = session(body: Data(html.utf8))
+                defer { session.invalidateAndCancel() }
+                let context = context(app: app)
+                let result = try XCTUnwrap(WebToolPack(session: session).handle(name: "web.fetch", arguments: ["url": fixtureURL()],
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                XCTAssertTrue(result.ok, "\(result.payload)")
+                XCTAssertEqual(result.payload["heading"] as? String, expected, html)
+                if html.hasPrefix("<title>") {
+                    XCTAssertEqual(result.payload["title"] as? String, "literal <h1>Fake</h1>")
+                }
+            }
         }
     }
 
@@ -77,6 +137,53 @@ final class WebToolPackTests: XCTestCase {
                 context: context, clientID: context.clientID, app: app, cancellation: nil))
             XCTAssertFalse(changed.ok)
             XCTAssertEqual(changed.payload["code"] as? String, "web_content_changed")
+        }
+    }
+
+    func testHTMLMetadataPreservesContinuedTextAndSourcePaging() throws {
+        try withApp { app in
+            let html = "<title>Page &amp; title</title><h1>First heading 😀</h1><p>" +
+                String(repeating: "Quoted \"line\" 😀 &amp; body\n", count: 180) + "</p>"
+            let session = session(body: Data(html.utf8))
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session)
+            let context = context(app: app, maximum: 4_000)
+            for format in ["text", "source"] {
+                var offset = 0
+                var digest: String?
+                var received = ""
+                var finished = false
+                var requests = 0
+                for _ in 0..<30 {
+                    requests += 1
+                    var arguments: [String: Any] = ["url": fixtureURL(), "format": format, "byte_offset": offset]
+                    if let digest { arguments["if_content_sha256"] = digest }
+                    let result = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: arguments,
+                        context: context, clientID: context.clientID, app: app, cancellation: nil))
+                    XCTAssertTrue(result.ok, "\(result.payload)")
+                    XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: result).count, 4_000)
+                    XCTAssertEqual(result.payload["title"] as? String, "Page & title")
+                    XCTAssertEqual(result.payload["heading"] as? String, "First heading 😀")
+                    let piece = try XCTUnwrap(result.payload["content"] as? String)
+                    XCTAssertFalse(piece.isEmpty)
+                    received += piece
+                    let pageDigest = try XCTUnwrap(result.payload["content_sha256"] as? String)
+                    if let digest { XCTAssertEqual(pageDigest, digest) }
+                    digest = pageDigest
+                    guard let next = result.payload["next_byte_offset"] as? Int else {
+                        XCTAssertEqual(result.payload["has_more"] as? Bool, false)
+                        finished = true
+                        break
+                    }
+                    XCTAssertEqual(result.payload["has_more"] as? Bool, true)
+                    XCTAssertEqual(next, offset + piece.utf8.count)
+                    XCTAssertGreaterThan(next, offset)
+                    offset = next
+                }
+                XCTAssertTrue(finished, "\(format) paging must finish within the bounded request count")
+                XCTAssertGreaterThan(requests, 1)
+                XCTAssertEqual(received, format == "source" ? html : WebToolPack.plainText(html))
+            }
         }
     }
 

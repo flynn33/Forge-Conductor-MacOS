@@ -189,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.19.0**, build **29** (current source; candidate qualification is separate from installation).
+Version **0.20.0**, build **30** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -416,7 +416,7 @@ challenges return errors.
 | Tool | Arguments and continuation |
 | --- | --- |
 | `web.search` | `query`; optional `limit` from 1–10 (default 5). Returns titles, URLs and snippets through DuckDuckGo HTML. Read selected URLs with `web.fetch`. |
-| `web.fetch` | `url`; optional `format: "text"` (default) or `"source"`. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
+| `web.fetch` | `url`; optional `format: "text"` (default) or `"source"`. HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
 | `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
 | `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
@@ -438,7 +438,28 @@ paired `before_created_at` and `before_job_id` fields as arguments to the next
 timestamp-only cursors retain their exclusive-time behavior. Xcode receipt
 budgets are checked before job admission; submission still does not establish
 native success, and native exit 65 remains a failure. Byte-paged
-`job.read_output` and base64 recovery remain available.
+`job.read_output` and base64 recovery remain available. Queued, running and
+cancelling jobs can return an owned output snapshot. `is_snapshot: true` and
+`sha256_is_provisional: true` mean the hash and byte counts describe that moment;
+more bytes can arrive. Continue or poll at `next_offset` even when `eof: true`,
+which means the end of the currently retained bytes. `producer_eof` reports the
+producer separately. A complete result requires a terminal job, a final page
+(`is_snapshot: false`), producer EOF without a read error, and no artifact
+truncation for both streams. If ownership is not yet readable, the existing
+`runtime_output_unavailable` code has `retryable: true`; retry the same offset.
+
+Project-memory `get`, `search` and `list_recent` hide records whose valid
+`expires_at` has passed. Use `include_expired: true` to inspect them. Expiry
+filters queries; it does not delete records or remove them from export or
+status counts. New expiry values require an RFC 3339 calendar timestamp with an
+explicit timezone and seconds 00–59. Existing invalid timestamps remain visible
+and non-expiring. To recover a legacy export with those values, use
+`project_memory.import` with `expiry_policy: "preserve_legacy_v1"`; the default
+`"strict"` rejects malformed expiry. Preview and commit apply the same checksum,
+project, type and batch bounds. Preserved expiry bytes count toward the 1 MiB
+batch limit; this mode does not authorize malformed new remember writes.
+Use returned memory cursors as opaque values with the same query and visibility
+mode. Current cursors avoid skipping later live rows when earlier rows expire.
 
 ## 7. Automatic continuity
 
