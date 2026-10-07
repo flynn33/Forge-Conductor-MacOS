@@ -688,6 +688,101 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(unknown.payload["retryable"] as? Bool, false)
     }
 
+    func testSearchContextAndFilenameFiltersPreserveDefaultExclusions() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("search-context-filters")
+        try bindProjectContext(app: app, clientID: client)
+        let root = tempHome.appendingPathComponent("search-files")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for (name, content) in [
+            ("included.swift", "before\nneedle\nafter\n"),
+            ("excluded.swift", "needle excluded\n"),
+            ("other.txt", "needle other\n"),
+        ] {
+            try content.write(to: root.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+        let dependencies = root.appendingPathComponent("node_modules")
+        try FileManager.default.createDirectory(at: dependencies, withIntermediateDirectories: true)
+        try "needle dependency".write(to: dependencies.appendingPathComponent("dependency.swift"),
+                                     atomically: true, encoding: .utf8)
+        let filtered = try app.tools.call(name: "search_text", arguments: [
+            "path": root.path, "pattern": "needle", "context_lines": 1,
+            "include": ["*.swift"], "exclude": ["excluded.*"],
+        ], clientID: client)
+        XCTAssertTrue(filtered.ok, "\(filtered.payload)")
+        let matches = try XCTUnwrap(filtered.payload["matches"] as? [String])
+        XCTAssertEqual(matches.count, 3)
+        XCTAssertTrue(matches.contains { $0.hasSuffix("-1-before") })
+        XCTAssertTrue(matches.contains { $0.hasSuffix(":2:needle") })
+        XCTAssertTrue(matches.contains { $0.hasSuffix("-3-after") })
+        XCTAssertTrue(matches.allSatisfy { $0.contains("included.swift") })
+        let legacy = try app.tools.call(name: "search_text", arguments: [
+            "path": root.path, "pattern": "needle",
+        ], clientID: client)
+        XCTAssertTrue(legacy.ok)
+        XCTAssertEqual(legacy.payload["count"] as? Int, 3)
+        let invalidOptions: [[String: Any]] = [
+            ["context_lines": -1], ["context_lines": 21], ["context_lines": "bad"],
+            ["context_lines": true], ["context_lines": "1"], ["context_lines": 1.5],
+            ["include": "*.swift"], ["exclude": [""]], ["include": Array(repeating: "*", count: 33)],
+        ]
+        for options in invalidOptions {
+            var arguments = options
+            arguments["path"] = root.path
+            arguments["pattern"] = "needle"
+            let invalid = try app.tools.call(name: "search_text", arguments: arguments, clientID: client)
+            XCTAssertFalse(invalid.ok)
+            XCTAssertEqual(invalid.payload["code"] as? String, "invalid_search_options")
+        }
+    }
+
+    func testGitDiffFilenameFilterSeparatesOptionsAndReportsCaptureLimits() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let client = ClientID("git-diff-file-filter")
+        try bindProjectContext(app: app, clientID: client)
+        let root = tempHome.appendingPathComponent("diff-repository")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let runner = ProcessRunner()
+        let git = GitExecutableResolver.executable.path
+        func run(_ args: [String]) throws {
+            let result = try runner.run(executable: git, arguments: args,
+                                        currentDirectory: root.path, timeoutSec: 10)
+            XCTAssertEqual(result.exitCode, 0, result.stderr)
+            XCTAssertFalse(result.timedOut)
+        }
+        try run(["init"])
+        for name in ["--selected.txt", "other.txt"] {
+            try "before\n".write(to: root.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+        try run(["add", "--", "."])
+        try run(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                 "-c", "commit.gpgsign=false", "commit", "-m", "fixture"])
+        for name in ["--selected.txt", "other.txt"] {
+            try "after\n".write(to: root.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+        let filtered = try app.tools.call(name: "git_diff", arguments: [
+            "cwd": root.path, "file": "--selected.txt",
+        ], clientID: client)
+        XCTAssertTrue(filtered.ok, "\(filtered.payload)")
+        let output = try XCTUnwrap(filtered.payload["stdout"] as? String)
+        XCTAssertTrue(output.contains("--selected.txt"))
+        XCTAssertFalse(output.contains("other.txt"))
+        XCTAssertEqual(filtered.payload["stdout_truncated"] as? Bool, false)
+        XCTAssertEqual(filtered.payload["stderr_truncated"] as? Bool, false)
+        try run(["add", "--", "."])
+        let staged = try app.tools.call(name: "git_diff", arguments: [
+            "cwd": root.path, "staged": true, "file": "--selected.txt",
+        ], clientID: client)
+        XCTAssertTrue(staged.ok)
+        XCTAssertEqual(staged.payload["stdout"] as? String, output)
+        let invalid = try app.tools.call(name: "git_diff", arguments: [
+            "cwd": root.path, "file": "",
+        ], clientID: client)
+        XCTAssertEqual(invalid.payload["code"] as? String, "invalid_file")
+    }
+
     func testFailedSearchDiagnosticRetainsReturnedProcessOutcome() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         defer { app.shutdown() }

@@ -148,6 +148,10 @@ public struct AgentToolPack: ToolPackHandling {
         let projects = try app.projectContexts.operatorProjects(
             cancellation: cancellation
         )
+        let projectMetadata = try app.projectMemory.identities.descriptors(
+            projectIDs: projects.map { $0.projectID.description },
+            cancellation: cancellation
+        )
         var payload: [String: Any] = [
             "ok": true,
             "version": ForgeApp.version,
@@ -168,11 +172,13 @@ public struct AgentToolPack: ToolPackHandling {
                     "project_generation": project.generation.rawValue,
                     "display_name": project.displayName,
                     "canonical_root": project.canonicalRoot.path,
+                    "github_repository_url": projectMetadata[project.projectID.description]?.githubRepositoryURL as Any,
                 ] as [String: Any]
             },
             "query_tools": [
                 "instructions": ["instruction_catalog", "instruction_read"],
                 "project_files": ["fs_list", "fs_read", "fs_glob", "search_text"],
+                "web": ["web.search", "web.fetch"],
                 "development_policy": ["fs_list", "fs_read", "fs_glob", "search_text"],
                 "continuity": [
                     "continuity.status", "continuity.get_pending_handoff",
@@ -294,6 +300,7 @@ public struct AgentToolPack: ToolPackHandling {
                 "project_id": effectiveContext.projectID.description,
                 "project_generation": effectiveContext.projectGeneration.rawValue,
                 "client_id": effectiveContext.clientID.rawValue,
+                "network_allowed": effectiveContext.authorizationScope.networkAllowed,
             ] as [String: Any]
         } else {
             payload["project_context"] = [
@@ -303,6 +310,10 @@ public struct AgentToolPack: ToolPackHandling {
             ] as [String: Any]
         }
         if let project = selectedProject {
+            let selectedMetadata = try projectMetadata[project.projectID.description]
+                ?? app.projectMemory.identities.descriptors(
+                    projectIDs: [project.projectID.description], cancellation: cancellation
+                )[project.projectID.description]
             let projectStateDirectory = app.paths.projectsDir.appendingPathComponent(
                 project.projectID.description,
                 isDirectory: true
@@ -311,6 +322,7 @@ public struct AgentToolPack: ToolPackHandling {
                 "project_id": project.projectID.description,
                 "project_generation": project.generation.rawValue,
                 "canonical_root": project.canonicalRoot.path,
+                "github_repository_url": selectedMetadata?.githubRepositoryURL as Any,
                 "run_id": effectiveContext?.runID?.description as Any,
             ] as [String: Any]
             locations.merge([

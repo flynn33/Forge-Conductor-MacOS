@@ -373,6 +373,7 @@ public final class ManagerRoutes: @unchecked Sendable {
     public static let maximumProjectRelinkPathBytes = 4_096
     static let maximumProjectRelinkBodyBytes = 16_384
     static let maximumProjectContentClearBodyBytes = 512
+    static let maximumProjectRepositoryBodyBytes = 4_096
     static let maximumInstructionQueueBodyBytes = 16_384
     static let maximumRuntimeJobCancelBodyBytes = 256
     static let maximumProviderProbeBodyBytes = 512
@@ -1058,6 +1059,62 @@ public final class ManagerRoutes: @unchecked Sendable {
             let object = try JSONSupport.object(from: body)
             let result = try manager.projectStatus(projectID: try projectID(object))
             http.respondJSON(connection, status: 200, object: result)
+        case ("PUT", "/api/manager/projects/repository"):
+            guard body.count <= Self.maximumProjectRepositoryBodyBytes else {
+                http.respondJSON(connection, status: 413, object: [
+                    "ok": false, "code": "project_repository_body_too_large",
+                    "message": "Repository update accepts one bounded project and GitHub location",
+                ])
+                return
+            }
+            let object: [String: Any]
+            do { object = try JSONSupport.object(from: body) }
+            catch {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_project_repository",
+                    "message": "Repository update requires a JSON object",
+                ])
+                return
+            }
+            guard Set(object.keys) == ["project_id", "project_generation", "github_repository_url"],
+                  object["github_repository_url"] is String
+                    || object["github_repository_url"] is NSNull else {
+                http.respondJSON(connection, status: 400, object: [
+                    "ok": false, "code": "invalid_project_repository",
+                    "message": "Repository update requires project UUID, generation, and a GitHub URL or null",
+                ])
+                return
+            }
+            do {
+                let result = try manager.updateProjectRepository(
+                    projectID: try projectID(object),
+                    expectedGeneration: try projectGeneration(object),
+                    location: object["github_repository_url"] as? String
+                )
+                http.respondJSON(connection, status: 200, object: result)
+            } catch let error as ProjectContextError {
+                let status: Int
+                switch error {
+                case .invalidIdentifier, .invalidGeneration: status = 400
+                case .projectNotFound: status = 404
+                case .databaseBusy: status = 503
+                default: status = 409
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false, "code": error.code, "message": error.localizedDescription,
+                ])
+            } catch let error as ProjectMemoryError {
+                let status: Int
+                switch error {
+                case .invalidRequest, .payloadTooLarge: status = 400
+                case .projectNotFound: status = 404
+                case .databaseBusy: status = 503
+                default: status = 500
+                }
+                http.respondJSON(connection, status: status, object: [
+                    "ok": false, "code": error.code, "message": error.localizedDescription,
+                ])
+            }
         case ("POST", "/api/manager/projects/relink"):
             guard body.count <= Self.maximumProjectRelinkBodyBytes else {
                 http.respondJSON(connection, status: 413, object: [

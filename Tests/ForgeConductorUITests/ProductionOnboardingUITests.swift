@@ -415,6 +415,102 @@ final class ProductionOnboardingUITests: XCTestCase, @unchecked Sendable {
         attach("direct-project-path-registration", snapshot)
     }
 
+    func testNativeGitHubRepositorySaveRelaunchRejectAndClearPersistExactProject() async throws {
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        try click(app.buttons["project-register-by-path"])
+        try replace(app.textFields["project-register-path"], with: projectRoot.path)
+        try click(app.buttons["project-register-confirm"])
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            self.app.buttons["project-register-by-path"].isEnabled
+                && self.app.staticTexts[self.projectRoot.lastPathComponent].exists
+        })
+        let registered: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=10")
+        XCTAssertEqual(registered.projects.count, 1)
+        let project = try XCTUnwrap(registered.projects.first)
+        XCTAssertNil(project.githubRepositoryURL)
+        XCTAssertEqual(project.canonicalRoot, projectRoot.path)
+        try click(element("project-row-\(project.projectID)"))
+
+        let metadataURL = forgeHome.appendingPathComponent("Projects", isDirectory: true)
+            .appendingPathComponent(project.projectID, isDirectory: true)
+            .appendingPathComponent("project.json")
+        func metadata() throws -> OnboardingRepositoryMetadata {
+            let data = try Data(contentsOf: metadataURL)
+            XCTAssertLessThanOrEqual(data.count, 4 * 1_024 * 1_024)
+            return try JSONDecoder().decode(OnboardingRepositoryMetadata.self, from: data)
+        }
+        func managerProject() async throws -> OnboardingProjectSnapshot.Project {
+            let snapshot: OnboardingProjectSnapshot = try await read("/api/manager/operator/snapshot?limit=10")
+            XCTAssertEqual(snapshot.projects.count, 1)
+            return try XCTUnwrap(snapshot.projects.first { $0.projectID == project.projectID })
+        }
+        let originalMetadata = try metadata()
+        let canonicalURL = "https://github.com/owner/native-project"
+        let location = app.textFields["project-github-repository-location"]
+        XCTAssertTrue(location.waitForExistence(timeout: 10))
+        try replace(location, with: "git@github.com:owner/native-project.git")
+        try click(app.buttons["project-github-repository-save"])
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            (location.value as? String) == canonicalURL
+                && self.app.buttons["project-github-repository-clear"].isEnabled
+        })
+        XCTAssertTrue(element("project-github-repository-open").exists)
+        XCTAssertFalse(element("operator-unavailable").exists)
+        let savedProject = try await managerProject()
+        XCTAssertEqual(savedProject.githubRepositoryURL, canonicalURL)
+        XCTAssertEqual(savedProject.projectGeneration, project.projectGeneration)
+        let savedMetadata = try metadata()
+        XCTAssertEqual(savedMetadata.id, originalMetadata.id)
+        XCTAssertEqual(savedMetadata.aliases, originalMetadata.aliases)
+        XCTAssertEqual(savedMetadata.repositoryIdentity, originalMetadata.repositoryIdentity)
+        XCTAssertEqual(savedMetadata.githubRepositoryURL, canonicalURL)
+        attach("native-github-saved-manager", savedProject)
+        attach("native-github-saved-metadata", savedMetadata)
+        attachNativeSurface("native-github-repository-saved")
+
+        app.terminate()
+        _ = try await launchOrdinaryApplication()
+        try click(app.buttons["tab-projects"])
+        try click(element("project-row-\(project.projectID)"))
+        let restoredLocation = app.textFields["project-github-repository-location"]
+        XCTAssertTrue(waitUntil(timeout: 10) { (restoredLocation.value as? String) == canonicalURL })
+        let restoredProject = try await managerProject()
+        XCTAssertEqual(restoredProject, savedProject)
+        XCTAssertEqual(try metadata(), savedMetadata)
+        attachNativeSurface("native-github-repository-restored")
+
+        try replace(restoredLocation, with: "https://example.invalid/owner/native-project")
+        try click(app.buttons["project-github-repository-save"])
+        XCTAssertTrue(waitUntil {
+            self.contains(self.element("operator-unavailable"), "Enter a GitHub repository URL")
+        })
+        let rejectedProject = try await managerProject()
+        XCTAssertEqual(rejectedProject, savedProject)
+        XCTAssertEqual(try metadata(), savedMetadata)
+        attachNativeSurface("native-github-invalid-host-rejected")
+
+        try click(app.buttons["project-github-repository-clear"])
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            (restoredLocation.value as? String) == ""
+                && !self.app.buttons["project-github-repository-clear"].isEnabled
+        })
+        XCTAssertFalse(element("project-github-repository-open").exists)
+        XCTAssertFalse(element("operator-unavailable").exists)
+        let clearedProject = try await managerProject()
+        XCTAssertNil(clearedProject.githubRepositoryURL)
+        XCTAssertEqual(clearedProject.projectID, project.projectID)
+        XCTAssertEqual(clearedProject.projectGeneration, project.projectGeneration)
+        let clearedMetadata = try metadata()
+        XCTAssertNil(clearedMetadata.githubRepositoryURL)
+        XCTAssertEqual(clearedMetadata.id, originalMetadata.id)
+        XCTAssertEqual(clearedMetadata.aliases, originalMetadata.aliases)
+        XCTAssertEqual(clearedMetadata.repositoryIdentity, originalMetadata.repositoryIdentity)
+        attach("native-github-cleared-manager", clearedProject)
+        attach("native-github-cleared-metadata", clearedMetadata)
+        attachNativeSurface("native-github-repository-cleared")
+    }
+
     func testNativeProjectsImportsMixedInstructionFolderWithoutBlockingReadableWork() async throws {
         let instructionFolder = projectRoot.appendingPathComponent(
             "Instruction Package", isDirectory: true
@@ -1478,15 +1574,24 @@ private struct OnboardingProjectSnapshot: Codable, Sendable, Equatable {
         let canonicalRoot: String
         let projectGeneration: UInt64
         let lifecycleState: String
+        let githubRepositoryURL: String?
         enum CodingKeys: String, CodingKey {
             case projectID = "project_id"
             case displayName = "display_name"
             case canonicalRoot = "canonical_root"
             case projectGeneration = "project_generation"
             case lifecycleState = "lifecycle_state"
+            case githubRepositoryURL = "github_repository_url"
         }
     }
     let projects: [Project]
+}
+
+private struct OnboardingRepositoryMetadata: Codable, Sendable, Equatable {
+    let id: String
+    let aliases: [String]
+    let repositoryIdentity: String?
+    let githubRepositoryURL: String?
 }
 
 private struct OnboardingProjectGenerationRequest: Encodable, Sendable {

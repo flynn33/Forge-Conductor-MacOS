@@ -117,6 +117,13 @@ public struct GitToolPack: ToolPackHandling {
         case "git_diff":
             gitArgs = ["diff"]
             if ToolArgHelpers.bool(arguments, "staged") == true { gitArgs.append("--cached") }
+            if let raw = arguments["file"] {
+                guard let file = raw as? String, !file.isEmpty,
+                      file.utf8.count <= 4_096, !file.contains("\0") else {
+                    return .failure(code: "invalid_file", message: "file must be a nonempty Git pathspec of at most 4096 bytes")
+                }
+                gitArgs.append(contentsOf: ["--", file])
+            }
         case "git_log":
             let n = ToolArgHelpers.int(arguments, "limit") ?? 20
             gitArgs = ["log", "-n", "\(n)", "--oneline"]
@@ -229,6 +236,8 @@ public struct GitToolPack: ToolPackHandling {
                 "stderr": result.stderr,
                 "cwd": cwd,
                 "timed_out": result.timedOut,
+                "stdout_truncated": result.stdoutTruncated,
+                "stderr_truncated": result.stderrTruncated,
             ],
             isError: !ok
         )

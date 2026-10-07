@@ -328,6 +328,9 @@ struct ProjectsOperatorView: View {
                 LabeledContent("Project UUID") { OperatorIdentifier(project.projectID) }
             }
 
+            ProjectRepositoryEditor(project: project, viewModel: viewModel)
+                .id("\(project.projectID):\(project.projectGeneration)")
+
             GroupBox("Active bindings") {
                 if project.bindings.isEmpty {
                     Text("No active binding records were published.")
@@ -900,6 +903,63 @@ struct ProjectsOperatorView: View {
         guard panel.runModal() == .OK, let url = panel.urls.first,
               url.isFileURL, (url.path as NSString).isAbsolutePath else { return }
         viewModel.relinkSelectedProject(to: url.path)
+    }
+}
+
+private struct ProjectRepositoryEditor: View {
+    let project: OperatorProject
+    @ObservedObject var viewModel: ProjectsViewModel
+    @State private var location: String
+
+    init(project: OperatorProject, viewModel: ProjectsViewModel) {
+        self.project = project
+        self.viewModel = viewModel
+        _location = State(initialValue: project.githubRepositoryURL ?? "")
+    }
+
+    var body: some View {
+        GroupBox("GitHub repository") {
+            VStack(alignment: .leading, spacing: 10) {
+                TextField("https://github.com/owner/repository", text: $location)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("GitHub repository location")
+                    .accessibilityIdentifier("project-github-repository-location")
+                    .onSubmit(save)
+                Text("Link this project's GitHub repository using an HTTPS URL or GitHub SSH clone location.")
+                    .font(.caption)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                HStack {
+                    Button("Save Repository", action: save)
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("project-github-repository-save")
+                    Button("Clear Repository") {
+                        viewModel.saveGitHubRepository(
+                            projectID: project.projectID,
+                            generation: project.projectGeneration,
+                            location: nil
+                        )
+                    }
+                    .disabled(project.githubRepositoryURL == nil)
+                    .accessibilityIdentifier("project-github-repository-clear")
+                    if let url = project.githubRepositoryURL.flatMap(URL.init(string:)) {
+                        Link("Open on GitHub", destination: url)
+                            .accessibilityIdentifier("project-github-repository-open")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .disabled(viewModel.isLoading || project.lifecycleState != "active")
+        }
+        .onChange(of: project.githubRepositoryURL) { _, url in location = url ?? "" }
+        .accessibilityIdentifier("project-github-repository")
+    }
+
+    private func save() {
+        viewModel.saveGitHubRepository(
+            projectID: project.projectID,
+            generation: project.projectGeneration,
+            location: location
+        )
     }
 }
 

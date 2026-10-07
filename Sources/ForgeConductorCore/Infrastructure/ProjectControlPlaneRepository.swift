@@ -6555,6 +6555,47 @@ public actor ProjectControlPlaneRepository {
         }
     }
 
+    /// Upgrades only the historical unrestricted ordinary MCP binding. Run-bound,
+    /// leased and explicitly scoped authorizations retain their network policy.
+    func ordinaryMCPInvocationContextWithWebAccess(
+        clientID: ClientID,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ToolInvocationContext {
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue)
+        try Self.validate(owner)
+        let current = try invocationContext(for: owner, clientID: clientID, cancellation: cancellation)
+        guard current.runID == nil, current.authorizationScope.allowedTools == ["*"],
+              !current.authorizationScope.networkAllowed else { return current }
+        let snapshot = try binding(for: owner, cancellation: cancellation)
+        guard snapshot?.leaseOwner == nil, snapshot?.leaseExpiresAt == nil else { return current }
+        return try controlledTransaction(cancellation: cancellation) { connection in
+            guard let binding = try bindingUnlocked(owner: owner, includeInactive: false, connection: connection) else {
+                throw ProjectContextError.projectContextRequired(owner)
+            }
+            _ = try requiredActiveProjectUnlocked(binding.projectID, generation: binding.projectGeneration, connection: connection)
+            try requireActiveProviderSessionUnlocked(owner: owner, binding: binding, connection: connection)
+            if binding.leaseOwner?.hasPrefix(DesktopProviderMCPAttachmentContract.attachedMarkerPrefix) == true {
+                _ = try validatedDesktopMCPBindingUnlocked(binding, expectedProviderID: nil, connection: connection)
+            }
+            guard binding.runID == nil, binding.leaseOwner == nil, binding.leaseExpiresAt == nil,
+                  binding.authorizationScope.allowedTools == ["*"], !binding.authorizationScope.networkAllowed else {
+                return binding.invocationContext(clientID: clientID)
+            }
+            let prior = binding.authorizationScope
+            let updated = ToolAuthorizationScope(canonicalRoots: prior.canonicalRoots, writableRoots: prior.writableRoots,
+                allowedTools: prior.allowedTools, networkAllowed: true, maximumInlineOutputBytes: prior.maximumInlineOutputBytes)
+            try connection.execute(
+                "UPDATE project_bindings SET authorization_scope_json=?,updated_at=? WHERE binding_id=? AND active=1",
+                bindings: [.text(try Self.scopeJSON(updated)), .text(ISO8601.string(from: clock.now())),
+                           .text(binding.bindingID.uuidString.lowercased())]
+            )
+            guard let migrated = try bindingUnlocked(owner: owner, includeInactive: false, connection: connection) else {
+                throw ProjectContextError.integrityFailure("MCP web authorization could not be read back")
+            }
+            return migrated.invocationContext(clientID: clientID)
+        }
+    }
+
     public func invocationContext(
         for owner: ProjectBindingOwner,
         clientID: ClientID? = nil,

@@ -77,7 +77,7 @@ public final class ProjectContextService: @unchecked Sendable {
         let scope = ToolAuthorizationScope(
             canonicalRoots: [project.canonicalRoot],
             allowedTools: allowedTools,
-            networkAllowed: false,
+            networkAllowed: true,
             maximumInlineOutputBytes: maximumInlineOutputBytes
         )
         // Project registration is durable. Complete the idempotent binding even
@@ -106,7 +106,7 @@ public final class ProjectContextService: @unchecked Sendable {
         let scope = ToolAuthorizationScope(
             canonicalRoots: [project.canonicalRoot],
             allowedTools: allowedTools,
-            networkAllowed: false,
+            networkAllowed: true,
             maximumInlineOutputBytes: maximumInlineOutputBytes
         )
         let binding = try wait(cancellation: nil, committedResultWins: true) { control in
@@ -546,10 +546,8 @@ public final class ProjectContextService: @unchecked Sendable {
         for clientID: ClientID,
         cancellation: ToolCallCancellation? = nil
     ) throws -> ToolInvocationContext {
-        let owner = ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue)
         return try wait(cancellation: cancellation, committedResultWins: false) { control in
-            try await self.repository.invocationContext(
-                for: owner,
+            try await self.repository.ordinaryMCPInvocationContextWithWebAccess(
                 clientID: clientID,
                 cancellation: control
             )

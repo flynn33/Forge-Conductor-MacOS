@@ -19,6 +19,9 @@ protocol OperatorManagerClientProtocol: Sendable {
         _ request: OperatorProjectRegistrationRequest
     ) async throws -> OperatorProjectRegistrationOutcome
     func projectStatus(projectID: String) async throws -> OperatorProject
+    func updateProjectRepository(
+        projectID: String, generation: UInt64, location: String?
+    ) async throws -> OperatorProject
     func removeProject(projectID: String, generation: UInt64) async throws -> OperatorProjectArchiveReceipt
     func resetProject(projectID: String, generation: UInt64) async throws -> OperatorResetReceipt
     func instructionQueue(projectID: String, generation: UInt64) async throws -> OperatorInstructionQueue
@@ -122,6 +125,14 @@ protocol OperatorManagerClientProtocol: Sendable {
 }
 
 extension OperatorManagerClientProtocol {
+    func updateProjectRepository(
+        projectID: String, generation: UInt64, location: String?
+    ) async throws -> OperatorProject {
+        throw OperatorManagerClientError.capabilityUnavailable(
+            "GitHub repository editing is unavailable from this manager client."
+        )
+    }
+
     func activitySnapshot(
         limit: Int,
         runID: String,
@@ -643,6 +654,30 @@ final class OperatorManagerHTTPClient: OperatorManagerClientProtocol, @unchecked
                 )
             }
         }
+    }
+
+    func updateProjectRepository(
+        projectID: String, generation: UInt64, location: String?
+    ) async throws -> OperatorProject {
+        try validateProjectGeneration(projectID: projectID, generation: generation)
+        let normalized = try GitHubRepositoryLocation.normalized(location)
+        let project: OperatorProject = try await request(
+            method: "PUT", path: "/api/manager/projects/repository",
+            body: ProjectRepositoryBody(
+                projectID: projectID, projectGeneration: generation,
+                githubRepositoryURL: normalized ?? ""
+            ),
+            timeoutInterval: 12
+        )
+        guard project.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              project.projectGeneration == generation,
+              project.lifecycleState == "active",
+              project.githubRepositoryURL == normalized else {
+            throw OperatorManagerClientError.invalidPayload(
+                "Repository update did not match the selected project generation and location"
+            )
+        }
+        return project
     }
 
     func projectStatus(projectID: String) async throws -> OperatorProject {
@@ -1778,6 +1813,14 @@ final class OperatorManagerClientRouter: OperatorManagerClientProtocol, @uncheck
         try await current.updateSettings(patch)
     }
 
+    func updateProjectRepository(
+        projectID: String, generation: UInt64, location: String?
+    ) async throws -> OperatorProject {
+        try await current.updateProjectRepository(
+            projectID: projectID, generation: generation, location: location
+        )
+    }
+
     func registerProject(
         _ request: OperatorProjectRegistrationRequest
     ) async throws -> OperatorProjectRegistrationOutcome {
@@ -2249,6 +2292,17 @@ private struct ProjectGenerationBody: Encodable {
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
         case projectGeneration = "project_generation"
+    }
+}
+
+private struct ProjectRepositoryBody: Encodable {
+    let projectID: String
+    let projectGeneration: UInt64
+    let githubRepositoryURL: String
+    enum CodingKeys: String, CodingKey {
+        case projectID = "project_id"
+        case projectGeneration = "project_generation"
+        case githubRepositoryURL = "github_repository_url"
     }
 }
 

@@ -1,4 +1,31 @@
-# Project memory isolation — SLICE-05 verification
+# Project memory
+
+## Project repository metadata
+
+In Projects, select a registered project and enter its GitHub location in
+**GitHub repository**. **Save Repository** links it to the stable project ID;
+**Clear Repository** removes the link. HTTPS URLs, `git@github.com:owner/repo.git`
+and `ssh://git@github.com/owner/repo.git` normalize to `https://github.com/owner/repo`.
+The input must name one GitHub owner and repository; credentials, another host,
+query strings and fragments are rejected.
+
+This optional metadata uses the existing owner-only project registry and
+per-project `project.json` persistence journal. Existing schema-1 entries without
+the field decode with no linked repository. Saving preserves the independently
+discovered Git identity, local aliases and project generation. Registration and
+relink retain the saved URL. Updates require the existing authenticated Manager
+control credential and the selected active generation; stale editors are rejected.
+
+The native Manager snapshot and exact project status, `get_forge_status`
+(`projects` and selected `project`), and `project_memory.status` (`project`)
+publish the optional `github_repository_url`. A stored link supplies project
+context; it does not validate remote availability or change Git remotes or credentials.
+
+The October 7 implementation and qualification boundary are recorded in
+[Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md).
+The historical test receipt below retains its original source and scope.
+
+## Historical project memory isolation — SLICE-05 verification
 
 **Status:** behavior verified working — no source repair required. Project-isolated durable memory works: a record belongs to its selected project, is invisible to other projects (lookup, search, and no default-project fallback), and remains readable after the isolated repository is reopened. The one uncovered exclusion case (cross-project lookup + fallback) gained a focused regression.
 **Evidence class:** E1 (executed focused tests on this checkout against disposable fixtures).

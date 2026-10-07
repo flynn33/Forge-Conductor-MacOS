@@ -274,6 +274,7 @@ public enum ManagerToolCategory: String, Codable, Sendable, Equatable, CaseItera
     static func classify(_ toolID: String) -> Self {
         if toolID.hasPrefix("fs_") { return .files }
         if toolID.hasPrefix("search_") { return .search }
+        if toolID.hasPrefix("web.") { return .search }
         if toolID.hasPrefix("git_") { return .sourceControl }
         if toolID == "shell_exec" || toolID.hasPrefix("xcode.") { return .commands }
         if toolID.hasPrefix("project_memory.") || toolID.hasPrefix("memory_") {
@@ -640,6 +641,7 @@ private enum ProductionToolDefinitionSource {
             ?? ContinuityLifecycleToolPack.description(for: name)
             ?? RuntimeJobToolPack.description(for: name)
             ?? XcodeCLIToolPack.description(for: name)
+            ?? WebToolPack.description(for: name)
             ?? baseDescriptions[name]
     }
 
@@ -649,6 +651,7 @@ private enum ProductionToolDefinitionSource {
             ?? ContinuityLifecycleToolPack.schema(for: name)
             ?? RuntimeJobToolPack.schema(for: name)
             ?? XcodeCLIToolPack.schema(for: name)
+            ?? WebToolPack.schema(for: name)
             ?? baseSchema(for: name)
     }
 
@@ -668,8 +671,8 @@ private enum ProductionToolDefinitionSource {
         "context_list": "List recent context handoff packets.",
         "instruction_catalog": "Page the complete project/run-bound inventory for an immutable imported instruction snapshot before beginning work.",
         "instruction_read": "Read a byte-bounded UTF-8 window from one converted project/run-bound instruction document with a durable continuation cursor. Forge may reduce maximum_bytes to fit the current provider context and inline-result budgets; continue from next_byte_offset.",
-        "fs_read": "Read a UTF-8 text file. Optional 1-based line window: offset (start line) + length/limit (line count). Response includes total_lines, start_line, end_line, has_more, next_offset. Do not re-call with the same offset when content was returned.",
-        "fs_write": "Write a UTF-8 text file.",
+        "fs_read": "Read a file. Default encoding=utf8 preserves the 1-based line window: offset + length/limit, with total_lines, start_line, end_line, has_more and next_offset. encoding=base64 reads a bounded exact-byte page using byte_offset and maximum_bytes; continue at next_byte_offset. Do not repeat an offset after content was returned.",
+        "fs_write": "Write a file. Default encoding=utf8 writes text; encoding=base64 accepts strict base64 for up to 2 MiB of decoded bytes.",
         "fs_edit": "Replace occurrences of old with new in a file.",
         "fs_list": "List directory entries.",
         "fs_glob": "Find files by name pattern under a path.",
@@ -679,13 +682,13 @@ private enum ProductionToolDefinitionSource {
         "fs_move": "Move/rename a path.",
         "shell_exec": "Run a bash command with timeout.",
         "git_status": "git status --porcelain.",
-        "git_diff": "git diff (optional staged).",
+        "git_diff": "git diff (optional staged and repository-relative file pathspec).",
         "git_log": "git log --oneline.",
         "git_add": "git add path or -A.",
         "git_commit": "git commit -m message.",
         "pdf_write": "Write a PDF from markdown-ish text (stdlib, no pandoc).",
         "pdf_from_file": "Convert a local markdown/text file to PDF.",
-        "search_text": "Recursive text search (grep).",
+        "search_text": "Recursive text search (grep), with optional context_lines and include/exclude filename globs.",
         "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
         "memory_get": "Read a durable memory note by key.",
         "memory_list": "List durable memory notes (optional prefix/tag; hides internal agent and continuity keys by default).",
@@ -819,6 +822,10 @@ private enum ProductionToolDefinitionSource {
                 "type": "object",
                 "properties": [
                     "path": ["type": "string"] as [String: Any],
+                    "encoding": ["type": "string", "enum": ["utf8", "base64"], "default": "utf8"] as [String: Any],
+                    "byte_offset": ["type": "integer", "minimum": 0, "default": 0] as [String: Any],
+                    "maximum_bytes": ["type": "integer", "minimum": 1, "maximum": 32_768, "default": 16_384,
+                                      "description": "Raw byte request for encoding=base64. The returned page may be smaller to fit the encoded MCP/project budget; continue at next_byte_offset."] as [String: Any],
                     "offset": [
                         "type": "integer",
                         "description": "1-based start line for a partial read",
@@ -876,6 +883,7 @@ private enum ProductionToolDefinitionSource {
                 "properties": [
                     "path": ["type": "string"] as [String: Any],
                     "content": ["type": "string"] as [String: Any],
+                    "encoding": ["type": "string", "enum": ["utf8", "base64"], "default": "utf8"] as [String: Any],
                 ] as [String: Any],
                 "required": ["path", "content"],
             ]
@@ -915,8 +923,22 @@ private enum ProductionToolDefinitionSource {
                 "properties": [
                     "pattern": ["type": "string"] as [String: Any],
                     "path": ["type": "string"] as [String: Any],
+                    "context_lines": ["type": "integer", "minimum": 0, "maximum": 20, "default": 0] as [String: Any],
+                    "include": ["type": "array", "maxItems": 32, "items": ["type": "string", "maxLength": 256]] as [String: Any],
+                    "exclude": ["type": "array", "maxItems": 32, "items": ["type": "string", "maxLength": 256]] as [String: Any],
                 ] as [String: Any],
                 "required": ["pattern"],
+            ]
+        case "git_diff":
+            return [
+                "type": "object",
+                "properties": [
+                    "cwd": ["type": "string"] as [String: Any],
+                    "staged": ["type": "boolean"] as [String: Any],
+                    "file": ["type": "string", "minLength": 1, "maxLength": 4_096,
+                             "description": "Optional repository-relative pathspec passed after --."] as [String: Any],
+                ] as [String: Any],
+                "required": [] as [String],
             ]
         case "memory_set":
             return [

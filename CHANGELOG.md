@@ -10,10 +10,22 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### 0.19.0 (29) project repository and model tools
+
+- Added project-linked GitHub repository entry in Projects, including normalization,
+  Save, Clear, and Open on GitHub. Status and memory descriptors expose the saved URL.
+- Added native `web.fetch` and `web.search` for ordinary project-bound MCP chats.
+- Added optional base64 binary file reads/writes while preserving UTF-8 defaults.
+- Added context lines and filename filters to `search_text`, and a file pathspec
+  to `git_diff` with explicit stdout/stderr truncation flags.
+- Verification and the separate host PowerShell repair are recorded in
+  [the current feature record](docs/PROJECT-WEB-QWEN.md). Candidate and installed
+  acceptance remain separate.
+
+
 **Published owner checkpoint — 0.18.0 (28).** The source and wiki were
 published under the owner identity and both local checkouts were synchronized.
-The owner will build, notarize and install this version; further product repair
-waits for the installation report. The actual managed policy mission remains
+The owner subsequently reported installation and authorized the next feature work. The actual managed policy mission remains
 **unverified** after a harness preparation failure before model activation.
 Installed and all-feature acceptance remain open. [Published references and limits](docs/LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
 

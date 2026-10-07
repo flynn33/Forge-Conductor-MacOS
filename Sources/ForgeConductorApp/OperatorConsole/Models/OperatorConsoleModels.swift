@@ -117,6 +117,7 @@ struct OperatorProject: Decodable, Sendable, Equatable, Identifiable {
     let migrationWarnings: [String]
     let resetReceipt: OperatorResetReceipt?
     let pendingTransition: OperatorProjectTransition?
+    let githubRepositoryURL: String?
 
     var id: String { projectID }
 
@@ -130,6 +131,7 @@ struct OperatorProject: Decodable, Sendable, Equatable, Identifiable {
         case migrationWarnings = "migration_warnings"
         case resetReceipt = "reset_receipt"
         case pendingTransition = "pending_transition"
+        case githubRepositoryURL = "github_repository_url"
     }
 
     init(from decoder: Decoder) throws {
@@ -148,6 +150,7 @@ struct OperatorProject: Decodable, Sendable, Equatable, Identifiable {
             OperatorProjectTransition.self,
             forKey: .pendingTransition
         )
+        githubRepositoryURL = try container.decodeIfPresent(String.self, forKey: .githubRepositoryURL)
     }
 }
 

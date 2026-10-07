@@ -18,6 +18,7 @@ private struct ProjectRegistryEntry: Codable {
     var aliases: [String]
     var createdAt: String
     var updatedAt: String
+    var githubRepositoryURL: String? = nil
 }
 
 private struct ProjectIdentityUpdateIntent: Codable {
@@ -215,6 +216,45 @@ final class ProjectIdentityResolver: @unchecked Sendable {
             guard let entry = registry.projects.first(where: { $0.id == projectID }) else {
                 throw ProjectMemoryError.projectNotFound(projectID)
             }
+            return descriptor(entry)
+        }
+    }
+
+    func descriptors(
+        projectIDs: [String],
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> [String: ProjectMemoryDescriptor] {
+        try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            let requested = Set(projectIDs.map { $0.lowercased() })
+            let registry = try loadRegistry(cancellation: cancellation)
+            return Dictionary(uniqueKeysWithValues: registry.projects
+                .filter { requested.contains($0.id.lowercased()) }
+                .map { ($0.id.lowercased(), descriptor($0)) })
+        }
+    }
+
+    @discardableResult
+    func updateGitHubRepository(
+        projectID: String,
+        location: String?,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> ProjectMemoryDescriptor {
+        let url = try GitHubRepositoryLocation.normalized(location)
+        return try withRegistryLock(cancellation: cancellation) {
+            try recoverPendingIdentityUpdate(cancellation: cancellation)
+            var registry = try loadRegistry(cancellation: cancellation)
+            guard let index = registry.projects.firstIndex(where: {
+                $0.id.caseInsensitiveCompare(projectID) == .orderedSame
+            }) else {
+                throw ProjectMemoryError.projectNotFound(projectID)
+            }
+            var entry = registry.projects[index]
+            if entry.githubRepositoryURL == url { return descriptor(entry) }
+            entry.githubRepositoryURL = url
+            entry.updatedAt = ISO8601.string(from: clock.now())
+            registry.projects[index] = entry
+            try persistIdentityUpdate(entry: entry, registry: registry, cancellation: cancellation)
             return descriptor(entry)
         }
     }
@@ -1889,7 +1929,8 @@ final class ProjectIdentityResolver: @unchecked Sendable {
     private func descriptor(_ entry: ProjectRegistryEntry) -> ProjectMemoryDescriptor {
         ProjectMemoryDescriptor(
             id: entry.id, displayName: entry.displayName,
-            repositoryIdentity: entry.repositoryIdentity, aliases: entry.aliases
+            repositoryIdentity: entry.repositoryIdentity, aliases: entry.aliases,
+            githubRepositoryURL: entry.githubRepositoryURL
         )
     }
 }
@@ -2463,6 +2504,9 @@ public final class ProjectMemoryService: @unchecked Sendable {
         status["capability_version"] = Self.capabilityVersion
         status["limits"] = limits.asDictionary()
         status["cache"] = ["open_repositories": openRepositoryCount, "maximum": limits.maximumOpenProjects]
+        status["project"] = try identities.descriptor(
+            projectID: projectID, cancellation: cancellation
+        ).asDictionary()
         return status
     }
 

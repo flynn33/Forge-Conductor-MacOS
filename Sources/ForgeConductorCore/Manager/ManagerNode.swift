@@ -886,6 +886,9 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             }.map { ($0.command.projectID, $0) },
             uniquingKeysWith: { first, _ in first }
         )
+        let projectMetadata = try app.projectMemory.identities.descriptors(
+            projectIDs: persisted.projects.map { $0.projectID.description }
+        )
         let projectRows = try persisted.projects.map { project in
             Self.operatorProject(
                 project,
@@ -893,7 +896,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
                 resetReceipt: persisted.resetReceipts[project.projectID],
                 continuity: continuityByProject[project.projectID],
                 pendingTransition: try operatorProjectTransition(project),
-                paths: app.paths
+                paths: app.paths,
+                githubRepositoryURL: projectMetadata[project.projectID.description]?.githubRepositoryURL
             )
         }
         let projectedProjectIDs = Set(projectRows.map { $0.projectID.lowercased() })
@@ -1555,7 +1559,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             resetReceipt: persisted.resetReceipt,
             continuity: persisted.continuity,
             pendingTransition: try operatorProjectTransition(persisted.project),
-            paths: app.paths
+            paths: app.paths,
+            githubRepositoryURL: try app.projectMemory.identities.descriptors(
+                projectIDs: [projectID.description]
+            )[projectID.description]?.githubRepositoryURL
         )
     }
 
@@ -1569,7 +1576,10 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             resetReceipt: persisted.resetReceipt,
             continuity: persisted.continuity,
             pendingTransition: try operatorProjectTransition(persisted.project),
-            paths: app.paths
+            paths: app.paths,
+            githubRepositoryURL: try app.projectMemory.identities.descriptors(
+                projectIDs: [projectID.description]
+            )[projectID.description]?.githubRepositoryURL
         )
         var response = Self.projectDictionary(persisted.project)
         response.merge(
@@ -1577,6 +1587,45 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             uniquingKeysWith: { _, projected in projected }
         )
         return response
+    }
+
+    /// Saves informational remote metadata under the same transition fence as
+    /// registration/reset/relink. A stale editor cannot update another generation.
+    @discardableResult
+    public func updateProjectRepository(
+        projectID: ProjectID,
+        expectedGeneration: ProjectGeneration,
+        location: String?
+    ) throws -> [String: Any] {
+        let normalized = try GitHubRepositoryLocation.normalized(location)
+        guard expectedGeneration.rawValue > 0,
+              expectedGeneration.rawValue < UInt64(Int64.max) else {
+            throw ProjectContextError.invalidGeneration(expectedGeneration.rawValue)
+        }
+        let recovery = SecureFilesystemRecoveryLedger(paths: app.paths)
+        do {
+            return try recovery.withRetainedAuthorityFence(
+                projectID: projectID, generation: expectedGeneration
+            ) { _ in
+                guard let project = try app.projectContexts.project(projectID) else {
+                    throw ProjectContextError.projectNotFound(projectID)
+                }
+                guard project.generation == expectedGeneration else {
+                    throw ProjectContextError.staleProjectGeneration(
+                        expected: expectedGeneration, actual: project.generation
+                    )
+                }
+                guard project.lifecycleState == .active else {
+                    throw ProjectContextError.projectNotActive(project.lifecycleState)
+                }
+                _ = try app.projectMemory.identities.updateGitHubRepository(
+                    projectID: projectID.description, location: normalized
+                )
+                return try projectStatus(projectID: projectID)
+            }
+        } catch SecureFilesystemRecoveryLedgerError.retainedAuthority {
+            throw ProjectContextError.retainedFilesystemRecovery(projectID)
+        }
     }
 
     private func operatorProjectPersistence(
@@ -5035,7 +5084,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
         resetReceipt: ProjectGenerationResetReceipt?,
         continuity: ManagerOperatorContinuityReadModel?,
         pendingTransition: ManagerOperatorProjectTransition?,
-        paths: AppPaths
+        paths: AppPaths,
+        githubRepositoryURL: String? = nil
     ) -> ManagerOperatorProject {
         let databaseURL = paths.projectsDir
             .appendingPathComponent(project.projectID.description, isDirectory: true)
@@ -5106,7 +5156,8 @@ public final class ManagerNode: ManagerControlling, @unchecked Sendable {
             },
             pendingTransition: pendingTransition,
             createdAt: project.createdAt,
-            updatedAt: project.updatedAt
+            updatedAt: project.updatedAt,
+            githubRepositoryURL: githubRepositoryURL
         )
     }
 

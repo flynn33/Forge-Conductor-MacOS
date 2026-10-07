@@ -310,7 +310,7 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 id: "research",
                 displayName: "Research",
                 description: "Gather facts from the local codebase with path citations.",
-                tools: ["fs_read", "fs_list", "fs_glob", "search_text", "git_log", "git_status", "shell_exec"],
+                tools: ["fs_read", "fs_list", "fs_glob", "search_text", "git_log", "git_status", "shell_exec", "web.search", "web.fetch"],
                 toolsForbidden: ["fs_write", "fs_edit", "fs_delete", "git_commit", "git_push"],
                 whenToUse: ["Factual question about how the system works"],
                 firstMoves: ["search_text / fs_glob", "fs_read sources", "agent_run_complete"],

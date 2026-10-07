@@ -95,6 +95,7 @@ public struct ProjectMemoryDescriptor: Sendable, Equatable {
     public var displayName: String
     public var repositoryIdentity: String?
     public var aliases: [String]
+    public var githubRepositoryURL: String? = nil
 
     public func asDictionary() -> [String: Any] {
         [
@@ -102,7 +103,59 @@ public struct ProjectMemoryDescriptor: Sendable, Equatable {
             "display_name": displayName,
             "repository_identity": repositoryIdentity as Any,
             "aliases": aliases,
+            "github_repository_url": githubRepositoryURL as Any,
         ]
+    }
+}
+
+/// Operator-entered repository metadata. It does not grant access or replace
+/// the independently discovered repository identity used by registration.
+public enum GitHubRepositoryLocation {
+    public static let maximumBytes = 2_048
+
+    public static func normalized(_ raw: String?) throws -> String? {
+        guard let raw else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        guard value.utf8.count <= maximumBytes else {
+            throw ProjectMemoryError.payloadTooLarge("GitHub repository location exceeds 2048 bytes")
+        }
+        let path: String
+        if value.hasPrefix("git@github.com:") {
+            path = String(value.dropFirst("git@github.com:".count))
+        } else {
+            guard let components = URLComponents(string: value),
+                  components.host?.lowercased() == "github.com",
+                  components.port == nil,
+                  components.password == nil,
+                  components.query == nil, components.fragment == nil,
+                  (components.scheme?.lowercased() == "https" && components.user == nil)
+                    || (components.scheme?.lowercased() == "ssh" && components.user == "git"),
+                  components.percentEncodedPath == components.path,
+                  components.path.hasPrefix("/") else {
+                throw ProjectMemoryError.invalidRequest(
+                    "Enter a GitHub repository URL such as https://github.com/owner/repository"
+                )
+            }
+            path = String(components.path.dropFirst())
+        }
+        var repositoryPath = path
+        if repositoryPath.hasSuffix("/") { repositoryPath.removeLast() }
+        if repositoryPath.hasSuffix(".git") { repositoryPath.removeLast(4) }
+        let segments = repositoryPath.split(separator: "/", omittingEmptySubsequences: false)
+        let ownerCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
+        let repositoryCharacters = ownerCharacters.union(CharacterSet(charactersIn: "_."))
+        guard segments.count == 2,
+              (1...39).contains(segments[0].utf8.count),
+              segments[0].first != "-", segments[0].last != "-",
+              !segments[0].contains("--"),
+              segments[0].unicodeScalars.allSatisfy(ownerCharacters.contains),
+              (1...100).contains(segments[1].utf8.count),
+              segments[1] != ".", segments[1] != "..",
+              segments[1].unicodeScalars.allSatisfy(repositoryCharacters.contains) else {
+            throw ProjectMemoryError.invalidRequest("GitHub location must name one owner and repository")
+        }
+        return "https://github.com/\(segments[0])/\(segments[1])"
     }
 }
 

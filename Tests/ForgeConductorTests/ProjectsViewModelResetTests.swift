@@ -157,6 +157,12 @@ final class ProjectsViewModelResetTests: XCTestCase {
         private(set) var resetCalls: [ResetCall] = []
         private(set) var statusCalls: [StatusCall] = []
         private(set) var clearCalls: [ClearCall] = []
+        struct RepositoryCall: Sendable, Equatable {
+            let projectID: String
+            let generation: UInt64
+            let location: String?
+        }
+        private(set) var repositoryCalls: [RepositoryCall] = []
 
         init(
             snapshot: OperatorSnapshot? = nil,
@@ -222,6 +228,21 @@ final class ProjectsViewModelResetTests: XCTestCase {
                 )
             }
             return response
+        }
+
+        func updateProjectRepository(
+            projectID: String, generation: UInt64, location: String?
+        ) async throws -> OperatorProject {
+            repositoryCalls.append(RepositoryCall(
+                projectID: projectID, generation: generation, location: location
+            ))
+            if gateArmed {
+                while !gateReleased { try await Task.sleep(for: .milliseconds(5)) }
+                gateArmed = false
+            }
+            if let statusError { throw statusError }
+            guard let statusProject else { throw notInScope }
+            return statusProject
         }
 
         func instructionQueue(
@@ -403,6 +424,62 @@ final class ProjectsViewModelResetTests: XCTestCase {
     }
 
     // MARK: - Tests
+
+    func testGitHubRepositorySaveUsesCapturedProjectDuringSelectionChangeAndSurvivesRefresh() async throws {
+        let savedJSON = Self.projectJSON(generation: 1, withReceipt: false)
+            .replacingOccurrences(of: "\"reset_receipt\": null", with: "\"github_repository_url\": \"https://github.com/owner/repository\", \"reset_receipt\": null")
+        let initial = try Self.fixture(OperatorSnapshot.self, from: Self.twoProjectSnapshotJSON())
+        let refreshed = try Self.fixture(OperatorSnapshot.self, from: "{\"projects\":[\(savedJSON)]}")
+        let client = FakeOperatorClient(
+            snapshot: initial, subsequentSnapshot: refreshed,
+            statusProject: try Self.fixture(OperatorProject.self, from: savedJSON)
+        )
+        let viewModel = await settledViewModel(client: client)
+        XCTAssertNil(viewModel.selectedProject?.githubRepositoryURL)
+        await client.armResetGate()
+        viewModel.saveGitHubRepository(
+            projectID: Self.projectID, generation: 1,
+            location: "git@github.com:owner/repository.git"
+        )
+        XCTAssertTrue(viewModel.isLoading)
+        viewModel.selectedProjectID = Self.secondProjectID
+        await client.releaseResetGate()
+        await waitUntilIdle(viewModel)
+        XCTAssertEqual(viewModel.selectedProjectID, Self.secondProjectID)
+        XCTAssertNil(viewModel.selectedProject?.githubRepositoryURL)
+        XCTAssertEqual(viewModel.projects.first { $0.projectID == Self.projectID }?.githubRepositoryURL,
+                       "https://github.com/owner/repository")
+        let savedCalls = await client.repositoryCalls
+        XCTAssertEqual(savedCalls, [FakeOperatorClient.RepositoryCall(
+            projectID: Self.projectID, generation: 1, location: "https://github.com/owner/repository"
+        )])
+        viewModel.load()
+        await waitUntilIdle(viewModel)
+        XCTAssertEqual(viewModel.selectedProject?.githubRepositoryURL, "https://github.com/owner/repository")
+    }
+
+    func testGitHubRepositoryClearAndInvalidOrStaleEditsRespectSelectedProject() async throws {
+        let savedJSON = Self.projectJSON(generation: 1, withReceipt: false)
+            .replacingOccurrences(of: "\"reset_receipt\": null", with: "\"github_repository_url\": \"https://github.com/owner/repository\", \"reset_receipt\": null")
+        let client = FakeOperatorClient(
+            snapshot: try Self.fixture(OperatorSnapshot.self, from: "{\"projects\":[\(savedJSON)]}"),
+            statusProject: try Self.fixture(OperatorProject.self, from: Self.projectJSON(generation: 1, withReceipt: false))
+        )
+        let viewModel = await settledViewModel(client: client)
+        viewModel.saveGitHubRepository(projectID: Self.projectID, generation: 2, location: nil)
+        XCTAssertNotNil(viewModel.errorMessage)
+        viewModel.saveGitHubRepository(projectID: Self.projectID, generation: 1, location: "https://example.com/owner/repo")
+        XCTAssertNotNil(viewModel.errorMessage)
+        let rejectedCalls = await client.repositoryCalls
+        XCTAssertTrue(rejectedCalls.isEmpty)
+        XCTAssertEqual(viewModel.selectedProject?.githubRepositoryURL, "https://github.com/owner/repository")
+        viewModel.saveGitHubRepository(projectID: Self.projectID, generation: 1, location: nil)
+        await waitUntilIdle(viewModel)
+        XCTAssertNil(viewModel.selectedProject?.githubRepositoryURL)
+        XCTAssertNil(viewModel.errorMessage)
+        let clearedCalls = await client.repositoryCalls
+        XCTAssertEqual(clearedCalls, [FakeOperatorClient.RepositoryCall(projectID: Self.projectID, generation: 1, location: nil)])
+    }
 
     func testInstructionPackageArrowOrderingMovesExactlyOnePosition() {
         XCTAssertEqual(

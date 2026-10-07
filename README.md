@@ -1,18 +1,19 @@
 # Forge Conductor for macOS
 
-Current source is **0.18.0 (28)**. The LM Studio runtime repair adds an adjustable
-continuity tool-call threshold for ordinary MCP chats and managed runs, and native
-Xcode CLI tools. It repairs durable progress, policy observation/notice delivery,
-and idle MCP telemetry. Validation
-is in progress; the running installation remains separate. See [the current
-repair record](docs/LMSTUDIO-RUNTIME-REPAIR.md) for reproduced defects and evidence.
+Current source is **0.19.0 (29)**. Projects now supports a saved GitHub repository
+location linked to the stable project identity. Native web fetch/search, binary
+file transport, search context/filename filters and per-file Git diffs passed
+signed-candidate MCP checks. Qwen consumed both web tools through LM Studio's
+supported API. Its active desktop chat also verified the repaired host PowerShell
+cache through installed Forge. Projects has two passing app-hosted tests; native
+UI automation could not initialize, so its click-through gate remains open.
+The installed 0.18.0 (28) application remains separate from this candidate. See [the current work and
+verification record](docs/PROJECT-WEB-QWEN.md).
 
-**Published owner checkpoint — 0.18.0 (28).** The source and wiki were
-published under the owner identity and both local checkouts were synchronized.
-The owner will build, notarize and install this version; further product repair
-waits for the installation report. The actual managed policy mission remains
-**unverified** after a harness preparation failure before model activation.
-Installed and all-feature acceptance remain open. [Published references and limits](docs/LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
+The preceding **0.18.0 (28) owner checkpoint** was published and synchronized.
+The owner has since installed that build and authorized this feature work.
+Its historical validation and open gates remain in [the runtime repair
+record](docs/LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
 
 Managed policy feedback and source replay now pass **93 affected source cases**
 (two disjoint selections: 65 + 28, zero failures/skips) on `5af17b77…`, including
@@ -789,6 +790,7 @@ separate; see the [runtime repair record](docs/LMSTUDIO-RUNTIME-REPAIR.md).
 The Projects surface supports:
 
 - multi-folder selection and validated absolute-path registration;
+- a saved GitHub repository location with Save, Clear and Open on GitHub controls;
 - multi-source instruction import;
 - drag-and-drop and explicit earlier/later ordering;
 - **Delete Package** for the selected package;

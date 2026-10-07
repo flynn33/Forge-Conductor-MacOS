@@ -11,6 +11,8 @@ tools:
   - git_log
   - git_status
   - shell_exec
+  - web.search
+  - web.fetch
 tools_forbidden:
   - fs_write
   - fs_edit

@@ -1063,6 +1063,7 @@ public struct ManagerOperatorProject: Encodable, Sendable, Equatable {
     public let pendingTransition: ManagerOperatorProjectTransition?
     public let createdAt: String
     public let updatedAt: String
+    public let githubRepositoryURL: String?
 
     enum CodingKeys: String, CodingKey {
         case projectID = "project_id"
@@ -1076,6 +1077,7 @@ public struct ManagerOperatorProject: Encodable, Sendable, Equatable {
         case pendingTransition = "pending_transition"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case githubRepositoryURL = "github_repository_url"
     }
 
     public func asDictionary() throws -> [String: Any] {

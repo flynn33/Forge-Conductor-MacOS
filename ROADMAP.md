@@ -1,9 +1,23 @@
 # Forge Conductor macOS — project roadmap
 
+## October 7 project repository and Qwen collaboration
+
+Current source identity is **0.19.0 (29)**; installed 0.18.0 (28) is preserved.
+The owner requested project-linked GitHub entry, model web access, and work with
+the active Qwen chat on its reported failures and requested functionality.
+[The feature record](docs/PROJECT-WEB-QWEN.md) distinguishes implemented changes,
+executed checks, host repairs and still-open additions.
+
+| Milestone | Current evidence | Remaining gate |
+| --- | --- | --- |
+| Projects GitHub linkage | Stable-project metadata, generation-fenced update, native editor and model projection implemented. Four registry tests and the authenticated route passed in signed native Core; two app-hosted tests passed. | Native UI runner timed out enabling automation mode: zero UI cases executed. Click-through/screenshots remain open; source publication pending. |
+| Web and file tools for LM Studio | 402 affected source cases passed (two documented skips; live-provider skip subsequently executed and passed), affected final edits rerun. Signed native Core passed 24 cases across two exact selections, app-hosted passed two. Production signed MCP passed five web and six file/search/Git cases; actual Qwen consumed both web tools and finished normally. | Installed build remains 0.18.0 (28). Candidate source publication pending; browser JavaScript/authenticated sessions and broad wishlist are separate open additions. |
+| Qwen reported runtime failures | Cache A/B reproduced PowerShell exit 134; archived reversible cache repair passed three direct probes. Active Qwen installed-Forge PowerShell job `91dcf79a…` completed exit zero with version 7.6.6 and full untruncated streams. Native reproducers also demonstrate unenforced memory expiry and unavailable running-job output. | CLU/task/context require supported host identity; ordinary GUI rollover and all-feature acceptance remain open. Expiry and running-output repairs are the next independent work. |
+
+
 **Published owner checkpoint — 0.18.0 (28).** The source and wiki were
 published under the owner identity and both local checkouts were synchronized.
-The owner will build, notarize and install this version; further product repair
-waits for the installation report. The actual managed policy mission remains
+The owner subsequently reported installation and authorized the next feature work. The actual managed policy mission remains
 **unverified** after a harness preparation failure before model activation.
 Installed and all-feature acceptance remain open. [Published references and limits](docs/LMSTUDIO-RUNTIME-REPAIR.md#owner-publication-and-installation-checkpoint).
 

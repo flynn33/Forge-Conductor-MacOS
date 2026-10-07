@@ -39,7 +39,7 @@ final class FilesystemCancellationTests: XCTestCase {
             projectID: projectID,
             expectedGeneration: generation,
             owner: ProjectBindingOwner(kind: .mcpClient, id: clientID.rawValue),
-            allowedTools: ["fs_delete", "fs_move"]
+            allowedTools: ["fs_delete", "fs_move", "fs_read", "fs_write"]
         )
         invocationContext = try app.projectContexts.invocationContext(for: clientID)
     }
@@ -49,6 +49,275 @@ final class FilesystemCancellationTests: XCTestCase {
         app.shutdown()
         app = nil
         try? FileManager.default.removeItem(at: fixtureRoot)
+    }
+
+    func testBinaryTransportPreservesArbitraryBytesAndDefaultTextFailure() throws {
+        let file = home.appendingPathComponent("arbitrary.bin")
+        let bytes = Data((0...255).map(UInt8.init))
+        let write = try app.tools.call(name: "fs_write", arguments: [
+            "path": file.path, "encoding": "base64", "content": bytes.base64EncodedString(),
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(write.ok, "\(write.payload)")
+        XCTAssertEqual(write.payload["bytes_written"] as? Int, bytes.count)
+        XCTAssertEqual(try Data(contentsOf: file), bytes)
+
+        let text = try app.tools.call(name: "fs_read", arguments: ["path": file.path],
+            clientID: invocationContext.clientID)
+        XCTAssertFalse(text.ok)
+        XCTAssertEqual(text.payload["code"] as? String, "invalid_text_encoding")
+        XCTAssertEqual(text.payload["utf8_decodable"] as? Bool, false)
+        XCTAssertEqual(text.payload["binary_transport_available"] as? Bool, true)
+        XCTAssertNil(text.payload["binary_file"])
+        XCTAssertEqual(text.payload["suggested_encoding"] as? String, "base64")
+
+        var offset = 0
+        var reconstructed = Data()
+        repeat {
+            let read = try app.tools.call(name: "fs_read", arguments: [
+                "path": file.path, "encoding": "base64", "byte_offset": offset, "maximum_bytes": 100,
+            ], clientID: invocationContext.clientID)
+            XCTAssertTrue(read.ok, "\(read.payload)")
+            XCTAssertEqual(read.payload["encoding"] as? String, "base64")
+            XCTAssertEqual(read.payload["byte_offset"] as? Int, offset)
+            XCTAssertEqual(read.payload["total_bytes"] as? Int, bytes.count)
+            let content = try XCTUnwrap(read.payload["content"] as? String)
+            let page = try XCTUnwrap(Data(base64Encoded: content))
+            XCTAssertEqual(read.payload["bytes_read"] as? Int, page.count)
+            reconstructed.append(page)
+            let next = try XCTUnwrap(read.payload["next_byte_offset"] as? Int)
+            XCTAssertEqual(next, offset + page.count)
+            XCTAssertGreaterThan(next, offset)
+            offset = next
+            if read.payload["has_more"] as? Bool == false { break }
+        } while offset < bytes.count
+        XCTAssertEqual(reconstructed, bytes)
+    }
+
+    func testBinaryTransportPreservesLatin1TextWithoutClaimingBinaryFileFormat() throws {
+        let file = home.appendingPathComponent("latin1.txt")
+        let latin1 = Data([0x63, 0x61, 0x66, 0xE9])
+        XCTAssertEqual(String(data: latin1, encoding: .isoLatin1), "caf\u{00E9}")
+        try latin1.write(to: file)
+        let text = try app.tools.call(name: "fs_read", arguments: ["path": file.path],
+            clientID: invocationContext.clientID)
+        XCTAssertFalse(text.ok)
+        XCTAssertEqual(text.payload["code"] as? String, "invalid_text_encoding")
+        XCTAssertEqual(text.payload["utf8_decodable"] as? Bool, false)
+        XCTAssertEqual(text.payload["binary_transport_available"] as? Bool, true)
+        XCTAssertNil(text.payload["binary_file"])
+        let bytes = try app.tools.call(name: "fs_read", arguments: [
+            "path": file.path, "encoding": "base64",
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(bytes.ok, "\(bytes.payload)")
+        XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(bytes.payload["content"] as? String)), latin1)
+    }
+
+    func testBinaryReadPagesLargeRegularFilesWithinInlineOutputBudget() throws {
+        let file = home.appendingPathComponent("large.bin")
+        let bytes = Data(repeating: 0xFF, count: 3 * 1_024 * 1_024)
+        try bytes.write(to: file)
+        let first = try app.tools.call(name: "fs_read", arguments: [
+            "path": file.path, "encoding": "base64",
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(first.ok, "\(first.payload)")
+        let firstBytes = try XCTUnwrap(first.payload["bytes_read"] as? Int)
+        XCTAssertGreaterThan(firstBytes, 0)
+        XCTAssertLessThanOrEqual(firstBytes, 16 * 1_024)
+        XCTAssertEqual(first.payload["next_byte_offset"] as? Int, firstBytes)
+        XCTAssertEqual(first.payload["has_more"] as? Bool, true)
+
+        let last = try app.tools.call(name: "fs_read", arguments: [
+            "path": file.path, "encoding": "base64", "byte_offset": bytes.count - 32 * 1_024,
+            "maximum_bytes": 32 * 1_024,
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(last.ok, "\(last.payload)")
+        let lastBytes = try XCTUnwrap(last.payload["bytes_read"] as? Int)
+        XCTAssertGreaterThan(lastBytes, 0)
+        XCTAssertLessThan(lastBytes, 32 * 1_024)
+        XCTAssertEqual(last.payload["total_bytes"] as? Int, bytes.count)
+        XCTAssertEqual(last.payload["next_byte_offset"] as? Int, bytes.count - 32 * 1_024 + lastBytes)
+        XCTAssertEqual(last.payload["has_more"] as? Bool, true)
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: last).count, 65_536)
+
+        let final = try app.tools.call(name: "fs_read", arguments: [
+            "path": file.path, "encoding": "base64", "byte_offset": bytes.count - 16,
+            "maximum_bytes": 32 * 1_024,
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(final.ok, "\(final.payload)")
+        XCTAssertEqual(final.payload["bytes_read"] as? Int, 16)
+        XCTAssertEqual(final.payload["next_byte_offset"] as? Int, bytes.count)
+        XCTAssertEqual(final.payload["has_more"] as? Bool, false)
+
+        let pastEOF = try app.tools.call(name: "fs_read", arguments: [
+            "path": file.path, "encoding": "base64", "byte_offset": Int.max,
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(pastEOF.ok, "\(pastEOF.payload)")
+        XCTAssertEqual(pastEOF.payload["bytes_read"] as? Int, 0)
+        XCTAssertEqual(pastEOF.payload["next_byte_offset"] as? Int, Int.max)
+        XCTAssertEqual(pastEOF.payload["has_more"] as? Bool, false)
+    }
+
+    func testBinaryReadFitsFullMCPFrameToSmallCallerBudgetAndRejectsImpossibleBudget() throws {
+        let file = home.appendingPathComponent("small-budget.bin")
+        try Data(repeating: 0xFF, count: 32 * 1_024).write(to: file)
+        func read(byteOffset: Int, budget: Int) throws -> ToolResult {
+            let scope = invocationContext.authorizationScope
+            let context = ToolInvocationContext(
+                projectID: invocationContext.projectID,
+                projectGeneration: invocationContext.projectGeneration,
+                clientID: invocationContext.clientID,
+                authorizationScope: ToolAuthorizationScope(canonicalRoots: scope.canonicalRoots,
+                    writableRoots: scope.writableRoots, allowedTools: scope.allowedTools,
+                    networkAllowed: scope.networkAllowed, maximumInlineOutputBytes: budget)
+            )
+            return try XCTUnwrap(FilesystemToolPack().handle(name: "fs_read", arguments: [
+                "path": file.path, "encoding": "base64", "byte_offset": byteOffset,
+                "maximum_bytes": 32 * 1_024,
+            ], context: context, clientID: context.clientID, app: app,
+                cancellation: ToolCallCancellation(timeoutSeconds: 5)))
+        }
+        let first = try read(byteOffset: 0, budget: 2_048)
+        XCTAssertTrue(first.ok, "\(first.payload)")
+        let firstCount = try XCTUnwrap(first.payload["bytes_read"] as? Int)
+        XCTAssertGreaterThan(firstCount, 0)
+        XCTAssertLessThan(firstCount, 16 * 1_024)
+        XCTAssertEqual(first.payload["next_byte_offset"] as? Int, firstCount)
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: first).count, 2_048)
+        let second = try read(byteOffset: firstCount, budget: 2_048)
+        XCTAssertTrue(second.ok, "\(second.payload)")
+        XCTAssertGreaterThan(try XCTUnwrap(second.payload["next_byte_offset"] as? Int), firstCount)
+        XCTAssertLessThanOrEqual(try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: second).count, 2_048)
+        let impossible = try read(byteOffset: 0, budget: 32)
+        XCTAssertFalse(impossible.ok)
+        XCTAssertEqual(impossible.payload["code"] as? String, "file_output_budget_too_small")
+        let impossibleEOF = try read(byteOffset: Int.max, budget: 32)
+        XCTAssertFalse(impossibleEOF.ok)
+        XCTAssertEqual(impossibleEOF.payload["code"] as? String, "file_output_budget_too_small")
+    }
+
+    func testBinaryReadRejectsInvalidOrAmbiguousByteWindows() throws {
+        let file = home.appendingPathComponent("window.bin")
+        try Data([0xFF]).write(to: file)
+        let invalid: [[String: Any]] = [
+            ["byte_offset": -1], ["byte_offset": 0.5], ["byte_offset": true],
+            ["byte_offset": "0"], ["byte_offset": NSNull()],
+            ["maximum_bytes": 0], ["maximum_bytes": 32 * 1_024 + 1],
+            ["maximum_bytes": false], ["maximum_bytes": "1"],
+            ["offset": 1], ["length": 1], ["limit": 1],
+        ]
+        for window in invalid {
+            let base: [String: Any] = ["path": file.path, "encoding": "base64"]
+            let arguments = base.merging(window) { _, value in value }
+            let result = try app.tools.call(name: "fs_read", arguments: arguments,
+                clientID: invocationContext.clientID)
+            XCTAssertFalse(result.ok, "\(window)")
+            XCTAssertEqual(result.payload["code"] as? String, "invalid_window", "\(result.payload)")
+        }
+    }
+
+    func testBinaryWriteRejectsMalformedAndOversizedPayloadsWithoutMutation() throws {
+        let file = home.appendingPathComponent("keep.bin")
+        let prior = Data([0xDE, 0xAD, 0xBE, 0xEF])
+        try prior.write(to: file)
+        let malformedContents: [Any] = ["***=", "YQ", "YQ==\n", "YR==", 1234, true]
+        for malformed in malformedContents {
+            let result = try app.tools.call(name: "fs_write", arguments: [
+                "path": file.path, "encoding": "base64", "content": malformed,
+            ], clientID: invocationContext.clientID)
+            XCTAssertFalse(result.ok)
+            XCTAssertEqual(result.payload["code"] as? String, "invalid_base64")
+            XCTAssertEqual(try Data(contentsOf: file), prior)
+        }
+        // One extra decoded byte still fits the encoded-length ceiling and must
+        // be rejected by the decoded size check before opening the destination.
+        let tooLarge = Data(repeating: 0, count: 2 * 1_024 * 1_024 + 1).base64EncodedString()
+        let result = try app.tools.call(name: "fs_write", arguments: [
+            "path": file.path, "encoding": "base64", "content": tooLarge,
+        ], clientID: invocationContext.clientID)
+        XCTAssertFalse(result.ok)
+        XCTAssertEqual(result.payload["code"] as? String, "content_too_large")
+        XCTAssertEqual(try Data(contentsOf: file), prior)
+
+        let encodedOverLimit = String(repeating: "A", count: tooLarge.utf8.count + 4)
+        let beforeDecode = try app.tools.call(name: "fs_write", arguments: [
+            "path": file.path, "encoding": "base64", "content": encodedOverLimit,
+        ], clientID: invocationContext.clientID)
+        XCTAssertFalse(beforeDecode.ok)
+        XCTAssertEqual(beforeDecode.payload["code"] as? String, "content_too_large")
+        XCTAssertEqual(try Data(contentsOf: file), prior)
+    }
+
+    func testBinaryWriteAllowsExactLimitAndEmptyPayloadWithAtomicModePreservation() throws {
+        let file = home.appendingPathComponent("mode.bin")
+        try Data([0]).write(to: file)
+        XCTAssertEqual(Darwin.chmod(file.path, 0o600), 0)
+        let bytes = Data(repeating: 0xFF, count: 2 * 1_024 * 1_024)
+        let atLimit = try app.tools.call(name: "fs_write", arguments: [
+            "path": file.path, "encoding": "base64", "content": bytes.base64EncodedString(),
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(atLimit.ok, "\(atLimit.payload)")
+        XCTAssertEqual(try Data(contentsOf: file), bytes)
+        let mode = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o600)
+        let empty = try app.tools.call(name: "fs_write", arguments: [
+            "path": file.path, "encoding": "base64", "content": "",
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(empty.ok, "\(empty.payload)")
+        XCTAssertEqual(empty.payload["bytes_written"] as? Int, 0)
+        let read = try app.tools.call(name: "fs_read", arguments: [
+            "path": file.path, "encoding": "base64",
+        ], clientID: invocationContext.clientID)
+        XCTAssertTrue(read.ok, "\(read.payload)")
+        XCTAssertEqual(read.payload["content"] as? String, "")
+        XCTAssertEqual(read.payload["total_bytes"] as? Int, 0)
+        XCTAssertEqual(read.payload["has_more"] as? Bool, false)
+    }
+
+    func testBinaryTransportRetainsRegularFileAndPinnedParentProtection() throws {
+        let directory = try app.tools.call(name: "fs_read", arguments: [
+            "path": home.path, "encoding": "base64",
+        ], clientID: invocationContext.clientID)
+        XCTAssertFalse(directory.ok)
+        XCTAssertEqual(directory.payload["code"] as? String, "not_regular_file")
+        let fifo = home.appendingPathComponent("fifo")
+        XCTAssertEqual(Darwin.mkfifo(fifo.path, 0o600), 0)
+        let special = try app.tools.call(name: "fs_read", arguments: [
+            "path": fifo.path, "encoding": "base64",
+        ], clientID: invocationContext.clientID)
+        XCTAssertFalse(special.ok)
+        XCTAssertEqual(special.payload["code"] as? String, "not_regular_file")
+
+        let link = home.appendingPathComponent("parent-link")
+        let outside = fixtureRoot.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        XCTAssertThrowsError(try FilesystemToolPack().handle(name: "fs_write", arguments: [
+            "path": link.appendingPathComponent("target.bin").path,
+            "encoding": "base64", "content": "//4=",
+        ], context: invocationContext, clientID: invocationContext.clientID, app: app,
+            cancellation: ToolCallCancellation(timeoutSeconds: 5)))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside.appendingPathComponent("target.bin").path))
+    }
+
+    func testBinaryTransportRejectsUnknownEncodingAndHonorsCancellation() throws {
+        let file = home.appendingPathComponent("cancel.bin")
+        try Data([0xFF]).write(to: file)
+        for tool in ["fs_read", "fs_write"] {
+            let invalid = try app.tools.call(name: tool, arguments: [
+                "path": file.path, "encoding": "hex", "content": "FF",
+            ], clientID: invocationContext.clientID)
+            XCTAssertFalse(invalid.ok)
+            XCTAssertEqual(invalid.payload["code"] as? String, "invalid_encoding")
+            let cancellation = ToolCallCancellation()
+            cancellation.cancel()
+            XCTAssertThrowsError(try FilesystemToolPack().handle(name: tool, arguments: [
+                "path": file.path, "encoding": "base64", "content": "/w==",
+            ], context: invocationContext, clientID: invocationContext.clientID, app: app,
+                cancellation: cancellation)) { error in
+                XCTAssertTrue(error is CancellationError)
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: file), Data([0xFF]))
     }
 
     func testRecursiveDeleteReportsPartialMutationAfterCancellation() throws {

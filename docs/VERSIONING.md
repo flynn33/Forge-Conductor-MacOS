@@ -11,9 +11,10 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.18.0 (28)**. The new Xcode CLI tools and adjustable
-continuity setting advance the feature-release component. Current validation
-is recorded in [the repair record](LMSTUDIO-RUNTIME-REPAIR.md).
+Current identity is **0.19.0 (29)**. Project GitHub linkage and native model web/file
+tools advance the feature-release component. Current validation is recorded in
+[the feature record](PROJECT-WEB-QWEN.md). The preceding **0.18.0 (28)** Xcode CLI
+and continuity-setting receipts remain in [the repair record](LMSTUDIO-RUNTIME-REPAIR.md).
 
 Preceding identity was **0.17.0 (27)**. The Graphite/Compute UI implementation and
 native QA/check-refresh passed; exact owner publication/readback/synchronization refs are retained externally; version alignment and a signed build
@@ -54,8 +55,8 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.18.0`, build `28`. The backward-compatible
-Xcode CLI tools and continuity setting advance the feature-release component and resets the
+The current product version is `0.19.0`, build `29`. The backward-compatible
+project repository and web/file tools advance the feature-release component and reset the
 patch component. `VERSION`, `BUILD_NUMBER`, protocol constants, all 12 Xcode
 marketing-version settings and all 16 build-number settings align.
 

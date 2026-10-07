@@ -12,6 +12,9 @@ import ForgeFilesystemProtocol
 /// Filesystem tool pack: read/write/edit/list/glob/mkdir/delete/move.
 public struct FilesystemToolPack: ToolPackHandling {
     private static let maximumTextFileBytes = 2 * 1024 * 1024
+    private static let defaultBinaryReadBytes = 16 * 1_024
+    private static let maximumBinaryReadBytes = 32 * 1_024
+    private static let maximumBase64ContentBytes = ((maximumTextFileBytes + 2) / 3) * 4
     private static let maximumRecursiveMutationEntries = 100_000
     private static let maximumMutationSeconds: TimeInterval = 300
     public static let maximumListEntries = 1_000
@@ -165,7 +168,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         guard toolNames.contains(name) else { return nil }
         try cancellation?.checkCancellation()
         switch name {
-        case "fs_read": return try fsRead(arguments, cancellation: cancellation)
+        case "fs_read": return try fsRead(arguments, context: context, cancellation: cancellation)
         case "fs_write": return try fsWrite(arguments, cancellation: cancellation)
         case "fs_edit": return try fsEdit(arguments, cancellation: cancellation)
         case "fs_list": return try fsList(arguments, cancellation: cancellation)
@@ -373,12 +376,20 @@ public struct FilesystemToolPack: ToolPackHandling {
 
     private func fsRead(
         _ args: [String: Any],
+        context: ToolInvocationContext?,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
         guard let path = ToolArgHelpers.string(args, "path") else {
             return .failure(code: "missing_path", message: "path required")
         }
+        guard let encoding = Self.fileEncoding(args) else {
+            return .failure(code: "invalid_encoding", message: "encoding must be utf8 or base64", retryable: false)
+        }
         let url = ToolArgHelpers.resolvePath(path)
+        if encoding == "base64" {
+            let budget = min(65_536, context?.authorizationScope.maximumInlineOutputBytes ?? 65_536)
+            return try fsReadBinary(args, at: url, inlineBudget: budget, cancellation: cancellation)
+        }
         let data: Data
         let text: String
         do {
@@ -480,6 +491,87 @@ public struct FilesystemToolPack: ToolPackHandling {
     /// Default line window when offset is provided without length/limit.
     private static let defaultWindowLines = 200
 
+    private static func fileEncoding(_ args: [String: Any]) -> String? {
+        guard let supplied = args["encoding"] else { return "utf8" }
+        guard let encoding = supplied as? String,
+              encoding == "utf8" || encoding == "base64" else { return nil }
+        return encoding
+    }
+
+    private static func binaryReadInteger(_ value: Any?) -> Int? {
+        guard let value, let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        return Int(number.stringValue)
+    }
+
+    private func fsReadBinary(
+        _ args: [String: Any],
+        at url: URL,
+        inlineBudget: Int,
+        cancellation: ToolCallCancellation?
+    ) throws -> ToolResult {
+        guard ["offset", "length", "limit", "start_line", "max_lines"].allSatisfy({ args[$0] == nil }) else {
+            return .failure(code: "invalid_window", message: "base64 reads use byte_offset and maximum_bytes, not line windows", retryable: false)
+        }
+        let byteOffset = args["byte_offset"] == nil ? 0 : Self.binaryReadInteger(args["byte_offset"])
+        let maximumBytes = args["maximum_bytes"] == nil ? Self.defaultBinaryReadBytes : Self.binaryReadInteger(args["maximum_bytes"])
+        guard let byteOffset, byteOffset >= 0,
+              let maximumBytes, (1...Self.maximumBinaryReadBytes).contains(maximumBytes) else {
+            return .failure(code: "invalid_window", message: "byte_offset must be a nonnegative integer; maximum_bytes must be an integer from 1 to \(Self.maximumBinaryReadBytes)", retryable: false)
+        }
+        do {
+            let (data, totalBytes) = try Self.readPinnedBinaryWindow(
+                at: url, byteOffset: byteOffset, maximumBytes: maximumBytes,
+                cancellation: cancellation
+            )
+            func candidate(_ count: Int) -> ToolResult? {
+                // The frame includes both text and structured content, including
+                // their JSON escaping. Measure that exact duplicated wire form.
+                let nextByteOffset = byteOffset + count
+                let hasMore = count > 0 && nextByteOffset < totalBytes
+                let result = ToolResult.success([
+                    "path": url.path,
+                    "encoding": "base64",
+                    "content": data.prefix(count).base64EncodedString(),
+                    "total_bytes": totalBytes,
+                    "byte_offset": byteOffset,
+                    "bytes_read": count,
+                    "has_more": hasMore,
+                    "next_byte_offset": nextByteOffset,
+                    "note": hasMore
+                        ? "Continue with byte_offset=\(nextByteOffset). Do not repeat the same byte offset."
+                        : "Reached end of file. Stop paginating this path.",
+                ])
+                guard inlineBudget > 0,
+                      let frame = try? MCPToolResponse.data(id: String(repeating: "x", count: 128), result: result),
+                      frame.count <= inlineBudget else { return nil }
+                return result
+            }
+            if let completeWindow = candidate(data.count) { return completeWindow }
+            var lower = data.isEmpty ? 0 : 1
+            var upper = data.count - 1
+            var fitting: ToolResult?
+            while lower <= upper {
+                try cancellation?.checkCancellation()
+                let count = lower + (upper - lower) / 2
+                if let result = candidate(count) {
+                    fitting = result
+                    lower = count + 1
+                } else {
+                    upper = count - 1
+                }
+            }
+            return fitting ?? .failure(code: "file_output_budget_too_small",
+                message: "Inline response budget cannot fit binary file metadata and content", retryable: false)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ToolCallDeadlineExceeded {
+            throw error
+        } catch {
+            return Self.classifiedReadFailure(error, at: url)
+        }
+    }
+
     private func fsWrite(
         _ args: [String: Any],
         cancellation: ToolCallCancellation?
@@ -488,12 +580,30 @@ public struct FilesystemToolPack: ToolPackHandling {
               let content = ToolArgHelpers.string(args, "content") else {
             return .failure(code: "missing_args", message: "path and content required")
         }
+        guard let encoding = Self.fileEncoding(args) else {
+            return .failure(code: "invalid_encoding", message: "encoding must be utf8 or base64", retryable: false)
+        }
         let url = ToolArgHelpers.resolvePath(path)
-        let data = Data(content.utf8)
+        let data: Data
+        if encoding == "base64" {
+            guard args["content"] is String else {
+                return .failure(code: "invalid_base64", message: "base64 content must be a string", retryable: false)
+            }
+            guard content.utf8.count <= Self.maximumBase64ContentBytes else {
+                return .failure(code: "content_too_large", message: "Decoded base64 writes are limited to \(Self.maximumTextFileBytes) bytes", retryable: false)
+            }
+            guard let decoded = Data(base64Encoded: content),
+                  decoded.base64EncodedString() == content else {
+                return .failure(code: "invalid_base64", message: "content must be canonical padded base64 without whitespace", retryable: false)
+            }
+            data = decoded
+        } else {
+            data = Data(content.utf8)
+        }
         guard data.count <= Self.maximumTextFileBytes else {
             return .failure(
                 code: "content_too_large",
-                message: "Text writes are limited to \(Self.maximumTextFileBytes) bytes",
+                message: "\(encoding == "base64" ? "Decoded base64" : "Text") writes are limited to \(Self.maximumTextFileBytes) bytes",
                 retryable: false
             )
         }
@@ -4392,7 +4502,49 @@ public struct FilesystemToolPack: ToolPackHandling {
         }
         failure.payload["failure_stage"] = "bounded_file_read"
         failure.payload["cause_classified"] = knownReadError != nil || isMissing || isDenied
+        if case .invalidUTF8 = knownReadError {
+            failure.payload["utf8_decodable"] = false
+            failure.payload["binary_transport_available"] = true
+            failure.payload["suggested_encoding"] = "base64"
+            failure.payload["note"] = "This file is not valid UTF-8. Read it with encoding=base64 and byte_offset/maximum_bytes."
+        }
         return failure
+    }
+
+    private static func readPinnedBinaryWindow(
+        at url: URL,
+        byteOffset: Int,
+        maximumBytes: Int,
+        cancellation: ToolCallCancellation?
+    ) throws -> (Data, Int) {
+        try cancellation?.checkCancellation()
+        let (parent, leaf) = try pinnedTextParent(of: url, create: false, cancellation: cancellation)
+        let descriptor = Darwin.openat(parent.rawValue, leaf, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH)
+        guard descriptor >= 0 else { throw posixError(errno, path: url.path) }
+        defer { _ = Darwin.close(descriptor) }
+        var information = stat()
+        guard Darwin.fstat(descriptor, &information) == 0 else { throw posixError(errno, path: url.path) }
+        guard information.st_mode & S_IFMT == S_IFREG else { throw BoundedTextReadError.notRegularFile }
+        guard let totalBytes = Int(exactly: information.st_size), totalBytes >= 0 else {
+            throw posixError(EOVERFLOW, path: url.path)
+        }
+        guard byteOffset < totalBytes else { return (Data(), totalBytes) }
+        let windowBytes = min(maximumBytes, totalBytes - byteOffset)
+        var buffer = [UInt8](repeating: 0, count: windowBytes)
+        var retainedBytes = 0
+        while retainedBytes < windowBytes {
+            try cancellation?.checkCancellation()
+            let count = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.pread(descriptor, bytes.baseAddress!.advanced(by: retainedBytes),
+                    windowBytes - retainedBytes, off_t(byteOffset + retainedBytes))
+            }
+            if count > 0 { retainedBytes += count; continue }
+            if count == 0 { break }
+            if errno == EINTR { continue }
+            throw posixError(errno, path: url.path)
+        }
+        try cancellation?.checkCancellation()
+        return (Data(buffer.prefix(retainedBytes)), totalBytes)
     }
 
     /// Opens nonblocking so special files cannot strand the transport thread, then

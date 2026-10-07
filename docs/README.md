@@ -1,9 +1,14 @@
 # Documentation guide
 
-<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
-## Compute PCB refinement — verified native scope
+Current source is **0.19.0 (29)**. Project-linked GitHub metadata and the new
+web/file tool contracts are described in the [user guide](../USER-GUIDE.md) and
+[October 7 implementation record](PROJECT-WEB-QWEN.md). Qualification details
+in the earlier checkpoints below retain their original source and scope.
 
-Current source remains **0.17.0 (27)**. Compute has trace-bound board frames,
+<!-- FORGE-COMPUTE-PCB-FOLLOWUP:BEGIN -->
+## Historical Compute PCB refinement — verified native scope
+
+This checkpoint uses **0.17.0 (27)**. Compute has trace-bound board frames,
 eight-point pulse clearance, external headings/readings, a much darker PCB and
 surrounding panel, and brighter traveling trace signals. The canonical My Mac
 selection passed **45 tests**; **31 SwiftPM repeats** passed. All **68 PNGs**
@@ -34,6 +39,7 @@ qualification is not promoted by this UI phase.
 | [Guided Setup and Guided Mode](GUIDED-MODE.md) | Follow current setup guidance or open contextual offline help |
 | [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
+| [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |
 | [Instruction packages](INSTRUCTION-PACKAGES.md) | Import, order, query, and delete project instruction packages |
 | [Completion evidence](NATIVE-COMPLETION.md) | Understand built-in evidence checks and instruction-package-owned requirements |
 | [Automation and usability remediation](AUTOMATION-USABILITY-REMEDIATION.md) | Track the revision-2 minimal-input remediation and its evidence |
@@ -47,7 +53,7 @@ qualification is not promoted by this UI phase.
 | [Rune Forge and Stjornarvald](STJORNARVALD.md) | Pinned policy binding, durable log, all-format catalog, Raven rules, manager lifecycle/API, managed/MCP notice delivery, non-interference boundary, realization map, and delivered state |
 | [Rune Forge acceptance](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) | Every issued acceptance row, integrated evidence, and the remaining physical VoiceOver limit |
 | [Rune Forge handoff](RUNE-FORGE-STJORNARVALD-HANDOFF.md) | Repository, policy, behavior, verification, version, candidate, and open-matter handoff |
-| [Project memory](PROJECT-MEMORY.md) | Project-scoped durable memory contract |
+| [Project memory](PROJECT-MEMORY.md) | Optional project-linked GitHub metadata and historical project memory isolation evidence |
 | [Project reset](PROJECT-RESET.md) | Generation reset and isolation behavior |
 | [Continuity ingress](CONTINUITY-INGRESS.md) | Authorized source attachment and rollover |
 | [Context and agent continuity](CONTEXT-AGENT-CONTINUITY.md) | Handoff packet and host behavior |

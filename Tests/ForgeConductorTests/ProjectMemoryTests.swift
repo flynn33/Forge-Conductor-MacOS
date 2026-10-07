@@ -49,6 +49,121 @@ final class ProjectMemoryTests: XCTestCase {
         try? FileManager.default.removeItem(at: home.deletingLastPathComponent())
     }
 
+    func testGitHubRepositoryLocationNormalizesCloneURLsAndRejectsNonRepositoryInputs() throws {
+        for location in [
+            " https://github.com/Owner/Repository.git/ \n",
+            "git@github.com:Owner/Repository.git",
+            "ssh://git@github.com/Owner/Repository.git",
+            "https://github.com/Owner/Repository",
+        ] {
+            XCTAssertEqual(try GitHubRepositoryLocation.normalized(location), "https://github.com/Owner/Repository")
+        }
+        XCTAssertNil(try GitHubRepositoryLocation.normalized(nil))
+        XCTAssertNil(try GitHubRepositoryLocation.normalized("  \n"))
+        for location in [
+            "http://github.com/owner/repository", "https://example.com/owner/repository",
+            "https://github.com.evil.example/owner/repository",
+            "https://token@github.com/owner/repository",
+            "https://github.com/owner/repository?token=secret",
+            "https://github.com/owner/repository#readme",
+            "https://github.com:443/owner/repository",
+            "https://github.com/owner/repository/tree/main",
+            "https://github.com/owner", "https://github.com/owner//repository",
+            "https://github.com/owner/..", "https://github.com/owner/%72epository",
+            "git@github.com:owner/repository;touch-file",
+            "ssh://someone@github.com/owner/repository",
+            String(repeating: "a", count: GitHubRepositoryLocation.maximumBytes + 1),
+        ] {
+            XCTAssertThrowsError(try GitHubRepositoryLocation.normalized(location), location)
+        }
+    }
+
+    func testGitHubRepositoryMetadataPersistsAndClearsWithoutChangingIdentityOrAnotherProject() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let first = try app.projectMemory.initializeUnchecked(path: projectA.path)
+        let second = try app.projectMemory.initializeUnchecked(path: projectB.path)
+        let firstID = try XCTUnwrap(first["project_id"] as? String)
+        let secondID = try XCTUnwrap(second["project_id"] as? String)
+        let before = try app.projectMemory.identities.descriptor(projectID: firstID)
+        XCTAssertNil(before.githubRepositoryURL) // Existing schema 1 entries omit this optional field.
+        let updated = try app.projectMemory.identities.updateGitHubRepository(
+            projectID: firstID, location: "git@github.com:owner/first.git"
+        )
+        XCTAssertEqual(updated.id, before.id)
+        XCTAssertEqual(updated.repositoryIdentity, before.repositoryIdentity)
+        XCTAssertEqual(updated.aliases, before.aliases)
+        let restarted = ProjectIdentityResolver(paths: app.paths)
+        XCTAssertEqual(try restarted.descriptor(projectID: firstID).githubRepositoryURL, "https://github.com/owner/first")
+        XCTAssertNil(try restarted.descriptor(projectID: secondID).githubRepositoryURL)
+        let status = try app.projectMemory.status(projectID: firstID)
+        XCTAssertEqual((status["project"] as? [String: Any])?["github_repository_url"] as? String, "https://github.com/owner/first")
+        let metadata = try JSONSupport.object(from: Data(contentsOf: app.paths.projectsDir
+            .appendingPathComponent(firstID).appendingPathComponent("project.json")))
+        XCTAssertEqual(metadata["githubRepositoryURL"] as? String, "https://github.com/owner/first")
+        XCTAssertThrowsError(try restarted.updateGitHubRepository(
+            projectID: UUID().uuidString, location: "https://github.com/owner/missing"
+        ))
+        _ = try restarted.updateGitHubRepository(projectID: firstID, location: nil)
+        XCTAssertNil(try ProjectIdentityResolver(paths: app.paths).descriptor(projectID: firstID).githubRepositoryURL)
+    }
+
+    func testGitHubRepositoryInterruptedMetadataWriteRecoversThePreviousCommittedLocation() throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let initialized = try app.projectMemory.initializeUnchecked(path: projectA.path)
+        let projectID = try XCTUnwrap(initialized["project_id"] as? String)
+        _ = try app.projectMemory.identities.updateGitHubRepository(
+            projectID: projectID, location: "https://github.com/owner/committed"
+        )
+        let interrupted = ProjectIdentityResolver(
+            paths: app.paths, clock: SystemClock(),
+            afterMetadataWriteObserver: { throw ProjectIdentityPersistenceInterruption.afterMetadataWrite },
+            didRegistryCommitObserver: nil
+        )
+        XCTAssertThrowsError(try interrupted.updateGitHubRepository(
+            projectID: projectID, location: "https://github.com/owner/interrupted"
+        ))
+        let recovered = try ProjectIdentityResolver(paths: app.paths).descriptor(projectID: projectID)
+        XCTAssertEqual(recovered.githubRepositoryURL, "https://github.com/owner/committed")
+        let metadata = try JSONSupport.object(from: Data(contentsOf: app.paths.projectsDir
+            .appendingPathComponent(projectID).appendingPathComponent("project.json")))
+        XCTAssertEqual(metadata["githubRepositoryURL"] as? String, "https://github.com/owner/committed")
+    }
+
+    func testGitHubRepositoryConcurrentResolversPreserveEachProjectsCommittedLocation() async throws {
+        let app = try bootstrapApplication()
+        defer { app.shutdown() }
+        let first = try app.projectMemory.initializeUnchecked(path: projectA.path)
+        let second = try app.projectMemory.initializeUnchecked(path: projectB.path)
+        let firstID = try XCTUnwrap(first["project_id"] as? String)
+        let secondID = try XCTUnwrap(second["project_id"] as? String)
+        let firstResolver = ProjectIdentityResolver(paths: app.paths)
+        let secondResolver = ProjectIdentityResolver(paths: app.paths)
+        let gate = InitializationGate(participantCount: 2)
+        let count = try await withThrowingTaskGroup(of: ProjectMemoryDescriptor.self) { group in
+            group.addTask {
+                await gate.wait()
+                return try firstResolver.updateGitHubRepository(
+                    projectID: firstID, location: "https://github.com/owner/first"
+                )
+            }
+            group.addTask {
+                await gate.wait()
+                return try secondResolver.updateGitHubRepository(
+                    projectID: secondID, location: "https://github.com/owner/second"
+                )
+            }
+            var completed = 0
+            for try await _ in group { completed += 1 }
+            return completed
+        }
+        XCTAssertEqual(count, 2)
+        let reopened = ProjectIdentityResolver(paths: app.paths)
+        XCTAssertEqual(try reopened.descriptor(projectID: firstID).githubRepositoryURL, "https://github.com/owner/first")
+        XCTAssertEqual(try reopened.descriptor(projectID: secondID).githubRepositoryURL, "https://github.com/owner/second")
+    }
+
     func testRedactorRemovesQuotedJSONCredentialFields() throws {
         let input = #"{"api_key":"json-api-secret","password":"json-password-secret","authorization":"Bearer json-bearer-secret","safe":"retained"}"#
         let redacted = try XCTUnwrap(ProjectMemoryRedactor().redact(input))

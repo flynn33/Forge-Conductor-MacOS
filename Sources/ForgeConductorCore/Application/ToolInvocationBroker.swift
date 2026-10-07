@@ -118,6 +118,8 @@ public enum ProductionToolReplayCatalog {
         "pdf_write": .idempotent,
         "pdf_from_file": .idempotent,
         "search_text": .readOnly,
+        "web.fetch": .readOnly,
+        "web.search": .readOnly,
 
         "memory_set": .idempotent,
         "memory_get": .readOnly,

@@ -994,6 +994,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         "memory_set",
         "agent_run_start", "agent_run_complete",
         "search_text",
+        "web.fetch", "web.search",
         "pdf_write", "pdf_from_file",
         "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
         "job.status", "job.read_output", "job.list", "job.cancel",

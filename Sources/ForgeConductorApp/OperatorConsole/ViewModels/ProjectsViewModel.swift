@@ -2,6 +2,7 @@
 // Main-actor projection and typed project commands for the native operator UI.
 
 import Foundation
+import ForgeConductorCore
 
 @MainActor
 final class ProjectsViewModel: ObservableObject {
@@ -205,6 +206,54 @@ final class ProjectsViewModel: ObservableObject {
                 if committedCount > 0 {
                     notice = "Registered \(committedCount) project folder\(committedCount == 1 ? "" : "s") before the reported error."
                 }
+            }
+            isLoading = false
+        }
+    }
+
+    func saveGitHubRepository(projectID: String, generation: UInt64, location: String?) {
+        guard !isLoading else { return }
+        guard let project = selectedProject,
+              project.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+              project.projectGeneration == generation,
+              project.lifecycleState == "active" else {
+            errorMessage = "The selected project or generation changed. Refresh before saving."
+            return
+        }
+        let normalized: String?
+        do { normalized = try GitHubRepositoryLocation.normalized(location) }
+        catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        isLoading = true
+        errorMessage = nil
+        notice = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let updated = try await client.updateProjectRepository(
+                    projectID: projectID, generation: generation, location: normalized
+                )
+                guard updated.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
+                      updated.projectGeneration == generation,
+                      updated.githubRepositoryURL == normalized else {
+                    throw OperatorManagerClientError.invalidPayload(
+                        "Repository update did not match the selected project"
+                    )
+                }
+                if let index = projects.firstIndex(where: {
+                    $0.projectID.caseInsensitiveCompare(projectID) == .orderedSame
+                        && $0.projectGeneration == generation
+                }) {
+                    projects[index] = updated
+                }
+                notice = normalized == nil
+                    ? "Cleared the GitHub repository for \(project.displayName)."
+                    : "Saved the GitHub repository for \(project.displayName)."
+                lastUpdated = Date()
+            } catch {
+                errorMessage = error.localizedDescription
             }
             isLoading = false
         }

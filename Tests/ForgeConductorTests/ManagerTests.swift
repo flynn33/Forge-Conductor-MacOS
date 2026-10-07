@@ -1936,6 +1936,78 @@ final class ManagerTests: XCTestCase {
         })
     }
 
+    func testGitHubRepositoryRouteIsAuthorizedGenerationFencedAndVisibleToMCP() async throws {
+        let app = try ForgeApp.bootstrap(home: home)
+        let port = Int.random(in: 29_000...39_000)
+        try app.config.update([
+            "dashboard": ["port": port] as [String: Any], "allowed_roots": [home.path],
+        ], save: true)
+        let firstRoot = home.appendingPathComponent("repository-first", isDirectory: true)
+        let secondRoot = home.appendingPathComponent("repository-second", isDirectory: true)
+        for root in [firstRoot, secondRoot] {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        }
+        let node = ManagerNode(app: app)
+        defer { _ = try? node.stopService(); app.shutdown() }
+        let first = try node.registerProject(path: firstRoot.path)
+        let second = try node.registerProject(path: secondRoot.path)
+        let firstID = try XCTUnwrap(first["project_id"] as? String)
+        let secondID = try XCTUnwrap(second["project_id"] as? String)
+        let firstProject = ProjectID(try XCTUnwrap(UUID(uuidString: firstID)))
+        let before = try app.projectMemory.identities.descriptor(projectID: firstID)
+        _ = try node.startService()
+        try await Task.sleep(for: .milliseconds(150))
+        let credential = try ManagerControlCredentialStore(paths: app.paths).bearerToken()
+        let endpoint = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)/api/manager/projects/repository"))
+        func put(_ body: Data, authorized: Bool = true) throws -> (Data, HTTPURLResponse) {
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "PUT"
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if authorized { request.setValue("Bearer \(credential)", forHTTPHeaderField: "Authorization") }
+            return try HTTPTestHelpers.fetch(request)
+        }
+        func updateBody(_ url: Any, generation: UInt64 = 1) throws -> Data {
+            try JSONSupport.data(from: [
+                "project_id": firstID, "project_generation": generation,
+                "github_repository_url": url,
+            ])
+        }
+        XCTAssertEqual(try put(updateBody("git@github.com:owner/first.git"), authorized: false).1.statusCode, 401)
+        XCTAssertEqual(try put(Data(repeating: 0x20, count: ManagerRoutes.maximumProjectRepositoryBodyBytes + 1)).1.statusCode, 413)
+        XCTAssertEqual(try put(updateBody("https://github.com/owner/first?token=secret")).1.statusCode, 400)
+        XCTAssertEqual(try put(updateBody("https://github.com/owner/first", generation: 2)).1.statusCode, 409)
+        XCTAssertEqual(try put(JSONSupport.data(from: [
+            "project_id": firstID, "project_generation": 1, "github_repository_url": 42,
+        ])).1.statusCode, 400)
+        let (savedData, savedResponse) = try put(updateBody("git@github.com:owner/first.git"))
+        XCTAssertEqual(savedResponse.statusCode, 200)
+        let saved = try JSONSupport.object(from: savedData)
+        XCTAssertEqual(saved["github_repository_url"] as? String, "https://github.com/owner/first")
+        XCTAssertEqual(saved["project_generation"] as? Int, 1)
+        let after = try app.projectMemory.identities.descriptor(projectID: firstID)
+        XCTAssertEqual(after.id, before.id)
+        XCTAssertEqual(after.aliases, before.aliases)
+        XCTAssertEqual(after.repositoryIdentity, before.repositoryIdentity)
+        XCTAssertNil(try app.projectMemory.identities.descriptor(projectID: secondID).githubRepositoryURL)
+        XCTAssertEqual(try node.operatorProjectStatus(projectID: firstProject).githubRepositoryURL, "https://github.com/owner/first")
+        let row = try XCTUnwrap(node.operatorSnapshot(limit: 10).projects.first { $0.projectID == firstID })
+        XCTAssertEqual(row.githubRepositoryURL, "https://github.com/owner/first")
+        let status = try app.tools.call(
+            name: "get_forge_status", arguments: ["project_id": firstID], clientID: ClientID("repository-test")
+        )
+        XCTAssertTrue(status.ok, status.payload.description)
+        XCTAssertEqual((status.payload["project"] as? [String: Any])?["github_repository_url"] as? String,
+                       "https://github.com/owner/first")
+        XCTAssertEqual(((status.payload["projects"] as? [[String: Any]])?.first { $0["project_id"] as? String == firstID })?["github_repository_url"] as? String,
+                       "https://github.com/owner/first")
+        XCTAssertEqual(try put(updateBody(NSNull())).1.statusCode, 200)
+        XCTAssertNil(try ProjectIdentityResolver(paths: app.paths).descriptor(projectID: firstID).githubRepositoryURL)
+        _ = try node.resetProjectGeneration(projectID: firstProject, expectedGeneration: .initial)
+        XCTAssertEqual(try put(updateBody("https://github.com/owner/stale")).1.statusCode, 409)
+        XCTAssertNil(try app.projectMemory.identities.descriptor(projectID: firstID).githubRepositoryURL)
+    }
+
     func testProjectMutationRoutesMatchExactOperatorProjectionAndResetReceipt() async throws {
         let app = try ForgeApp.bootstrap(home: home)
         let port = Int.random(in: 29_000...39_000)

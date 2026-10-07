@@ -189,7 +189,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.18.0**, build **28** (current source; candidate qualification is separate from installation).
+Version **0.19.0**, build **29** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -318,6 +318,17 @@ identity against the filesystem, mounted-volume, home, Manager, and active-
 workspace roots at the actual mutation boundary; a changed or uninspectable
 identity fails closed.
 
+Select a project and enter its repository in **GitHub repository**. Acceptable
+locations include `https://github.com/owner/repository`,
+`git@github.com:owner/repository.git` and `ssh://git@github.com/owner/repository.git`.
+Choose **Save Repository** to persist the canonical HTTPS URL, **Open on GitHub**
+to visit it, or **Clear Repository** to remove the link. This metadata stays with
+the stable project ID and does not change the project's registration identity or
+Git credentials. Models receive it as `github_repository_url` in project status.
+The link also appears in `get_forge_status` and `project_memory.status` project
+metadata. See [project memory](docs/PROJECT-MEMORY.md) for persistence and
+compatibility details.
+
 Available maintenance actions include:
 
 - relink a moved project folder;
@@ -391,6 +402,34 @@ in the returned priority order and follow all applicable requirements before
 making development changes. Then give the model the task in LM Studio as usual.
 
 Forge Conductor does not start this work through a Managed Run.
+
+### Web and file tools
+
+After attaching the project, the model can use `web.search` to find public pages
+and `web.fetch` to read HTTP(S) text. Ordinary LM Studio MCP project bindings
+receive network access; explicitly scoped and run-bound grants retain their
+network policy. Check `project_context.network_allowed` in `get_forge_status`.
+Web responses are external data. These tools do not execute JavaScript or use
+an authenticated browser session; HTTP failures and search-provider browser
+challenges return errors.
+
+| Tool | Arguments and continuation |
+| --- | --- |
+| `web.search` | `query`; optional `limit` from 1–10 (default 5). Returns titles, URLs and snippets through DuckDuckGo HTML. Read selected URLs with `web.fetch`. |
+| `web.fetch` | `url`; optional `format: "text"` (default) or `"source"`. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
+| `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
+| `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
+| `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
+| `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
+
+Web tools accept integer `timeout_sec` from 1–30 (default 20), and
+`maximum_bytes` from 1–65,536 (default 16,384) for the encoded inline response;
+the project budget can reduce that allowance. Each fetch receives at most 1 MiB
+and follows at most five redirects. Binary file reads request 16 KiB by default,
+up to 32 KiB raw bytes per page; the returned page can be smaller to fit the
+encoded MCP and project budgets. Always use the returned cursor rather than
+advancing by the requested size. Binary transport lets tools preserve exact file
+bytes; format-specific authoring and image understanding have separate capabilities.
 
 When inspecting jobs, `job.list` may return fewer complete rows to fit the
 response byte budget. If `has_more` is true, pass the returned `next_cursor`'s
