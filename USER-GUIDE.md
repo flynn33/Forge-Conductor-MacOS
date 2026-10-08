@@ -1,5 +1,21 @@
 # Forge Conductor user guide
 
+Version **0.36.3**, build **52** corrects `web.fetch` continuation after
+non-UTF-8 text expands during decoding. A request still receives at most **1 MiB**.
+For `text`/`source`, offsets and counts address decoded UTF-8 content up to
+**3 MiB**; for `base64`, they address the original response bytes up to **1 MiB**.
+Use the returned cursor and whole-content SHA, rather than advancing by a
+requested page size. [Contract and current qualification](docs/WEB-RESPONSE-BUDGET.md)
+record passing source/native, candidate build and App/CLI public web checks.
+Qwen consumed all three results; its original strict final-format NONPASS and
+separate raw-JSON correction are retained. CUA transport blocked the Projects
+and filtered Tools checks; GUI attempts remain NONPASS. Final document check results are recorded in external root receipts.
+The existing `web.search`, `web.fetch` and `web.render` capabilities retain their
+separate contracts. Project GitHub Save/reopen and stable linked-project identity
+remain a required GUI gate; full web and all-model acceptance are open.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Version **0.36.2**, build **51** adds build identity to fresh successful status
 responses. `forge_status` and `get_forge_status` expose string `version` and
 `build` together; the returned identity belongs to the process serving the call.
@@ -690,7 +706,7 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | Tool | Arguments and continuation |
 | --- | --- |
 | `web.search` | `query`; optional `limit` from 1–10 (default 5). Returns titles, URLs and snippets through DuckDuckGo HTML. Read selected URLs with `web.fetch`. |
-| `web.fetch` | `url`; optional `format: "text"` (default), `"source"` or `"base64"`. Base64 preserves the original response bytes for any MIME type; offsets, counts and SHA256 refer to decoded bytes. Text/source HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
+| `web.fetch` | `url`; optional `format: "text"` (default), `"source"` or `"base64"`. Base64 preserves the original response bytes for any MIME type; offsets, counts and SHA256 refer to those original bytes (up to 1 MiB). Text/source offsets and counts refer to decoded UTF-8 content (up to 3 MiB); offsets must lie within content on a UTF-8 boundary. Text/source HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
 | `web.render` | `url`; optional `timeout_sec` and `maximum_bytes`. Returns a finite native JavaScript DOM snapshot with title, text, returned-content SHA256/count, URLs, project identity, readiness and truncation. There is no continuation cursor. Requires macOS 27+ and project network/tool authorization. |
 | `fs_list` | Optional `path`. Path-only calls retain the legacy 1,000-entry cap. Supply `limit` (1–1,000; default 100), `cursor` or `maximum_bytes` to select paged mode. Paged arguments are validated before path normalization; count tokens must have an exact integral value. Continue using the returned `next_cursor` until `has_more` is false; `deadline_ms` alone retains legacy mode. Directory changes require restarting. [Contract and verified scopes](docs/FILESYSTEM-LIST-PAGING.md). |
 | `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
@@ -777,7 +793,8 @@ An impossible envelope returns an explicit budget error. Renderer
 extraction visits at most 4,096 nodes and returns at most 8,192 UTF-8 text bytes;
 whole network bytes, DOM size and JavaScript heap are not capped.
 Each HTTP fetch receives at most 1 MiB
-and follows at most five redirects. Each continued web page fetches the URL
+and follows at most five redirects. Text/source decoding can expand those bytes
+to at most 3 MiB of UTF-8 content; base64 keeps the original-byte 1 MiB limit. Each continued web page fetches the URL
 again; `if_content_sha256` detects a changed body. Decode each base64 page
 separately and append its bytes, then use the returned byte cursor. Binary file reads request 16 KiB by default,
 up to 32 KiB raw bytes per page; the returned page can be smaller to fit the

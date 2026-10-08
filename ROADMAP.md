@@ -1,5 +1,21 @@
 # Forge Conductor macOS — project roadmap
 
+## Decoded UTF-8 web continuation correction
+
+Current target **0.36.3 (52)** corrects `web.fetch` cursors for decoded text,
+retaining 1 MiB receive/base64 bounds and allowing at most 3 MiB UTF-8 content.
+
+| Milestone | Observed evidence | Remaining gate |
+| --- | --- | --- |
+| Baseline and correction | One Latin1 method failed in source/native in 7.152/14.688 s, normal exits 1/65/unforced: an advertised 1,049,794 cursor exceeded the old 1,048,576 validation limit. Source now validates cursors by format and checks decoded content at 3 MiB. | Both original baselines remain NONPASS; no new decoder or tool is added. |
+| Contract and parity | Three new source methods passed in 14.031 s. Matching full-class source/native 28 passed in 13.866/24.896 s, zero failures/skips, normal 0/unforced, on the same 464-input 768064e9… maps; all 25 previous methods remain unchanged. Latin1 selected suffix reaches EOF; Windows-1252/UTF-16 use crossing windows plus tail/EOF controls. Four separate source/native neighbors passed in 2.185/2.507 s, giving 32 distinct methods per route. | Three focused cases add no distinct coverage; Windows/UTF-16 complete-body unions are not claimed. |
+| Authorities and candidate | Existing memberships/workspace/signing are preserved; only existing version/build authorities, twelve marketing/sixteen build values and two G3 literals advance. CLI/app passed in 0.991/0.903 s; ordinary Debug/strict signature passed in 24.888/0.130 s and native CLI version in 0.514 s, normal 0/unforced. Candidate f0800991… binds seven artifacts/actual .36.3/52 on the same 464 map; reference 49b64d97… binds 38 guards. | Scoped consumer outcomes follow; GUI remains blocked, with no installed or Release result. |
+| Native/model and GUI | Signed App/CLI passed in 5.246/4.821 s: each 13 responses/11 frames, four controlled GETs, exact selected 8,208-byte suffix/EOF, and three actual public search/fetch/render results. Qwen consumed three complete results over four observed Low turns in 75.012 s; native/model/observer ended normally with full EOF, but the original fenced-JSON final response made the overall attempt NONPASS. A separate 20.616 s raw-JSON correction acknowledged five actual metadata fields and two root-grounded facts using the consumed partial render; no native/web replay or additional observed Low template. | GUI v3/v4 remain NONPASS after a whole deadline and CUA native-pipe failure, with no project mutation observed. V4 Doctor showed .36.3/52 and the owned isolated home; Dashboard showed catalog84, not filtered Tools web rows. Projects GitHub Save/reopen/stable linked identity and web GUI gates remain blocked. Original web v1/v2/v3 NONPASSs remain retained; full web/all-model/installed acceptance is open. |
+| Documents and delivery | Initial G3 source/native passed exactly one method each in 2.743/2.639 s on the same source map; 32-plus-one unions give 33 distinct methods per route, not one 33-test invocation. Thirteen current documents retain complete historical bodies. | Final G3/hygiene/whitespace results are recorded in external root receipts; exact source/wiki publication/readback/synchronization identities remain external. Repeated G3 adds no distinct coverage. Installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates stay open. |
+
+[Web contract and exact coverage](docs/WEB-RESPONSE-BUDGET.md).
+The preceding status-build correction and complete prior evidence follow.
+
 ## Status build identity correction
 
 Current target **0.36.2 (51)** adds missing string build identity beside version

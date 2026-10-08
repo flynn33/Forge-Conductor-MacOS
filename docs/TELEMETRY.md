@@ -1,5 +1,18 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.36.3`, build `52`. The correction
+changes decoded web content/cursor bounds at the existing `WebToolPack` owner.
+No telemetry producer, delivery invariant, gauge, timer, audit format or resource
+owner changes. Matching 28 source/native web methods passed; those paging tests
+are not performance, lifetime or installed GUI proof. Four source/native neighbor
+methods and candidate builds/signature also passed. App/CLI public web checks
+passed; Qwen consumed three results, with original strict final-format NONPASS and
+separate raw-JSON correction retained. Initial G3 passed once per route; GUI
+attempts remain NONPASS after deadline/CUA pipe failure. Final document check results are recorded in external root receipts. [Web scope](WEB-RESPONSE-BUDGET.md) retains
+limits and external publication identities.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Current source documentation targets `0.36.2`, build `51`. The correction adds
 build identity only to fresh status success payloads. No telemetry producer,
 delivery invariant, gauge, timer, audit format or resource owner changes.
@@ -496,6 +509,10 @@ autonomous continuity, long-duration resource budgets, and owner-deferred
 representative physical-hardware qualification remain open.
 
 ## Version
+
+Current source target: `0.36.3`; build: `52`.
+
+Preceding .36.2 identity record (retained):
 
 Current source target: `0.36.2`; build: `51`.
 

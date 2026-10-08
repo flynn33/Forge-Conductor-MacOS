@@ -1,5 +1,22 @@
 # Versioning policy
 
+Current target identity is **0.36.3 (52)**. Correcting an advertised web
+continuation cursor rejected by the old receive-byte limit is a backward-compatible
+patch; it adds no tool or format. The `web.fetch` schema now advertises the
+3 MiB decoded text/source offset bound and describes the retained 1 MiB raw/base64
+limit. `VERSION`, `BUILD_NUMBER`, compiled constants and twelve marketing/sixteen
+build settings advance together, with two G3 expectation literals changed.
+Existing graph memberships, workspace and signing are preserved. Matching
+28 source/native web methods and four separate neighbors passed, giving 32
+distinct methods per route; focused three adds no distinct coverage. Candidate
+builds/signature and App/CLI public web checks passed; Qwen's original final-format
+NONPASS and separate raw-JSON correction remain distinct from consumed-result
+proof. Initial G3 adds one method for 33 distinct methods per route. GUI v3/v4
+remain NONPASS, with project-linking/filtered Tools checks blocked; final document check results are recorded in external root receipts; exact source/wiki publication,
+readback and synchronization identities are retained externally.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Current target identity is **0.36.2 (51)**. Adding the missing build identity
 is a backward-compatible correction under the patch policy below. `VERSION`,
 `BUILD_NUMBER`, compiled constants and twelve marketing/sixteen build settings
@@ -317,6 +334,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.36.3`, build `52`, for the decoded UTF-8 cursor correction; preceding phase identities remain unchanged.
+
+Preceding .36.2 identity record (retained):
 
 Current source target is `0.36.2`, build `51`, for the status-build correction; preceding phase identities remain unchanged.
 

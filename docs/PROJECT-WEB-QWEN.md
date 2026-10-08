@@ -1,5 +1,51 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.36.3 (52)** corrects `web.fetch` continuation when
+supported non-UTF-8 text expands during decoding. HTTP receive/base64 cursors
+retain 1 MiB; decoded text/source content and cursors allow at most 3 MiB.
+Matching 28 source/native web methods passed, including the three encoding cases;
+[exact windows and remaining gates](WEB-RESPONSE-BUDGET.md) remain scoped.
+Four separate source/native neighbor methods passed, giving 32 distinct methods
+per route; initial G3 adds one method for 33 distinct methods per route.
+Candidate builds/signature and signed App/CLI public web checks passed in
+5.246/4.821 s. Each native route produced 13 responses/11 frames, four controlled
+GETs and the exact 8,208-byte selected suffix through EOF. Actual public search
+returned three results; the selected Apple URLSession fetch returned 42 UTF-8
+text bytes without JavaScript, and render returned a truncated 7,219-byte
+JavaScript/Lockdown snapshot.
+
+Qwen `qwen/qwen3.8-27b` completed four observed Low turns and consumed three
+selected complete public MCP results in 75.012 s. Actual first text and structured
+payloads match; full result blocks were delivered, with normal native/model/
+observer exits and EOF. The original fenced-JSON final response failed strict
+raw-JSON parsing; the overall attempt remains NONPASS with its outer forced flag.
+A separate read-only 20.616 s format correction reused those results, returning
+five exact actual metadata fields and two root-grounded facts from the consumed
+partial render. It made no native/web request; Low was requested but no additional
+Low template was observed. This is separate corrective evidence, not a replacement
+PASS for the original attempt.
+
+The existing `web.search`, `web.fetch` and `web.render` tools retain their contracts;
+a visible tool row alone does not execute a web request. GUI v3 expired at its
+whole deadline in 240.446 s; v4 stopped after the native CUA pipe closed in
+93.763 s. Both remain NONPASS, with empty case collections and forced owned
+exit -15; final groups were gone and source/artifact/shared-default guards stayed
+exact. Root observed v4 Doctor version .36.3/build52 and the owned isolated home,
+plus Dashboard catalog84. This does not qualify filtered Tools web rows. Doctor
+installation/live-plugin mismatches remained, and Deploy was not invoked. No
+project mutation was observed; the required Projects GitHub Save/reopen/stable
+linked identity flow remains blocked by CUA transport. Installed
+.18.0/build 28 advertised 76 tools with all three web tools absent; the model's
+contradicted 66-tool count is not an inventory. Full web, all models, managed
+adapter, installation and shipment remain open. Initial G3 passed once in source/
+native; final document check results are recorded in external root receipts and exact delivery identities
+remain external. GUI readback b68a8778… retains the blocker without a GUI pass. V1's optional-Config pre-native failure and v2's actual
+zero search results remain NONPASS. A newer curl challenge capture is a separate
+request and does not establish the older native response body. Prior status
+evidence follows.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Current source target **0.36.2 (51)** addresses the missing status build
 identity raised during model feedback. Both fresh successful status aliases
 return string `build` beside `version`; stored historical replay remains unchanged.

@@ -1,5 +1,62 @@
 # Web response budgets
 
+<a id="decoded-utf8-continuation-correction"></a>
+
+## Decoded UTF-8 continuation correction
+
+Current source target **0.36.3 (52)** corrects an advertised `web.fetch`
+text/source cursor rejected by the old raw receive-byte input limit. The
+ISO-8859-1 baseline returned cursor **1,049,794**, then rejected its continuation
+against **1,048,576**. One method/one failure executed in source/native in
+**7.152/14.688 s**, normal exits 1/65, unforced with complete output. Both
+original baselines remain **NONPASS**.
+
+Each HTTP request still receives at most **1 MiB (1,048,576 bytes)**. Base64
+`byte_offset`, counts and SHA address the original received bytes; its cursor
+maximum remains 1 MiB. Text/source offsets, counts and SHA address the decoded
+UTF-8 representation (HTML `text` uses the existing text extraction). Decoded
+content and input cursors are bounded to **3 MiB (3,145,728 UTF-8 bytes)**,
+covering the existing Windows-1252 decoder's maximum 3× expansion. No decoder,
+encoding or MIME support is added. The existing decoder tries UTF-8 first,
+then its existing declared ISO-8859-1, Windows-1252 or UTF-16 fallback.
+The schema advertises the decoded maximum and describes both units; runtime
+validation selects the format-specific limit before networking. Text/source
+also rejects offsets outside content or inside a UTF-8 scalar.
+
+Always use returned `next_byte_offset` with `if_content_sha256`; continuations
+still refetch the URL. The whole-content digest, positive page/EOF rules,
+required notice/ID/LF final sizing, HTML metadata behavior and inline allowance
+retain the preceding contract below. The 3 MiB content bound is not a larger
+network or inline response allowance. `web.search` and `web.render` retain their
+separate contracts; fetch/search do not execute JavaScript. The renderer remains
+a separate macOS 27+ snapshot capability with its documented compatibility limits.
+
+| Gate | Observed scope or pending result |
+| --- | --- |
+| Source/native web methods | Three new source methods passed in 14.031 s; the same 28 full-class source/native methods passed in 13.866/24.896 s, zero failures/skips, normal 0/unforced, on unchanged 464-input 768064e9… maps. All 25 old methods remain unchanged. The native three are a subset of that 28 run; focused source three adds no distinct methods. |
+| ISO-8859-1 | 528,384 raw bytes become 1,056,768 UTF-8 bytes. Both text/source formats begin at 1,048,560 and reconstruct the complete selected 8,208-byte suffix through framed EOF, with exact original slices/SHA/cursors. This is a suffix test, not a complete-body union. |
+| Windows-1252 | 1,048,576 raw bytes become 3,145,728 UTF-8 bytes. Both formats examine two crossing continuation windows plus last-six-byte/exact EOF requests. Raw/base64 exact EOF remains 1 MiB; above-format-limit cursors reject before networking. No complete expanded-body union is claimed. |
+| UTF-16 | A 1,048,576-byte BOM fixture becomes 1,572,861 UTF-8 bytes from independent expected scalar bytes. Both formats examine two crossing windows plus last-six-byte/exact EOF requests; no complete expanded-body union is claimed. |
+| Framing and parity | New encoding tests require 4,096-byte final successful-frame allowance, escaped IDs, a required notice, matching text/structured payloads and exactly one LF. Four separate source/native neighbor methods passed in 2.185/2.507 s, covering canonical catalog/schema, renderer grant/context and final-frame parity. The exact unions give 32 distinct methods per route, not one 32-test invocation. |
+| Candidate | CLI/app passed in 0.991/0.903 s; ordinary Debug/strict signature in 24.888/0.130 s, native CLI version in 0.514 s, normal 0/unforced/full EOF. Candidate f0800991… binds seven artifacts, bundle .36.3/52 and the same 464 map; reference 49b64d97… binds 38 current/prior/protected guards. |
+| Candidate wire and public web | Signed App/CLI passed in 5.246/4.821 s, normal 0/unforced/full EOF; each 13 responses/11 frames, four controlled GETs, actual cursor 1,049,858 and exact selected 8,208-byte suffix/EOF. Raw over-limit failed before network; mid-scalar and changed digest failed after their bounded refetch. Both retain exact 84 catalog/83 neighboring descriptors, config and all four guard sets. Actual public search returned 3 results; selected URLSession fetch returned 42 UTF-8 text bytes/JavaScript false, render 7,219 bytes/JavaScript true/Lockdown/truncated true. |
+| Qwen consumption and correction | In 75.012 s, four observed Low completed turns consumed three selected complete results,13 native responses/11 frames with normal native/model/observer exits/full EOF. Original final fenced JSON failed strict raw parsing; overall NONPASS and outer forced flag remain. Separate 20.616 s read-only correction returned five exact metadata fields/two root-grounded facts from the consumed partial render, with zero native/web requests. Extra Low requested was not observed; original attempt is not relabeled PASS. |
+| Retained helper/provider attempts | V1 failed absent optional Config inventory before native/model calls. V2 controlled paging passed but actual public search returned zero results, so overall NONPASS remains. A newer curl challenge is a separate capture and does not establish that historical native body. |
+| GUI blocker | V3 whole deadline in 240.446 s and v4 CUA native-pipe failure/stopped run in 93.763 s remain NONPASS, cases empty/forced owned exit -15/final groups gone. V4 Doctor showed .36.3/52, owned home and current executable OK; installation/live-plugin mismatches remain, with no Deploy. Dashboard84 is not filtered Tools web rows. No project mutation was observed; Projects GitHub Save/reopen/stable linked identity and filtered web rows remain blocked. |
+| Documents and delivery | Initial G3 source/native each passed exactly one method in 2.743/2.639 s, giving 33 distinct methods per route with no repeated-count credit. Native launch warning remains. Final G3/hygiene/whitespace results are recorded in external root receipts. Exact owner source/wiki publication/readback/synchronization identities remain external. |
+
+The owning receipt is `web-decoded-utf8-28-method-qualification-0363.json`
+(SHA256 **c647c8ab2eaf6821e44602039530392c80f4814659e278d3473ce3a186b05f60**).
+The root consumer readback is `web-decoded-utf8-runtime-root-readback-0363-v3.json`
+(SHA256 **acee9aa9d35c645c274f005732872dcb38e02ba2af879df2ffd7181c8bdd4f6c**).
+The GUI root readback is `native-candidate-gui-root-runtime-readback-0363-v4.json`
+(SHA256 **b68a877878f6b88a43f46bb3b18c7c1dbb0ac5f36deadc963346c3a800957c1d**).
+The .36.2 status closeout retains its separate receipt **5e92bfe9…**.
+Installed GUI, Projects GitHub Save/reopen/stable linked identity, full web,
+all models, managed adapter, other formats, Release and shipment remain open.
+The complete .26 notice and response-sizing histories and original NONPASS
+receipts follow unchanged.
+
 <a id="notice-receipt-truth-follow-up"></a>
 
 ## Notice receipt truth follow-up

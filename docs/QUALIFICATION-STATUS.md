@@ -1,5 +1,91 @@
 # Version and qualification status
 
+Current source target **0.36.3, build 52** corrects `web.fetch` continuation
+for text that expands when decoded to UTF-8. HTTP receive/base64 cursor bounds
+remain **1,048,576 bytes**; decoded text/source content and cursors are bounded to
+**3,145,728 UTF-8 bytes**. Within-content UTF-8 boundaries and whole-content SHA
+checks remain; only the fetch descriptor's cursor bound/description is widened.
+
+The exact Latin1 regression executed one method/one failure in source/native in
+**7.152/14.688 s**, normal exits **1/65**, unforced and complete: the returned
+cursor **1,049,794** exceeded the old **1,048,576** input limit. Both original
+baselines remain **NONPASS**. After root's source admission, the three new source
+methods passed in **14.031 s**; the same full **28** web methods passed in
+source/canonical native in **13.866/24.896 s**, zero failures/skips, normal
+exit 0/unforced, on unchanged **464-input 768064e9… maps**. Existing 25 methods
+remain byte-identical. The new three native methods are included in the full
+28 run, not a separate repeat; focused source three adds no distinct coverage.
+
+Coverage is ISO-8859-1 selected suffix through EOF, Windows-1252 maximum 3×
+UTF-8 expansion and UTF-16 independent scalar bytes. Both text/source formats
+exercise exact framed data/SHA/cursors, escaped IDs, required notice and LF;
+Windows/UTF-16 use two crossing windows plus six-byte tail/exact EOF controls,
+not complete expanded-body reassembly. Raw/base64 EOF and format-specific
+above-limit rejection retain their exact bounds. [Detailed contract](WEB-RESPONSE-BUDGET.md).
+
+Four separate source/native neighbor methods passed in **2.185/2.507 s**,
+zero failures/skips, normal 0/unforced, on the same map. They cover canonical
+catalog/schema parity, renderer grant/context admission and escaped-ID/notice
+final-frame sizing. The exact 28-plus-four unions give **32 distinct methods
+per route**, not one 32-test invocation. CLI/app compilation passed in
+**0.991/0.903 s**; ordinary Debug/strict signature in **24.888/0.130 s** and
+native CLI version in **0.514 s**, normal 0/unforced/full EOF. Candidate
+**f0800991…** binds seven artifacts and actual bundle **0.36.3/52** on the
+same 464 map; protected reference **49b64d97…** binds **38** current/prior/protected
+guards. Signed App/CLI public web checks passed in **5.246/4.821 s**, normal
+0/unforced/full EOF: each **13 responses/11 frames**, four controlled GETs,
+advertised cursor **1,049,858** and exact selected **8,208-byte suffix/EOF**.
+Both preserve the complete 84-definition catalog and 83 unrelated descriptors,
+full configuration and all four before/after source/candidate/protected/harness
+guard sets. Public search returned three actual results; selected URLSession fetch
+returned **42 UTF-8 text bytes** without JavaScript; render returned **7,219 bytes**,
+JavaScript/Lockdown, truncated true, SHA **82c7e7a5…5893b**.
+
+Qwen **qwen/qwen3.8-27b** completed four actual Low turns and consumed three
+selected, fully written, correlated, verified and delivered complete public MCP
+results in **75.012 s**. Native responses/frames and controlled paging match the
+App/CLI counts; native/model/observer exited normally with full EOF. The original
+fenced-JSON final response failed strict raw-JSON parsing: overall **NONPASS** and
+the outer forced flag remain retained. A separate read-only **20.616 s** format
+correction returned strict raw JSON with five exact actual metadata fields and
+two root-grounded facts from the consumed partial render. It reused all three
+results with **zero native/web requests**. Extra Low was requested but **not
+observed**; this is not a replacement PASS for the original attempt.
+The root runtime readback is `web-decoded-utf8-runtime-root-readback-0363-v3.json`,
+SHA **acee9aa9d35c645c274f005732872dcb38e02ba2af879df2ffd7181c8bdd4f6c**.
+Root rehashed current source464 and protected38 unchanged after correction.
+
+V1's optional-Config inventory failure occurred before native/model requests
+(**e6094b78…**, NONPASS). V2 separately passed controlled paging but returned zero
+actual public search results (**10184c18…**, NONPASS). Its newer curl challenge
+capture is a separate request; the historical native body remains unknown.
+
+Initial G3 source/native each passed exactly one method in **2.743/2.639 s**,
+normal 0/unforced/full EOF, on the same source map. Exact 32-plus-one unions give
+**33 distinct methods per route**, not one 33-test invocation; repeated G3 adds
+no distinct methods. Native G3 retains its DVTAssertions launch warning.
+GUI v3 expired at the whole deadline in **240.446 s**; v4 was stopped after
+**Sky Computer Use native pipe closed before response**, in **93.763 s**. Both
+remain **NONPASS**, with empty case collections, forced owned exit **-15** and
+final owned groups gone. Source464, all 24 runtime artifact guards/eight shared
+files and shared typed defaults stayed exact. V4 Doctor showed **0.36.3/52**,
+the owned isolated home and current executable OK; expected isolated-home
+installation/live-plugin mismatches remain, with no Deploy action. Dashboard
+showed **84** tools; filtered Tools web rows, Projects GitHub Save/reopen and
+stable linked identity remain unexercised, with no project mutation observed.
+The GUI root readback is `native-candidate-gui-root-runtime-readback-0363-v4.json`,
+SHA **b68a877878f6b88a43f46bb3b18c7c1dbb0ac5f36deadc963346c3a800957c1d**.
+These native GUI gates remain blocked until the CUA capability changes.
+Final G3/hygiene/whitespace results are recorded in external root receipts.
+Exact source/wiki publication/readback/synchronization identities remain in
+external closeout receipts. Prior .36.2 status source/wiki closeout
+is retained separately in receipt **5e92bfe9…**. This phase claims no full suite,
+whole-body Windows/UTF-16 reconstruction, installed acceptance or diagnostic-free run.
+Projects GitHub Save/reopen/stable linked-project identity, full web, all models,
+managed-adapter, other requested formats, Release and shipment remain open.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Current source target **0.36.2, build 51** corrects build identity in fresh
 successful `forge_status`/`get_forge_status` responses. Both use the existing
 string `ForgeApp.buildVersion`; their inputs/tool names and historical completed
@@ -1915,6 +2001,10 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
+Current source target: **0.36.3, build 52**, supporting **macOS 26+**; matching 28 web plus four neighbor methods passed and remaining gates are recorded above.
+
+Preceding .36.2 identity record (retained):
+
 Current source target: **0.36.2, build 51**, supporting **macOS 26+**; focused status/replay methods passed and remaining gates are recorded above.
 
 Preceding .36.1 status sentence (retained):
@@ -1949,6 +2039,10 @@ the detailed, source-bound receipts are in the
 [roadmap](../ROADMAP.md).
 
 ## Version and build agreement
+
+The current target is **0.36.3, build 52** for the decoded UTF-8 cursor correction. Matching 28 web plus four neighbors and one separately run initial G3 give 33 distinct source/native methods per route. Candidate builds/signature and App/CLI public web checks passed; Qwen consumed three results, with original strict final-format NONPASS and separate correction retained. GUI v3/v4 remain NONPASS with Projects/filtered Tools gates blocked; final document check results are recorded in external root receipts and exact delivery identities remain external.
+
+Preceding .36.2 identity record (retained):
 
 The current target is **0.36.2, build 51** for the status-build correction. Matching six source/native methods and CLI/app compilation passed; candidate/runtime, document and delivery gates are pending actual receipts.
 

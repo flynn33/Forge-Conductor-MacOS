@@ -1,5 +1,24 @@
 # Forge Conductor for macOS
 
+Current source target **0.36.3 (52)** corrects `web.fetch` continuation for
+text that expands when decoded to UTF-8. HTTP receive and base64 cursor limits
+remain **1 MiB**; text/source content and cursors are bounded to **3 MiB**.
+Always use returned `next_byte_offset` and `content_sha256` for continuation.
+The same 28 web methods passed in source/canonical native; the three new methods
+are included in that selection. [Web response budgets](docs/WEB-RESPONSE-BUDGET.md)
+records the exact encoding/window coverage. Four separate source/native neighbor
+methods also passed, giving 32 distinct methods per route. CLI/app/ordinary
+Debug/strict-signature and App/CLI public web checks passed. Qwen consumed three
+complete public tool results; its original strict final-format gate remained
+NONPASS, with a separate raw-JSON correction using the same consumed results.
+Initial G3 passed once per route, giving 33 distinct methods per route. GUI
+attempts remain NONPASS after a deadline and CUA native-pipe failure; Projects
+Save/reopen and filtered Tools checks remain blocked. Final document check results are recorded in external root receipts; exact delivery identities remain external.
+Project GitHub persistence/reopen,
+full web, all models, installation and shipment remain open.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Current source target **0.36.2 (51)** corrects status build identity.
 Fresh successful `forge_status` and `get_forge_status` responses include
 string `build` from the same compiled authority as `version`. The shared MCP
@@ -857,8 +876,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.36.2** |
-| **Build** | **51** |
+| **Version** | **0.36.3** |
+| **Build** | **52** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -974,6 +993,10 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.36.3 (52)` for the decoded UTF-8 cursor correction; see the latest phase above.
+
+Preceding .36.2 identity record (retained):
 
 The current target is `0.36.2 (51)` for the status-build correction; see the latest phase above.
 

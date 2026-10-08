@@ -1,4 +1,19 @@
-# Context and agent continuity (v0.36.2)
+# Context and agent continuity (v0.36.3)
+
+Current source documentation targets 0.36.3 (52). `web.fetch` text/source
+continuation addresses decoded UTF-8 bytes up to 3 MiB while receive/base64 bounds
+remain 1 MiB. Use the returned cursor and whole-content SHA to reject changed
+content. Project context, grants, handoff, successor/ACK/seal, replay and notice
+receipt contracts remain unchanged. Matching 28 source/native web methods passed;
+four separate neighbor methods give 32 distinct methods per route. Candidate
+builds/signature and App/CLI public web checks passed. Qwen consumed three complete
+results over four observed Low turns; its original strict final-format NONPASS
+and separate raw-JSON correction remain separate. Initial G3 adds one method for
+33 distinct methods per route. GUI attempts remain NONPASS after deadline/CUA
+pipe failure; project-linking and filtered Tools checks remain blocked. Final document check results are recorded in external root receipts; exact delivery identities remain external. These checks do not prove live rollover,
+full web or all models.
+
+## Preceding 0.36.2 (51) status-build qualification
 
 Current source documentation targets 0.36.2 (51). Fresh status responses expose
 string build identity beside version. Resume bootstrap inputs and all handoff,

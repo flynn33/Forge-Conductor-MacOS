@@ -769,6 +769,143 @@ final class WebToolPackTests: XCTestCase {
         }
     }
 
+    func testDecodedLatin1UTF8ContinuationCrossesReceiveLimitThroughFinalFrame() throws {
+        try withApp { app in
+            let count = WebToolPack.maximumResponseBytes / 2 + 4_096
+            let raw = Data(repeating: 0xE9, count: count)
+            let expected = String(repeating: "\u{00E9}", count: count)
+            try assertDecodedUTF8Window(app: app, raw: raw, contentType: "text/plain; charset=iso-8859-1",
+                expected: expected, offset: WebToolPack.maximumResponseBytes - 16,
+                maximumPages: 16, requireWholeSuffix: true)
+        }
+    }
+
+    func testWindows1252MaximumUTF8ExpansionKeepsRawBase64BoundsAndExactEOF() throws {
+        try withApp { app in
+            let raw = Data(repeating: 0x80, count: WebToolPack.maximumResponseBytes)
+            let expected = String(repeating: "\u{20AC}", count: raw.count)
+            let decodedLimit = WebToolPack.maximumResponseBytes * 3
+            XCTAssertEqual(expected.utf8.count, decodedLimit)
+            try assertDecodedUTF8Window(app: app, raw: raw, contentType: "text/plain; charset=windows-1252",
+                expected: expected, offset: WebToolPack.maximumResponseBytes / 3 * 3,
+                maximumPages: 2, requireWholeSuffix: false)
+
+            let session = session(body: raw, contentType: "text/plain; charset=windows-1252")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app)
+            let url = fixtureURL()
+            let end = try XCTUnwrap(pack.handle(name: "web.fetch",
+                arguments: ["url": url, "format": "base64", "byte_offset": raw.count],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(end.ok, "\(end.payload)")
+            XCTAssertEqual(end.payload["total_content_bytes"] as? Int, raw.count)
+            XCTAssertEqual(end.payload["content_sha256"] as? String, JSONSupport.sha256Hex(raw))
+            XCTAssertEqual(end.payload["content"] as? String, "")
+            XCTAssertEqual(end.payload["has_more"] as? Bool, false)
+            XCTAssertTrue(end.payload["next_byte_offset"] is NSNull)
+            for (format, offset) in [("base64", raw.count + 1), ("text", decodedLimit + 1), ("source", decodedLimit + 1)] {
+                WebResponseProtocol.configure(body: raw, contentType: "text/plain; charset=windows-1252")
+                let denied = try XCTUnwrap(pack.handle(name: "web.fetch",
+                    arguments: ["url": url, "format": format, "byte_offset": offset],
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                XCTAssertEqual(denied.payload["code"] as? String, "web_invalid_argument", format)
+                XCTAssertNil(WebResponseProtocol.latestRequest, "Over-limit cursors must be rejected before networking")
+            }
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let properties = try XCTUnwrap(try XCTUnwrap(catalog.definition(named: "web.fetch"))
+                .inputSchemaObject()["properties"] as? [String: Any])
+            let cursor = try XCTUnwrap(properties["byte_offset"] as? [String: Any])
+            XCTAssertEqual(cursor["maximum"] as? Int, decodedLimit)
+        }
+    }
+
+    func testUTF16DecodedUTF8ContinuationUsesIndependentScalarBytes() throws {
+        try withApp { app in
+            var raw = Data(repeating: 0, count: WebToolPack.maximumResponseBytes)
+            raw[0] = 0xFF; raw[1] = 0xFE
+            for offset in stride(from: 2, to: raw.count, by: 2) { raw[offset + 1] = 0x08 }
+            let expected = String(repeating: "\u{0800}", count: (raw.count - 2) / 2)
+            XCTAssertEqual(expected.utf8.count, (raw.count - 2) / 2 * 3)
+            try assertDecodedUTF8Window(app: app, raw: raw, contentType: "text/plain; charset=utf-16",
+                expected: expected, offset: WebToolPack.maximumResponseBytes / 3 * 3,
+                maximumPages: 2, requireWholeSuffix: false)
+        }
+    }
+
+    private func assertDecodedUTF8Window(app: ForgeApp, raw: Data, contentType: String,
+                                        expected: String, offset initialOffset: Int,
+                                        maximumPages: Int, requireWholeSuffix: Bool) throws {
+        let bytes = Data(expected.utf8), digest = JSONSupport.sha256Hex(bytes)
+        XCTAssertLessThanOrEqual(raw.count, WebToolPack.maximumResponseBytes)
+        XCTAssertGreaterThan(bytes.count, WebToolPack.maximumResponseBytes)
+        let session = session(body: raw, contentType: contentType)
+        defer { session.invalidateAndCancel() }
+        let pack = WebToolPack(session: session), context = context(app: app, maximum: 4_096)
+        let url = fixtureURL(), notice = "Required decoded-UTF8 paging notice 😀\n"
+        for format in ["text", "source"] {
+            var offset = initialOffset, reconstructed = Data(), finished = false, crossed = false
+            for page in 0..<maximumPages {
+                let produced = try XCTUnwrap(pack.handle(name: "web.fetch",
+                    arguments: ["url": url, "format": format, "byte_offset": offset,
+                                "if_content_sha256": digest, "maximum_bytes": 4_096],
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                guard produced.ok else { return XCTFail("Advertised \(format) cursor \(offset) was rejected: \(produced.payload)") }
+                let id = "decoded-\(format)-\(page)-\"\\\n😀"
+                let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                    result: produced, additiveNotice: notice, budget: 4_096), id: id, notice: notice, budget: 4_096)
+                let piece = Data(try XCTUnwrap(payload["content"] as? String).utf8)
+                guard !piece.isEmpty, piece.count <= bytes.count - offset else { return XCTFail("Invalid decoded page extent") }
+                XCTAssertEqual(piece, bytes.subdata(in: offset..<(offset + piece.count)))
+                XCTAssertEqual(payload["content_sha256"] as? String, digest)
+                XCTAssertEqual(payload["total_content_bytes"] as? Int, bytes.count)
+                XCTAssertEqual(payload["received_bytes"] as? Int, raw.count)
+                XCTAssertEqual(payload["returned_content_bytes"] as? Int, piece.count)
+                XCTAssertEqual(payload["byte_offset"] as? Int, offset)
+                XCTAssertEqual(payload["format"] as? String, format)
+                XCTAssertEqual(payload["javascript_executed"] as? Bool, false)
+                reconstructed.append(piece)
+                let next = offset + piece.count
+                let more = next < bytes.count
+                XCTAssertEqual(payload["has_more"] as? Bool, more)
+                XCTAssertEqual(payload["truncated"] as? Bool, more)
+                if more {
+                    let advertised = try XCTUnwrap(payload["next_byte_offset"] as? Int)
+                    XCTAssertEqual(advertised, next); XCTAssertGreaterThan(advertised, offset)
+                    if page == 0 { XCTAssertGreaterThan(advertised, WebToolPack.maximumResponseBytes) }
+                    crossed = crossed || advertised > WebToolPack.maximumResponseBytes
+                    offset = advertised
+                } else {
+                    XCTAssertTrue(payload["next_byte_offset"] is NSNull)
+                    finished = true
+                    break
+                }
+            }
+            XCTAssertTrue(crossed, "The final framed response must actually advertise a cursor above the receive cap")
+            if requireWholeSuffix {
+                XCTAssertTrue(finished, "The bounded decoded suffix must reach EOF")
+                XCTAssertEqual(reconstructed, Data(bytes.dropFirst(initialOffset)))
+            } else {
+                XCTAssertEqual(reconstructed, bytes.subdata(in: initialOffset..<(initialOffset + reconstructed.count)))
+            }
+            for tailOffset in [bytes.count - 6, bytes.count] {
+                let produced = try XCTUnwrap(pack.handle(name: "web.fetch",
+                    arguments: ["url": url, "format": format, "byte_offset": tailOffset,
+                                "if_content_sha256": digest, "maximum_bytes": 4_096],
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                guard produced.ok else { return XCTFail("Exact decoded EOF cursor was rejected: \(produced.payload)") }
+                let id = "decoded-eof-\(format)-\(tailOffset)"
+                let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                    result: produced, additiveNotice: notice, budget: 4_096), id: id, notice: notice, budget: 4_096)
+                XCTAssertEqual(Data(try XCTUnwrap(payload["content"] as? String).utf8), bytes.dropFirst(tailOffset))
+                XCTAssertEqual(payload["content_sha256"] as? String, digest)
+                XCTAssertEqual(payload["returned_content_bytes"] as? Int, bytes.count - tailOffset)
+                XCTAssertEqual(payload["has_more"] as? Bool, false)
+                XCTAssertEqual(payload["truncated"] as? Bool, false)
+                XCTAssertTrue(payload["next_byte_offset"] is NSNull)
+            }
+        }
+    }
+
     private func webWirePayload(_ response: [String: Any], id: String, notice: String?,
                                 budget: Int? = nil, isError: Bool = false) throws -> [String: Any] {
         XCTAssertEqual(response["id"] as? String, id)

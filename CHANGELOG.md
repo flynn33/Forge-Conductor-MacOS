@@ -10,6 +10,30 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.36.3 (52)` decoded UTF-8 web cursor correction
+
+- Correct `web.fetch` text/source continuation when supported text expands while
+  decoding to UTF-8. Decoded content/cursors are bounded to 3 MiB; HTTP receive
+  and original-byte base64 cursor bounds remain 1 MiB. The descriptor states
+  both units; use returned cursor/whole-content SHA for continuation.
+- Preserve existing decoders, tool names, grants, deadlines/cancellation, final
+  notice/ID/LF sizing and all 25 previous web methods. Matching 28 source/native
+  methods passed in 13.866/24.896 s; focused source three passed in 14.031 s and
+  adds no distinct coverage. Both original one-method cursor failures remain
+  NONPASS. [Exact encoding/window scope](docs/WEB-RESPONSE-BUDGET.md) does not
+  claim complete Windows/UTF-16 body reconstruction.
+- Four separate source/native neighbor methods passed in 2.185/2.507 s, giving
+  32 distinct methods per route. CLI/app passed in 0.991/0.903 s; ordinary Debug
+  and strict signature passed in 24.888/0.130 s. Signed App/CLI public web checks
+  passed in 5.246/4.821 s. Qwen consumed three complete results over four observed
+  Low turns; its original fenced-JSON final response remained overall NONPASS.
+  A separate raw-JSON correction reused those results without web/native replay.
+  Initial G3 passed one method each in 2.743/2.639 s, giving 33 distinct methods
+  per route. GUI v3/v4 remain NONPASS: the whole deadline/native CUA pipe
+  blocked Projects and filtered Tools checks, with no project mutation observed.
+  Final document check results are recorded in external root receipts; exact delivery identities remain external. GitHub-linking GUI, full web, all models, installed,
+  other requested formats and shipment remain open.
+
 ### `0.36.2 (51)` status build identity correction
 
 - Add string `build` beside `version` in fresh successful `forge_status` and

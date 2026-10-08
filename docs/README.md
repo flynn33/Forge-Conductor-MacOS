@@ -1,5 +1,18 @@
 # Documentation guide
 
+Current source target **0.36.3 (52)** corrects decoded UTF-8 continuation in
+`web.fetch`. [Web response budgets](WEB-RESPONSE-BUDGET.md) explains the 1 MiB
+raw/base64 and 3 MiB decoded text/source limits, retained baseline failures and
+exact test windows. Matching 28 web plus four separate source/native neighbor
+methods passed; initial G3 adds one method for 33 distinct methods per route.
+Candidate builds/signature and App/CLI public web checks passed. Qwen's three
+consumed results, original final-format NONPASS and separate raw-JSON correction
+are retained. GUI v3/v4 remain NONPASS after deadline/CUA pipe failure, with
+Projects and filtered Tools checks blocked. Final document check results are recorded in external root receipts; delivery identities remain external. The three existing web tools and project GitHub-linking goal retain
+separate acceptance gates.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Current source target **0.36.2 (51)** corrects string build identity in both
 status aliases, preserving their inputs and historical completed replay.
 See [qualification status](QUALIFICATION-STATUS.md),

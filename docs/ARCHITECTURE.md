@@ -1,5 +1,26 @@
 # Forge Conductor architecture
 
+Version: `0.36.3`; build: `52`. `WebToolPack.maximumUTF8ContentBytes` bounds
+text/source content and cursor validation at three times the existing 1 MiB
+receive limit. Base64 cursor validation retains the raw 1 MiB limit. The
+`web.fetch` descriptor advertises the decoded upper bound and describes both
+units. After text conversion, the existing owner checks UTF-8 content size before
+digest and paging; in-content UTF-8 boundaries still apply.
+The observed Latin1 failure advertised a decoded cursor above the old raw-byte
+input cap, then rejected the continuation. Matching 28 source/native web methods
+passed; no new tool, decoder, cache or grant is introduced. Continued pages
+retain existing request ownership, including their refetch.
+Final MCP sizing, SHA/cursor semantics, deadlines/cancellation, context and notice
+contracts remain. [Contract and evidence](WEB-RESPONSE-BUDGET.md) retain exact
+window scope. Four source/native neighbor methods and candidate builds/signature
+also passed. App/CLI exercised the corrected cursor and all three public web tools;
+Qwen consumed their complete results. Its original final-format NONPASS and
+separate raw-JSON correction remain separate. Initial G3 adds one method to the
+32-method union. GUI attempts remain NONPASS after deadline/CUA pipe failure,
+with Projects and filtered Tools checks blocked. Final document check results are recorded in external root receipts, with delivery identities external.
+
+## Preceding 0.36.2 (51) status-build qualification
+
 Version: `0.36.2`; build: `51`. `AgentToolPack.forgeStatus` adds the string
 `build` field beside `version` from `ForgeApp.buildVersion`. Both status aliases
 route through that common success payload. `MCPToolResponse` serializes the same
