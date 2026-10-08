@@ -1,5 +1,20 @@
 # Forge Conductor architecture
 
+Version: `0.36.2`; build: `51`. `AgentToolPack.forgeStatus` adds the string
+`build` field beside `version` from `ForgeApp.buildVersion`. Both status aliases
+route through that common success payload. `MCPToolResponse` serializes the same
+payload into first text and `structuredContent`; input schemas and tool names stay
+unchanged.
+`ToolInvocationBroker` returns completed durable results unchanged, so historical
+replays may omit `build`. No repository/session/storage migration is introduced.
+Matching six-method source/native and signed App/CLI/Qwen status checks passed.
+Native text and structured payloads matched; Qwen consumed the two actual alias
+results. Initial G3 gives seven distinct methods per route. Exact document and
+publication identities belong in external closeout receipts;
+[qualification status](QUALIFICATION-STATUS.md) retains open gates.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Version: `0.36.1`; build: `50`. The common instruction-package `makePackage`
 boundary rejects more than 4,096 retained documents before hashing, publication
 or queue linkage. ZIP containers and manifests count toward that existing

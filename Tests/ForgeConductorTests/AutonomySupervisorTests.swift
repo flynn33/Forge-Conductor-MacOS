@@ -628,6 +628,95 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testStatusAliasesReplayCompletedHistoricalResultWithoutAddingBuild() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(
+                repository: repository,
+                root: root,
+                allowedTools: ["forge_status", "get_forge_status"]
+            )
+            let lease = try await repository.acquireRunLease(
+                runID: fixture.run.runID,
+                ownerID: "manager-historical-status",
+                policy: fixture.leasePolicy
+            )
+            let toolFixture = try await makeProviderToolContext(
+                repository: repository,
+                run: fixture.run,
+                lease: lease,
+                sessionID: "session-historical-status"
+            )
+            let legacyPayload: [String: Any] = [
+                "ok": true,
+                "version": "historical-status-fixture",
+                "runtime": "swift",
+            ]
+            let legacySummary = try JSONSupport.canonicalJSON([
+                "ok": true,
+                "is_error": false,
+                "payload": legacyPayload,
+            ])
+            let legacySHA256 = JSONSupport.sha256Hex(legacySummary)
+            let arguments: [String: Any] = [:]
+            let executor = CountingToolExecutor()
+            let broker = ToolInvocationBroker(
+                repository: repository,
+                executor: executor,
+                classifier: StaticToolReplayClassifier(
+                    classifications: ProductionToolReplayCatalog.classifications
+                )
+            )
+            for name in ["forge_status", "get_forge_status"] {
+                let callID = "historical-\(name)"
+                let idempotencyKey = "historical-\(name)-key"
+                let seeded = try await repository.persistToolInvocationIntent(
+                    ToolInvocationIntent(
+                        turnID: toolFixture.turn.turnID,
+                        runID: fixture.run.runID,
+                        sessionID: try XCTUnwrap(toolFixture.context.providerSessionID),
+                        projectID: fixture.run.projectID,
+                        projectGeneration: fixture.run.projectGeneration,
+                        providerCallID: callID,
+                        toolName: name,
+                        replayClass: .idempotent,
+                        idempotencyKey: idempotencyKey,
+                        argumentsSHA256: JSONSupport.sha256Hex(try JSONSupport.canonicalJSON(arguments))
+                    ),
+                    lease: lease
+                )
+                let completed = try await repository.transitionToolInvocation(
+                    invocationID: seeded.invocationID,
+                    expected: .intent,
+                    to: .completed,
+                    lease: lease,
+                    resultSHA256: legacySHA256,
+                    resultSummary: legacySummary
+                )
+                let replayed = try await broker.invoke(
+                    BrokeredToolCall(
+                        providerCallID: callID,
+                        toolName: name,
+                        arguments: arguments,
+                        idempotencyKey: idempotencyKey
+                    ),
+                    turnID: toolFixture.turn.turnID,
+                    context: toolFixture.context,
+                    lease: lease
+                )
+                XCTAssertTrue(replayed.ok)
+                XCTAssertFalse(replayed.isError)
+                XCTAssertNil(replayed.payload["build"])
+                XCTAssertEqual(try JSONSupport.canonicalJSON(replayed.payload), try JSONSupport.canonicalJSON(legacyPayload))
+                let retained = try await repository.toolInvocation(
+                    sessionID: try XCTUnwrap(toolFixture.context.providerSessionID),
+                    providerCallID: callID
+                )
+                XCTAssertEqual(try XCTUnwrap(retained), completed)
+            }
+            XCTAssertEqual(executor.callCount, 0)
+        }
+    }
+
     func testToolBrokerAcceptsWildcardAndReusesCompletedIdempotentResult() async throws {
         try await withRepository { repository, root in
             let fixture = try await makeRun(repository: repository, root: root, allowedTools: ["*"])

@@ -1,5 +1,17 @@
 # Forge Conductor user guide
 
+Version **0.36.2**, build **51** adds build identity to fresh successful status
+responses. `forge_status` and `get_forge_status` expose string `version` and
+`build` together; the returned identity belongs to the process serving the call.
+A stored completed response replay retains its original payload and may omit
+`build`. Do not infer the running GUI identity from a replay or a tool-count claim.
+[Focused checks and remaining gates](docs/QUALIFICATION-STATUS.md) are separate
+from installed acceptance. Signed candidate App/CLI and actual Qwen checks
+confirmed both fresh aliases and their matching text/structured payloads;
+Qwen acknowledged only the two string identity values, not GUI or web behavior.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Version **0.36.1**, build **50** corrects the retained-document import limit.
 Each package can retain at most 4,096 documents, including its ZIP container or
 manifest: select up to 4,095 regular ZIP members or listed manifest documents,

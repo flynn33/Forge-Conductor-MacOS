@@ -278,6 +278,44 @@ final class CoreTests: XCTestCase {
 
     // MARK: - Tools
 
+    func testStatusAliasesExposeStringBuildInDirectAndMCPPayloads() throws {
+        let app = try ForgeApp.bootstrap(home: tempHome)
+        defer { app.shutdown() }
+        let mcp = MCPServer(app: app, clientID: ClientID("mcp-status-build"))
+        for (offset, name) in ["forge_status", "get_forge_status"].enumerated() {
+            let arguments: [String: Any] = name == "get_forge_status" ? ["resume": true] : [:]
+            let direct = try app.tools.call(
+                name: name,
+                arguments: arguments,
+                clientID: ClientID("direct-status-build-\(offset)")
+            )
+            XCTAssertTrue(direct.ok, "\(direct.payload)")
+            XCTAssertFalse(direct.isError)
+            XCTAssertEqual(direct.payload["version"] as? String, ForgeApp.version)
+            XCTAssertEqual(direct.payload["build"] as? String, ForgeApp.buildVersion)
+            let responseID = 30 + offset
+            let resp = mcp.handle([
+                "jsonrpc": "2.0",
+                "id": responseID,
+                "method": "tools/call",
+                "params": [
+                    "name": name,
+                    "arguments": arguments,
+                ] as [String: Any],
+            ])
+            XCTAssertEqual(resp?["id"] as? Int, responseID)
+            let result = try XCTUnwrap(resp?["result"] as? [String: Any])
+            XCTAssertEqual(result["isError"] as? Bool, false)
+            let content = try XCTUnwrap(result["content"] as? [[String: Any]])
+            let text = try XCTUnwrap(content.first?["text"] as? String)
+            let textPayload = try JSONSupport.object(from: Data(text.utf8))
+            let structured = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+            XCTAssertEqual(try JSONSupport.data(from: textPayload), try JSONSupport.data(from: structured))
+            XCTAssertEqual(structured["version"] as? String, ForgeApp.version)
+            XCTAssertEqual(structured["build"] as? String, ForgeApp.buildVersion)
+        }
+    }
+
     func testForgeStatusTool() throws {
         let app = try ForgeApp.bootstrap(home: tempHome)
         let result = try app.tools.call(name: "forge_status", arguments: [:], clientID: ClientID("t1"))

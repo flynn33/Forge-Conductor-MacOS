@@ -1,5 +1,18 @@
 # Versioning policy
 
+Current target identity is **0.36.2 (51)**. Adding the missing build identity
+is a backward-compatible correction under the patch policy below. `VERSION`,
+`BUILD_NUMBER`, compiled constants and twelve marketing/sixteen build settings
+advance together, with only two G3 identity expectation literals changed.
+Graph memberships, signing, tool names/input schemas and historical durable
+replay are preserved. Matching six source/native methods, candidate build/signature
+and signed App/CLI/Qwen status checks passed. Initial G3 source/native one each
+gives seven distinct methods per route. Exact document rechecks and source/wiki
+publication/readback/synchronization identities belong in external closeout
+receipts, preserving the separate installed and shipment boundaries.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Current target identity is **0.36.1 (50)**. This enforces the existing final
 4,096-document import/catalog bound, so the correction advances the patch
 component under the policy below; it adds no user-facing format or tool.
@@ -304,6 +317,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.36.2`, build `51`, for the status-build correction; preceding phase identities remain unchanged.
+
+Preceding .36.1 identity and qualification record (retained):
 
 Current source target is `0.36.1`, build `50`, for the instruction-count correction; preceding BMP identities remain unchanged.
 

@@ -1,5 +1,16 @@
 # Documentation guide
 
+Current source target **0.36.2 (51)** corrects string build identity in both
+status aliases, preserving their inputs and historical completed replay.
+See [qualification status](QUALIFICATION-STATUS.md),
+[versioning](VERSIONING.md) and [project/web/Qwen scope](PROJECT-WEB-QWEN.md).
+The six focused source/native methods and signed App/CLI/Qwen status checks
+passed; initial G3 gives seven distinct methods per route. Exact document and
+source/wiki publication/readback/synchronization identities belong in external
+closeout receipts. Previous phase bodies follow unchanged.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Current source target **0.36.0 (49)** adds bounded BMP to
 [image writing](NATIVE-IMAGE-WRITING.md), preserving PNG/TIFF/JPEG/GIF/WebP.
 Independent encoded-channel tests and native PNG-reference rendering are

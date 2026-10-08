@@ -10,6 +10,24 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.36.2 (51)` status build identity correction
+
+- Add string `build` beside `version` in fresh successful `forge_status` and
+  `get_forge_status` payloads, including MCP first text/structured content.
+- Preserve existing inputs/tool names, resume bootstrap and completed historical
+  replay; old recorded responses may omit build. All prior test bodies remain.
+- Retain the original one-method/four-assertion missing-build NONPASS. Matching
+  six-method source/native checks passed in 13.976/38.620 s, zero failures/skips,
+  normal exit 0/unforced. CLI/app compilation passed in 0.986/0.862 s.
+  Ordinary Debug/strict signature passed in 24.908/0.133 s; native CLI version
+  passed in 0.626 s, normal exit 0/unforced. Signed candidate App/CLI status
+  checks passed in 0.654/0.634 s; Qwen passed three observed Low-mode responses
+  and two consumed status results in 18.467 s, with exact version/build ACK.
+  Initial G3 source/native one each passed in 1.541/2.624 s, giving seven
+  distinct methods per route; initial hygiene/whitespace passed in 0.661/0.138 s.
+  Exact document rechecks and source/wiki delivery identities belong in external
+  closeout receipts; GUI/full-web/all-model/installed/shipment gates remain open.
+
 ### `0.36.1 (50)` instruction-package count correction
 
 - Count every retained document, including a ZIP container or manifest, within

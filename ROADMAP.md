@@ -1,5 +1,22 @@
 # Forge Conductor macOS — project roadmap
 
+## Status build identity correction
+
+Current target **0.36.2 (51)** adds missing string build identity beside version
+in fresh successful status responses; historical completed replay is preserved.
+
+| Milestone | Observed evidence | Remaining gate |
+| --- | --- | --- |
+| Baseline and local correction | One source method failed with four missing-build assertions in 7.590 s, normal exit 1/unforced. One shared payload field now uses the existing compiled build authority for both aliases. | Original baseline remains NONPASS. External strict-output consumers are unverified. |
+| Contract and parity | Matching six source/canonical native methods passed in 13.976/38.620 s, zero failures/skips, normal exit 0/unforced, on unchanged 464-input 08250288… maps. Both direct/MCP aliases, resumed bootstrap, text/structured parity, canonical catalog and unchanged historical completed replay are covered. All old Core/Autonomy bodies remain byte-identical. | Focused status scope only; no full-suite result. Native DVTAssertions warning is retained. |
+| Authorities, builds and delivery | Existing memberships/workspace/signing remain; patch identity advances five existing authority/G3 paths, twelve marketing/sixteen build settings and two G3 literals. CLI/app compilation passed in 0.986/0.862 s; ordinary Debug/strict signature in 24.908/0.133 s and native CLI version in 0.626 s, normal exit 0/unforced. The .36.2/51 seven-artifact candidate binds the same 464 map. | Exact final document and source/wiki publication/readback/synchronization identities belong in external closeout receipts. Installed GUI/full web/all models/managed-adapter/other formats/Release/shipment remain open. |
+| Status protocol and model | Signed App/CLI v5 passed in 0.654/0.634 s; each produced four correlated responses/two tool frames, exact string 0.36.2/51 aliases, unchanged complete config and the exact 84-definition native catalog. Qwen qwen/qwen3.8-27b passed in 18.467 s: three actual Low responses, two selected status results fully written/correlated/verified/delivered/consumed, and a strict two-string version/build ACK. All native/outer exits were normal 0/unforced with complete EOF; source464 and 31 root guards matched. | Qwen was supplied only the two status definitions; native catalog parity is separate. Metadata consumption is not full web/all-model/GUI acceptance. Original v2 rejected preparation and v3/v4 overall NONPASSs remain preserved. |
+| Documentation and closeout | Initial G3 source/native each passed one method in 1.541/2.624 s; six status methods plus separately run G3 give seven distinct methods per route. Initial hygiene/whitespace passed in 0.661/0.138 s on the same source map. Current twelve-document status heads retain full preceding histories. | Repeated G3 adds no distinct coverage; final recheck/publication/readback/synchronization identities are external. No full-suite or broader completion claim. |
+
+The .36.1 candidate GUI attempt remains NONPASS after CUA transport failure;
+Projects GitHub persistence/reopen and Tools web execution are still unqualified.
+[Status qualification](docs/QUALIFICATION-STATUS.md). Complete prior phases follow.
+
 ## Instruction-package retained-document count correction
 
 Current target **0.36.1 (50)** enforces the existing 4,096-document catalog bound

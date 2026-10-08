@@ -1,5 +1,14 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.36.2`, build `51`. The correction adds
+build identity only to fresh status success payloads. No telemetry producer,
+delivery invariant, gauge, timer, audit format or resource owner changes.
+The focused source/native and signed App/CLI/Qwen status checks passed. These
+status/replay/schema checks are not performance or lifetime proof;
+[qualification status](QUALIFICATION-STATUS.md) retains the remaining gates.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Current source documentation targets `0.36.1`, build `50`. Instruction-package
 count validation changes at its existing owner; no telemetry producer, gauge,
 delivery, audit format, timer or lifetime repair is included. Source/native
@@ -487,6 +496,10 @@ autonomous continuity, long-duration resource budgets, and owner-deferred
 representative physical-hardware qualification remain open.
 
 ## Version
+
+Current source target: `0.36.2`; build: `51`.
+
+Preceding .36.1 version record (retained):
 
 Current source target: `0.36.1`; build: `50`.
 

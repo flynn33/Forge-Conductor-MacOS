@@ -1,5 +1,18 @@
 # Forge Conductor for macOS
 
+Current source target **0.36.2 (51)** corrects status build identity.
+Fresh successful `forge_status` and `get_forge_status` responses include
+string `build` from the same compiled authority as `version`. The shared MCP
+first-text and structured payloads carry that field. Stored historical completed
+results remain byte-for-byte unchanged and may omit `build`.
+The focused six source/native methods and signed candidate App/CLI/Qwen
+status checks passed. Initial document checks give seven distinct methods per
+route; [qualification status](docs/QUALIFICATION-STATUS.md) retains exact scope
+and external document/publication closeout boundaries.
+Installed GUI, full web, all models, installation and shipment remain open.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Current source target **0.36.1 (50)** corrects instruction-package admission:
 the final immutable snapshot may contain at most **4,096 retained documents**,
 including a ZIP container or package manifest. ZIPs with 4,095 regular members
@@ -844,8 +857,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.36.1** |
-| **Build** | **50** |
+| **Version** | **0.36.2** |
+| **Build** | **51** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -961,6 +974,10 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.36.2 (51)` for the status-build correction; see the latest phase above.
+
+Preceding .36.1 identity and qualification record (retained):
 
 The current target is `0.36.1 (50)` for the instruction-count correction; see the latest phase above.
 

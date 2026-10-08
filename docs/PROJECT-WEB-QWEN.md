@@ -1,5 +1,24 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.36.2 (51)** addresses the missing status build
+identity raised during model feedback. Both fresh successful status aliases
+return string `build` beside `version`; stored historical replay remains unchanged.
+Six focused source/native methods and signed candidate App/CLI status checks
+passed. Actual qwen/qwen3.8-27b completed three observed Low-mode responses,
+consuming the two actual status results and acknowledging string 0.36.2/51 in
+18.467 s. Only the two status definitions were supplied to these model calls;
+the separately verified 84-definition native catalog is not a model-wide
+advertisement or web-execution claim. Initial G3 gives seven distinct methods
+per route; exact document/publication identities belong in external receipts.
+The prior .36.1 GUI attempt remains NONPASS after
+CUA transport failed; project GitHub persistence/reopen and live web execution
+are still open. Installed .18.0/build 28 advertised 76 tools with all three web
+tools absent; the model's earlier 66-tool count remains contradicted.
+This metadata correction does not qualify full web, all models, installed GUI,
+managed-adapter, installation or shipment.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Current source target **0.36.0 (49)** adds bounded BMP to supplied-pixel
 `image_write`, preserving PNG/TIFF/JPEG/GIF/WebP. New-candidate Qwen BMP
 write/read consumption passed in 32.566 s, normal exit 0/unforced, with three

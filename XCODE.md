@@ -1,5 +1,22 @@
 # Forge Conductor — Xcode
 
+Current source version **0.36.2**, build **51** corrects shared status metadata.
+Existing product/test membership, workspace and signing remain unchanged.
+The six status/replay/catalog methods belong to **ForgeConductorTests** in the
+canonical **ForgeConductor** scheme; use that target in `-only-testing` selectors.
+Source/native six passed in 13.976/38.620 s, zero failures/skips, on the same
+464-input 08250288… map. CLI/app compilation passed in 0.986/0.862 s.
+Ordinary Debug/strict signature passed in 24.908/0.133 s; native CLI version
+passed in 0.626 s. The .36.2/51 candidate binds seven artifacts and that same
+source map. Signed App/CLI status and Qwen consumption checks passed.
+Initial G3 source/native one each passed in 1.541/2.624 s, giving matching
+six-plus-one unions of seven distinct methods per route. Initial hygiene and
+whitespace passed in 0.661/0.138 s; final document/publication identities belong
+in external closeout receipts. Repeated G3 does not add a distinct method.
+Native IDELaunchSession.m:395 DVTAssertions warning is retained.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Current source version **0.36.1**, build **50** is an instruction-count correction.
 Existing Core/test memberships, workspace, signing and deployment remain;
 project identity changes are 12 marketing/16 build values and two G3 literals.
@@ -991,7 +1008,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.36.1 (50)` for the instruction-count correction; BMP retains its qualified identity in its preceding phase record. Preceding .35 target record (retained): Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final-document G3 source/native one each and hygiene/whitespace passed, adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.36.2 (51)` for the status-build correction; candidate/runtime and delivery gates are recorded above. Preceding .36.1 target record (retained): Current source targets `0.36.1 (50)` for the instruction-count correction; BMP retains its qualified identity in its preceding phase record. Preceding .35 target record (retained): Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final-document G3 source/native one each and hygiene/whitespace passed, adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

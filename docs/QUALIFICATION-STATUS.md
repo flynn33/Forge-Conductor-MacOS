@@ -1,5 +1,67 @@
 # Version and qualification status
 
+Current source target **0.36.2, build 51** corrects build identity in fresh
+successful `forge_status`/`get_forge_status` responses. Both use the existing
+string `ForgeApp.buildVersion`; their inputs/tool names and historical completed
+replay remain unchanged. No installation or registration is changed.
+
+The missing-build baseline executed one method with four assertion failures in
+7.590 s, normal exit 1/unforced: both aliases omitted build in direct and MCP
+payloads. This original baseline remains **NONPASS**. After the one-field change,
+source/native passed the exact same six distinct methods in **13.976/38.620 s**,
+zero failures/skips, normal exit 0/unforced, on unchanged **464-input 08250288…
+maps**. The tests cover both direct/MCP aliases, resumed bootstrap, canonical
+catalog/schema parity and unchanged completed historical replay with zero
+executor dispatches. Every prior Core/Autonomy method/helper remains unchanged.
+Canonical native membership is **ForgeConductorTests**, scheme **ForgeConductor**.
+CLI/app compilation passed in **0.986/0.862 s**; ordinary Debug/strict signature
+in **24.908/0.133 s** and native CLI version in **0.626 s**, normal exit 0/unforced.
+Candidate f62ae18f… binds seven artifacts, actual bundle 0.36.2/51 and the same
+464-input source map. Native IDELaunchSession.m:395 DVTAssertions warning
+remains; no diagnostic-free claim follows.
+
+Signed candidate v5 App/CLI status checks passed in **0.654/0.634 s**.
+Each mode had **four correlated native responses/two tool frames**, exact
+string version/build in both aliases and matching first-text/structured values,
+complete config equality and exact **84-definition native catalog** parity.
+Actual **qwen/qwen3.8-27b** passed in **18.467 s**: three normal public-API
+responses with **three actual Low templates**, two selected status results
+fully written/correlated/verified/delivered/consumed by completed turns 1/2,
+and a strict two-string final ACK (`0.36.2`, `51`). Only the two status tool
+definitions were supplied to the model; native catalog parity is separate.
+Every native/outer mode exited normally 0/unforced with full EOF. The public
+observer was intentionally stopped, joined with EOF and exit 0, without forced
+kill. The root runtime readback **634b154c…** binds unchanged current **464**
+source inputs and **31** candidate/prior/protected guards.
+
+Initial-document G3 source/native each passed **one method in 1.541/2.624 s**;
+six status methods plus separately run G3 give **seven distinct methods per
+route**, not one seven-test invocation. Initial hygiene/whitespace passed in
+**0.661/0.138 s** (b3de07c0…); repeated G3 checks add no distinct coverage.
+Final document recheck and exact source/wiki publication/readback/synchronization
+identities belong in external closeout receipts; no future pass or commit
+identifier is asserted here. No full-suite result is claimed.
+
+Rejected v2 preparation retains its interpreter admission E1 (18,058,560-byte binary
+versus 1 MiB text cap) and was never executed. Actual v3 failed preflight on a
+stale prior-profile literal; actual v4 status/native results were correct but
+the overall run remained NONPASS because the fixture omitted default budget
+state and strict config equality failed. The fresh v5 fixture includes the
+observed default state while preserving full equality. These preparation/fixture
+failures are retained separately and are not product status failures.
+
+The earlier .36.1 candidate GUI attempt remains **NONPASS**: Doctor version/build
+and isolated home were observed, then CUA lost its native pipe; Projects
+persistence/reopen and Tools web execution were not qualified. Owned cleanup
+required TERM; protected/shared guards matched and owned suites were absent.
+Installed .18.0/build 28 and registrations retain their identities. Its actual
+76-tool/no-web observation is not replaced by the model's contradicted 66 count.
+Installed GUI, full web, all models, managed-adapter, other requested formats,
+Release and shipment remain open. Prior .36.1 source/wiki closeout is retained
+in its external c402bf05… receipt, separately from this correction.
+
+## Preceding 0.36.1 (50) instruction-count qualification
+
 Current source target **0.36.1, build 50** corrects the instruction-package
 retained-document count at the common owner before publication/queue mutation.
 The original two rejection tests failed normally in **12.245 s**, exit 1/unforced,
@@ -1853,6 +1915,10 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
+Current source target: **0.36.2, build 51**, supporting **macOS 26+**; focused status/replay methods passed and remaining gates are recorded above.
+
+Preceding .36.1 status sentence (retained):
+
 Current source target: **0.36.1, build 50**, supporting **macOS 26+**; instruction-count gates are recorded above and BMP retains its preceding scoped results.
 
 Preceding .35 status sentence (retained):
@@ -1883,6 +1949,10 @@ the detailed, source-bound receipts are in the
 [roadmap](../ROADMAP.md).
 
 ## Version and build agreement
+
+The current target is **0.36.2, build 51** for the status-build correction. Matching six source/native methods and CLI/app compilation passed; candidate/runtime, document and delivery gates are pending actual receipts.
+
+Preceding .36.1 agreement and qualification record (retained):
 
 The current target is **0.36.1, build 50** for the instruction-count correction. Current source/native queue tests and builds passed; initial-document G3 source/native one each and initial hygiene/whitespace passed. Exact source/wiki delivery remains pending.
 

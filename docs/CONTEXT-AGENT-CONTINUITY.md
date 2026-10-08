@@ -1,4 +1,14 @@
-# Context and agent continuity (v0.36.1)
+# Context and agent continuity (v0.36.2)
+
+Current source documentation targets 0.36.2 (51). Fresh status responses expose
+string build identity beside version. Resume bootstrap inputs and all handoff,
+successor/ACK/seal/project-generation contracts remain unchanged. Historical
+completed status replay preserves its original payload without enrichment.
+Matching six source/native methods and signed App/CLI/Qwen status checks passed;
+initial G3 gives seven distinct methods per route. No live rollover or installed
+GUI acceptance follows. See [qualification status](QUALIFICATION-STATUS.md).
+
+## Preceding 0.36.1 (50) instruction-count qualification
 
 Current source documentation targets 0.36.1 (50). Package admission now counts
 the retained ZIP container or manifest within the existing 4,096-document limit.

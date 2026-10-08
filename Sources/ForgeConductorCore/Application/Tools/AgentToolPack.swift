@@ -155,6 +155,7 @@ public struct AgentToolPack: ToolPackHandling {
         var payload: [String: Any] = [
             "ok": true,
             "version": ForgeApp.version,
+            "build": ForgeApp.buildVersion,
             "runtime": "swift",
             "home": app.paths.home.path,
             "client_id": clientID.rawValue,
